@@ -1266,9 +1266,16 @@ impl InProcessWebServer {
         match FileSettingsService::new(&durable_root).update(&body) {
             Ok(value) => {
                 if let Some(runtime_root) = &self.runtime_root {
-                    let automation = WorkflowEngine::with_durable_root(runtime_root, durable_root);
-                    if let Err(error) = automation.apply_runtime_settings() {
-                        return error_response(error);
+                    match self.current_target_root() {
+                        Ok(Some(target_root)) => {
+                            let automation =
+                                WorkflowEngine::with_target_root(runtime_root, target_root);
+                            if let Err(error) = automation.apply_runtime_settings() {
+                                return error_response(error);
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(error) => return error_response(error),
                     }
                 }
                 let value = self.with_runtime_settings(value);

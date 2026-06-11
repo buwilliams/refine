@@ -814,10 +814,10 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     let Some(runtime_root) = &server.runtime_root else {
         return Ok(());
     };
-    let Some(durable_root) = server.current_refine_dir()? else {
+    let Some(target_root) = server.current_target_root()? else {
         return Ok(());
     };
-    let automation = WorkflowEngine::with_durable_root(runtime_root, durable_root);
+    let automation = WorkflowEngine::with_target_root(runtime_root, target_root);
     let result = automation.evaluate_workflow();
     let refresh_result = server.refresh_projection_cache_after_mutation();
     result?;

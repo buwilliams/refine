@@ -87,7 +87,7 @@ fn test_cargo_integrations() -> Result<(), String> {
             .args([
                 "test",
                 "--test",
-                "cli_durable_root",
+                "cli_target_root",
                 "--test",
                 "production_binary_install",
                 "--",

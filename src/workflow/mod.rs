@@ -135,7 +135,7 @@ pub trait WorkflowAutomation {
 #[derive(Clone, Debug)]
 pub struct WorkflowEngine {
     pub runtime_root: PathBuf,
-    pub durable_root: Option<PathBuf>,
+    pub target_root: Option<PathBuf>,
 }
 
 impl WorkflowEngine {
@@ -143,23 +143,29 @@ impl WorkflowEngine {
         let runtime_root = runtime_root.into();
         Self {
             runtime_root,
-            durable_root: None,
+            target_root: None,
         }
     }
 
-    pub fn with_durable_root(
+    pub fn with_target_root(
         runtime_root: impl Into<PathBuf>,
-        durable_root: impl Into<PathBuf>,
+        target_root: impl Into<PathBuf>,
     ) -> Self {
         let runtime_root = runtime_root.into();
         Self {
             runtime_root,
-            durable_root: Some(durable_root.into()),
+            target_root: Some(target_root.into()),
         }
     }
 
     pub fn state_path(&self) -> PathBuf {
         self.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)
+    }
+
+    fn refine_dir(&self) -> Option<PathBuf> {
+        self.target_root
+            .as_ref()
+            .map(|target_root| target_root.join(".refine"))
     }
 
     pub fn load_state(&self) -> RefineResult<WorkflowAutomationState> {
@@ -174,8 +180,9 @@ impl WorkflowEngine {
 
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
         let mut policy = WorkflowPolicy::default();
-        if let Some(durable_root) = &self.durable_root {
-            let settings = FileSettingsService::new(durable_root).load()?;
+        if let Some(target_root) = &self.target_root {
+            let refine_dir = target_root.join(".refine");
+            let settings = FileSettingsService::new(&refine_dir).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
@@ -196,11 +203,8 @@ impl WorkflowEngine {
                 &[2],
             );
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
-            policy.target_app_id = durable_root
-                .parent()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| policy.target_app_id.clone());
-            policy.active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
+            policy.target_app_id = target_root.display().to_string();
+            policy.active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
         }
         Ok(policy)
     }
@@ -208,9 +212,9 @@ impl WorkflowEngine {
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
         let mut state = self.load_state()?;
         state.policy = self.policy()?;
-        let promoted = match &self.durable_root {
-            Some(durable_root) => match self.ensure_automation_running(&state) {
-                Ok(()) => self.promote_backlog_to_todo(durable_root)?,
+        let promoted = match self.refine_dir() {
+            Some(refine_dir) => match self.ensure_automation_running(&state) {
+                Ok(()) => self.promote_backlog_to_todo(&refine_dir)?,
                 Err(RefineError::Conflict(_)) => 0,
                 Err(error) => return Err(error),
             },
@@ -238,11 +242,11 @@ impl WorkflowEngine {
     }
 
     pub fn rollback_in_progress_gaps_to_todo(&self) -> RefineResult<usize> {
-        let Some(durable_root) = &self.durable_root else {
+        let Some(refine_dir) = self.refine_dir() else {
             return Ok(0);
         };
-        let snapshot = self.projection_snapshot(durable_root)?;
-        let active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
+        let snapshot = self.projection_snapshot(&refine_dir)?;
+        let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
         let gap_ids = snapshot
             .gaps
             .values()
@@ -255,7 +259,7 @@ impl WorkflowEngine {
         if gap_ids.is_empty() {
             return Ok(0);
         }
-        let work_items = FileWorkItemService::new(durable_root);
+        let work_items = FileWorkItemService::new(refine_dir);
         for gap_id in &gap_ids {
             work_items.rollback_in_progress_gap_to_todo(gap_id)?;
         }
@@ -404,8 +408,8 @@ impl WorkflowEngine {
         })
     }
 
-    fn projection_snapshot(&self, durable_root: &Path) -> RefineResult<ProjectionSnapshot> {
-        FileProjectStateStore::with_runtime_root(durable_root, &self.runtime_root)
+    fn projection_snapshot(&self, refine_dir: &Path) -> RefineResult<ProjectionSnapshot> {
+        FileProjectStateStore::with_runtime_root(refine_dir, &self.runtime_root)
             .load_or_refresh_projection(&self.runtime_root.join("cache"))
     }
 
@@ -444,15 +448,15 @@ impl WorkflowEngine {
         })
     }
 
-    fn promote_backlog_to_todo(&self, durable_root: &Path) -> RefineResult<usize> {
-        let settings = FileSettingsService::new(durable_root).load()?;
+    fn promote_backlog_to_todo(&self, refine_dir: &Path) -> RefineResult<usize> {
+        let settings = FileSettingsService::new(refine_dir).load()?;
         let threshold = setting_i64(&settings, "backlog_promote_after_seconds", 3600);
         if threshold < 0 {
             return Ok(0);
         }
-        let snapshot = self.projection_snapshot(durable_root)?;
-        let service = FileWorkItemService::new(durable_root);
-        let active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
+        let snapshot = self.projection_snapshot(refine_dir)?;
+        let service = FileWorkItemService::new(refine_dir);
+        let active_node_id = FileNodeRegistryService::new(refine_dir).active_node_id()?;
         let now = Utc::now();
         let mut promoted = 0;
         let mut candidates = snapshot
@@ -521,26 +525,21 @@ impl WorkflowEngine {
         execution_id: &str,
     ) -> RefineResult<WorkflowStepResult> {
         let claim = self.claim_by_id(claim_id)?;
-        let durable_root = self.durable_root.as_ref().ok_or_else(|| {
+        let target_root = self.target_root.as_ref().ok_or_else(|| {
             RefineError::InvalidInput(
-                "durable root is required to execute claimed workflow work".to_string(),
+                "target root is required to execute claimed workflow work".to_string(),
             )
         })?;
+        let refine_dir = target_root.join(".refine");
         let work_items = FileWorkItemService::with_projection_cache(
-            durable_root,
+            &refine_dir,
             self.runtime_root.join("cache"),
         );
         let round_idx = ensure_workflow_round(&work_items, &claim.gap_id)?;
-        let settings = FileSettingsService::new(durable_root).load()?;
-        let app_root = durable_root.parent().ok_or_else(|| {
-            RefineError::InvalidInput(
-                "durable root must be inside an attached target app".to_string(),
-            )
-        })?;
+        let settings = FileSettingsService::new(&refine_dir).load()?;
         let mut ctx = WorkflowContext::new(
             &self.runtime_root,
-            durable_root,
-            app_root,
+            target_root,
             claim,
             execution_id,
             round_idx,
@@ -712,15 +711,15 @@ impl WorkflowAutomation for WorkflowEngine {
         let policy = self.policy()?;
         state.policy = policy.clone();
         self.ensure_automation_running(&state)?;
-        let Some(durable_root) = &self.durable_root else {
+        let Some(refine_dir) = self.refine_dir() else {
             return Ok(state
                 .claims
                 .iter()
                 .filter(|claim| claim.state == WorkflowClaimState::Claimed)
                 .count());
         };
-        self.promote_backlog_to_todo(durable_root)?;
-        let snapshot = self.projection_snapshot(durable_root)?;
+        self.promote_backlog_to_todo(&refine_dir)?;
+        let snapshot = self.projection_snapshot(&refine_dir)?;
         let mut eligible = snapshot
             .gaps
             .values()
@@ -793,10 +792,10 @@ impl WorkflowAutomation for WorkflowEngine {
         if let Some(existing) = Self::active_claim(&state, gap_id) {
             return Ok(existing.claim_id.clone());
         }
-        let gap = if let Some(durable_root) = &self.durable_root {
-            let snapshot = self.projection_snapshot(durable_root)?;
+        let gap = if let Some(refine_dir) = self.refine_dir() {
+            let snapshot = self.projection_snapshot(&refine_dir)?;
             let gap = snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
-                RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
+                RefineError::NotFound(format!("Gap {gap_id} was not found in target state"))
             })?;
             if !Self::feature_claim_eligible(&snapshot, &gap) {
                 return Err(RefineError::Conflict(format!(
@@ -860,12 +859,12 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim {claim_id} is not claimed"
             )));
         }
-        if let Some(durable_root) = &self.durable_root {
+        if let Some(refine_dir) = self.refine_dir() {
             let policy = self.policy()?;
-            let snapshot = self.projection_snapshot(durable_root)?;
+            let snapshot = self.projection_snapshot(&refine_dir)?;
             let gap = snapshot.gaps.get(&claim.gap_id).ok_or_else(|| {
                 RefineError::NotFound(format!(
-                    "Gap {} was not found in durable state",
+                    "Gap {} was not found in target state",
                     claim.gap_id
                 ))
             })?;
@@ -1372,9 +1371,10 @@ mod tests {
     #[test]
     fn file_automation_promotes_todo_gaps_and_starts_executions() {
         let temp_root = unique_temp_dir("automation");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Queued", Some("GAP1"))
             .unwrap();
@@ -1385,7 +1385,7 @@ mod tests {
             .create_gap_summary("Backlog", Some("GAP2"))
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 1);
         assert_eq!(automation.promote().unwrap(), 0);
         let state = automation.load_state().unwrap();
@@ -1407,21 +1407,22 @@ mod tests {
     #[test]
     fn file_automation_auto_promotes_backlog_gaps_when_configured() {
         let temp_root = unique_temp_dir("automation-backlog-promote");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Instant Backlog", Some("GAP1"))
             .unwrap();
         work_items
             .create_gap_summary("Never Backlog", Some("GAP2"))
             .unwrap();
-        let settings = FileSettingsService::new(&durable_root);
+        let settings = FileSettingsService::new(&refine_dir);
         settings
             .update(&json!({"backlog_promote_after_seconds": "-1"}))
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 0);
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
@@ -1456,12 +1457,13 @@ mod tests {
     #[test]
     fn file_automation_uses_global_cap_for_single_node_defaults() {
         let temp_root = unique_temp_dir("automation-global-cap");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({"parallel_run_cap": 3}))
             .unwrap();
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         for id in ["GAP1", "GAP2", "GAP3", "GAP4"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
@@ -1472,7 +1474,7 @@ mod tests {
                 .unwrap();
         }
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 3);
         let state = automation.load_state().unwrap();
         assert_eq!(state.policy.global_limit, 3);
@@ -1495,12 +1497,13 @@ mod tests {
     #[test]
     fn file_automation_blocks_lower_priority_work_behind_higher_priority_gaps() {
         let temp_root = unique_temp_dir("automation-priority-band");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({"parallel_run_cap": 3}))
             .unwrap();
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         for (id, priority) in [("LOW", "low"), ("MEDIUM", "medium"), ("HIGH", "high")] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
@@ -1511,7 +1514,7 @@ mod tests {
                 .unwrap();
         }
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert!(automation.claim("MEDIUM").is_err());
         assert!(automation.claim("LOW").is_err());
         assert_eq!(automation.promote().unwrap(), 1);
@@ -1525,13 +1528,14 @@ mod tests {
     #[test]
     fn file_automation_applies_runtime_settings_without_waiting_for_automation() {
         let temp_root = unique_temp_dir("automation-apply-runtime-settings");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Instant Backlog", Some("GAP1"))
             .unwrap();
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "parallel_run_cap": 7,
                 "parallel_per_node_cap": 7,
@@ -1540,7 +1544,7 @@ mod tests {
             }))
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.apply_runtime_settings().unwrap(), 1);
         let state = automation.load_state().unwrap();
         assert_eq!(state.policy.global_limit, 7);
@@ -1558,15 +1562,16 @@ mod tests {
     #[test]
     fn file_automation_runtime_settings_skip_off_node_backlog_promotions() {
         let temp_root = unique_temp_dir("automation-runtime-settings-off-node");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({"backlog_promote_after_seconds": "0"}))
             .unwrap();
-        FileNodeRegistryService::new(&durable_root)
+        FileNodeRegistryService::new(&refine_dir)
             .create("remote-node")
             .unwrap();
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Local backlog", Some("LOCAL"))
             .unwrap();
@@ -1583,7 +1588,7 @@ mod tests {
             )
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.apply_runtime_settings().unwrap(), 1);
         assert_eq!(
             work_items.show_gap_summary("LOCAL").unwrap().gap.status,
@@ -1600,9 +1605,10 @@ mod tests {
     #[test]
     fn file_automation_enforces_configured_concurrency_limits() {
         let temp_root = unique_temp_dir("automation-limits");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "parallel_run_cap": 2,
                 "parallel_per_node_cap": 2,
@@ -1611,7 +1617,7 @@ mod tests {
                 "agent_cli": "smoke-ai"
             }))
             .unwrap();
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         for id in ["GAP1", "GAP2", "GAP3"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
@@ -1619,7 +1625,7 @@ mod tests {
                 .unwrap();
         }
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 1);
         assert_eq!(automation.promote().unwrap(), 0);
         let state = automation.load_state().unwrap();
@@ -1635,9 +1641,10 @@ mod tests {
     #[test]
     fn file_automation_enforces_active_node_ownership() {
         let temp_root = unique_temp_dir("automation-node-ownership");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Local", Some("LOCAL"))
             .unwrap();
@@ -1659,18 +1666,18 @@ mod tests {
                 },
             )
             .unwrap();
-        FileNodeRegistryService::new(&durable_root)
+        FileNodeRegistryService::new(&refine_dir)
             .create("remote-node")
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 1);
         assert!(automation.claim("REMOTE").is_err());
 
-        FileNodeRegistryService::new(&durable_root)
+        FileNodeRegistryService::new(&refine_dir)
             .activate("remote-node")
             .unwrap();
-        let remote_automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let remote_automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let remote_claim = remote_automation.claim("REMOTE").unwrap();
         let state = remote_automation.load_state().unwrap();
         assert!(
@@ -1686,16 +1693,17 @@ mod tests {
     #[test]
     fn file_automation_respects_feature_order_on_promote_claim_and_start() {
         let temp_root = unique_temp_dir("automation-feature-order");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let claim_runtime_root = temp_root.join("run/8081");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "parallel_run_cap": 2,
                 "parallel_per_node_cap": 2
             }))
             .unwrap();
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_feature_summary("Feature", Some("FEAT1"), None, None, None)
             .unwrap();
@@ -1707,7 +1715,7 @@ mod tests {
             work_items.assign_gap_to_feature("FEAT1", id).unwrap();
         }
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert!(automation.claim("SECOND").is_err());
         assert_eq!(automation.promote().unwrap(), 1);
         let state = automation.load_state().unwrap();
@@ -1723,8 +1731,7 @@ mod tests {
                 crate::tools::product::work_items::BulkGapUpdate::Status("done".to_string()),
             )
             .unwrap();
-        let claim_automation =
-            WorkflowEngine::with_durable_root(&claim_runtime_root, &durable_root);
+        let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
         let second_claim = claim_automation.claim("SECOND").unwrap();
         work_items
             .bulk_update_gaps(
@@ -1743,7 +1750,8 @@ mod tests {
     #[test]
     fn file_automation_fails_in_progress_gap_on_post_implementation_governance_violation() {
         let temp_root = unique_temp_dir("automation-governance");
-        let durable_root = temp_root.join(".refine");
+        let target_root = temp_root.clone();
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -1783,7 +1791,7 @@ mod tests {
         unsafe {
             std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
         }
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Governed implementation", Some("GAP1"))
             .unwrap();
@@ -1793,10 +1801,10 @@ mod tests {
         work_items
             .transition_gap_status("GAP1", GapStatus::Todo)
             .unwrap();
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&json!({"agent_cli": "smoke-ai"}))
             .unwrap();
-        FileGovernanceService::new(&durable_root)
+        FileGovernanceService::new(&refine_dir)
             .save(&json!({
                 "product": "A small app.",
                 "constitution": "Keep generated markers out of app.py.",
@@ -1804,7 +1812,7 @@ mod tests {
             }))
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let error = automation.evaluate_workflow().unwrap_err();
         assert!(error.to_string().contains("Do not append smoke markers."));
         let gap = work_items.show_gap_detail("GAP1").unwrap();
@@ -1870,9 +1878,10 @@ mod tests {
     #[test]
     fn file_automation_pause_moves_in_progress_gaps_back_to_todo() {
         let temp_root = unique_temp_dir("automation-pause-rollback");
-        let durable_root = temp_root.join("durable");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         work_items
             .create_gap_summary("Running work", Some("GAP1"))
             .unwrap();
@@ -1880,7 +1889,7 @@ mod tests {
             .transition_gap_status("GAP1", GapStatus::Todo)
             .unwrap();
 
-        let automation = WorkflowEngine::with_durable_root(&runtime_root, &durable_root);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let claim_id = automation.claim("GAP1").unwrap();
         automation.start_claim(&claim_id).unwrap();
         work_items

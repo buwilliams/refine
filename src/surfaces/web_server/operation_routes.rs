@@ -131,8 +131,8 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        let automation = match self.current_refine_dir() {
-            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
+        let automation = match self.current_target_root() {
+            Ok(Some(target_root)) => WorkflowEngine::with_target_root(runtime_root, target_root),
             Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
         };
@@ -151,8 +151,8 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        let automation = match self.current_refine_dir() {
-            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
+        let automation = match self.current_target_root() {
+            Ok(Some(target_root)) => WorkflowEngine::with_target_root(runtime_root, target_root),
             Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
         };
@@ -240,13 +240,13 @@ impl InProcessWebServer {
         match supervisor.set_background_processes_stopped(stopped) {
             Ok(_) => {
                 if stopped {
-                    let durable_root = match self.current_refine_dir() {
+                    let target_root = match self.current_target_root() {
                         Ok(root) => root,
                         Err(error) => return error_response(error),
                     };
-                    if let Some(durable_root) = durable_root
+                    if let Some(target_root) = target_root
                         && let Err(error) =
-                            WorkflowEngine::with_durable_root(runtime_root, durable_root)
+                            WorkflowEngine::with_target_root(runtime_root, target_root)
                                 .rollback_in_progress_gaps_to_todo()
                     {
                         return error_response(error);
@@ -276,13 +276,13 @@ impl InProcessWebServer {
         match supervisor.set_agents_paused(paused) {
             Ok(_) => {
                 if paused {
-                    let durable_root = match self.current_refine_dir() {
+                    let target_root = match self.current_target_root() {
                         Ok(root) => root,
                         Err(error) => return error_response(error),
                     };
-                    if let Some(durable_root) = durable_root
+                    if let Some(target_root) = target_root
                         && let Err(error) =
-                            WorkflowEngine::with_durable_root(runtime_root, durable_root)
+                            WorkflowEngine::with_target_root(runtime_root, target_root)
                                 .rollback_in_progress_gaps_to_todo()
                     {
                         return error_response(error);

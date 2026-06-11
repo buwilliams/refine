@@ -14,8 +14,7 @@ use crate::workflow::{WorkflowClaim, json_object, now_timestamp};
 
 pub struct WorkflowContext<'a> {
     pub runtime_root: &'a Path,
-    pub durable_root: &'a Path,
-    pub app_root: &'a Path,
+    pub target_root: &'a Path,
     pub claim_id: String,
     pub gap_id: String,
     pub provider: String,
@@ -35,8 +34,7 @@ pub struct WorkflowContext<'a> {
 impl<'a> WorkflowContext<'a> {
     pub fn new(
         runtime_root: &'a Path,
-        durable_root: &'a Path,
-        app_root: &'a Path,
+        target_root: &'a Path,
         claim: WorkflowClaim,
         execution_id: &'a str,
         round_idx: usize,
@@ -45,8 +43,7 @@ impl<'a> WorkflowContext<'a> {
     ) -> Self {
         Self {
             runtime_root,
-            durable_root,
-            app_root,
+            target_root,
             claim_id: claim.claim_id,
             gap_id: claim.gap_id,
             provider: claim.provider,
@@ -68,8 +65,12 @@ impl<'a> WorkflowContext<'a> {
         self.runtime_root
     }
 
-    pub fn durable_root(&self) -> &Path {
-        self.durable_root
+    pub fn target_root(&self) -> &Path {
+        self.target_root
+    }
+
+    pub fn refine_dir(&self) -> PathBuf {
+        self.target_root.join(".refine")
     }
 
     pub fn request_transition(&mut self, from: GapStatus, to: GapStatus) -> RefineResult<()> {
@@ -96,7 +97,7 @@ impl<'a> WorkflowContext<'a> {
         details
             .entry("execution_id".to_string())
             .or_insert_with(|| json!(self.execution_id));
-        FileLogService::new(self.durable_root).append_round_log(
+        FileLogService::new(self.refine_dir()).append_round_log(
             &self.gap_id,
             self.round_idx,
             LogEntry {

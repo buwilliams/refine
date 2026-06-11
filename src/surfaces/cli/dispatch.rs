@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use serde_json::{Value, json};
@@ -45,9 +45,9 @@ pub fn run() -> RefineResult<()> {
 
 pub fn dispatch(cli: Cli) -> RefineResult<()> {
     #[cfg(not(test))]
-    if let Some(path) = explicit_durable_root_path(&cli.command) {
+    if let Some(path) = explicit_target_root_path(&cli.command) {
         return Err(RefineError::InvalidInput(format!(
-            "direct --durable-root CLI dispatch is not supported in normal operation; use the daemon API for durable state mutations instead ({})",
+            "direct --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead ({})",
             path.display()
         )));
     }
@@ -158,23 +158,23 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::Doctor {
-                    durable_root,
+                    target_root,
                     runtime_root,
                     repo_root,
                 },
         } => {
             let report =
-                FileDiagnosticsService::new(durable_root, runtime_root, repo_root).doctor()?;
+                FileDiagnosticsService::new(target_root, runtime_root, repo_root).doctor()?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
             Ok(())
         }
         Commands::Node {
-            action:
-                NodeAction::List {
-                    durable_root: Some(durable_root),
-                },
+            action: NodeAction::List {
+                target_root: Some(target_root),
+            },
         } => {
-            let nodes = FileNodeRegistryService::new(durable_root).list_response()?;
+            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .list_response()?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
         }
@@ -182,10 +182,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 NodeAction::Show {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(durable_root).show(&id)?;
+            let node =
+                FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -193,10 +194,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 NodeAction::Create {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(durable_root).create(&id)?;
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .create(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -204,10 +206,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 NodeAction::Activate {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let nodes = FileNodeRegistryService::new(durable_root).activate(&id)?;
+            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .activate(&id)?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
         }
@@ -215,10 +218,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 NodeAction::Archive {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(durable_root).archive(&id)?;
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .archive(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -227,10 +231,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 NodeAction::Rename {
                     id,
                     name,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(durable_root).rename(&id, &name)?;
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .rename(&id, &name)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -238,10 +243,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 NodeAction::Settings {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let settings = FileNodeRegistryService::new(durable_root).settings(&id)?;
+            let settings = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+                .settings(&id)?;
             println!("{}", serde_json::to_string_pretty(&settings).unwrap());
             Ok(())
         }
@@ -250,28 +256,30 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 NodeAction::Transfer {
                     id,
                     item_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            FileNodeRegistryService::new(&durable_root).show(&id)?;
-            let result = FileWorkItemService::new(durable_root).bulk_transfer_gaps_to_node(
-                &id,
-                BulkGapSelection {
-                    filter: BulkGapFilter::default(),
-                    selected_ids: Some(vec![item_id]),
-                    exclude_ids: Vec::new(),
-                },
-            )?;
+            FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .bulk_transfer_gaps_to_node(
+                    &id,
+                    BulkGapSelection {
+                        filter: BulkGapFilter::default(),
+                        selected_ids: Some(vec![item_id]),
+                        exclude_ids: Vec::new(),
+                    },
+                )?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
         Commands::Cluster {
             action:
                 ClusterAction::List {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).list_response()?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .list_response()?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -279,10 +287,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::Show {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let node = FileClusterRegistryService::new(durable_root).show(&id)?;
+            let node = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -290,10 +299,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::AddNode {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).add_node(&id)?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .add_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -310,23 +320,24 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_app_path,
                     refine_port,
                     enabled,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).upsert_node(
-                &id,
-                ClusterNodeUpdate {
-                    display_name,
-                    ssh_host,
-                    ssh_user,
-                    ssh_identity_path,
-                    ssh_port: ssh_port.map(u64::from),
-                    refine_checkout,
-                    target_app_path,
-                    refine_port: refine_port.map(u64::from),
-                    enabled,
-                },
-            )?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .upsert_node(
+                    &id,
+                    ClusterNodeUpdate {
+                        display_name,
+                        ssh_host,
+                        ssh_user,
+                        ssh_identity_path,
+                        ssh_port: ssh_port.map(u64::from),
+                        refine_checkout,
+                        target_app_path,
+                        refine_port: refine_port.map(u64::from),
+                        enabled,
+                    },
+                )?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -334,10 +345,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::EnableNode {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).set_enabled(&id, true)?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .set_enabled(&id, true)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -345,10 +357,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::DisableNode {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).set_enabled(&id, false)?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .set_enabled(&id, false)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -356,10 +369,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::RemoveNode {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(durable_root).remove_node(&id)?;
+            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .remove_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -368,10 +382,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ClusterAction::Bootstrap {
                     id,
                     dry_run,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterRegistryService::new(durable_root)
+            let result = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
                 .bootstrap_node_response(&id, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -379,10 +393,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Cluster {
             action:
                 ClusterAction::Sync {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let sync = FileClusterRegistryService::new(durable_root).sync_response()?;
+            let sync = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .sync_response()?;
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
             Ok(())
         }
@@ -391,10 +406,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ClusterAction::Run {
                     id,
                     command,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterRegistryService::new(durable_root).run_remote(&id, &command)?;
+            let result = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                .run_remote(&id, &command)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
@@ -403,48 +419,47 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ClusterAction::Transfer {
                     id,
                     item_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let service = FileClusterRegistryService::new(&durable_root);
+            let service = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root));
             service.transfer(&item_id, &id)?;
-            let result = FileWorkItemService::new(durable_root).bulk_transfer_gaps_to_node(
-                &id,
-                BulkGapSelection {
-                    filter: BulkGapFilter::default(),
-                    selected_ids: Some(vec![item_id]),
-                    exclude_ids: Vec::new(),
-                },
-            )?;
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .bulk_transfer_gaps_to_node(
+                    &id,
+                    BulkGapSelection {
+                        filter: BulkGapFilter::default(),
+                        selected_ids: Some(vec![item_id]),
+                        exclude_ids: Vec::new(),
+                    },
+                )?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
         Commands::Cluster {
             action:
                 ClusterAction::Maintenance {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
             let maintenance =
-                FileClusterRegistryService::new(durable_root).maintenance_response()?;
+                FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+                    .maintenance_response()?;
             println!("{}", serde_json::to_string_pretty(&maintenance).unwrap());
             Ok(())
         }
         Commands::Log {
-            action:
-                LogAction::List {
-                    durable_root,
-                    limit,
-                },
+            action: LogAction::List { target_root, limit },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
                 print_json(&json!({
                     "entries": response.get("activity").cloned().unwrap_or_default()
                 }));
                 return Ok(());
             }
-            let entries = FileActivityService::new(durable_root).recent(limit)?;
+            let entries =
+                FileActivityService::new(refine_dir_for_target_root(&target_root)).recent(limit)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries})).unwrap()
@@ -452,13 +467,9 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Log {
-            action:
-                LogAction::Tail {
-                    durable_root,
-                    limit,
-                },
+            action: LogAction::Tail { target_root, limit },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
                 print_json(&json!({
                     "entries": response.get("activity").cloned().unwrap_or_default(),
@@ -466,7 +477,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }));
                 return Ok(());
             }
-            let entries = FileActivityService::new(durable_root).recent(limit)?;
+            let entries =
+                FileActivityService::new(refine_dir_for_target_root(&target_root)).recent(limit)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries, "tail": true})).unwrap()
@@ -474,9 +486,9 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Log {
-            action: LogAction::Show { id, durable_root },
+            action: LogAction::Show { id, target_root },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let response = daemon_json("GET", "/activity?limit=1000", None)?;
                 let Some(entry) = response
                     .get("activity")
@@ -495,7 +507,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 print_json(&json!({ "entry": entry }));
                 return Ok(());
             }
-            let service = FileActivityService::new(durable_root);
+            let service = FileActivityService::new(refine_dir_for_target_root(&target_root));
             let limit = service.count()?.max(1);
             let Some(entry) = service
                 .query(limit, 0, None, None, None, None, None)?
@@ -516,7 +528,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 LogAction::Query {
                     q,
-                    durable_root,
+                    target_root,
                     limit,
                     offset,
                     gap_id,
@@ -525,7 +537,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     actor,
                 },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let mut query = vec![
                     format!("limit={limit}"),
                     format!("offset={offset}"),
@@ -549,15 +561,16 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }));
                 return Ok(());
             }
-            let entries = FileActivityService::new(durable_root).query(
-                limit,
-                offset,
-                gap_id.as_deref(),
-                severity.as_deref(),
-                category.as_deref(),
-                actor.as_deref(),
-                Some(&q),
-            )?;
+            let entries = FileActivityService::new(refine_dir_for_target_root(&target_root))
+                .query(
+                    limit,
+                    offset,
+                    gap_id.as_deref(),
+                    severity.as_deref(),
+                    category.as_deref(),
+                    actor.as_deref(),
+                    Some(&q),
+                )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries})).unwrap()
@@ -567,10 +580,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Log {
             action:
                 LogAction::Export {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let service = FileActivityService::new(durable_root);
+            let service = FileActivityService::new(refine_dir_for_target_root(&target_root));
             let limit = service.count()?;
             let entries = if limit == 0 {
                 Vec::new()
@@ -586,7 +599,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Log {
-            action: LogAction::Export { durable_root: None },
+            action: LogAction::Export { target_root: None },
         } => {
             let response = daemon_json("GET", "/activity?limit=1000", None)?;
             let entries = response.get("activity").cloned().unwrap_or_default();
@@ -597,13 +610,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Log {
             action:
                 LogAction::Bundle {
-                    durable_root,
+                    target_root,
                     runtime_root,
                     repo_root,
                     redact_secrets,
                 },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let response = daemon_json(
                     "POST",
                     "/diagnostics/support-bundle",
@@ -612,8 +625,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 print_json(&response);
                 return Ok(());
             }
-            let bundle = FileSupportBundleService::new(durable_root, runtime_root, repo_root)
-                .export(redact_secrets)?;
+            let bundle = FileSupportBundleService::new(
+                refine_dir_for_target_root(&target_root),
+                runtime_root,
+                repo_root,
+            )
+            .export(redact_secrets)?;
             println!("{}", serde_json::to_string_pretty(&bundle).unwrap());
             Ok(())
         }
@@ -762,10 +779,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ProjectAction::Status {
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root).status()?;
+            let status = FileProjectRegistryService::new(runtime_root, target_root).status()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -774,10 +791,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ProjectAction::Attach {
                     path,
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root)
+            let status = FileProjectRegistryService::new(runtime_root, target_root)
                 .attach_with_migration(&path)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
@@ -787,10 +804,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ProjectAction::Switch {
                     name,
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root)
+            let status = FileProjectRegistryService::new(runtime_root, target_root)
                 .switch_with_migration(&name)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
@@ -799,10 +816,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ProjectAction::Detach {
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root).detach()?;
+            let status = FileProjectRegistryService::new(runtime_root, target_root).detach()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -812,10 +829,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     name,
                     path,
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let registry = FileProjectRegistryService::new(runtime_root, durable_root)
+            let registry = FileProjectRegistryService::new(runtime_root, target_root)
                 .register_path(Some(&name), &path, false)?;
             println!("{}", serde_json::to_string_pretty(&registry).unwrap());
             Ok(())
@@ -828,10 +845,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     name,
                     make_current,
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root).clone_app(
+            let status = FileProjectRegistryService::new(runtime_root, target_root).clone_app(
                 &source,
                 &destination,
                 name.as_deref(),
@@ -845,23 +862,23 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ProjectAction::Remove {
                     name,
                     runtime_root,
-                    durable_root,
+                    target_root,
                 },
         } => {
             let registry =
-                FileProjectRegistryService::new(runtime_root, durable_root).remove(&name)?;
+                FileProjectRegistryService::new(runtime_root, target_root).remove(&name)?;
             println!("{}", serde_json::to_string_pretty(&registry).unwrap());
             Ok(())
         }
         Commands::Project {
             action:
                 ProjectAction::Migrate {
-                    durable_root,
+                    target_root,
                     runtime_root,
                 },
         } => {
             let report =
-                FileProjectRegistryService::new(runtime_root, durable_root).migrate_current()?;
+                FileProjectRegistryService::new(runtime_root, target_root).migrate_current()?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::to_value(report).unwrap()).unwrap()
@@ -871,30 +888,31 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Project {
             action:
                 ProjectAction::Doctor {
-                    durable_root,
+                    target_root,
                     runtime_root,
                     repo_root,
                 },
         } => {
             let report =
-                FileDiagnosticsService::new(durable_root, runtime_root, repo_root).doctor()?;
+                FileDiagnosticsService::new(target_root, runtime_root, repo_root).doctor()?;
             println!("{}", serde_json::to_string_pretty(&report).unwrap());
             Ok(())
         }
         Commands::Project {
             action:
                 ProjectAction::Sync {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     cache_dir,
                 },
         } => {
+            let refine_dir = refine_dir_for_target_root(&target_root);
             let store = cache_dir
                 .as_ref()
                 .and_then(|cache_dir| cache_dir.parent())
                 .map(|runtime_root| {
-                    FileProjectStateStore::with_runtime_root(&durable_root, runtime_root)
+                    FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root)
                 })
-                .unwrap_or_else(|| FileProjectStateStore::new(&durable_root));
+                .unwrap_or_else(|| FileProjectStateStore::new(&refine_dir));
             let snapshot = store.rebuild_projection()?;
             if let Some(cache_dir) = &cache_dir {
                 store.persist_projection_snapshot(&cache_dir, &snapshot)?;
@@ -914,7 +932,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Project {
             action: ProjectAction::Sync {
-                durable_root: None, ..
+                target_root: None, ..
             },
         } => {
             let response = daemon_json("POST", "/cache/rebuild", None)?;
@@ -925,12 +943,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Create {
                     name,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     id,
                 },
         } => {
-            let gap =
-                FileWorkItemService::new(durable_root).create_gap_summary(&name, id.as_deref())?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .create_gap_summary(&name, id.as_deref())?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -938,12 +956,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Gap {
-            action:
-                GapAction::List {
-                    durable_root: Some(durable_root),
-                },
+            action: GapAction::List {
+                target_root: Some(target_root),
+            },
         } => {
-            let gaps: Vec<_> = FileWorkItemService::new(durable_root)
+            let gaps: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
                 .list_gap_summaries()?
                 .into_iter()
                 .map(|gap| gap.gap)
@@ -958,10 +975,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Show {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).show_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .show_gap_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -972,18 +990,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Edit {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     name,
                     priority,
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).update_gap_metadata_summary(
-                &id,
-                name.as_deref(),
-                priority.as_deref(),
-                None,
-                None,
-            )?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .update_gap_metadata_summary(
+                    &id,
+                    name.as_deref(),
+                    priority.as_deref(),
+                    None,
+                    None,
+                )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -995,12 +1014,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 GapAction::Note {
                     id,
                     body,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     author,
                 },
         } => {
-            let gap =
-                FileWorkItemService::new(durable_root).add_gap_note_summary(&id, &author, &body)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .add_gap_note_summary(&id, &author, &body)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1013,10 +1032,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     id,
                     note_id,
                     body,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
             let detail = service.show_gap_detail(&id)?;
             let notes = edit_gap_note_values(gap_notes_from_detail(&detail), &note_id, &body)?;
             let gap = service.replace_gap_notes_summary(&id, &notes)?;
@@ -1031,10 +1050,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 GapAction::NoteDelete {
                     id,
                     note_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
             let detail = service.show_gap_detail(&id)?;
             let notes = delete_gap_note_values(gap_notes_from_detail(&detail), &note_id)?;
             let gap = service.replace_gap_notes_summary(&id, &notes)?;
@@ -1048,14 +1067,14 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Round {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     reporter,
                     actual,
                     target,
                     edit_latest,
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
             let gap = if edit_latest {
                 service.edit_latest_gap_round_summary(
                     &id,
@@ -1098,10 +1117,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Delete {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(durable_root).delete_gap_record(&id)?;
+            FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .delete_gap_record(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"deleted": true, "id": id})).unwrap()
@@ -1112,10 +1132,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Cancel {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).cancel_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .cancel_gap_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1126,10 +1147,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Start {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).start_gap_workflow(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .start_gap_workflow(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1140,11 +1162,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Retry {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     stage,
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
             let gap = match stage.as_str() {
                 "quality" | "qa" => service.retry_gap_quality_summary(&id)?,
                 "merge" => service.retry_gap_merge_summary(&id)?,
@@ -1166,10 +1188,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Verify {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).verify_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .verify_gap_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1180,10 +1203,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Merge {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).merge_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .merge_gap_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1194,10 +1218,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::Undo {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(durable_root).undo_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .undo_gap_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
@@ -1209,11 +1234,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 GapAction::AssignFeature {
                     id,
                     feature_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature =
-                FileWorkItemService::new(durable_root).assign_gap_to_feature(&feature_id, &id)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .assign_gap_to_feature(&feature_id, &id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1229,10 +1254,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 GapAction::RemoveFeature {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
             let current = service.show_gap_summary(&id)?;
             let Some(feature_id) = current.gap.feature_id.clone() else {
                 return Err(
@@ -1257,19 +1282,20 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 FeatureAction::Create {
                     name,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     id,
                     description,
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(durable_root).create_feature_summary(
-                &name,
-                id.as_deref(),
-                description.as_deref(),
-                reporter.as_deref(),
-                None,
-            )?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .create_feature_summary(
+                    &name,
+                    id.as_deref(),
+                    description.as_deref(),
+                    reporter.as_deref(),
+                    None,
+                )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1285,19 +1311,20 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 FeatureAction::Edit {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                     name,
                     description,
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(durable_root).update_feature_metadata_summary(
-                &id,
-                name.as_deref(),
-                description.as_deref(),
-                reporter.as_deref(),
-                None,
-            )?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .update_feature_metadata_summary(
+                    &id,
+                    name.as_deref(),
+                    description.as_deref(),
+                    reporter.as_deref(),
+                    None,
+                )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1312,20 +1339,21 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Feature {
             action:
                 FeatureAction::List {
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let features: Vec<_> = FileWorkItemService::new(durable_root)
-                .list_feature_summaries()?
-                .into_iter()
-                .map(|feature| {
-                    json!({
-                        "feature": feature.feature,
-                        "gap_ids": feature.gap_ids,
-                        "rollup": feature.rollup
+            let features: Vec<_> =
+                FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                    .list_feature_summaries()?
+                    .into_iter()
+                    .map(|feature| {
+                        json!({
+                            "feature": feature.feature,
+                            "gap_ids": feature.gap_ids,
+                            "rollup": feature.rollup
+                        })
                     })
-                })
-                .collect();
+                    .collect();
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"features": features})).unwrap()
@@ -1336,10 +1364,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 FeatureAction::Show {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(durable_root).show_feature_summary(&id)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .show_feature_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1356,11 +1385,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 FeatureAction::AddGap {
                     id,
                     gap_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature =
-                FileWorkItemService::new(durable_root).assign_gap_to_feature(&id, &gap_id)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .assign_gap_to_feature(&id, &gap_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1377,11 +1406,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 FeatureAction::RemoveGap {
                     id,
                     gap_id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature =
-                FileWorkItemService::new(durable_root).remove_gap_from_feature(&id, &gap_id)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .remove_gap_from_feature(&id, &gap_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1399,10 +1428,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     id,
                     gap_id,
                     order,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(durable_root)
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
                 .reorder_gap_in_feature(&id, &gap_id, order)?;
             println!(
                 "{}",
@@ -1420,7 +1449,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 FeatureAction::Move {
                     id,
                     target,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
             let Some(target) = GapStatus::parse_wire(&target) else {
@@ -1430,8 +1459,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     ),
                 );
             };
-            let feature =
-                FileWorkItemService::new(durable_root).move_feature_workflow(&id, target)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .move_feature_workflow(&id, target)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1447,10 +1476,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 FeatureAction::Cancel {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(durable_root).cancel_feature_summary(&id)?;
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .cancel_feature_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
@@ -1466,10 +1496,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 FeatureAction::Delete {
                     id,
-                    durable_root: Some(durable_root),
+                    target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(durable_root).delete_feature_record(&id)?;
+            FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .delete_feature_record(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"deleted": true, "id": id})).unwrap()
@@ -1479,7 +1510,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Feature {
             action:
                 FeatureAction::Import {
-                    durable_root,
+                    target_root,
                     text,
                     file,
                     csv,
@@ -1487,7 +1518,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     feature_id,
                 },
         } => {
-            if skipped_durable_root(&durable_root) {
+            if skipped_target_root(&target_root) {
                 let import = FileImportService::new(PathBuf::new());
                 let source = if let Some(file) = file {
                     fs::read_to_string(&file).map_err(|error| {
@@ -1525,7 +1556,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 print_json(&response);
                 return Ok(());
             }
-            let service = FileImportService::new(durable_root);
+            let service = FileImportService::new(refine_dir_for_target_root(&target_root));
             let result = if let Some(file) = file {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
             } else {
@@ -1589,11 +1620,12 @@ fn run_system_start(
     let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
     let snapshot = if let Some(client_repo) = project_status.client_repo {
         eprintln!("refine: warming project cache for {client_repo}");
-        let durable_root = PathBuf::from(client_repo).join(".refine");
+        let target_root = PathBuf::from(client_repo);
+        let refine_dir = refine_dir_for_target_root(&target_root);
         let cache_root = cache_dir
             .clone()
             .unwrap_or_else(|| port_runtime_root.join("cache"));
-        let store = FileProjectStateStore::with_runtime_root(&durable_root, &port_runtime_root);
+        let store = FileProjectStateStore::with_runtime_root(&refine_dir, &port_runtime_root);
         store.load_or_refresh_projection(&cache_root)?
     } else {
         eprintln!("refine: no active project; using empty project cache");
@@ -1701,7 +1733,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
     let response = match action {
         GapAction::Create {
             name,
-            durable_root: None,
+            target_root: None,
             id,
         } => daemon_json(
             "POST",
@@ -1711,16 +1743,14 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
                 "id": id
             })),
         )?,
-        GapAction::List { durable_root: None } => {
-            daemon_json("GET", "/work/gaps?limit=1000", None)?
-        }
+        GapAction::List { target_root: None } => daemon_json("GET", "/work/gaps?limit=1000", None)?,
         GapAction::Show {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?,
         GapAction::Edit {
             id,
-            durable_root: None,
+            target_root: None,
             name,
             priority,
         } => daemon_json(
@@ -1734,7 +1764,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         GapAction::Note {
             id,
             body,
-            durable_root: None,
+            target_root: None,
             author,
         } => daemon_json(
             "POST",
@@ -1748,7 +1778,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
             id,
             note_id,
             body,
-            durable_root: None,
+            target_root: None,
         } => {
             let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
             let notes =
@@ -1762,7 +1792,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         GapAction::NoteDelete {
             id,
             note_id,
-            durable_root: None,
+            target_root: None,
         } => {
             let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
             let notes = delete_gap_note_values(gap_notes_from_detail(&detail["gap"]), &note_id)?;
@@ -1774,7 +1804,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         }
         GapAction::Round {
             id,
-            durable_root: None,
+            target_root: None,
             reporter,
             actual,
             target,
@@ -1798,7 +1828,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         }
         GapAction::Start {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/gaps/{}/start", path_segment(&id)),
@@ -1806,7 +1836,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::Cancel {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/gaps/{}/cancel", path_segment(&id)),
@@ -1814,7 +1844,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::Retry {
             id,
-            durable_root: None,
+            target_root: None,
             stage,
         } => {
             let action = if stage.trim().eq_ignore_ascii_case("merge") {
@@ -1830,7 +1860,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         }
         GapAction::Verify {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/gaps/{}/verify", path_segment(&id)),
@@ -1838,7 +1868,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::Merge {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/gaps/{}/merge", path_segment(&id)),
@@ -1846,7 +1876,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::Undo {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/gaps/{}/undo", path_segment(&id)),
@@ -1854,12 +1884,12 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::Delete {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json("DELETE", &format!("/work/gaps/{}", path_segment(&id)), None)?,
         GapAction::AssignFeature {
             id,
             feature_id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!(
@@ -1871,7 +1901,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         )?,
         GapAction::RemoveFeature {
             id,
-            durable_root: None,
+            target_root: None,
         } => {
             let current = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
             let feature_id = current
@@ -1905,7 +1935,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
     let response = match action {
         FeatureAction::Create {
             name,
-            durable_root: None,
+            target_root: None,
             id,
             description,
             reporter,
@@ -1919,12 +1949,12 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
                 "reporter": reporter
             })),
         )?,
-        FeatureAction::List { durable_root: None } => {
+        FeatureAction::List { target_root: None } => {
             daemon_json("GET", "/work/features?limit=1000", None)?
         }
         FeatureAction::Show {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "GET",
             &format!("/work/features/{}", path_segment(&id)),
@@ -1932,7 +1962,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         )?,
         FeatureAction::Edit {
             id,
-            durable_root: None,
+            target_root: None,
             name,
             description,
             reporter,
@@ -1948,7 +1978,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         FeatureAction::AddGap {
             id,
             gap_id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!(
@@ -1961,7 +1991,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         FeatureAction::RemoveGap {
             id,
             gap_id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "DELETE",
             &format!(
@@ -1975,7 +2005,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
             id,
             gap_id,
             order,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!(
@@ -1988,7 +2018,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         FeatureAction::Move {
             id,
             target,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/features/{}/move", path_segment(&id)),
@@ -1996,7 +2026,7 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         )?,
         FeatureAction::Cancel {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/work/features/{}/cancel", path_segment(&id)),
@@ -2004,20 +2034,20 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
         )?,
         FeatureAction::Delete {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "DELETE",
             &format!("/work/features/{}", path_segment(&id)),
             None,
         )?,
         FeatureAction::Import {
-            durable_root,
+            target_root,
             text,
             file,
             csv,
             reporter,
             feature_id,
-        } if skipped_durable_root(&durable_root) => {
+        } if skipped_target_root(&target_root) => {
             let source = if let Some(file) = file {
                 fs::read_to_string(&file).map_err(|error| {
                     RefineError::Io(format!(
@@ -2103,26 +2133,20 @@ fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
 #[cfg(not(test))]
 fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
     let response = match action {
-        LogAction::List {
-            durable_root,
-            limit,
-        } if skipped_durable_root(&durable_root) => {
+        LogAction::List { target_root, limit } if skipped_target_root(&target_root) => {
             let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
             json!({
                 "entries": response.get("activity").cloned().unwrap_or_default()
             })
         }
-        LogAction::Tail {
-            durable_root,
-            limit,
-        } if skipped_durable_root(&durable_root) => {
+        LogAction::Tail { target_root, limit } if skipped_target_root(&target_root) => {
             let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
             json!({
                 "entries": response.get("activity").cloned().unwrap_or_default(),
                 "tail": true
             })
         }
-        LogAction::Show { id, durable_root } if skipped_durable_root(&durable_root) => {
+        LogAction::Show { id, target_root } if skipped_target_root(&target_root) => {
             let response = daemon_json("GET", "/activity?limit=1000", None)?;
             let Some(entry) = response
                 .get("activity")
@@ -2142,14 +2166,14 @@ fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
         }
         LogAction::Query {
             q,
-            durable_root,
+            target_root,
             limit,
             offset,
             gap_id,
             severity,
             category,
             actor,
-        } if skipped_durable_root(&durable_root) => {
+        } if skipped_target_root(&target_root) => {
             let mut query = vec![
                 format!("limit={limit}"),
                 format!("offset={offset}"),
@@ -2172,17 +2196,17 @@ fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
                 "entries": response.get("activity").cloned().unwrap_or_default()
             })
         }
-        LogAction::Export { durable_root: None } => {
+        LogAction::Export { target_root: None } => {
             let response = daemon_json("GET", "/activity?limit=1000", None)?;
             let entries = response.get("activity").cloned().unwrap_or_default();
             let exported = entries.as_array().map(Vec::len).unwrap_or_default();
             json!({"entries": entries, "exported": exported})
         }
         LogAction::Bundle {
-            durable_root,
+            target_root,
             redact_secrets,
             ..
-        } if skipped_durable_root(&durable_root) => daemon_json(
+        } if skipped_target_root(&target_root) => daemon_json(
             "POST",
             "/diagnostics/support-bundle",
             Some(json!({ "redact_secrets": redact_secrets })),
@@ -2245,10 +2269,10 @@ fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
 
 fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
     let response = match action {
-        NodeAction::List { durable_root: None } => daemon_json("GET", "/nodes", None)?,
+        NodeAction::List { target_root: None } => daemon_json("GET", "/nodes", None)?,
         NodeAction::Show {
             id,
-            durable_root: None,
+            target_root: None,
         } => {
             let nodes = daemon_json("GET", "/nodes", None)?;
             let active_node_id = nodes
@@ -2272,15 +2296,15 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
         }
         NodeAction::Create {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json("POST", "/nodes", Some(json!({ "id": id })))?,
         NodeAction::Activate {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json("POST", "/nodes/activate", Some(json!({ "node_id": id })))?,
         NodeAction::Archive {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/nodes/{}", path_segment(&id)),
@@ -2289,7 +2313,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
         NodeAction::Rename {
             id,
             name,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/nodes/{}", path_segment(&id)),
@@ -2297,7 +2321,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
         )?,
         NodeAction::Settings {
             id,
-            durable_root: None,
+            target_root: None,
         } => {
             let nodes = daemon_json("GET", "/nodes", None)?;
             let exists = nodes
@@ -2320,7 +2344,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
         NodeAction::Transfer {
             id,
             item_id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             "/nodes/transfer-gaps",
@@ -2342,10 +2366,10 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
 
 fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
     let response = match action {
-        ClusterAction::List { durable_root: None } => daemon_json("GET", "/cluster", None)?,
+        ClusterAction::List { target_root: None } => daemon_json("GET", "/cluster", None)?,
         ClusterAction::Show {
             id,
-            durable_root: None,
+            target_root: None,
         } => {
             let cluster = daemon_json("GET", "/cluster", None)?;
             let node = cluster
@@ -2362,7 +2386,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         }
         ClusterAction::AddNode {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json("POST", "/cluster/nodes", Some(json!({ "id": id })))?,
         ClusterAction::EditNode {
             id,
@@ -2375,7 +2399,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
             target_app_path,
             refine_port,
             enabled,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/cluster/nodes/{}", path_segment(&id)),
@@ -2393,7 +2417,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         )?,
         ClusterAction::EnableNode {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/cluster/nodes/{}", path_segment(&id)),
@@ -2401,7 +2425,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         )?,
         ClusterAction::DisableNode {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/cluster/nodes/{}", path_segment(&id)),
@@ -2409,7 +2433,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         )?,
         ClusterAction::RemoveNode {
             id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "DELETE",
             &format!("/cluster/nodes/{}", path_segment(&id)),
@@ -2418,7 +2442,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         ClusterAction::Bootstrap {
             id,
             dry_run,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/cluster/nodes/{}/bootstrap", path_segment(&id)),
@@ -2427,7 +2451,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         ClusterAction::Run {
             id,
             command,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/cluster/nodes/{}/run", path_segment(&id)),
@@ -2436,13 +2460,13 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         ClusterAction::Transfer {
             id,
             item_id,
-            durable_root: None,
+            target_root: None,
         } => daemon_json(
             "POST",
             &format!("/cluster/nodes/{}/transfer", path_segment(&id)),
             Some(json!({ "item_id": item_id })),
         )?,
-        ClusterAction::Maintenance { durable_root: None } => {
+        ClusterAction::Maintenance { target_root: None } => {
             let cluster = daemon_json("GET", "/cluster", None)?;
             json!({
                 "ok": true,
@@ -2453,7 +2477,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
                 "cluster": cluster
             })
         }
-        ClusterAction::Sync { durable_root: None } => {
+        ClusterAction::Sync { target_root: None } => {
             let cluster = daemon_json("GET", "/cluster", None)?;
             let synced = cluster
                 .get("nodes")
@@ -2680,94 +2704,98 @@ fn delete_gap_note_values(notes: Vec<Value>, note_id: &str) -> RefineResult<Vec<
     Ok(next)
 }
 
-fn skipped_durable_root(path: &PathBuf) -> bool {
+fn skipped_target_root(path: &PathBuf) -> bool {
     path.as_os_str().is_empty()
 }
 
-pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf> {
+fn refine_dir_for_target_root(target_root: &Path) -> PathBuf {
+    target_root.join(".refine")
+}
+
+pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
         Commands::Project { action } => match action {
-            ProjectAction::Status { durable_root, .. }
-            | ProjectAction::Attach { durable_root, .. }
-            | ProjectAction::Switch { durable_root, .. }
-            | ProjectAction::Detach { durable_root, .. }
-            | ProjectAction::Register { durable_root, .. }
-            | ProjectAction::Clone { durable_root, .. }
-            | ProjectAction::Remove { durable_root, .. }
-            | ProjectAction::Migrate { durable_root, .. }
-            | ProjectAction::Sync { durable_root, .. }
-            | ProjectAction::Doctor { durable_root, .. } => durable_root.as_ref(),
+            ProjectAction::Status { target_root, .. }
+            | ProjectAction::Attach { target_root, .. }
+            | ProjectAction::Switch { target_root, .. }
+            | ProjectAction::Detach { target_root, .. }
+            | ProjectAction::Register { target_root, .. }
+            | ProjectAction::Clone { target_root, .. }
+            | ProjectAction::Remove { target_root, .. }
+            | ProjectAction::Migrate { target_root, .. }
+            | ProjectAction::Sync { target_root, .. }
+            | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
         },
         Commands::Gap { action } => match action {
-            GapAction::Create { durable_root, .. }
-            | GapAction::List { durable_root }
-            | GapAction::Show { durable_root, .. }
-            | GapAction::Edit { durable_root, .. }
-            | GapAction::Note { durable_root, .. }
-            | GapAction::NoteEdit { durable_root, .. }
-            | GapAction::NoteDelete { durable_root, .. }
-            | GapAction::Round { durable_root, .. }
-            | GapAction::Start { durable_root, .. }
-            | GapAction::Cancel { durable_root, .. }
-            | GapAction::Retry { durable_root, .. }
-            | GapAction::Verify { durable_root, .. }
-            | GapAction::Merge { durable_root, .. }
-            | GapAction::Undo { durable_root, .. }
-            | GapAction::Delete { durable_root, .. }
-            | GapAction::AssignFeature { durable_root, .. }
-            | GapAction::RemoveFeature { durable_root, .. } => durable_root.as_ref(),
+            GapAction::Create { target_root, .. }
+            | GapAction::List { target_root }
+            | GapAction::Show { target_root, .. }
+            | GapAction::Edit { target_root, .. }
+            | GapAction::Note { target_root, .. }
+            | GapAction::NoteEdit { target_root, .. }
+            | GapAction::NoteDelete { target_root, .. }
+            | GapAction::Round { target_root, .. }
+            | GapAction::Start { target_root, .. }
+            | GapAction::Cancel { target_root, .. }
+            | GapAction::Retry { target_root, .. }
+            | GapAction::Verify { target_root, .. }
+            | GapAction::Merge { target_root, .. }
+            | GapAction::Undo { target_root, .. }
+            | GapAction::Delete { target_root, .. }
+            | GapAction::AssignFeature { target_root, .. }
+            | GapAction::RemoveFeature { target_root, .. } => target_root.as_ref(),
         },
         Commands::Feature { action } => match action {
-            FeatureAction::Create { durable_root, .. }
-            | FeatureAction::List { durable_root }
-            | FeatureAction::Show { durable_root, .. }
-            | FeatureAction::Edit { durable_root, .. }
-            | FeatureAction::AddGap { durable_root, .. }
-            | FeatureAction::RemoveGap { durable_root, .. }
-            | FeatureAction::ReorderGap { durable_root, .. }
-            | FeatureAction::Move { durable_root, .. }
-            | FeatureAction::Cancel { durable_root, .. }
-            | FeatureAction::Delete { durable_root, .. } => durable_root.as_ref(),
-            FeatureAction::Import { durable_root, .. } => Some(durable_root),
+            FeatureAction::Create { target_root, .. }
+            | FeatureAction::List { target_root }
+            | FeatureAction::Show { target_root, .. }
+            | FeatureAction::Edit { target_root, .. }
+            | FeatureAction::AddGap { target_root, .. }
+            | FeatureAction::RemoveGap { target_root, .. }
+            | FeatureAction::ReorderGap { target_root, .. }
+            | FeatureAction::Move { target_root, .. }
+            | FeatureAction::Cancel { target_root, .. }
+            | FeatureAction::Delete { target_root, .. } => target_root.as_ref(),
+            FeatureAction::Import { target_root, .. } => Some(target_root),
         },
         Commands::Workflow { action } => match action {
             WorkflowAction::Pause { .. } | WorkflowAction::Resume { .. } => None,
         },
         Commands::Node { action } => match action {
-            NodeAction::List { durable_root }
-            | NodeAction::Show { durable_root, .. }
-            | NodeAction::Create { durable_root, .. }
-            | NodeAction::Activate { durable_root, .. }
-            | NodeAction::Archive { durable_root, .. }
-            | NodeAction::Rename { durable_root, .. }
-            | NodeAction::Settings { durable_root, .. }
-            | NodeAction::Transfer { durable_root, .. } => durable_root.as_ref(),
+            NodeAction::List { target_root }
+            | NodeAction::Show { target_root, .. }
+            | NodeAction::Create { target_root, .. }
+            | NodeAction::Activate { target_root, .. }
+            | NodeAction::Archive { target_root, .. }
+            | NodeAction::Rename { target_root, .. }
+            | NodeAction::Settings { target_root, .. }
+            | NodeAction::Transfer { target_root, .. } => target_root.as_ref(),
         },
         Commands::Cluster { action } => match action {
-            ClusterAction::List { durable_root }
-            | ClusterAction::Show { durable_root, .. }
-            | ClusterAction::AddNode { durable_root, .. }
-            | ClusterAction::EditNode { durable_root, .. }
-            | ClusterAction::EnableNode { durable_root, .. }
-            | ClusterAction::DisableNode { durable_root, .. }
-            | ClusterAction::RemoveNode { durable_root, .. }
-            | ClusterAction::Bootstrap { durable_root, .. }
-            | ClusterAction::Sync { durable_root }
-            | ClusterAction::Run { durable_root, .. }
-            | ClusterAction::Transfer { durable_root, .. }
-            | ClusterAction::Maintenance { durable_root } => durable_root.as_ref(),
+            ClusterAction::List { target_root }
+            | ClusterAction::Show { target_root, .. }
+            | ClusterAction::AddNode { target_root, .. }
+            | ClusterAction::EditNode { target_root, .. }
+            | ClusterAction::EnableNode { target_root, .. }
+            | ClusterAction::DisableNode { target_root, .. }
+            | ClusterAction::RemoveNode { target_root, .. }
+            | ClusterAction::Bootstrap { target_root, .. }
+            | ClusterAction::Sync { target_root }
+            | ClusterAction::Run { target_root, .. }
+            | ClusterAction::Transfer { target_root, .. }
+            | ClusterAction::Maintenance { target_root } => target_root.as_ref(),
         },
         Commands::Log { action } => match action {
-            LogAction::List { durable_root, .. }
-            | LogAction::Tail { durable_root, .. }
-            | LogAction::Show { durable_root, .. }
-            | LogAction::Query { durable_root, .. }
-            | LogAction::Bundle { durable_root, .. } => Some(durable_root),
-            LogAction::Export { durable_root } => durable_root.as_ref(),
+            LogAction::List { target_root, .. }
+            | LogAction::Tail { target_root, .. }
+            | LogAction::Show { target_root, .. }
+            | LogAction::Query { target_root, .. }
+            | LogAction::Bundle { target_root, .. } => Some(target_root),
+            LogAction::Export { target_root } => target_root.as_ref(),
         },
         Commands::Agent { .. } => None,
         Commands::System { action } => match action {
-            SystemAction::Doctor { durable_root, .. } => durable_root.as_ref(),
+            SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
             SystemAction::Install { .. }
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
@@ -2780,7 +2808,7 @@ pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf>
             | SystemAction::ApiGroups => None,
         },
     }
-    .filter(|path| !skipped_durable_root(path))
+    .filter(|path| !skipped_target_root(path))
 }
 
 fn new_cli_idempotency_key() -> String {

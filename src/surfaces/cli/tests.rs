@@ -1,5 +1,5 @@
 use super::dispatch::{
-    absolute_cli_path, dispatch, explicit_durable_root_path, system_status_response,
+    absolute_cli_path, dispatch, explicit_target_root_path, system_status_response,
 };
 use super::*;
 use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
@@ -17,23 +17,23 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn explicit_durable_root_path_detects_internal_cli_escape_hatch() {
-    let durable_root = PathBuf::from("/tmp/refine-state");
+fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
+    let target_root = PathBuf::from("/tmp/refine-state");
     let command = Commands::Gap {
         action: GapAction::Create {
             name: "direct write".to_string(),
-            durable_root: Some(durable_root.clone()),
+            target_root: Some(target_root.clone()),
             id: None,
         },
     };
-    assert_eq!(explicit_durable_root_path(&command), Some(&durable_root));
+    assert_eq!(explicit_target_root_path(&command), Some(&target_root));
 
     let default_daemon_command = Commands::Workflow {
         action: WorkflowAction::Pause {
             runtime_root: PathBuf::from("run"),
         },
     };
-    assert_eq!(explicit_durable_root_path(&default_daemon_command), None);
+    assert_eq!(explicit_target_root_path(&default_daemon_command), None);
 }
 
 #[test]
@@ -58,8 +58,9 @@ fn default_static_root_finds_checkout_assets() {
 #[test]
 fn project_sync_rebuilds_projection_from_cli_surface() {
     let temp_root = unique_temp_dir("cli-project-sync");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::write(
@@ -79,8 +80,8 @@ fn project_sync_rebuilds_projection_from_cli_surface() {
         "refine",
         "project",
         "sync",
-        "--durable-root",
-        durable_root.to_str().unwrap(),
+        "--target-root",
+        target_root.to_str().unwrap(),
         "--cache-dir",
         cache_dir.to_str().unwrap(),
     ])
@@ -142,7 +143,7 @@ fn system_start_owns_foreground_web_options() {
     assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
 
     assert!(Cli::try_parse_from(["refine", "system", "web"]).is_err());
-    assert!(Cli::try_parse_from(["refine", "system", "web", "--durable-root", ".refine"]).is_err());
+    assert!(Cli::try_parse_from(["refine", "system", "web", "--target-root", ".refine"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "serve", "--once"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "start", "--token", "secret"]).is_err());
 }
@@ -163,8 +164,8 @@ fn project_registry_commands_use_shared_file_project_registry_service() {
             "status",
             "--runtime-root",
             runtime_root.to_str().unwrap(),
-            "--durable-root",
-            app_one.join(".refine").to_str().unwrap(),
+            "--target-root",
+            app_one.to_str().unwrap(),
         ])
         .unwrap(),
     )
@@ -327,17 +328,17 @@ fn project_attach_creates_missing_local_project() {
 #[test]
 fn project_and_system_doctor_and_migrate_use_observability_services() {
     let temp_root = unique_temp_dir("cli-doctor-migrate");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
     let runtime_root = temp_root.join("run");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&target_root).unwrap();
 
     for argv in [
         vec![
             "refine",
             "project",
             "doctor",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--runtime-root",
             runtime_root.to_str().unwrap(),
             "--repo-root",
@@ -347,8 +348,8 @@ fn project_and_system_doctor_and_migrate_use_observability_services() {
             "refine",
             "system",
             "doctor",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--runtime-root",
             runtime_root.to_str().unwrap(),
             "--repo-root",
@@ -358,8 +359,8 @@ fn project_and_system_doctor_and_migrate_use_observability_services() {
             "refine",
             "project",
             "migrate",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--runtime-root",
             runtime_root.to_str().unwrap(),
         ],
@@ -375,9 +376,10 @@ fn project_attach_runs_legacy_refine_migration() {
     let temp_root = unique_temp_dir("cli-project-migration");
     let runtime_root = temp_root.join("run");
     let app_root = temp_root.join("legacy-app");
-    let durable_root = app_root.join(".refine");
-    fs::create_dir_all(durable_root.join("gaps/GA")).unwrap();
-    fs::write(durable_root.join("gaps/GA/gap.json"), "{}").unwrap();
+    let target_root = app_root.clone();
+    let refine_dir = target_root.join(".refine");
+    fs::create_dir_all(refine_dir.join("gaps/GA")).unwrap();
+    fs::write(refine_dir.join("gaps/GA/gap.json"), "{}").unwrap();
 
     dispatch(
         Cli::try_parse_from([
@@ -392,8 +394,7 @@ fn project_attach_runs_legacy_refine_migration() {
     )
     .unwrap();
     let config: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(durable_root.join("refine.json")).unwrap())
-            .unwrap();
+        serde_json::from_str(&fs::read_to_string(refine_dir.join("refine.json")).unwrap()).unwrap();
     assert_eq!(config["schema_version"], 1);
 
     dispatch(
@@ -401,8 +402,8 @@ fn project_attach_runs_legacy_refine_migration() {
             "refine",
             "project",
             "migrate",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--runtime-root",
             runtime_root.to_str().unwrap(),
         ])
@@ -542,15 +543,16 @@ fn system_status_reports_current_version_and_running_ports() {
 #[test]
 fn gap_create_list_show_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-gap-create");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
 
     let create = Cli::try_parse_from([
         "refine",
         "gap",
         "create",
         "CLI Gap",
-        "--durable-root",
-        durable_root.to_str().unwrap(),
+        "--target-root",
+        target_root.to_str().unwrap(),
         "--id",
         "GAP1",
     ])
@@ -561,8 +563,8 @@ fn gap_create_list_show_use_shared_file_work_item_service() {
         "refine",
         "gap",
         "list",
-        "--durable-root",
-        durable_root.to_str().unwrap(),
+        "--target-root",
+        target_root.to_str().unwrap(),
     ])
     .unwrap();
     dispatch(list).unwrap();
@@ -572,13 +574,13 @@ fn gap_create_list_show_use_shared_file_work_item_service() {
         "gap",
         "show",
         "GAP1",
-        "--durable-root",
-        durable_root.to_str().unwrap(),
+        "--target-root",
+        target_root.to_str().unwrap(),
     ])
     .unwrap();
     dispatch(show).unwrap();
 
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"name\": \"CLI Gap\""));
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -586,7 +588,8 @@ fn gap_create_list_show_use_shared_file_work_item_service() {
 #[test]
 fn gap_edit_note_delete_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-gap-edit-note-delete");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
 
     dispatch(
         Cli::try_parse_from([
@@ -594,8 +597,8 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
             "gap",
             "create",
             "Original",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
@@ -608,8 +611,8 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
             "gap",
             "edit",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--name",
             "Renamed",
             "--priority",
@@ -625,8 +628,8 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
             "note",
             "GAP1",
             "CLI note",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--author",
             "Reviewer",
         ])
@@ -634,7 +637,7 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
     )
     .unwrap();
 
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"name\": \"Renamed\""));
     assert!(written.contains("\"priority\": \"medium\""));
     assert!(written.contains("\"body\": \"CLI note\""));
@@ -645,28 +648,29 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
             "gap",
             "delete",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
 fn gap_round_append_and_edit_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-gap-rounds");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
             "gap",
             "create",
             "Round Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
@@ -679,8 +683,8 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
             "gap",
             "round",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--reporter",
             "Reporter",
             "--actual",
@@ -697,8 +701,8 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
             "gap",
             "round",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--edit-latest",
             "--reporter",
             "Reviewer",
@@ -709,7 +713,7 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
     )
     .unwrap();
 
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
     assert!(written.contains("\"actual\": \"Revised\""));
     assert!(written.contains("\"target\": \"Target\""));
@@ -719,22 +723,23 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
 #[test]
 fn gap_merge_and_undo_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-gap-merge-undo");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
             "gap",
             "create",
             "Merge Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
         .unwrap(),
     )
     .unwrap();
-    let gap_path = durable_root.join("gaps/GA/P1/gap.json");
+    let gap_path = refine_dir.join("gaps/GA/P1/gap.json");
     let mut value: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&gap_path).unwrap()).unwrap();
     value["status"] = serde_json::Value::String("ready-merge".to_string());
@@ -746,8 +751,8 @@ fn gap_merge_and_undo_use_shared_file_work_item_service() {
             "gap",
             "merge",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
@@ -761,8 +766,8 @@ fn gap_merge_and_undo_use_shared_file_work_item_service() {
             "gap",
             "undo",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
@@ -776,7 +781,8 @@ fn gap_merge_and_undo_use_shared_file_work_item_service() {
 #[test]
 fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-membership");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
 
     dispatch(
         Cli::try_parse_from([
@@ -784,8 +790,8 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "gap",
             "create",
             "Gap One",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
@@ -798,8 +804,8 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "feature",
             "create",
             "Feature One",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "FEA1",
         ])
@@ -813,8 +819,8 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "add-gap",
             "FEA1",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
@@ -825,8 +831,8 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "feature",
             "show",
             "FEA1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
@@ -836,14 +842,14 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "refine",
             "feature",
             "list",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
 
-    let assigned = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let assigned = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(assigned.contains("\"feature_id\": \"FEA1\""));
     assert!(assigned.contains("\"feature_order\": 1"));
 
@@ -854,13 +860,13 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
             "remove-gap",
             "FEA1",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let removed = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let removed = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(removed.contains("\"feature_id\": null"));
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -869,15 +875,16 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
 #[test]
 fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     let temp_root = unique_temp_dir("cli-gap-lifecycle");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     for (command, args) in [
         (
             "gap",
             vec![
                 "create",
                 "Lifecycle Gap",
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
                 "--id",
                 "GAP1",
             ],
@@ -887,8 +894,8 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
             vec![
                 "create",
                 "Feature One",
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
                 "--id",
                 "FEA1",
             ],
@@ -906,14 +913,14 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
             "assign-feature",
             "GAP1",
             "FEA1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"feature_id\": \"FEA1\"")
     );
@@ -924,8 +931,8 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
             "feature",
             "edit",
             "FEA1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--name",
             "Renamed Feature",
             "--description",
@@ -936,7 +943,7 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
         .unwrap(),
     )
     .unwrap();
-    let feature = fs::read_to_string(durable_root.join("features/FE/A1/feature.json")).unwrap();
+    let feature = fs::read_to_string(refine_dir.join("features/FE/A1/feature.json")).unwrap();
     assert!(feature.contains("\"name\": \"Renamed Feature\""));
     assert!(feature.contains("\"reporter\": \"QA\""));
 
@@ -946,14 +953,14 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
             "gap",
             "remove-feature",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"feature_id\": null")
     );
@@ -964,14 +971,14 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
             "gap",
             "start",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"status\": \"in-progress\"")
     );
@@ -982,7 +989,8 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
 #[test]
 fn feature_reorder_and_move_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-reorder-move");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         dispatch(
             Cli::try_parse_from([
@@ -990,8 +998,8 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
                 "gap",
                 "create",
                 name,
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
                 "--id",
                 id,
             ])
@@ -1005,8 +1013,8 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
             "feature",
             "create",
             "Feature One",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "FEA1",
         ])
@@ -1021,8 +1029,8 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
                 "add-gap",
                 "FEA1",
                 gap_id,
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
             ])
             .unwrap(),
         )
@@ -1036,14 +1044,14 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
             "FEA1",
             "GAP2",
             "1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P2/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P2/gap.json"))
             .unwrap()
             .contains("\"feature_order\": 1")
     );
@@ -1055,14 +1063,14 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
             "move",
             "FEA1",
             "todo",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
@@ -1073,7 +1081,8 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
 #[test]
 fn feature_cancel_and_delete_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-cancel-delete");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         dispatch(
             Cli::try_parse_from([
@@ -1081,8 +1090,8 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
                 "gap",
                 "create",
                 name,
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
                 "--id",
                 id,
             ])
@@ -1096,8 +1105,8 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
             "feature",
             "create",
             "Feature One",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "FEA1",
         ])
@@ -1112,8 +1121,8 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
                 "add-gap",
                 "FEA1",
                 gap_id,
-                "--durable-root",
-                durable_root.to_str().unwrap(),
+                "--target-root",
+                target_root.to_str().unwrap(),
             ])
             .unwrap(),
         )
@@ -1126,14 +1135,14 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
             "feature",
             "cancel",
             "FEA1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"status\": \"cancelled\"")
     );
@@ -1144,15 +1153,15 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
             "feature",
             "delete",
             "FEA1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    assert!(!durable_root.join("features/FE/A1/feature.json").exists());
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(!durable_root.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1160,15 +1169,16 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
 #[test]
 fn feature_import_uses_shared_import_service() {
     let temp_root = unique_temp_dir("cli-feature-import");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
             "feature",
             "create",
             "Imported Feature",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "FEA1",
         ])
@@ -1187,8 +1197,8 @@ fn feature_import_uses_shared_import_service() {
             "refine",
             "feature",
             "import",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--file",
             csv.to_str().unwrap(),
             "--csv",
@@ -1199,7 +1209,7 @@ fn feature_import_uses_shared_import_service() {
     )
     .unwrap();
 
-    let snapshot = FileProjectStateStore::new(&durable_root)
+    let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let gap = snapshot.gaps.values().next().unwrap();
@@ -1213,8 +1223,9 @@ fn feature_import_uses_shared_import_service() {
 #[test]
 fn log_commands_use_shared_activity_service() {
     let temp_root = unique_temp_dir("cli-log-activity");
-    let durable_root = temp_root.join(".refine");
-    let service = FileActivityService::new(&durable_root);
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
+    let service = FileActivityService::new(&refine_dir);
     let first = service.new_entry(
         "Build failed",
         "error",
@@ -1233,8 +1244,8 @@ fn log_commands_use_shared_activity_service() {
             "refine",
             "log",
             "list",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--limit",
             "2",
         ],
@@ -1242,8 +1253,8 @@ fn log_commands_use_shared_activity_service() {
             "refine",
             "log",
             "tail",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--limit",
             "1",
         ],
@@ -1252,8 +1263,8 @@ fn log_commands_use_shared_activity_service() {
             "log",
             "query",
             "failed",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--severity",
             "error",
             "--gap-id",
@@ -1264,15 +1275,15 @@ fn log_commands_use_shared_activity_service() {
             "log",
             "show",
             first_id.as_str(),
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "log",
             "export",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
     ] {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
@@ -1284,11 +1295,12 @@ fn log_commands_use_shared_activity_service() {
 #[test]
 fn log_bundle_exports_redacted_support_bundle() {
     let temp_root = unique_temp_dir("cli-log-bundle");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     let runtime_root = temp_root.join("run");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     fs::write(
-        durable_root.join("settings.json"),
+        refine_dir.join("settings.json"),
         r#"{"provider_token":"secret-value","visible":"ok"}"#,
     )
     .unwrap();
@@ -1298,8 +1310,8 @@ fn log_bundle_exports_redacted_support_bundle() {
             "refine",
             "log",
             "bundle",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--runtime-root",
             runtime_root.to_str().unwrap(),
             "--repo-root",
@@ -1309,7 +1321,7 @@ fn log_bundle_exports_redacted_support_bundle() {
     )
     .unwrap();
 
-    let bundle_dir = durable_root.join("support-bundles");
+    let bundle_dir = refine_dir.join("support-bundles");
     let bundle_path = fs::read_dir(&bundle_dir)
         .unwrap()
         .next()
@@ -1326,15 +1338,16 @@ fn log_bundle_exports_redacted_support_bundle() {
 #[test]
 fn node_commands_use_shared_node_registry_service() {
     let temp_root = unique_temp_dir("cli-node-registry");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
             "gap",
             "create",
             "Owned Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
@@ -1347,16 +1360,16 @@ fn node_commands_use_shared_node_registry_service() {
             "refine",
             "node",
             "list",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "node",
             "create",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
@@ -1364,24 +1377,24 @@ fn node_commands_use_shared_node_registry_service() {
             "rename",
             "node-1",
             "Node One",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "node",
             "activate",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "node",
             "settings",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
@@ -1389,34 +1402,33 @@ fn node_commands_use_shared_node_registry_service() {
             "transfer",
             "node-1",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "node",
             "activate",
             "default",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "node",
             "archive",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
     ] {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let gap = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(gap.contains("\"node_id\": \"node-1\""));
     let nodes: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(durable_root.join("nodes.json")).unwrap())
-            .unwrap();
+        serde_json::from_str(&fs::read_to_string(refine_dir.join("nodes.json")).unwrap()).unwrap();
     assert_eq!(nodes["nodes"][1]["display_name"], "Node One");
     assert_eq!(nodes["nodes"][1]["archived"], true);
 
@@ -1426,15 +1438,16 @@ fn node_commands_use_shared_node_registry_service() {
 #[test]
 fn cluster_commands_use_shared_cluster_registry_service() {
     let temp_root = unique_temp_dir("cli-cluster-registry");
-    let durable_root = temp_root.join(".refine");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
             "gap",
             "create",
             "Cluster Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
             "--id",
             "GAP1",
         ])
@@ -1447,24 +1460,24 @@ fn cluster_commands_use_shared_cluster_registry_service() {
             "refine",
             "cluster",
             "list",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "add-node",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "show",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
@@ -1479,24 +1492,24 @@ fn cluster_commands_use_shared_cluster_registry_service() {
             "~/.ssh/refine_ed25519",
             "--ssh-port",
             "2222",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "disable-node",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "enable-node",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
@@ -1504,8 +1517,8 @@ fn cluster_commands_use_shared_cluster_registry_service() {
             "bootstrap",
             "node-1",
             "--dry-run",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
@@ -1513,39 +1526,39 @@ fn cluster_commands_use_shared_cluster_registry_service() {
             "transfer",
             "node-1",
             "GAP1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "sync",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "maintenance",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "cluster",
             "remove-node",
             "node-1",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
+            "--target-root",
+            target_root.to_str().unwrap(),
         ],
     ] {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let gap = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(gap.contains("\"node_id\": \"node-1\""));
     let cluster: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(durable_root.join("cluster.json")).unwrap())
+        serde_json::from_str(&fs::read_to_string(refine_dir.join("cluster.json")).unwrap())
             .unwrap();
     assert_eq!(cluster["nodes"].as_array().unwrap().len(), 0);
 

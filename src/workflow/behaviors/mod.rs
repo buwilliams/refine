@@ -73,7 +73,7 @@ impl WorkflowBehavior for WorkflowTodo {
             &ctx.gap_id,
             ctx.round_idx,
         );
-        let app_git = FileGitWorktreeService::with_runtime_root(ctx.app_root, ctx.runtime_root);
+        let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         ctx.request_transition(GapStatus::Todo, GapStatus::InProgress)?;
         let worktree_path = match app_git.worktree(&branch) {
             Ok(path) => path,
@@ -226,7 +226,7 @@ impl WorkflowBehavior for WorkflowReadyMerge {
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
         let commit = ctx.require_commit()?.to_string();
-        let merger = FileMergerService::new(ctx.runtime_root, ctx.durable_root);
+        let merger = FileMergerService::new(ctx.runtime_root, ctx.refine_dir());
         let merge = match merger.merge_branch_for_workflow(&branch) {
             Ok(result) if result.ok => result,
             Ok(result) => {
@@ -271,7 +271,7 @@ impl WorkflowBehavior for WorkflowBuild {
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let target_app =
-            FileTargetAppService::new(ctx.durable_root, ctx.runtime_root, ctx.app_root);
+            FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
         let build = match target_app
             .build_with_metadata(ctx.workflow_process_metadata("build", "WorkflowBuild"))
         {
@@ -361,7 +361,7 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
             diagnostics: vec!["Quality checks disabled.".to_string()],
         });
     }
-    let service = FileQualityService::with_runtime_root(ctx.durable_root, ctx.runtime_root);
+    let service = FileQualityService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root);
     let browser_required = setting_string(&ctx.settings, "quality_regressions_enabled", "0") == "1";
     service.run_checks(QualityCheckRequest {
         owner_id: ctx.gap_id.clone(),
@@ -414,7 +414,7 @@ fn evaluate_workflow_governance(
     worktree_path: &str,
     provider_cwd: &std::path::Path,
 ) -> RefineResult<GovernanceEvaluation> {
-    let governance = FileGovernanceService::new(ctx.durable_root).load()?;
+    let governance = FileGovernanceService::new(ctx.refine_dir()).load()?;
     let rules = governance
         .get("rules")
         .and_then(|value| value.as_array())

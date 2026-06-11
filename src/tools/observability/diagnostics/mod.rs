@@ -31,19 +31,19 @@ pub trait DiagnosticsService {
 
 #[derive(Clone, Debug)]
 pub struct FileDiagnosticsService {
-    pub durable_root: Option<PathBuf>,
+    pub target_root: Option<PathBuf>,
     pub runtime_root: PathBuf,
     pub repo_root: PathBuf,
 }
 
 impl FileDiagnosticsService {
     pub fn new(
-        durable_root: Option<PathBuf>,
+        target_root: Option<PathBuf>,
         runtime_root: impl Into<PathBuf>,
         repo_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root,
+            target_root,
             runtime_root: runtime_root.into(),
             repo_root: repo_root.into(),
         }
@@ -53,7 +53,7 @@ impl FileDiagnosticsService {
 impl DiagnosticsService for FileDiagnosticsService {
     fn doctor(&self) -> RefineResult<DoctorReport> {
         let project_status =
-            FileProjectRegistryService::new(&self.runtime_root, self.durable_root.clone())
+            FileProjectRegistryService::new(&self.runtime_root, self.target_root.clone())
                 .status()?;
         let process_summary = FileProcessSupervisor::new(&self.runtime_root).list()?;
         let providers = HostAgentProviderService::new().detect().unwrap_or_default();
@@ -92,9 +92,9 @@ impl DiagnosticsService for FileDiagnosticsService {
                 })
                 .unwrap_or_else(|error| format!("git inspection unavailable: {error}"));
         let activity_count = self
-            .durable_root
+            .target_root
             .as_ref()
-            .and_then(|root| FileActivityService::new(root).count().ok())
+            .and_then(|root| FileActivityService::new(root.join(".refine")).count().ok())
             .unwrap_or(0);
         let browser_status = command_status(
             &self.runtime_root,
@@ -111,7 +111,7 @@ impl DiagnosticsService for FileDiagnosticsService {
             "docker CLI not found; Docker-dependent target workflows will be blocked",
         );
         let storage_root = self
-            .durable_root
+            .target_root
             .as_ref()
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| "none".to_string());
@@ -149,10 +149,10 @@ impl DiagnosticsService for FileDiagnosticsService {
             browser: vec![browser_status],
             docker: vec![docker_status],
             storage: vec![
-                format!("durable_root={storage_root}"),
+                format!("target_root={storage_root}"),
                 format!(
-                    "durable_root_exists={}",
-                    durable_root_exists(&self.durable_root)
+                    "target_root_exists={}",
+                    target_root_exists(&self.target_root)
                 ),
                 format!("runtime_root_exists={}", self.runtime_root.exists()),
                 format!("activity_entries={activity_count}"),
@@ -224,9 +224,9 @@ fn install_target_label(target: &InstallTarget) -> &'static str {
     }
 }
 
-fn durable_root_exists(durable_root: &Option<PathBuf>) -> bool {
-    durable_root
+fn target_root_exists(target_root: &Option<PathBuf>) -> bool {
+    target_root
         .as_ref()
-        .map(|path| path.exists())
+        .map(|path| path.exists() && path.join(".refine").exists())
         .unwrap_or(false)
 }

@@ -24,8 +24,8 @@ path = "tests/smoke_ai_contract.rs"
 test = false
 
 [[test]]
-name = "cli_durable_root"
-path = "tests/cli_durable_root.rs"
+name = "cli_target_root"
+path = "tests/cli_target_root.rs"
 test = false
 
 [[test]]
