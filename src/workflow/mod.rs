@@ -13,30 +13,22 @@ use uuid::Uuid;
 
 use crate::model::JsonObject;
 use crate::model::gap::GapPriority;
-use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
-use crate::process::subprocess::{
-    FileProcessSupervisor, ProcessPauseState, ProcessSupervisor, workflow_subprocess_metadata,
-};
-use crate::process::supervisor::config::{
-    ConfigService, FileGovernanceService, FileSettingsService,
-};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
-use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
-};
-use crate::tools::host::target_apps::FileTargetAppService;
-use crate::tools::observability::logs::FileLogService;
-use crate::tools::product::merging::{FileMergerService, MergerGapResult};
+use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
 };
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
+use crate::workflow::behaviors::{
+    WorkflowBuild, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge, WorkflowReview,
+    WorkflowTodo,
+};
+use crate::workflow::context::WorkflowContext;
 
 pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 
@@ -115,7 +107,6 @@ pub struct WorkflowPassResult {
     pub promoted: usize,
     pub claims: Vec<WorkflowClaim>,
     pub steps: Vec<WorkflowStepResult>,
-    pub merged: Option<MergerGapResult>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -493,20 +484,11 @@ impl WorkflowEngine {
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
         let promoted = self.promote()?;
         let steps = self.execute_claimed_work()?;
-        let merged = match &self.durable_root {
-            Some(durable_root) => {
-                FileMergerService::new(&self.runtime_root, durable_root)
-                    .tick()?
-                    .processed
-            }
-            None => None,
-        };
         let state = self.load_state()?;
         Ok(WorkflowPassResult {
             promoted,
             claims: state.claims,
             steps,
-            merged,
         })
     }
 
@@ -555,469 +537,87 @@ impl WorkflowEngine {
                 "durable root must be inside an attached target app".to_string(),
             )
         })?;
-        let branch = implementation_branch_name(
-            setting_string(&settings, "branch_name_pattern", "refine/{gap_id}").as_str(),
-            &claim.gap_id,
+        let mut ctx = WorkflowContext::new(
+            &self.runtime_root,
+            durable_root,
+            app_root,
+            claim,
+            execution_id,
             round_idx,
+            settings,
+            work_items,
         );
-        let app_git = FileGitWorktreeService::with_runtime_root(app_root, &self.runtime_root);
-        let workflow = WorkflowExecution {
-            execution_id,
-            gap_id: &claim.gap_id,
-            round_idx,
-            work_items: &work_items,
-            durable_root,
-        };
+        self.advance_claim_behaviors(&mut ctx)?;
+        let branch = ctx
+            .branch
+            .clone()
+            .ok_or_else(|| missing_workflow_artifact("branch", &ctx.gap_id))?;
+        let commit = ctx
+            .commit
+            .clone()
+            .ok_or_else(|| missing_workflow_artifact("commit", &ctx.gap_id))?;
+        let merge = ctx
+            .merge
+            .clone()
+            .ok_or_else(|| missing_workflow_artifact("merge", &ctx.gap_id))?;
+        let provider_output = ctx
+            .provider_output
+            .clone()
+            .ok_or_else(|| missing_workflow_artifact("provider output", &ctx.gap_id))?;
+        let final_status = ctx
+            .final_status
+            .clone()
+            .unwrap_or(GapStatus::Review)
+            .as_str()
+            .to_string();
 
-        work_items.advance_automated_gap_status(&claim.gap_id, GapStatus::InProgress)?;
-        workflow.log(
-            self,
-            "state",
-            "Workflow status changed: todo -> in-progress",
-            None,
-        )?;
-
-        let worktree_path = match app_git.worktree(&branch) {
-            Ok(path) => path,
-            Err(error) => {
-                self.fail_workflow(&workflow, "branch", &error)?;
-                return Err(error);
-            }
-        };
-        workflow.log(
-            self,
-            "git",
-            &format!("Created implementation worktree for {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "worktree": worktree_path
-            }))),
-        )?;
-        if let Err(error) = work_items.update_gap_branch_name(&claim.gap_id, Some(&branch)) {
-            self.fail_workflow(&workflow, "branch", &error)?;
-            return Err(error);
-        }
-
-        let prompt = gap_agent_prompt(&claim.gap_id);
-        let agent_cwd = agent_worktree_cwd(
-            &worktree_path,
-            setting_string(&settings, "agent_subpath", "").as_str(),
-        )?;
-        let provider =
-            HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
-        let provider_output = match provider.invoke(ProviderInvocation {
-            provider: claim.provider.clone(),
-            prompt,
-            session_id: None,
-            cwd: Some(agent_cwd.display().to_string()),
-            process_metadata: workflow_subprocess_metadata(
-                execution_id,
-                &claim.gap_id,
-                "in-progress",
-                "WorkflowImplementation",
-                Some(round_idx),
-            ),
-        }) {
-            Ok(output) => output,
-            Err(error) => {
-                self.fail_workflow(&workflow, "agent", &error)?;
-                return Err(error);
-            }
-        };
-        workflow.log(
-            self,
-            "agent",
-            "Gap agent completed",
-            Some(json_object(json!({
-                "provider": claim.provider,
-                "output": provider_output,
-                "branch": branch,
-                "worktree": worktree_path
-            }))),
-        )?;
-
-        let worktree_git =
-            FileGitWorktreeService::with_runtime_root(&worktree_path, &self.runtime_root);
-        let commit = match worktree_git.commit(
-            &format!("Implement {} round {}", claim.gap_id, round_idx + 1),
-            &[],
-        ) {
-            Ok(commit) => commit,
-            Err(error) => {
-                self.fail_workflow(&workflow, "commit", &error)?;
-                return Err(error);
-            }
-        };
-        workflow.log(
-            self,
-            "git",
-            &format!("Committed implementation branch {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "commit": commit,
-                "worktree": worktree_path
-            }))),
-        )?;
-
-        let governance = match self.evaluate_workflow_governance(
-            durable_root,
-            &settings,
-            &claim.provider,
-            &worktree_path,
-            &agent_cwd,
-            &claim.gap_id,
-            round_idx,
-            execution_id,
-        ) {
-            Ok(evaluation) => evaluation,
-            Err(error) => {
-                self.fail_workflow(&workflow, "governance", &error)?;
-                return Err(error);
-            }
-        };
-        self.record_governance(&workflow, &governance)?;
-        if governance.failed {
-            let error = RefineError::Conflict(
-                governance
-                    .message
-                    .clone()
-                    .unwrap_or_else(|| "governance checks failed".to_string()),
-            );
-            self.fail_workflow(&workflow, "governance", &error)?;
-            return Err(error);
-        }
-
-        if let Err(error) = workflow.advance(self, GapStatus::Qa, "in-progress") {
-            self.fail_workflow(&workflow, "state", &error)?;
-            return Err(error);
-        }
-        let quality =
-            match self.run_workflow_quality(durable_root, &settings, &claim.gap_id, execution_id) {
-                Ok(result) => result,
-                Err(error) => {
-                    self.record_quality_error(&workflow, &error)?;
-                    self.fail_workflow(&workflow, "quality", &error)?;
-                    return Err(error);
-                }
-            };
-        self.record_quality(&workflow, &quality)?;
-        if !quality.ok {
-            let error = RefineError::Conflict("quality checks failed".to_string());
-            self.fail_workflow(&workflow, "quality", &error)?;
-            return Err(error);
-        }
-
-        if let Err(error) = workflow.advance(self, GapStatus::ReadyMerge, "qa") {
-            self.fail_workflow(&workflow, "state", &error)?;
-            return Err(error);
-        }
-        let merger = FileMergerService::new(&self.runtime_root, durable_root);
-        let merge = match merger.merge_branch_for_workflow(&branch) {
-            Ok(result) if result.ok => result,
-            Ok(result) => {
-                let error = RefineError::Conflict(
-                    result
-                        .message
-                        .clone()
-                        .unwrap_or_else(|| "implementation merge failed".to_string()),
-                );
-                workflow.log(
-                    self,
-                    "merge",
-                    "Implementation merge failed",
-                    Some(json_object(json!({"branch": branch, "merge": &result}))),
-                )?;
-                self.fail_workflow(&workflow, "merge", &error)?;
-                return Err(error);
-            }
-            Err(error) => {
-                self.fail_workflow(&workflow, "merge", &error)?;
-                return Err(error);
-            }
-        };
-        workflow.log(
-            self,
-            "merge",
-            &format!("Merged implementation branch {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "commit": commit,
-                "merge": &merge
-            }))),
-        )?;
-
-        if let Err(error) = workflow.advance(self, GapStatus::Build, "ready-merge") {
-            self.fail_workflow(&workflow, "state", &error)?;
-            return Err(error);
-        }
-        let target_app = FileTargetAppService::new(durable_root, &self.runtime_root, app_root);
-        let build = match target_app.build_with_metadata(workflow_subprocess_metadata(
-            execution_id,
-            &claim.gap_id,
-            "build",
-            "WorkflowBuild",
-            Some(round_idx),
-        )) {
-            Ok(snapshot) if snapshot.ok => snapshot,
-            Ok(snapshot) => {
-                let error = RefineError::Conflict(snapshot.message.clone());
-                workflow.log(
-                    self,
-                    "build",
-                    "Target app build failed",
-                    Some(json_object(json!({"target_app": &snapshot}))),
-                )?;
-                self.fail_workflow(&workflow, "build", &error)?;
-                return Err(error);
-            }
-            Err(error) => {
-                self.fail_workflow(&workflow, "build", &error)?;
-                return Err(error);
-            }
-        };
-        workflow.log(
-            self,
-            "build",
-            "Target app build passed",
-            Some(json_object(json!({"target_app": &build}))),
-        )?;
-        if let Err(error) = workflow.advance(self, GapStatus::Review, "build") {
-            self.fail_workflow(&workflow, "state", &error)?;
-            return Err(error);
-        }
-
-        self.mark_claim_state(claim_id, WorkflowClaimState::Completed)?;
+        self.mark_claim_state(&ctx.claim_id, WorkflowClaimState::Completed)?;
         Ok(WorkflowStepResult {
-            claim_id: claim_id.to_string(),
-            gap_id: claim.gap_id,
+            claim_id: ctx.claim_id,
+            gap_id: ctx.gap_id,
             execution_id: execution_id.to_string(),
-            provider: claim.provider,
+            provider: ctx.provider,
             branch,
             commit,
             merge,
-            final_status: "review".to_string(),
+            final_status,
             provider_output,
         })
     }
 
-    fn fail_workflow(
-        &self,
-        workflow: &WorkflowExecution<'_>,
-        category: &str,
-        error: &RefineError,
-    ) -> RefineResult<()> {
-        let _ = workflow
-            .work_items
-            .advance_automated_gap_status(workflow.gap_id, GapStatus::Failed);
-        workflow.log(
-            self,
-            category,
-            &format!("Workflow failed: {error}"),
-            Some(json_object(json!({"error": error.to_string()}))),
-        )
-    }
-
-    fn run_workflow_quality(
-        &self,
-        durable_root: &Path,
-        settings: &JsonObject,
-        gap_id: &str,
-        execution_id: &str,
-    ) -> RefineResult<QualityCheckResult> {
-        if setting_string(settings, "quality_enabled", "0") != "1" {
-            return Ok(QualityCheckResult {
-                owner_id: gap_id.to_string(),
-                ok: true,
-                diagnostics: vec!["Quality checks disabled.".to_string()],
-            });
-        }
-        let service = FileQualityService::with_runtime_root(durable_root, &self.runtime_root);
-        let browser_required = setting_string(settings, "quality_regressions_enabled", "0") == "1";
-        service.run_checks(QualityCheckRequest {
-            owner_id: gap_id.to_string(),
-            command: String::new(),
-            browser_required,
-            process_metadata: workflow_subprocess_metadata(
-                execution_id,
-                gap_id,
-                "qa",
-                "WorkflowQa",
-                None,
-            ),
-        })
-    }
-
-    fn record_quality(
-        &self,
-        workflow: &WorkflowExecution<'_>,
-        result: &QualityCheckResult,
-    ) -> RefineResult<()> {
-        let message = if result.ok {
-            "Quality checks passed"
-        } else {
-            "Quality checks failed"
-        };
-        workflow
-            .work_items
-            .update_latest_gap_round_evaluation_summary(
-                workflow.gap_id,
-                &json!({
-                    "quality_state": if result.ok { "passed" } else { "failed" },
-                    "quality_message": message,
-                    "quality_details": {"diagnostics": result.diagnostics},
-                    "quality_checked_at": now_timestamp()
-                }),
-            )?;
-        workflow.log(
-            self,
-            "quality",
-            message,
-            Some(json_object(json!({
-                "ok": result.ok,
-                "diagnostics": result.diagnostics
-            }))),
-        )
-    }
-
-    fn record_quality_error(
-        &self,
-        workflow: &WorkflowExecution<'_>,
-        error: &RefineError,
-    ) -> RefineResult<()> {
-        workflow
-            .work_items
-            .update_latest_gap_round_evaluation_summary(
-                workflow.gap_id,
-                &json!({
-                    "quality_state": "failed",
-                    "quality_message": "Quality checks failed.",
-                    "quality_details": {"error": error.to_string()},
-                    "quality_checked_at": now_timestamp()
-                }),
-            )?;
-        Ok(())
-    }
-
-    fn evaluate_workflow_governance(
-        &self,
-        durable_root: &Path,
-        _settings: &JsonObject,
-        provider_name: &str,
-        worktree_path: &str,
-        provider_cwd: &Path,
-        gap_id: &str,
-        round_idx: usize,
-        execution_id: &str,
-    ) -> RefineResult<GovernanceEvaluation> {
-        let governance = FileGovernanceService::new(durable_root).load()?;
-        let rules = governance
-            .get("rules")
-            .and_then(|value| value.as_array())
-            .cloned()
-            .unwrap_or_default();
-        if rules.is_empty() {
-            return Ok(GovernanceEvaluation {
-                failed: false,
-                message: None,
-                details: json_object(json!({
-                    "phase": "post_implementation",
-                    "configured": false,
-                    "governance_configured": governance.get("configured").and_then(Value::as_bool).unwrap_or(false),
-                    "rules_checked": 0,
-                    "failed_actions": []
-                })),
-            });
-        }
-        let prompt = post_implementation_governance_prompt(
-            &governance,
-            &rules,
-            worktree_path,
-            provider_cwd,
-            gap_id,
-            round_idx,
-        );
-        let provider =
-            HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
-        let output = provider.invoke(ProviderInvocation {
-            provider: provider_name.to_string(),
-            prompt,
-            session_id: None,
-            cwd: Some(provider_cwd.display().to_string()),
-            process_metadata: workflow_subprocess_metadata(
-                execution_id,
-                gap_id,
-                "in-progress",
-                "WorkflowImplementationGovernance",
-                Some(round_idx),
-            ),
-        })?;
-        let mut evaluation = parse_governance_provider_output(&output, rules.len());
-        evaluation.details.insert(
-            "provider".to_string(),
-            Value::String(provider_name.to_string()),
-        );
-        evaluation.details.insert(
-            "worktree".to_string(),
-            Value::String(worktree_path.to_string()),
-        );
-        evaluation.details.insert(
-            "cwd".to_string(),
-            Value::String(provider_cwd.display().to_string()),
-        );
-        evaluation.details.insert(
-            "governance_configured".to_string(),
-            governance
-                .get("configured")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-                .into(),
-        );
-        Ok(GovernanceEvaluation {
-            details: evaluation.details,
-            ..evaluation
-        })
-    }
-
-    fn record_governance(
-        &self,
-        workflow: &WorkflowExecution<'_>,
-        evaluation: &GovernanceEvaluation,
-    ) -> RefineResult<()> {
-        let message = evaluation.message.clone().unwrap_or_else(|| {
-            if evaluation.details["configured"].as_bool() == Some(true) {
-                "Governance checks passed.".to_string()
-            } else {
-                "No governance rules configured.".to_string()
+    fn advance_claim_behaviors(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<()> {
+        let todo = WorkflowTodo;
+        let implementation = WorkflowImplementation;
+        let qa = WorkflowQa;
+        let ready_merge = WorkflowReadyMerge;
+        let build = WorkflowBuild;
+        let review = WorkflowReview;
+        let behaviors: [&dyn WorkflowBehavior; 6] =
+            [&todo, &implementation, &qa, &ready_merge, &build, &review];
+        let mut current = GapStatus::Todo;
+        loop {
+            let Some(behavior) = behaviors
+                .iter()
+                .copied()
+                .find(|behavior| behavior.observes() == current)
+            else {
+                return Err(RefineError::Conflict(format!(
+                    "No workflow behavior registered for {}",
+                    current.as_str()
+                )));
+            };
+            match behavior.advance(ctx)? {
+                WorkflowAdvanceOutcome::Transition { to, .. } => {
+                    current = to;
+                }
+                WorkflowAdvanceOutcome::Completed { .. } => return Ok(()),
+                WorkflowAdvanceOutcome::Noop { reason }
+                | WorkflowAdvanceOutcome::Blocked { reason }
+                | WorkflowAdvanceOutcome::Failed { reason } => {
+                    return Err(RefineError::Conflict(reason));
+                }
             }
-        });
-        workflow
-            .work_items
-            .update_latest_gap_round_evaluation_summary(
-                workflow.gap_id,
-                &json!({
-                    "rule_state": if evaluation.failed { "failed" } else { "passed" },
-                    "meta_rule_state": "passed",
-                    "product_state": "passed",
-                    "constitution_state": "passed",
-                    "governance_message": message,
-                    "governance_details": evaluation.details,
-                    "governance_checked_at": now_timestamp(),
-                    "governance_rule_actions": evaluation.details
-                        .get("failed_actions")
-                        .cloned()
-                        .unwrap_or_else(|| json!([]))
-                }),
-            )?;
-        workflow.log(
-            self,
-            "governance",
-            if evaluation.failed {
-                "Governance checks failed"
-            } else {
-                "Governance checks passed"
-            },
-            Some(evaluation.details.clone()),
-        )
+        }
     }
 
     fn claim_by_id(&self, claim_id: &str) -> RefineResult<WorkflowClaim> {
@@ -1104,55 +704,6 @@ struct GovernanceEvaluation {
     failed: bool,
     message: Option<String>,
     details: JsonObject,
-}
-
-struct WorkflowExecution<'a> {
-    execution_id: &'a str,
-    gap_id: &'a str,
-    round_idx: usize,
-    work_items: &'a FileWorkItemService,
-    durable_root: &'a Path,
-}
-
-impl WorkflowExecution<'_> {
-    fn advance(&self, automation: &WorkflowEngine, to: GapStatus, from: &str) -> RefineResult<()> {
-        self.work_items
-            .advance_automated_gap_status(self.gap_id, to.clone())?;
-        self.log(
-            automation,
-            "state",
-            &format!("Workflow status changed: {from} -> {}", to.as_str()),
-            None,
-        )
-    }
-
-    fn log(
-        &self,
-        _automation: &WorkflowEngine,
-        category: &str,
-        message: &str,
-        details: Option<JsonObject>,
-    ) -> RefineResult<()> {
-        let mut details = details.unwrap_or_default();
-        details
-            .entry("execution_id".to_string())
-            .or_insert_with(|| json!(self.execution_id));
-        FileLogService::new(self.durable_root).append_round_log(
-            self.gap_id,
-            self.round_idx,
-            LogEntry {
-                datetime: now_timestamp(),
-                severity: "info".to_string(),
-                category: category.to_string(),
-                message: message.to_string(),
-                details: Some(details),
-                actions: Vec::new(),
-                actor: Some("refine".to_string()),
-                gap_id: Some(self.gap_id.to_string()),
-            },
-        )?;
-        Ok(())
-    }
 }
 
 impl WorkflowAutomation for WorkflowEngine {
@@ -1796,6 +1347,12 @@ fn new_claim_id() -> String {
 
 fn new_execution_id() -> String {
     format!("exec-{}", Uuid::new_v4())
+}
+
+fn missing_workflow_artifact(name: &str, gap_id: &str) -> RefineError {
+    RefineError::Conflict(format!(
+        "workflow artifact {name} is missing for Gap {gap_id}"
+    ))
 }
 
 fn now_timestamp() -> String {

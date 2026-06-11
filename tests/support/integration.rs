@@ -307,7 +307,7 @@ impl IntegrationFixture {
         ];
         if !self.agent_automation_enabled {
             env.push((
-                "REFINE_AGENT_SCHEDULER_DISABLED".to_string(),
+                "REFINE_AGENT_WORKFLOW_DISABLED".to_string(),
                 "1".to_string(),
             ));
         }

@@ -122,7 +122,7 @@ struct StaticAssetCacheEntry {
 static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry>>> =
     OnceLock::new();
 
-const AGENT_SCHEDULER_INTERVAL: Duration = Duration::from_secs(1);
+const AGENT_WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
@@ -225,7 +225,7 @@ impl LocalHttpDaemon {
         let _automation_loop = if agent_automation_loop_disabled() {
             None
         } else {
-            Some(self.start_agent_automation_loop(AGENT_SCHEDULER_INTERVAL))
+            Some(self.start_agent_automation_loop(AGENT_WORKFLOW_INTERVAL))
         };
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
     }
@@ -827,7 +827,7 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
 
 fn agent_automation_loop_disabled() -> bool {
     matches!(
-        env::var("REFINE_AGENT_SCHEDULER_DISABLED")
+        env::var("REFINE_AGENT_WORKFLOW_DISABLED")
             .ok()
             .as_deref()
             .map(str::trim),

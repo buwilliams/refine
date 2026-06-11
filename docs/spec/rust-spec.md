@@ -641,7 +641,7 @@ Requirements:
 - Agents, QA, merge, governance, and target-app build are tools invoked by
   workflow behaviors.
 - Public automation controls pause or resume workflow automation; there is no
-  public schedule/run/tick command.
+  public manual trigger command for starting workflow work.
 
 ### Agent Providers
 

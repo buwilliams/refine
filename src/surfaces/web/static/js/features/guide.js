@@ -224,7 +224,7 @@ const GUIDE_CATEGORIES = [
         "Default: 2000 MB.",
         { hash: "#/node/runtime", selector: "#s-ui-memory" }),
       guideItem("runtime-worker-cpu-priority", "Worker CPU priority", "Educate and configure",
-        "Worker CPU priority lowers background worker scheduling priority so Refine is less likely to compete with normal development work.",
+        "Worker CPU priority lowers background worker CPU priority so Refine is less likely to compete with normal development work.",
         "Default: low.",
         { hash: "#/node/runtime", selector: "#s-worker-cpu-priority" }),
       guideItem("runtime-resource-isolation", "Resource isolation mode", "Educate and configure",

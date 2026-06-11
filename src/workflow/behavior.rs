@@ -1,6 +1,5 @@
 use crate::model::workflow::GapStatus;
 use crate::process::supervisor::errors::RefineResult;
-use crate::tools::product::project_state::GapSummaryProjection;
 use crate::workflow::context::WorkflowContext;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -28,9 +27,5 @@ pub enum WorkflowAdvanceOutcome {
 pub trait WorkflowBehavior {
     fn observes(&self) -> GapStatus;
 
-    fn advance(
-        &self,
-        gap: &GapSummaryProjection,
-        ctx: &mut WorkflowContext,
-    ) -> RefineResult<WorkflowAdvanceOutcome>;
+    fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome>;
 }
