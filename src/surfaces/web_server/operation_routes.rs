@@ -131,7 +131,7 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        let automation = match self.current_durable_root() {
+        let automation = match self.current_refine_dir() {
             Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
             Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
@@ -151,7 +151,7 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        let automation = match self.current_durable_root() {
+        let automation = match self.current_refine_dir() {
             Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
             Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
@@ -169,7 +169,7 @@ impl InProcessWebServer {
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("read managed processes");
         }
-        let durable_root = match self.current_durable_root() {
+        let durable_root = match self.current_refine_dir() {
             Ok(root) => root,
             Err(error) => return error_response(error),
         };
@@ -240,7 +240,7 @@ impl InProcessWebServer {
         match supervisor.set_background_processes_stopped(stopped) {
             Ok(_) => {
                 if stopped {
-                    let durable_root = match self.current_durable_root() {
+                    let durable_root = match self.current_refine_dir() {
                         Ok(root) => root,
                         Err(error) => return error_response(error),
                     };
@@ -276,7 +276,7 @@ impl InProcessWebServer {
         match supervisor.set_agents_paused(paused) {
             Ok(_) => {
                 if paused {
-                    let durable_root = match self.current_durable_root() {
+                    let durable_root = match self.current_refine_dir() {
                         Ok(root) => root,
                         Err(error) => return error_response(error),
                     };
@@ -539,7 +539,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_support_bundle(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "export support bundle");
+        let durable_root = require_refine_dir!(self, "export support bundle");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("export support bundle");
         };
@@ -575,7 +575,7 @@ impl InProcessWebServer {
         let repo_root = self
             .source_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        let durable_root = self.current_durable_root().ok().flatten();
+        let durable_root = self.current_refine_dir().ok().flatten();
         let cache_key = diagnostics_cache_key(runtime_root, durable_root.as_ref(), &repo_root);
         if !refresh {
             let cache = DIAGNOSTICS_CACHE

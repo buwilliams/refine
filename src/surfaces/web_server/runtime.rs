@@ -66,23 +66,23 @@ impl InProcessWebServer {
 
     pub(super) fn project_registry_service(&self) -> Option<FileProjectRegistryService> {
         self.app_registry_runtime_root().map(|runtime_root| {
-            FileProjectRegistryService::new(runtime_root, self.durable_root.clone())
+            FileProjectRegistryService::new(runtime_root, self.target_root.clone())
         })
     }
 
     pub(super) fn current_projection(&self) -> RefineResult<ProjectionSnapshot> {
-        if let Some(durable_root) = self.current_durable_root()? {
+        if let Some(refine_dir) = self.current_refine_dir()? {
             if let Some(runtime_root) = &self.runtime_root {
-                let key = projection_cache_key(&durable_root, runtime_root);
+                let key = projection_cache_key(&refine_dir, runtime_root);
                 if let Some(snapshot) = hot_projection(&key)? {
                     return Ok(snapshot);
                 }
-                let store = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root);
+                let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
                 let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
                 store_hot_projection(key, snapshot.clone())?;
                 Ok(snapshot)
             } else {
-                let store = FileProjectStateStore::new(durable_root);
+                let store = FileProjectStateStore::new(refine_dir);
                 store.rebuild_projection()
             }
         } else {
@@ -90,14 +90,20 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn current_durable_root(&self) -> RefineResult<Option<PathBuf>> {
+    pub(super) fn current_target_root(&self) -> RefineResult<Option<PathBuf>> {
         if let Some(runtime_root) = self.app_registry_runtime_root() {
             let registry = FileProjectRegistryService::new(runtime_root, None);
             if let Some(active_app) = registry.load()?.active_app {
-                return Ok(Some(PathBuf::from(active_app).join(".refine")));
+                return Ok(Some(PathBuf::from(active_app)));
             }
         }
-        Ok(self.durable_root.clone())
+        Ok(self.target_root.clone())
+    }
+
+    pub(super) fn current_refine_dir(&self) -> RefineResult<Option<PathBuf>> {
+        Ok(self
+            .current_target_root()?
+            .map(|target_root| target_root.join(".refine")))
     }
 
     pub(super) fn chat_service(&self, durable_root: &Path) -> FileChatService {
@@ -126,11 +132,11 @@ impl InProcessWebServer {
         if projection.runtime != runtime {
             projection.runtime = runtime;
             self.persist_runtime_projection_snapshot(&projection)?;
-            if let (Some(runtime_root), Some(durable_root)) =
-                (&self.runtime_root, self.current_durable_root()?)
+            if let (Some(runtime_root), Some(refine_dir)) =
+                (&self.runtime_root, self.current_refine_dir()?)
             {
                 store_hot_projection(
-                    projection_cache_key(&durable_root, runtime_root),
+                    projection_cache_key(&refine_dir, runtime_root),
                     projection.clone(),
                 )?;
             }
@@ -143,7 +149,7 @@ impl InProcessWebServer {
             return Ok(RuntimeProjection::default());
         };
         let key = runtime_cache_key(runtime_root);
-        let durable_root = self.current_durable_root()?;
+        let durable_root = self.current_refine_dir()?;
         let current_fingerprint =
             runtime_projection_fingerprint(runtime_root, durable_root.as_deref())?;
         {
@@ -167,7 +173,7 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeProjection::default());
         };
-        let durable_root = self.current_durable_root()?;
+        let durable_root = self.current_refine_dir()?;
         let fingerprint = runtime_projection_fingerprint(runtime_root, durable_root.as_deref())?;
         self.refresh_runtime_projection_cache_with_fingerprint(fingerprint)
     }
@@ -201,7 +207,7 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeProjection::default());
         };
-        let durable_root = self.current_durable_root()?;
+        let durable_root = self.current_refine_dir()?;
         let process =
             process_summary_value_with_chat_sessions(runtime_root, durable_root.as_deref())?;
         let processes = process
@@ -243,7 +249,7 @@ impl InProcessWebServer {
         if self.runtime_root.is_none() {
             return Ok(());
         }
-        if self.current_durable_root()?.is_none() {
+        if self.current_target_root()?.is_none() {
             return Ok(());
         }
         self.rebuild_current_projection_cache()?;
@@ -254,7 +260,7 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(None);
         };
-        let Some(durable_root) = self.current_durable_root()? else {
+        let Some(durable_root) = self.current_refine_dir()? else {
             return Ok(None);
         };
         let snapshot = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root)
@@ -281,9 +287,9 @@ impl InProcessWebServer {
                 "runtime root is required to rebuild projection cache".to_string(),
             ));
         };
-        let Some(durable_root) = self.current_durable_root()? else {
+        let Some(durable_root) = self.current_refine_dir()? else {
             return Err(RefineError::InvalidInput(
-                "durable root is required to rebuild projection cache".to_string(),
+                "target root is required to rebuild projection cache".to_string(),
             ));
         };
         let store = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root);
@@ -312,7 +318,7 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(());
         };
-        let Some(durable_root) = self.current_durable_root()? else {
+        let Some(durable_root) = self.current_refine_dir()? else {
             return Ok(());
         };
         FileProjectStateStore::with_runtime_root(durable_root, runtime_root)
@@ -355,10 +361,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn source_root(&self) -> Option<PathBuf> {
-        self.current_durable_root()
-            .ok()
-            .flatten()
-            .and_then(|root| root.parent().map(Path::to_path_buf))
+        self.current_target_root().ok().flatten()
     }
 }
 

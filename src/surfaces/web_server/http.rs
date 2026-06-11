@@ -167,7 +167,7 @@ impl LocalHttpDaemon {
         &self,
         mut report: impl FnMut(&str),
     ) -> RefineResult<()> {
-        if let Some(durable_root) = self.server.current_durable_root()? {
+        if let Some(durable_root) = self.server.current_refine_dir()? {
             report("recovering interrupted chat turns");
             self.server
                 .chat_service(&durable_root)
@@ -740,7 +740,7 @@ impl LocalHttpDaemon {
                 }),
             },
         ];
-        if let Some(durable_root) = self.server.current_durable_root()? {
+        if let Some(durable_root) = self.server.current_refine_dir()? {
             if let Some(entry) = FileActivityService::new(&durable_root)
                 .recent(1)?
                 .into_iter()
@@ -814,7 +814,7 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     let Some(runtime_root) = &server.runtime_root else {
         return Ok(());
     };
-    let Some(durable_root) = server.current_durable_root()? else {
+    let Some(durable_root) = server.current_refine_dir()? else {
         return Ok(());
     };
     let automation = WorkflowEngine::with_durable_root(runtime_root, durable_root);

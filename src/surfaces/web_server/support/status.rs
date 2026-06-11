@@ -68,13 +68,13 @@ pub(in crate::surfaces::web_server) fn process_text_matches(
     text.contains(feature_id) || gap_ids.iter().any(|gap_id| text.contains(gap_id))
 }
 
-pub(in crate::surfaces::web_server) fn durable_root_unavailable(action: &str) -> ApiResponse {
+pub(in crate::surfaces::web_server) fn target_root_unavailable(action: &str) -> ApiResponse {
     ApiResponse::json(
         503,
         json!({
             "error": {
-                "code": "durable_root_unavailable",
-                "message": format!("daemon cannot {action} without a durable root")
+                "code": "target_root_unavailable",
+                "message": format!("daemon cannot {action} without a target root")
             }
         }),
     )

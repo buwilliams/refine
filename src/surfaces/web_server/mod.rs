@@ -187,17 +187,17 @@ struct ApiMutationEvent {
 pub struct InProcessWebServer {
     pub status: DaemonStatus,
     pub projection: ProjectionSnapshot,
-    /// Test/bootstrap fixture root. The served daemon resolves real app state
+    /// Test/bootstrap target app root. The served daemon resolves real app state
     /// from the runtime app registry at request time.
-    pub durable_root: Option<PathBuf>,
+    pub target_root: Option<PathBuf>,
     pub runtime_root: Option<PathBuf>,
 }
 
-macro_rules! require_durable_root {
+macro_rules! require_refine_dir {
     ($server:expr, $action:expr) => {{
-        match $server.current_durable_root() {
+        match $server.current_refine_dir() {
             Ok(Some(path)) => path,
-            Ok(None) => return durable_root_unavailable($action),
+            Ok(None) => return target_root_unavailable($action),
             Err(error) => return error_response(error),
         }
     }};

@@ -796,7 +796,7 @@ fn nonempty_or_import_value<'a>(value: &'a str, fallback: &'a str) -> &'a str {
 
 impl InProcessWebServer {
     fn active_node_id_for_routes(&self) -> String {
-        self.current_durable_root()
+        self.current_refine_dir()
             .ok()
             .flatten()
             .and_then(|durable_root| {
@@ -809,7 +809,7 @@ impl InProcessWebServer {
     }
 
     fn node_display_names_for_routes(&self) -> BTreeMap<String, String> {
-        self.current_durable_root()
+        self.current_refine_dir()
             .ok()
             .flatten()
             .and_then(|durable_root| {
@@ -837,7 +837,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_transition(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "mutate work items");
+        let durable_root = require_refine_dir!(self, "mutate work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -882,7 +882,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_action(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "mutate work items");
+        let durable_root = require_refine_dir!(self, "mutate work items");
         let Some((gap_id, action)) = gap_id_and_action(&request.path) else {
             return gap_id_required();
         };
@@ -921,7 +921,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "create work items");
+        let durable_root = require_refine_dir!(self, "create work items");
         let body = request.body.as_ref();
         let actual = body
             .and_then(|body| body.get("actual"))
@@ -1124,7 +1124,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_bulk_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "bulk update work items");
+        let durable_root = require_refine_dir!(self, "bulk update work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1145,7 +1145,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_bulk_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "bulk delete work items");
+        let durable_root = require_refine_dir!(self, "bulk delete work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1163,7 +1163,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "create features");
+        let durable_root = require_refine_dir!(self, "create features");
         let Some(name) = request
             .body
             .as_ref()
@@ -1216,7 +1216,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "update features");
+        let durable_root = require_refine_dir!(self, "update features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1247,7 +1247,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_bulk_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "bulk update features");
+        let durable_root = require_refine_dir!(self, "bulk update features");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1279,7 +1279,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_bulk_assign_gaps(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "bulk assign Gaps to Features");
+        let durable_root = require_refine_dir!(self, "bulk assign Gaps to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1305,7 +1305,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "update work items");
+        let durable_root = require_refine_dir!(self, "update work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1403,7 +1403,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_note(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "edit work items");
+        let durable_root = require_refine_dir!(self, "edit work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1444,7 +1444,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_append(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "append Gap rounds");
+        let durable_root = require_refine_dir!(self, "append Gap rounds");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1492,7 +1492,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_edit_latest(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "edit latest Gap round");
+        let durable_root = require_refine_dir!(self, "edit latest Gap round");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1531,7 +1531,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_evaluation_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "update latest Gap round evaluation");
+        let durable_root = require_refine_dir!(self, "update latest Gap round evaluation");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1551,7 +1551,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_log_append(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "append Gap round logs");
+        let durable_root = require_refine_dir!(self, "append Gap round logs");
         let Some(rest) = request.path.strip_prefix("/work/gaps/") else {
             return gap_id_required();
         };
@@ -1630,7 +1630,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_logs(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "read Gap round logs");
+        let durable_root = require_refine_dir!(self, "read Gap round logs");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1675,7 +1675,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "delete work items");
+        let durable_root = require_refine_dir!(self, "delete work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1696,7 +1696,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_cancel(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "cancel work items");
+        let durable_root = require_refine_dir!(self, "cancel work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1715,7 +1715,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_show(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "read Features");
+        let durable_root = require_refine_dir!(self, "read Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1746,7 +1746,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_add_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "assign Gaps to Features");
+        let durable_root = require_refine_dir!(self, "assign Gaps to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1787,7 +1787,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_add_gap_path(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "assign Gaps to Features");
+        let durable_root = require_refine_dir!(self, "assign Gaps to Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1811,7 +1811,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_remove_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "remove Gaps from Features");
+        let durable_root = require_refine_dir!(self, "remove Gaps from Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1835,7 +1835,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_reorder_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "reorder Feature Gaps");
+        let durable_root = require_refine_dir!(self, "reorder Feature Gaps");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1872,7 +1872,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_move(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "move Feature workflow");
+        let durable_root = require_refine_dir!(self, "move Feature workflow");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1911,7 +1911,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_cancel(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "cancel Features");
+        let durable_root = require_refine_dir!(self, "cancel Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1953,7 +1953,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "delete Features");
+        let durable_root = require_refine_dir!(self, "delete Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1989,7 +1989,7 @@ impl InProcessWebServer {
                 }),
             );
         };
-        let durable_root = require_durable_root!(self, "read Gap detail");
+        let durable_root = require_refine_dir!(self, "read Gap detail");
         match self.work_item_service(durable_root).show_gap_detail(gap_id) {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap})),
             Err(error) => error_response(error),
@@ -2150,11 +2150,11 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_list(&self, raw_path: &str) -> ApiResponse {
-        let Some(_) = (match self.current_durable_root() {
+        let Some(_) = (match self.current_refine_dir() {
             Ok(durable_root) => durable_root,
             Err(error) => return error_response(error),
         }) else {
-            return durable_root_unavailable("read activity");
+            return target_root_unavailable("read activity");
         };
         let projection = match self.current_projection() {
             Ok(projection) => projection,
@@ -2192,7 +2192,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_ui_error(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "record UI activity");
+        let durable_root = require_refine_dir!(self, "record UI activity");
         let body = request.body.unwrap_or_else(|| json!({}));
         let message = body
             .get("message")
@@ -2223,7 +2223,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_cleanup(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "clean up activity");
+        let durable_root = require_refine_dir!(self, "clean up activity");
         let body = request.body.unwrap_or_else(|| json!({}));
         let days = body
             .get("days")
@@ -2336,9 +2336,9 @@ impl InProcessWebServer {
                 }),
             );
         }
-        let durable_root = require_durable_root!(self, "undo Git changes");
+        let durable_root = require_refine_dir!(self, "undo Git changes");
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("undo Git changes");
+            return target_root_unavailable("undo Git changes");
         };
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("undo Git changes");
@@ -2481,7 +2481,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_files_tree(&self, raw_path: &str) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("read source files");
+            return target_root_unavailable("read source files");
         };
         let path = query_param(raw_path, "path").unwrap_or_default();
         let recursive = query_param(raw_path, "recursive")
@@ -2503,7 +2503,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_files_read(&self, raw_path: &str) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("read source file");
+            return target_root_unavailable("read source file");
         };
         let path = query_param(raw_path, "path").unwrap_or_default();
         let offset = query_param(raw_path, "offset")
@@ -2521,7 +2521,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_files_search(&self, raw_path: &str) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("search source files");
+            return target_root_unavailable("search source files");
         };
         let query = query_param(raw_path, "q").unwrap_or_default();
         let max_entries = query_param(raw_path, "max_entries")
@@ -2536,7 +2536,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_terminal_session_start(&self, request: ApiRequest) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("start terminal session");
+            return target_root_unavailable("start terminal session");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let cols = body
@@ -2626,7 +2626,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_merger_hard_reset_worktree(&self) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("hard-reset Git worktree");
+            return target_root_unavailable("hard-reset Git worktree");
         };
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("hard-reset Git worktree");
@@ -2645,7 +2645,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "extract imported Gaps");
+        let durable_root = require_refine_dir!(self, "extract imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")
@@ -2839,7 +2839,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_persist(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "persist imported Gaps");
+        let durable_root = require_refine_dir!(self, "persist imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")

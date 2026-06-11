@@ -38,14 +38,14 @@ pub trait ProjectRegistryService {
 #[derive(Clone, Debug)]
 pub struct FileProjectRegistryService {
     pub runtime_root: PathBuf,
-    pub current_durable_root: Option<PathBuf>,
+    pub current_target_root: Option<PathBuf>,
 }
 
 impl FileProjectRegistryService {
-    pub fn new(runtime_root: impl Into<PathBuf>, current_durable_root: Option<PathBuf>) -> Self {
+    pub fn new(runtime_root: impl Into<PathBuf>, current_target_root: Option<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
-            current_durable_root,
+            current_target_root,
         }
     }
 
@@ -106,9 +106,8 @@ impl FileProjectRegistryService {
     pub fn status(&self) -> RefineResult<ProjectStatus> {
         let mut registry = self.load()?;
         let startup_app = self
-            .current_durable_root
+            .current_target_root
             .as_ref()
-            .and_then(|root| root.parent())
             .map(|path| path.display().to_string());
         if registry.active_app.is_none() {
             registry.active_app = startup_app.clone();
@@ -314,9 +313,12 @@ impl FileProjectRegistryService {
     }
 
     pub fn migrate_current(&self) -> RefineResult<ProjectMigrationReport> {
-        let durable_root = self.current_durable_project_root()?;
-        FileProjectMigrationService::with_runtime_root(durable_root, self.runtime_root.clone())
-            .migrate()
+        let target_root = self.current_target_root()?;
+        FileProjectMigrationService::with_runtime_root(
+            target_root.join(".refine"),
+            self.runtime_root.clone(),
+        )
+        .migrate()
     }
 
     fn ensure_schema_ready(&self, app_path: &Path) -> RefineResult<()> {
@@ -364,8 +366,8 @@ impl FileProjectRegistryService {
         Ok(false)
     }
 
-    fn current_durable_project_root(&self) -> RefineResult<PathBuf> {
-        if let Some(root) = &self.current_durable_root {
+    fn current_target_root(&self) -> RefineResult<PathBuf> {
+        if let Some(root) = &self.current_target_root {
             return Ok(root.clone());
         }
         let registry = self.load()?;
@@ -374,7 +376,7 @@ impl FileProjectRegistryService {
                 "no active project is attached".to_string(),
             ));
         };
-        Ok(PathBuf::from(app).join(".refine"))
+        Ok(PathBuf::from(app))
     }
 
     fn git_init(&self, app_path: &Path) -> RefineResult<()> {

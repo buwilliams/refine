@@ -475,7 +475,7 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -527,7 +527,7 @@ fn web_server_creates_gap_from_new_gap_modal_payload() {
     let temp_root = unique_temp_dir("http-gap-create-modal");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -573,7 +573,7 @@ fn web_server_handles_new_gap_duplicate_decisions() {
     let temp_root = unique_temp_dir("http-gap-duplicate-modal");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let body = json!({
         "reporter": "Alice",
@@ -646,7 +646,7 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root);
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root);
     let daemon = LocalHttpDaemon {
         server,
@@ -683,7 +683,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root);
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -907,7 +907,7 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -994,7 +994,7 @@ fn web_server_transitions_gap_and_durable_root() {
         .unwrap();
     let mut server = server_with_projection();
     server.projection = projection;
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let response = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1026,7 +1026,7 @@ fn web_server_creates_and_shows_gap() {
     let temp_root = unique_temp_dir("http-create-show");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let create = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1053,7 +1053,7 @@ fn web_server_edits_notes_and_deletes_gap() {
     let temp_root = unique_temp_dir("http-edit-note-delete");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1132,7 +1132,7 @@ fn web_server_appends_and_edits_latest_round() {
     let temp_root = unique_temp_dir("http-rounds");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1186,7 +1186,7 @@ fn web_server_appends_and_reads_gap_round_logs() {
     let temp_root = unique_temp_dir("http-gap-round-logs");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
@@ -1266,7 +1266,7 @@ fn web_server_creates_features_and_updates_membership() {
     let temp_root = unique_temp_dir("http-feature-membership");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1316,7 +1316,7 @@ fn web_server_reorders_and_moves_feature_workflow() {
     let temp_root = unique_temp_dir("http-feature-reorder-move");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1382,7 +1382,7 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let temp_root = unique_temp_dir("http-feature-gap-actions");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     for (id, name) in [
         ("GAP1", "Verify Gap"),
         ("GAP2", "Retry Quality"),
@@ -1505,7 +1505,7 @@ fn web_server_cancels_and_deletes_features() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         server.handle(ApiRequest {
@@ -1592,7 +1592,7 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let temp_root = unique_temp_dir("http-api-aliases");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let create_gap = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1639,7 +1639,7 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let temp_root = unique_temp_dir("http-bulk-api-aliases");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     for (id, name) in [("GAP1", "Bulk One"), ("GAP2", "Bulk Two")] {
         let create = server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1698,7 +1698,7 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     let temp_root = unique_temp_dir("http-activity");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let recorded = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1735,7 +1735,7 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     let temp_root = unique_temp_dir("http-import-persist");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let parsed = server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1816,7 +1816,7 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
         std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
     }
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     FileSettingsService::new(&durable_root)
         .update(&json!({"agent_cli": "smoke-ai"}))
@@ -1882,7 +1882,7 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let prefix = format!(
         "cancel-import-{}",
@@ -1979,7 +1979,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     server.handle(ApiRequest {
@@ -2084,7 +2084,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root);
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let changes = server.handle(ApiRequest {
@@ -2135,7 +2135,7 @@ fn web_server_hard_resets_git_worktree() {
     fs::write(temp_root.join("app.txt"), "dirty\n").unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root);
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2168,7 +2168,7 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     fs::create_dir_all(&durable_root).unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let no_repo = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2247,7 +2247,7 @@ fn web_server_project_sync_pulls_fast_forward_and_allows_refine_runtime_noise() 
     git(&seed, &["push", "origin", "main"]).unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(app_root.join(".refine"));
+    server.target_root = Some(app_root.clone());
     server.runtime_root = Some(temp_root.join("run/8080"));
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2278,7 +2278,7 @@ fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
     fs::write(app_root.join("local.txt"), "local dirty\n").unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(app_root.join(".refine"));
+    server.target_root = Some(app_root.clone());
     server.runtime_root = Some(temp_root.join("run/8080"));
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2315,7 +2315,7 @@ fn web_server_project_sync_reports_pull_failure_for_diverged_branch() {
     git(&app_root, &["commit", "-m", "local update"]).unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(app_root.join(".refine"));
+    server.target_root = Some(app_root.clone());
     server.runtime_root = Some(temp_root.join("run/8080"));
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2340,7 +2340,7 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let temp_root = unique_temp_dir("http-cleanups");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2410,7 +2410,7 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let temp_root = unique_temp_dir("http-node-transfer");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     for (id, name) in [
         ("GAP1", "Transfer One"),
         ("GAP2", "Transfer Two"),
@@ -2503,7 +2503,7 @@ fn web_server_manages_cluster_node_registry() {
     let temp_root = unique_temp_dir("http-cluster-registry");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2588,7 +2588,7 @@ fn web_server_serves_source_file_tree_read_and_search() {
     fs::write(temp_root.join("artifact.bin"), [0x00, 0x01, 0x02]).unwrap();
     fs::write(durable_root.join("settings.json"), "{}").unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let tree = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2684,7 +2684,7 @@ fn web_server_runs_interactive_terminal_session() {
     fs::write(temp_root.join("README.md"), "terminal root\n").unwrap();
 
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root);
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let start = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2738,7 +2738,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     fs::create_dir_all(temp_root.join("child")).unwrap();
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let path = server.handle(ApiRequest {
@@ -2915,7 +2915,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
     let registry = FileOperationRegistry::new(&runtime_root);
     let operation = registry.register("bulk_update_gaps").unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
@@ -2975,7 +2975,7 @@ fn web_server_retries_workflow_executions() {
     let claim_id = automation.claim("GAP1").unwrap();
     let execution_id = automation.start_claim(&claim_id).unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let retry = server.handle(ApiRequest {
@@ -3111,7 +3111,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     )
     .unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let listed = server.handle(ApiRequest {
@@ -3458,7 +3458,7 @@ fn web_server_manages_quality_settings_and_regressions() {
     let runtime_root = temp_root.join("run/8080");
     write_fake_playwright(&temp_root, 0);
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let app_settings = server.handle(ApiRequest {
@@ -3615,7 +3615,7 @@ fn web_server_manages_durable_chat_sessions() {
         "{\"message\":\"web provider output\",\"importable_artifacts\":[{\"type\":\"round\",\"round\":{\"reporter\":\"QA\",\"actual\":\"Broken\",\"target\":\"Fixed\"}}]}",
     );
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3710,7 +3710,7 @@ fn web_server_edits_and_removes_queued_chat_messages() {
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3769,7 +3769,7 @@ fn web_server_standalone_chat_start_and_stop_manage_worktree() {
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3812,7 +3812,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_workt
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3888,7 +3888,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let session_path = durable_root.join(format!("chat/sessions/{}.json", session.id));
 
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -3927,7 +3927,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&durable_root).unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
@@ -4142,7 +4142,7 @@ fn web_server_applies_runtime_settings_updates_immediately() {
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let created = server.handle(ApiRequest {
@@ -4293,7 +4293,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&durable_root).unwrap();
     let mut server = server_with_projection();
-    server.durable_root = None;
+    server.target_root = None;
     server.runtime_root = Some(runtime_root.clone());
 
     let detached_settings = server.handle(ApiRequest {
@@ -4304,7 +4304,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     assert_eq!(detached_settings.status, 503);
     assert_eq!(
         detached_settings.body["error"]["code"],
-        "durable_root_unavailable"
+        "target_root_unavailable"
     );
 
     let attached = server.handle(ApiRequest {
@@ -4357,7 +4357,7 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let temp_root = unique_temp_dir("http-project-config");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
 
     let governance = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -4450,7 +4450,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     )
     .unwrap();
     let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
+    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -4783,7 +4783,7 @@ fn server_with_projection() -> InProcessWebServer {
             dashboard: DashboardProjection::default(),
             runtime: RuntimeProjection::default(),
         },
-        durable_root: None,
+        target_root: None,
         runtime_root: None,
     }
 }
