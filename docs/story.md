@@ -211,3 +211,27 @@ Effort: Extreme (52 commits, 7 milestones)
 Milestones started: full Rust release gate; multi-instance and cluster coverage; target-app and chat workflow fixes; installer/release hardening; UI regression cleanup; manual Docker release testing; 3.0 patch releases.
 
 The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Gap drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and 3.0 patch releases, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports and Docker-safe bind defaults. Long UI and workflow paths covering Features, Gaps, CSV import, chat, governance, and Settings were stabilized before the next patch release.
+
+## Day 28: 2026-06-09 (Tuesday)
+
+Effort: Very High (27 commits, 5 milestones)
+
+Milestones started: Plan Draft background extraction; agent-install runbook cleanup; scoped test orchestration; daemon startup progress; README positioning polish.
+
+Plan Mode and install guidance tightened together: Plan prompts became more product-spec oriented, Plan Draft extraction moved into the background, and agent-install docs were reworked around clearer Homebrew and update flows. The test story also got sharper with orchestrator-only integration suites, scoped suite names, and fuller wording around full versus targeted runs. Product surfaces kept improving through restored Process settings, SSE-backed toolbar chat updates, daemon startup cache progress, and a long README language pass that clarified governance, agent fleet, and team-organization positioning before the 3.0.3 patch release.
+
+## Day 29: 2026-06-10 (Wednesday)
+
+Effort: Very High (19 commits, 5 milestones)
+
+Milestones started: runtime settings immediacy; scheduler priority-band parallelism; standalone chat worktrees; toolbar terminal; reporter/assignee semantics.
+
+Workflow and toolbar work moved into more complete product shape: runtime settings began applying immediately, scheduling could use parallel capacity within priority bands, backlog promotion became active-node scoped, and projection/process registry bloat was trimmed. Standalone chat gained real worktree ownership, ready-merge handoff, centralized submission paths, streamed agent activity, unborn-HEAD handling, and plan working-state fixes. The toolbar also gained an interactive Terminal tab with faster input handling and nested-scroll polish, while the data model corrected reporter and assignee semantics and project attach learned to create missing local projects.
+
+## Day 30: 2026-06-11 (Thursday)
+
+Effort: High (12 commits, 4 milestones)
+
+Milestones started: workflow behavior-engine refactor; operation naming cleanup; target-root/runtime clarification; target-app QA gate.
+
+Workflow internals were reshaped around clearer architecture: the scheduler moved into workflow-oriented services, process handling was refactored, behavior engines landed, and background jobs were renamed to operations. Runtime and target-root boundaries were clarified across daemon launch and web handling, Playwright integration scaffolding was removed, QA now runs through target-app tests, and daemon launch liveness detection was fixed. The day closed by cleaning up flaky Rust unit tests around Smoke AI isolation, chat session persistence, and the automation loop's build-stage fixture.
