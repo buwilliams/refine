@@ -68,6 +68,56 @@ function workflowStatuses() {
     : WORKFLOW_STATUSES;
 }
 
+const PASSED_REVIEW_STATES = new Set(["pass", "passed", "ok", "success", "succeeded"]);
+const FAILED_REVIEW_STATES = new Set(["fail", "failed", "error", "rejected", "violation"]);
+
+function normalizeReviewState(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || normalized === "none") return "unclassified";
+  if (PASSED_REVIEW_STATES.has(normalized)) return "passed";
+  if (FAILED_REVIEW_STATES.has(normalized)) return "failed";
+  return normalized;
+}
+
+function reviewStatePassed(value) {
+  return normalizeReviewState(value) === "passed";
+}
+
+function reviewStateClass(value, passedClass = "done", failedClass = "failed", emptyClass = "todo") {
+  const normalized = normalizeReviewState(value);
+  if (normalized === "unclassified") return emptyClass;
+  return normalized === "passed" ? passedClass : failedClass;
+}
+
+function governanceReviewStatus(round) {
+  const ruleState = normalizeReviewState(round?.rule_state);
+  if (ruleState === "unclassified") {
+    return {
+      visible: false,
+      passed: false,
+      states: {
+        rules: ruleState,
+        product: normalizeReviewState(round?.product_state),
+        constitution: normalizeReviewState(round?.constitution_state),
+        meta: normalizeReviewState(round?.meta_rule_state),
+      },
+    };
+  }
+  const states = {
+    rules: ruleState,
+    product: normalizeReviewState(round?.product_state),
+    constitution: normalizeReviewState(round?.constitution_state),
+    meta: normalizeReviewState(round?.meta_rule_state),
+  };
+  return {
+    visible: true,
+    passed: states.rules === "passed"
+      && states.product === "passed"
+      && states.constitution === "passed",
+    states,
+  };
+}
+
 function updateActiveNodeLabel() {
   const el = document.getElementById("active-node-label");
   const project = state.project || {};

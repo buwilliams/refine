@@ -376,6 +376,23 @@ fn static_gap_detail_logs_feature_blocking_notice_to_system() {
     assert!(gaps_detail.contains(r#"source: "workflow""#));
 }
 
+#[test]
+fn static_gap_detail_uses_shared_governance_review_state_helpers() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
+    let gaps_detail = fs::read_to_string(static_root.join("js/features/gaps-detail.js")).unwrap();
+
+    assert!(common.contains("function governanceReviewStatus"));
+    assert!(common.contains(r#""pass", "passed""#));
+    assert!(common.contains("function reviewStateClass"));
+    assert!(gaps_detail.contains("governanceReviewStatus(round)"));
+    assert!(gaps_detail.contains("governanceReviewStatus(latest)"));
+    assert!(gaps_detail.contains("reviewStateClass(states.product)"));
+    assert!(gaps_detail.contains("reviewStateClass(states.constitution)"));
+    assert!(!gaps_detail.contains(r#"product_state === "pass""#));
+    assert!(!gaps_detail.contains(r#"constitution_state === "pass""#));
+}
+
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut rest = source;

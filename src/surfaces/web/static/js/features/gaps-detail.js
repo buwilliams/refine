@@ -758,10 +758,10 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
         <strong>Round ${idx + 1}</strong>
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
         ${isLatest && rnd.rule_state && rnd.rule_state !== "unclassified"
-          ? `<span class="status-pill ${rnd.rule_state === "passed" ? "done" : "failed"}">governance: ${htmlEscape(rnd.rule_state)}</span>`
+          ? `<span class="status-pill ${reviewStateClass(rnd.rule_state)}">governance: ${htmlEscape(rnd.rule_state)}</span>`
           : ""}
         ${isLatest && rnd.quality_state && rnd.quality_state !== "unclassified"
-          ? `<span class="status-pill ${rnd.quality_state === "passed" ? "qa" : "failed"}">quality: ${htmlEscape(rnd.quality_state)}</span>`
+          ? `<span class="status-pill ${reviewStateClass(rnd.quality_state, "qa")}">quality: ${htmlEscape(rnd.quality_state)}</span>`
           : ""}
         <span class="spacer"></span>
         <span class="muted small">
@@ -781,18 +781,20 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
 }
 
 function renderGovernanceSummary(round) {
-  if (!round || !round.rule_state || round.rule_state === "unclassified") {
+  const governance = governanceReviewStatus(round);
+  if (!governance.visible) {
     return "";
   }
   const actions = round.governance_rule_actions || [];
+  const states = governance.states;
   return `
     <div class="card" style="margin:0 0 14px" data-testid="gap-governance-summary">
       <h3>Governance</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${round.rule_state === "passed" ? "done" : "failed"}" data-testid="gap-governance-rules">rules: ${htmlEscape(round.rule_state)}</span>
-        <span class="status-pill ${round.product_state === "pass" ? "done" : "failed"}" data-testid="gap-governance-product">product: ${htmlEscape(round.product_state || "unclassified")}</span>
-        <span class="status-pill ${round.constitution_state === "pass" ? "done" : "failed"}" data-testid="gap-governance-constitution">constitution: ${htmlEscape(round.constitution_state || "unclassified")}</span>
-        <span class="status-pill todo" data-testid="gap-governance-meta">meta: ${htmlEscape(round.meta_rule_state || "none")}</span>
+        <span class="status-pill ${reviewStateClass(states.rules)}" data-testid="gap-governance-rules">rules: ${htmlEscape(states.rules)}</span>
+        <span class="status-pill ${reviewStateClass(states.product)}" data-testid="gap-governance-product">product: ${htmlEscape(states.product)}</span>
+        <span class="status-pill ${reviewStateClass(states.constitution)}" data-testid="gap-governance-constitution">constitution: ${htmlEscape(states.constitution)}</span>
+        <span class="status-pill ${reviewStateClass(states.meta)}" data-testid="gap-governance-meta">meta: ${htmlEscape(states.meta)}</span>
       </div>
       ${round.governance_message ? `<p style="margin-bottom:6px" data-testid="gap-governance-message">${htmlEscape(round.governance_message)}</p>` : ""}
       ${round.governance_details ? `<details data-testid="gap-governance-details"><summary>Details</summary><pre>${htmlEscape(round.governance_details)}</pre></details>` : ""}
@@ -816,7 +818,7 @@ function renderQualitySummary(round) {
     <div class="card" style="margin:0 0 14px" data-testid="gap-quality-summary">
       <h3>Quality</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${round.quality_state === "passed" ? "qa" : "failed"}" data-testid="gap-quality-state">quality: ${htmlEscape(round.quality_state)}</span>
+        <span class="status-pill ${reviewStateClass(round.quality_state, "qa")}" data-testid="gap-quality-state">quality: ${htmlEscape(normalizeReviewState(round.quality_state))}</span>
         ${round.quality_checked_at ? `<span class="muted small" data-testid="gap-quality-checked-at">${fmtTime(round.quality_checked_at)}</span>` : ""}
       </div>
       ${round.quality_message ? `<p style="margin-bottom:6px" data-testid="gap-quality-message">${htmlEscape(round.quality_message)}</p>` : ""}
@@ -949,13 +951,11 @@ function computeFailureBanner(gap, latest) {
 }
 
 function computeGovernanceBanner(gap, latest) {
-  if (!latest || !latest.rule_state || latest.rule_state === "unclassified") {
+  const governance = governanceReviewStatus(latest);
+  if (!governance.visible) {
     return null;
   }
-  const passed = latest.rule_state === "passed"
-    && latest.product_state === "pass"
-    && latest.constitution_state === "pass";
-  if (passed) return null;
+  if (governance.passed) return null;
   return {
     severity: gap.status === "backlog" ? "warn" : "error",
     message: latest.governance_message || "Governance review requires changes before implementation.",
