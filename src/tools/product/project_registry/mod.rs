@@ -326,11 +326,9 @@ impl FileProjectRegistryService {
         if migrated {
             return Ok(());
         }
-        let durable_root = app_path.join(".refine");
-        let service = FileProjectMigrationService::with_runtime_root(
-            &durable_root,
-            self.runtime_root.clone(),
-        );
+        let refine_dir = app_path.join(".refine");
+        let service =
+            FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
         if schema.compatible && !schema.migration_required {
             return Ok(());
@@ -353,11 +351,9 @@ impl FileProjectRegistryService {
     }
 
     fn migrate_schema_if_safe(&self, app_path: &Path) -> RefineResult<bool> {
-        let durable_root = app_path.join(".refine");
-        let service = FileProjectMigrationService::with_runtime_root(
-            &durable_root,
-            self.runtime_root.clone(),
-        );
+        let refine_dir = app_path.join(".refine");
+        let service =
+            FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
         if schema.migration_required && schema.safe_auto && !schema.requires_cluster_quiescence {
             service.migrate()?;
@@ -656,8 +652,7 @@ mod tests {
         let runtime_root = temp_root.join("run/8080");
         let app_root = temp_root.join("app");
         fs::create_dir_all(app_root.join(".refine")).unwrap();
-        let service =
-            FileProjectRegistryService::new(&runtime_root, Some(app_root.join(".refine")));
+        let service = FileProjectRegistryService::new(&runtime_root, Some(app_root.clone()));
 
         let status = service.status().unwrap();
         assert!(status.attached);

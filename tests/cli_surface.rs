@@ -450,7 +450,7 @@ fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixtu
 fn seed_gap_status(fixture: &IntegrationFixture, gap_id: &str, status: &str) {
     let payload = fixture.api_json(
         "POST",
-        "/api/work/gaps/bulk",
+        "/api/gaps/bulk",
         serde_json::json!({
             "selected_ids": [gap_id],
             "exclude_ids": [],

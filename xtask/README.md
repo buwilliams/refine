@@ -14,8 +14,9 @@ Commands:
 - `cargo run --manifest-path xtask/Cargo.toml -- test-rust`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-smoke-ai`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-cli`
-- `cargo run --manifest-path xtask/Cargo.toml -- test-all`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-install-uninstall`
+- `cargo run --manifest-path xtask/Cargo.toml -- test-full-workflow`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync`
+- `cargo run --manifest-path xtask/Cargo.toml -- test-all`
 - `cargo run --manifest-path xtask/Cargo.toml -- check`

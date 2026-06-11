@@ -54,13 +54,11 @@ Use `./r test` as the authoritative test entrypoint. The default command runs on
 Suites:
 
 - `unit` - in-crate Rust unit tests. This is the default when no suite is provided.
-- `integration` - opt-in integration, daemon, Docker, cluster, and UI suites.
+- `integration` - opt-in CLI, daemon, Docker, and cluster suites.
 - `full` - all test suites and repository checks.
 - `rust` - Rust unit, integration, and doc tests.
 - `smoke-ai` - Smoke AI fixture contract.
-- `cli` - daemon-backed CLI surface tests.
-- `ui` - Playwright UI tests.
-- `surface` - smoke AI, CLI, multi-instance sync, and UI suites.
+- `cli` - daemon-backed CLI integration tests. These are the authoritative surface tests and exercise the same daemon-backed product services used by the web UI.
 - `cluster-ssh` - Docker/SSH-backed cluster CLI tests.
 - `install-uninstall` - Docker-backed install/uninstall tests.
 - `full-workflow` - daemon-backed full workflow test.

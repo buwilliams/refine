@@ -43,7 +43,7 @@ fn print_usage() {
 \n\
 Suites:\n\
   --unit         Run in-crate Rust unit tests only. This is the default.\n\
-  --integration  Run opt-in integration, daemon, Docker, cluster, and UI suites.\n\
+  --integration  Run opt-in CLI, daemon, Docker, and cluster suites.\n\
   --full         Run all test suites and repository checks.\n\
 \n\
 Examples:\n\

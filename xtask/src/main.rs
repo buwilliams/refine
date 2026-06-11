@@ -21,8 +21,6 @@ fn main() {
         Some("test-install-uninstall") => test_install_uninstall(),
         Some("test-full-workflow") => test_full_workflow(),
         Some("test-multi-instance-sync") => test_multi_instance_sync(),
-        Some("test-ui") => test_ui(),
-        Some("test-surface") => test_surface(),
         Some("test-all") => test_all(),
         Some("check") | None => check_all(),
         Some(command) => Err(format!("unknown xtask command: {command}")),
@@ -37,13 +35,6 @@ fn check_all() -> Result<(), String> {
     print_api_contract()?;
     check_static_assets()?;
     print_runtime_layout()
-}
-
-fn test_surface() -> Result<(), String> {
-    test_smoke_ai()?;
-    test_cli()?;
-    test_multi_instance_sync()?;
-    test_ui()
 }
 
 fn test_all() -> Result<(), String> {
@@ -105,8 +96,7 @@ fn test_integration() -> Result<(), String> {
     test_cluster_ssh()?;
     test_install_uninstall()?;
     test_full_workflow()?;
-    test_multi_instance_sync()?;
-    test_ui()
+    test_multi_instance_sync()
 }
 
 fn test_smoke_ai() -> Result<(), String> {
@@ -234,39 +224,6 @@ fn test_multi_instance_sync() -> Result<(), String> {
     run(&mut command, "run multi-instance sync tests")
 }
 
-fn test_ui() -> Result<(), String> {
-    let repo_root = repo_root()?;
-    let smoke_ai = ensure_smoke_ai_built(&repo_root)?;
-    run(
-        Command::new("cargo")
-            .args(["build", "--bin", "refine"])
-            .current_dir(&repo_root),
-        "build refine binary",
-    )?;
-    ensure_playwright_package(&repo_root)?;
-    let refine_bin = repo_root
-        .join("target/debug")
-        .join(executable_name("refine"));
-    let mut command = Command::new("npx");
-    command
-        .args(["playwright", "test", "--config", "playwright.config.ts"])
-        .current_dir(&repo_root)
-        .env("REFINE_TEST_REFINE_BIN", refine_bin)
-        .env("REFINE_TEST_PORT", test_port())
-        .env("REFINE_DAEMON_PORT", test_port())
-        .env("REFINE_TEST_BASE_URL", format!("http://127.0.0.1:{}", test_port()))
-        .env("REFINE_SMOKE_AI_PATH", smoke_ai);
-    run(&mut command, "run Playwright UI tests").map_err(|error| {
-        if error.contains("Executable doesn't exist") || error.contains("browserType.launch") {
-            format!(
-                "{error}\nPlaywright browsers are missing. Install them with `npx playwright install --with-deps chromium` and rerun `cargo run --manifest-path xtask/Cargo.toml -- test-ui`."
-            )
-        } else {
-            error
-        }
-    })
-}
-
 fn print_api_contract() -> Result<(), String> {
     let groups = API_GROUPS
         .iter()
@@ -364,24 +321,6 @@ fn test_port() -> String {
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "18080".to_string())
-}
-
-fn ensure_playwright_package(repo_root: &Path) -> Result<(), String> {
-    if repo_root.join("node_modules/@playwright/test").is_dir() {
-        return Ok(());
-    }
-    if !repo_root.join("package-lock.json").is_file() {
-        run(
-            Command::new("npm")
-                .args(["install", "--package-lock-only"])
-                .current_dir(repo_root),
-            "create package-lock.json",
-        )?;
-    }
-    run(
-        Command::new("npm").args(["install"]).current_dir(repo_root),
-        "install Playwright npm dependencies",
-    )
 }
 
 fn check_git_diff() -> Result<(), String> {

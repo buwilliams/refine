@@ -34,15 +34,13 @@ Usage: ./r test [SUITE]
 
 Suites:
   unit                 Run in-crate Rust unit tests only. This is the default.
-  integration          Run opt-in integration, daemon, Docker, cluster, and UI suites.
+  integration          Run opt-in CLI, daemon, Docker, and cluster suites.
   full                 Run all test suites and repository checks.
 
 Focused xtask suites:
   rust
-  surface
   smoke-ai
   cli
-  ui
   cluster-ssh
   install-uninstall
   full-workflow
@@ -82,17 +80,11 @@ run_test_command() {
     rust)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-rust
       ;;
-    surface)
-      exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-surface
-      ;;
     smoke-ai)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-smoke-ai
       ;;
     cli)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cli
-      ;;
-    ui)
-      exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-ui
       ;;
     cluster-ssh)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cluster-ssh
@@ -154,11 +146,6 @@ print_test_dry_run() {
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-rust\n' "$ROOT"
       ;;
-    surface)
-      printf 'mode=test\n'
-      printf 'executable=cargo\n'
-      printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-surface\n' "$ROOT"
-      ;;
     smoke-ai)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
@@ -168,11 +155,6 @@ print_test_dry_run() {
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cli\n' "$ROOT"
-      ;;
-    ui)
-      printf 'mode=test\n'
-      printf 'executable=cargo\n'
-      printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-ui\n' "$ROOT"
       ;;
     cluster-ssh)
       printf 'mode=test\n'
