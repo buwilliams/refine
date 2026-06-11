@@ -33,13 +33,14 @@ async function extractImportDrafts(text, draftsRoot, signal = null, options = {}
 
 let planDraftExtractionPromise = null;
 
-async function extractPlanDraftsInBackground(text) {
+async function extractPlanDraftsInBackground(text, options = {}) {
   if (planDraftExtractionPromise) return await planDraftExtractionPromise;
   planDraftExtractionPromise = (async () => {
     const response = await api("POST", "/api/import/extract", {
       text,
       purpose: "plan",
       background: true,
+      ...options,
     });
     if (!response?.operation?.id) return response;
     recordUiNotice("Plan Draft extraction queued", {

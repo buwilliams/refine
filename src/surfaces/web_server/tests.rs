@@ -1783,6 +1783,84 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
 }
 
 #[test]
+fn web_server_extracts_plan_drafts_from_chat_session_context() {
+    let temp_root = unique_temp_dir("http-import-plan-chat-context");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
+    let _smoke_ai_env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let plan_feature = json!({
+        "feature": {
+            "name": "Chat Context Feature",
+            "description": "Feature extracted from persisted Plan chat context.",
+            "gaps": [{
+                "name": "Use persisted chat transcript",
+                "actual": "Draft Feature only uses fallback browser text.",
+                "target": "Draft Feature extracts from the stored Plan chat transcript.",
+                "priority": "high"
+            }]
+        }
+    })
+    .to_string();
+    write_fake_provider(&refine_dir, "smoke-ai", 0, &plan_feature);
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root);
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/chat/start".to_string(),
+        body: Some(json!({"purpose": "plan", "provider": "smoke-ai"})),
+    });
+    assert_eq!(started.status, 201);
+    let session_id = started.body["session_id"].as_str().unwrap().to_string();
+
+    let input = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/input"),
+        body: Some(json!({"text": "Plan the chat-context feature."})),
+    });
+    assert_eq!(input.status, 200);
+    wait_for_chat_read_line(&server, &session_id, "Chat Context Feature");
+    let fallback_feature = json!({
+        "feature": {
+            "name": "Fallback Feature",
+            "gaps": [{
+                "name": "Fallback gap",
+                "actual": "Fallback actual",
+                "target": "Fallback target"
+            }]
+        }
+    })
+    .to_string();
+
+    let extracted = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/extract".to_string(),
+        body: Some(json!({
+            "purpose": "plan",
+            "chat_session_id": session_id,
+            "text": fallback_feature
+        })),
+    });
+    assert_eq!(extracted.status, 200);
+    assert_eq!(
+        extracted.body["feature_destination"]["newName"],
+        "Chat Context Feature"
+    );
+    assert_eq!(extracted.body["drafts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        extracted.body["drafts"][0]["name"],
+        "Use persisted chat transcript"
+    );
+    assert_eq!(extracted.body["source"], "input");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
     let temp_root = unique_temp_dir("daemon-agent-automation-loop");
     let refine_dir = temp_root.join(".refine");

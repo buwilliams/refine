@@ -2563,7 +2563,9 @@ async function draftGapsFromPlan() {
   });
   minimizeToolbar();
   try {
-    const result = await extractPlanDraftsInBackground(transcript);
+    const result = await extractPlanDraftsInBackground(transcript, {
+      chat_session_id: t.sessionId || "",
+    });
     await openPlanDraftModalFromResult(transcript, result);
   } catch (error) {
     await showActionError(error, "Plan Draft extraction failed");

@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
@@ -19,6 +19,7 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::tools::product::chat::FileChatService;
 use crate::tools::product::imports::{
     FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
     import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
@@ -92,6 +93,31 @@ fn latest_round_duplicate_match(
         }
     }
     Ok(None)
+}
+
+fn import_extraction_text(
+    refine_dir: &Path,
+    runtime_root: Option<&Path>,
+    body: &Value,
+) -> Result<String, RefineError> {
+    let session_id = body
+        .get("chat_session_id")
+        .or_else(|| body.get("chatSessionId"))
+        .or_else(|| body.get("session_id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    if let Some(session_id) = session_id {
+        let chat = if let Some(runtime_root) = runtime_root {
+            FileChatService::with_runtime_root(refine_dir, runtime_root)
+        } else {
+            FileChatService::new(refine_dir)
+        };
+        return chat.transcript_text(session_id);
+    }
+
+    Ok(body_text(body).to_string())
 }
 
 #[derive(Default)]
@@ -2478,7 +2504,10 @@ impl InProcessWebServer {
     }
 
     fn import_extract_response(&self, refine_dir: PathBuf, body: Value) -> ApiResponse {
-        let text = body_text(&body);
+        let text = match import_extraction_text(&refine_dir, self.runtime_root.as_deref(), &body) {
+            Ok(text) => text,
+            Err(error) => return error_response(error),
+        };
         let purpose = body
             .get("purpose")
             .and_then(Value::as_str)
@@ -2487,14 +2516,14 @@ impl InProcessWebServer {
         let reporter = body.get("reporter").and_then(|value| value.as_str());
         let provider = import_provider_from_settings(&refine_dir, &body);
         if purpose == "plan"
-            && let Some(result) = parse_structured_import_result(text, reporter)
+            && let Some(result) = parse_structured_import_result(&text, reporter)
         {
             return import_extraction_response(result, &provider, purpose, "input");
         }
         let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
             provider: provider.clone(),
-            prompt: import_extraction_prompt(text, purpose),
+            prompt: import_extraction_prompt(&text, purpose),
             session_id: None,
             cwd,
             process_metadata: Default::default(),

@@ -443,6 +443,19 @@ impl FileChatService {
         Ok(sessions)
     }
 
+    pub fn transcript_text(&self, session_id: &str) -> RefineResult<String> {
+        let record = self.load_record(session_id)?;
+        Ok(record
+            .transcript_events
+            .iter()
+            .filter(|event| !event_bool(event, "progress"))
+            .filter_map(event_text)
+            .map(|line| line.trim().to_string())
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n"))
+    }
+
     fn load_record(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
         validate_session_id(session_id)?;
         let path = self.session_path(session_id);
