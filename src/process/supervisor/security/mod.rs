@@ -814,7 +814,7 @@ mod tests {
         let refine_dir = temp_root.join(".refine");
         FileSettingsService::new(&refine_dir)
             .update(&serde_json::json!({
-                "allowed_commands": "printf, npm run test\nplaywright"
+                "allowed_commands": "printf, npm run test\ncargo test"
             }))
             .unwrap();
 

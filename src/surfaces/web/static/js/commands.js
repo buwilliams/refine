@@ -710,7 +710,7 @@ registerCommand({
   group: "AI",
   aliases: ["generate-app-config", "target-generate"],
   confirm: () => modalConfirm(
-    "Ask the agent to analyse the codebase, write .refine/manage-app.sh, and point the start/stop/build/status commands at it? This can take a minute or two and overwrites the saved target-app fields and any existing .refine/manage-app.sh.",
+    "Ask the agent to analyse the codebase, write .refine/manage-app.sh, and point the start/stop/build/test/status commands at it? This can take a minute or two and overwrites the saved target-app fields and any existing .refine/manage-app.sh.",
     { title: "Generate target-app config", okLabel: "Generate" },
   ),
   run: async ({ button } = {}) => {
@@ -737,34 +737,6 @@ registerCommand({
       }
     });
   },
-});
-
-registerCommand({
-  id: "quality.regression.new",
-  title: "Quality: create regression",
-  group: "Quality",
-  aliases: ["regression_new", "new-regression", "create-regression"],
-  keywords: ["playwright screenshot qa"],
-  parse: (input) => ({
-    prompt: commandTailFor(input, ["regression_new", "new-regression", "create-regression"]),
-  }),
-  run: async ({ button, prompt } = {}) => {
-    if (state.currentRoute !== "project") {
-      location.hash = "#/project/quality";
-    } else {
-      setSettingsTab("quality");
-    }
-    return openRegressionCreateModal(prompt || "", button);
-  },
-});
-
-registerCommand({
-  id: "quality.regression.run",
-  title: "Quality: run regressions on current checkout",
-  group: "Quality",
-  aliases: ["run-regressions", "regression-run"],
-  keywords: ["playwright screenshot qa"],
-  run: ({ button } = {}) => runQualityRegressions(button),
 });
 
 registerCommand({

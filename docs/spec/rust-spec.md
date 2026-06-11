@@ -729,13 +729,15 @@ Requirements:
 
 Module: `tools::host::quality`; path: `src/tools/host/quality/`.
 
-Owns abstractions for: run checks, browser QA, regressions, screenshots, compare, gate.
+Owns abstractions for: run checks, screenshots, compare, gate, and workflow QA
+policy. Workflow QA executes the configured target-app test command through the
+target-app service under supervisor ownership.
 
 Requirements:
 
 - Quality checks are operations supervised by the daemon.
-- Browser automation dependencies are discovered and repaired separately from
-  Refine's own runtime dependencies.
+- Target-app tests are configured with `target_app_test_command` and run as
+  supervised Quality-owned subprocesses.
 - Results are persisted, visible, and tied to the relevant Gap, Feature, or app.
 - Users can rerun, cancel, and inspect quality operations from any surface.
 
@@ -1060,7 +1062,7 @@ Representative API groups:
 - `/agents`: provider configuration, auth, diagnostics.
 - `/operations`: operation status, logs, cancel.
 - `/processes`: managed process list and controls.
-- `/quality`: checks, regressions, screenshots.
+- `/quality`: checks and screenshots.
 - `/chat`: sessions, messages, streaming events.
 - `/settings`: project and runtime settings.
 

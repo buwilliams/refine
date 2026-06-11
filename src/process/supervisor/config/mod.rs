@@ -409,7 +409,6 @@ fn default_settings() -> JsonObject {
         ("merge_target_branch", "main"),
         ("quality_enabled", "0"),
         ("quality_timing", "pre_merge"),
-        ("quality_regressions_enabled", "0"),
         ("allowed_commands", ""),
         ("agent_cli", "claude"),
         ("paused", "0"),
@@ -420,12 +419,14 @@ fn default_settings() -> JsonObject {
         ("target_app_start_command", ""),
         ("target_app_stop_command", ""),
         ("target_app_build_command", ""),
+        ("target_app_test_command", ""),
         ("target_app_status_command", ""),
         ("target_app_cwd", ""),
         ("target_app_env_json", "{}"),
         ("target_app_start_timeout_seconds", "60"),
         ("target_app_stop_timeout_seconds", "30"),
         ("target_app_build_timeout_seconds", "600"),
+        ("target_app_test_timeout_seconds", "600"),
         ("target_app_status_timeout_seconds", "30"),
         ("target_app_log_path", ""),
         ("target_app_http_check_url", ""),
@@ -462,7 +463,6 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "merge_target_branch",
         "quality_enabled",
         "quality_timing",
-        "quality_regressions_enabled",
         "allowed_commands",
         "agent_cli",
         "paused",
@@ -473,12 +473,14 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "target_app_start_command",
         "target_app_stop_command",
         "target_app_build_command",
+        "target_app_test_command",
         "target_app_status_command",
         "target_app_cwd",
         "target_app_env_json",
         "target_app_start_timeout_seconds",
         "target_app_stop_timeout_seconds",
         "target_app_build_timeout_seconds",
+        "target_app_test_timeout_seconds",
         "target_app_status_timeout_seconds",
         "target_app_log_path",
         "target_app_http_check_url",
@@ -517,7 +519,7 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
                 ))
             }
         }
-        "quality_enabled" | "quality_regressions_enabled" | "paused" => {
+        "quality_enabled" | "paused" => {
             Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string())
         }
         "quality_timing" => {

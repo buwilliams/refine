@@ -7,9 +7,7 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
-};
+use crate::tools::host::quality::QualityCheckResult;
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::FileMergerService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
@@ -361,13 +359,21 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
             diagnostics: vec!["Quality checks disabled.".to_string()],
         });
     }
-    let service = FileQualityService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root);
-    let browser_required = setting_string(&ctx.settings, "quality_regressions_enabled", "0") == "1";
-    service.run_checks(QualityCheckRequest {
+    let service = FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
+    let snapshot = service.test_with_metadata(ctx.workflow_process_metadata("qa", "WorkflowQa"))?;
+    let mut diagnostics = vec![snapshot.message.clone()];
+    if let Some(operation) = snapshot.last_operation {
+        if !operation.stdout.trim().is_empty() {
+            diagnostics.push(operation.stdout);
+        }
+        if !operation.stderr.trim().is_empty() {
+            diagnostics.push(operation.stderr);
+        }
+    }
+    Ok(QualityCheckResult {
         owner_id: ctx.gap_id.clone(),
-        command: String::new(),
-        browser_required,
-        process_metadata: ctx.workflow_process_metadata("qa", "WorkflowQa"),
+        ok: snapshot.ok,
+        diagnostics,
     })
 }
 

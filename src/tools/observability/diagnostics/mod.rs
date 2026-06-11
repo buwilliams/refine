@@ -96,13 +96,6 @@ impl DiagnosticsService for FileDiagnosticsService {
             .as_ref()
             .and_then(|root| FileActivityService::new(root.join(".refine")).count().ok())
             .unwrap_or(0);
-        let browser_status = command_status(
-            &self.runtime_root,
-            "playwright",
-            &["--version"],
-            "playwright CLI available",
-            "playwright CLI not found; browser QA remains task-scoped",
-        );
         let docker_status = command_status(
             &self.runtime_root,
             "docker",
@@ -146,7 +139,10 @@ impl DiagnosticsService for FileDiagnosticsService {
                 format!("detected_providers={}", providers.len()),
                 format!("installed_providers={}", installed_providers.join(",")),
             ],
-            browser: vec![browser_status],
+            browser: vec![
+                "workflow QA uses the configured target-app test command; no browser CLI is required"
+                    .to_string(),
+            ],
             docker: vec![docker_status],
             storage: vec![
                 format!("target_root={storage_root}"),

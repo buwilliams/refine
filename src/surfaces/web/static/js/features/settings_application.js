@@ -88,7 +88,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         <strong>Generate with AI</strong> analyses the codebase, writes a
         <code>.refine/manage-app.sh</code> wrapper with timestamped logging,
         and points the commands below at it
-        (<code>./.refine/manage-app.sh start|stop|build|status</code>).
+        (<code>./.refine/manage-app.sh start|stop|build|test|status</code>).
         Refine runs the saved commands directly on the host. You can override
         any field — including swapping in your own commands.
       </p>
@@ -134,6 +134,15 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
                data-testid="target-app-build-command"
                placeholder="./.refine/manage-app.sh build"
                value="${htmlEscape(s.target_app_build_command || "")}"></div>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Test command",
+        "application-test",
+        "one-line shell command that runs target-app tests for workflow QA.",
+      )}</label>
+        <input type="text" id="s-target-test-command"
+               data-testid="target-app-test-command"
+               placeholder="./.refine/manage-app.sh test"
+               value="${htmlEscape(s.target_app_test_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Automatic application build",
         "application-auto-build",
@@ -191,6 +200,8 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
           <input type="number" id="s-target-stop-timeout" data-testid="target-app-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Build timeout (s)", "application-build-timeout")}</label>
           <input type="number" id="s-target-build-timeout" data-testid="target-app-build-timeout" value="${htmlEscape(s.target_app_build_timeout_seconds || "300")}"></div>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Test timeout (s)", "application-test-timeout")}</label>
+          <input type="number" id="s-target-test-timeout" data-testid="target-app-test-timeout" value="${htmlEscape(s.target_app_test_timeout_seconds || "600")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Status timeout (s)", "application-status-timeout")}</label>
           <input type="number" id="s-target-status-timeout" data-testid="target-app-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Log path", "application-log-path")}</label>
@@ -233,6 +244,7 @@ function collectSettingsApplicationPayload() {
     target_app_start_command: $("#s-target-start-command").value,
     target_app_stop_command: $("#s-target-stop-command").value,
     target_app_build_command: $("#s-target-build-command").value,
+    target_app_test_command: $("#s-target-test-command").value,
     target_app_auto_build: $("#s-target-auto-build").value,
     target_app_auto_build_hour_utc: $("#s-target-auto-build-hour-utc").value,
     target_app_status_command: $("#s-target-status-command").value,
@@ -241,6 +253,7 @@ function collectSettingsApplicationPayload() {
     target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
     target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
     target_app_build_timeout_seconds: $("#s-target-build-timeout").value,
+    target_app_test_timeout_seconds: $("#s-target-test-timeout").value,
     target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
     target_app_log_path: $("#s-target-log-path").value,
     target_app_http_check_url: $("#s-target-http-url").value,

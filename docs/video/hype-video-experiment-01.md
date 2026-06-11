@@ -53,7 +53,7 @@ data visible.
 - **Plan / Chat:** create-menu Plan flow and attached `Open Chat` on a Gap.
 - **Agent workflow:** status movement through `todo`, `in-progress`,
   `ready-merge`, `review`, and `done`.
-- **Quality:** Quality gate and regression evidence, preferably including a
+- **Quality:** Quality gate and test evidence, preferably including a
   screenshot result if available.
 - **Guidance / Governance:** configured rules and instructions shaping work
   before execution.
@@ -92,7 +92,7 @@ Use this as the base narration, paced around 80 seconds:
 > is ready for attention.
 >
 > Guidance and Governance shape agent work before it starts. Quality checks and
-> regression evidence keep it aligned with product intent and requirements.
+> test evidence keep it aligned with product intent and requirements.
 >
 > When an agent finishes, Refine moves the change through logs, review, merge,
 > and explicit human verification.

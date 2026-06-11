@@ -52,12 +52,14 @@ pub struct TargetAppGeneratedConfig {
     pub start_command: String,
     pub stop_command: String,
     pub build_command: String,
+    pub test_command: String,
     pub status_command: String,
     pub cwd: String,
     pub env: JsonObject,
     pub start_timeout_seconds: u64,
     pub stop_timeout_seconds: u64,
     pub build_timeout_seconds: u64,
+    pub test_timeout_seconds: u64,
     pub status_timeout_seconds: u64,
     pub log_path: String,
     pub http_check_url: String,
@@ -271,12 +273,58 @@ impl FileTargetAppService {
         Ok(snapshot)
     }
 
+    pub fn test(&self) -> RefineResult<TargetAppSnapshot> {
+        self.test_with_metadata(Default::default())
+    }
+
+    pub fn test_with_metadata(
+        &self,
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<TargetAppSnapshot> {
+        let settings = self.settings()?;
+        let command = setting(&settings, "target_app_test_command");
+        if command.trim().is_empty() {
+            let mut snapshot = self.load_snapshot()?;
+            snapshot.ok = false;
+            snapshot.state = "failed".to_string();
+            snapshot.message = "No target-app test command is configured.".to_string();
+            snapshot.last_error = snapshot.message.clone();
+            self.save_snapshot(&snapshot)?;
+            return Ok(snapshot);
+        }
+        let operation = self.run_quality_command("test", &command, &settings, process_metadata)?;
+        let ok = operation.exit_code == Some(0);
+        let snapshot = TargetAppSnapshot {
+            ok,
+            state: if ok { "stopped" } else { "failed" }.to_string(),
+            message: operation_message(&operation),
+            last_check_at: String::new(),
+            last_check_ok: ok,
+            last_check_message: operation_message(&operation),
+            last_health_at: String::new(),
+            last_health_ok: ok,
+            last_health_message: operation_message(&operation),
+            last_error: if ok {
+                String::new()
+            } else {
+                operation_message(&operation)
+            },
+            last_operation_id: operation.id.clone(),
+            last_operation: Some(operation),
+            process_id: None,
+            pid: None,
+        };
+        self.save_snapshot(&snapshot)?;
+        Ok(snapshot)
+    }
+
     pub fn generate_config(&self) -> RefineResult<TargetAppGeneratedConfig> {
         let settings = self.settings()?;
         let mut config = TargetAppGeneratedConfig {
             start_command: setting(&settings, "target_app_start_command"),
             stop_command: setting(&settings, "target_app_stop_command"),
             build_command: setting(&settings, "target_app_build_command"),
+            test_command: setting(&settings, "target_app_test_command"),
             status_command: setting(&settings, "target_app_status_command"),
             cwd: setting(&settings, "target_app_cwd"),
             env: serde_json::Map::new(),
@@ -289,6 +337,9 @@ impl FileTargetAppService {
             build_timeout_seconds: setting(&settings, "target_app_build_timeout_seconds")
                 .parse()
                 .unwrap_or(300),
+            test_timeout_seconds: setting(&settings, "target_app_test_timeout_seconds")
+                .parse()
+                .unwrap_or(600),
             status_timeout_seconds: setting(&settings, "target_app_status_timeout_seconds")
                 .parse()
                 .unwrap_or(10),
@@ -322,6 +373,7 @@ impl FileTargetAppService {
         } else if project_root.join("Cargo.toml").exists() {
             fill_if_empty(&mut config.start_command, "cargo run");
             fill_if_empty(&mut config.build_command, "cargo build");
+            fill_if_empty(&mut config.test_command, "cargo test");
             fill_if_empty(&mut config.status_command, "cargo check --quiet");
             notes.push("Detected Cargo.toml and generated cargo commands.".to_string());
         } else if project_root.join("Makefile").exists() || project_root.join("makefile").exists() {
@@ -401,6 +453,7 @@ impl FileTargetAppService {
         config.start_command = "./.refine/manage-app.sh start".to_string();
         config.stop_command = "./.refine/manage-app.sh stop".to_string();
         config.build_command = "./.refine/manage-app.sh build".to_string();
+        config.test_command = "./.refine/manage-app.sh test".to_string();
         config.status_command = "./.refine/manage-app.sh status".to_string();
         config.cwd = ".".to_string();
         append_note(
@@ -417,13 +470,49 @@ impl FileTargetAppService {
         settings: &JsonObject,
         process_metadata: Map<String, Value>,
     ) -> RefineResult<TargetAppOperation> {
+        self.run_owned_command(
+            kind,
+            command,
+            settings,
+            process_metadata,
+            ProcessOwner::TargetApp,
+            "target_app",
+        )
+    }
+
+    fn run_quality_command(
+        &self,
+        kind: &str,
+        command: &str,
+        settings: &JsonObject,
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<TargetAppOperation> {
+        self.run_owned_command(
+            kind,
+            command,
+            settings,
+            process_metadata,
+            ProcessOwner::Quality,
+            "quality",
+        )
+    }
+
+    fn run_owned_command(
+        &self,
+        kind: &str,
+        command: &str,
+        settings: &JsonObject,
+        process_metadata: Map<String, Value>,
+        owner: ProcessOwner,
+        authorization_category: &str,
+    ) -> RefineResult<TargetAppOperation> {
         let started_at = now_timestamp();
         FileSecurityService::from_project_settings(&self.runtime_root, &self.refine_dir)?
-            .authorize_host_command("target_app", command)?;
+            .authorize_host_command(authorization_category, command)?;
         let (shell, args) = shell_program_args(command);
         let output = FileProcessSupervisor::new(&self.runtime_root).run_to_completion(
             ManagedProcessSpec {
-                owner: ProcessOwner::TargetApp,
+                owner,
                 command: shell,
                 args,
                 cwd: Some(self.command_cwd(settings).display().to_string()),
@@ -688,6 +777,7 @@ fn apply_package_json_defaults(
         );
     }
     if scripts.contains_key("test") {
+        fill_if_empty(&mut config.test_command, &format!("{package_manager} test"));
         fill_if_empty(
             &mut config.status_command,
             &format!("{package_manager} test -- --help >/dev/null 2>&1 || true"),
@@ -721,6 +811,9 @@ fn apply_makefile_defaults(path: &Path, config: &mut TargetAppGeneratedConfig) -
     }
     if targets.contains(&"build") {
         fill_if_empty(&mut config.build_command, "make build");
+    }
+    if targets.contains(&"test") {
+        fill_if_empty(&mut config.test_command, "make test");
     }
     if targets.contains(&"status") {
         fill_if_empty(&mut config.status_command, "make status");
@@ -897,6 +990,10 @@ fn clear_generated_wrapper_entrypoints(config: &mut TargetAppGeneratedConfig) ->
         config.build_command.clear();
         cleared = true;
     }
+    if is_manage_app_wrapper_entrypoint(&config.test_command, "test") {
+        config.test_command.clear();
+        cleared = true;
+    }
     if is_manage_app_wrapper_entrypoint(&config.status_command, "status") {
         config.status_command.clear();
         cleared = true;
@@ -941,6 +1038,7 @@ fn manage_app_wrapper_script(config: &TargetAppGeneratedConfig) -> String {
         format!("START_COMMAND={}", shell_quote(config.start_command.trim())),
         format!("STOP_COMMAND={}", shell_quote(config.stop_command.trim())),
         format!("BUILD_COMMAND={}", shell_quote(config.build_command.trim())),
+        format!("TEST_COMMAND={}", shell_quote(config.test_command.trim())),
         format!(
             "STATUS_COMMAND={}",
             shell_quote(config.status_command.trim())
@@ -1007,9 +1105,10 @@ fn manage_app_wrapper_script(config: &TargetAppGeneratedConfig) -> String {
         "  start) run_cmd \"$START_COMMAND\" ;;".to_string(),
         "  stop) run_cmd \"$STOP_COMMAND\" ;;".to_string(),
         "  build) run_cmd \"$BUILD_COMMAND\" ;;".to_string(),
+        "  test) run_cmd \"$TEST_COMMAND\" ;;".to_string(),
         "  status) run_cmd \"$STATUS_COMMAND\" ;;".to_string(),
         "  *)".to_string(),
-        "    printf 'usage: %s start|stop|build|status\\n' \"$0\" >&2".to_string(),
+        "    printf 'usage: %s start|stop|build|test|status\\n' \"$0\" >&2".to_string(),
         "    exit 64".to_string(),
         "    ;;".to_string(),
         "esac".to_string(),
@@ -1166,7 +1265,9 @@ mod tests {
             .update(&json!({
                 "target_app_status_command": "test -f status-ok",
                 "target_app_build_command": "touch built && echo built",
-                "target_app_cwd": target_root.to_str().unwrap()
+                "target_app_test_command": "printf test-ok > tested && echo test-ok",
+                "target_app_cwd": target_root.to_str().unwrap(),
+                "allowed_commands": "test, touch, printf"
             }))
             .unwrap();
         fs::write(target_root.join("status-ok"), "").unwrap();
@@ -1179,6 +1280,14 @@ mod tests {
         let built = service.build().unwrap();
         assert!(built.ok);
         assert!(target_root.join("built").exists());
+
+        let tested = service.test().unwrap();
+        assert!(tested.ok);
+        assert_eq!(tested.last_operation.as_ref().unwrap().kind, "test");
+        assert_eq!(tested.last_operation.as_ref().unwrap().stdout, "test-ok");
+        assert!(target_root.join("tested").exists());
+        let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
+        assert!(audit.contains("\"actor\":\"quality\""));
         assert!(runtime_root.join(TARGET_APP_STATE_FILE).exists());
 
         fs::remove_dir_all(temp_root).unwrap();
@@ -1279,7 +1388,7 @@ mod tests {
         fs::create_dir_all(&target_root).unwrap();
         fs::write(
             target_root.join("package.json"),
-            r#"{"scripts":{"dev":"vite","build":"vite build"}}"#,
+            r#"{"scripts":{"dev":"vite","build":"vite build","test":"vitest run"}}"#,
         )
         .unwrap();
         fs::write(target_root.join("pnpm-lock.yaml"), "").unwrap();
@@ -1295,6 +1404,7 @@ mod tests {
             .unwrap();
         assert_eq!(generated.start_command, "pnpm run dev");
         assert_eq!(generated.build_command, "pnpm run build");
+        assert_eq!(generated.test_command, "pnpm test");
         assert_eq!(generated.tcp_check_port, "5173");
         assert!(generated.notes.contains("package.json"));
 
@@ -1365,6 +1475,7 @@ mod tests {
                 "target_app_start_command": "./.refine/manage-app.sh start",
                 "target_app_stop_command": "./.refine/manage-app.sh stop",
                 "target_app_build_command": "./.refine/manage-app.sh build",
+                "target_app_test_command": "./.refine/manage-app.sh test",
                 "target_app_status_command": "./.refine/manage-app.sh status"
             }))
             .unwrap();
@@ -1376,6 +1487,7 @@ mod tests {
         assert_eq!(generated.start_command, "./.refine/manage-app.sh start");
         assert_eq!(generated.stop_command, "./.refine/manage-app.sh stop");
         assert_eq!(generated.build_command, "./.refine/manage-app.sh build");
+        assert_eq!(generated.test_command, "./.refine/manage-app.sh test");
         assert_eq!(generated.status_command, "./.refine/manage-app.sh status");
         assert!(
             generated
@@ -1386,6 +1498,7 @@ mod tests {
         assert!(!wrapper.contains("START_COMMAND='./.refine/manage-app.sh start'"));
         assert!(!wrapper.contains("STOP_COMMAND='./.refine/manage-app.sh stop'"));
         assert!(!wrapper.contains("BUILD_COMMAND='./.refine/manage-app.sh build'"));
+        assert!(!wrapper.contains("TEST_COMMAND='./.refine/manage-app.sh test'"));
         assert!(!wrapper.contains("STATUS_COMMAND='./.refine/manage-app.sh status'"));
         assert!(wrapper.contains("python3 -m http.server"));
         assert!(wrapper.contains("STATUS_COMMAND='curl -fsS"));
@@ -1407,6 +1520,7 @@ mod tests {
             start_command: "printf \"$WRAP_VALUE\" > ../started".to_string(),
             stop_command: String::new(),
             build_command: "printf built > ../built".to_string(),
+            test_command: "printf tested > ../tested".to_string(),
             status_command: "printf status-ok".to_string(),
             cwd: "client".to_string(),
             env: serde_json::Map::from_iter([(
@@ -1416,6 +1530,7 @@ mod tests {
             start_timeout_seconds: 120,
             stop_timeout_seconds: 60,
             build_timeout_seconds: 300,
+            test_timeout_seconds: 600,
             status_timeout_seconds: 10,
             log_path: String::new(),
             http_check_url: String::new(),
@@ -1431,6 +1546,7 @@ mod tests {
         assert_eq!(config.start_command, "./.refine/manage-app.sh start");
         assert_eq!(config.stop_command, "./.refine/manage-app.sh stop");
         assert_eq!(config.build_command, "./.refine/manage-app.sh build");
+        assert_eq!(config.test_command, "./.refine/manage-app.sh test");
         assert_eq!(config.status_command, "./.refine/manage-app.sh status");
         assert_eq!(config.cwd, ".");
         assert_eq!(config.log_path, ".refine/manage-app.log");
@@ -1439,6 +1555,7 @@ mod tests {
         let script = fs::read_to_string(&wrapper_path).unwrap();
         assert!(script.contains("APP_CWD='client'"));
         assert!(script.contains("START_COMMAND='printf \"$WRAP_VALUE\" > ../started'"));
+        assert!(script.contains("TEST_COMMAND='printf tested > ../tested'"));
         assert!(script.contains("# Analysis notes: provider analysis"));
         assert!(script.contains("export WRAP_VALUE='wrapped'"));
 
@@ -1474,12 +1591,14 @@ mod tests {
             start_command: String::new(),
             stop_command: String::new(),
             build_command: String::new(),
+            test_command: "npm test".to_string(),
             status_command: "npm test -- --help >/dev/null 2>&1 || true".to_string(),
             cwd: ".".to_string(),
             env: serde_json::Map::new(),
             start_timeout_seconds: 120,
             stop_timeout_seconds: 60,
             build_timeout_seconds: 300,
+            test_timeout_seconds: 600,
             status_timeout_seconds: 10,
             log_path: String::new(),
             http_check_url: format!("http://127.0.0.1:{port}/"),
@@ -1495,6 +1614,7 @@ mod tests {
         assert_eq!(config.start_command, "./.refine/manage-app.sh start");
         assert_eq!(config.stop_command, "./.refine/manage-app.sh stop");
         assert_eq!(config.build_command, "./.refine/manage-app.sh build");
+        assert_eq!(config.test_command, "./.refine/manage-app.sh test");
         assert_eq!(config.status_command, "./.refine/manage-app.sh status");
         assert!(config.notes.contains("static web content"));
 
