@@ -493,21 +493,21 @@ fn project_status_for(
     current: Option<String>,
     attached: bool,
 ) -> RefineResult<ProjectStatus> {
-    let active_refine_root = current
+    let active_refine_dir = current
         .as_ref()
         .map(|path| PathBuf::from(path).join(".refine"));
-    let schema = match &active_refine_root {
+    let schema = match &active_refine_dir {
         Some(root) => FileProjectMigrationService::new(root).status()?,
         None => detached_schema_status(),
     };
     Ok(ProjectStatus {
         attached,
         registry_enabled: true,
-        client_repo: current.clone(),
-        volume_root: active_refine_root
+        target_root: current.clone(),
+        refine_dir: active_refine_dir
             .as_ref()
             .map(|path| path.display().to_string()),
-        config_path: active_refine_root
+        config_path: active_refine_dir
             .as_ref()
             .map(|path| path.join("refine.json").display().to_string()),
         schema,
@@ -701,7 +701,7 @@ mod tests {
             .unwrap();
         assert!(destination.join(".git").exists());
         assert_eq!(
-            status.client_repo.as_deref(),
+            status.target_root.as_deref(),
             Some(destination.to_str().unwrap())
         );
         let registry = service.load().unwrap();
@@ -731,7 +731,7 @@ mod tests {
         let status = service.attach(destination.to_str().unwrap()).unwrap();
 
         assert_eq!(
-            status.client_repo.as_deref(),
+            status.target_root.as_deref(),
             Some(destination.to_str().unwrap())
         );
         assert!(destination.join(".git").exists());

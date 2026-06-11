@@ -77,24 +77,24 @@ fn validate_automated_gap_transition(from: &GapStatus, to: &GapStatus) -> Refine
 
 #[derive(Clone, Debug)]
 pub struct FileWorkItemService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub projection_cache_dir: Option<PathBuf>,
 }
 
 impl FileWorkItemService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             projection_cache_dir: None,
         }
     }
 
     pub fn with_projection_cache(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         cache_dir: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             projection_cache_dir: Some(cache_dir.into()),
         }
     }
@@ -106,18 +106,18 @@ impl FileWorkItemService {
             let store = cache_dir
                 .parent()
                 .map(|runtime_root| {
-                    FileProjectStateStore::with_runtime_root(&self.durable_root, runtime_root)
+                    FileProjectStateStore::with_runtime_root(&self.refine_dir, runtime_root)
                 })
-                .unwrap_or_else(|| FileProjectStateStore::new(&self.durable_root));
+                .unwrap_or_else(|| FileProjectStateStore::new(&self.refine_dir));
             store.load_or_refresh_projection(cache_dir)
         } else {
-            let store = FileProjectStateStore::new(&self.durable_root);
+            let store = FileProjectStateStore::new(&self.refine_dir);
             store.rebuild_projection()
         }
     }
 
     fn active_node_id(&self) -> RefineResult<String> {
-        FileNodeRegistryService::new(&self.durable_root).active_node_id()
+        FileNodeRegistryService::new(&self.refine_dir).active_node_id()
     }
 
     fn ensure_gap_owned(&self, gap: &GapSummaryProjection) -> RefineResult<()> {
@@ -177,7 +177,7 @@ impl FileWorkItemService {
             ));
         }
 
-        let gap_path = gap_json_path(&self.durable_root, &gap_id);
+        let gap_path = gap_json_path(&self.refine_dir, &gap_id);
         if gap_path.exists() {
             return Err(RefineError::Conflict(format!(
                 "Gap {gap_id} already exists"
@@ -206,7 +206,7 @@ impl FileWorkItemService {
     pub fn show_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
         let snapshot = self.projection_snapshot()?;
         snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
+            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
         })
     }
 
@@ -255,7 +255,7 @@ impl FileWorkItemService {
 
     fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
         let node_id = node_id.unwrap_or("default");
-        FileNodeRegistryService::new(&self.durable_root)
+        FileNodeRegistryService::new(&self.refine_dir)
             .show(node_id)
             .ok()
             .and_then(|value| {
@@ -271,7 +271,7 @@ impl FileWorkItemService {
         let Some(rounds) = object.get_mut("rounds").and_then(Value::as_array_mut) else {
             return Ok(());
         };
-        let log_service = FileLogService::new(&self.durable_root);
+        let log_service = FileLogService::new(&self.refine_dir);
         let round_count = rounds.len();
         for (idx, round) in rounds.iter_mut().enumerate() {
             let logs = log_service.round_logs(gap_id, idx)?;
@@ -315,7 +315,7 @@ impl FileWorkItemService {
             ));
         }
 
-        let feature_path = feature_json_path(&self.durable_root, &feature_id);
+        let feature_path = feature_json_path(&self.refine_dir, &feature_id);
         if feature_path.exists() {
             return Err(RefineError::Conflict(format!(
                 "Feature {feature_id} already exists"
@@ -349,7 +349,7 @@ impl FileWorkItemService {
         let snapshot = self.projection_snapshot()?;
         snapshot.features.get(feature_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!(
-                "Feature {feature_id} was not found in durable state"
+                "Feature {feature_id} was not found in refine state"
             ))
         })
     }
@@ -364,7 +364,7 @@ impl FileWorkItemService {
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let feature_path = feature_json_path(&self.durable_root, feature_id);
+        let feature_path = feature_json_path(&self.refine_dir, feature_id);
         let bytes = fs::read(&feature_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Feature {}: {error}",
@@ -581,7 +581,7 @@ impl FileWorkItemService {
         for gap in gaps {
             self.delete_gap_record(&gap.gap.id)?;
         }
-        let feature_path = feature_json_path(&self.durable_root, feature_id);
+        let feature_path = feature_json_path(&self.refine_dir, feature_id);
         fs::remove_file(&feature_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to delete Feature {}: {error}",
@@ -937,12 +937,12 @@ impl FileWorkItemService {
     ) -> RefineResult<GapSummaryProjection> {
         let snapshot = self.projection_snapshot()?;
         let current = snapshot.gaps.get(gap_id).ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
+            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
         })?;
         self.ensure_gap_owned(current)?;
         validate_manual_gap_transition(&current.gap.status, &target)?;
 
-        let gap_path = self.durable_root.join(&current.gap.json_path);
+        let gap_path = self.refine_dir.join(&current.gap.json_path);
         let bytes = fs::read(&gap_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Gap {}: {error}",
@@ -1403,7 +1403,7 @@ impl FileWorkItemService {
         let current = self.show_gap_summary(gap_id)?;
         self.ensure_gap_owned(&current)?;
         validate_gap_operation(&current.gap.status, &GapOperation::Delete)?;
-        let gap_path = self.durable_root.join(&current.gap.json_path);
+        let gap_path = self.refine_dir.join(&current.gap.json_path);
         fs::remove_file(&gap_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to delete Gap {}: {error}",
@@ -1426,7 +1426,7 @@ impl FileWorkItemService {
         &self,
         current: &GapSummaryProjection,
     ) -> RefineResult<(PathBuf, Value)> {
-        let gap_path = self.durable_root.join(&current.gap.json_path);
+        let gap_path = self.refine_dir.join(&current.gap.json_path);
         let bytes = fs::read(&gap_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Gap {}: {error}",
@@ -1516,7 +1516,7 @@ impl FileWorkItemService {
     fn set_feature_assignee_unchecked(&self, feature_id: &str, assignee: &str) -> RefineResult<()> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let feature_path = feature_json_path(&self.durable_root, feature_id);
+        let feature_path = feature_json_path(&self.refine_dir, feature_id);
         let bytes = fs::read(&feature_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Feature {}: {error}",
@@ -2014,18 +2014,18 @@ fn validate_feature_operation(
     }
 }
 
-fn gap_json_path(durable_root: &std::path::Path, gap_id: &str) -> PathBuf {
+fn gap_json_path(refine_dir: &std::path::Path, gap_id: &str) -> PathBuf {
     let gap_id = gap_id.to_uppercase();
-    durable_root
+    refine_dir
         .join("gaps")
         .join(&gap_id[..2])
         .join(&gap_id[2..])
         .join("gap.json")
 }
 
-fn feature_json_path(durable_root: &std::path::Path, feature_id: &str) -> PathBuf {
+fn feature_json_path(refine_dir: &std::path::Path, feature_id: &str) -> PathBuf {
     let feature_id = feature_id.to_uppercase();
-    durable_root
+    refine_dir
         .join("features")
         .join(&feature_id[..2])
         .join(&feature_id[2..])

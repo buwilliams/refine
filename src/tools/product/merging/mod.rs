@@ -37,17 +37,17 @@ pub struct MergerGapResult {
 #[derive(Clone, Debug)]
 pub struct FileMergerService {
     pub runtime_root: PathBuf,
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub operation_registry: FileOperationRegistry,
 }
 
 impl FileMergerService {
-    pub fn new(runtime_root: impl Into<PathBuf>, durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(runtime_root: impl Into<PathBuf>, refine_dir: impl Into<PathBuf>) -> Self {
         let runtime_root = runtime_root.into();
         Self {
             operation_registry: FileOperationRegistry::new(&runtime_root),
             runtime_root,
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
@@ -65,7 +65,7 @@ impl FileMergerService {
             return Ok(MergerTickResult { processed: None });
         };
         let gap_id = gap.gap.id.clone();
-        let settings = FileSettingsService::new(&self.durable_root).load()?;
+        let settings = FileSettingsService::new(&self.refine_dir).load()?;
         let branch_name = gap
             .gap
             .branch_name
@@ -106,8 +106,8 @@ impl FileMergerService {
     }
 
     pub fn merge_branch_for_workflow(&self, branch_name: &str) -> RefineResult<MergeResult> {
-        let source_root = source_root(&self.durable_root)?;
-        let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
+        let target_root = target_root(&self.refine_dir)?;
+        let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
         let mut result = git.merge(branch_name)?;
         for _ in 0..5 {
             if result.ok || !merge_message_has_index_lock(&result) {
@@ -126,8 +126,8 @@ impl FileMergerService {
         target_branch: &str,
         operation_id: &str,
     ) -> RefineResult<MergerGapResult> {
-        let source_root = source_root(&self.durable_root)?;
-        let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
+        let target_root = target_root(&self.refine_dir)?;
+        let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
         git.switch(target_branch)?;
         let merge = git.merge_no_ff(branch_name)?;
         if !merge.ok {
@@ -150,7 +150,7 @@ impl FileMergerService {
             });
         }
         let work_items = FileWorkItemService::with_projection_cache(
-            &self.durable_root,
+            &self.refine_dir,
             self.runtime_root.join("cache"),
         );
         work_items.advance_automated_gap_status(gap_id, GapStatus::Build)?;
@@ -200,7 +200,7 @@ impl FileMergerService {
         recover: &MergeResult,
     ) -> RefineResult<()> {
         let work_items = FileWorkItemService::with_projection_cache(
-            &self.durable_root,
+            &self.refine_dir,
             self.runtime_root.join("cache"),
         );
         work_items.advance_automated_gap_status(gap_id, GapStatus::Failed)?;
@@ -231,7 +231,7 @@ impl FileMergerService {
 
     fn next_ready_merge_gap(&self) -> RefineResult<Option<GapSummaryProjection>> {
         let snapshot =
-            FileProjectStateStore::with_runtime_root(&self.durable_root, &self.runtime_root)
+            FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root)
                 .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         let mut candidates = snapshot
             .gaps
@@ -295,11 +295,11 @@ pub fn branch_name_for_gap(settings: &JsonObject, gap_id: &str) -> String {
     setting_string(settings, "branch_name_pattern", "refine/{gap_id}").replace("{gap_id}", gap_id)
 }
 
-pub fn source_root(durable_root: &Path) -> RefineResult<PathBuf> {
-    durable_root.parent().map(Path::to_path_buf).ok_or_else(|| {
+pub fn target_root(refine_dir: &Path) -> RefineResult<PathBuf> {
+    refine_dir.parent().map(Path::to_path_buf).ok_or_else(|| {
         RefineError::InvalidInput(format!(
-            "durable root {} has no source repository parent",
-            durable_root.display()
+            "refine dir {} has no target root",
+            refine_dir.display()
         ))
     })
 }
@@ -343,13 +343,13 @@ mod tests {
     fn file_merger_merges_one_ready_gap_per_tick_with_no_ff_commit() {
         let temp_root = unique_temp_dir("merger-success");
         let repo = temp_root.join("repo");
-        let durable_root = repo.join(".refine");
+        let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
 
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         for id in ["GAP1", "GAP2"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
@@ -372,7 +372,7 @@ mod tests {
             git(&repo, &["switch", "main"]).unwrap();
         }
 
-        let merger = FileMergerService::new(&runtime_root, &durable_root);
+        let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let first = merger.tick().unwrap().processed.unwrap();
         assert_eq!(first.gap_id, "GAP1");
         assert_eq!(
@@ -408,13 +408,13 @@ mod tests {
     fn file_merger_marks_only_conflicted_gap_failed_and_recovers_target() {
         let temp_root = unique_temp_dir("merger-conflict");
         let repo = temp_root.join("repo");
-        let durable_root = repo.join(".refine");
+        let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
 
-        let work_items = FileWorkItemService::new(&durable_root);
+        let work_items = FileWorkItemService::new(&refine_dir);
         for id in ["AAA", "ZZZ"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
@@ -442,7 +442,7 @@ mod tests {
         commit_file(&repo, "clean.txt", "clean\n", "clean side");
         git(&repo, &["switch", "main"]).unwrap();
 
-        let merger = FileMergerService::new(&runtime_root, &durable_root);
+        let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let conflicted = merger.tick().unwrap().processed.unwrap();
         assert_eq!(conflicted.status, "failed");
         assert_eq!(conflicted.conflicts, vec!["app.txt"]);

@@ -193,7 +193,7 @@ Provider notes after JSON."#;
                 "implementation_gaps": [
                     {
                         "name": "Persist alert preferences",
-                        "actual": "There is no durable model for per-category alert thresholds.",
+                        "actual": "There is no refine model for per-category alert thresholds.",
                         "target": "The backend persists threshold preferences and exposes them through the budget settings API.",
                         "priority": "medium"
                     }
@@ -215,7 +215,7 @@ Provider notes after JSON."#;
         assert_eq!(result.drafts[0].name, "Budget threshold alert");
         assert_eq!(result.drafts[1].name, "Persist alert preferences");
         assert_eq!(result.drafts[2].name, "Verify alert trigger coverage");
-        assert!(result.drafts[1].actual.contains("durable model"));
+        assert!(result.drafts[1].actual.contains("refine model"));
         assert!(result.drafts[2].target.contains("Automated tests"));
     }
 
@@ -390,14 +390,14 @@ struct PlanFeatureDestination {
     description: String,
 }
 
-fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
+fn import_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> String {
     body.get("provider")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|provider| !provider.is_empty())
         .map(str::to_string)
         .or_else(|| {
-            FileSettingsService::new(durable_root)
+            FileSettingsService::new(refine_dir)
                 .load()
                 .ok()
                 .and_then(|settings| {
@@ -799,8 +799,8 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|durable_root| {
-                FileNodeRegistryService::new(durable_root)
+            .and_then(|refine_dir| {
+                FileNodeRegistryService::new(refine_dir)
                     .active_node_id()
                     .ok()
             })
@@ -812,8 +812,8 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|durable_root| {
-                FileNodeRegistryService::new(durable_root)
+            .and_then(|refine_dir| {
+                FileNodeRegistryService::new(refine_dir)
                     .list_response()
                     .ok()
             })
@@ -837,7 +837,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_transition(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "mutate work items");
+        let refine_dir = require_refine_dir!(self, "mutate work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -873,7 +873,7 @@ impl InProcessWebServer {
         };
 
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .transition_gap_status(gap_id, status)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -882,11 +882,11 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_action(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "mutate work items");
+        let refine_dir = require_refine_dir!(self, "mutate work items");
         let Some((gap_id, action)) = gap_id_and_action(&request.path) else {
             return gap_id_required();
         };
-        let service = self.work_item_service(durable_root);
+        let service = self.work_item_service(refine_dir);
         let result = match action {
             "start" => service.start_gap_workflow(gap_id),
             "verify" => service.verify_gap_summary(gap_id),
@@ -921,7 +921,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create work items");
+        let refine_dir = require_refine_dir!(self, "create work items");
         let body = request.body.as_ref();
         let actual = body
             .and_then(|body| body.get("actual"))
@@ -986,7 +986,7 @@ impl InProcessWebServer {
             ));
         }
 
-        let service = self.work_item_service(durable_root);
+        let service = self.work_item_service(refine_dir);
         let duplicate = if id.is_none() {
             match latest_round_duplicate_match(&service, actual, target) {
                 Ok(duplicate) => duplicate,
@@ -1124,7 +1124,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_bulk_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "bulk update work items");
+        let refine_dir = require_refine_dir!(self, "bulk update work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1136,7 +1136,7 @@ impl InProcessWebServer {
             return invalid_bulk_body();
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_update_gaps(selection, update)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -1145,7 +1145,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_bulk_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "bulk delete work items");
+        let refine_dir = require_refine_dir!(self, "bulk delete work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1154,7 +1154,7 @@ impl InProcessWebServer {
             Err(_) => return invalid_bulk_body(),
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_delete_gaps(selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -1163,7 +1163,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create features");
+        let refine_dir = require_refine_dir!(self, "create features");
         let Some(name) = request
             .body
             .as_ref()
@@ -1200,7 +1200,7 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("assignee"))
             .and_then(|assignee| assignee.as_str());
-        match self.work_item_service(durable_root).create_feature_summary(
+        match self.work_item_service(refine_dir).create_feature_summary(
             name,
             id,
             description,
@@ -1216,7 +1216,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update features");
+        let refine_dir = require_refine_dir!(self, "update features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1226,7 +1226,7 @@ impl InProcessWebServer {
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .update_feature_metadata_summary(
                 feature_id,
                 body.get("name").and_then(|value| value.as_str()),
@@ -1247,7 +1247,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_bulk_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "bulk update features");
+        let refine_dir = require_refine_dir!(self, "bulk update features");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
@@ -1270,7 +1270,7 @@ impl InProcessWebServer {
             return invalid_bulk_body();
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_update_features(selection, assignee)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -1279,7 +1279,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_bulk_assign_gaps(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "bulk assign Gaps to Features");
+        let refine_dir = require_refine_dir!(self, "bulk assign Gaps to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1296,7 +1296,7 @@ impl InProcessWebServer {
             Err(_) => return invalid_bulk_body(),
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_assign_gaps_to_feature(feature_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -1305,7 +1305,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update work items");
+        let refine_dir = require_refine_dir!(self, "update work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1370,7 +1370,7 @@ impl InProcessWebServer {
             },
             None => None,
         };
-        let service = self.work_item_service(durable_root);
+        let service = self.work_item_service(refine_dir);
         let mut gap = match status {
             Some(status) => match service.transition_gap_status(gap_id, status) {
                 Ok(gap) => gap,
@@ -1403,7 +1403,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_note(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "edit work items");
+        let refine_dir = require_refine_dir!(self, "edit work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1435,7 +1435,7 @@ impl InProcessWebServer {
             .and_then(|author| author.as_str())
             .unwrap_or("");
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .add_gap_note_summary(gap_id, author, body)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -1444,7 +1444,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_append(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "append Gap rounds");
+        let refine_dir = require_refine_dir!(self, "append Gap rounds");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1483,7 +1483,7 @@ impl InProcessWebServer {
             .and_then(|body| body.get("assignee"))
             .and_then(|value| value.as_str());
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .append_gap_round_summary_with_assignee(gap_id, reporter, assignee, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -1492,7 +1492,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_edit_latest(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "edit latest Gap round");
+        let refine_dir = require_refine_dir!(self, "edit latest Gap round");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1522,7 +1522,7 @@ impl InProcessWebServer {
             .and_then(|body| body.get("target"))
             .and_then(|value| value.as_str());
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .edit_latest_gap_round_summary(gap_id, reporter, assignee, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -1531,7 +1531,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_evaluation_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update latest Gap round evaluation");
+        let refine_dir = require_refine_dir!(self, "update latest Gap round evaluation");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1542,7 +1542,7 @@ impl InProcessWebServer {
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .update_latest_gap_round_evaluation_summary(gap_id, &body)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -1551,7 +1551,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_round_log_append(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "append Gap round logs");
+        let refine_dir = require_refine_dir!(self, "append Gap round logs");
         let Some(rest) = request.path.strip_prefix("/work/gaps/") else {
             return gap_id_required();
         };
@@ -1567,10 +1567,7 @@ impl InProcessWebServer {
                 json!({"error": {"code": "invalid_round", "message": "round index is required"}}),
             );
         };
-        let gap = match self
-            .work_item_service(&durable_root)
-            .show_gap_summary(gap_id)
-        {
+        let gap = match self.work_item_service(&refine_dir).show_gap_summary(gap_id) {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
@@ -1620,7 +1617,7 @@ impl InProcessWebServer {
                 .map(str::to_string),
             gap_id: Some(gap_id.to_string()),
         };
-        match FileLogService::new(durable_root).append_round_log(gap_id, round_idx, entry) {
+        match FileLogService::new(refine_dir).append_round_log(gap_id, round_idx, entry) {
             Ok(log) => ApiResponse::json(
                 200,
                 json!({"log": log, "gap_id": gap_id, "round_idx": round_idx}),
@@ -1630,7 +1627,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_logs(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read Gap round logs");
+        let refine_dir = require_refine_dir!(self, "read Gap round logs");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1639,10 +1636,7 @@ impl InProcessWebServer {
         else {
             return gap_id_required();
         };
-        let gap = match self
-            .work_item_service(&durable_root)
-            .show_gap_summary(gap_id)
-        {
+        let gap = match self.work_item_service(&refine_dir).show_gap_summary(gap_id) {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
@@ -1653,7 +1647,7 @@ impl InProcessWebServer {
             );
         }
         let round_idx = 0;
-        match FileLogService::new(durable_root).page_round_logs(gap_id, round_idx, 50, 0) {
+        match FileLogService::new(refine_dir).page_round_logs(gap_id, round_idx, 50, 0) {
             Ok((logs, has_more, total)) => ApiResponse::json(
                 200,
                 json!({
@@ -1675,7 +1669,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "delete work items");
+        let refine_dir = require_refine_dir!(self, "delete work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1683,10 +1677,7 @@ impl InProcessWebServer {
         else {
             return gap_id_required();
         };
-        match self
-            .work_item_service(durable_root)
-            .delete_gap_record(gap_id)
-        {
+        match self.work_item_service(refine_dir).delete_gap_record(gap_id) {
             Ok(()) => match self.refresh_projection_cache_after_mutation() {
                 Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": gap_id})),
                 Err(error) => error_response(error),
@@ -1696,7 +1687,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_gap_cancel(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "cancel work items");
+        let refine_dir = require_refine_dir!(self, "cancel work items");
         let Some(gap_id) = request
             .path
             .strip_prefix("/work/gaps/")
@@ -1706,7 +1697,7 @@ impl InProcessWebServer {
             return gap_id_required();
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .cancel_gap_summary(gap_id)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -1715,7 +1706,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_show(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read Features");
+        let refine_dir = require_refine_dir!(self, "read Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1723,7 +1714,7 @@ impl InProcessWebServer {
         else {
             return feature_id_required();
         };
-        let service = FileWorkItemService::new(durable_root);
+        let service = FileWorkItemService::new(refine_dir);
         match service.show_feature_summary(feature_id) {
             Ok(feature) => {
                 let gaps = feature
@@ -1746,7 +1737,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_add_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "assign Gaps to Features");
+        let refine_dir = require_refine_dir!(self, "assign Gaps to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1772,7 +1763,7 @@ impl InProcessWebServer {
             );
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .assign_gap_to_feature(feature_id, gap_id)
         {
             Ok(feature) => match self.refresh_projection_cache_after_mutation() {
@@ -1787,7 +1778,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_add_gap_path(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "assign Gaps to Features");
+        let refine_dir = require_refine_dir!(self, "assign Gaps to Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1799,7 +1790,7 @@ impl InProcessWebServer {
             return feature_id_required();
         }
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .assign_gap_to_feature(feature_id, gap_id)
         {
             Ok(feature) => ApiResponse::json(
@@ -1811,7 +1802,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_remove_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "remove Gaps from Features");
+        let refine_dir = require_refine_dir!(self, "remove Gaps from Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1823,7 +1814,7 @@ impl InProcessWebServer {
             return feature_id_required();
         }
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .remove_gap_from_feature(feature_id, gap_id)
         {
             Ok(feature) => ApiResponse::json(
@@ -1835,7 +1826,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_reorder_gap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "reorder Feature Gaps");
+        let refine_dir = require_refine_dir!(self, "reorder Feature Gaps");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
@@ -1860,7 +1851,7 @@ impl InProcessWebServer {
             Err(response) => return response,
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .reorder_gap_in_feature(feature_id, gap_id, order)
         {
             Ok(feature) => ApiResponse::json(
@@ -1872,7 +1863,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_move(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "move Feature workflow");
+        let refine_dir = require_refine_dir!(self, "move Feature workflow");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1899,7 +1890,7 @@ impl InProcessWebServer {
             );
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .move_feature_workflow(feature_id, target)
         {
             Ok(feature) => ApiResponse::json(
@@ -1911,7 +1902,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_cancel(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "cancel Features");
+        let refine_dir = require_refine_dir!(self, "cancel Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1933,7 +1924,7 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .cancel_feature_summary(feature_id)
         {
             Ok(feature) => ApiResponse::json(
@@ -1953,7 +1944,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "delete Features");
+        let refine_dir = require_refine_dir!(self, "delete Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1962,7 +1953,7 @@ impl InProcessWebServer {
             return feature_id_required();
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .delete_feature_record(feature_id)
         {
             Ok(()) => match self.refresh_projection_cache_after_mutation() {
@@ -1989,8 +1980,8 @@ impl InProcessWebServer {
                 }),
             );
         };
-        let durable_root = require_refine_dir!(self, "read Gap detail");
-        match self.work_item_service(durable_root).show_gap_detail(gap_id) {
+        let refine_dir = require_refine_dir!(self, "read Gap detail");
+        match self.work_item_service(refine_dir).show_gap_detail(gap_id) {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap})),
             Err(error) => error_response(error),
         }
@@ -2151,7 +2142,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_activity_list(&self, raw_path: &str) -> ApiResponse {
         let Some(_) = (match self.current_refine_dir() {
-            Ok(durable_root) => durable_root,
+            Ok(refine_dir) => refine_dir,
             Err(error) => return error_response(error),
         }) else {
             return target_root_unavailable("read activity");
@@ -2192,14 +2183,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_ui_error(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "record UI activity");
+        let refine_dir = require_refine_dir!(self, "record UI activity");
         let body = request.body.unwrap_or_else(|| json!({}));
         let message = body
             .get("message")
             .and_then(|message| message.as_str())
             .unwrap_or("UI error")
             .trim();
-        let service = FileActivityService::new(durable_root);
+        let service = FileActivityService::new(refine_dir);
         let mut entry = service.new_entry(
             if message.is_empty() {
                 "UI error"
@@ -2223,7 +2214,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_cleanup(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "clean up activity");
+        let refine_dir = require_refine_dir!(self, "clean up activity");
         let body = request.body.unwrap_or_else(|| json!({}));
         let days = body
             .get("days")
@@ -2234,7 +2225,7 @@ impl InProcessWebServer {
             .and_then(|value| value.as_bool())
             .unwrap_or(false)
             || days == 0;
-        let service = FileActivityService::new(durable_root);
+        let service = FileActivityService::new(refine_dir);
         match service.cleanup(days, clear) {
             Ok(result) => ApiResponse::json(
                 200,
@@ -2276,8 +2267,8 @@ impl InProcessWebServer {
             .iter()
             .find_map(|change| change.branch.clone())
             .or_else(|| {
-                self.source_root().and_then(|source_root| {
-                    FileGitWorktreeService::new(source_root)
+                self.target_root().and_then(|target_root| {
+                    FileGitWorktreeService::new(target_root)
                         .inspect("")
                         .ok()
                         .and_then(|status| status.branch)
@@ -2336,8 +2327,8 @@ impl InProcessWebServer {
                 }),
             );
         }
-        let durable_root = require_refine_dir!(self, "undo Git changes");
-        let Some(source_root) = self.source_root() else {
+        let refine_dir = require_refine_dir!(self, "undo Git changes");
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("undo Git changes");
         };
         let Some(runtime_root) = &self.runtime_root else {
@@ -2350,14 +2341,14 @@ impl InProcessWebServer {
                 .find(|change| change.commit == commit)
                 .and_then(|change| change.gap_id.clone())
         });
-        match FileGitWorktreeService::with_runtime_root(source_root, runtime_root)
+        match FileGitWorktreeService::with_runtime_root(target_root, runtime_root)
             .revert_commit(commit)
         {
             Ok(result) => {
                 let cancelled_gap = if result.ok {
                     match linked_gap_id.as_deref() {
                         Some(gap_id) => match self
-                            .work_item_service(durable_root)
+                            .work_item_service(refine_dir)
                             .cancel_gap_summary(gap_id)
                         {
                             Ok(gap) => Some(gap.gap.id),
@@ -2480,7 +2471,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_files_tree(&self, raw_path: &str) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("read source files");
         };
         let path = query_param(raw_path, "path").unwrap_or_default();
@@ -2495,14 +2486,14 @@ impl InProcessWebServer {
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or(200)
             .clamp(1, 1000);
-        match files_tree_response(&source_root, &path, recursive, max_depth, max_entries) {
+        match files_tree_response(&target_root, &path, recursive, max_depth, max_entries) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_files_read(&self, raw_path: &str) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("read source file");
         };
         let path = query_param(raw_path, "path").unwrap_or_default();
@@ -2513,14 +2504,14 @@ impl InProcessWebServer {
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or(128_000)
             .clamp(1, 512_000);
-        match files_read_response(&source_root, &path, offset, limit) {
+        match files_read_response(&target_root, &path, offset, limit) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_files_search(&self, raw_path: &str) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("search source files");
         };
         let query = query_param(raw_path, "q").unwrap_or_default();
@@ -2528,14 +2519,14 @@ impl InProcessWebServer {
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or(20)
             .clamp(1, 200);
-        match files_search_response(&source_root, &query, max_entries) {
+        match files_search_response(&target_root, &query, max_entries) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_terminal_session_start(&self, request: ApiRequest) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("start terminal session");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
@@ -2549,7 +2540,7 @@ impl InProcessWebServer {
             .and_then(Value::as_u64)
             .and_then(|value| u16::try_from(value).ok())
             .unwrap_or(0);
-        match terminal_session_start_response(&source_root, cols, rows) {
+        match terminal_session_start_response(&target_root, cols, rows) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -2625,13 +2616,13 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_merger_hard_reset_worktree(&self) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return target_root_unavailable("hard-reset Git worktree");
         };
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("hard-reset Git worktree");
         };
-        match FileGitWorktreeService::with_runtime_root(source_root, runtime_root).hard_reset() {
+        match FileGitWorktreeService::with_runtime_root(target_root, runtime_root).hard_reset() {
             Ok(result) => ApiResponse::json(
                 200,
                 json!({
@@ -2645,7 +2636,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "extract imported Gaps");
+        let refine_dir = require_refine_dir!(self, "extract imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")
@@ -2688,7 +2679,7 @@ impl InProcessWebServer {
             let runtime_root = runtime_root.clone();
             thread::spawn(move || {
                 let registry = FileOperationRegistry::new(&runtime_root);
-                let response = server.import_extract_response(durable_root, body);
+                let response = server.import_extract_response(refine_dir, body);
                 let mut result = response.body.clone();
                 match result.as_object_mut() {
                     Some(object) => {
@@ -2728,10 +2719,10 @@ impl InProcessWebServer {
             });
             return ApiResponse::json(202, json!({"operation": operation_response(operation)}));
         }
-        self.import_extract_response(durable_root, body)
+        self.import_extract_response(refine_dir, body)
     }
 
-    fn import_extract_response(&self, durable_root: PathBuf, body: Value) -> ApiResponse {
+    fn import_extract_response(&self, refine_dir: PathBuf, body: Value) -> ApiResponse {
         let text = body_text(&body);
         let purpose = body
             .get("purpose")
@@ -2739,13 +2730,13 @@ impl InProcessWebServer {
             .map(str::trim)
             .unwrap_or("import");
         let reporter = body.get("reporter").and_then(|value| value.as_str());
-        let provider = import_provider_from_settings(&durable_root, &body);
+        let provider = import_provider_from_settings(&refine_dir, &body);
         if purpose == "plan"
             && let Some(result) = parse_structured_import_result(text, reporter)
         {
             return import_extraction_response(result, &provider, purpose, "input");
         }
-        let cwd = self.source_root().map(|path| path.display().to_string());
+        let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
             provider: provider.clone(),
             prompt: import_extraction_prompt(text, purpose),
@@ -2839,7 +2830,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_persist(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "persist imported Gaps");
+        let refine_dir = require_refine_dir!(self, "persist imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")
@@ -2874,7 +2865,7 @@ impl InProcessWebServer {
             thread::spawn(move || {
                 let registry = FileOperationRegistry::new(&runtime_root);
                 let response = server.import_persist_background_response(
-                    durable_root,
+                    refine_dir,
                     body,
                     &registry,
                     &operation_id,
@@ -2923,12 +2914,12 @@ impl InProcessWebServer {
             });
             return ApiResponse::json(202, json!({ "operation": operation_response(operation) }));
         }
-        self.import_persist_response(durable_root, body)
+        self.import_persist_response(refine_dir, body)
     }
 
     fn import_persist_background_response(
         &self,
-        durable_root: PathBuf,
+        refine_dir: PathBuf,
         body: Value,
         registry: &FileOperationRegistry,
         operation_id: &str,
@@ -2938,7 +2929,7 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let draft_total = drafts.len();
-        let service = self.work_item_service(&durable_root);
+        let service = self.work_item_service(&refine_dir);
         let mut failures = Vec::new();
         let mut feature_response = serde_json::Value::Null;
         let feature_id = match import_destination_feature_id(&service, &body) {
@@ -3073,12 +3064,12 @@ impl InProcessWebServer {
         Ok(())
     }
 
-    fn import_persist_response(&self, durable_root: PathBuf, body: Value) -> ApiResponse {
+    fn import_persist_response(&self, refine_dir: PathBuf, body: Value) -> ApiResponse {
         let drafts = match import_drafts_from_value(&body, None) {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),
         };
-        let service = self.work_item_service(&durable_root);
+        let service = self.work_item_service(&refine_dir);
         let mut failures = Vec::new();
         let mut feature_response = serde_json::Value::Null;
         let feature_id = match import_destination_feature_id(&service, &body) {

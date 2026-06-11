@@ -357,15 +357,15 @@ impl InProcessWebServer {
         })
     }
 
-    pub(super) fn source_root(&self) -> Option<PathBuf> {
+    pub(super) fn target_root(&self) -> Option<PathBuf> {
         self.current_target_root().ok().flatten()
     }
 }
 
-fn projection_cache_key(durable_root: &Path, runtime_root: &Path) -> String {
+fn projection_cache_key(refine_dir: &Path, runtime_root: &Path) -> String {
     format!(
         "{}|{}",
-        durable_root.display(),
+        refine_dir.display(),
         runtime_root.join("cache").display()
     )
 }
@@ -393,7 +393,7 @@ fn store_hot_projection(key: String, snapshot: ProjectionSnapshot) -> RefineResu
 
 fn runtime_projection_fingerprint(
     runtime_root: &Path,
-    durable_root: Option<&Path>,
+    refine_dir: Option<&Path>,
 ) -> RefineResult<RuntimeProjectionFingerprint> {
     let mut fingerprint = RuntimeProjectionFingerprint::default();
     for path in [
@@ -406,8 +406,8 @@ fn runtime_projection_fingerprint(
     ] {
         collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;
     }
-    if let Some(durable_root) = durable_root {
-        let chat_sessions = durable_root.join("chat/sessions");
+    if let Some(refine_dir) = refine_dir {
+        let chat_sessions = refine_dir.join("chat/sessions");
         collect_runtime_path_fingerprint(runtime_root, &chat_sessions, &mut fingerprint.entries)?;
     }
     Ok(fingerprint)

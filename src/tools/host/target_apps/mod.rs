@@ -69,21 +69,21 @@ pub struct TargetAppGeneratedConfig {
 
 #[derive(Clone, Debug)]
 pub struct FileTargetAppService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: PathBuf,
-    pub source_root: PathBuf,
+    pub target_root: PathBuf,
 }
 
 impl FileTargetAppService {
     pub fn new(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
-        source_root: impl Into<PathBuf>,
+        target_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: runtime_root.into(),
-            source_root: source_root.into(),
+            target_root: target_root.into(),
         }
     }
 
@@ -136,7 +136,7 @@ impl FileTargetAppService {
         }
         let (shell, args) = shell_program_args(&command);
         let security =
-            FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?;
+            FileSecurityService::from_project_settings(&self.runtime_root, &self.refine_dir)?;
         let process = FileProcessSupervisor::with_allowed_commands(
             &self.runtime_root,
             security.allowed_commands.iter().cloned(),
@@ -364,7 +364,7 @@ impl FileTargetAppService {
         &self,
         config: &mut TargetAppGeneratedConfig,
     ) -> RefineResult<()> {
-        let wrapper_dir = self.source_root.join(".refine");
+        let wrapper_dir = self.target_root.join(".refine");
         fs::create_dir_all(&wrapper_dir).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create target-app wrapper directory {}: {error}",
@@ -382,7 +382,7 @@ impl FileTargetAppService {
                     .to_string(),
             );
         }
-        let project_root = config_project_root(&self.source_root, &config.cwd);
+        let project_root = config_project_root(&self.target_root, &config.cwd);
         apply_static_web_server_defaults(&project_root, config, &mut notes);
         for note in notes {
             append_note(&mut config.notes, &note);
@@ -418,7 +418,7 @@ impl FileTargetAppService {
         process_metadata: Map<String, Value>,
     ) -> RefineResult<TargetAppOperation> {
         let started_at = now_timestamp();
-        FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?
+        FileSecurityService::from_project_settings(&self.runtime_root, &self.refine_dir)?
             .authorize_host_command("target_app", command)?;
         let (shell, args) = shell_program_args(command);
         let output = FileProcessSupervisor::new(&self.runtime_root).run_to_completion(
@@ -520,7 +520,7 @@ impl FileTargetAppService {
     }
 
     fn settings(&self) -> RefineResult<JsonObject> {
-        FileSettingsService::new(&self.durable_root).load()
+        FileSettingsService::new(&self.refine_dir).load()
     }
 
     fn state_path(&self) -> PathBuf {
@@ -587,13 +587,13 @@ impl FileTargetAppService {
     fn command_cwd(&self, settings: &JsonObject) -> PathBuf {
         let cwd = setting(settings, "target_app_cwd");
         if cwd.trim().is_empty() {
-            return self.source_root.clone();
+            return self.target_root.clone();
         }
         let path = PathBuf::from(cwd);
         if path.is_absolute() {
             path
         } else {
-            self.source_root.join(path)
+            self.target_root.join(path)
         }
     }
 
@@ -764,16 +764,16 @@ fn apply_static_web_server_defaults(
     ));
 }
 
-fn config_project_root(source_root: &Path, cwd: &str) -> PathBuf {
+fn config_project_root(target_root: &Path, cwd: &str) -> PathBuf {
     let cwd = cwd.trim();
     if cwd.is_empty() || cwd == "." {
-        return source_root.to_path_buf();
+        return target_root.to_path_buf();
     }
     let path = PathBuf::from(cwd);
     if path.is_absolute() {
         path
     } else {
-        source_root.join(path)
+        target_root.join(path)
     }
 }
 
@@ -1157,20 +1157,20 @@ mod tests {
     #[test]
     fn target_app_service_runs_status_and_build_commands() {
         let temp_root = unique_temp_dir("target-app-service");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
-        FileSettingsService::new(&durable_root)
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "target_app_status_command": "test -f status-ok",
                 "target_app_build_command": "touch built && echo built",
-                "target_app_cwd": source_root.to_str().unwrap()
+                "target_app_cwd": target_root.to_str().unwrap()
             }))
             .unwrap();
-        fs::write(source_root.join("status-ok"), "").unwrap();
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        fs::write(target_root.join("status-ok"), "").unwrap();
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
 
         let status = service.status().unwrap();
         assert_eq!(status.state, "running");
@@ -1178,7 +1178,7 @@ mod tests {
 
         let built = service.build().unwrap();
         assert!(built.ok);
-        assert!(source_root.join("built").exists());
+        assert!(target_root.join("built").exists());
         assert!(runtime_root.join(TARGET_APP_STATE_FILE).exists());
 
         fs::remove_dir_all(temp_root).unwrap();
@@ -1187,18 +1187,18 @@ mod tests {
     #[test]
     fn target_app_service_spawns_start_command_and_registers_process() {
         let temp_root = unique_temp_dir("target-app-start");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
-        FileSettingsService::new(&durable_root)
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "target_app_start_command": "printf target-started; sleep 2",
-                "target_app_cwd": source_root.to_str().unwrap()
+                "target_app_cwd": target_root.to_str().unwrap()
             }))
             .unwrap();
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
 
         let started = service.start().unwrap();
         assert_eq!(started.state, "running");
@@ -1227,12 +1227,12 @@ mod tests {
     #[test]
     fn target_app_snapshot_write_replaces_longer_state() {
         let temp_root = unique_temp_dir("target-app-state");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
         let mut long_snapshot = TargetAppSnapshot {
             state: "running".to_string(),
             message: "Target application started.".to_string(),
@@ -1272,25 +1272,25 @@ mod tests {
     #[test]
     fn target_app_service_generates_package_json_config() {
         let temp_root = unique_temp_dir("target-app-generate");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
         fs::write(
-            source_root.join("package.json"),
+            target_root.join("package.json"),
             r#"{"scripts":{"dev":"vite","build":"vite build"}}"#,
         )
         .unwrap();
-        fs::write(source_root.join("pnpm-lock.yaml"), "").unwrap();
-        FileSettingsService::new(&durable_root)
+        fs::write(target_root.join("pnpm-lock.yaml"), "").unwrap();
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "target_app_url": "http://127.0.0.1:5173",
-                "target_app_cwd": source_root.to_str().unwrap()
+                "target_app_cwd": target_root.to_str().unwrap()
             }))
             .unwrap();
 
-        let generated = FileTargetAppService::new(&durable_root, &runtime_root, &source_root)
+        let generated = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root)
             .generate_config()
             .unwrap();
         assert_eq!(generated.start_command, "pnpm run dev");
@@ -1304,26 +1304,26 @@ mod tests {
     #[test]
     fn target_app_service_generates_static_web_server_for_package_without_start_script() {
         let temp_root = unique_temp_dir("target-app-static-package");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
+        let target_root = temp_root.join("app");
         let port = free_test_port();
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
         fs::write(
-            source_root.join("package.json"),
+            target_root.join("package.json"),
             r#"{"scripts":{"test":"node --test"}}"#,
         )
         .unwrap();
-        fs::write(source_root.join("index.html"), "<h1>Static app</h1>").unwrap();
-        FileSettingsService::new(&durable_root)
+        fs::write(target_root.join("index.html"), "<h1>Static app</h1>").unwrap();
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "target_app_url": format!("http://127.0.0.1:{port}/"),
-                "target_app_cwd": source_root.to_str().unwrap()
+                "target_app_cwd": target_root.to_str().unwrap()
             }))
             .unwrap();
 
-        let generated = FileTargetAppService::new(&durable_root, &runtime_root, &source_root)
+        let generated = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root)
             .generate_config()
             .unwrap();
         assert!(generated.start_command.contains("python3 -m http.server"));
@@ -1346,22 +1346,22 @@ mod tests {
     #[test]
     fn target_app_generation_does_not_embed_existing_manage_app_entrypoints() {
         let temp_root = unique_temp_dir("target-app-wrapper-regeneration");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let source_root = temp_root.join("app");
+        let target_root = temp_root.join("app");
         let port = free_test_port();
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
         fs::write(
-            source_root.join("package.json"),
+            target_root.join("package.json"),
             r#"{"scripts":{"test":"node --test"}}"#,
         )
         .unwrap();
-        fs::write(source_root.join("index.html"), "<h1>Static app</h1>").unwrap();
-        FileSettingsService::new(&durable_root)
+        fs::write(target_root.join("index.html"), "<h1>Static app</h1>").unwrap();
+        FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "target_app_url": format!("http://127.0.0.1:{port}/"),
-                "target_app_cwd": source_root.to_str().unwrap(),
+                "target_app_cwd": target_root.to_str().unwrap(),
                 "target_app_start_command": "./.refine/manage-app.sh start",
                 "target_app_stop_command": "./.refine/manage-app.sh stop",
                 "target_app_build_command": "./.refine/manage-app.sh build",
@@ -1369,7 +1369,7 @@ mod tests {
             }))
             .unwrap();
 
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
         let mut generated = service.generate_config().unwrap();
         service.write_manage_app_wrapper(&mut generated).unwrap();
 
@@ -1382,7 +1382,7 @@ mod tests {
                 .notes
                 .contains("Ignored existing manage-app wrapper entrypoints")
         );
-        let wrapper = fs::read_to_string(source_root.join(".refine/manage-app.sh")).unwrap();
+        let wrapper = fs::read_to_string(target_root.join(".refine/manage-app.sh")).unwrap();
         assert!(!wrapper.contains("START_COMMAND='./.refine/manage-app.sh start'"));
         assert!(!wrapper.contains("STOP_COMMAND='./.refine/manage-app.sh stop'"));
         assert!(!wrapper.contains("BUILD_COMMAND='./.refine/manage-app.sh build'"));
@@ -1396,11 +1396,11 @@ mod tests {
     #[test]
     fn target_app_service_writes_manage_app_wrapper() {
         let temp_root = unique_temp_dir("target-app-wrapper");
-        let source_root = temp_root.join("app");
-        let durable_root = source_root.join(".refine");
+        let target_root = temp_root.join("app");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let inner_root = source_root.join("client");
-        fs::create_dir_all(&durable_root).unwrap();
+        let inner_root = target_root.join("client");
+        fs::create_dir_all(&refine_dir).unwrap();
         fs::create_dir_all(&inner_root).unwrap();
 
         let mut config = TargetAppGeneratedConfig {
@@ -1424,7 +1424,7 @@ mod tests {
             process_check_command: String::new(),
             notes: "provider analysis".to_string(),
         };
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
 
         service.write_manage_app_wrapper(&mut config).unwrap();
 
@@ -1435,7 +1435,7 @@ mod tests {
         assert_eq!(config.cwd, ".");
         assert_eq!(config.log_path, ".refine/manage-app.log");
 
-        let wrapper_path = source_root.join(".refine/manage-app.sh");
+        let wrapper_path = target_root.join(".refine/manage-app.sh");
         let script = fs::read_to_string(&wrapper_path).unwrap();
         assert!(script.contains("APP_CWD='client'"));
         assert!(script.contains("START_COMMAND='printf \"$WRAP_VALUE\" > ../started'"));
@@ -1444,15 +1444,15 @@ mod tests {
 
         let output = std::process::Command::new(&wrapper_path)
             .arg("start")
-            .current_dir(&source_root)
+            .current_dir(&target_root)
             .output()
             .unwrap();
         assert!(output.status.success());
         assert_eq!(
-            fs::read_to_string(source_root.join("started")).unwrap(),
+            fs::read_to_string(target_root.join("started")).unwrap(),
             "wrapped"
         );
-        let log = fs::read_to_string(source_root.join(".refine/manage-app.log")).unwrap();
+        let log = fs::read_to_string(target_root.join(".refine/manage-app.log")).unwrap();
         assert!(log.contains("[start] cwd="));
         assert!(log.contains("[start] exit=0"));
 
@@ -1462,13 +1462,13 @@ mod tests {
     #[test]
     fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
         let temp_root = unique_temp_dir("target-app-wrapper-static");
-        let source_root = temp_root.join("app");
-        let durable_root = source_root.join(".refine");
+        let target_root = temp_root.join("app");
+        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let port = free_test_port();
-        fs::create_dir_all(&durable_root).unwrap();
-        fs::create_dir_all(&source_root).unwrap();
-        fs::write(source_root.join("index.html"), "<h1>AI static app</h1>").unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        fs::write(target_root.join("index.html"), "<h1>AI static app</h1>").unwrap();
 
         let mut config = TargetAppGeneratedConfig {
             start_command: String::new(),
@@ -1488,7 +1488,7 @@ mod tests {
             process_check_command: String::new(),
             notes: "provider returned only a test status command".to_string(),
         };
-        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
 
         service.write_manage_app_wrapper(&mut config).unwrap();
 
@@ -1498,7 +1498,7 @@ mod tests {
         assert_eq!(config.status_command, "./.refine/manage-app.sh status");
         assert!(config.notes.contains("static web content"));
 
-        let wrapper_path = source_root.join(".refine/manage-app.sh");
+        let wrapper_path = target_root.join(".refine/manage-app.sh");
         let script = fs::read_to_string(&wrapper_path).unwrap();
         assert!(!script.contains("START_COMMAND=''"));
         assert!(!script.contains("STOP_COMMAND=''"));
@@ -1509,7 +1509,7 @@ mod tests {
 
         let start = std::process::Command::new(&wrapper_path)
             .arg("start")
-            .current_dir(&source_root)
+            .current_dir(&target_root)
             .output()
             .unwrap();
         assert!(
@@ -1520,12 +1520,12 @@ mod tests {
         );
         let status = std::process::Command::new(&wrapper_path)
             .arg("status")
-            .current_dir(&source_root)
+            .current_dir(&target_root)
             .output()
             .unwrap();
         let stop = std::process::Command::new(&wrapper_path)
             .arg("stop")
-            .current_dir(&source_root)
+            .current_dir(&target_root)
             .output()
             .unwrap();
         assert!(

@@ -303,10 +303,10 @@ pub(in crate::surfaces::web_server) fn recent_process_sse_events(
 }
 
 pub(in crate::surfaces::web_server) fn recent_chat_sse_events(
-    durable_root: &Path,
+    refine_dir: &Path,
     limit: usize,
 ) -> RefineResult<Vec<Value>> {
-    let sessions_dir = durable_root.join("chat/sessions");
+    let sessions_dir = refine_dir.join("chat/sessions");
     if !sessions_dir.exists() {
         return Ok(Vec::new());
     }

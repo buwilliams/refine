@@ -14,30 +14,30 @@ use crate::tools::host::agent_providers::{ProviderInvocation, ProviderInvocation
 pub struct TestRuntimeFixture {
     pub root: PathBuf,
     pub runtime_root: PathBuf,
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl TestRuntimeFixture {
     pub fn new(name: &str) -> RefineResult<Self> {
         let root = unique_temp_dir(name);
         let runtime_root = root.join("run").join("8080");
-        let durable_root = root.join("app").join(".refine");
+        let refine_dir = root.join("app").join(".refine");
         fs::create_dir_all(&runtime_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create test runtime root {}: {error}",
                 runtime_root.display()
             ))
         })?;
-        fs::create_dir_all(&durable_root).map_err(|error| {
+        fs::create_dir_all(&refine_dir).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create test durable root {}: {error}",
-                durable_root.display()
+                "failed to create test refine dir {}: {error}",
+                refine_dir.display()
             ))
         })?;
         Ok(Self {
             root,
             runtime_root,
-            durable_root,
+            refine_dir,
         })
     }
 
@@ -176,7 +176,7 @@ mod tests {
     fn testing_fixture_creates_isolated_roots_and_contract_helpers() {
         let fixture = TestRuntimeFixture::new("testing-fixture").unwrap();
         assert!(fixture.runtime_root.exists());
-        assert!(fixture.durable_root.exists());
+        assert!(fixture.refine_dir.exists());
         assert_json_contract(&serde_json::json!({"ok": true, "id": "one"}), &["ok", "id"]).unwrap();
         assert!(assert_json_contract(&serde_json::json!({"ok": true}), &["id"]).is_err());
         fixture.cleanup().unwrap();

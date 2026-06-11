@@ -128,15 +128,15 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_quality_get(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "load quality settings");
-        match FileQualityService::new(durable_root).load_settings() {
+        let refine_dir = require_refine_dir!(self, "load quality settings");
+        match FileQualityService::new(refine_dir).load_settings() {
             Ok(settings) => ApiResponse::json(200, json!(settings)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_quality_save(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "save quality settings");
+        let refine_dir = require_refine_dir!(self, "save quality settings");
         let patch = match serde_json::from_value::<QualitySettingsPatch>(
             request.body.unwrap_or_else(|| json!({})),
         ) {
@@ -153,9 +153,9 @@ impl InProcessWebServer {
                 );
             }
         };
-        match FileQualityService::new(&durable_root).save_settings(patch) {
+        match FileQualityService::new(&refine_dir).save_settings(patch) {
             Ok(settings) => {
-                append_quality_activity(&durable_root, "Quality settings updated".to_string());
+                append_quality_activity(&refine_dir, "Quality settings updated".to_string());
                 ApiResponse::json(200, json!(settings))
             }
             Err(error) => error_response(error),
@@ -163,7 +163,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_quality_checks(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "run quality checks");
+        let refine_dir = require_refine_dir!(self, "run quality checks");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("run quality checks");
         };
@@ -186,7 +186,7 @@ impl InProcessWebServer {
             .or_else(|| body.get("browser"))
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
-        match QualityOperationRunner::new(&durable_root, runtime_root).run_checks(
+        match QualityOperationRunner::new(&refine_dir, runtime_root).run_checks(
             QualityCheckRequest {
                 owner_id,
                 command,
@@ -196,7 +196,7 @@ impl InProcessWebServer {
         ) {
             Ok(operation_result) => {
                 append_quality_activity(
-                    &durable_root,
+                    &refine_dir,
                     format!(
                         "Quality checks completed for {}",
                         operation_result.result.owner_id
@@ -216,9 +216,9 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_quality_screenshots(&self, raw_path: &str) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "list quality screenshots");
+        let refine_dir = require_refine_dir!(self, "list quality screenshots");
         let owner_id = query_param(raw_path, "owner_id").unwrap_or_else(|| "app".to_string());
-        match FileQualityService::new(durable_root).screenshots(&owner_id) {
+        match FileQualityService::new(refine_dir).screenshots(&owner_id) {
             Ok(screenshots) => {
                 let screenshot_count = screenshots.len();
                 ApiResponse::json(
@@ -236,7 +236,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_quality_regression_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create quality regressions");
+        let refine_dir = require_refine_dir!(self, "create quality regressions");
         let body = request.body.unwrap_or_else(|| json!({}));
         let title = body
             .get("title")
@@ -250,10 +250,10 @@ impl InProcessWebServer {
             .get("description")
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileQualityService::new(&durable_root).create_regression(title, description, prompt) {
+        match FileQualityService::new(&refine_dir).create_regression(title, description, prompt) {
             Ok(regression) => {
                 append_quality_activity(
-                    &durable_root,
+                    &refine_dir,
                     format!("Regression created: {}", regression.title),
                 );
                 ApiResponse::json(201, json!({"ok": true, "regression": regression}))
@@ -263,7 +263,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_quality_regression_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update quality regressions");
+        let refine_dir = require_refine_dir!(self, "update quality regressions");
         let Some(regression_id) = request
             .path
             .strip_prefix("/quality/regressions/")
@@ -272,14 +272,14 @@ impl InProcessWebServer {
             return regression_id_required();
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        match FileQualityService::new(durable_root).update_regression(regression_id, &body) {
+        match FileQualityService::new(refine_dir).update_regression(regression_id, &body) {
             Ok(regression) => ApiResponse::json(200, json!({"ok": true, "regression": regression})),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_quality_regression_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "delete quality regressions");
+        let refine_dir = require_refine_dir!(self, "delete quality regressions");
         let Some(regression_id) = request
             .path
             .strip_prefix("/quality/regressions/")
@@ -287,19 +287,18 @@ impl InProcessWebServer {
         else {
             return regression_id_required();
         };
-        match FileQualityService::new(durable_root).delete_regression(regression_id) {
+        match FileQualityService::new(refine_dir).delete_regression(regression_id) {
             Ok(()) => ApiResponse::json(200, json!({"ok": true})),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_quality_regression_run(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "run quality regressions");
+        let refine_dir = require_refine_dir!(self, "run quality regressions");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("run quality regressions");
         };
-        match FileQualityService::with_runtime_root(durable_root, runtime_root)
-            .run_regressions(true)
+        match FileQualityService::with_runtime_root(refine_dir, runtime_root).run_regressions(true)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
@@ -307,7 +306,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_start(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "start chat sessions");
+        let refine_dir = require_refine_dir!(self, "start chat sessions");
         let body = request.body.unwrap_or_else(|| json!({}));
         let attachment = if let Some(gap_id) = body.get("gap_id").and_then(|value| value.as_str()) {
             ChatAttachment::Gap(gap_id.to_string())
@@ -321,7 +320,7 @@ impl InProcessWebServer {
             .or_else(|| body.get("mode"))
             .and_then(|value| value.as_str());
         let configured_provider = || {
-            FileSettingsService::new(&durable_root)
+            FileSettingsService::new(&refine_dir)
                 .load()
                 .ok()
                 .and_then(|settings| {
@@ -338,7 +337,7 @@ impl InProcessWebServer {
         let provider = requested_provider
             .clone()
             .or_else(|| effective_chat_provider(configured_provider()));
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         if matches!(attachment, ChatAttachment::Standalone) && self.runtime_root.is_none() {
             return runtime_root_unavailable("start standalone chat sessions");
         }
@@ -359,7 +358,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_input(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "send chat input");
+        let refine_dir = require_refine_dir!(self, "send chat input");
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
@@ -385,7 +384,7 @@ impl InProcessWebServer {
                 }),
             );
         };
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         match service.append_user_message(session_id, text) {
             Ok(session) => ApiResponse::json(
                 200,
@@ -400,7 +399,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_queue_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update queued chat input");
+        let refine_dir = require_refine_dir!(self, "update queued chat input");
         let Some((session_id, message_id)) = chat_queue_path_parts(&request.path) else {
             return chat_session_id_required();
         };
@@ -421,7 +420,7 @@ impl InProcessWebServer {
                 }),
             );
         };
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         match service.update_queued_message(session_id, message_id, text) {
             Ok(session) => ApiResponse::json(
                 200,
@@ -435,11 +434,11 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_queue_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "remove queued chat input");
+        let refine_dir = require_refine_dir!(self, "remove queued chat input");
         let Some((session_id, message_id)) = chat_queue_path_parts(&request.path) else {
             return chat_session_id_required();
         };
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         match service.remove_queued_message(session_id, message_id) {
             Ok(session) => ApiResponse::json(
                 200,
@@ -453,7 +452,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_read(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read chat sessions");
+        let refine_dir = require_refine_dir!(self, "read chat sessions");
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
@@ -462,7 +461,7 @@ impl InProcessWebServer {
         else {
             return chat_session_id_required();
         };
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         match service.read(session_id) {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
@@ -470,7 +469,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_stop(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "stop chat sessions");
+        let refine_dir = require_refine_dir!(self, "stop chat sessions");
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
@@ -479,7 +478,7 @@ impl InProcessWebServer {
         else {
             return chat_session_id_required();
         };
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         match service.stop_with_standalone_cleanup(session_id) {
             Ok(session) => ApiResponse::json(
                 200,
@@ -495,7 +494,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_chat_submit_ready_merge(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "submit standalone chat for merge");
+        let refine_dir = require_refine_dir!(self, "submit standalone chat for merge");
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("submit standalone chat for merge");
         }
@@ -508,7 +507,7 @@ impl InProcessWebServer {
             return chat_session_id_required();
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let service = self.chat_service(&durable_root);
+        let service = self.chat_service(&refine_dir);
         let submit = service.submit_standalone_ready_merge(
             session_id,
             StandaloneReadyMergeRequest {

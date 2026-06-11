@@ -1618,9 +1618,9 @@ fn run_system_start(
     eprintln!("refine: preparing daemon at http://{addr}");
     eprintln!("refine: loading active project registry");
     let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
-    let snapshot = if let Some(client_repo) = project_status.client_repo {
-        eprintln!("refine: warming project cache for {client_repo}");
-        let target_root = PathBuf::from(client_repo);
+    let snapshot = if let Some(target_root) = project_status.target_root {
+        eprintln!("refine: warming project cache for {target_root}");
+        let target_root = PathBuf::from(target_root);
         let refine_dir = refine_dir_for_target_root(&target_root);
         let cache_root = cache_dir
             .clone()

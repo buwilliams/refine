@@ -63,7 +63,7 @@ fn project_status_is_attached_to_test_app(fixture: &IntegrationFixture) {
     let payload = fixture.json_stdout(&output);
     assert_eq!(payload["attached"], true, "{payload:#}");
     assert!(
-        payload["client_repo"]
+        payload["target_root"]
             .as_str()
             .unwrap_or_default()
             .ends_with("rust-test-app"),
@@ -101,7 +101,7 @@ fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) {
     fixture.assert_success("project switch", &switch);
     let switch_payload = fixture.json_stdout(&switch);
     assert_eq!(switch_payload["attached"], true);
-    assert_eq!(switch_payload["client_repo"], registered_app_path);
+    assert_eq!(switch_payload["target_root"], registered_app_path);
 
     let detach = fixture.run_refine(&["project", "detach"]);
     fixture.assert_success("project detach", &detach);
@@ -116,7 +116,7 @@ fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) {
 
     let attach = fixture.run_refine(&["project", "attach", &primary_app]);
     fixture.assert_success("project attach primary", &attach);
-    assert_eq!(fixture.json_stdout(&attach)["client_repo"], primary_app);
+    assert_eq!(fixture.json_stdout(&attach)["target_root"], primary_app);
 
     let migrate = fixture.run_refine(&["project", "migrate"]);
     fixture.assert_success("project migrate", &migrate);
@@ -140,11 +140,11 @@ fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) {
     fixture.assert_success("project clone", &clone);
     let clone_payload = fixture.json_stdout(&clone);
     assert_eq!(clone_payload["attached"], true);
-    assert_eq!(clone_payload["client_repo"], clone_destination_path);
+    assert_eq!(clone_payload["target_root"], clone_destination_path);
 
     let restore = fixture.run_refine(&["project", "switch", &primary_app]);
     fixture.assert_success("project switch primary", &restore);
-    assert_eq!(fixture.json_stdout(&restore)["client_repo"], primary_app);
+    assert_eq!(fixture.json_stdout(&restore)["target_root"], primary_app);
 
     let remove_registered = fixture.run_refine(&["project", "remove", "registered"]);
     fixture.assert_success("project remove registered", &remove_registered);

@@ -8,7 +8,7 @@ function renderProjectApplicationsSection({
       <h3>Applications</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small">
-        Current app: <code>${htmlEscape(state.project?.client_repo || "Not attached")}</code>
+        Current app: <code>${htmlEscape(state.project?.target_root || "Not attached")}</code>
       </p>
       ${projectRegistryEnabled ? "" : `
         <p class="muted small" style="color:var(--warn)">
@@ -60,8 +60,8 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
     <section class="settings-section">
       <h3>Scope</h3>
       <p class="muted small">
-        Where refine's agent work lands inside the client repo. The base
-        repo location still owns all git plumbing — worktree create, fetch,
+        Where refine's agent work lands inside the target root. The base
+        target location still owns all git plumbing — worktree create, fetch,
         merge, push.
       </p>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -387,7 +387,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
 
 function refreshProjectApplicationsSectionOnly(project) {
   const projectApps = project?.apps || [];
-  const currentProject = project?.client_repo || "";
+  const currentProject = project?.target_root || "";
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}

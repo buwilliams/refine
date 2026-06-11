@@ -271,7 +271,7 @@ function drawGapDetail(gap) {
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
   // Chat is always available — the value is the Gap context the runner
   // primes into the provider session. The chat runs in the Gap's worktree
-  // when one exists and falls back to the client repo when it doesn't.
+  // when one exists and falls back to the target root when it doesn't.
 
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow

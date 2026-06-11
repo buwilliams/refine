@@ -22,18 +22,18 @@ pub trait ConfigService {
 
 #[derive(Clone, Debug)]
 pub struct FileSettingsService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileSettingsService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
     pub fn path(&self) -> PathBuf {
-        self.durable_root.join(SETTINGS_FILE)
+        self.refine_dir.join(SETTINGS_FILE)
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
@@ -147,19 +147,19 @@ impl ConfigService for FileSettingsService {
 
 #[derive(Clone, Debug)]
 pub struct FileGovernanceService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileGovernanceService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
     pub fn load(&self) -> RefineResult<Value> {
         let mut value = read_json_or_default(
-            self.durable_root.join(GOVERNANCE_FILE),
+            self.refine_dir.join(GOVERNANCE_FILE),
             json!({"product": "", "constitution": "", "rules": []}),
         )?;
         normalize_governance(&mut value);
@@ -183,7 +183,7 @@ impl FileGovernanceService {
             current["rules"] = normalize_rules(rules);
         }
         normalize_governance(&mut current);
-        write_json(self.durable_root.join(GOVERNANCE_FILE), &current)?;
+        write_json(self.refine_dir.join(GOVERNANCE_FILE), &current)?;
         Ok(current)
     }
 
@@ -216,18 +216,18 @@ impl FileGovernanceService {
 
 #[derive(Clone, Debug)]
 pub struct FileGuidanceService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileGuidanceService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
     pub fn list(&self) -> RefineResult<Value> {
-        let value = read_json_or_default(self.durable_root.join(GUIDANCE_FILE), json!([]))?;
+        let value = read_json_or_default(self.refine_dir.join(GUIDANCE_FILE), json!([]))?;
         Ok(json!({"guidance": normalize_guidance_list(&value)}))
     }
 
@@ -243,20 +243,20 @@ impl FileGuidanceService {
             ));
         }
         let guidance = normalize_guidance_list(items);
-        write_json(self.durable_root.join(GUIDANCE_FILE), &guidance)?;
+        write_json(self.refine_dir.join(GUIDANCE_FILE), &guidance)?;
         Ok(json!({"guidance": guidance}))
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct FileReporterService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileReporterService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
@@ -303,7 +303,7 @@ impl FileReporterService {
         reporter["name"] = Value::String(clean.clone());
         self.save_reporters(&reporters)?;
         if old != clean {
-            rewrite_reporter_references(&self.durable_root, &old, &clean)?;
+            rewrite_reporter_references(&self.refine_dir, &old, &clean)?;
         }
         Ok(json!({"ok": true, "old": old, "new": clean}))
     }
@@ -345,12 +345,12 @@ impl FileReporterService {
             return Err(RefineError::NotFound("Reporter was not found".to_string()));
         }
         self.delete(id)?;
-        rewrite_reporter_references(&self.durable_root, &old, &new)?;
+        rewrite_reporter_references(&self.refine_dir, &old, &new)?;
         Ok(json!({"ok": true, "old": old, "new": new}))
     }
 
     fn load_reporters(&self) -> RefineResult<Vec<Value>> {
-        let value = read_json_or_default(self.durable_root.join(REPORTERS_FILE), json!([]))?;
+        let value = read_json_or_default(self.refine_dir.join(REPORTERS_FILE), json!([]))?;
         let reporters = normalize_reporters(&value);
         if reporters.is_empty() {
             let seeded = self.seed_reporters_from_gap_rounds()?;
@@ -364,16 +364,16 @@ impl FileReporterService {
 
     fn save_reporters(&self, reporters: &[Value]) -> RefineResult<()> {
         write_json(
-            self.durable_root.join(REPORTERS_FILE),
+            self.refine_dir.join(REPORTERS_FILE),
             &Value::Array(reporters.to_vec()),
         )
     }
 
     fn seed_reporters_from_gap_rounds(&self) -> RefineResult<Vec<Value>> {
         let mut names = BTreeSet::new();
-        collect_reporter_names(&self.durable_root.join("gaps"), "gap.json", &mut names)?;
+        collect_reporter_names(&self.refine_dir.join("gaps"), "gap.json", &mut names)?;
         collect_reporter_names(
-            &self.durable_root.join("features"),
+            &self.refine_dir.join("features"),
             "feature.json",
             &mut names,
         )?;
@@ -848,12 +848,12 @@ fn collect_reporter_name(value: Option<&Value>, names: &mut BTreeSet<String>) {
     }
 }
 
-fn rewrite_reporter_references(durable_root: &Path, old: &str, new: &str) -> RefineResult<()> {
+fn rewrite_reporter_references(refine_dir: &Path, old: &str, new: &str) -> RefineResult<()> {
     if old.trim().is_empty() || old == new {
         return Ok(());
     }
-    rewrite_reporter_references_in_tree(&durable_root.join("gaps"), "gap.json", old, new)?;
-    rewrite_reporter_references_in_tree(&durable_root.join("features"), "feature.json", old, new)
+    rewrite_reporter_references_in_tree(&refine_dir.join("gaps"), "gap.json", old, new)?;
+    rewrite_reporter_references_in_tree(&refine_dir.join("features"), "feature.json", old, new)
 }
 
 fn rewrite_reporter_references_in_tree(
@@ -946,8 +946,8 @@ mod tests {
     #[test]
     fn file_settings_service_lists_defaults_and_persists_updates() {
         let temp_root = unique_temp_dir("settings");
-        let durable_root = temp_root.join(".refine");
-        let service = FileSettingsService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileSettingsService::new(&refine_dir);
 
         assert_eq!(service.load().unwrap()["agent_cli"], "claude");
         let updated = service
@@ -969,10 +969,10 @@ mod tests {
     #[test]
     fn file_settings_service_migrates_target_app_build_settings() {
         let temp_root = unique_temp_dir("settings-build-migration");
-        let durable_root = temp_root.join(".refine");
-        fs::create_dir_all(&durable_root).unwrap();
+        let refine_dir = temp_root.join(".refine");
+        fs::create_dir_all(&refine_dir).unwrap();
         fs::write(
-            durable_root.join(SETTINGS_FILE),
+            refine_dir.join(SETTINGS_FILE),
             serde_json::to_string_pretty(&json!({
                 "target_app_rebuild_command": "npm run build",
                 "target_app_rebuild_timeout_seconds": "45",
@@ -984,7 +984,7 @@ mod tests {
         )
         .unwrap();
 
-        let service = FileSettingsService::new(&durable_root);
+        let service = FileSettingsService::new(&refine_dir);
         let settings = service.load().unwrap();
         assert_eq!(settings["target_app_build_command"], "npm run build");
         assert_eq!(settings["target_app_build_timeout_seconds"], "45");
@@ -1001,9 +1001,9 @@ mod tests {
     #[test]
     fn file_project_config_services_persist_governance_guidance_and_reporters() {
         let temp_root = unique_temp_dir("project-config");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
 
-        let governance = FileGovernanceService::new(&durable_root);
+        let governance = FileGovernanceService::new(&refine_dir);
         let saved = governance
             .save(&json!({
                 "product": "Refine",
@@ -1020,7 +1020,7 @@ mod tests {
             true
         );
 
-        let guidance = FileGuidanceService::new(&durable_root);
+        let guidance = FileGuidanceService::new(&refine_dir);
         let guidance_payload = guidance
             .update(&json!({"guidance": [{
                 "name": "Accessibility",
@@ -1031,8 +1031,8 @@ mod tests {
             .unwrap();
         assert_eq!(guidance_payload["guidance"].as_array().unwrap().len(), 1);
 
-        let gap_dir = durable_root.join("gaps/GA/P1");
-        let feature_dir = durable_root.join("features/FE/A1");
+        let gap_dir = refine_dir.join("gaps/GA/P1");
+        let feature_dir = refine_dir.join("features/FE/A1");
         fs::create_dir_all(&gap_dir).unwrap();
         fs::create_dir_all(&feature_dir).unwrap();
         fs::write(
@@ -1058,7 +1058,7 @@ mod tests {
         )
         .unwrap();
 
-        let reporters = FileReporterService::new(&durable_root);
+        let reporters = FileReporterService::new(&refine_dir);
         let buddy = reporters.create("Buddy").unwrap()["reporter"].clone();
         let alex = reporters.create("Alex").unwrap()["reporter"].clone();
         reporters

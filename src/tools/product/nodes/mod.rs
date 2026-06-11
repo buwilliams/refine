@@ -13,7 +13,7 @@ pub const ACTIVE_NODE_FILE: &str = "active-node.json";
 
 #[derive(Clone, Debug)]
 pub struct FileNodeRegistryService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -23,18 +23,18 @@ pub struct NodeUpdate {
 }
 
 impl FileNodeRegistryService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
     pub fn registry_path(&self) -> PathBuf {
-        self.durable_root.join(NODE_REGISTRY_FILE)
+        self.refine_dir.join(NODE_REGISTRY_FILE)
     }
 
     pub fn active_path(&self) -> PathBuf {
-        self.durable_root.join(ACTIVE_NODE_FILE)
+        self.refine_dir.join(ACTIVE_NODE_FILE)
     }
 
     pub fn active_node_id(&self) -> RefineResult<String> {
@@ -286,7 +286,7 @@ impl FileNodeRegistryService {
             &self.active_path(),
             &json!({
                 "active_node_id": id,
-                "volume_root": self.durable_root.display().to_string(),
+                "refine_dir": self.refine_dir.display().to_string(),
                 "updated_at": now_timestamp()
             }),
         )
@@ -419,8 +419,8 @@ mod tests {
     #[test]
     fn file_node_registry_manages_nodes_and_active_selection() {
         let temp_root = unique_temp_dir("nodes");
-        let durable_root = temp_root.join(".refine");
-        let service = FileNodeRegistryService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileNodeRegistryService::new(&refine_dir);
 
         assert_eq!(
             service.list_response().unwrap()["active_node_id"],

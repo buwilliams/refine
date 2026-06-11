@@ -12,7 +12,7 @@ let _agentStatusRefreshTimer = null;
 function targetAppProjectLabel() {
   const project = state.project || {};
   if (project.attached === false) return "No app";
-  const current = project.client_repo || "";
+  const current = project.target_root || "";
   const apps = Array.isArray(project.apps) ? project.apps : [];
   const app = apps.find((candidate) => candidate.path === current);
   if (app?.name) return app.name;

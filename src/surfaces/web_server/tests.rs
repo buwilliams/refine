@@ -472,10 +472,10 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
 #[test]
 fn local_http_daemon_replays_idempotent_mutation_responses() {
     let temp_root = unique_temp_dir("http-idempotency");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -500,7 +500,7 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
     assert_eq!(second.status, 201);
     assert_eq!(first.body, second.body);
     assert_eq!(
-        fs::read_dir(durable_root.join("gaps/GA/P1"))
+        fs::read_dir(refine_dir.join("gaps/GA/P1"))
             .unwrap()
             .filter_map(Result::ok)
             .filter(|entry| entry.file_name() == "gap.json")
@@ -525,9 +525,9 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
 #[test]
 fn web_server_creates_gap_from_new_gap_modal_payload() {
     let temp_root = unique_temp_dir("http-gap-create-modal");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -571,9 +571,9 @@ fn web_server_creates_gap_from_new_gap_modal_payload() {
 #[test]
 fn web_server_handles_new_gap_duplicate_decisions() {
     let temp_root = unique_temp_dir("http-gap-duplicate-modal");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let body = json!({
         "reporter": "Alice",
@@ -643,10 +643,10 @@ fn web_server_handles_new_gap_duplicate_decisions() {
 #[test]
 fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     let temp_root = unique_temp_dir("http-idempotency-conflict");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root);
     let daemon = LocalHttpDaemon {
         server,
@@ -680,10 +680,10 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
 #[test]
 fn local_http_daemon_persists_successful_mutations_for_sse() {
     let temp_root = unique_temp_dir("http-mutation-sse");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -904,10 +904,10 @@ fn local_http_daemon_reports_startup_cache_progress() {
 #[test]
 fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let temp_root = unique_temp_dir("http-hot-projection-metrics");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -971,10 +971,10 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
 }
 
 #[test]
-fn web_server_transitions_gap_and_durable_root() {
+fn web_server_transitions_gap_and_refine_dir() {
     let temp_root = unique_temp_dir("http-transition");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
+    let refine_dir = temp_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::write(
         gap_dir.join("gap.json"),
@@ -989,12 +989,12 @@ fn web_server_transitions_gap_and_durable_root() {
             }"#,
     )
     .unwrap();
-    let projection = FileProjectStateStore::new(&durable_root)
+    let projection = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let mut server = server_with_projection();
     server.projection = projection;
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let response = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1024,9 +1024,9 @@ fn web_server_transitions_gap_and_durable_root() {
 #[test]
 fn web_server_creates_and_shows_gap() {
     let temp_root = unique_temp_dir("http-create-show");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let create = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1035,7 +1035,7 @@ fn web_server_creates_and_shows_gap() {
     });
     assert_eq!(create.status, 201);
     assert_eq!(create.body["gap"]["id"], "GAP1");
-    assert!(durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
 
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1051,9 +1051,9 @@ fn web_server_creates_and_shows_gap() {
 #[test]
 fn web_server_edits_notes_and_deletes_gap() {
     let temp_root = unique_temp_dir("http-edit-note-delete");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1075,7 +1075,7 @@ fn web_server_edits_notes_and_deletes_gap() {
         body: Some(json!({"author": "Reviewer", "body": "Needs context"})),
     });
     assert_eq!(note.status, 200);
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"body\": \"Needs context\""));
     let written_gap = serde_json::from_str::<serde_json::Value>(&written).unwrap();
     let note_id = written_gap["notes"][0]["id"].as_str().unwrap();
@@ -1122,7 +1122,7 @@ fn web_server_edits_notes_and_deletes_gap() {
         body: None,
     });
     assert_eq!(delete.status, 200);
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1130,9 +1130,9 @@ fn web_server_edits_notes_and_deletes_gap() {
 #[test]
 fn web_server_appends_and_edits_latest_round() {
     let temp_root = unique_temp_dir("http-rounds");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1154,7 +1154,7 @@ fn web_server_appends_and_edits_latest_round() {
     });
     assert_eq!(edit.status, 200);
     assert_eq!(edit.body["gap"]["reporter"], "Reviewer");
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
     assert!(written.contains("\"actual\": \"Revised\""));
 
@@ -1176,7 +1176,7 @@ fn web_server_appends_and_edits_latest_round() {
     });
     assert_eq!(reporters.status, 200);
     assert_eq!(reporters.body["reporters"][0]["name"], "Reviewer");
-    assert!(durable_root.join("reporters.json").exists());
+    assert!(refine_dir.join("reporters.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1184,9 +1184,9 @@ fn web_server_appends_and_edits_latest_round() {
 #[test]
 fn web_server_appends_and_reads_gap_round_logs() {
     let temp_root = unique_temp_dir("http-gap-round-logs");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
@@ -1209,7 +1209,7 @@ fn web_server_appends_and_reads_gap_round_logs() {
         })),
     });
     assert_eq!(append.status, 200);
-    assert!(durable_root.join("gaps/GA/P1/logs.jsonl").exists());
+    assert!(refine_dir.join("gaps/GA/P1/logs.jsonl").exists());
 
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1264,9 +1264,9 @@ fn web_server_appends_and_reads_gap_round_logs() {
 #[test]
 fn web_server_creates_features_and_updates_membership() {
     let temp_root = unique_temp_dir("http-feature-membership");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
@@ -1314,9 +1314,9 @@ fn web_server_creates_features_and_updates_membership() {
 #[test]
 fn web_server_reorders_and_moves_feature_workflow() {
     let temp_root = unique_temp_dir("http-feature-reorder-move");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1369,7 +1369,7 @@ fn web_server_reorders_and_moves_feature_workflow() {
     assert_eq!(move_feature.status, 200);
     assert_eq!(move_feature.body["rollup"]["status"], "todo");
     assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
@@ -1380,9 +1380,9 @@ fn web_server_reorders_and_moves_feature_workflow() {
 #[test]
 fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let temp_root = unique_temp_dir("http-feature-gap-actions");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     for (id, name) in [
         ("GAP1", "Verify Gap"),
         ("GAP2", "Retry Quality"),
@@ -1502,10 +1502,10 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
 #[test]
 fn web_server_cancels_and_deletes_features() {
     let temp_root = unique_temp_dir("http-feature-cancel-delete");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
         server.handle(ApiRequest {
@@ -1580,9 +1580,9 @@ fn web_server_cancels_and_deletes_features() {
         body: None,
     });
     assert_eq!(feature_delete.status, 200);
-    assert!(!durable_root.join("features/FE/A1/feature.json").exists());
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(!durable_root.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1590,9 +1590,9 @@ fn web_server_cancels_and_deletes_features() {
 #[test]
 fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let temp_root = unique_temp_dir("http-api-aliases");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let create_gap = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1637,9 +1637,9 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
 #[test]
 fn web_server_accepts_static_ui_bulk_api_aliases() {
     let temp_root = unique_temp_dir("http-bulk-api-aliases");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     for (id, name) in [("GAP1", "Bulk One"), ("GAP2", "Bulk Two")] {
         let create = server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1674,7 +1674,7 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     assert_eq!(bulk_assign.status, 200);
     assert_eq!(bulk_assign.body["updated"], 2);
     assert_eq!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
             .unwrap()
             .contains("\"feature_id\": \"FEA1\""),
         true
@@ -1687,8 +1687,8 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     });
     assert_eq!(bulk_delete.status, 200);
     assert_eq!(bulk_delete.body["deleted"], 1);
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(durable_root.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(refine_dir.join("gaps/GA/P2/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1696,9 +1696,9 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
 #[test]
 fn web_server_records_and_lists_activity_for_static_ui() {
     let temp_root = unique_temp_dir("http-activity");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let recorded = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1707,7 +1707,7 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     });
     assert_eq!(recorded.status, 200);
     assert_eq!(recorded.body["recorded"], true);
-    assert!(durable_root.join("logs/activity.jsonl").exists());
+    assert!(refine_dir.join("logs/activity.jsonl").exists());
 
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1733,9 +1733,9 @@ fn web_server_records_and_lists_activity_for_static_ui() {
 #[test]
 fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     let temp_root = unique_temp_dir("http-import-persist");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let parsed = server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1785,7 +1785,7 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
 #[test]
 fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
     let temp_root = unique_temp_dir("daemon-agent-automation-loop");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
@@ -1816,9 +1816,9 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
         std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
     }
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
-    FileSettingsService::new(&durable_root)
+    FileSettingsService::new(&refine_dir)
         .update(&json!({"agent_cli": "smoke-ai"}))
         .unwrap();
 
@@ -1879,10 +1879,10 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
 #[test]
 fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
     let temp_root = unique_temp_dir("http-import-cancel");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let prefix = format!(
         "cancel-import-{}",
@@ -1976,10 +1976,10 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
 #[test]
 fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() {
     let temp_root = unique_temp_dir("http-cache-changes-performance");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     server.handle(ApiRequest {
@@ -2035,7 +2035,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         performance.body["operations"],
         json!(["cache.rebuild", "provider.turn"])
     );
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -2054,10 +2054,10 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
 #[test]
 fn web_server_lists_git_changes_and_reverts_commits() {
     let temp_root = unique_temp_dir("http-git-changes");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    let gap_dir = durable_root.join("gaps").join("GA").join("P1");
-    fs::create_dir_all(&durable_root).unwrap();
+    let gap_dir = refine_dir.join("gaps").join("GA").join("P1");
+    fs::create_dir_all(&refine_dir).unwrap();
     fs::create_dir_all(&gap_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -2084,7 +2084,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
 
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let changes = server.handle(ApiRequest {
@@ -2113,8 +2113,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
         FileProcessSupervisor::new(&runtime_root)
             .list()
             .unwrap()
-            .iter()
-            .any(|process| process.label.as_deref() == Some("git"))
+            .is_empty()
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -2123,9 +2122,9 @@ fn web_server_lists_git_changes_and_reverts_commits() {
 #[test]
 fn web_server_hard_resets_git_worktree() {
     let temp_root = unique_temp_dir("http-git-reset");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
     git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
@@ -2135,7 +2134,7 @@ fn web_server_hard_resets_git_worktree() {
     fs::write(temp_root.join("app.txt"), "dirty\n").unwrap();
 
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2152,8 +2151,7 @@ fn web_server_hard_resets_git_worktree() {
         FileProcessSupervisor::new(&runtime_root)
             .list()
             .unwrap()
-            .iter()
-            .any(|process| process.label.as_deref() == Some("git"))
+            .is_empty()
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -2163,12 +2161,12 @@ fn web_server_hard_resets_git_worktree() {
 fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     let temp_root = unique_temp_dir("http-project-sync-basic");
     let app_root = temp_root.join("app");
-    let durable_root = app_root.join(".refine");
+    let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
 
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let no_repo = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2338,16 +2336,16 @@ fn web_server_project_sync_reports_pull_failure_for_diverged_branch() {
 #[test]
 fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let temp_root = unique_temp_dir("http-cleanups");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/activity/ui-error".to_string(),
         body: Some(json!({"message": "Boom"})),
     });
-    assert!(durable_root.join("logs/activity.jsonl").exists());
+    assert!(refine_dir.join("logs/activity.jsonl").exists());
     let cleanup = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/activity/cleanup".to_string(),
@@ -2355,7 +2353,7 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     });
     assert_eq!(cleanup.status, 200);
     assert_eq!(cleanup.body["deleted"], 1);
-    assert!(!durable_root.join("logs/activity.jsonl").exists());
+    assert!(!refine_dir.join("logs/activity.jsonl").exists());
 
     let runtime_root = temp_root.join("run/8080");
     server.runtime_root = Some(runtime_root.clone());
@@ -2408,9 +2406,9 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
 #[test]
 fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let temp_root = unique_temp_dir("http-node-transfer");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     for (id, name) in [
         ("GAP1", "Transfer One"),
         ("GAP2", "Transfer Two"),
@@ -2444,7 +2442,7 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     });
     assert_eq!(activated.status, 200);
     assert_eq!(activated.body["active_node_id"], "remote-qa");
-    assert!(durable_root.join("active-node.json").exists());
+    assert!(refine_dir.join("active-node.json").exists());
 
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2501,9 +2499,9 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
 #[test]
 fn web_server_manages_cluster_node_registry() {
     let temp_root = unique_temp_dir("http-cluster-registry");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2525,7 +2523,7 @@ fn web_server_manages_cluster_node_registry() {
         registered.body["nodes"][0]["ssh_identity_path"],
         "~/.ssh/refine_ed25519"
     );
-    assert!(durable_root.join("cluster.json").exists());
+    assert!(refine_dir.join("cluster.json").exists());
 
     let disabled = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -2573,9 +2571,9 @@ fn web_server_manages_cluster_node_registry() {
 #[test]
 fn web_server_serves_source_file_tree_read_and_search() {
     let temp_root = unique_temp_dir("http-files");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     fs::create_dir_all(temp_root.join("src")).unwrap();
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     fs::write(temp_root.join("README.md"), "hello\nworld\n").unwrap();
     fs::write(temp_root.join("src/main.rs"), "fn main() {}\n").unwrap();
     fs::write(
@@ -2586,9 +2584,9 @@ fn web_server_serves_source_file_tree_read_and_search() {
     )
     .unwrap();
     fs::write(temp_root.join("artifact.bin"), [0x00, 0x01, 0x02]).unwrap();
-    fs::write(durable_root.join("settings.json"), "{}").unwrap();
+    fs::write(refine_dir.join("settings.json"), "{}").unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let tree = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2679,12 +2677,12 @@ fn web_server_serves_source_file_tree_read_and_search() {
 #[test]
 fn web_server_runs_interactive_terminal_session() {
     let temp_root = unique_temp_dir("http-terminal");
-    let durable_root = temp_root.join(".refine");
-    fs::create_dir_all(&durable_root).unwrap();
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
     fs::write(temp_root.join("README.md"), "terminal root\n").unwrap();
 
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let start = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2733,12 +2731,12 @@ fn web_server_runs_interactive_terminal_session() {
 #[test]
 fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let temp_root = unique_temp_dir("http-project-utils");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join("child")).unwrap();
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let path = server.handle(ApiRequest {
@@ -2873,7 +2871,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
             exit_code: Some(0),
         })
         .unwrap();
-    let chat = FileChatService::new(&durable_root);
+    let chat = FileChatService::new(&refine_dir);
     let session = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
         .unwrap();
@@ -2909,13 +2907,13 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
 #[test]
 fn web_server_reads_and_cancels_runtime_operations() {
     let temp_root = unique_temp_dir("http-operations");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     let registry = FileOperationRegistry::new(&runtime_root);
     let operation = registry.register("bulk_update_gaps").unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
@@ -2925,7 +2923,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
     });
     assert_eq!(status.status, 200);
     assert_eq!(status.body["operation"]["status"], "running");
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -2953,7 +2951,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
             .iter()
             .any(|entry| entry["message"] == "Operation cancelled")
     );
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -2968,14 +2966,14 @@ fn web_server_reads_and_cancels_runtime_operations() {
 #[test]
 fn web_server_retries_workflow_executions() {
     let temp_root = unique_temp_dir("http-workflow-execution-retry");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     let automation = WorkflowEngine::new(&runtime_root);
     let claim_id = automation.claim("GAP1").unwrap();
     let execution_id = automation.start_claim(&claim_id).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let retry = server.handle(ApiRequest {
@@ -2989,7 +2987,7 @@ fn web_server_retries_workflow_executions() {
     assert_eq!(retry.body["execution"]["status"], "running");
     assert_ne!(retry.body["execution"]["id"], execution_id);
 
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -3001,11 +2999,11 @@ fn web_server_retries_workflow_executions() {
 #[test]
 fn web_server_lists_processes_and_updates_pause_controls() {
     let temp_root = unique_temp_dir("http-processes");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let supervisor = FileProcessSupervisor::new(&runtime_root);
-    let chat = FileChatService::with_runtime_root(&durable_root, &runtime_root);
+    let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
     let standalone_chat = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), None)
         .unwrap();
@@ -3111,7 +3109,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     )
     .unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let listed = server.handle(ApiRequest {
@@ -3262,7 +3260,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(summary.body["agent_count"], 2);
     assert_eq!(summary.body["process_count"], 6);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -3318,7 +3316,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .contains("warn stderr")
     );
 
-    let work_items = FileWorkItemService::new(&durable_root);
+    let work_items = FileWorkItemService::new(&refine_dir);
     work_items
         .create_gap_summary("Stop background rollback", Some("GAP-BACKGROUND"))
         .unwrap();
@@ -3376,7 +3374,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         GapStatus::Todo
     );
     assert!(runtime_root.join("process-control.json").exists());
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -3454,11 +3452,11 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 #[test]
 fn web_server_manages_quality_settings_and_regressions() {
     let temp_root = unique_temp_dir("http-quality");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     write_fake_playwright(&temp_root, 0);
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let app_settings = server.handle(ApiRequest {
@@ -3536,7 +3534,7 @@ fn web_server_manages_quality_settings_and_regressions() {
     assert_eq!(created.status, 201);
     assert_eq!(created.body["regression"]["id"], "dashboard-smoke");
     assert!(
-        durable_root
+        refine_dir
             .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
@@ -3603,19 +3601,19 @@ fn web_server_manages_quality_settings_and_regressions() {
 }
 
 #[test]
-fn web_server_manages_durable_chat_sessions() {
+fn web_server_manages_refine_chat_sessions() {
     let temp_root = unique_temp_dir("http-chat");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
     write_fake_provider(
-        &durable_root,
+        &refine_dir,
         "smoke-ai",
         0,
         "{\"message\":\"web provider output\",\"importable_artifacts\":[{\"type\":\"round\",\"round\":{\"reporter\":\"QA\",\"actual\":\"Broken\",\"target\":\"Fixed\"}}]}",
     );
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3627,7 +3625,7 @@ fn web_server_manages_durable_chat_sessions() {
     let session_id = started.body["session_id"].as_str().unwrap().to_string();
     assert_eq!(started.body["mode"], "gap");
     assert!(
-        durable_root
+        refine_dir
             .join(format!("chat/sessions/{session_id}.json"))
             .exists()
     );
@@ -3706,11 +3704,11 @@ fn web_server_manages_durable_chat_sessions() {
 #[test]
 fn web_server_edits_and_removes_queued_chat_messages() {
     let temp_root = unique_temp_dir("http-chat-queue");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3720,7 +3718,7 @@ fn web_server_edits_and_removes_queued_chat_messages() {
     });
     assert_eq!(started.status, 201);
     let session_id = started.body["session_id"].as_str().unwrap().to_string();
-    let session_path = durable_root.join(format!("chat/sessions/{session_id}.json"));
+    let session_path = refine_dir.join(format!("chat/sessions/{session_id}.json"));
     let mut persisted: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&session_path).unwrap()).unwrap();
     persisted["queue_dispatching"] = json!(true);
@@ -3765,11 +3763,11 @@ fn web_server_edits_and_removes_queued_chat_messages() {
 #[test]
 fn web_server_standalone_chat_start_and_stop_manage_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-worktree");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3808,11 +3806,11 @@ fn web_server_standalone_chat_start_and_stop_manage_worktree() {
 #[test]
 fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-submit");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -3855,7 +3853,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_workt
     );
 
     let session: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(durable_root.join(format!("chat/sessions/{session_id}.json"))).unwrap(),
+        &fs::read_to_string(refine_dir.join(format!("chat/sessions/{session_id}.json"))).unwrap(),
     )
     .unwrap();
     assert_eq!(session["closed"], true);
@@ -3875,20 +3873,20 @@ fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_workt
 #[test]
 fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let temp_root = unique_temp_dir("http-chat-recovery");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
-    let chat = FileChatService::with_runtime_root(&durable_root, &runtime_root);
+    let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
     let session = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
         .unwrap();
     let operation = FileOperationRegistry::new(&runtime_root)
         .register(&format!("chat:{}", session.id))
         .unwrap();
-    let session_path = durable_root.join(format!("chat/sessions/{}.json", session.id));
+    let session_path = refine_dir.join(format!("chat/sessions/{}.json", session.id));
 
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -3922,12 +3920,12 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
 fn web_server_reports_project_registry_and_updates_settings() {
     let temp_root = unique_temp_dir("http-project-settings");
     let app_root = temp_root.join("app");
-    let durable_root = app_root.join(".refine");
+    let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let app_registry_root = temp_root.join("run");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
@@ -3937,7 +3935,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     });
     assert_eq!(status.status, 200);
     assert_eq!(status.body["attached"], true);
-    assert_eq!(status.body["client_repo"], app_root.display().to_string());
+    assert_eq!(status.body["target_root"], app_root.display().to_string());
     assert_eq!(status.body["apps"].as_array().unwrap().len(), 1);
     assert!(app_registry_root.join("apps.json").exists());
     assert!(!runtime_root.join("apps.json").exists());
@@ -3977,7 +3975,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     });
     assert_eq!(attached.status, 200);
     assert_eq!(
-        attached.body["client_repo"],
+        attached.body["target_root"],
         other_app.display().to_string()
     );
     assert!(supervisor.inspect("old-target-app-process").is_err());
@@ -3995,7 +3993,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         body: Some(json!({"path": app_root.display().to_string()})),
     });
     assert_eq!(switched.status, 200);
-    assert_eq!(switched.body["client_repo"], app_root.display().to_string());
+    assert_eq!(switched.body["target_root"], app_root.display().to_string());
 
     let third_app = temp_root.join("third");
     fs::create_dir_all(&third_app).unwrap();
@@ -4044,7 +4042,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     });
     assert_eq!(switched_by_name.status, 200);
     assert_eq!(
-        switched_by_name.body["client_repo"],
+        switched_by_name.body["target_root"],
         third_app.display().to_string()
     );
 
@@ -4055,7 +4053,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     });
     assert_eq!(detached.status, 200);
     assert_eq!(detached.body["attached"], false);
-    assert_eq!(detached.body["client_repo"], serde_json::Value::Null);
+    assert_eq!(detached.body["target_root"], serde_json::Value::Null);
 
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -4094,7 +4092,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         true
     );
     assert!(runtime_root.join("process-control.json").exists());
-    assert!(durable_root.join("settings.json").exists());
+    assert!(refine_dir.join("settings.json").exists());
 
     let removed = server.handle(ApiRequest {
         method: "DELETE".to_string(),
@@ -4123,7 +4121,7 @@ fn web_server_project_attach_creates_missing_local_project() {
 
     assert_eq!(attached.status, 200);
     assert_eq!(
-        attached.body["client_repo"],
+        attached.body["target_root"],
         destination.display().to_string()
     );
     assert!(destination.join(".git").exists());
@@ -4138,11 +4136,11 @@ fn web_server_project_attach_creates_missing_local_project() {
 fn web_server_applies_runtime_settings_updates_immediately() {
     let temp_root = unique_temp_dir("http-runtime-settings-apply");
     let app_root = temp_root.join("app");
-    let durable_root = app_root.join(".refine");
+    let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
     let created = server.handle(ApiRequest {
@@ -4190,9 +4188,9 @@ fn web_server_migrates_legacy_project_state_automatically() {
     let temp_root = unique_temp_dir("http-project-migration");
     let runtime_root = temp_root.join("run/8080");
     let app_root = temp_root.join("legacy-app");
-    let durable_root = app_root.join(".refine");
-    fs::create_dir_all(durable_root.join("gaps/GA")).unwrap();
-    fs::write(durable_root.join("gaps/GA/gap.json"), "{}").unwrap();
+    let refine_dir = app_root.join(".refine");
+    fs::create_dir_all(refine_dir.join("gaps/GA")).unwrap();
+    fs::write(refine_dir.join("gaps/GA/gap.json"), "{}").unwrap();
 
     let mut server = server_with_projection();
     server.runtime_root = Some(runtime_root.clone());
@@ -4205,8 +4203,8 @@ fn web_server_migrates_legacy_project_state_automatically() {
     assert_eq!(migrated_attach.status, 200);
     assert_eq!(migrated_attach.body["schema"]["compatible"], true);
     assert_eq!(migrated_attach.body["schema"]["schema_version"], 1);
-    assert!(durable_root.join("refine.json").exists());
-    assert!(durable_root.join("backups/migrations").exists());
+    assert!(refine_dir.join("refine.json").exists());
+    assert!(refine_dir.join("backups/migrations").exists());
 
     let migrate_again = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4227,8 +4225,8 @@ fn web_server_migrates_legacy_project_state_automatically() {
     assert_eq!(status.body["schema"]["migration_required"], false);
 
     let second_app = temp_root.join("second-legacy-app");
-    let second_durable_root = second_app.join(".refine");
-    fs::create_dir_all(second_durable_root.join("features")).unwrap();
+    let second_refine_dir = second_app.join(".refine");
+    fs::create_dir_all(second_refine_dir.join("features")).unwrap();
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/register".to_string(),
@@ -4246,16 +4244,16 @@ fn web_server_migrates_legacy_project_state_automatically() {
     });
     assert_eq!(migrated_switch.status, 200);
     assert_eq!(
-        migrated_switch.body["client_repo"],
+        migrated_switch.body["target_root"],
         second_app.display().to_string()
     );
-    assert!(second_durable_root.join("refine.json").exists());
+    assert!(second_refine_dir.join("refine.json").exists());
 
     let newer_app = temp_root.join("newer-app");
-    let newer_durable_root = newer_app.join(".refine");
-    fs::create_dir_all(&newer_durable_root).unwrap();
+    let newer_refine_dir = newer_app.join(".refine");
+    fs::create_dir_all(&newer_refine_dir).unwrap();
     fs::write(
-        newer_durable_root.join("refine.json"),
+        newer_refine_dir.join("refine.json"),
         r#"{"schema_version":999,"refine":{"version":"future"},"created_at":"now","updated_at":"now","settings":{}}"#,
     )
     .unwrap();
@@ -4288,10 +4286,10 @@ fn web_server_migrates_legacy_project_state_automatically() {
 fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let temp_root = unique_temp_dir("http-detached-active-app");
     let app_root = temp_root.join("app");
-    let durable_root = app_root.join(".refine");
+    let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let app_registry_root = temp_root.join("run");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     let mut server = server_with_projection();
     server.target_root = None;
     server.runtime_root = Some(runtime_root.clone());
@@ -4313,7 +4311,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
         body: Some(json!({"path": app_root.display().to_string()})),
     });
     assert_eq!(attached.status, 200);
-    assert_eq!(attached.body["client_repo"], app_root.display().to_string());
+    assert_eq!(attached.body["target_root"], app_root.display().to_string());
     assert!(app_registry_root.join("apps.json").exists());
     assert!(!runtime_root.join("apps.json").exists());
 
@@ -4324,7 +4322,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     });
     assert_eq!(settings.status, 200);
     assert_eq!(settings.body["settings"]["agent_cli"], "smoke-ai");
-    assert!(durable_root.join("settings.json").exists());
+    assert!(refine_dir.join("settings.json").exists());
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4332,7 +4330,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
         body: Some(json!({"name": "Detached attach gap", "id": "GAP1"})),
     });
     assert_eq!(created.status, 201);
-    assert!(durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
 
     let daemon = LocalHttpDaemon {
         server,
@@ -4355,9 +4353,9 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
 #[test]
 fn web_server_manages_governance_guidance_and_reporters() {
     let temp_root = unique_temp_dir("http-project-config");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let governance = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -4431,9 +4429,9 @@ fn web_server_manages_governance_guidance_and_reporters() {
     });
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["reporters"].as_array().unwrap().len(), 1);
-    assert!(durable_root.join("governance.json").exists());
-    assert!(durable_root.join("guidance.json").exists());
-    assert!(durable_root.join("reporters.json").exists());
+    assert!(refine_dir.join("governance.json").exists());
+    assert!(refine_dir.join("guidance.json").exists());
+    assert!(refine_dir.join("reporters.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -4441,7 +4439,7 @@ fn web_server_manages_governance_guidance_and_reporters() {
 #[test]
 fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let temp_root = unique_temp_dir("http-status-surfaces");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(
@@ -4450,7 +4448,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     )
     .unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(durable_root.parent().unwrap().to_path_buf());
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -4528,7 +4526,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         })),
     });
     assert_eq!(transfer.status, 200);
-    FileActivityService::new(&durable_root)
+    FileActivityService::new(&refine_dir)
         .append(ActivityEntry {
             id: "act-dashboard".to_string(),
             datetime: "2026-06-05T00:00:00Z".to_string(),
@@ -4592,7 +4590,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(carol["active"], 0);
     assert_eq!(carol["done"], 1);
     assert_eq!(carol["completion_rate"], 100.0);
-    let cached = FileProjectStateStore::new(&durable_root)
+    let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -4700,7 +4698,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         generated_operation.result["config"]["start_command"],
         "./.refine/manage-app.sh start"
     );
-    let settings = FileSettingsService::new(&durable_root).load().unwrap();
+    let settings = FileSettingsService::new(&refine_dir).load().unwrap();
     assert_eq!(
         settings["target_app_start_command"],
         "./.refine/manage-app.sh start"
@@ -4971,8 +4969,8 @@ fn write_fake_playwright(root: &Path, exit_code: i32) {
     }
 }
 
-fn write_fake_provider(durable_root: &Path, name: &str, exit_code: i32, output: &str) {
-    let bin_dir = durable_root.join("provider-bin");
+fn write_fake_provider(refine_dir: &Path, name: &str, exit_code: i32, output: &str) {
+    let bin_dir = refine_dir.join("provider-bin");
     fs::create_dir_all(&bin_dir).unwrap();
     let path = bin_dir.join(name);
     let mut file = fs::File::create(&path).unwrap();

@@ -21,7 +21,7 @@ pub struct NodeRegistry {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ActiveNodeSelection {
     pub active_node_id: String,
-    pub volume_root: String,
+    pub refine_dir: String,
     pub updated_at: Timestamp,
 }
 

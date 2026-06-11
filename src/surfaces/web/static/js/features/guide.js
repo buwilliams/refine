@@ -439,7 +439,7 @@ function readGuideChecklist() {
 
 function guideStateStorageKey(project = null) {
   const projectState = project || (typeof state !== "undefined" ? state.project : null) || {};
-  const path = projectState.client_repo || projectState.path || "";
+  const path = projectState.target_root || projectState.path || "";
   return `${GUIDE_STATE_KEY_PREFIX}${path ? encodeURIComponent(path) : GUIDE_DETACHED_STATE_KEY}`;
 }
 

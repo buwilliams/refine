@@ -22,8 +22,8 @@ pub struct RefineVersion {
 pub struct ProjectStatus {
     pub attached: bool,
     pub registry_enabled: bool,
-    pub client_repo: Option<String>,
-    pub volume_root: Option<String>,
+    pub target_root: Option<String>,
+    pub refine_dir: Option<String>,
     pub config_path: Option<String>,
     pub schema: ProjectSchemaStatus,
     pub maintenance: Option<ProjectMaintenance>,

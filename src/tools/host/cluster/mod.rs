@@ -34,7 +34,7 @@ pub trait ClusterService {
 
 #[derive(Clone, Debug)]
 pub struct FileClusterRegistryService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
 
@@ -52,25 +52,25 @@ pub struct ClusterNodeUpdate {
 }
 
 impl FileClusterRegistryService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: None,
         }
     }
 
     pub fn with_runtime_root(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: Some(runtime_root.into()),
         }
     }
 
     pub fn path(&self) -> PathBuf {
-        self.durable_root.join(CLUSTER_REGISTRY_FILE)
+        self.refine_dir.join(CLUSTER_REGISTRY_FILE)
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
@@ -393,8 +393,8 @@ impl FileClusterRegistryService {
         let runtime_root = self
             .runtime_root
             .clone()
-            .unwrap_or_else(|| self.durable_root.join("runtime"));
-        FileSecurityService::from_project_settings(runtime_root, &self.durable_root)
+            .unwrap_or_else(|| self.refine_dir.join("runtime"));
+        FileSecurityService::from_project_settings(runtime_root, &self.refine_dir)
     }
 }
 
@@ -836,8 +836,8 @@ mod tests {
     #[test]
     fn file_cluster_registry_manages_node_lifecycle() {
         let temp_root = unique_temp_dir("cluster");
-        let durable_root = temp_root.join(".refine");
-        let service = FileClusterRegistryService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileClusterRegistryService::new(&refine_dir);
 
         assert_eq!(service.list_response().unwrap()["enabled"], false);
         service.add_node("node-1").unwrap();
@@ -856,12 +856,12 @@ mod tests {
     #[test]
     fn file_cluster_registry_authorizes_remote_run_commands() {
         let temp_root = unique_temp_dir("cluster-security");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        FileSettingsService::new(&durable_root)
+        FileSettingsService::new(&refine_dir)
             .update(&serde_json::json!({"allowed_commands": "printf"}))
             .unwrap();
-        let service = FileClusterRegistryService::with_runtime_root(&durable_root, &runtime_root);
+        let service = FileClusterRegistryService::with_runtime_root(&refine_dir, &runtime_root);
         service
             .upsert_node(
                 "node-1",

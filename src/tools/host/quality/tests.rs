@@ -11,8 +11,8 @@ use super::*;
 #[test]
 fn quality_settings_persist_and_report_configured_state() {
     let temp_root = unique_temp_dir("quality-settings");
-    let durable_root = temp_root.join(".refine");
-    let service = FileQualityService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileQualityService::new(&refine_dir);
 
     let saved = service
         .save_settings(QualitySettingsPatch {
@@ -28,7 +28,7 @@ fn quality_settings_persist_and_report_configured_state() {
     assert_eq!(saved.timing, POST_BUILD);
     assert_eq!(saved.regressions_enabled, "1");
     assert!(saved.configured);
-    assert!(durable_root.join(SETTINGS_FILE).exists());
+    assert!(refine_dir.join(SETTINGS_FILE).exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -36,12 +36,12 @@ fn quality_settings_persist_and_report_configured_state() {
 #[test]
 fn quality_regressions_create_update_delete_and_run() {
     let temp_root = unique_temp_dir("quality-regressions");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     write_fake_playwright(&temp_root, 0);
-    FileSettingsService::new(&durable_root)
+    FileSettingsService::new(&refine_dir)
         .update(&json!({"target_app_url": "http://127.0.0.1:3000"}))
         .unwrap();
-    let service = FileQualityService::new(&durable_root);
+    let service = FileQualityService::new(&refine_dir);
     service
         .save_settings(QualitySettingsPatch {
             regressions_enabled: Some(json!("1")),
@@ -54,7 +54,7 @@ fn quality_regressions_create_update_delete_and_run() {
         .unwrap();
     assert_eq!(created.id, "dashboard-smoke");
     assert!(
-        durable_root
+        refine_dir
             .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
@@ -82,7 +82,7 @@ fn quality_regressions_create_update_delete_and_run() {
     service.delete_regression(&created.id).unwrap();
     assert!(service.list_regressions(true).unwrap().is_empty());
     assert!(
-        !durable_root
+        !refine_dir
             .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
@@ -93,9 +93,9 @@ fn quality_regressions_create_update_delete_and_run() {
 #[test]
 fn quality_regression_run_reports_missing_target_url_as_infra() {
     let temp_root = unique_temp_dir("quality-regression-infra");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     write_fake_playwright(&temp_root, 0);
-    let service = FileQualityService::new(&durable_root);
+    let service = FileQualityService::new(&refine_dir);
     service
         .save_settings(QualitySettingsPatch {
             regressions_enabled: Some(json!(true)),
@@ -117,12 +117,12 @@ fn quality_regression_run_reports_missing_target_url_as_infra() {
 #[test]
 fn quality_service_runs_commands_compares_screenshots_and_gates() {
     let temp_root = unique_temp_dir("quality-trait");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     write_fake_playwright(&temp_root, 0);
-    FileSettingsService::new(&durable_root)
+    FileSettingsService::new(&refine_dir)
         .update(&json!({"target_app_url": "http://127.0.0.1:3000"}))
         .unwrap();
-    let service = FileQualityService::new(&durable_root);
+    let service = FileQualityService::new(&refine_dir);
 
     let command_result = service
         .run_checks(QualityCheckRequest {
@@ -174,12 +174,12 @@ fn quality_service_runs_commands_compares_screenshots_and_gates() {
 #[test]
 fn quality_service_enforces_allowed_commands_for_direct_checks() {
     let temp_root = unique_temp_dir("quality-security");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    FileSettingsService::new(&durable_root)
+    FileSettingsService::new(&refine_dir)
         .update(&json!({"allowed_commands": "printf"}))
         .unwrap();
-    let service = FileQualityService::with_runtime_root(&durable_root, &runtime_root);
+    let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
 
     let denied = service.run_checks(QualityCheckRequest {
         owner_id: "GAP1".to_string(),

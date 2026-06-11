@@ -169,7 +169,7 @@ impl InProcessWebServer {
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("read managed processes");
         }
-        let durable_root = match self.current_refine_dir() {
+        let refine_dir = match self.current_refine_dir() {
             Ok(root) => root,
             Err(error) => return error_response(error),
         };
@@ -184,7 +184,7 @@ impl InProcessWebServer {
                     };
                     match process_summary_value_with_chat_sessions(
                         runtime_root,
-                        durable_root.as_deref(),
+                        refine_dir.as_deref(),
                     ) {
                         Ok(value) => value,
                         Err(error) => return error_response(error),
@@ -539,7 +539,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_support_bundle(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "export support bundle");
+        let refine_dir = require_refine_dir!(self, "export support bundle");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("export support bundle");
         };
@@ -549,9 +549,9 @@ impl InProcessWebServer {
             .and_then(Value::as_bool)
             .unwrap_or(true);
         let repo_root = self
-            .source_root()
+            .target_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        match FileSupportBundleService::new(durable_root, runtime_root.clone(), repo_root)
+        match FileSupportBundleService::new(refine_dir, runtime_root.clone(), repo_root)
             .export(redact_secrets)
         {
             Ok(bundle) => ApiResponse::json(200, json!(bundle)),
@@ -573,10 +573,10 @@ impl InProcessWebServer {
             ));
         };
         let repo_root = self
-            .source_root()
+            .target_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        let durable_root = self.current_refine_dir().ok().flatten();
-        let cache_key = diagnostics_cache_key(runtime_root, durable_root.as_ref(), &repo_root);
+        let refine_dir = self.current_refine_dir().ok().flatten();
+        let cache_key = diagnostics_cache_key(runtime_root, refine_dir.as_ref(), &repo_root);
         if !refresh {
             let cache = DIAGNOSTICS_CACHE
                 .get_or_init(|| Mutex::new(BTreeMap::new()))
@@ -591,7 +591,7 @@ impl InProcessWebServer {
             Err(error) => return Err(error),
         };
         let doctor =
-            FileDiagnosticsService::new(durable_root, runtime_root.clone(), repo_root).doctor()?;
+            FileDiagnosticsService::new(refine_dir, runtime_root.clone(), repo_root).doctor()?;
         let provider = projection
             .runtime
             .preflight
@@ -665,13 +665,13 @@ fn workflow_execution_json(automation: &WorkflowEngine, execution_id: &str) -> R
 
 fn diagnostics_cache_key(
     runtime_root: &std::path::Path,
-    durable_root: Option<&PathBuf>,
+    refine_dir: Option<&PathBuf>,
     repo_root: &std::path::Path,
 ) -> String {
     format!(
         "{}|{}|{}",
         runtime_root.display(),
-        durable_root
+        refine_dir
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| "none".to_string()),
         repo_root.display()

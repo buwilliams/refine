@@ -92,14 +92,14 @@ pub(in crate::surfaces::web_server) fn project_directories_response(
 }
 
 pub(in crate::surfaces::web_server) fn files_tree_response(
-    source_root: &Path,
+    target_root: &Path,
     path: &str,
     recursive: bool,
     max_depth: usize,
     max_entries: usize,
 ) -> RefineResult<Value> {
     let rel_path = normalize_file_path(path)?;
-    let absolute = source_root.join(&rel_path);
+    let absolute = target_root.join(&rel_path);
     if !absolute.exists() {
         return Err(RefineError::NotFound(format!(
             "source path {} was not found",
@@ -116,7 +116,7 @@ pub(in crate::surfaces::web_server) fn files_tree_response(
     let mut meta_by_path = serde_json::Map::new();
     let mut remaining = max_entries;
     collect_file_tree(
-        source_root,
+        target_root,
         &rel_path,
         recursive,
         max_depth,
@@ -143,7 +143,7 @@ pub(in crate::surfaces::web_server) fn files_tree_response(
 }
 
 pub(in crate::surfaces::web_server) fn collect_file_tree(
-    source_root: &Path,
+    target_root: &Path,
     rel_path: &Path,
     recursive: bool,
     max_depth: usize,
@@ -152,8 +152,8 @@ pub(in crate::surfaces::web_server) fn collect_file_tree(
     entries_by_path: &mut serde_json::Map<String, Value>,
     meta_by_path: &mut serde_json::Map<String, Value>,
 ) -> RefineResult<()> {
-    let absolute = source_root.join(rel_path);
-    let mut entries = read_file_entries(source_root, &absolute, rel_path)?;
+    let absolute = target_root.join(rel_path);
+    let mut entries = read_file_entries(target_root, &absolute, rel_path)?;
     let mut truncated = false;
     if entries.len() > *remaining {
         entries.truncate(*remaining);
@@ -190,7 +190,7 @@ pub(in crate::surfaces::web_server) fn collect_file_tree(
                 break;
             }
             collect_file_tree(
-                source_root,
+                target_root,
                 &child,
                 recursive,
                 max_depth,
@@ -205,7 +205,7 @@ pub(in crate::surfaces::web_server) fn collect_file_tree(
 }
 
 pub(in crate::surfaces::web_server) fn read_file_entries(
-    source_root: &Path,
+    target_root: &Path,
     absolute: &Path,
     rel_path: &Path,
 ) -> RefineResult<Vec<Value>> {
@@ -259,12 +259,12 @@ pub(in crate::surfaces::web_server) fn read_file_entries(
             .then_with(|| a_name.to_lowercase().cmp(&b_name.to_lowercase()))
             .then_with(|| a_name.cmp(b_name))
     });
-    let _ = source_root;
+    let _ = target_root;
     Ok(entries)
 }
 
 pub(in crate::surfaces::web_server) fn files_read_response(
-    source_root: &Path,
+    target_root: &Path,
     path: &str,
     offset: usize,
     limit: usize,
@@ -275,7 +275,7 @@ pub(in crate::surfaces::web_server) fn files_read_response(
             "file path is required".to_string(),
         ));
     }
-    let absolute = source_root.join(&rel_path);
+    let absolute = target_root.join(&rel_path);
     if !absolute.exists() {
         return Err(RefineError::NotFound(format!(
             "source file {} was not found",
@@ -355,7 +355,7 @@ pub(in crate::surfaces::web_server) fn files_read_response(
 }
 
 pub(in crate::surfaces::web_server) fn files_search_response(
-    source_root: &Path,
+    target_root: &Path,
     query: &str,
     max_entries: usize,
 ) -> RefineResult<Value> {
@@ -370,7 +370,7 @@ pub(in crate::surfaces::web_server) fn files_search_response(
     let mut entries = Vec::new();
     let mut truncated = false;
     search_source_paths(
-        source_root,
+        target_root,
         Path::new(""),
         &query,
         max_entries,
@@ -385,7 +385,7 @@ pub(in crate::surfaces::web_server) fn files_search_response(
 }
 
 pub(in crate::surfaces::web_server) fn search_source_paths(
-    source_root: &Path,
+    target_root: &Path,
     rel_path: &Path,
     query: &str,
     max_entries: usize,
@@ -396,7 +396,7 @@ pub(in crate::surfaces::web_server) fn search_source_paths(
         *truncated = true;
         return Ok(());
     }
-    let absolute = source_root.join(rel_path);
+    let absolute = target_root.join(rel_path);
     for entry in fs::read_dir(&absolute).map_err(|error| {
         RefineError::Io(format!(
             "failed to search source directory {}: {error}",
@@ -441,7 +441,7 @@ pub(in crate::surfaces::web_server) fn search_source_paths(
         }
         if metadata.is_dir() {
             search_source_paths(
-                source_root,
+                target_root,
                 &child_rel,
                 query,
                 max_entries,

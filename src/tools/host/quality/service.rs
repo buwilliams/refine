@@ -19,24 +19,24 @@ use super::types::*;
 
 #[derive(Clone, Debug)]
 pub struct FileQualityService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
 
 impl FileQualityService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: None,
         }
     }
 
     pub fn with_runtime_root(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: Some(runtime_root.into()),
         }
     }
@@ -208,7 +208,7 @@ impl FileQualityService {
             .iter()
             .find(|regression| regression.id == regression_id)
             .map(|regression| {
-                self.durable_root
+                self.refine_dir
                     .join("regressions")
                     .join(&regression.spec_path)
             });
@@ -606,36 +606,36 @@ impl FileQualityService {
     }
 
     fn settings_path(&self) -> PathBuf {
-        self.durable_root.join(SETTINGS_FILE)
+        self.refine_dir.join(SETTINGS_FILE)
     }
 
     fn manifest_path(&self) -> PathBuf {
-        self.durable_root.join(REGRESSION_MANIFEST_FILE)
+        self.refine_dir.join(REGRESSION_MANIFEST_FILE)
     }
 
     fn regression_specs_dir(&self) -> PathBuf {
-        self.durable_root.join("regressions/specs")
+        self.refine_dir.join("regressions/specs")
     }
 
     fn regression_runs_dir(&self) -> PathBuf {
-        self.durable_root.join("regressions/runs")
+        self.refine_dir.join("regressions/runs")
     }
 
     fn spec_file(&self, regression: &RegressionCheck) -> PathBuf {
-        self.durable_root
+        self.refine_dir
             .join("regressions")
             .join(&regression.spec_path)
     }
 
     fn project_root(&self) -> PathBuf {
-        self.durable_root
+        self.refine_dir
             .parent()
             .map(Path::to_path_buf)
-            .unwrap_or_else(|| self.durable_root.clone())
+            .unwrap_or_else(|| self.refine_dir.clone())
     }
 
     fn target_app_url(&self) -> String {
-        FileSettingsService::new(&self.durable_root)
+        FileSettingsService::new(&self.refine_dir)
             .load()
             .ok()
             .and_then(|settings| {
@@ -833,14 +833,14 @@ pub trait QualityService {
 
 #[derive(Clone, Debug)]
 pub struct QualityOperationRunner {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: PathBuf,
 }
 
 impl QualityOperationRunner {
-    pub fn new(durable_root: impl Into<PathBuf>, runtime_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>, runtime_root: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: runtime_root.into(),
         }
     }
@@ -860,7 +860,7 @@ impl QualityOperationRunner {
                 })),
             ),
         )?;
-        let service = FileQualityService::with_runtime_root(&self.durable_root, &self.runtime_root);
+        let service = FileQualityService::with_runtime_root(&self.refine_dir, &self.runtime_root);
         let result = service.run_checks(request)?;
         registry.append_log(
             &operation.id,
@@ -1036,8 +1036,8 @@ impl FileQualityService {
         let runtime_root = self
             .runtime_root
             .clone()
-            .unwrap_or_else(|| self.durable_root.join("runtime"));
-        FileSecurityService::from_project_settings(runtime_root, &self.durable_root)
+            .unwrap_or_else(|| self.refine_dir.join("runtime"));
+        FileSecurityService::from_project_settings(runtime_root, &self.refine_dir)
     }
 }
 

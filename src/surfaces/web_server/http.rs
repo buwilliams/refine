@@ -167,10 +167,10 @@ impl LocalHttpDaemon {
         &self,
         mut report: impl FnMut(&str),
     ) -> RefineResult<()> {
-        if let Some(durable_root) = self.server.current_refine_dir()? {
+        if let Some(refine_dir) = self.server.current_refine_dir()? {
             report("recovering interrupted chat turns");
             self.server
-                .chat_service(&durable_root)
+                .chat_service(&refine_dir)
                 .recover_interrupted_turns(
                     "Daemon restarted before the provider turn completed.",
                 )?;
@@ -740,8 +740,8 @@ impl LocalHttpDaemon {
                 }),
             },
         ];
-        if let Some(durable_root) = self.server.current_refine_dir()? {
-            if let Some(entry) = FileActivityService::new(&durable_root)
+        if let Some(refine_dir) = self.server.current_refine_dir()? {
+            if let Some(entry) = FileActivityService::new(&refine_dir)
                 .recent(1)?
                 .into_iter()
                 .next()
@@ -751,7 +751,7 @@ impl LocalHttpDaemon {
                     data: json!(entry),
                 });
             }
-            for payload in recent_chat_sse_events(&durable_root, 10)? {
+            for payload in recent_chat_sse_events(&refine_dir, 10)? {
                 events.push(SseEventFrame {
                     event: "chat_event",
                     data: payload,

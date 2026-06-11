@@ -185,9 +185,9 @@ fn projection_query_filters_sorts_and_pages_gaps_and_features() {
 #[test]
 fn file_store_persists_and_loads_projection_snapshot() {
     let temp_root = unique_temp_dir("projection-store");
-    let durable_root = temp_root.join("durable");
+    let refine_dir = temp_root.join("refine");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    let store = FileProjectStateStore::new(&durable_root);
+    let store = FileProjectStateStore::new(&refine_dir);
     store.initialize().unwrap();
 
     let mut gaps = BTreeMap::new();
@@ -220,9 +220,9 @@ fn file_store_persists_and_loads_projection_snapshot() {
 #[test]
 fn file_store_persists_projection_snapshot_concurrently() {
     let temp_root = unique_temp_dir("projection-store-concurrent");
-    let durable_root = temp_root.join("durable");
+    let refine_dir = temp_root.join("refine");
     let cache_dir = temp_root.join("run").join("cache");
-    let store = FileProjectStateStore::new(&durable_root);
+    let store = FileProjectStateStore::new(&refine_dir);
     store.initialize().unwrap();
 
     let barrier = Arc::new(Barrier::new(12));
@@ -257,7 +257,7 @@ fn file_store_persists_projection_snapshot_concurrently() {
 fn file_store_ignores_incompatible_snapshot_versions() {
     let temp_root = unique_temp_dir("projection-version");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    let store = FileProjectStateStore::new(temp_root.join("durable"));
+    let store = FileProjectStateStore::new(temp_root.join("refine"));
     let mut snapshot = store.rebuild_projection().unwrap();
     snapshot.version = PROJECTION_SNAPSHOT_VERSION + 1;
 
@@ -277,9 +277,9 @@ fn file_store_ignores_incompatible_snapshot_versions() {
 #[test]
 fn file_store_loads_cached_projection_until_fingerprints_change() {
     let temp_root = unique_temp_dir("projection-refresh");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    let gap_dir = durable_root.join("gaps").join("GA").join("P1");
+    let gap_dir = refine_dir.join("gaps").join("GA").join("P1");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::write(
         gap_dir.join("gap.json"),
@@ -291,7 +291,7 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
             }"#,
     )
     .unwrap();
-    let store = FileProjectStateStore::new(&durable_root);
+    let store = FileProjectStateStore::new(&refine_dir);
     let mut snapshot = store.load_or_refresh_projection(&cache_dir).unwrap();
     assert_eq!(snapshot.gaps["GAP1"].gap.name, "Cached name");
 
@@ -306,7 +306,7 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
         gap_dir.join("gap.json"),
         r#"{
               "id": "GAP1",
-              "name": "Refreshed name with changed durable content",
+              "name": "Refreshed name with changed refine content",
               "status": "todo",
               "rounds": []
             }"#,
@@ -315,7 +315,7 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
     let refreshed = store.load_or_refresh_projection(&cache_dir).unwrap();
     assert_eq!(
         refreshed.gaps["GAP1"].gap.name,
-        "Refreshed name with changed durable content"
+        "Refreshed name with changed refine content"
     );
     assert_ne!(refreshed.generated_at, "cached-sentinel");
 
@@ -325,14 +325,14 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
 #[test]
 fn rebuild_projection_scans_python_style_gap_and_feature_records() {
     let temp_root = unique_temp_dir("projection-rebuild");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
-    let remote_gap_dir = durable_root.join("gaps").join("02").join("GAP2");
-    let feature_dir = durable_root.join("features").join("01").join("FEATURE1");
+    let refine_dir = temp_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
+    let remote_gap_dir = refine_dir.join("gaps").join("02").join("GAP2");
+    let feature_dir = refine_dir.join("features").join("01").join("FEATURE1");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::create_dir_all(&remote_gap_dir).unwrap();
     fs::create_dir_all(&feature_dir).unwrap();
-    fs::create_dir_all(durable_root.join("logs")).unwrap();
+    fs::create_dir_all(refine_dir.join("logs")).unwrap();
     fs::write(
         gap_dir.join("gap.json"),
         r#"{
@@ -379,7 +379,7 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
     )
     .unwrap();
     fs::write(
-            durable_root.join(ACTIVITY_LOG_FILE),
+            refine_dir.join(ACTIVITY_LOG_FILE),
             concat!(
                 "{\"id\":\"act-1\",\"datetime\":\"2026-01-03T00:00:00Z\",\"severity\":\"error\",\"category\":\"quality\",\"message\":\"Remote QA failed\",\"gap_id\":\"GAP2\",\"actor\":\"browser\",\"details\":{\"selector\":\"#app\"},\"actions\":[]}\n",
                 "{\"id\":\"act-2\",\"datetime\":\"2026-01-04T00:00:00Z\",\"severity\":\"info\",\"category\":\"state\",\"message\":\"Feature changed\",\"gap_id\":null,\"actor\":\"system\",\"details\":null,\"actions\":[]}\n"
@@ -387,7 +387,7 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
         )
         .unwrap();
 
-    let snapshot = FileProjectStateStore::new(&durable_root)
+    let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let gap = &snapshot.gaps["GAP1"];
@@ -477,8 +477,8 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
 #[test]
 fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
     let temp_root = unique_temp_dir("projection-changes");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("GA").join("P1");
+    let refine_dir = temp_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("GA").join("P1");
     fs::create_dir_all(&gap_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -505,7 +505,7 @@ fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
     fs::write(temp_root.join("app.txt"), "two\n").unwrap();
     git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
 
-    let snapshot = FileProjectStateStore::new(&durable_root)
+    let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     assert!(snapshot.source_fingerprints.contains_key("git:HEAD"));
@@ -537,11 +537,11 @@ fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
 }
 
 #[test]
-fn rebuild_projection_with_runtime_root_records_git_processes_outside_durable_runtime() {
+fn rebuild_projection_with_runtime_root_avoids_refine_runtime_processes() {
     let temp_root = unique_temp_dir("projection-runtime-root");
-    let durable_root = temp_root.join(".refine");
+    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
     git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
@@ -549,12 +549,12 @@ fn rebuild_projection_with_runtime_root_records_git_processes_outside_durable_ru
     git(&temp_root, &["add", "app.txt"]).unwrap();
     git(&temp_root, &["commit", "-m", "initial"]).unwrap();
 
-    FileProjectStateStore::with_runtime_root(&durable_root, &runtime_root)
+    FileProjectStateStore::with_runtime_root(&refine_dir, &runtime_root)
         .rebuild_projection()
         .unwrap();
 
-    assert!(!durable_root.join("runtime/processes").exists());
-    assert!(runtime_root.join("processes").exists());
+    assert!(!refine_dir.join("runtime/processes").exists());
+    assert!(!runtime_root.join("processes").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

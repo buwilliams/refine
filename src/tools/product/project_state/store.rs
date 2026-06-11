@@ -36,24 +36,24 @@ pub trait ProjectStateStore {
 
 #[derive(Clone, Debug)]
 pub struct FileProjectStateStore {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
 
 impl FileProjectStateStore {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: None,
         }
     }
 
     pub fn with_runtime_root(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: Some(runtime_root.into()),
         }
     }
@@ -96,15 +96,15 @@ impl FileProjectStateStore {
 
     pub fn collect_source_fingerprints(&self) -> RefineResult<BTreeMap<String, SourceFingerprint>> {
         let mut source_fingerprints = BTreeMap::new();
-        for path in Self::collect_json_files(&self.durable_root.join("gaps"), "gap.json")? {
+        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "gap.json")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
-        for path in Self::collect_json_files(&self.durable_root.join("features"), "feature.json")? {
+        for path in Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
-        let activity_path = self.durable_root.join(ACTIVITY_LOG_FILE);
+        let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&activity_path)?);
@@ -128,13 +128,13 @@ impl FileProjectStateStore {
     }
 
     fn relative_path(&self, path: &Path) -> RefineResult<String> {
-        path.strip_prefix(&self.durable_root)
+        path.strip_prefix(&self.refine_dir)
             .map(|relative| relative.to_string_lossy().replace('\\', "/"))
             .map_err(|error| {
                 RefineError::InvalidInput(format!(
-                    "path {} is not under durable root {}: {error}",
+                    "path {} is not under refine dir {}: {error}",
                     path.display(),
-                    self.durable_root.display()
+                    self.refine_dir.display()
                 ))
             })
     }
@@ -288,7 +288,7 @@ impl FileProjectStateStore {
     }
 
     fn project_activity(&self) -> RefineResult<BTreeMap<String, ActivitySummaryProjection>> {
-        let path = self.durable_root.join(ACTIVITY_LOG_FILE);
+        let path = self.refine_dir.join(ACTIVITY_LOG_FILE);
         if !path.exists() {
             return Ok(BTreeMap::new());
         }
@@ -334,10 +334,10 @@ impl FileProjectStateStore {
         &self,
         gaps: &BTreeMap<String, GapSummaryProjection>,
     ) -> BTreeMap<String, ChangeSummaryProjection> {
-        let Some(source_root) = self.source_root() else {
+        let Some(target_root) = self.target_root() else {
             return BTreeMap::new();
         };
-        let service = self.git_service(source_root);
+        let service = self.git_service(target_root);
         let branch = service.inspect("").ok().and_then(|status| status.branch);
         let Ok(changes) = service.recent_changes(1000) else {
             return BTreeMap::new();
@@ -368,13 +368,13 @@ impl FileProjectStateStore {
             .collect()
     }
 
-    fn source_root(&self) -> Option<PathBuf> {
-        self.durable_root.parent().map(Path::to_path_buf)
+    fn target_root(&self) -> Option<PathBuf> {
+        self.refine_dir.parent().map(Path::to_path_buf)
     }
 
     fn git_head_fingerprint(&self) -> Option<SourceFingerprint> {
-        let source_root = self.source_root()?;
-        let service = self.git_service(source_root);
+        let target_root = self.target_root()?;
+        let service = self.git_service(target_root);
         let branch = service
             .inspect("")
             .ok()
@@ -397,11 +397,11 @@ impl FileProjectStateStore {
         })
     }
 
-    fn git_service(&self, source_root: PathBuf) -> FileGitWorktreeService {
+    fn git_service(&self, target_root: PathBuf) -> FileGitWorktreeService {
         if let Some(runtime_root) = &self.runtime_root {
-            FileGitWorktreeService::with_runtime_root(source_root, runtime_root)
+            FileGitWorktreeService::with_runtime_root(target_root, runtime_root)
         } else {
-            FileGitWorktreeService::new(source_root)
+            FileGitWorktreeService::new(target_root)
         }
     }
 }
@@ -444,10 +444,10 @@ fn latest_round_assignee(
 
 impl ProjectStateStore for FileProjectStateStore {
     fn initialize(&self) -> RefineResult<()> {
-        fs::create_dir_all(&self.durable_root).map_err(|error| {
+        fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
-                "failed to initialize durable root {}: {error}",
-                self.durable_root.display()
+                "failed to initialize refine dir {}: {error}",
+                self.refine_dir.display()
             ))
         })
     }
@@ -516,10 +516,10 @@ impl ProjectStateStore for FileProjectStateStore {
         let mut source_fingerprints = BTreeMap::new();
         let mut gaps = BTreeMap::new();
         let mut features = BTreeMap::new();
-        let gap_paths = Self::collect_json_files(&self.durable_root.join("gaps"), "gap.json")?;
+        let gap_paths = Self::collect_json_files(&self.refine_dir.join("gaps"), "gap.json")?;
         let feature_paths =
-            Self::collect_json_files(&self.durable_root.join("features"), "feature.json")?;
-        let activity_path = self.durable_root.join(ACTIVITY_LOG_FILE);
+            Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")?;
+        let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
 
         for path in gap_paths {
             let rel_path = self.relative_path(&path)?;

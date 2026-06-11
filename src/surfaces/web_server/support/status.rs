@@ -199,11 +199,8 @@ pub(in crate::surfaces::web_server) fn first_non_empty(first: &str, second: &str
     }
 }
 
-pub(in crate::surfaces::web_server) fn append_quality_activity(
-    durable_root: &Path,
-    message: String,
-) {
-    let service = FileActivityService::new(durable_root);
+pub(in crate::surfaces::web_server) fn append_quality_activity(refine_dir: &Path, message: String) {
+    let service = FileActivityService::new(refine_dir);
     let entry = service.new_entry(message, "info", "quality", None, Some("refine".to_string()));
     let _ = service.append(entry);
 }
@@ -239,13 +236,13 @@ pub(in crate::surfaces::web_server) fn process_summary_value(
 
 pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
     runtime_root: &Path,
-    durable_root: Option<&Path>,
+    refine_dir: Option<&Path>,
 ) -> RefineResult<Value> {
     let supervisor = FileProcessSupervisor::new(runtime_root);
     let pause_state = supervisor.pause_state()?;
     let mut process_values = Vec::new();
     let mut seen_process_ids = BTreeSet::new();
-    for process_root in process_roots(runtime_root, durable_root) {
+    for process_root in process_roots(runtime_root, refine_dir) {
         let processes =
             FileProcessSupervisor::new(&process_root).recover_owner(ProcessOwner::TargetApp)?;
         for process in processes {
@@ -258,7 +255,7 @@ pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
             }
         }
     }
-    append_chat_session_processes(&mut process_values, runtime_root, durable_root)?;
+    append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
     let runner_reachable = runner_reachable_value(runtime_root);
     Ok(json!({
         "runner_reachable": runner_reachable,
@@ -273,10 +270,10 @@ pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
     }))
 }
 
-fn process_roots(runtime_root: &Path, durable_root: Option<&Path>) -> Vec<PathBuf> {
+fn process_roots(runtime_root: &Path, refine_dir: Option<&Path>) -> Vec<PathBuf> {
     let mut roots = vec![runtime_root.to_path_buf()];
-    if let Some(durable_root) = durable_root {
-        let project_runtime_root = durable_root.join("runtime");
+    if let Some(refine_dir) = refine_dir {
+        let project_runtime_root = refine_dir.join("runtime");
         if project_runtime_root != runtime_root
             && should_scan_legacy_process_root(&project_runtime_root)
         {
@@ -302,9 +299,9 @@ fn should_scan_legacy_process_root(project_runtime_root: &Path) -> bool {
 fn append_chat_session_processes(
     process_values: &mut Vec<Value>,
     runtime_root: &Path,
-    durable_root: Option<&Path>,
+    refine_dir: Option<&Path>,
 ) -> RefineResult<()> {
-    let Some(durable_root) = durable_root else {
+    let Some(refine_dir) = refine_dir else {
         return Ok(());
     };
     let existing_session_ids = process_values
@@ -312,7 +309,7 @@ fn append_chat_session_processes(
         .filter_map(|process| process.get("session_id").and_then(Value::as_str))
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
-    let service = FileChatService::with_runtime_root(durable_root, runtime_root);
+    let service = FileChatService::with_runtime_root(refine_dir, runtime_root);
     for session in service.list_sessions()? {
         if !is_process_visible_chat_session(&session) || existing_session_ids.contains(&session.id)
         {
@@ -690,8 +687,8 @@ pub(in crate::surfaces::web_server) fn project_status_value(
     json!({
         "attached": status.attached,
         "registry_enabled": status.registry_enabled,
-        "client_repo": status.client_repo,
-        "volume_root": status.volume_root,
+        "target_root": status.target_root,
+        "refine_dir": status.refine_dir,
         "config_path": status.config_path,
         "schema": status.schema,
         "maintenance": status.maintenance,
@@ -718,8 +715,8 @@ mod tests {
             uuid::Uuid::new_v4()
         ));
         let runtime_root = temp_root.join("run/8080");
-        let durable_root = temp_root.join("app/.refine");
-        let legacy_processes = durable_root.join("runtime/processes");
+        let refine_dir = temp_root.join("app/.refine");
+        let legacy_processes = refine_dir.join("runtime/processes");
         fs::create_dir_all(&runtime_root).unwrap();
         fs::create_dir_all(&legacy_processes).unwrap();
         for index in 0..=LEGACY_PROCESS_ROOT_ENTRY_LIMIT {
@@ -727,7 +724,7 @@ mod tests {
         }
 
         assert_eq!(
-            process_roots(&runtime_root, Some(&durable_root)),
+            process_roots(&runtime_root, Some(&refine_dir)),
             vec![runtime_root]
         );
 

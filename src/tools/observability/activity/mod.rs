@@ -27,18 +27,18 @@ pub struct ActivityCleanupResult {
 
 #[derive(Clone, Debug)]
 pub struct FileActivityService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileActivityService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
     pub fn path(&self) -> PathBuf {
-        self.durable_root.join(ACTIVITY_LOG_FILE)
+        self.refine_dir.join(ACTIVITY_LOG_FILE)
     }
 
     pub fn new_entry(
@@ -326,8 +326,8 @@ mod tests {
     #[test]
     fn file_activity_service_appends_and_queries_jsonl() {
         let temp_root = unique_temp_dir("activity");
-        let durable_root = temp_root.join(".refine");
-        let service = FileActivityService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileActivityService::new(&refine_dir);
         let entry = service.new_entry(
             "Something happened",
             "error",
@@ -358,8 +358,8 @@ mod tests {
     #[test]
     fn file_activity_service_prunes_old_entries() {
         let temp_root = unique_temp_dir("activity-cleanup");
-        let durable_root = temp_root.join(".refine");
-        let service = FileActivityService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileActivityService::new(&refine_dir);
         let mut old = service.new_entry("Old", "info", "system", None, None);
         old.datetime = "2020-01-01T00:00:00Z".to_string();
         let recent = service.new_entry("Recent", "info", "system", None, None);

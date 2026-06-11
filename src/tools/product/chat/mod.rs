@@ -115,26 +115,26 @@ pub trait ChatService {
 
 #[derive(Clone, Debug)]
 pub struct FileChatService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: PathBuf,
 }
 
 impl FileChatService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
-        let durable_root = durable_root.into();
-        let runtime_root = default_chat_runtime_root(&durable_root);
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
+        let refine_dir = refine_dir.into();
+        let runtime_root = default_chat_runtime_root(&refine_dir);
         Self {
-            durable_root,
+            refine_dir,
             runtime_root,
         }
     }
 
     pub fn with_runtime_root(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: runtime_root.into(),
         }
     }
@@ -349,7 +349,7 @@ impl FileChatService {
             ));
         }
 
-        let settings = FileSettingsService::new(&self.durable_root).load()?;
+        let settings = FileSettingsService::new(&self.refine_dir).load()?;
         let target_branch = settings
             .get("merge_target_branch")
             .and_then(Value::as_str)
@@ -359,7 +359,7 @@ impl FileChatService {
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree.path, &self.runtime_root);
         let work_items = FileWorkItemService::with_projection_cache(
-            &self.durable_root,
+            &self.refine_dir,
             self.runtime_root.join("cache"),
         );
         let gap = work_items.create_gap_summary(&name, None)?;
@@ -484,7 +484,7 @@ impl FileChatService {
     }
 
     fn sessions_dir(&self) -> PathBuf {
-        self.durable_root.join("chat/sessions")
+        self.refine_dir.join("chat/sessions")
     }
 
     fn session_path(&self, session_id: &str) -> PathBuf {
@@ -492,14 +492,14 @@ impl FileChatService {
     }
 
     fn create_standalone_worktree(&self, session_id: &str) -> RefineResult<ChatSessionWorktree> {
-        let source_root = self.durable_root.parent().ok_or_else(|| {
+        let target_root = self.refine_dir.parent().ok_or_else(|| {
             RefineError::InvalidInput(format!(
-                "durable root {} has no source repository parent",
-                self.durable_root.display()
+                "refine dir {} has no target root",
+                self.refine_dir.display()
             ))
         })?;
         let branch = format!("refine/standalone/{session_id}");
-        let git = FileGitWorktreeService::with_runtime_root(source_root, &self.runtime_root);
+        let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root);
         let target = git
             .git_path("refine-standalone-worktrees")?
             .join(session_id);
@@ -520,13 +520,13 @@ impl FileChatService {
     }
 
     fn cleanup_standalone_worktree(&self, worktree: &ChatSessionWorktree) -> RefineResult<()> {
-        let source_root = self.durable_root.parent().ok_or_else(|| {
+        let target_root = self.refine_dir.parent().ok_or_else(|| {
             RefineError::InvalidInput(format!(
-                "durable root {} has no source repository parent",
-                self.durable_root.display()
+                "refine dir {} has no target root",
+                self.refine_dir.display()
             ))
         })?;
-        let git = FileGitWorktreeService::new(source_root);
+        let git = FileGitWorktreeService::new(target_root);
         let path = PathBuf::from(&worktree.path);
         if path.exists() {
             git.remove_worktree(&path, true)?;
@@ -1060,10 +1060,10 @@ fn unread_progress(record: &ChatSessionRecord) -> Vec<String> {
 
 impl FileChatService {
     fn project_root(&self) -> PathBuf {
-        self.durable_root
+        self.refine_dir
             .parent()
             .map(PathBuf::from)
-            .unwrap_or_else(|| self.durable_root.clone())
+            .unwrap_or_else(|| self.refine_dir.clone())
     }
 
     fn chat_cwd(&self, record: &ChatSessionRecord) -> PathBuf {
@@ -1079,7 +1079,7 @@ impl FileChatService {
 
     fn provider_path_override(&self) -> Option<String> {
         let mut paths = Vec::new();
-        paths.push(self.durable_root.join("provider-bin"));
+        paths.push(self.refine_dir.join("provider-bin"));
         paths.push(self.project_root().join("node_modules/.bin"));
         if let Some(path) = std::env::var_os("PATH") {
             paths.extend(std::env::split_paths(&path));
@@ -1103,17 +1103,16 @@ impl FileChatService {
         let context = self
             .attached_product_context(record)
             .unwrap_or_else(|error| {
-                format!("Attachment context could not be rebuilt from durable records: {error}")
+                format!("Attachment context could not be rebuilt from refine records: {error}")
             });
         format!(
-            "Refine {mode} chat attached to {attachment}.\n\n{instructions}\n\nCurrent durable context:\n{context}\n\nUser message:\n{message}",
+            "Refine {mode} chat attached to {attachment}.\n\n{instructions}\n\nCurrent refine context:\n{context}\n\nUser message:\n{message}",
             mode = record.mode
         )
     }
 
     fn attached_product_context(&self, record: &ChatSessionRecord) -> RefineResult<String> {
-        let store =
-            FileProjectStateStore::with_runtime_root(&self.durable_root, &self.runtime_root);
+        let store = FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root);
         let snapshot = store.load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         match &record.attachment {
             ChatAttachment::Gap(id) => {
@@ -1393,11 +1392,11 @@ fn new_queued_message_id() -> String {
     )
 }
 
-fn default_chat_runtime_root(durable_root: &Path) -> PathBuf {
-    durable_root
+fn default_chat_runtime_root(refine_dir: &Path) -> PathBuf {
+    refine_dir
         .parent()
         .map(|root| root.join("run/chat"))
-        .unwrap_or_else(|| durable_root.join("run/chat"))
+        .unwrap_or_else(|| refine_dir.join("run/chat"))
 }
 
 fn chat_session_id_from_operation(operation: &OperationHandle) -> Option<&str> {
@@ -1428,9 +1427,9 @@ mod tests {
     #[test]
     fn file_chat_service_persists_session_transcript_and_stop() {
         let temp_root = unique_temp_dir("chat");
-        let durable_root = temp_root.join(".refine");
-        write_fake_provider(&durable_root, "smoke-ai", 0, "provider says hello");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        write_fake_provider(&refine_dir, "smoke-ai", 0, "provider says hello");
+        let service = FileChatService::new(&refine_dir);
 
         let session = service
             .start_with_options(
@@ -1476,13 +1475,13 @@ mod tests {
     fn file_chat_service_streams_provider_output_into_progress() {
         let temp_root = unique_temp_dir("chat-provider-stream");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         write_fake_provider_script(
-            &durable_root,
+            &refine_dir,
             "claude",
             "#!/bin/sh\nprintf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"streamed activity line\"}}'\nsleep 1\nprintf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"final response line\"}}'\n",
         );
-        let service = FileChatService::new(&durable_root);
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("claude"), Some("chat"))
             .unwrap();
@@ -1519,13 +1518,13 @@ mod tests {
     }
 
     #[test]
-    fn file_chat_service_rebuilds_attached_gap_context_from_durable_records() {
+    fn file_chat_service_rebuilds_attached_gap_context_from_refine_records() {
         let temp_root = unique_temp_dir("chat-gap-context");
-        let durable_root = temp_root.join(".refine");
-        FileWorkItemService::new(&durable_root)
+        let refine_dir = temp_root.join(".refine");
+        FileWorkItemService::new(&refine_dir)
             .create_gap_summary("Checkout fails", Some("GAP1"))
             .unwrap();
-        let service = FileChatService::new(&durable_root);
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(
                 ChatAttachment::Gap("GAP1".to_string()),
@@ -1535,7 +1534,7 @@ mod tests {
             .unwrap();
 
         let prompt = service.chat_prompt(&session, "What changed?");
-        assert!(prompt.contains("Current durable context"));
+        assert!(prompt.contains("Current refine context"));
         assert!(prompt.contains("\"id\": \"GAP1\""));
         assert!(prompt.contains("\"name\": \"Checkout fails\""));
         assert!(prompt.contains("What changed?"));
@@ -1547,8 +1546,8 @@ mod tests {
     fn file_chat_service_plan_prompt_drafts_software_specs() {
         let temp_root = unique_temp_dir("chat-plan-prompt");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("plan"))
             .unwrap();
@@ -1576,8 +1575,8 @@ mod tests {
         let temp_root = unique_temp_dir("chat-plan-unborn");
         init_unborn_git_app(&temp_root);
         fs::write(temp_root.join("draft.txt"), "local draft\n").unwrap();
-        let durable_root = temp_root.join(".refine");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileChatService::new(&refine_dir);
 
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("plan"))
@@ -1603,14 +1602,14 @@ mod tests {
     fn file_chat_service_persists_importable_artifacts_from_provider_output() {
         let temp_root = unique_temp_dir("chat-artifacts");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         write_fake_provider(
-            &durable_root,
+            &refine_dir,
             "smoke-ai",
             0,
             r#"{"importable_artifacts":[{"type":"round","round":{"reporter":"QA","actual":"Broken","target":"Fixed"}},{"type":"gap","gap":{"name":"Imported gap","actual":"A","target":"B"}}]}"#,
         );
-        let service = FileChatService::new(&durable_root);
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1641,9 +1640,9 @@ mod tests {
     fn file_chat_service_runs_standalone_provider_turns_in_attached_worktree() {
         let temp_root = unique_temp_dir("chat-standalone-worktree-cwd");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
-        write_cwd_provider(&durable_root, "smoke-ai");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        write_cwd_provider(&refine_dir, "smoke-ai");
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1666,9 +1665,9 @@ mod tests {
     fn file_chat_service_persists_provider_failure() {
         let temp_root = unique_temp_dir("chat-failure");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
-        write_fake_provider(&durable_root, "smoke-ai", 2, "provider failed");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        write_fake_provider(&refine_dir, "smoke-ai", 2, "provider failed");
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1691,14 +1690,14 @@ mod tests {
     fn file_chat_service_persists_provider_session_id_and_in_flight_lifecycle() {
         let temp_root = unique_temp_dir("chat-provider-session");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         write_fake_provider(
-            &durable_root,
+            &refine_dir,
             "smoke-ai",
             0,
             r#"{"session_id":"prov-1","item":{"type":"agent_message","text":"provider says hello"}}"#,
         );
-        let service = FileChatService::new(&durable_root);
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1712,7 +1711,7 @@ mod tests {
         assert_eq!(resumed.last_turn_started_at, None);
         assert!(!resumed.interrupted);
         let persisted: Value = serde_json::from_str(
-            &fs::read_to_string(durable_root.join(format!("chat/sessions/{}.json", session.id)))
+            &fs::read_to_string(refine_dir.join(format!("chat/sessions/{}.json", session.id)))
                 .unwrap(),
         )
         .unwrap();
@@ -1736,9 +1735,9 @@ mod tests {
     fn file_chat_service_edits_removes_and_batches_queued_messages() {
         let temp_root = unique_temp_dir("chat-queue");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
-        write_fake_provider(&durable_root, "smoke-ai", 0, "queued provider response");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        write_fake_provider(&refine_dir, "smoke-ai", 0, "queued provider response");
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1787,8 +1786,8 @@ mod tests {
     fn file_chat_service_recovers_stale_in_flight_turns() {
         let temp_root = unique_temp_dir("chat-recovery");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
-        let service = FileChatService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
@@ -1825,14 +1824,14 @@ mod tests {
     fn file_chat_service_resumes_provider_session_when_supported() {
         let temp_root = unique_temp_dir("chat-provider-resume");
         init_git_app(&temp_root);
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         write_fake_provider(
-            &durable_root,
+            &refine_dir,
             "claude",
             0,
             r#"{"session_id":"prov-2","item":{"type":"agent_message","text":"resumed ok"}}"#,
         );
-        let service = FileChatService::new(&durable_root);
+        let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("claude"), Some("chat"))
             .unwrap();
@@ -1965,16 +1964,16 @@ mod tests {
         service.resume(session_id).unwrap()
     }
 
-    fn write_fake_provider_script(durable_root: &PathBuf, name: &str, script: &str) {
-        let bin_dir = durable_root.join("provider-bin");
+    fn write_fake_provider_script(refine_dir: &PathBuf, name: &str, script: &str) {
+        let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);
         fs::write(&path, script).unwrap();
         make_provider_executable(&path);
     }
 
-    fn write_fake_provider(durable_root: &PathBuf, name: &str, exit_code: i32, output: &str) {
-        let bin_dir = durable_root.join("provider-bin");
+    fn write_fake_provider(refine_dir: &PathBuf, name: &str, exit_code: i32, output: &str) {
+        let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);
         let mut file = fs::File::create(&path).unwrap();
@@ -1996,8 +1995,8 @@ mod tests {
         }
     }
 
-    fn write_cwd_provider(durable_root: &PathBuf, name: &str) {
-        let bin_dir = durable_root.join("provider-bin");
+    fn write_cwd_provider(refine_dir: &PathBuf, name: &str) {
+        let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);
         let mut file = fs::File::create(&path).unwrap();

@@ -17,13 +17,13 @@ pub trait LogService {
 
 #[derive(Clone, Debug)]
 pub struct FileLogService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileLogService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
@@ -43,7 +43,7 @@ impl FileLogService {
             entry,
             round_idx: Some(round_idx),
         };
-        let path = gap_logs_path(&self.durable_root, gap_id);
+        let path = gap_logs_path(&self.refine_dir, gap_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
                 RefineError::Io(format!(
@@ -96,7 +96,7 @@ impl FileLogService {
     }
 
     fn read_sidecar(&self, gap_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
-        let path = gap_logs_path(&self.durable_root, gap_id);
+        let path = gap_logs_path(&self.refine_dir, gap_id);
         if !path.exists() {
             return Ok(Vec::new());
         }
@@ -209,9 +209,9 @@ fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-fn gap_logs_path(durable_root: &Path, gap_id: &str) -> PathBuf {
+fn gap_logs_path(refine_dir: &Path, gap_id: &str) -> PathBuf {
     let gap_id = gap_id.to_uppercase();
-    durable_root
+    refine_dir
         .join("gaps")
         .join(&gap_id[..2])
         .join(&gap_id[2..])
@@ -226,8 +226,8 @@ mod tests {
     #[test]
     fn file_log_service_appends_and_pages_round_sidecar() {
         let temp_root = unique_temp_dir("round-logs");
-        let durable_root = temp_root.join(".refine");
-        let service = FileLogService::new(&durable_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileLogService::new(&refine_dir);
         let entry = LogEntry {
             datetime: String::new(),
             severity: "info".to_string(),
@@ -240,7 +240,7 @@ mod tests {
         };
         let written = service.append_round_log("GAP1", 1, entry).unwrap();
         assert_eq!(written.round_idx, Some(1));
-        assert!(durable_root.join("gaps/GA/P1/logs.jsonl").exists());
+        assert!(refine_dir.join("gaps/GA/P1/logs.jsonl").exists());
 
         let (page, has_more, total) = service.page_round_logs("GAP1", 1, 50, 0).unwrap();
         assert!(!has_more);
@@ -254,8 +254,8 @@ mod tests {
     #[test]
     fn file_log_service_tolerates_legacy_string_details_in_round_sidecar() {
         let temp_root = unique_temp_dir("round-logs-legacy-details");
-        let durable_root = temp_root.join(".refine");
-        let path = gap_logs_path(&durable_root, "GAP1");
+        let refine_dir = temp_root.join(".refine");
+        let path = gap_logs_path(&refine_dir, "GAP1");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
             &path,
@@ -263,7 +263,7 @@ mod tests {
         )
         .unwrap();
 
-        let service = FileLogService::new(&durable_root);
+        let service = FileLogService::new(&refine_dir);
         let logs = service.round_logs("GAP1", 1).unwrap();
 
         assert_eq!(logs.len(), 1);

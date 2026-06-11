@@ -761,7 +761,7 @@ async function ensureProjectAttached() {
         let result;
         try {
           result = await api("POST", "/api/project/attach", {
-            path: snap.client_repo,
+            path: snap.target_root,
             migrate: true,
           });
         } finally {

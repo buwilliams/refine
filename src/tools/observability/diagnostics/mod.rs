@@ -132,7 +132,7 @@ impl DiagnosticsService for FileDiagnosticsService {
                     format!(
                         "attached={}",
                         project_status
-                            .client_repo
+                            .target_root
                             .unwrap_or_else(|| "unknown".to_string())
                     )
                 } else {

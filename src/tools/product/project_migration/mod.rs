@@ -16,30 +16,30 @@ const LEGACY_0_TO_1_ID: &str = "legacy-0-to-1";
 
 #[derive(Clone, Debug)]
 pub struct FileProjectMigrationService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
 
 impl FileProjectMigrationService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: None,
         }
     }
 
     pub fn with_runtime_root(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: Some(runtime_root.into()),
         }
     }
 
     pub fn status(&self) -> RefineResult<ProjectSchemaStatus> {
-        schema_status(&self.durable_root)
+        schema_status(&self.refine_dir)
     }
 
     pub fn initialize_current_schema(&self) -> RefineResult<()> {
@@ -63,10 +63,10 @@ impl FileProjectMigrationService {
                     .unwrap_or_else(|| "project schema is not compatible".to_string()),
             ));
         }
-        fs::create_dir_all(&self.durable_root).map_err(|error| {
+        fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create durable root {}: {error}",
-                self.durable_root.display()
+                "failed to create refine dir {}: {error}",
+                self.refine_dir.display()
             ))
         })?;
         write_json_atomic(&self.config_path(), &current_project_config())
@@ -129,10 +129,10 @@ impl FileProjectMigrationService {
     }
 
     fn apply_legacy_0_to_1(&self) -> RefineResult<PathBuf> {
-        fs::create_dir_all(&self.durable_root).map_err(|error| {
+        fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create durable root {}: {error}",
-                self.durable_root.display()
+                "failed to create refine dir {}: {error}",
+                self.refine_dir.display()
             ))
         })?;
         let backup_dir = self.backup_dir(LEGACY_0_TO_1_ID);
@@ -163,14 +163,14 @@ impl FileProjectMigrationService {
     }
 
     fn backup_dir(&self, migration_id: &str) -> PathBuf {
-        self.durable_root
+        self.refine_dir
             .join("backups")
             .join("migrations")
             .join(format!("{}-{migration_id}", backup_timestamp()))
     }
 
     fn config_path(&self) -> PathBuf {
-        self.durable_root.join("refine.json")
+        self.refine_dir.join("refine.json")
     }
 
     fn invalidate_projection_cache(&self) -> RefineResult<()> {
@@ -190,10 +190,10 @@ impl FileProjectMigrationService {
     }
 }
 
-pub fn schema_status(durable_root: &Path) -> RefineResult<ProjectSchemaStatus> {
-    let config_path = durable_root.join("refine.json");
+pub fn schema_status(refine_dir: &Path) -> RefineResult<ProjectSchemaStatus> {
+    let config_path = refine_dir.join("refine.json");
     if !config_path.exists() {
-        if durable_state_exists(durable_root)? {
+        if refine_state_exists(refine_dir)? {
             return Ok(migration_required_status(
                 Some(0),
                 LEGACY_0_TO_1_ID,
@@ -289,22 +289,22 @@ fn migration_required_status(
     }
 }
 
-fn durable_state_exists(durable_root: &Path) -> RefineResult<bool> {
-    let entries = match fs::read_dir(durable_root) {
+fn refine_state_exists(refine_dir: &Path) -> RefineResult<bool> {
+    let entries = match fs::read_dir(refine_dir) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => {
             return Err(RefineError::Io(format!(
-                "failed to inspect durable root {}: {error}",
-                durable_root.display()
+                "failed to inspect refine dir {}: {error}",
+                refine_dir.display()
             )));
         }
     };
     for entry in entries {
         let entry = entry.map_err(|error| {
             RefineError::Io(format!(
-                "failed to inspect durable root {}: {error}",
-                durable_root.display()
+                "failed to inspect refine dir {}: {error}",
+                refine_dir.display()
             ))
         })?;
         if entry.file_name().to_str() == Some("backups") {
@@ -426,10 +426,10 @@ mod tests {
     #[test]
     fn migration_creates_config_backup_and_invalidates_projection_cache() {
         let temp_root = unique_temp_dir("migration-run");
-        let durable_root = temp_root.join("app/.refine");
+        let refine_dir = temp_root.join("app/.refine");
         let runtime_root = temp_root.join("run");
-        fs::create_dir_all(durable_root.join("gaps/GA")).unwrap();
-        fs::write(durable_root.join("gaps/GA/gap.json"), "{}").unwrap();
+        fs::create_dir_all(refine_dir.join("gaps/GA")).unwrap();
+        fs::write(refine_dir.join("gaps/GA/gap.json"), "{}").unwrap();
         fs::create_dir_all(runtime_root.join("cache")).unwrap();
         fs::write(
             runtime_root.join("cache").join(PROJECTION_SNAPSHOT_FILE),
@@ -437,14 +437,14 @@ mod tests {
         )
         .unwrap();
 
-        let service = FileProjectMigrationService::with_runtime_root(&durable_root, &runtime_root);
+        let service = FileProjectMigrationService::with_runtime_root(&refine_dir, &runtime_root);
         let report = service.migrate().unwrap();
         assert!(report.ok);
         assert!(report.migrated);
         assert_eq!(report.from_version, Some(0));
         assert_eq!(report.to_version, CURRENT_PROJECT_SCHEMA_VERSION);
         assert_eq!(report.applied, vec![LEGACY_0_TO_1_ID]);
-        assert!(durable_root.join("refine.json").exists());
+        assert!(refine_dir.join("refine.json").exists());
         assert!(
             PathBuf::from(report.backup_path.unwrap())
                 .join("manifest.json")

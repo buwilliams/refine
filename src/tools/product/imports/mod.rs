@@ -28,13 +28,13 @@ pub struct ImportPersistResult {
 
 #[derive(Clone, Debug)]
 pub struct FileImportService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
 }
 
 impl FileImportService {
-    pub fn new(durable_root: impl Into<PathBuf>) -> Self {
+    pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
         }
     }
 
@@ -158,7 +158,7 @@ impl FileImportService {
         drafts: Vec<ImportDraft>,
         feature_id: Option<&str>,
     ) -> RefineResult<ImportPersistResult> {
-        let work_items = FileWorkItemService::new(&self.durable_root);
+        let work_items = FileWorkItemService::new(&self.refine_dir);
         let mut gap_ids = Vec::new();
         if let Some(feature_id) = feature_id {
             work_items.show_feature_summary(feature_id)?;
@@ -351,12 +351,12 @@ mod tests {
     #[test]
     fn file_import_service_imports_text_into_feature() {
         let temp_root = unique_temp_dir("import");
-        let durable_root = temp_root.join(".refine");
-        FileWorkItemService::new(&durable_root)
+        let refine_dir = temp_root.join(".refine");
+        FileWorkItemService::new(&refine_dir)
             .create_feature_summary("Feature", Some("FEA1"), None, None, None)
             .unwrap();
 
-        let result = FileImportService::new(&durable_root)
+        let result = FileImportService::new(&refine_dir)
             .import_from_text(
                 "Actual behavior => Target behavior",
                 false,
@@ -366,7 +366,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.created, 1);
-        let gap = FileWorkItemService::new(&durable_root)
+        let gap = FileWorkItemService::new(&refine_dir)
             .show_gap_summary(&result.gap_ids[0])
             .unwrap();
         assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));

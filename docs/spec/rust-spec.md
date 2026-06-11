@@ -6,7 +6,7 @@ Define a Rust-native Refine architecture with three user-facing surfaces:
 **web**, **desktop**, and **CLI**. All surfaces talk to one local
 supervisor daemon that owns host integration, process lifecycle, project
 attachment, target-app operations, agent execution, workflow automation, and
-durable Refine state. Real work is centralized in `workflow` and `tools` so
+persisted .refine state. Real work is centralized in `workflow` and `tools` so
 Desktop, browser, and CLI expose the same product capabilities through
 different presentation and transport layers.
 
@@ -174,7 +174,7 @@ Desktop shell      Browser UI          CLI
        canonical records, workflow states,
        allowed operations, process kinds
                       |
- durable project state + local runtime root/<port>/ runtime state
+ persisted project state + local runtime root/<port>/ runtime state
 ```
 
 The supervisor daemon is the single local authority. It contains the local web
@@ -182,7 +182,7 @@ server that serves UI assets and exposes the HTTP and server-sent-event routes
 used by Desktop, browser, and CLI surfaces. Route
 handlers are transport adapters: they handle HTTP concerns, translate requests
 and responses, and call `workflow/tools` for real work. Surfaces do not directly mutate
-durable state or own long-lived OS processes.
+persisted state or own long-lived OS processes.
 
 ## Capability Model
 
@@ -279,15 +279,15 @@ unless a migration intentionally changes it.
 Module: `model::project`; path: `src/model/project/`.
 
 Owns the canonical shape of a Refine target-app attachment and project state.
-This covers both durable `.refine` state in the target app and port-scoped
+This covers both persisted `.refine` state in the target app and port-scoped
 runtime selection state under the Refine checkout's `run/` directory.
 
 Properties:
 
 - `ProjectConfig`: `schema_version`, `refine.version`, `created_at`,
   `updated_at`, and project-level `settings`.
-- `ProjectStatus`: `attached`, `registry_enabled`, `client_repo`,
-  `volume_root`, `config_path`, `schema`, `maintenance`, `apps`,
+- `ProjectStatus`: `attached`, `registry_enabled`, `target_root`,
+  `refine_dir`, `config_path`, `schema`, `maintenance`, `apps`,
   `active_node_id`, `active_node`, and `message` when detached or invalid.
 - `ProjectSchemaStatus`: `compatible`, `migration_required`,
   `schema_version`, `current_schema_version`, `reason`, `migration_id`,
@@ -312,7 +312,7 @@ Rules:
 Module: `model::gap`; path: `src/model/gap/`.
 
 Owns the canonical Gap, round, note, and Gap-owned quality/governance state.
-The Python baseline stores durable Gap state in `gap.json` and projects common
+The Python baseline stores persisted Gap state in `gap.json` and projects common
 fields into `gaps_index` as a rebuildable cache.
 
 Properties:
@@ -346,7 +346,7 @@ Rules:
 Module: `model::feature`; path: `src/model/feature/`.
 
 Owns Feature metadata and the derived rollup produced from ordered Gaps.
-The Python baseline stores durable Feature metadata in `feature.json` and
+The Python baseline stores persisted Feature metadata in `feature.json` and
 projects common fields into `features_index`.
 
 Properties:
@@ -363,7 +363,7 @@ Properties:
 Rules:
 
 - A Feature's workflow status is derived from its ordered Gaps; it is not an
-  independent durable field in the Python baseline.
+  independent persisted field in the Python baseline.
 - Feature workflow actions can move eligible Gaps to `backlog` or `todo`.
   Protected Gap statuses are `review`, `done`, `ready-merge`, and
   `build`.
@@ -452,7 +452,7 @@ Properties:
 
 - `Node`: `id`, `display_name`, `created_at`, `updated_at`, and `archived`.
 - `NodeRegistry`: `nodes`.
-- `ActiveNodeSelection`: `active_node_id`, `volume_root`, and `updated_at`.
+- `ActiveNodeSelection`: `active_node_id`, `refine_dir`, and `updated_at`.
 - `NodeSettings`: application, runtime, target-app config, and target-app
   runtime setting maps scoped to a node.
 - `NodeOwnership`: the `node_id` fields on Gap and Feature records.
@@ -546,7 +546,7 @@ Requirements:
 - Status distinguishes daemon health, web availability, worker state, target-app
   state, active operations, and degraded integrations.
 - Restart preserves attached app selection and running operation records.
-- Crash recovery reconciles durable state with OS process reality.
+- Crash recovery reconciles persisted state with OS process reality.
 - Stop terminates or detaches managed processes according to their ownership
   policy.
 
@@ -596,11 +596,11 @@ Requirements:
 - The first pass should persist the projection snapshot under the selected
   local runtime root's `<port>/cache/` directory, including source-file
   fingerprints, so startup can load the snapshot and rescan only changed,
-  missing, or new durable records.
+  missing, or new persisted records.
 - The projection snapshot and required indexes are part of
   `tools::product::project_state`; routes should ask tools for query results
   instead of rebuilding ad hoc indexes per surface.
-- A full durable-record scan remains the fallback when the projection snapshot
+- A full persisted-record scan remains the fallback when the projection snapshot
   is missing, corrupt, incompatible, or intentionally discarded.
 - Durable records remain the source of truth. Projection state must be
   rebuildable after corruption or version upgrades.
@@ -633,7 +633,7 @@ retry, and workflow-state evaluation.
 Requirements:
 
 - Workflow is always on while the daemon is running.
-- Workflow behavior modules evaluate eligible Gaps by durable workflow state.
+- Workflow behavior modules evaluate eligible Gaps by workflow state.
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
@@ -752,11 +752,11 @@ Requirements:
   semantics.
 - Long-running provider priming or resume steps are observable.
 - Chat events can produce importable rounds, Gaps, or Feature plans.
-- Chat records are durable enough to survive daemon restart: Refine session id,
+- Chat records are persisted enough to survive daemon restart: Refine session id,
   mode, provider, provider session id when known, attached Gap or Feature id,
   created/updated timestamps, transcript events, importable artifacts, and
   closed/interrupted status are persisted outside in-memory process state.
-- In-flight provider processes are runtime operations, not durable conversation
+- In-flight provider processes are runtime operations, not persisted conversation
   state. After a daemon crash or restart, unfinished turns are marked
   interrupted with enough diagnostic detail for the UI or CLI to show what
   happened and let the user resume or start a new turn.
@@ -765,7 +765,7 @@ Requirements:
   transcript and starts a fresh provider session with explicit user-visible
   status.
 - Gap-attached and Feature-attached chats rebuild their product context from
-  durable Refine records on resume. Persisted transcripts should not be the only
+  persisted Refine records on resume. Persisted transcripts should not be the only
   source of Gap, Feature, or round state.
 
 ### Observability And Diagnostics
@@ -903,7 +903,7 @@ The complete web UI asset tree lives under `src/surfaces/web/static/`.
 Rust product code lives under `src/`, and repository automation lives under
 `xtask/`, so the native architecture is explicit at the repository root. The
 Tauri wrapper lives under `desktop/src-tauri/` and depends on the Rust product
-package. It should not own capabilities, durable state rules, process lifecycle,
+package. It should not own capabilities, persisted state rules, process lifecycle,
 provider behavior, or workflow logic.
 
 The local runtime root is not part of the Rust source tree. In checkout-based
@@ -948,7 +948,7 @@ Rules:
   workflow states, operation rules, and pure validation. They should not depend
   on processing, surface, host, supervisor, or observability modules.
 - `workflow::*` modules own workflow state movement and behavior orchestration.
-- `tools::product::*` modules own durable stores and product IO used by
+- `tools::product::*` modules own persisted stores and product IO used by
   workflow and surfaces.
 - `tools::host::*` modules own OS, Git, process, provider, browser, Docker,
   toolchain, target-app, quality, and cluster integration using model-defined
@@ -960,7 +960,7 @@ Rules:
   through this abstraction; model modules do not.
 - `surfaces::*` modules own entrypoints and adapters for CLI, web,
   desktop, and the daemon web server. Surface modules call supervisor-facing
-  services; they do not directly mutate durable Refine state or spawn managed
+  services; they do not directly mutate persisted .refine state or spawn managed
   processes.
 - Avoid a generic `shared` module. Put code in the module that owns the concept.
   If a primitive is genuinely cross-cutting, give it a narrow named home inside
@@ -1100,36 +1100,36 @@ cache files, or another cache structure. The daemon should:
 
 - Load the projection snapshot from the selected local runtime root's
   `<port>/cache/` directory during startup.
-- Validate the snapshot version and source-file fingerprints for durable
+- Validate the snapshot version and source-file fingerprints for persisted
   records such as `gap.json` and `feature.json`.
-- Rescan only changed, missing, or newly discovered durable records.
+- Rescan only changed, missing, or newly discovered persisted records.
 - Build in-memory indexes from the validated projection for nearly instant UI
   counts, facets, filters, sorts, and lookups.
-- Update durable records first on every mutation, then update the in-memory
+- Update persisted records first on every mutation, then update the in-memory
   projection and persisted snapshot for responsiveness.
 - Emit SSE updates after projection changes so surfaces can refresh without
   rescanning.
-- Fall back to a full durable-record scan when the snapshot is absent,
+- Fall back to a full persisted-record scan when the snapshot is absent,
   incompatible, or corrupt.
 
 This projection layer is the required cache abstraction. Common UI queries
 such as "how many Gaps are done?" must be answered by the projection API, not
-by each surface scanning durable records or inventing its own query path.
+by each surface scanning persisted records or inventing its own query path.
 
 The first Rust cache choice is therefore:
 
 - Durable model records remain JSON/source records.
 - The local runtime root's `<port>/cache/` directory stores a versioned
-  projection snapshot with durable source fingerprints.
+  projection snapshot with persisted source fingerprints.
 - The daemon loads the snapshot, incrementally refreshes changed records, and
   builds in-memory indexes.
 - The projection API is the only supported query abstraction for surfaces.
-- The first pass does not use a query database. It uses durable model records,
+- The first pass does not use a query database. It uses persisted model records,
   projection snapshots, and in-memory indexes.
 - Projection updates do not need to provide database-style ACID semantics.
   Durable records remain the source of truth; projection corruption, partial
   snapshot writes, or missed cache updates are recovered by discarding the
-  snapshot and rebuilding from durable records.
+  snapshot and rebuilding from persisted records.
 
 ### Required Projection Indexes
 
@@ -1141,7 +1141,7 @@ Gap projection:
 
 - Keep `GapSummaryProjection` keyed by `gap_id` with `id`, `name`, `status`,
   `priority`, `reporter`, `round_count`, `created`, `updated`, `branch_name`,
-  `node_id`, `feature_id`, `feature_order`, durable JSON path, and display
+  `node_id`, `feature_id`, `feature_order`, persisted JSON path, and display
   fields such as `node_display_name`.
 - Index by status for workflow counts and status filters.
 - Index by node, including current-node, all-node, and unknown-node queries.
@@ -1157,12 +1157,12 @@ Gap projection:
 - Return stable matching Gap id sets for bulk update, transfer, feature
   assignment, and bulk delete operations across pagination.
 - Return filtered status counts so workflow visualizations can reflect the
-  current filter set without a second durable scan.
+  current filter set without a second persisted scan.
 
 Feature projection:
 
 - Keep `FeatureSummaryProjection` keyed by `feature_id` with `id`, `name`,
-  `description`, `reporter`, `node_id`, `created`, `updated`, and durable JSON
+  `description`, `reporter`, `node_id`, `created`, `updated`, and persisted JSON
   path.
 - Index by node, reporter, derived feature status, updated, created, name, and
   id.
@@ -1206,7 +1206,7 @@ Runtime projection:
 
 - Keep supervisor, process, background-operation, target-app, performance, and
   preflight snapshots in local runtime cache state rather than Git-visible
-  durable model records.
+  persisted model records.
 - These runtime projections still need indexed lookup and pagination where the
   UI asks for process, performance, or operation tables, but they are not part of the
   portable workflow model.
@@ -1348,7 +1348,7 @@ implementation details.
 - `docs/spec/rust-spec.md` defines web, desktop, and CLI surfaces over one
   supervisor daemon.
 - The architecture is organized around system capabilities.
-- The daemon is the sole local authority for process lifecycle and durable
+- The daemon is the sole local authority for process lifecycle and persisted
   workflow mutations.
 - Refine itself has no required host Python dependency in the target Rust
   architecture.
@@ -1363,7 +1363,7 @@ implementation details.
 - The document includes migration and testing strategy for a vertical port.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
-- The document defines the Rust cache choice as durable model records plus a
+- The document defines the Rust cache choice as persisted model records plus a
   persisted projection snapshot under the selected local runtime root's
   `<port>/cache/` directory and in-memory indexes for the current UI's list,
   count, facet, search, sort, and lookup needs.

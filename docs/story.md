@@ -186,7 +186,7 @@ Effort: Very High (31 commits, 4 milestones)
 
 Milestones started: Rust architecture implementation; repo layout migration; Rust conformance hardening; runtime process scoping.
 
-Refine crossed from architecture plan into native implementation: Rust module boundaries, core workflow services, web and CLI surfaces, projection-cache design, and conformance reports all moved into the repo. The Python implementation was preserved under `python/`, the native crate became the root package at version 3.0.0, durable-root bypasses were guarded, supervisor-routed process lifecycle work advanced, web endpoints were aligned with runtime architecture, and dashboard/runtime polling was reduced.
+Refine crossed from architecture plan into native implementation: Rust module boundaries, core workflow services, web and CLI surfaces, projection-cache design, and conformance reports all moved into the repo. The Python implementation was preserved under `python/`, the native crate became the root package at version 3.0.0, target-root bypasses were guarded, supervisor-routed process lifecycle work advanced, web endpoints were aligned with runtime architecture, and dashboard/runtime polling was reduced.
 
 ## Day 25: 2026-06-06 (Saturday)
 

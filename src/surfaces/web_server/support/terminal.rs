@@ -41,14 +41,14 @@ struct TerminalSession {
 static TERMINAL_SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<TerminalSession>>>> = OnceLock::new();
 
 pub(in crate::surfaces::web_server) fn terminal_session_start_response(
-    source_root: &Path,
+    target_root: &Path,
     cols: u16,
     rows: u16,
 ) -> RefineResult<Value> {
-    let cwd = source_root.canonicalize().map_err(|error| {
+    let cwd = target_root.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
             "terminal cwd {} is not available: {error}",
-            source_root.display()
+            target_root.display()
         ))
     })?;
     let session = TerminalSession::spawn(cwd, cols, rows)?;

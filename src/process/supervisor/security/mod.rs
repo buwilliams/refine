@@ -466,11 +466,11 @@ impl FileSecurityService {
 
     pub fn from_project_settings(
         runtime_root: impl Into<PathBuf>,
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
     ) -> RefineResult<Self> {
         let runtime_root = runtime_root.into();
-        let durable_root = durable_root.into();
-        let settings = FileSettingsService::new(durable_root).load()?;
+        let refine_dir = refine_dir.into();
+        let settings = FileSettingsService::new(refine_dir).load()?;
         let allowed_commands = settings
             .get("allowed_commands")
             .and_then(|value| value.as_str())
@@ -811,15 +811,15 @@ mod tests {
     fn file_security_service_loads_allowed_commands_from_project_settings() {
         let temp_root = unique_temp_dir("security-settings");
         let runtime_root = temp_root.join("run");
-        let durable_root = temp_root.join(".refine");
-        FileSettingsService::new(&durable_root)
+        let refine_dir = temp_root.join(".refine");
+        FileSettingsService::new(&refine_dir)
             .update(&serde_json::json!({
                 "allowed_commands": "printf, npm run test\nplaywright"
             }))
             .unwrap();
 
         let security =
-            FileSecurityService::from_project_settings(&runtime_root, &durable_root).unwrap();
+            FileSecurityService::from_project_settings(&runtime_root, &refine_dir).unwrap();
 
         assert!(
             security

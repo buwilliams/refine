@@ -7,10 +7,10 @@ use crate::model::workflow::GapStatus;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn file_work_item_service_transitions_gap_via_durable_json() {
+fn file_work_item_service_transitions_gap_via_refine_json() {
     let temp_root = unique_temp_dir("work-item-transition");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
+    let refine_dir = temp_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::write(
         gap_dir.join("gap.json"),
@@ -27,7 +27,7 @@ fn file_work_item_service_transitions_gap_via_durable_json() {
     .unwrap();
 
     let updated =
-        FileWorkItemService::new(&durable_root).transition_gap_status("GAP1", GapStatus::Todo);
+        FileWorkItemService::new(&refine_dir).transition_gap_status("GAP1", GapStatus::Todo);
     assert_eq!(updated.unwrap().gap.status, GapStatus::Todo);
     let written = fs::read_to_string(gap_dir.join("gap.json")).unwrap();
     assert!(written.contains("\"status\": \"todo\""));
@@ -39,15 +39,15 @@ fn file_work_item_service_transitions_gap_via_durable_json() {
 #[test]
 fn file_work_item_service_creates_and_lists_gap_json() {
     let temp_root = unique_temp_dir("work-item-create");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
 
     let gap = service
         .create_gap_summary("Created from Rust", Some("GAP1"))
         .unwrap();
     assert_eq!(gap.gap.id, "GAP1");
     assert_eq!(gap.gap.status, GapStatus::Backlog);
-    assert!(durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
     assert_eq!(service.list_gap_summaries().unwrap().len(), 1);
     assert_eq!(
         service.show_gap_summary("GAP1").unwrap().gap.name,
@@ -60,8 +60,8 @@ fn file_work_item_service_creates_and_lists_gap_json() {
 #[test]
 fn file_work_item_service_edits_notes_and_deletes_gap_json() {
     let temp_root = unique_temp_dir("work-item-edit-note-delete");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     service
         .create_gap_summary("Original", Some("GAP1"))
         .unwrap();
@@ -82,20 +82,20 @@ fn file_work_item_service_edits_notes_and_deletes_gap_json() {
     service
         .add_gap_note_summary("GAP1", "Reviewer", "Needs a note")
         .unwrap();
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"author\": \"Reviewer\""));
     assert!(written.contains("\"body\": \"Needs a note\""));
 
     service.delete_gap_record("GAP1").unwrap();
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
 fn file_work_item_service_appends_and_edits_latest_round() {
     let temp_root = unique_temp_dir("work-item-rounds");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     service
         .create_gap_summary("Round Gap", Some("GAP1"))
         .unwrap();
@@ -115,7 +115,7 @@ fn file_work_item_service_appends_and_edits_latest_round() {
         .unwrap();
     assert_eq!(gap.gap.reporter.as_deref(), Some("Reviewer"));
     assert_eq!(gap.gap.assignee.as_deref(), Some("Reviewer"));
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
     assert!(written.contains("\"assignee\": \"Reviewer\""));
     assert!(written.contains("\"actual\": \"New actual\""));
@@ -128,8 +128,8 @@ fn file_work_item_service_appends_and_edits_latest_round() {
 #[test]
 fn file_work_item_service_creates_features_and_updates_gap_membership() {
     let temp_root = unique_temp_dir("work-item-feature");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
     service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
 
@@ -144,7 +144,7 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
         .unwrap();
     assert_eq!(feature.feature.id, "FEA1");
     assert_eq!(feature.feature.assignee.as_deref(), Some("Reviewer"));
-    assert!(durable_root.join("features/FE/A1/feature.json").exists());
+    assert!(refine_dir.join("features/FE/A1/feature.json").exists());
 
     let feature = service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     assert_eq!(feature.gap_ids, vec!["GAP1"]);
@@ -168,8 +168,8 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
 #[test]
 fn file_work_item_service_reorders_and_moves_feature_workflow() {
     let temp_root = unique_temp_dir("work-item-feature-workflow");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
     service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
     service.create_gap_summary("Gap C", Some("GAP3")).unwrap();
@@ -200,8 +200,8 @@ fn file_work_item_service_reorders_and_moves_feature_workflow() {
 #[test]
 fn file_work_item_service_cancels_and_deletes_features_through_gap_paths() {
     let temp_root = unique_temp_dir("work-item-feature-cancel-delete");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     for (id, name) in [
         ("GAP1", "Backlog Gap"),
         ("GAP2", "Todo Gap"),
@@ -238,10 +238,10 @@ fn file_work_item_service_cancels_and_deletes_features_through_gap_paths() {
     );
 
     service.delete_feature_record("FEA1").unwrap();
-    assert!(!durable_root.join("features/FE/A1/feature.json").exists());
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(!durable_root.join("gaps/GA/P2/gap.json").exists());
-    assert!(!durable_root.join("gaps/GA/P3/gap.json").exists());
+    assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P3/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -249,8 +249,8 @@ fn file_work_item_service_cancels_and_deletes_features_through_gap_paths() {
 #[test]
 fn file_work_item_service_merges_and_undoes_gap_workflow() {
     let temp_root = unique_temp_dir("work-item-merge-undo");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     service
         .create_gap_summary("Merge Gap", Some("GAP1"))
         .unwrap();
@@ -272,8 +272,8 @@ fn file_work_item_service_merges_and_undoes_gap_workflow() {
 #[test]
 fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
     let temp_root = unique_temp_dir("work-item-bulk");
-    let durable_root = temp_root.join(".refine");
-    let service = FileWorkItemService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
     for (id, name) in [
         ("GAP1", "Bulk one"),
         ("GAP2", "Bulk two"),
@@ -322,7 +322,7 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
         )
         .unwrap();
     assert_eq!(reporter_result.updated, 2);
-    let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
 
     let assignee_result = service
@@ -389,8 +389,8 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
         })
         .unwrap();
     assert_eq!(delete_result.deleted, 2);
-    assert!(!durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(!durable_root.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -398,12 +398,12 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
 #[test]
 fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
     let temp_root = unique_temp_dir("work-item-node-ownership");
-    let durable_root = temp_root.join(".refine");
-    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&durable_root);
+    let refine_dir = temp_root.join(".refine");
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
     nodes.create("remote-node").unwrap();
     nodes.activate("remote-node").unwrap();
 
-    let service = FileWorkItemService::new(&durable_root);
+    let service = FileWorkItemService::new(&refine_dir);
     let local_gap = service
         .create_gap_summary("Remote-owned", Some("GAP1"))
         .unwrap();
@@ -452,8 +452,8 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
 #[test]
 fn file_work_item_service_rejects_invalid_manual_transition() {
     let temp_root = unique_temp_dir("work-item-invalid-transition");
-    let durable_root = temp_root.join(".refine");
-    let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
+    let refine_dir = temp_root.join(".refine");
+    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
     fs::create_dir_all(&gap_dir).unwrap();
     fs::write(
         gap_dir.join("gap.json"),
@@ -468,7 +468,7 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
     )
     .unwrap();
 
-    let err = FileWorkItemService::new(&durable_root)
+    let err = FileWorkItemService::new(&refine_dir)
         .transition_gap_status("GAP1", GapStatus::InProgress)
         .unwrap_err();
     assert_eq!(

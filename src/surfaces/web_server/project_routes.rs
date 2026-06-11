@@ -35,14 +35,14 @@ struct ProjectSyncGitResult {
     detail: Option<String>,
 }
 
-fn configured_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
+fn configured_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> String {
     body.get("provider")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|provider| !provider.is_empty())
         .map(str::to_string)
         .or_else(|| {
-            FileSettingsService::new(durable_root)
+            FileSettingsService::new(refine_dir)
                 .load()
                 .ok()
                 .and_then(|settings| {
@@ -95,7 +95,7 @@ fn governance_generation_prompt(product: &str, constitution: &str) -> String {
     )
 }
 
-fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
+fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
     format!(
         "Analyze this target app codebase and generate lifecycle commands for Refine to wrap. \
          Return only JSON with kind=target-app and fields start_command, stop_command, \
@@ -104,7 +104,7 @@ fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
          status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
          process_check_command, and notes. Do not write files; Refine will write \
          .refine/manage-app.sh from your analysis.\n\nProject root: {}",
-        source_root.display()
+        target_root.display()
     )
 }
 
@@ -141,22 +141,22 @@ fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
 }
 
 fn sync_attached_project_git_state(
-    durable_root: &std::path::Path,
+    refine_dir: &std::path::Path,
 ) -> RefineResult<ProjectSyncGitResult> {
-    let Some(app_root) = durable_root.parent() else {
+    let Some(target_root) = refine_dir.parent() else {
         return Ok(ProjectSyncGitResult::default());
     };
-    if !app_root.join(".git").exists() {
+    if !target_root.join(".git").exists() {
         return Ok(ProjectSyncGitResult::default());
     }
 
-    let inside = run_project_git(app_root, &["rev-parse", "--is-inside-work-tree"])?;
+    let inside = run_project_git(target_root, &["rev-parse", "--is-inside-work-tree"])?;
     if !inside.status.success() || String::from_utf8_lossy(&inside.stdout).trim() != "true" {
         return Ok(ProjectSyncGitResult::default());
     }
 
     let upstream = run_project_git(
-        app_root,
+        target_root,
         &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
     )?;
     if !upstream.status.success() {
@@ -167,7 +167,7 @@ fn sync_attached_project_git_state(
         });
     }
 
-    let status = run_project_git(app_root, &["status", "--porcelain=v1", "-uall"])?;
+    let status = run_project_git(target_root, &["status", "--porcelain=v1", "-uall"])?;
     if !status.status.success() {
         let stderr = String::from_utf8_lossy(&status.stderr).trim().to_string();
         return Err(RefineError::Conflict(format!(
@@ -190,7 +190,7 @@ fn sync_attached_project_git_state(
         });
     }
 
-    let pull = run_project_git(app_root, &["pull", "--ff-only"])?;
+    let pull = run_project_git(target_root, &["pull", "--ff-only"])?;
     if !pull.status.success() {
         let stderr = String::from_utf8_lossy(&pull.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&pull.stdout).trim().to_string();
@@ -228,12 +228,12 @@ fn project_sync_status_line_blocks_pull(line: &str) -> bool {
 }
 
 fn run_project_git(
-    app_root: &std::path::Path,
+    target_root: &std::path::Path,
     args: &[&str],
 ) -> RefineResult<std::process::Output> {
     std::process::Command::new("git")
         .args(args)
-        .current_dir(app_root)
+        .current_dir(target_root)
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|error| RefineError::Io(format!("failed to run git {}: {error}", args.join(" "))))
@@ -418,7 +418,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_node_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create node");
+        let refine_dir = require_refine_dir!(self, "create node");
         let body = request.body.unwrap_or_else(|| json!({}));
         if let Some(node_id) = body.get("id").and_then(|value| value.as_str()) {
             let node_id = node_id.trim();
@@ -427,7 +427,7 @@ impl InProcessWebServer {
                     "node id is required".to_string(),
                 ));
             }
-            return match FileNodeRegistryService::new(&durable_root).create(node_id) {
+            return match FileNodeRegistryService::new(&refine_dir).create(node_id) {
                 Ok(_) => self.handle_nodes(),
                 Err(error) => error_response(error),
             };
@@ -442,28 +442,28 @@ impl InProcessWebServer {
                 "display_name is required".to_string(),
             ));
         }
-        match FileNodeRegistryService::new(&durable_root).create_with_display_name(display_name) {
+        match FileNodeRegistryService::new(&refine_dir).create_with_display_name(display_name) {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_node_activate(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "activate node");
+        let refine_dir = require_refine_dir!(self, "activate node");
         let body = request.body.unwrap_or_else(|| json!({}));
         let node_id = body
             .get("node_id")
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim();
-        match FileNodeRegistryService::new(durable_root).activate(node_id) {
+        match FileNodeRegistryService::new(refine_dir).activate(node_id) {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_node_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update node");
+        let refine_dir = require_refine_dir!(self, "update node");
         let Some(node_id) = request
             .path
             .strip_prefix("/nodes/")
@@ -480,14 +480,14 @@ impl InProcessWebServer {
                 .map(str::to_string),
             archived: body.get("archived").and_then(|value| value.as_bool()),
         };
-        match FileNodeRegistryService::new(durable_root).update(node_id, update) {
+        match FileNodeRegistryService::new(refine_dir).update(node_id, update) {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_node_transfer_gaps(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "transfer Gaps to node");
+        let refine_dir = require_refine_dir!(self, "transfer Gaps to node");
         let body = request.body.unwrap_or_else(|| json!({}));
         let target_node_id = body
             .get("target_node_id")
@@ -495,7 +495,7 @@ impl InProcessWebServer {
             .unwrap_or("")
             .trim();
         if let Err(error) =
-            FileNodeRegistryService::new(&durable_root).ensure_transfer_target(target_node_id)
+            FileNodeRegistryService::new(&refine_dir).ensure_transfer_target(target_node_id)
         {
             return error_response(error);
         }
@@ -504,7 +504,7 @@ impl InProcessWebServer {
             Err(_) => return invalid_bulk_body(),
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_transfer_gaps_to_node(target_node_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -527,7 +527,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_cluster(&self) -> ApiResponse {
-        let durable_root = match self.current_refine_dir() {
+        let refine_dir = match self.current_refine_dir() {
             Ok(Some(path)) => path,
             Ok(None) => {
                 return ApiResponse::json(
@@ -542,7 +542,7 @@ impl InProcessWebServer {
             }
             Err(error) => return error_response(error),
         };
-        match FileClusterRegistryService::new(durable_root).list_response() {
+        match FileClusterRegistryService::new(refine_dir).list_response() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -553,7 +553,7 @@ impl InProcessWebServer {
         request: ApiRequest,
         path_id: Option<String>,
     ) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "configure cluster node");
+        let refine_dir = require_refine_dir!(self, "configure cluster node");
         let body = request.body.unwrap_or_else(|| json!({}));
         let is_create = request.method == "POST" && path_id.is_none();
         let id = path_id
@@ -593,7 +593,7 @@ impl InProcessWebServer {
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
-        let service = FileClusterRegistryService::new(durable_root);
+        let service = FileClusterRegistryService::new(refine_dir);
         let result = if is_create {
             service
                 .add_node(id)
@@ -608,7 +608,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_cluster_node_delete(&self, node_id: Option<String>) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "remove cluster node");
+        let refine_dir = require_refine_dir!(self, "remove cluster node");
         let Some(node_id) = node_id
             .as_deref()
             .map(str::trim)
@@ -618,14 +618,14 @@ impl InProcessWebServer {
                 "cluster node id is required".to_string(),
             ));
         };
-        match FileClusterRegistryService::new(durable_root).remove_node(node_id) {
+        match FileClusterRegistryService::new(refine_dir).remove_node(node_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_cluster_node_bootstrap(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "bootstrap cluster node");
+        let refine_dir = require_refine_dir!(self, "bootstrap cluster node");
         let Some(node_id) = request
             .path
             .strip_prefix("/cluster/nodes/")
@@ -643,9 +643,9 @@ impl InProcessWebServer {
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
         let service = if let Some(runtime_root) = &self.runtime_root {
-            FileClusterRegistryService::with_runtime_root(durable_root, runtime_root)
+            FileClusterRegistryService::with_runtime_root(refine_dir, runtime_root)
         } else {
-            FileClusterRegistryService::new(durable_root)
+            FileClusterRegistryService::new(refine_dir)
         };
         match service.bootstrap_node_response(node_id, dry_run) {
             Ok(value) => ApiResponse::json(200, value),
@@ -654,7 +654,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_cluster_node_run(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "run cluster command");
+        let refine_dir = require_refine_dir!(self, "run cluster command");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("run cluster command");
         };
@@ -674,7 +674,7 @@ impl InProcessWebServer {
             .get("command")
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileClusterRegistryService::with_runtime_root(durable_root, runtime_root)
+        match FileClusterRegistryService::with_runtime_root(refine_dir, runtime_root)
             .run_remote_response(node_id, command)
         {
             Ok(value) => ApiResponse::json(200, value),
@@ -683,7 +683,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_cluster_node_transfer(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "transfer cluster item");
+        let refine_dir = require_refine_dir!(self, "transfer cluster item");
         let Some(node_id) = request
             .path
             .strip_prefix("/cluster/nodes/")
@@ -704,8 +704,7 @@ impl InProcessWebServer {
         if item_id.is_empty() {
             return error_response(RefineError::InvalidInput("item_id is required".to_string()));
         }
-        if let Err(error) =
-            FileClusterRegistryService::new(&durable_root).transfer(item_id, node_id)
+        if let Err(error) = FileClusterRegistryService::new(&refine_dir).transfer(item_id, node_id)
         {
             return error_response(error);
         }
@@ -714,7 +713,7 @@ impl InProcessWebServer {
             ..BulkGapSelection::default()
         };
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .bulk_transfer_gaps_to_node(node_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -723,7 +722,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn nodes_response(&self) -> RefineResult<serde_json::Value> {
-        let Some(durable_root) = self.current_refine_dir()? else {
+        let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(detached_nodes_response(BTreeMap::new()));
         };
         let projection = self.current_projection()?;
@@ -736,7 +735,7 @@ impl InProcessWebServer {
                 .entry(gap.gap.status.as_str().to_string())
                 .or_insert(0) += 1;
         }
-        FileNodeRegistryService::new(durable_root).list_with_counts_response(counts)
+        FileNodeRegistryService::new(refine_dir).list_with_counts_response(counts)
     }
 
     pub(super) fn handle_target_app_status(&self) -> ApiResponse {
@@ -862,13 +861,13 @@ impl InProcessWebServer {
         let mut source = "local".to_string();
         let mut raw = String::new();
         let config = match self.current_refine_dir() {
-            Ok(Some(durable_root)) => {
-                provider = configured_provider_from_settings(&durable_root, body);
+            Ok(Some(refine_dir)) => {
+                provider = configured_provider_from_settings(&refine_dir, body);
                 match HostAgentProviderService::new().invoke(ProviderInvocation {
                     provider: provider.clone(),
-                    prompt: target_app_generation_prompt(&service.source_root),
+                    prompt: target_app_generation_prompt(&service.target_root),
                     session_id: None,
-                    cwd: Some(service.source_root.display().to_string()),
+                    cwd: Some(service.target_root.display().to_string()),
                     process_metadata: Default::default(),
                 }) {
                     Ok(output) => {
@@ -894,9 +893,9 @@ impl InProcessWebServer {
                 let settings = target_app_generated_settings(&config);
                 if persist_settings {
                     match self.current_refine_dir() {
-                        Ok(Some(durable_root)) => {
+                        Ok(Some(refine_dir)) => {
                             if let Err(error) =
-                                FileSettingsService::new(&durable_root).update(&settings)
+                                FileSettingsService::new(&refine_dir).update(&settings)
                             {
                                 return error_response(error);
                             }
@@ -1185,7 +1184,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
         let git_sync = match self.current_refine_dir() {
-            Ok(Some(durable_root)) => match sync_attached_project_git_state(&durable_root) {
+            Ok(Some(refine_dir)) => match sync_attached_project_git_state(&refine_dir) {
                 Ok(result) => result,
                 Err(error) => return error_response(error),
             },
@@ -1225,7 +1224,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_scaffold(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create scaffold Gaps");
+        let refine_dir = require_refine_dir!(self, "create scaffold Gaps");
         let name = request
             .body
             .as_ref()
@@ -1233,7 +1232,7 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("Scaffold target application");
         match self
-            .work_item_service(durable_root)
+            .work_item_service(refine_dir)
             .create_gap_summary(name, None)
         {
             Ok(gap) => ApiResponse::json(201, json!({"ok": true, "gap": gap.gap})),
@@ -1242,15 +1241,15 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_settings_get(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read settings");
-        match FileSettingsService::new(durable_root).list_response() {
+        let refine_dir = require_refine_dir!(self, "read settings");
+        match FileSettingsService::new(refine_dir).list_response() {
             Ok(value) => ApiResponse::json(200, self.with_runtime_settings(value)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_settings_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update settings");
+        let refine_dir = require_refine_dir!(self, "update settings");
         let body = request.body.unwrap_or_else(|| json!({}));
         if let Some(paused) = body.get("paused").map(runtime_bool_setting)
             && let Some(runtime_root) = &self.runtime_root
@@ -1263,7 +1262,7 @@ impl InProcessWebServer {
                 return error_response(error);
             }
         }
-        match FileSettingsService::new(&durable_root).update(&body) {
+        match FileSettingsService::new(&refine_dir).update(&body) {
             Ok(value) => {
                 if let Some(runtime_root) = &self.runtime_root {
                     match self.current_target_root() {
@@ -1324,16 +1323,16 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_governance_get(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read governance settings");
-        match FileGovernanceService::new(durable_root).load() {
+        let refine_dir = require_refine_dir!(self, "read governance settings");
+        match FileGovernanceService::new(refine_dir).load() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_governance_save(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "save governance settings");
-        match FileGovernanceService::new(durable_root)
+        let refine_dir = require_refine_dir!(self, "save governance settings");
+        match FileGovernanceService::new(refine_dir)
             .save(&request.body.unwrap_or_else(|| json!({})))
         {
             Ok(value) => ApiResponse::json(200, value),
@@ -1342,7 +1341,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_governance_generate_rules(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "generate governance rules");
+        let refine_dir = require_refine_dir!(self, "generate governance rules");
         let body = request.body.unwrap_or_else(|| json!({}));
         let product = body
             .get("product")
@@ -1360,8 +1359,8 @@ impl InProcessWebServer {
             ));
         }
 
-        let provider = configured_provider_from_settings(&durable_root, &body);
-        let cwd = self.source_root().map(|path| path.display().to_string());
+        let provider = configured_provider_from_settings(&refine_dir, &body);
+        let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
             provider: provider.clone(),
             prompt: governance_generation_prompt(product, constitution),
@@ -1371,7 +1370,7 @@ impl InProcessWebServer {
         }) {
             Ok(output) => output,
             Err(_) => {
-                return match FileGovernanceService::new(&durable_root).generate_rules(&body) {
+                return match FileGovernanceService::new(&refine_dir).generate_rules(&body) {
                     Ok(mut value) => {
                         if let Some(object) = value.as_object_mut() {
                             object.insert("source".to_string(), json!("static"));
@@ -1384,7 +1383,7 @@ impl InProcessWebServer {
         };
         let mut rules = parse_generated_governance_rules(&output);
         if rules.is_empty() {
-            match FileGovernanceService::new(&durable_root).generate_rules(&body) {
+            match FileGovernanceService::new(&refine_dir).generate_rules(&body) {
                 Ok(value) => {
                     rules = value["rules"].as_array().cloned().unwrap_or_default();
                 }
@@ -1404,16 +1403,16 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_guidance_list(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "read guidance");
-        match FileGuidanceService::new(durable_root).list() {
+        let refine_dir = require_refine_dir!(self, "read guidance");
+        match FileGuidanceService::new(refine_dir).list() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_guidance_update(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "update guidance");
-        match FileGuidanceService::new(durable_root)
+        let refine_dir = require_refine_dir!(self, "update guidance");
+        match FileGuidanceService::new(refine_dir)
             .update(&request.body.unwrap_or_else(|| json!({})))
         {
             Ok(value) => ApiResponse::json(200, value),
@@ -1422,29 +1421,29 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_reporters_list(&self) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "list reporters");
-        match FileReporterService::new(durable_root).list() {
+        let refine_dir = require_refine_dir!(self, "list reporters");
+        match FileReporterService::new(refine_dir).list() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_reporter_create(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "create reporters");
+        let refine_dir = require_refine_dir!(self, "create reporters");
         let name = request
             .body
             .as_ref()
             .and_then(|body| body.get("name"))
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileReporterService::new(durable_root).create(name) {
+        match FileReporterService::new(refine_dir).create(name) {
             Ok(value) => ApiResponse::json(201, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_reporter_rename(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "rename reporters");
+        let refine_dir = require_refine_dir!(self, "rename reporters");
         let Some(id) = reporter_id_from_path(&request.path, "/reporters/", "") else {
             return reporter_id_required();
         };
@@ -1454,14 +1453,14 @@ impl InProcessWebServer {
             .and_then(|body| body.get("name"))
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileReporterService::new(durable_root).rename(id, name) {
+        match FileReporterService::new(refine_dir).rename(id, name) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_reporter_merge(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "merge reporters");
+        let refine_dir = require_refine_dir!(self, "merge reporters");
         let Some(id) = reporter_id_from_path(&request.path, "/reporters/", "/merge") else {
             return reporter_id_required();
         };
@@ -1481,18 +1480,18 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileReporterService::new(durable_root).merge(id, target_id) {
+        match FileReporterService::new(refine_dir).merge(id, target_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_reporter_delete(&self, request: ApiRequest) -> ApiResponse {
-        let durable_root = require_refine_dir!(self, "delete reporters");
+        let refine_dir = require_refine_dir!(self, "delete reporters");
         let Some(id) = reporter_id_from_path(&request.path, "/reporters/", "") else {
             return reporter_id_required();
         };
-        match FileReporterService::new(durable_root).delete(id) {
+        match FileReporterService::new(refine_dir).delete(id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }

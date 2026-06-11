@@ -120,7 +120,7 @@ async function loadSettingsSurfaceData() {
   const activeNode = nodeList.find((i) => i.id === activeNodeId) || null;
   const activeNodeLabel = activeNode?.display_name || activeNodeId || "Default";
   const projectApps = state.project?.apps || [];
-  const currentProject = state.project?.client_repo || "";
+  const currentProject = state.project?.target_root || "";
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}
@@ -216,7 +216,7 @@ function settingsSurfaceDataNeeds(surface, slug) {
 
 function detachedSettingsSurfaceData(project = {}) {
   const projectApps = project?.apps || [];
-  const currentProject = project?.client_repo || "";
+  const currentProject = project?.target_root || "";
   const nodeList = project?.nodes || [];
   const activeNodeId = project?.active_node_id || "";
   const activeNode = nodeList.find((i) => i.id === activeNodeId) || null;

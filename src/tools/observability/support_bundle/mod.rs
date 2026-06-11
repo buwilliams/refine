@@ -22,46 +22,46 @@ pub trait SupportBundleService {
 
 #[derive(Clone, Debug)]
 pub struct FileSupportBundleService {
-    pub durable_root: PathBuf,
+    pub refine_dir: PathBuf,
     pub runtime_root: PathBuf,
     pub repo_root: PathBuf,
 }
 
 impl FileSupportBundleService {
     pub fn new(
-        durable_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
         runtime_root: impl Into<PathBuf>,
         repo_root: impl Into<PathBuf>,
     ) -> Self {
         Self {
-            durable_root: durable_root.into(),
+            refine_dir: refine_dir.into(),
             runtime_root: runtime_root.into(),
             repo_root: repo_root.into(),
         }
     }
 
     fn output_dir(&self) -> PathBuf {
-        self.durable_root.join("support-bundles")
+        self.refine_dir.join("support-bundles")
     }
 }
 
 impl SupportBundleService for FileSupportBundleService {
     fn export(&self, redact_secrets: bool) -> RefineResult<SupportBundle> {
         let diagnostics = FileDiagnosticsService::new(
-            Some(self.durable_root.clone()),
+            Some(self.refine_dir.clone()),
             &self.runtime_root,
             &self.repo_root,
         )
         .doctor()?;
-        let activity = FileActivityService::new(&self.durable_root)
+        let activity = FileActivityService::new(&self.refine_dir)
             .recent(200)
             .unwrap_or_default();
         let metrics = FileMetricsService::new(&self.runtime_root)
             .report(PerformanceQuery::default())
             .map(|report| json!(report))
             .unwrap_or_else(|error| json!({"error": error.to_string()}));
-        let chat_sessions = read_chat_sessions(&self.durable_root)?;
-        let settings_path = self.durable_root.join("settings.json");
+        let chat_sessions = read_chat_sessions(&self.refine_dir)?;
+        let settings_path = self.refine_dir.join("settings.json");
         let settings = read_json_if_exists(&settings_path)?;
         let bundle = json!({
             "created_at": now_timestamp(),
@@ -115,8 +115,8 @@ fn read_json_if_exists(path: &Path) -> RefineResult<serde_json::Value> {
     })
 }
 
-fn read_chat_sessions(durable_root: &Path) -> RefineResult<Vec<serde_json::Value>> {
-    let sessions_dir = durable_root.join("chat/sessions");
+fn read_chat_sessions(refine_dir: &Path) -> RefineResult<Vec<serde_json::Value>> {
+    let sessions_dir = refine_dir.join("chat/sessions");
     if !sessions_dir.exists() {
         return Ok(Vec::new());
     }
@@ -190,15 +190,15 @@ mod tests {
     #[test]
     fn file_support_bundle_exports_redacted_json() {
         let temp_root = unique_temp_dir("support-bundle");
-        let durable_root = temp_root.join(".refine");
+        let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run");
-        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
         fs::write(
-            durable_root.join("settings.json"),
+            refine_dir.join("settings.json"),
             r#"{"api_token":"secret","safe":"visible"}"#,
         )
         .unwrap();
-        FileActivityService::new(&durable_root)
+        FileActivityService::new(&refine_dir)
             .append(crate::model::log::ActivityEntry {
                 id: "act-secret".to_string(),
                 datetime: "2026-06-05T00:00:00Z".to_string(),
@@ -222,7 +222,7 @@ mod tests {
         FileMetricsService::new(&runtime_root)
             .record_operation("cache.rebuild", 42.0, true, json!({"rows": 3}))
             .unwrap();
-        let sessions_dir = durable_root.join("chat/sessions");
+        let sessions_dir = refine_dir.join("chat/sessions");
         fs::create_dir_all(&sessions_dir).unwrap();
         fs::write(
             sessions_dir.join("CHAT1.json"),
@@ -249,7 +249,7 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        let service = FileSupportBundleService::new(&durable_root, &runtime_root, &temp_root);
+        let service = FileSupportBundleService::new(&refine_dir, &runtime_root, &temp_root);
         let bundle = service.export(true).unwrap();
 
         let body = fs::read_to_string(&bundle.path).unwrap();
