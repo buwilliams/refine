@@ -1848,6 +1848,62 @@ fn web_server_parses_import_csv_in_background() {
 }
 
 #[test]
+fn web_server_background_feature_import_promotes_all_instant_backlog_gaps() {
+    let temp_root = unique_temp_dir("http-import-feature-promote-all");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"backlog_promote_after_seconds": "0"}))
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/persist".to_string(),
+        body: Some(json!({
+            "background": true,
+            "new_feature_name": "Instant Feature",
+            "drafts": [
+                {
+                    "name": "First imported Gap",
+                    "actual": "First actual",
+                    "target": "First target",
+                    "priority": "high"
+                },
+                {
+                    "name": "Second imported Gap",
+                    "actual": "Second actual",
+                    "target": "Second target",
+                    "priority": "medium"
+                },
+                {
+                    "name": "Third imported Gap",
+                    "actual": "Third actual",
+                    "target": "Third target",
+                    "priority": "low"
+                }
+            ]
+        })),
+    });
+    assert_eq!(started.status, 202);
+    let operation_id = started.body["operation"]["id"].as_str().unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = wait_for_operation_status(&registry, operation_id, OperationState::Succeeded);
+    let result = operation.result;
+    assert_eq!(result["http_status"], 201);
+    assert_eq!(result["count"], 3);
+    assert_eq!(result["promoted"], 3);
+    let gaps = result["gaps"].as_array().unwrap();
+    assert_eq!(gaps.len(), 3);
+    assert!(gaps.iter().all(|gap| gap["status"] == "todo"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_extracts_plan_drafts_from_chat_session_context() {
     let temp_root = unique_temp_dir("http-import-plan-chat-context");
     let refine_dir = temp_root.join(".refine");

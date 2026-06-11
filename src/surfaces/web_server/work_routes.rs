@@ -32,6 +32,7 @@ use crate::tools::product::project_state::{
 use crate::tools::product::work_items::{
     BulkFeatureSelection, BulkGapSelection, FileWorkItemService,
 };
+use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
@@ -2886,6 +2887,17 @@ impl InProcessWebServer {
                 }
             }
         }
+        let mut promoted = 0;
+        if failures.is_empty() {
+            match self.promote_backlog_after_import() {
+                Ok(count) => promoted = count,
+                Err(error) => failures.push(json!({
+                    "index": 0,
+                    "name": "workflow",
+                    "message": error.to_string()
+                })),
+            }
+        }
         let created = created_gap_ids
             .iter()
             .filter_map(|gap_id| service.show_gap_summary(gap_id).ok())
@@ -2903,6 +2915,7 @@ impl InProcessWebServer {
                 "count": created.len(),
                 "created": created,
                 "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
+                "promoted": promoted,
                 "failures": failures,
                 "duplicate_actions": duplicate_actions.to_json(),
                 "feature": feature_response
@@ -2955,6 +2968,16 @@ impl InProcessWebServer {
             return Err(ImportPersistWorkerError::Cancelled);
         }
         Ok(())
+    }
+
+    fn promote_backlog_after_import(&self) -> Result<usize, RefineError> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Ok(0);
+        };
+        let Some(target_root) = self.target_root() else {
+            return Ok(0);
+        };
+        WorkflowEngine::with_target_root(runtime_root, target_root).promote_backlog_to_todo()
     }
 
     fn import_persist_response(&self, refine_dir: PathBuf, body: Value) -> ApiResponse {
@@ -3021,6 +3044,17 @@ impl InProcessWebServer {
         } else {
             None
         };
+        let mut promoted = 0;
+        if failures.is_empty() {
+            match self.promote_backlog_after_import() {
+                Ok(count) => promoted = count,
+                Err(error) => failures.push(json!({
+                    "index": 0,
+                    "name": "workflow",
+                    "message": error.to_string()
+                })),
+            }
+        }
         let created = import_result
             .as_ref()
             .map(|(result, _)| {
@@ -3044,6 +3078,7 @@ impl InProcessWebServer {
                 "count": created.len(),
                 "created": created,
                 "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
+                "promoted": promoted,
                 "failures": failures,
                 "duplicate_actions": import_result
                     .as_ref()

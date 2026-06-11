@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 pub mod behavior;
 pub mod behaviors;
 pub mod context;
+pub mod promotion;
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -29,6 +30,7 @@ use crate::workflow::behaviors::{
     WorkflowTodo,
 };
 use crate::workflow::context::WorkflowContext;
+use crate::workflow::promotion::BacklogPromotionService;
 
 pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 
@@ -214,7 +216,7 @@ impl WorkflowEngine {
         state.policy = self.policy()?;
         let promoted = match self.refine_dir() {
             Some(refine_dir) => match self.ensure_automation_running(&state) {
-                Ok(()) => self.promote_backlog_to_todo(&refine_dir)?,
+                Ok(()) => self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?,
                 Err(RefineError::Conflict(_)) => 0,
                 Err(error) => return Err(error),
             },
@@ -222,6 +224,17 @@ impl WorkflowEngine {
         };
         self.save_state(&mut state)?;
         Ok(promoted)
+    }
+
+    pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
+        let Some(refine_dir) = self.refine_dir() else {
+            return Ok(0);
+        };
+        self.promote_backlog_to_todo_for_refine_dir(&refine_dir)
+    }
+
+    fn promote_backlog_to_todo_for_refine_dir(&self, refine_dir: &Path) -> RefineResult<usize> {
+        BacklogPromotionService::new(refine_dir, &self.runtime_root).promote_backlog_to_todo()
     }
 
     pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
@@ -461,43 +474,6 @@ impl WorkflowEngine {
         })
     }
 
-    fn promote_backlog_to_todo(&self, refine_dir: &Path) -> RefineResult<usize> {
-        let settings = FileSettingsService::new(refine_dir).load()?;
-        let threshold = setting_i64(&settings, "backlog_promote_after_seconds", 3600);
-        if threshold < 0 {
-            return Ok(0);
-        }
-        let snapshot = self.projection_snapshot(refine_dir)?;
-        let service = FileWorkItemService::new(refine_dir);
-        let active_node_id = FileNodeRegistryService::new(refine_dir).active_node_id()?;
-        let now = Utc::now();
-        let mut promoted = 0;
-        let mut candidates = snapshot
-            .gaps
-            .values()
-            .filter(|projection| projection.gap.status == GapStatus::Backlog)
-            .filter(|projection| {
-                projection.gap.node_id.as_deref().unwrap_or("default") == active_node_id
-            })
-            .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
-            .filter(|projection| backlog_gap_age_seconds(projection, now) >= Some(threshold))
-            .cloned()
-            .collect::<Vec<_>>();
-        candidates.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
-                .then_with(|| a.gap.updated.cmp(&b.gap.updated))
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
-        });
-        for gap in candidates {
-            service.transition_gap_status(&gap.gap.id, GapStatus::Todo)?;
-            promoted += 1;
-        }
-        Ok(promoted)
-    }
-
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
         let promoted = self.promote()?;
         let steps = self.execute_claimed_work()?;
@@ -731,7 +707,7 @@ impl WorkflowAutomation for WorkflowEngine {
                 .filter(|claim| claim.state == WorkflowClaimState::Claimed)
                 .count());
         };
-        self.promote_backlog_to_todo(&refine_dir)?;
+        self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?;
         let snapshot = self.projection_snapshot(&refine_dir)?;
         let mut eligible = snapshot
             .gaps
@@ -1040,14 +1016,6 @@ fn setting_cap_with_default_values(
     }
 }
 
-fn setting_i64(settings: &JsonObject, key: &str, fallback: i64) -> i64 {
-    settings
-        .get(key)
-        .and_then(|value| value.as_str())
-        .and_then(|value| value.trim().parse::<i64>().ok())
-        .unwrap_or(fallback)
-}
-
 fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
     settings
         .get(key)
@@ -1324,15 +1292,6 @@ fn json_object(value: serde_json::Value) -> JsonObject {
     value.as_object().cloned().unwrap_or_default()
 }
 
-fn backlog_gap_age_seconds(gap: &GapSummaryProjection, now: DateTime<Utc>) -> Option<i64> {
-    DateTime::parse_from_rfc3339(&gap.gap.updated)
-        .ok()
-        .map(|timestamp| {
-            now.signed_duration_since(timestamp.with_timezone(&Utc))
-                .num_seconds()
-        })
-}
-
 fn default_node_id() -> String {
     "default".to_string()
 }
@@ -1463,6 +1422,36 @@ mod tests {
             .collect::<Vec<_>>();
         claimed_gap_ids.sort_unstable();
         assert_eq!(claimed_gap_ids, vec!["GAP1", "GAP2"]);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_promotes_all_ordered_feature_backlog_gaps() {
+        let temp_root = unique_temp_dir("automation-feature-backlog-promote");
+        let target_root = temp_root.join("target");
+        let refine_dir = target_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_feature_summary("Imported Feature", Some("FEA1"), None, None, None)
+            .unwrap();
+        for id in ["GAP1", "GAP2", "GAP3"] {
+            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items.assign_gap_to_feature("FEA1", id).unwrap();
+        }
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({"backlog_promote_after_seconds": "0"}))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        assert_eq!(automation.promote_backlog_to_todo().unwrap(), 3);
+        for id in ["GAP1", "GAP2", "GAP3"] {
+            assert_eq!(
+                work_items.show_gap_summary(id).unwrap().gap.status,
+                GapStatus::Todo
+            );
+        }
 
         fs::remove_dir_all(temp_root).unwrap();
     }
