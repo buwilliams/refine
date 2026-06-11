@@ -4,11 +4,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::tools::host::agent_providers::{ProviderInvocation, ProviderInvocationResult};
-use crate::tools::host::process_supervision::{
+use crate::process::subprocess::{
     ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::agent_providers::{ProviderInvocation, ProviderInvocationResult};
 
 #[derive(Clone, Debug)]
 pub struct TestRuntimeFixture {
@@ -153,6 +153,7 @@ pub fn process_spec(command: &str, args: &[&str]) -> ManagedProcessSpec {
         limits: Some(ProcessResourceLimits::default()),
         authorization_command: None,
         sensitive: false,
+        metadata: Default::default(),
     }
 }
 
@@ -195,6 +196,7 @@ mod tests {
             prompt: "ship it".to_string(),
             cwd: None,
             session_id: None,
+            process_metadata: Default::default(),
         });
         assert_eq!(result.output, "done");
     }

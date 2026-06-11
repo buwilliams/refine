@@ -422,14 +422,14 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
         .unwrap_err();
     assert_eq!(
         err.category(),
-        crate::tools::supervisor::errors::ErrorCategory::Conflict
+        crate::process::supervisor::errors::ErrorCategory::Conflict
     );
     let err = service
         .update_feature_metadata_summary("FEA1", Some("Blocked"), None, None, None)
         .unwrap_err();
     assert_eq!(
         err.category(),
-        crate::tools::supervisor::errors::ErrorCategory::Conflict
+        crate::process::supervisor::errors::ErrorCategory::Conflict
     );
 
     service
@@ -473,7 +473,7 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
         .unwrap_err();
     assert_eq!(
         err.category(),
-        crate::tools::supervisor::errors::ErrorCategory::InvalidInput
+        crate::process::supervisor::errors::ErrorCategory::InvalidInput
     );
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -2,17 +2,15 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::errors::RefineResult;
 use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProviderService};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::installation::{
     FileInstallationService, InstallTarget, InstallationService,
 };
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
 use crate::tools::observability::activity::FileActivityService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
-use crate::tools::supervisor::errors::RefineResult;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DoctorReport {
@@ -180,6 +178,7 @@ fn command_status(
         limits: None,
         authorization_command: Some(format!("{} {}", command, args.join(" "))),
         sensitive: false,
+        metadata: Default::default(),
     });
     match output {
         Ok(output) if output.success() => {

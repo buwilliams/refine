@@ -1,13 +1,13 @@
 use crate::model::log::LogEntry;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 use serde_json::json;
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
@@ -22,13 +22,13 @@ use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::gap::{GapIndexProjection, GapPriority};
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GapStatus;
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+};
 use crate::surfaces::web_server::support::{
     runtime_process_status_value, runtime_process_summary_value,
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
-};
 use crate::tools::product::project_state::{
     DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection,
     PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, ProjectStateStore, ProjectionSnapshot,
@@ -1537,7 +1537,7 @@ fn web_server_cancels_and_deletes_features() {
     let process = supervisor
         .register(ManagedProcess {
             id: "agent-gap2".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::process::subprocess::ProcessOwner::Agent,
             pid: None,
             state: "running".to_string(),
             label: Some("agent".to_string()),
@@ -2852,7 +2852,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     supervisor
         .register(ManagedProcess {
             id: "sse-process".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("sse".to_string()),
@@ -2955,49 +2955,34 @@ fn web_server_reads_and_cancels_runtime_jobs() {
 }
 
 #[test]
-fn web_server_retries_automation_jobs_and_reads_retry_logs() {
-    let temp_root = unique_temp_dir("http-job-retry");
+fn web_server_retries_workflow_executions() {
+    let temp_root = unique_temp_dir("http-workflow-execution-retry");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
     let automation = WorkflowEngine::new(&runtime_root);
     let claim_id = automation.claim("GAP1").unwrap();
-    let job_id = automation.start_claim(&claim_id).unwrap();
+    let execution_id = automation.start_claim(&claim_id).unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let retry = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: format!("/api/jobs/{job_id}/retry"),
+        path: format!("/api/workflow/executions/{execution_id}/retry"),
         body: None,
     });
     assert_eq!(retry.status, 200);
-    assert_eq!(retry.body["retried_from"], job_id);
-    assert_eq!(retry.body["job"]["owner"], "gap:GAP1");
-    assert_ne!(retry.body["job"]["id"], job_id);
-
-    let logs = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: format!("/api/jobs/{job_id}/logs?limit=1"),
-        body: None,
-    });
-    assert_eq!(logs.status, 200);
-    assert_eq!(logs.body["log_count"], 1);
-    assert_eq!(logs.body["has_more"], true);
-    assert_eq!(logs.body["total"], 2);
+    assert_eq!(retry.body["retried_from"], execution_id);
+    assert_eq!(retry.body["execution"]["gap_id"], "GAP1");
+    assert_eq!(retry.body["execution"]["status"], "running");
+    assert_ne!(retry.body["execution"]["id"], execution_id);
 
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert!(
-        cached
-            .runtime
-            .background_jobs
-            .iter()
-            .any(|job| job["id"] == retry.body["job"]["id"])
-    );
+    assert!(cached.runtime.background_jobs.is_empty());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -3025,28 +3010,27 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     chat.stop(&stopped_chat.id).unwrap();
     supervisor
-        .launch(
-            crate::tools::host::process_supervision::ManagedProcessSpec {
-                owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
-                command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
-                args: if cfg!(windows) {
-                    vec!["/C".to_string(), "echo agent".to_string()]
-                } else {
-                    vec!["-c".to_string(), "echo agent".to_string()]
-                },
-                cwd: None,
-                env: Vec::new(),
-                stdin: None,
-                limits: None,
-                authorization_command: None,
-                sensitive: false,
+        .launch(crate::process::subprocess::ManagedProcessSpec {
+            owner: crate::process::subprocess::ProcessOwner::Agent,
+            command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "echo agent".to_string()]
+            } else {
+                vec!["-c".to_string(), "echo agent".to_string()]
             },
-        )
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: Default::default(),
+        })
         .unwrap();
     supervisor
         .register(ManagedProcess {
             id: "agent-context".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::process::subprocess::ProcessOwner::Agent,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Agent context".to_string()),
@@ -3062,7 +3046,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "chat-context".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Chat context".to_string()),
@@ -3080,7 +3064,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "ui-context".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("UI context".to_string()),
@@ -3096,7 +3080,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "exited-agent-context".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::process::subprocess::ProcessOwner::Agent,
             pid: None,
             state: "exited".to_string(),
             label: Some("Exited agent context".to_string()),
@@ -3288,9 +3272,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     fs::write(&stdout_path, "hello stdout\n").unwrap();
     fs::write(&stderr_path, "warn stderr\n").unwrap();
     supervisor
-        .register(crate::tools::host::process_supervision::ManagedProcess {
+        .register(crate::process::subprocess::ManagedProcess {
             id: "stream-test".to_string(),
-            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("stream".to_string()),

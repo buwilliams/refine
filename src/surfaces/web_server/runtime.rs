@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
-use crate::tools::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
@@ -13,8 +15,6 @@ use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionSnapshot, RuntimeProjection,
 };
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 use super::support::*;
 use super::*;

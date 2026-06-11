@@ -5,12 +5,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(test))]
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::lifecycle::daemon_executable_string;
-use crate::tools::supervisor::runtime::{
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::daemon_executable_string;
+use crate::process::supervisor::runtime::{
     DEFAULT_APP_ID, RuntimeOs, RuntimePathInputs, RuntimePathLayout,
 };
 
@@ -532,6 +530,7 @@ impl FileInstallationService {
                     limits: None,
                     authorization_command: Some(command.display()),
                     sensitive: false,
+                    metadata: Default::default(),
                 })
                 .map_err(|error| error.to_string())?;
             if output.success() {

@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::model::gap::GapPriority;
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GapStatus;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 use super::types::*;
 

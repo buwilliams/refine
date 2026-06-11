@@ -7,11 +7,9 @@ use chrono::Utc;
 use crate::model::project::{
     AppRegistry, ProjectMigrationReport, ProjectSchemaStatus, ProjectStatus, RegisteredApp,
 };
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::project_migration::FileProjectMigrationService;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 pub const APP_REGISTRY_FILE: &str = "apps.json";
 
@@ -210,6 +208,7 @@ impl FileProjectRegistryService {
                 limits: None,
                 authorization_command: Some("git clone".to_string()),
                 sensitive: false,
+                metadata: Default::default(),
             },
         )?;
         if !output.success() {
@@ -398,6 +397,7 @@ impl FileProjectRegistryService {
                 limits: None,
                 authorization_command: Some("git init".to_string()),
                 sensitive: false,
+                metadata: Default::default(),
             },
         )?;
         if output.success() {

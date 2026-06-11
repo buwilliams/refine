@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::thread;
-use std::time::Duration;
 
 pub mod behavior;
 pub mod behaviors;
@@ -17,14 +15,21 @@ use crate::model::JsonObject;
 use crate::model::gap::GapPriority;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
+use crate::process::subprocess::{
+    FileProcessSupervisor, ProcessPauseState, ProcessSupervisor, workflow_subprocess_metadata,
+};
+use crate::process::supervisor::config::{
+    ConfigService, FileGovernanceService, FileSettingsService,
+};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
-use crate::tools::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
 use crate::tools::host::quality::{
     FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
 };
+use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::merging::{FileMergerService, MergerGapResult};
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -32,9 +37,6 @@ use crate::tools::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
 };
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::tools::supervisor::config::{ConfigService, FileGovernanceService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 
@@ -43,7 +45,6 @@ pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json
 pub enum WorkflowPauseControl {
     Agents,
     TargetApp,
-    Job(String),
     AllAutomation,
 }
 
@@ -68,7 +69,8 @@ pub struct WorkflowClaim {
     pub provider: String,
     #[serde(default = "default_target_app_id")]
     pub target_app_id: String,
-    pub job_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_id: Option<String>,
     pub state: WorkflowClaimState,
     pub created_at: String,
     pub updated_at: String,
@@ -120,7 +122,7 @@ pub struct WorkflowPassResult {
 pub struct WorkflowStepResult {
     pub claim_id: String,
     pub gap_id: String,
-    pub job_id: String,
+    pub execution_id: String,
     pub provider: String,
     pub branch: String,
     pub commit: String,
@@ -135,22 +137,20 @@ pub trait WorkflowAutomation {
     fn start_claim(&self, claim_id: &str) -> RefineResult<String>;
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()>;
     fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()>;
-    fn cancel(&self, job_id: &str) -> RefineResult<()>;
-    fn retry(&self, job_id: &str) -> RefineResult<String>;
+    fn cancel(&self, execution_id: &str) -> RefineResult<()>;
+    fn retry(&self, execution_id: &str) -> RefineResult<String>;
 }
 
 #[derive(Clone, Debug)]
 pub struct WorkflowEngine {
     pub runtime_root: PathBuf,
     pub durable_root: Option<PathBuf>,
-    pub job_registry: FileJobRegistry,
 }
 
 impl WorkflowEngine {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         let runtime_root = runtime_root.into();
         Self {
-            job_registry: FileJobRegistry::new(&runtime_root),
             runtime_root,
             durable_root: None,
         }
@@ -162,7 +162,6 @@ impl WorkflowEngine {
     ) -> Self {
         let runtime_root = runtime_root.into();
         Self {
-            job_registry: FileJobRegistry::new(&runtime_root),
             runtime_root,
             durable_root: Some(durable_root.into()),
         }
@@ -271,6 +270,27 @@ impl WorkflowEngine {
         }
         self.interrupt_active_claims(&gap_ids)?;
         Ok(gap_ids.len())
+    }
+
+    fn signal_workflow_subprocesses(&self, execution_id: &str, signal: &str) -> RefineResult<()> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        for process in supervisor.list()? {
+            let matches_execution = process
+                .details
+                .as_deref()
+                .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                .and_then(|details| {
+                    details
+                        .get("execution_id")
+                        .and_then(|value| value.as_str())
+                        .map(|value| value == execution_id)
+                })
+                .unwrap_or(false);
+            if matches_execution {
+                supervisor.signal(&process.id, signal)?;
+            }
+        }
+        Ok(())
     }
 
     fn ensure_automation_running(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
@@ -501,18 +521,11 @@ impl WorkflowEngine {
             .collect::<Vec<_>>();
         let mut results = Vec::new();
         for claim_id in claim_ids {
-            let job_id = self.start_claim(&claim_id)?;
-            match self.execute_started_claim(&claim_id, &job_id) {
+            let execution_id = self.start_claim(&claim_id)?;
+            match self.execute_started_claim(&claim_id, &execution_id) {
                 Ok(result) => results.push(result),
                 Err(error) => {
                     let _ = self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
-                    let _ = self.job_registry.fail_with_error(
-                        &job_id,
-                        json!({
-                            "claim_id": claim_id,
-                            "error": error.to_string()
-                        }),
-                    );
                     return Err(error);
                 }
             }
@@ -523,7 +536,7 @@ impl WorkflowEngine {
     fn execute_started_claim(
         &self,
         claim_id: &str,
-        job_id: &str,
+        execution_id: &str,
     ) -> RefineResult<WorkflowStepResult> {
         let claim = self.claim_by_id(claim_id)?;
         let durable_root = self.durable_root.as_ref().ok_or_else(|| {
@@ -549,7 +562,7 @@ impl WorkflowEngine {
         );
         let app_git = FileGitWorktreeService::with_runtime_root(app_root, &self.runtime_root);
         let workflow = WorkflowExecution {
-            job_id,
+            execution_id,
             gap_id: &claim.gap_id,
             round_idx,
             work_items: &work_items,
@@ -597,6 +610,13 @@ impl WorkflowEngine {
             prompt,
             session_id: None,
             cwd: Some(agent_cwd.display().to_string()),
+            process_metadata: workflow_subprocess_metadata(
+                execution_id,
+                &claim.gap_id,
+                "in-progress",
+                "WorkflowImplementation",
+                Some(round_idx),
+            ),
         }) {
             Ok(output) => output,
             Err(error) => {
@@ -647,6 +667,7 @@ impl WorkflowEngine {
             &agent_cwd,
             &claim.gap_id,
             round_idx,
+            execution_id,
         ) {
             Ok(evaluation) => evaluation,
             Err(error) => {
@@ -670,14 +691,15 @@ impl WorkflowEngine {
             self.fail_workflow(&workflow, "state", &error)?;
             return Err(error);
         }
-        let quality = match self.run_workflow_quality(durable_root, &settings, &claim.gap_id) {
-            Ok(result) => result,
-            Err(error) => {
-                self.record_quality_error(&workflow, &error)?;
-                self.fail_workflow(&workflow, "quality", &error)?;
-                return Err(error);
-            }
-        };
+        let quality =
+            match self.run_workflow_quality(durable_root, &settings, &claim.gap_id, execution_id) {
+                Ok(result) => result,
+                Err(error) => {
+                    self.record_quality_error(&workflow, &error)?;
+                    self.fail_workflow(&workflow, "quality", &error)?;
+                    return Err(error);
+                }
+            };
         self.record_quality(&workflow, &quality)?;
         if !quality.ok {
             let error = RefineError::Conflict("quality checks failed".to_string());
@@ -689,7 +711,8 @@ impl WorkflowEngine {
             self.fail_workflow(&workflow, "state", &error)?;
             return Err(error);
         }
-        let merge = match merge_with_transient_lock_retry(&app_git, &branch) {
+        let merger = FileMergerService::new(&self.runtime_root, durable_root);
+        let merge = match merger.merge_branch_for_workflow(&branch) {
             Ok(result) if result.ok => result,
             Ok(result) => {
                 let error = RefineError::Conflict(
@@ -723,36 +746,51 @@ impl WorkflowEngine {
             }))),
         )?;
 
-        for (from, to) in [
-            ("ready-merge", GapStatus::Build),
-            ("build", GapStatus::Review),
-        ] {
-            if let Err(error) = workflow.advance(self, to, from) {
-                self.fail_workflow(&workflow, "state", &error)?;
+        if let Err(error) = workflow.advance(self, GapStatus::Build, "ready-merge") {
+            self.fail_workflow(&workflow, "state", &error)?;
+            return Err(error);
+        }
+        let target_app = FileTargetAppService::new(durable_root, &self.runtime_root, app_root);
+        let build = match target_app.build_with_metadata(workflow_subprocess_metadata(
+            execution_id,
+            &claim.gap_id,
+            "build",
+            "WorkflowBuild",
+            Some(round_idx),
+        )) {
+            Ok(snapshot) if snapshot.ok => snapshot,
+            Ok(snapshot) => {
+                let error = RefineError::Conflict(snapshot.message.clone());
+                workflow.log(
+                    self,
+                    "build",
+                    "Target app build failed",
+                    Some(json_object(json!({"target_app": &snapshot}))),
+                )?;
+                self.fail_workflow(&workflow, "build", &error)?;
                 return Err(error);
             }
+            Err(error) => {
+                self.fail_workflow(&workflow, "build", &error)?;
+                return Err(error);
+            }
+        };
+        workflow.log(
+            self,
+            "build",
+            "Target app build passed",
+            Some(json_object(json!({"target_app": &build}))),
+        )?;
+        if let Err(error) = workflow.advance(self, GapStatus::Review, "build") {
+            self.fail_workflow(&workflow, "state", &error)?;
+            return Err(error);
         }
 
-        self.job_registry.finish_with_result(
-            job_id,
-            JobState::Succeeded,
-            json!({
-                "gap_id": claim.gap_id,
-                "provider": claim.provider,
-                "branch": branch,
-                "commit": commit,
-                "merge": merge,
-                "quality": quality,
-                "governance": governance.details,
-                "provider_output": provider_output,
-                "final_status": "review"
-            }),
-        )?;
         self.mark_claim_state(claim_id, WorkflowClaimState::Completed)?;
         Ok(WorkflowStepResult {
             claim_id: claim_id.to_string(),
             gap_id: claim.gap_id,
-            job_id: job_id.to_string(),
+            execution_id: execution_id.to_string(),
             provider: claim.provider,
             branch,
             commit,
@@ -784,6 +822,7 @@ impl WorkflowEngine {
         durable_root: &Path,
         settings: &JsonObject,
         gap_id: &str,
+        execution_id: &str,
     ) -> RefineResult<QualityCheckResult> {
         if setting_string(settings, "quality_enabled", "0") != "1" {
             return Ok(QualityCheckResult {
@@ -798,6 +837,13 @@ impl WorkflowEngine {
             owner_id: gap_id.to_string(),
             command: String::new(),
             browser_required,
+            process_metadata: workflow_subprocess_metadata(
+                execution_id,
+                gap_id,
+                "qa",
+                "WorkflowQa",
+                None,
+            ),
         })
     }
 
@@ -861,6 +907,7 @@ impl WorkflowEngine {
         provider_cwd: &Path,
         gap_id: &str,
         round_idx: usize,
+        execution_id: &str,
     ) -> RefineResult<GovernanceEvaluation> {
         let governance = FileGovernanceService::new(durable_root).load()?;
         let rules = governance
@@ -896,6 +943,13 @@ impl WorkflowEngine {
             prompt,
             session_id: None,
             cwd: Some(provider_cwd.display().to_string()),
+            process_metadata: workflow_subprocess_metadata(
+                execution_id,
+                gap_id,
+                "in-progress",
+                "WorkflowImplementationGovernance",
+                Some(round_idx),
+            ),
         })?;
         let mut evaluation = parse_governance_provider_output(&output, rules.len());
         evaluation.details.insert(
@@ -1016,30 +1070,6 @@ impl WorkflowEngine {
         }
         Ok(())
     }
-
-    fn append_job_log(
-        &self,
-        job_id: &str,
-        gap_id: &str,
-        category: &str,
-        message: &str,
-        details: Option<JsonObject>,
-    ) -> RefineResult<()> {
-        self.job_registry.append_log(
-            job_id,
-            LogEntry {
-                datetime: now_timestamp(),
-                severity: "info".to_string(),
-                category: category.to_string(),
-                message: message.to_string(),
-                details,
-                actions: Vec::new(),
-                actor: Some("refine".to_string()),
-                gap_id: Some(gap_id.to_string()),
-            },
-        )?;
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1077,7 +1107,7 @@ struct GovernanceEvaluation {
 }
 
 struct WorkflowExecution<'a> {
-    job_id: &'a str,
+    execution_id: &'a str,
     gap_id: &'a str,
     round_idx: usize,
     work_items: &'a FileWorkItemService,
@@ -1098,12 +1128,15 @@ impl WorkflowExecution<'_> {
 
     fn log(
         &self,
-        automation: &WorkflowEngine,
+        _automation: &WorkflowEngine,
         category: &str,
         message: &str,
         details: Option<JsonObject>,
     ) -> RefineResult<()> {
-        automation.append_job_log(self.job_id, self.gap_id, category, message, details.clone())?;
+        let mut details = details.unwrap_or_default();
+        details
+            .entry("execution_id".to_string())
+            .or_insert_with(|| json!(self.execution_id));
         FileLogService::new(self.durable_root).append_round_log(
             self.gap_id,
             self.round_idx,
@@ -1112,7 +1145,7 @@ impl WorkflowExecution<'_> {
                 severity: "info".to_string(),
                 category: category.to_string(),
                 message: message.to_string(),
-                details,
+                details: Some(details),
                 actions: Vec::new(),
                 actor: Some("refine".to_string()),
                 gap_id: Some(self.gap_id.to_string()),
@@ -1184,7 +1217,7 @@ impl WorkflowAutomation for WorkflowEngine {
                 node_id: metadata.node_id,
                 provider: metadata.provider,
                 target_app_id: metadata.target_app_id,
-                job_id: None,
+                execution_id: None,
                 state: WorkflowClaimState::Claimed,
                 created_at: now.clone(),
                 updated_at: now,
@@ -1247,7 +1280,7 @@ impl WorkflowAutomation for WorkflowEngine {
             node_id: metadata.node_id,
             provider: metadata.provider,
             target_app_id: metadata.target_app_id,
-            job_id: None,
+            execution_id: None,
             state: WorkflowClaimState::Claimed,
             created_at: now.clone(),
             updated_at: now,
@@ -1299,14 +1332,12 @@ impl WorkflowAutomation for WorkflowEngine {
                 )));
             }
         }
-        let job = self
-            .job_registry
-            .register(&format!("gap:{}", claim.gap_id))?;
-        claim.job_id = Some(job.id.clone());
+        let execution_id = new_execution_id();
+        claim.execution_id = Some(execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
         self.save_state(&mut state)?;
-        Ok(job.id)
+        Ok(execution_id)
     }
 
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()> {
@@ -1321,14 +1352,14 @@ impl WorkflowAutomation for WorkflowEngine {
         self.save_state(&mut state)
     }
 
-    fn cancel(&self, job_id: &str) -> RefineResult<()> {
-        let job_id = job_id.trim();
-        self.job_registry.cancel(job_id)?;
+    fn cancel(&self, execution_id: &str) -> RefineResult<()> {
+        let execution_id = execution_id.trim();
+        self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
             .iter_mut()
-            .find(|claim| claim.job_id.as_deref() == Some(job_id))
+            .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
         {
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
@@ -1337,8 +1368,8 @@ impl WorkflowAutomation for WorkflowEngine {
         Ok(())
     }
 
-    fn retry(&self, job_id: &str) -> RefineResult<String> {
-        let job_id = job_id.trim();
+    fn retry(&self, execution_id: &str) -> RefineResult<String> {
+        let execution_id = execution_id.trim();
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1346,13 +1377,12 @@ impl WorkflowAutomation for WorkflowEngine {
         let Some(claim_index) = state
             .claims
             .iter()
-            .position(|claim| claim.job_id.as_deref() == Some(job_id))
+            .position(|claim| claim.execution_id.as_deref() == Some(execution_id))
         else {
             return Err(RefineError::NotFound(format!(
-                "claim for job {job_id} was not found"
+                "claim for execution {execution_id} was not found"
             )));
         };
-        let gap_id = state.claims[claim_index].gap_id.clone();
         let node_id = state.claims[claim_index].node_id.clone();
         let provider = state.claims[claim_index].provider.clone();
         let target_app_id = state.claims[claim_index].target_app_id.clone();
@@ -1368,28 +1398,14 @@ impl WorkflowAutomation for WorkflowEngine {
                 "automation concurrency limit reached".to_string(),
             ));
         }
-        let job = self.job_registry.register(&format!("gap:{gap_id}"))?;
-        let mut details = JsonObject::new();
-        details.insert("retried_job_id".to_string(), json!(job.id));
-        self.job_registry.append_log(
-            job_id,
-            LogEntry {
-                datetime: now_timestamp(),
-                severity: "info".to_string(),
-                category: "job".to_string(),
-                message: format!("Job retried as {}", job.id),
-                details: Some(details),
-                actions: Vec::new(),
-                actor: Some("refine".to_string()),
-                gap_id: Some(gap_id),
-            },
-        )?;
+        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let retried_execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
-        claim.job_id = Some(job.id.clone());
+        claim.execution_id = Some(retried_execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
         self.save_state(&mut state)?;
-        Ok(job.id)
+        Ok(retried_execution_id)
     }
 }
 
@@ -1532,28 +1548,6 @@ fn agent_worktree_cwd(worktree_path: &str, agent_subpath: &str) -> RefineResult<
         ));
     }
     Ok(root.join(relative))
-}
-
-fn merge_with_transient_lock_retry(
-    service: &FileGitWorktreeService,
-    branch: &str,
-) -> RefineResult<MergeResult> {
-    let mut result = service.merge(branch)?;
-    for _ in 0..5 {
-        if result.ok || !merge_message_has_index_lock(&result) {
-            return Ok(result);
-        }
-        thread::sleep(Duration::from_millis(50));
-        result = service.merge(branch)?;
-    }
-    Ok(result)
-}
-
-fn merge_message_has_index_lock(result: &MergeResult) -> bool {
-    result
-        .message
-        .as_deref()
-        .is_some_and(|message| message.contains("index.lock"))
 }
 
 fn post_implementation_governance_prompt(
@@ -1800,6 +1794,10 @@ fn new_claim_id() -> String {
     format!("res-{}", Uuid::new_v4())
 }
 
+fn new_execution_id() -> String {
+    format!("exec-{}", Uuid::new_v4())
+}
+
 fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
@@ -1807,15 +1805,15 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
     use crate::tools::product::nodes::FileNodeRegistryService;
     use crate::tools::product::work_items::{BulkGapSelection, FileWorkItemService};
-    use crate::tools::supervisor::config::{FileGovernanceService, FileSettingsService};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn file_automation_promotes_todo_gaps_and_executes_jobs() {
+    fn file_automation_promotes_todo_gaps_and_starts_executions() {
         let temp_root = unique_temp_dir("automation");
         let durable_root = temp_root.join("durable");
         let runtime_root = temp_root.join("run/8080");
@@ -1837,11 +1835,14 @@ mod tests {
         assert_eq!(state.claims.len(), 1);
         assert_eq!(state.claims[0].gap_id, "GAP1");
 
-        let job_id = automation.start_claim(&state.claims[0].claim_id).unwrap();
+        let execution_id = automation.start_claim(&state.claims[0].claim_id).unwrap();
+        assert!(execution_id.starts_with("exec-"));
+        let state = automation.load_state().unwrap();
         assert_eq!(
-            automation.job_registry.status(&job_id).unwrap().owner,
-            "gap:GAP1"
+            state.claims[0].execution_id.as_deref(),
+            Some(execution_id.as_str())
         );
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -2274,7 +2275,7 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_pauses_cancels_and_retries_jobs() {
+    fn file_automation_pauses_cancels_and_retries_executions() {
         let temp_root = unique_temp_dir("automation-controls");
         let automation = WorkflowEngine::new(temp_root.join("run/8080"));
 
@@ -2291,21 +2292,20 @@ mod tests {
 
         let claim_id = automation.claim("GAP1").unwrap();
         assert_eq!(automation.claim("GAP1").unwrap(), claim_id);
-        let job_id = automation.start_claim(&claim_id).unwrap();
-        automation.cancel(&job_id).unwrap();
+        let execution_id = automation.start_claim(&claim_id).unwrap();
+        automation.cancel(&execution_id).unwrap();
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
 
-        let retried_job_id = automation.retry(&job_id).unwrap();
-        assert_ne!(retried_job_id, job_id);
+        let retried_execution_id = automation.retry(&execution_id).unwrap();
+        assert_ne!(retried_execution_id, execution_id);
+        assert!(retried_execution_id.starts_with("exec-"));
+        let state = automation.load_state().unwrap();
         assert_eq!(
-            automation
-                .job_registry
-                .status(&retried_job_id)
-                .unwrap()
-                .owner,
-            "gap:GAP1"
+            state.claims[0].execution_id.as_deref(),
+            Some(retried_execution_id.as_str())
         );
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
 
         fs::remove_dir_all(temp_root).unwrap();
     }

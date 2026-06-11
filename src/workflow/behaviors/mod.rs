@@ -1,7 +1,7 @@
 use crate::model::workflow::GapStatus;
+use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::project_state::GapSummaryProjection;
-use crate::tools::supervisor::errors::RefineResult;
-use crate::workflow::behavior::{WorkflowBehavior, WorkflowDecision};
+use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 
 macro_rules! behavior {
@@ -14,14 +14,14 @@ macro_rules! behavior {
                 $status
             }
 
-            fn evaluate(
+            fn advance(
                 &self,
                 gap: &GapSummaryProjection,
                 _ctx: &mut WorkflowContext,
-            ) -> RefineResult<WorkflowDecision> {
-                Ok(WorkflowDecision::Noop {
+            ) -> RefineResult<WorkflowAdvanceOutcome> {
+                Ok(WorkflowAdvanceOutcome::Blocked {
                     reason: format!(
-                        "{} behavior has no standalone decision",
+                        "{} behavior is coordinated by WorkflowEngine",
                         gap.gap.status.as_str()
                     ),
                 })
@@ -34,7 +34,7 @@ behavior!(WorkflowBacklog, GapStatus::Backlog);
 behavior!(WorkflowTodo, GapStatus::Todo);
 behavior!(WorkflowImplementation, GapStatus::InProgress);
 behavior!(WorkflowQa, GapStatus::Qa);
-behavior!(WorkflowMerge, GapStatus::ReadyMerge);
+behavior!(WorkflowReadyMerge, GapStatus::ReadyMerge);
 behavior!(WorkflowBuild, GapStatus::Build);
 behavior!(WorkflowReview, GapStatus::Review);
 behavior!(WorkflowDone, GapStatus::Done);

@@ -7,6 +7,12 @@ use clap::Parser;
 use serde_json::{Value, json};
 
 use crate::model::workflow::GapStatus;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::{
+    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    current_launch_executable, current_launch_mode, http_probe,
+};
+use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::surfaces::web_server::{
     API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
 };
@@ -28,12 +34,6 @@ use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
 };
 use crate::tools::product::work_items::{BulkGapFilter, BulkGapSelection, FileWorkItemService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::lifecycle::{
-    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
-    current_launch_executable, current_launch_mode, http_probe,
-};
-use crate::tools::supervisor::runtime::RuntimeRoot;
 
 use super::actions::*;
 use super::helpers::*;
@@ -502,7 +502,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 .into_iter()
                 .find(|entry| entry.id == id)
             else {
-                return Err(crate::tools::supervisor::errors::RefineError::NotFound(
+                return Err(crate::process::supervisor::errors::RefineError::NotFound(
                     format!("Log entry {id} was not found"),
                 ));
             };
@@ -679,6 +679,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 prompt,
                 session_id: None,
                 cwd: cwd.map(|path| path.display().to_string()),
+                process_metadata: Default::default(),
             })?;
             println!(
                 "{}",
@@ -1065,19 +1066,25 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 )?
             } else {
                 let Some(reporter) = reporter.as_deref() else {
-                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                        "round reporter is required".to_string(),
-                    ));
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "round reporter is required".to_string(),
+                        ),
+                    );
                 };
                 let Some(actual) = actual.as_deref() else {
-                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                        "round actual is required".to_string(),
-                    ));
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "round actual is required".to_string(),
+                        ),
+                    );
                 };
                 let Some(target) = target.as_deref() else {
-                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                        "round target is required".to_string(),
-                    ));
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "round target is required".to_string(),
+                        ),
+                    );
                 };
                 service.append_gap_round_summary(&id, reporter, actual, target)?
             };
@@ -1142,9 +1149,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "quality" | "qa" => service.retry_gap_quality_summary(&id)?,
                 "merge" => service.retry_gap_merge_summary(&id)?,
                 _ => {
-                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                        "retry stage must be quality or merge".to_string(),
-                    ));
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "retry stage must be quality or merge".to_string(),
+                        ),
+                    );
                 }
             };
             println!(
@@ -1226,9 +1235,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let service = FileWorkItemService::new(durable_root);
             let current = service.show_gap_summary(&id)?;
             let Some(feature_id) = current.gap.feature_id.clone() else {
-                return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                    format!("Gap {id} is not assigned to a Feature"),
-                ));
+                return Err(
+                    crate::process::supervisor::errors::RefineError::InvalidInput(format!(
+                        "Gap {id} is not assigned to a Feature"
+                    )),
+                );
             };
             let feature = service.remove_gap_from_feature(&feature_id, &id)?;
             println!(
@@ -1413,9 +1424,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let Some(target) = GapStatus::parse_wire(&target) else {
-                return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                    "target must be backlog or todo".to_string(),
-                ));
+                return Err(
+                    crate::process::supervisor::errors::RefineError::InvalidInput(
+                        "target must be backlog or todo".to_string(),
+                    ),
+                );
             };
             let feature =
                 FileWorkItemService::new(durable_root).move_feature_workflow(&id, target)?;
@@ -1517,9 +1530,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
             } else {
                 let Some(text) = text.as_deref() else {
-                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-                        "feature import requires --text or --file".to_string(),
-                    ));
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "feature import requires --text or --file".to_string(),
+                        ),
+                    );
                 };
                 service.import_from_text(text, csv, reporter.as_deref(), feature_id.as_deref())?
             };

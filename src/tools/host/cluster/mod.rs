@@ -5,11 +5,9 @@ use crate::model::cluster::{
     Cluster, ClusterHealth, ClusterNode, RemoteRunResult, valid_cluster_node_id, valid_ssh_host,
     valid_ssh_user,
 };
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::security::FileSecurityService;
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::security::FileSecurityService;
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 
@@ -369,6 +367,7 @@ impl ClusterService for FileClusterRegistryService {
             limits: None,
             authorization_command: Some(remote_command.clone()),
             sensitive: false,
+            metadata: Default::default(),
         })?;
         Ok(RemoteRunResult {
             node_id: node_id.to_string(),
@@ -495,6 +494,7 @@ fn bootstrap_remote_node_with_runtime(
             limits: None,
             authorization_command: Some(remote_command.clone()),
             sensitive: false,
+            metadata: Default::default(),
         })?;
     Ok(RemoteRunResult {
         node_id: request.node_id,
@@ -739,7 +739,7 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tools::supervisor::config::FileSettingsService;
+    use crate::process::supervisor::config::FileSettingsService;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]

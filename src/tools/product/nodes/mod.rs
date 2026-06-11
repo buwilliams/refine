@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::node::{ActiveNodeSelection, Node, NodeRegistry, NodeSettings};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const NODE_REGISTRY_FILE: &str = "nodes.json";
 pub const ACTIVE_NODE_FILE: &str = "active-node.json";

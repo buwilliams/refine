@@ -5,15 +5,15 @@ use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::model::JsonObject;
-use crate::tools::host::process_supervision::{
+use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
 };
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::security::FileSecurityService;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::security::FileSecurityService;
 
 pub const TARGET_APP_STATE_FILE: &str = "target-app-state.json";
 
@@ -151,6 +151,7 @@ impl FileTargetAppService {
             limits: None,
             authorization_command: Some(command.clone()),
             sensitive: false,
+            metadata: Default::default(),
         })?;
         let operation = TargetAppOperation {
             id: new_operation_id("target-start"),
@@ -197,7 +198,7 @@ impl FileTargetAppService {
                 stderr: "No target-app stop command is configured.".to_string(),
             }
         } else {
-            self.run_command("stop", &command, &settings)?
+            self.run_command("stop", &command, &settings, Default::default())?
         };
         self.mark_target_processes_stopped()?;
         let ok = operation.exit_code == Some(0);
@@ -226,6 +227,13 @@ impl FileTargetAppService {
     }
 
     pub fn build(&self) -> RefineResult<TargetAppSnapshot> {
+        self.build_with_metadata(Default::default())
+    }
+
+    pub fn build_with_metadata(
+        &self,
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<TargetAppSnapshot> {
         let settings = self.settings()?;
         let command = setting(&settings, "target_app_build_command");
         if command.trim().is_empty() {
@@ -237,7 +245,7 @@ impl FileTargetAppService {
             self.save_snapshot(&snapshot)?;
             return Ok(snapshot);
         }
-        let operation = self.run_command("build", &command, &settings)?;
+        let operation = self.run_command("build", &command, &settings, process_metadata)?;
         let ok = operation.exit_code == Some(0);
         let snapshot = TargetAppSnapshot {
             ok,
@@ -407,6 +415,7 @@ impl FileTargetAppService {
         kind: &str,
         command: &str,
         settings: &JsonObject,
+        process_metadata: Map<String, Value>,
     ) -> RefineResult<TargetAppOperation> {
         let started_at = now_timestamp();
         FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?
@@ -423,6 +432,7 @@ impl FileTargetAppService {
                 limits: None,
                 authorization_command: Some(command.to_string()),
                 sensitive: false,
+                metadata: process_metadata,
             },
         )?;
         Ok(TargetAppOperation {
@@ -445,7 +455,8 @@ impl FileTargetAppService {
         let mut checks = Vec::new();
         let status_command = setting(settings, "target_app_status_command");
         if !status_command.trim().is_empty() {
-            let operation = self.run_command("status", &status_command, settings)?;
+            let operation =
+                self.run_command("status", &status_command, settings, Default::default())?;
             checks.push(TargetCheckResult {
                 ok: operation.exit_code == Some(0),
                 message: operation_message(&operation),
@@ -453,7 +464,12 @@ impl FileTargetAppService {
         }
         let process_command = setting(settings, "target_app_process_check_command");
         if !process_command.trim().is_empty() {
-            let operation = self.run_command("process-check", &process_command, settings)?;
+            let operation = self.run_command(
+                "process-check",
+                &process_command,
+                settings,
+                Default::default(),
+            )?;
             checks.push(TargetCheckResult {
                 ok: operation.exit_code == Some(0),
                 message: operation_message(&operation),

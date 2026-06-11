@@ -7,11 +7,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const SECURITY_AUDIT_FILE: &str = "security-audit.jsonl";
 pub const SECRET_INDEX_FILE: &str = "secret-index.json";
@@ -759,7 +757,7 @@ fn run_managed_command(
     command: HostCommand,
     stdin: Option<String>,
     action: &str,
-) -> RefineResult<crate::tools::host::process_supervision::ManagedProcessOutput> {
+) -> RefineResult<crate::process::subprocess::ManagedProcessOutput> {
     let authorization_command = command.authorization_command();
     FileProcessSupervisor::new(runtime_root)
         .run_to_completion(ManagedProcessSpec {
@@ -772,6 +770,7 @@ fn run_managed_command(
             limits: None,
             authorization_command: Some(authorization_command),
             sensitive: true,
+            metadata: Default::default(),
         })
         .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))
 }

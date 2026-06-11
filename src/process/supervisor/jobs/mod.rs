@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum JobState {

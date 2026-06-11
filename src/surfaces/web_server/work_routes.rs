@@ -7,6 +7,9 @@ use serde_json::{Map, Value, json};
 
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::RefineError;
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -23,9 +26,6 @@ use crate::tools::product::project_state::{
 use crate::tools::product::work_items::{
     BulkFeatureSelection, BulkGapSelection, FileWorkItemService,
 };
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::RefineError;
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 use super::support::*;
 use super::*;
@@ -423,7 +423,7 @@ fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -
 fn parse_provider_import_result(
     output: &str,
     reporter: Option<&str>,
-) -> crate::tools::supervisor::errors::RefineResult<ImportExtractionResult> {
+) -> crate::process::supervisor::errors::RefineResult<ImportExtractionResult> {
     if let Some(result) = parse_structured_import_result(output, reporter) {
         return Ok(result);
     }
@@ -2748,6 +2748,7 @@ impl InProcessWebServer {
             prompt: import_extraction_prompt(text, purpose),
             session_id: None,
             cwd,
+            process_metadata: Default::default(),
         }) {
             Ok(output) => output,
             Err(error) => return error_response(error),

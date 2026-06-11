@@ -5,10 +5,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SupportBundle {

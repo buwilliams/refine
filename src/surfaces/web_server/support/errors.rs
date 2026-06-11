@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::tools::supervisor::errors::RefineError;
+use crate::process::supervisor::errors::RefineError;
 
 use super::super::*;
 

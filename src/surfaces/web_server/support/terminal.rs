@@ -9,7 +9,7 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 const TERMINAL_INPUT_LIMIT: usize = 16_000;
 const TERMINAL_EVENT_BACKLOG: usize = 1_000;

@@ -1,7 +1,7 @@
 use serde_json::json;
 
+use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::work_items::{BulkGapUpdate, FileWorkItemService};
-use crate::tools::supervisor::errors::RefineResult;
 
 use super::super::*;
 

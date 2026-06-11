@@ -4,16 +4,16 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
+use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
-use crate::tools::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry};
-use crate::tools::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 
 use super::support::*;
@@ -119,11 +119,11 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("retry background jobs");
         };
-        let Some(job_id) = request
+        let Some(execution_id) = request
             .path
             .strip_prefix("/jobs/")
             .and_then(|path| path.strip_suffix("/retry"))
-            .filter(|job_id| !job_id.is_empty() && !job_id.contains('/'))
+            .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
         else {
             return job_id_required();
         };
@@ -132,25 +132,51 @@ impl InProcessWebServer {
             Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
         };
-        match automation.retry(job_id) {
-            Ok(retried_job_id) => {
-                match FileJobRegistry::new(runtime_root).status(&retried_job_id) {
-                    Ok(job) => {
-                        let job = job_response(job);
-                        if let Err(error) = self.current_projection_with_runtime() {
-                            return error_response(error);
-                        }
-                        ApiResponse::json(
-                            200,
-                            json!({
-                                "retried_from": job_id,
-                                "job": job
-                            }),
-                        )
-                    }
-                    Err(error) => error_response(error),
-                }
-            }
+        workflow_retry_response(&automation, execution_id)
+    }
+
+    pub(super) fn handle_workflow_execution_retry(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("retry workflow executions");
+        };
+        let Some(execution_id) = request
+            .path
+            .strip_prefix("/workflow/executions/")
+            .and_then(|path| path.strip_suffix("/retry"))
+            .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
+        else {
+            return job_id_required();
+        };
+        let automation = match self.current_durable_root() {
+            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
+            Ok(None) => WorkflowEngine::new(runtime_root),
+            Err(error) => return error_response(error),
+        };
+        workflow_retry_response(&automation, execution_id)
+    }
+
+    pub(super) fn handle_workflow_execution_cancel(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("cancel workflow executions");
+        };
+        let Some(execution_id) = request
+            .path
+            .strip_prefix("/workflow/executions/")
+            .and_then(|path| path.strip_suffix("/cancel"))
+            .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
+        else {
+            return job_id_required();
+        };
+        let automation = match self.current_durable_root() {
+            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
+            Ok(None) => WorkflowEngine::new(runtime_root),
+            Err(error) => return error_response(error),
+        };
+        match automation.cancel(execution_id) {
+            Ok(()) => match workflow_execution_json(&automation, execution_id) {
+                Ok(execution) => ApiResponse::json(200, json!({"execution": execution})),
+                Err(error) => error_response(error),
+            },
             Err(error) => error_response(error),
         }
     }
@@ -405,6 +431,7 @@ impl InProcessWebServer {
             prompt: prompt.to_string(),
             session_id: None,
             cwd,
+            process_metadata: Default::default(),
         }) {
             Ok(output) => ApiResponse::json(200, json!({"ok": true, "output": output})),
             Err(error) => error_response(error),
@@ -610,6 +637,46 @@ impl InProcessWebServer {
             );
         Ok(value)
     }
+}
+
+fn workflow_retry_response(automation: &WorkflowEngine, execution_id: &str) -> ApiResponse {
+    match automation.retry(execution_id) {
+        Ok(retried_execution_id) => {
+            match workflow_execution_json(automation, &retried_execution_id) {
+                Ok(execution) => ApiResponse::json(
+                    200,
+                    json!({
+                        "retried_from": execution_id,
+                        "execution": execution
+                    }),
+                ),
+                Err(error) => error_response(error),
+            }
+        }
+        Err(error) => error_response(error),
+    }
+}
+
+fn workflow_execution_json(automation: &WorkflowEngine, execution_id: &str) -> RefineResult<Value> {
+    let state = automation.load_state()?;
+    let claim = state
+        .claims
+        .iter()
+        .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
+        .ok_or_else(|| {
+            RefineError::NotFound(format!("Workflow execution {execution_id} was not found"))
+        })?;
+    Ok(json!({
+        "id": execution_id,
+        "claim_id": claim.claim_id,
+        "gap_id": claim.gap_id,
+        "status": claim.state,
+        "node_id": claim.node_id,
+        "provider": claim.provider,
+        "target_app_id": claim.target_app_id,
+        "created_at": claim.created_at,
+        "updated_at": claim.updated_at
+    }))
 }
 
 fn diagnostics_cache_key(

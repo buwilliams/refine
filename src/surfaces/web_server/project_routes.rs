@@ -1,4 +1,4 @@
-use crate::tools::supervisor::config::{
+use crate::process::supervisor::config::{
     ConfigService, FileGovernanceService, FileGuidanceService, FileReporterService,
     FileSettingsService,
 };
@@ -9,20 +9,18 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::workflow::GapStatus;
+use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ProcessOwner, ProcessSupervisor,
-};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::tools::product::work_items::BulkGapSelection;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
-use crate::tools::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;
@@ -865,6 +863,7 @@ impl InProcessWebServer {
                     prompt: target_app_generation_prompt(&service.source_root),
                     session_id: None,
                     cwd: Some(service.source_root.display().to_string()),
+                    process_metadata: Default::default(),
                 }) {
                     Ok(output) => {
                         raw = output.clone();
@@ -1355,6 +1354,7 @@ impl InProcessWebServer {
             prompt: governance_generation_prompt(product, constitution),
             session_id: None,
             cwd,
+            process_metadata: Default::default(),
         }) {
             Ok(output) => output,
             Err(_) => {

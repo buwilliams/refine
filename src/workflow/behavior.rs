@@ -1,11 +1,14 @@
 use crate::model::workflow::GapStatus;
+use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::project_state::GapSummaryProjection;
-use crate::tools::supervisor::errors::RefineResult;
 use crate::workflow::context::WorkflowContext;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum WorkflowDecision {
+pub enum WorkflowAdvanceOutcome {
     Noop {
+        reason: String,
+    },
+    Blocked {
         reason: String,
     },
     Transition {
@@ -13,14 +16,21 @@ pub enum WorkflowDecision {
         to: GapStatus,
         reason: String,
     },
+    Completed {
+        final_status: GapStatus,
+        reason: String,
+    },
+    Failed {
+        reason: String,
+    },
 }
 
 pub trait WorkflowBehavior {
     fn observes(&self) -> GapStatus;
 
-    fn evaluate(
+    fn advance(
         &self,
         gap: &GapSummaryProjection,
         ctx: &mut WorkflowContext,
-    ) -> RefineResult<WorkflowDecision>;
+    ) -> RefineResult<WorkflowAdvanceOutcome>;
 }

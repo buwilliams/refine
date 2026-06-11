@@ -7,10 +7,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
 
@@ -240,6 +238,7 @@ impl FileGitWorktreeService {
                 limits: None,
                 authorization_command: Some(format!("git {}", args.join(" "))),
                 sensitive: false,
+                metadata: Default::default(),
             },
         )?;
         Ok(HostCommandOutput {

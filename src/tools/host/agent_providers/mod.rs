@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
-use crate::tools::host::process_supervision::{
+use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessOutputStream, ManagedProcessSpec, ProcessOwner,
 };
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProviderCapability {
@@ -29,6 +30,8 @@ pub struct ProviderInvocation {
     pub prompt: String,
     pub session_id: Option<String>,
     pub cwd: Option<String>,
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub process_metadata: Map<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -189,7 +192,13 @@ impl HostAgentProviderService {
             invocation.session_id.as_deref(),
             cwd,
         );
-        self.run_provider_command_result_with_output(&args, cwd, spec.output_format, on_output)
+        self.run_provider_command_result_with_output(
+            &args,
+            cwd,
+            spec.output_format,
+            invocation.process_metadata,
+            on_output,
+        )
     }
 
     pub fn resume_detailed(
@@ -217,7 +226,13 @@ impl HostAgentProviderService {
             )));
         }
         let args = spec.chat_args(&binary, "", Some(session_id), None);
-        self.run_provider_command_result_with_output(&args, None, spec.output_format, on_output)
+        self.run_provider_command_result_with_output(
+            &args,
+            None,
+            spec.output_format,
+            Default::default(),
+            on_output,
+        )
     }
 
     fn run_provider_command_result_with_output<F>(
@@ -225,6 +240,7 @@ impl HostAgentProviderService {
         args: &[String],
         cwd: Option<&Path>,
         output_format: &str,
+        process_metadata: Map<String, Value>,
         mut on_output: F,
     ) -> RefineResult<ProviderInvocationResult>
     where
@@ -251,6 +267,7 @@ impl HostAgentProviderService {
                 limits: None,
                 authorization_command: Some(args.join(" ")),
                 sensitive: false,
+                metadata: process_metadata,
             },
             |stream, bytes| {
                 for line in formatter.push(stream, bytes) {
@@ -908,6 +925,7 @@ mod tests {
                 prompt: "hello".to_string(),
                 session_id: None,
                 cwd: None,
+                process_metadata: Default::default(),
             })
             .unwrap();
         assert!(output.contains("agent_message"));

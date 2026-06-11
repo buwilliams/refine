@@ -4,16 +4,14 @@ use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
 use crate::model::log::LogEntry;
-use crate::tools::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
-};
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
-use crate::tools::supervisor::security::FileSecurityService;
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::process::supervisor::security::FileSecurityService;
 
 use super::types::*;
 
@@ -236,6 +234,14 @@ impl FileQualityService {
     }
 
     pub fn run_regressions(&self, only_enabled: bool) -> RefineResult<RegressionRunResult> {
+        self.run_regressions_with_metadata(only_enabled, Default::default())
+    }
+
+    fn run_regressions_with_metadata(
+        &self,
+        only_enabled: bool,
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<RegressionRunResult> {
         let settings = self.read_stored_settings()?;
         if settings.regressions_enabled != "1" {
             return Ok(RegressionRunResult {
@@ -261,7 +267,7 @@ impl FileQualityService {
         }
         let mut runs = Vec::new();
         for regression in regressions {
-            runs.push(self.record_regression_run(&regression)?);
+            runs.push(self.record_regression_run(&regression, process_metadata.clone())?);
         }
         let passed = runs.iter().filter(|run| run.ok).count();
         let total = runs.len();
@@ -296,6 +302,7 @@ impl FileQualityService {
     fn record_regression_run(
         &self,
         regression: &RegressionCheck,
+        process_metadata: Map<String, Value>,
     ) -> RefineResult<RegressionRunSummary> {
         let run_id = new_run_id();
         let out_dir = self
@@ -328,7 +335,13 @@ impl FileQualityService {
                     "target app URL is required to run regression checks".to_string(),
                 )
             } else {
-                match self.run_playwright(regression, &out_dir, &screenshot_path, &target_url) {
+                match self.run_playwright(
+                    regression,
+                    &out_dir,
+                    &screenshot_path,
+                    &target_url,
+                    process_metadata,
+                ) {
                     Ok(execution) => {
                         command = execution.command;
                         stdout_tail = execution.stdout_tail;
@@ -382,6 +395,7 @@ impl FileQualityService {
         out_dir: &Path,
         screenshot_path: &Path,
         target_url: &str,
+        process_metadata: Map<String, Value>,
     ) -> RefineResult<RegressionExecution> {
         let Some(command) = self.playwright_command() else {
             return Ok(RegressionExecution {
@@ -422,6 +436,7 @@ impl FileQualityService {
                 ),
             ]),
             &command_display,
+            process_metadata,
         )?;
         let ok = output.success();
         let exit_code = output.process.exit_code;
@@ -673,7 +688,8 @@ impl FileQualityService {
         args: Vec<String>,
         env: Option<Vec<(String, String)>>,
         authorization_command: &str,
-    ) -> RefineResult<crate::tools::host::process_supervision::ManagedProcessOutput> {
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<crate::process::subprocess::ManagedProcessOutput> {
         let security = self.security()?;
         FileProcessSupervisor::with_allowed_commands(
             security.runtime_root,
@@ -689,6 +705,7 @@ impl FileQualityService {
             limits: None,
             authorization_command: Some(authorization_command.to_string()),
             sensitive: false,
+            metadata: process_metadata,
         })
     }
 }
@@ -786,6 +803,8 @@ pub struct QualityCheckRequest {
     pub owner_id: String,
     pub command: String,
     pub browser_required: bool,
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub process_metadata: Map<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -873,7 +892,16 @@ impl QualityService for FileQualityService {
     fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityCheckResult> {
         if request.command.trim().is_empty() {
             return if request.browser_required {
-                self.browser_qa(&request.owner_id)
+                let result = self.run_regressions_with_metadata(true, request.process_metadata)?;
+                Ok(QualityCheckResult {
+                    owner_id: request.owner_id,
+                    ok: result.ok,
+                    diagnostics: result
+                        .runs
+                        .into_iter()
+                        .map(|run| format!("{}: {}", run.title, run.message))
+                        .collect(),
+                })
             } else {
                 Ok(QualityCheckResult {
                     owner_id: request.owner_id,
@@ -883,7 +911,13 @@ impl QualityService for FileQualityService {
             };
         }
         let (shell, args) = shell_program_args(&request.command);
-        let output = self.run_quality_process(shell, args, None, &request.command)?;
+        let output = self.run_quality_process(
+            shell,
+            args,
+            None,
+            &request.command,
+            request.process_metadata,
+        )?;
         let ok = output.success();
         let exit_code = output.process.exit_code;
         let stdout = output.stdout;

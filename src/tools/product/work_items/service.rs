@@ -14,12 +14,12 @@ use crate::model::workflow::{
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
     is_feature_protected_status, user_status_transition,
 };
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
 };
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 use super::types::*;
 
@@ -41,11 +41,13 @@ pub fn validate_manual_gap_transition(from: &GapStatus, to: &GapStatus) -> Refin
     if decision.allowed {
         Ok(())
     } else {
-        Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
-            decision
-                .reason
-                .unwrap_or_else(|| "transition is not allowed".to_string()),
-        ))
+        Err(
+            crate::process::supervisor::errors::RefineError::InvalidInput(
+                decision
+                    .reason
+                    .unwrap_or_else(|| "transition is not allowed".to_string()),
+            ),
+        )
     }
 }
 

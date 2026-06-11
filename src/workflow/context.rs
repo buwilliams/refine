@@ -1,13 +1,17 @@
 use std::path::{Path, PathBuf};
 
+use crate::model::JsonObject;
 use crate::model::workflow::GapStatus;
-use crate::tools::supervisor::errors::RefineResult;
+use crate::process::subprocess::workflow_subprocess_metadata;
+use crate::process::supervisor::errors::RefineResult;
 
 #[derive(Clone, Debug)]
 pub struct WorkflowContext {
     pub runtime_root: PathBuf,
     pub durable_root: PathBuf,
     pub active_node_id: String,
+    pub execution_id: Option<String>,
+    pub round_idx: Option<usize>,
 }
 
 impl WorkflowContext {
@@ -20,6 +24,8 @@ impl WorkflowContext {
             runtime_root: runtime_root.into(),
             durable_root: durable_root.into(),
             active_node_id: active_node_id.into(),
+            execution_id: None,
+            round_idx: None,
         }
     }
 
@@ -38,5 +44,20 @@ impl WorkflowContext {
         _to: GapStatus,
     ) -> RefineResult<()> {
         Ok(())
+    }
+
+    pub fn workflow_process_metadata(
+        &self,
+        gap_id: &str,
+        workflow_state: &str,
+        behavior: &str,
+    ) -> JsonObject {
+        workflow_subprocess_metadata(
+            self.execution_id.as_deref().unwrap_or(gap_id),
+            gap_id,
+            workflow_state,
+            behavior,
+            self.round_idx,
+        )
     }
 }

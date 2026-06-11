@@ -1,4 +1,6 @@
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -7,13 +9,13 @@ use serde_json::{Value, json};
 use crate::model::JsonObject;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
+use crate::process::subprocess::FileProcessSupervisor;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
-use crate::tools::host::process_supervision::FileProcessSupervisor;
 use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MergerTickResult {
@@ -97,6 +99,20 @@ impl FileMergerService {
                 Err(error)
             }
         }
+    }
+
+    pub fn merge_branch_for_workflow(&self, branch_name: &str) -> RefineResult<MergeResult> {
+        let source_root = source_root(&self.durable_root)?;
+        let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
+        let mut result = git.merge(branch_name)?;
+        for _ in 0..5 {
+            if result.ok || !merge_message_has_index_lock(&result) {
+                return Ok(result);
+            }
+            thread::sleep(Duration::from_millis(50));
+            result = git.merge(branch_name)?;
+        }
+        Ok(result)
     }
 
     fn merge_gap_branch(
@@ -283,6 +299,13 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
 
 fn json_object(value: serde_json::Value) -> JsonObject {
     value.as_object().cloned().unwrap_or_default()
+}
+
+fn merge_message_has_index_lock(result: &MergeResult) -> bool {
+    result
+        .message
+        .as_deref()
+        .is_some_and(|message| message.contains("index.lock"))
 }
 
 fn now_timestamp() -> String {

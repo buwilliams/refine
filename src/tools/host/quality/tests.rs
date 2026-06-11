@@ -1,5 +1,5 @@
-use crate::tools::supervisor::config::FileSettingsService;
-use crate::tools::supervisor::errors::RefineError;
+use crate::process::supervisor::config::FileSettingsService;
+use crate::process::supervisor::errors::RefineError;
 use serde_json::json;
 use std::fs;
 use std::io::Write;
@@ -129,6 +129,7 @@ fn quality_service_runs_commands_compares_screenshots_and_gates() {
             owner_id: "GAP1".to_string(),
             command: "printf command-ok".to_string(),
             browser_required: false,
+            process_metadata: Default::default(),
         })
         .unwrap();
     assert!(command_result.ok);
@@ -184,6 +185,7 @@ fn quality_service_enforces_allowed_commands_for_direct_checks() {
         owner_id: "GAP1".to_string(),
         command: "rm -rf target".to_string(),
         browser_required: false,
+        process_metadata: Default::default(),
     });
 
     assert!(matches!(denied, Err(RefineError::Unauthorized(_))));

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use refine::tools::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
+use refine::process::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
 use refine::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
 use serde_json::json;
 

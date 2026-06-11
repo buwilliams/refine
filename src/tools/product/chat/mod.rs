@@ -11,15 +11,15 @@ use serde_json::{Value, json};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
 use crate::model::{JsonObject, Timestamp};
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::tools::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -880,6 +880,7 @@ impl FileChatService {
                     prompt: self.chat_prompt(&record, &message),
                     session_id: record.provider_session_id.clone(),
                     cwd: Some(self.chat_cwd(&record).display().to_string()),
+                    process_metadata: Default::default(),
                 },
                 |line| {
                     let _ = self.append_provider_activity_progress(&mut record, &line);

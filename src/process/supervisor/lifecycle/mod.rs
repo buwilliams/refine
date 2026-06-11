@@ -7,12 +7,12 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::tools::host::process_supervision::{
+use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
 };
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry};
-use crate::tools::supervisor::runtime::RuntimeRoot;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::process::supervisor::runtime::RuntimeRoot;
 
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
 const BACKGROUND_DAEMON_READY_TIMEOUT: Duration = Duration::from_secs(120);
@@ -180,6 +180,7 @@ impl FileDaemonLifecycleService {
             limits: None,
             authorization_command: Some("refine daemon start".to_string()),
             sensitive: true,
+            metadata: Default::default(),
         })?;
         eprintln!(
             "refine: starting daemon at http://{}:{}",
@@ -546,9 +547,9 @@ mod tests {
         };
         let supervisor = FileProcessSupervisor::new(runtime_root.port_root(4555));
         supervisor
-            .register(crate::tools::host::process_supervision::ManagedProcess {
+            .register(crate::process::subprocess::ManagedProcess {
                 id: "missing-pid".to_string(),
-                owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
+                owner: crate::process::subprocess::ProcessOwner::Agent,
                 pid: None,
                 state: "running".to_string(),
                 label: Some("agent".to_string()),

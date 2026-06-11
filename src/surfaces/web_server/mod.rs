@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::process::supervisor::errors::RefineResult;
+use crate::process::supervisor::lifecycle::DaemonStatus;
 use crate::tools::product::project_state::ProjectionSnapshot;
-use crate::tools::supervisor::errors::RefineResult;
-use crate::tools::supervisor::lifecycle::DaemonStatus;
 
 pub const API_CONTRACT_VERSION: &str = "1";
 pub const IDEMPOTENCY_DIR: &str = "idempotency";

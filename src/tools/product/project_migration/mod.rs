@@ -8,8 +8,8 @@ use crate::model::JsonObject;
 use crate::model::project::{
     ProjectConfig, ProjectMigrationReport, ProjectSchemaStatus, RefineVersion,
 };
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::project_state::PROJECTION_SNAPSHOT_FILE;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 pub const CURRENT_PROJECT_SCHEMA_VERSION: u64 = 1;
 const LEGACY_0_TO_1_ID: &str = "legacy-0-to-1";

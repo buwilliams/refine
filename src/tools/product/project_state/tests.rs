@@ -9,7 +9,7 @@ use super::*;
 use crate::model::feature::FeatureIndexProjection;
 use crate::model::gap::{GapIndexProjection, GapPriority};
 use crate::model::log::ActivityEntry;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use std::process::Command;
 use std::sync::{Arc, Barrier};
 use std::thread;

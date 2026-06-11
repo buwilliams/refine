@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{Duration, Utc};
 
 use crate::model::log::ActivityEntry;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const ACTIVITY_LOG_FILE: &str = "logs/activity.jsonl";
 

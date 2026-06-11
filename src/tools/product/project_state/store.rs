@@ -11,9 +11,9 @@ use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::gap::GapIndexProjection;
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GapStatus;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 use super::helpers::*;
 use super::types::*;

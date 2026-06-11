@@ -22,13 +22,13 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::{
+    DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
 use crate::tools::product::project_state::ProjectionQuery;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::lifecycle::{
-    DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
-};
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;

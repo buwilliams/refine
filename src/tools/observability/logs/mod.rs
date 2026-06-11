@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::log::{LogEntry, LogQuery, RoundLogEntry};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub trait LogService {
     fn append(&self, entry: LogEntry) -> RefineResult<()>;

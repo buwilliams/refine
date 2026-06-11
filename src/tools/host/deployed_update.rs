@@ -3,12 +3,12 @@ use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::lifecycle::{
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::{
     BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
     http_probe,
 };
-use crate::tools::supervisor::runtime::RuntimeRoot;
+use crate::process::supervisor::runtime::RuntimeRoot;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DeployedUpdateSummary {

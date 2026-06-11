@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::tools::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
 use crate::tools::product::chat::ChatSessionRecord;
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry};
 
 use super::super::http::HttpRequest;
 use super::super::*;

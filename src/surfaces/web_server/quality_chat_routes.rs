@@ -2,14 +2,14 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::tools::host::process_supervision::FileProcessSupervisor;
+use crate::process::subprocess::FileProcessSupervisor;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::quality::{
     FileQualityService, QualityCheckRequest, QualityJobRunner, QualityService, QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
-use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 use super::support::*;
 use super::*;
@@ -189,6 +189,7 @@ impl InProcessWebServer {
             owner_id,
             command,
             browser_required,
+            process_metadata: Default::default(),
         }) {
             Ok(job_result) => {
                 append_quality_activity(

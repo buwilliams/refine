@@ -6,11 +6,11 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::lifecycle::{
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
 };
-use crate::tools::supervisor::runtime::RuntimeRoot;
+use crate::process::supervisor::runtime::RuntimeRoot;
 
 pub const DESKTOP_STATE_FILE: &str = "desktop-state.json";
 pub const DESKTOP_EVENTS_FILE: &str = "desktop-events.jsonl";

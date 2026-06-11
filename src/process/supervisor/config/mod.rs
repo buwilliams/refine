@@ -6,8 +6,8 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
-use crate::tools::supervisor::errors::RefineError;
-use crate::tools::supervisor::errors::RefineResult;
+use crate::process::supervisor::errors::RefineError;
+use crate::process::supervisor::errors::RefineResult;
 
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const GOVERNANCE_FILE: &str = "governance.json";

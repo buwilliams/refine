@@ -10,7 +10,7 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const METRICS_LOG_FILE: &str = "metrics/performance.jsonl";
 pub const DEFAULT_METRICS_RETENTION_DAYS: i64 = 30;

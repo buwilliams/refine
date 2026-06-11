@@ -8,10 +8,10 @@ use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
-use crate::tools::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::supervisor::security::FileSecurityService;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::security::FileSecurityService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,6 +54,8 @@ pub struct ManagedProcessSpec {
     pub authorization_command: Option<String>,
     #[serde(default)]
     pub sensitive: bool,
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub metadata: Map<String, Value>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -142,6 +144,25 @@ impl ManagedProcess {
         }
         value
     }
+}
+
+pub fn workflow_subprocess_metadata(
+    execution_id: &str,
+    gap_id: &str,
+    workflow_state: &str,
+    behavior: &str,
+    round_idx: Option<usize>,
+) -> Map<String, Value> {
+    let mut metadata = Map::new();
+    metadata.insert("kind".to_string(), json!("workflow"));
+    metadata.insert("execution_id".to_string(), json!(execution_id));
+    metadata.insert("gap_id".to_string(), json!(gap_id));
+    metadata.insert("workflow_state".to_string(), json!(workflow_state));
+    metadata.insert("behavior".to_string(), json!(behavior));
+    if let Some(round_idx) = round_idx {
+        metadata.insert("round_idx".to_string(), json!(round_idx));
+    }
+    metadata
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -433,15 +454,11 @@ impl FileProcessSupervisor {
         };
         let mut process = ManagedProcess {
             id: process_id,
-            owner: spec.owner,
+            owner: spec.owner.clone(),
             pid: Some(child.id()),
             state: "running".to_string(),
-            label: Some(spec.command),
-            details: Some(if spec.sensitive {
-                "redacted".to_string()
-            } else {
-                spec.args.join(" ")
-            }),
+            label: Some(spec.command.clone()),
+            details: Some(process_details(&spec)),
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path,
@@ -667,15 +684,11 @@ impl ProcessSupervisor for FileProcessSupervisor {
 
         let process = ManagedProcess {
             id: process_id,
-            owner: spec.owner,
+            owner: spec.owner.clone(),
             pid: Some(child.id()),
             state: "running".to_string(),
-            label: Some(spec.command),
-            details: Some(if spec.sensitive {
-                "redacted".to_string()
-            } else {
-                spec.args.join(" ")
-            }),
+            label: Some(spec.command.clone()),
+            details: Some(process_details(&spec)),
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path,
@@ -870,6 +883,20 @@ fn process_command_line(spec: &ManagedProcessSpec) -> String {
         .chain(spec.args.iter().map(String::as_str))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn process_details(spec: &ManagedProcessSpec) -> String {
+    if spec.sensitive {
+        return "redacted".to_string();
+    }
+    if !spec.metadata.is_empty() {
+        let mut details = spec.metadata.clone();
+        details
+            .entry("command".to_string())
+            .or_insert_with(|| json!(process_command_line(spec)));
+        return serde_json::to_string(&details).unwrap_or_else(|_| spec.args.join(" "));
+    }
+    spec.args.join(" ")
 }
 
 fn process_command(spec: &ManagedProcessSpec) -> Command {
@@ -1123,6 +1150,7 @@ mod tests {
                 }),
                 authorization_command: None,
                 sensitive: false,
+                metadata: Default::default(),
             })
             .unwrap();
         assert_eq!(supervisor.list().unwrap().len(), 1);
@@ -1228,6 +1256,7 @@ mod tests {
             limits: None,
             authorization_command: None,
             sensitive: false,
+            metadata: Default::default(),
         });
         assert!(rejected.is_err());
         supervisor.set_agents_paused(false).unwrap();
@@ -1271,6 +1300,7 @@ mod tests {
             limits: None,
             authorization_command: Some("rm -rf target".to_string()),
             sensitive: false,
+            metadata: Default::default(),
         });
 
         assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
@@ -1297,6 +1327,7 @@ mod tests {
                 limits: None,
                 authorization_command: None,
                 sensitive: true,
+                metadata: Default::default(),
             })
             .unwrap()
             .process;
@@ -1339,6 +1370,7 @@ mod tests {
                 limits: None,
                 authorization_command: None,
                 sensitive: false,
+                metadata: Default::default(),
             })
             .unwrap();
 
