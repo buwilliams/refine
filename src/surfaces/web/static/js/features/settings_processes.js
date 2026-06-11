@@ -108,6 +108,8 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
         details: runnerProcessDetails(backend, runnerReachable, diag),
       };
     });
+  const supervised = backend.process_model === "supervisor";
+  const supervisorOwnsWorkflowToggle = supervised && rows.some((proc) => proc.kind === "supervisor");
   if (!rows.some((proc) => proc.kind === "target_app")) {
     rows.push(syntheticTargetAppProcess());
   }
@@ -124,13 +126,11 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
       : "Workflow automation can run Gap agents, QA, builds, and merges.",
     agents_paused: agentsPaused,
     background_processes_stopped: backgroundStopped,
-    actions: [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"],
+    actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
-  return orderManagedProcessRows(
-    rows, workflowAutomation, backend.process_model === "supervisor",
-  );
+  return orderManagedProcessRows(rows, workflowAutomation, supervised);
 }
 
 function normalizeManagedProcess(proc = {}) {
@@ -455,25 +455,34 @@ function processStatusLabel(status) {
   }[status] || status || "unknown";
 }
 
-function renderProcessActions(proc) {
+function workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle) {
+  const actions = ["hard_reset_worktree"];
+  if (!supervisorOwnsWorkflowToggle) {
+    actions.unshift(workflowPaused ? "unpause_workflow" : "pause_workflow");
+  }
+  return actions;
+}
+
+function processActionIds(proc) {
+  if (Array.isArray(proc.actions)) return proc.actions;
   if (proc.kind === "supervisor") {
     const workflowPaused = !!proc.background_processes_stopped || !!proc.agents_paused;
-    return `
-      <button class="${workflowPaused ? "" : "secondary"}" data-testid="process-workflow-toggle" data-toggle-workflow="${workflowPaused ? "unpause" : "pause"}">${workflowPaused ? "Unpause Workflow" : "Pause Workflow"}</button>`;
+    return [workflowPaused ? "unpause_workflow" : "pause_workflow"];
   }
   if (proc.kind === "workflow_automation" || proc.kind === "agent_automation") {
     const workflowPaused = !!proc.background_processes_stopped || !!proc.agents_paused;
-    return `
-      <button class="${workflowPaused ? "" : "secondary"}" data-testid="process-workflow-toggle" data-toggle-workflow="${workflowPaused ? "unpause" : "pause"}" ${proc.runner_reachable ? "" : "disabled"}>${workflowPaused ? "Unpause Workflow" : "Pause Workflow"}</button>
-      <button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${proc.runner_reachable && !workflowPaused ? "" : "disabled"}>Hard reset worktree</button>`;
+    return [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
   }
   if (proc.kind === "background_processes") {
-    const paused = proc.status === "paused";
     const stopped = !!proc.background_processes_stopped;
-    return `
-      <button class="${stopped ? "" : "secondary"}" data-testid="process-workflow-toggle" data-toggle-workflow="${stopped ? "unpause" : "pause"}">${stopped ? "Unpause Workflow" : "Pause Workflow"}</button>
-      <button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
+    return [stopped ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
   }
+  return null;
+}
+
+function renderProcessActions(proc) {
+  const actionIds = processActionIds(proc);
+  if (actionIds) return renderProcessActionButtons(proc, actionIds);
   if (proc.kind === "agent" && proc.gap_id) {
     return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
   }
@@ -496,6 +505,36 @@ function renderProcessActions(proc) {
       <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
   }
   return `<span class="muted small">-</span>`;
+}
+
+function renderProcessActionButtons(proc, actionIds) {
+  const buttons = actionIds
+    .map((actionId) => renderProcessActionButton(proc, actionId))
+    .filter(Boolean)
+    .join("\n");
+  return buttons || `<span class="muted small">-</span>`;
+}
+
+function renderProcessActionButton(proc, actionId) {
+  if (actionId === "pause_workflow" || actionId === "unpause_workflow") {
+    const paused = actionId === "unpause_workflow";
+    const disabled = workflowToggleDisabled(proc);
+    return `<button class="${paused ? "" : "secondary"}" data-testid="process-workflow-toggle" data-toggle-workflow="${paused ? "unpause" : "pause"}" ${disabled ? "disabled" : ""}>${paused ? "Unpause Workflow" : "Pause Workflow"}</button>`;
+  }
+  if (actionId === "hard_reset_worktree") {
+    const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
+    return `<button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${disabled ? "disabled" : ""}>Hard reset worktree</button>`;
+  }
+  return "";
+}
+
+function workflowToggleDisabled(proc) {
+  return (proc.kind === "workflow_automation" || proc.kind === "agent_automation") && !proc.runner_reachable;
+}
+
+function hardResetWorktreeDisabled(proc) {
+  if (proc.kind === "background_processes") return proc.status === "paused";
+  return !!proc.background_processes_stopped || !!proc.agents_paused;
 }
 
 function targetAppShowsStopAction(state) {
