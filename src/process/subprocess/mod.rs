@@ -1081,6 +1081,12 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
     }
     #[cfg(not(windows))]
     {
+        if reap_exited_child(pid) {
+            return Ok(false);
+        }
+        if unix_pid_is_zombie(pid)? {
+            return Ok(false);
+        }
         let status = Command::new("kill")
             .arg("-0")
             .arg(pid.to_string())
@@ -1093,6 +1099,36 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
             })?;
         Ok(status.success())
     }
+}
+
+#[cfg(not(windows))]
+fn reap_exited_child(pid: u32) -> bool {
+    const WNOHANG: i32 = 1;
+    unsafe extern "C" {
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+    }
+    let mut status = 0;
+    let result = unsafe { waitpid(pid as i32, &mut status, WNOHANG) };
+    result == pid as i32
+}
+
+#[cfg(not(windows))]
+fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
+    let status_path = PathBuf::from(format!("/proc/{pid}/status"));
+    let status = match fs::read_to_string(&status_path) {
+        Ok(status) => status,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(RefineError::Io(format!(
+                "failed to inspect process status {}: {error}",
+                status_path.display()
+            )));
+        }
+    };
+    Ok(status
+        .lines()
+        .find_map(|line| line.strip_prefix("State:"))
+        .is_some_and(|state| state.trim_start().starts_with('Z')))
 }
 
 fn append_stream_file(output: &mut String, label: &str, path: &str) -> RefineResult<()> {

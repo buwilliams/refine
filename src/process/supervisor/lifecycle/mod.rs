@@ -369,7 +369,9 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
 
     fn recover(&self, port: u16) -> RefineResult<DaemonStatus> {
         let port_root = self.runtime_root.port_root(port);
-        let recovered = FileProcessSupervisor::new(&port_root).recover()?;
+        let supervisor = FileProcessSupervisor::new(&port_root);
+        let before_recovery = supervisor.list()?;
+        let recovered = supervisor.recover()?;
         let interrupted_operations = FileOperationRegistry::new(&port_root).interrupt_active()?;
         let mut status = running_status(port);
         status.active_operations = recovered
@@ -386,9 +388,9 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
                 })
                 .map(|operation| operation.id),
         );
-        if recovered
+        if before_recovery
             .iter()
-            .any(|process| matches!(process.state.as_str(), "exited" | "interrupted"))
+            .any(|before| !recovered.iter().any(|after| after.id == before.id))
         {
             status
                 .degraded_integrations
@@ -577,10 +579,7 @@ mod tests {
                 .degraded_integrations
                 .contains(&"process-recovery-reconciled".to_string())
         );
-        assert_eq!(
-            supervisor.inspect("missing-pid").unwrap().state,
-            "interrupted"
-        );
+        assert!(supervisor.inspect("missing-pid").is_err());
         assert!(
             status
                 .degraded_integrations
