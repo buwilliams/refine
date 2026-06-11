@@ -329,6 +329,39 @@ fn web_server_route_groups_cover_static_web_surface() {
     );
 }
 
+#[test]
+fn static_import_modal_exposes_feature_import_surface() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
+    let import_modes = fs::read_to_string(static_root.join("js/features/gaps-import.js")).unwrap();
+    let import_modal =
+        fs::read_to_string(static_root.join("js/features/gaps-import-modal.js")).unwrap();
+    let import_prepare =
+        fs::read_to_string(static_root.join("js/features/gaps-import-prepare.js")).unwrap();
+
+    assert!(index.contains(r#"data-testid="nav-import-gaps">Import</a>"#));
+    assert!(commands.contains(r#"title: "Import""#));
+    assert!(import_modes.contains(r#"mode: "feature""#));
+    for label in [
+        "Import Feature",
+        "Import Gaps",
+        "Import Gaps (.csv)",
+        "Upload Gaps (.csv)",
+    ] {
+        assert!(import_modes.contains(label), "missing import label {label}");
+    }
+    assert!(import_modal.contains(r#"data-testid="import-feature-text""#));
+    assert!(import_modes.contains("Extract Feature"));
+    assert!(import_modal.contains("extractPlanFeatureDraftPayload(text)"));
+    assert!(
+        import_modal.contains("reviewPlanFeatureDraftPayload(root, payload, close, saveSession)")
+    );
+    assert!(import_prepare.contains("function planDraftPayloadFromResult"));
+    assert!(import_prepare.contains("async function extractPlanFeatureDraftPayload"));
+    assert!(import_prepare.contains("async function reviewPlanFeatureDraftPayload"));
+}
+
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut rest = source;

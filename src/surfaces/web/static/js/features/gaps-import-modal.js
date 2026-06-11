@@ -9,19 +9,32 @@ function openImportModal() {
     <div class="modal import-modal" role="dialog" aria-modal="true"
          data-testid="import-modal"
          aria-labelledby="import-title">
-      <div class="modal-title" id="import-title">Import gaps</div>
+      <div class="modal-title" id="import-title">Import</div>
       <div class="modal-body" data-testid="import-modal-body" style="max-height:72vh;overflow:auto">
         <nav class="settings-tabs" id="import-tabs" role="tablist" data-testid="import-tabs">
           ${Object.entries(IMPORT_MODES).map(([mode, meta]) => `
-            <button type="button" class="settings-tab ${mode === "ai" ? "active" : ""}"
+            <button type="button" class="settings-tab ${mode === "feature" ? "active" : ""}"
                     data-import-mode="${mode}" role="tab"
                     data-testid="import-tab-${htmlEscape(mode)}"
-                    aria-selected="${mode === "ai" ? "true" : "false"}">
+                    aria-selected="${mode === "feature" ? "true" : "false"}">
               ${htmlEscape(meta.label)}
             </button>`).join("")}
         </nav>
         <div class="card settings-tab-card import-tab-card">
-          <section class="settings-pane import-panel active" data-import-panel="ai">
+          <section class="settings-pane import-panel active" data-import-panel="feature">
+            <p class="muted small">Paste a long product spec or planning note. refine extracts one Feature
+            and its implementation-ready Gaps for review before saving.</p>
+            <div class="muted small" style="margin-bottom:8px">
+              Default reporter:
+              <strong class="js-reporter-name">${htmlEscape(reporter || "none selected")}</strong>.
+              Each drafted Gap can be edited before saving.
+            </div>
+            <div class="form-row">
+              <label>Feature spec</label>
+              <textarea id="import-feature-text" data-testid="import-feature-text" rows="10" placeholder="Paste a product spec, plan, or feature proposal here…"></textarea>
+            </div>
+          </section>
+          <section class="settings-pane import-panel" data-import-panel="ai">
             <p class="muted small">Paste free-form text (meeting transcript, bug report,
             feedback dump). refine extracts a draft list — review and edit before saving.</p>
             <div class="muted small" style="margin-bottom:8px">
@@ -69,14 +82,14 @@ function openImportModal() {
       </div>
       <div class="modal-actions">
         <button class="secondary" data-cancel data-testid="import-cancel">Cancel</button>
-        <button id="btn-extract" data-ok data-testid="import-extract">${IMPORT_MODES.ai.action}</button>
+        <button id="btn-extract" data-ok data-testid="import-extract">${IMPORT_MODES.feature.action}</button>
       </div>
     </div>
   `;
   document.body.appendChild(root);
 
   let session = readImportSession() || newImportSession();
-  let activeMode = session.mode || "ai";
+  let activeMode = IMPORT_MODES[session.mode] ? session.mode : "feature";
   let closed = false;
   let activeAbort = null;
   function close(navigateAway, options = {}) {
@@ -110,12 +123,14 @@ function openImportModal() {
     writeImportSession(session);
   }
   function markDirtyFromInputs() {
+    const featureText = root.querySelector("#import-feature-text")?.value || "";
     const sourceText = root.querySelector("#import-text")?.value || "";
     const csvText = root.querySelector("#import-csv-text")?.value || "";
-    const hasText = !!(sourceText.trim() || csvText.trim() || (session.uploadText || "").trim());
+    const hasText = !!(featureText.trim() || sourceText.trim() || csvText.trim() || (session.uploadText || "").trim());
     saveSession({
       mode: activeMode,
       phase: importSessionHasDrafts(session) ? session.phase : (hasText ? "editing" : "empty"),
+      featureText,
       sourceText,
       csvText,
     });
@@ -139,11 +154,13 @@ function openImportModal() {
     if (extractButton) extractButton.textContent = IMPORT_MODES[mode].action;
     const draftsRoot = root.querySelector("#import-drafts");
     if (draftsRoot && !importSessionHasDrafts(session)) draftsRoot.innerHTML = "";
-    const focusTarget = mode === "ai"
-      ? "#import-text"
-      : mode === "csv"
-        ? "#import-csv-text"
-        : "#import-csv-file-button";
+    const focusTarget = mode === "feature"
+      ? "#import-feature-text"
+      : mode === "ai"
+        ? "#import-text"
+        : mode === "csv"
+          ? "#import-csv-text"
+          : "#import-csv-file-button";
     root.querySelector(focusTarget)?.focus();
   }
   async function cancelImport() {
@@ -200,6 +217,7 @@ function openImportModal() {
       }
     }
   });
+  root.querySelector("#import-feature-text").addEventListener("input", markDirtyFromInputs);
   root.querySelector("#import-text").addEventListener("input", markDirtyFromInputs);
   root.querySelector("#import-csv-text").addEventListener("input", markDirtyFromInputs);
   root.querySelectorAll("[data-import-mode]").forEach((btn) => {
@@ -210,6 +228,29 @@ function openImportModal() {
     const btn = root.querySelector("#btn-extract");
     if (btn.disabled) return;
     const draftsRoot = root.querySelector("#import-drafts");
+    if (activeMode === "feature") {
+      const text = root.querySelector("#import-feature-text").value.trim();
+      if (!text) return toast("Paste a feature spec first", "error");
+      saveSession({ phase: "extracting", mode: activeMode, featureText: text, drafts: [], error: "" });
+      if (draftsRoot) {
+        drawImportProgress(draftsRoot, {
+          phase: "running",
+          lineCount: countImportLines(text),
+          feature: true,
+        });
+      }
+      await withButtonBusy(btn, "Extracting…", async () => {
+        try {
+          const payload = await extractPlanFeatureDraftPayload(text);
+          await reviewPlanFeatureDraftPayload(root, payload, close, saveSession);
+        } catch (e) {
+          saveSession({ phase: "editing", error: e.message });
+          if (draftsRoot) draftsRoot.innerHTML = "";
+          toast(e.message, "error");
+        }
+      });
+      return;
+    }
     if (activeMode === "ai") {
       const text = root.querySelector("#import-text").value.trim();
       if (!text) return toast("Paste some text first", "error");
@@ -269,6 +310,7 @@ function openImportModal() {
     });
   });
 
+  root.querySelector("#import-feature-text").value = session.featureText || "";
   root.querySelector("#import-text").value = session.sourceText || "";
   root.querySelector("#import-csv-text").value = session.csvText || "";
   if (session.fileName) {
@@ -321,10 +363,12 @@ function openImportModal() {
       draftsRoot.innerHTML = `<p class="muted">Import was interrupted before drafts were ready. Continue from the saved input above.</p>`;
     }
   }
-  const focusTarget = activeMode === "ai"
-    ? "#import-text"
-    : activeMode === "csv"
-      ? "#import-csv-text"
-      : "#import-csv-file-button";
+  const focusTarget = activeMode === "feature"
+    ? "#import-feature-text"
+    : activeMode === "ai"
+      ? "#import-text"
+      : activeMode === "csv"
+        ? "#import-csv-text"
+        : "#import-csv-file-button";
   root.querySelector(focusTarget)?.focus();
 }

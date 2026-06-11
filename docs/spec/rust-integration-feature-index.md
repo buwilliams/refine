@@ -142,7 +142,7 @@ Nav: Command Palette
 	Navigation: Arrow up/down, Enter execute, Escape close; empty state "No commands found."
 	Commands
 		Nav: Dashboard, Gaps, Changes, Logs, node/settings surfaces & tabs
-		Create: New Gap, Import gaps
+		Create: New Gap, Import
 		AI: Plan (make a plan), Draft Gaps from plan, Generate target-app config with AI
 		Toolbar: Toggle Toolbar, Maximize Toolbar, Files open, Files search
 		Gaps: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
@@ -230,9 +230,9 @@ Modals
 	Plan Mode (#/gaps/plan)
 		Plan text input; AI extracts gap drafts; per-gap edit (actual/target/priority/reporter)
 		Feature destination: standalone / new (name + description) / existing (dropdown); bulk save; duplicate detection
-	Import Gaps Modal (#/gaps/import)
-		Tabs/sources: AI Import (paste text), CSV Import (paste CSV), CSV Upload (Choose CSV file)
-			Distribute across nodes checkbox; Extract drafts / Parse CSV / Parse upload (progress)
+	Import Modal (#/gaps/import)
+		Tabs/sources: Import Feature (paste long spec), Import Gaps (paste text), Import Gaps (.csv) (paste CSV), Upload Gaps (.csv) (Choose CSV file)
+			Distribute across nodes checkbox; Extract Feature / Extract drafts / Parse CSV / Parse upload (progress)
 		Review (drafts, 25/page)
 			Per draft: checkbox, order, name (+ error), reporter, priority, node, actual, target; possible-duplicate info
 			Duplicate decision per row: move original to backlog / ignore / import
@@ -340,7 +340,7 @@ Implementation Internals (for e2e testing)
 		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-gap-link, #btn-plan-draft, #btn-gap-round-extract, #gap-round-extract-form/-body/-title, #btn-add-extracted-round
 		Gap modal: #btn-state-back, #btn-state-forward, #gap-action-menu, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-gap-feature-assign, #btn-gap-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #gap-notes-status
 		Gaps list: #gap-select-page, #gap-select-all (+ row checkboxes), table header sort controls
-		Import: #import-tabs, #import-title, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
+		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)
 	API surface (grouped; :id = path param)
 		Project/app: /api/project/status|attach|path|directories|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions

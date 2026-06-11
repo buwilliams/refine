@@ -48,7 +48,7 @@ data visible.
   activity.
 - **New Gap:** `+ New Gap`, reporter/context selector, actual behavior, target
   behavior, and submit.
-- **Import gaps:** paste a bug report, customer note, or meeting transcript;
+- **Import:** paste a bug report, customer note, meeting transcript, or feature spec;
   show extracted draft Gaps and the review/confirm flow.
 - **Plan / Chat:** create-menu Plan flow and attached `Open Chat` on a Gap.
 - **Agent workflow:** status movement through `todo`, `in-progress`,

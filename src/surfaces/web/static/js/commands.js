@@ -244,10 +244,10 @@ registerCommand({
 
 registerCommand({
   id: "gap.import",
-  title: "Import gaps",
+  title: "Import",
   group: "Create",
-  aliases: ["import", "import-gaps"],
-  keywords: ["csv", "ai import"],
+  aliases: ["import", "import-gaps", "import-feature"],
+  keywords: ["csv", "ai import", "feature"],
   run: () => {
     closeTopbarMenus();
     openImportModal();

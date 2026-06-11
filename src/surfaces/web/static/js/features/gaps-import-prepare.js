@@ -97,9 +97,10 @@ async function extractPlanDraftsInBackground(text, options = {}) {
 function drawImportProgress(root, state) {
   const lineCount = Number(state.lineCount || 0);
   const draftCount = Number(state.draftCount || 0);
+  const itemLabel = state.feature ? "Feature and Gap" : "Gap";
   const status = state.phase === "complete"
     ? `AI extracted ${draftCount} draft${draftCount === 1 ? "" : "s"}.`
-    : "Asking the selected AI provider to extract Gaps.";
+    : `Asking the selected AI provider to extract ${itemLabel} drafts.`;
   const detail = lineCount
     ? `The full ${lineCount}-line input is being sent as one request so the agent can use the whole context.`
     : "The full input is being sent as one request so the agent can use the whole context.";
@@ -129,7 +130,7 @@ async function openPlanDraftModalFromText(text) {
   });
 }
 
-async function openPlanDraftModalFromResult(text, result) {
+function planDraftPayloadFromResult(text, result) {
   const drafts = Array.isArray(result?.drafts) ? result.drafts : [];
   if (!drafts.length) {
     const err = new Error(
@@ -139,11 +140,58 @@ async function openPlanDraftModalFromResult(text, result) {
     err.code = result?.error?.code || "empty_plan_drafts";
     throw err;
   }
-  await openPlanDraftModalFromDrafts(text, drafts, result?.feature_destination || {
-    mode: "new",
-    newName: inferPlanFeatureName(text),
-    newDescription: inferPlanFeatureDescription(text),
-    existingId: "",
+  return {
+    drafts,
+    featureDestination: result?.feature_destination || {
+      mode: "new",
+      newName: inferPlanFeatureName(text),
+      newDescription: inferPlanFeatureDescription(text),
+      existingId: "",
+    },
+  };
+}
+
+async function openPlanDraftModalFromResult(text, result) {
+  const payload = planDraftPayloadFromResult(text, result);
+  await openPlanDraftModalFromDrafts(text, payload.drafts, payload.featureDestination);
+}
+
+async function extractPlanFeatureDraftPayload(text, options = {}) {
+  const result = await extractPlanDraftsInBackground(text, options);
+  return planDraftPayloadFromResult(text, result);
+}
+
+async function reviewPlanFeatureDraftPayload(root, payload, close, saveSession = null, options = {}) {
+  const drafts = payload.drafts || [];
+  drafts.forEach((draft) => {
+    draft.reporter = draft.reporter || state.lastReporter || "";
+    draft.priority = draft.priority || "low";
+  });
+  if (saveSession) {
+    saveSession({
+      phase: "deduping",
+      drafts,
+      featureDestination: payload.featureDestination,
+      prepareOperationId: "",
+      result: null,
+      error: "",
+    });
+  }
+  const annotated = await annotateImportDuplicateDrafts(drafts);
+  if (saveSession) {
+    saveSession({
+      phase: "review",
+      drafts: annotated,
+      featureDestination: payload.featureDestination,
+      operationId: "",
+      result: null,
+      error: "",
+    });
+  }
+  drawImportDrafts(root, annotated, close, {
+    saveSession,
+    clearSession: options.clearSession,
+    featureDestination: payload.featureDestination,
   });
 }
 
@@ -189,17 +237,14 @@ async function openPlanDraftModalFromDrafts(_text, drafts, featureDestination) {
   root.querySelector("[data-cancel]").addEventListener("click", () => close(false));
   const draftsRoot = root.querySelector("#import-drafts");
   try {
-    drafts.forEach((draft) => {
-      draft.reporter = draft.reporter || state.lastReporter || "";
-      draft.priority = draft.priority || "low";
-    });
+    await reviewPlanFeatureDraftPayload(
+      root,
+      { drafts, featureDestination },
+      close,
+      null,
+      { clearSession: false },
+    );
     if (closed) return;
-    const annotated = await annotateImportDuplicateDrafts(drafts);
-    if (closed) return;
-    drawImportDrafts(root, annotated, close, {
-      clearSession: false,
-      featureDestination,
-    });
   } catch (e) {
     if (e.name === "AbortError") return;
     if (draftsRoot) {

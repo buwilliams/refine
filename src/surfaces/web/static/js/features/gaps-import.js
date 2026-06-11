@@ -9,16 +9,20 @@ const IMPORT_CSV_REQUIRED_FIELDS = [
 ];
 const IMPORT_DRAFT_PAGE_SIZE = 25;
 const IMPORT_MODES = {
+  feature: {
+    label: "Import Feature",
+    action: "Extract Feature",
+  },
   ai: {
-    label: "AI Import",
+    label: "Import Gaps",
     action: "Extract drafts",
   },
   csv: {
-    label: "CSV Import",
+    label: "Import Gaps (.csv)",
     action: "Parse CSV",
   },
   upload: {
-    label: "CSV Upload",
+    label: "Upload Gaps (.csv)",
     action: "Parse upload",
   },
 };
@@ -43,8 +47,9 @@ function recoverImportSessionOnLoad() {
 function newImportSession() {
   return {
     id: `import-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    mode: "ai",
+    mode: "feature",
     phase: "empty",
+    featureText: "",
     sourceText: "",
     csvText: "",
     uploadText: "",
@@ -87,6 +92,7 @@ function importSessionIsDirty(session = readImportSession()) {
   if (session.phase && !["empty", "complete", "cancelled"].includes(session.phase)) return true;
   return !!(
     (session.sourceText || "").trim()
+    || (session.featureText || "").trim()
     || (session.csvText || "").trim()
     || (session.uploadText || "").trim()
     || (session.drafts || []).length
