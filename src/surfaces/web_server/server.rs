@@ -581,6 +581,20 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
+            && request.path.ends_with("/order")
+        {
+            return self.handle_feature_order_gap(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/features/")
+            && request.path.ends_with("/unorder")
+        {
+            return self.handle_feature_unorder_gap(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/features/")
             && request.path.contains("/gaps/")
             && !request.path.ends_with("/reorder")
         {

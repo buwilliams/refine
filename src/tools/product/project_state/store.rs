@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
+use crate::model::feature::{FeatureIndexProjection, FeatureRollup, compare_feature_gap_order};
 use crate::model::gap::GapIndexProjection;
 use crate::model::log::{ActivityEntry, RoundLogEntry};
 use crate::model::workflow::GapStatus;
@@ -585,9 +585,7 @@ impl ProjectStateStore for FileProjectStateStore {
                     .map(|gap| gap.gap.clone())
                     .collect();
                 feature_gaps.sort_by(|a, b| {
-                    a.feature_order
-                        .unwrap_or(i64::MAX)
-                        .cmp(&b.feature_order.unwrap_or(i64::MAX))
+                    compare_feature_gap_order(a.feature_order, b.feature_order)
                         .then_with(|| a.id.cmp(&b.id))
                 });
                 let rollup = FeatureRollup::derive(&feature_gaps);

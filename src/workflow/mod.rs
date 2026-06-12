@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::model::JsonObject;
+use crate::model::feature::{compare_feature_gap_order, is_ordered_feature_gap};
 use crate::model::gap::GapPriority;
 use crate::model::workflow::GapStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
@@ -438,7 +439,7 @@ impl WorkflowEngine {
             return true;
         };
         let Some(feature_order) = gap.gap.feature_order else {
-            return false;
+            return true;
         };
         let node_id = gap.gap.node_id.as_deref().unwrap_or("default");
         !snapshot.gaps.values().any(|other| {
@@ -456,6 +457,8 @@ impl WorkflowEngine {
             other.gap.id != gap.gap.id
                 && other.gap.feature_id.as_deref() == Some(feature_id)
                 && other.gap.node_id.as_deref().unwrap_or("default") == node_id
+                && is_ordered_feature_gap(gap.gap.feature_order)
+                && is_ordered_feature_gap(other.gap.feature_order)
                 && matches!(
                     other.gap.status,
                     GapStatus::InProgress
@@ -723,12 +726,7 @@ impl WorkflowAutomation for WorkflowEngine {
         eligible.sort_by(|a, b| {
             priority_rank(&b.gap.priority)
                 .cmp(&priority_rank(&a.gap.priority))
-                .then_with(|| {
-                    a.gap
-                        .feature_order
-                        .unwrap_or(i64::MAX)
-                        .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
-                })
+                .then_with(|| compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order))
                 .then_with(|| a.gap.created.cmp(&b.gap.created))
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
@@ -1712,20 +1710,27 @@ mod tests {
         work_items
             .create_feature_summary("Feature", Some("FEAT1"), None, None, None)
             .unwrap();
-        for id in ["FIRST", "SECOND"] {
+        for id in ["FIRST", "SECOND", "UNORDERED"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
                 .transition_gap_status(id, GapStatus::Todo)
                 .unwrap();
             work_items.assign_gap_to_feature("FEAT1", id).unwrap();
         }
+        work_items
+            .unorder_gap_in_feature("FEAT1", "UNORDERED")
+            .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert!(automation.claim("SECOND").is_err());
-        assert_eq!(automation.promote().unwrap(), 1);
+        assert_eq!(automation.promote().unwrap(), 2);
         let state = automation.load_state().unwrap();
-        assert_eq!(state.claims.len(), 1);
-        assert_eq!(state.claims[0].gap_id, "FIRST");
+        let claimed_gap_ids = state
+            .claims
+            .iter()
+            .map(|claim| claim.gap_id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(claimed_gap_ids, vec!["FIRST", "UNORDERED"]);
 
         work_items
             .bulk_update_gaps(
@@ -1737,7 +1742,7 @@ mod tests {
             )
             .unwrap();
         let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
-        assert_eq!(claim_automation.promote().unwrap(), 1);
+        assert_eq!(claim_automation.promote().unwrap(), 2);
         let state = claim_automation.load_state().unwrap();
         let second_claim = state
             .claims

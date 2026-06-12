@@ -529,7 +529,18 @@ fn feature_reorder_order_from_body(
             }),
         ));
     };
-    let mut ordered_gap_ids = feature.gap_ids.clone();
+    let mut ordered_gap_ids = feature
+        .gap_ids
+        .iter()
+        .filter(|id| {
+            projection
+                .gaps
+                .get(*id)
+                .and_then(|gap| gap.gap.feature_order)
+                .is_some()
+        })
+        .cloned()
+        .collect::<Vec<_>>();
     let Some(source_index) = ordered_gap_ids.iter().position(|id| id == gap_id) else {
         return Err(ApiResponse::json(
             404,
@@ -1601,6 +1612,58 @@ impl InProcessWebServer {
         match self
             .work_item_service(refine_dir)
             .remove_gap_from_feature(feature_id, gap_id)
+        {
+            Ok(feature) => ApiResponse::json(
+                200,
+                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_feature_order_gap(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "order Feature Gaps");
+        let Some(rest) = request.path.strip_prefix("/work/features/") else {
+            return feature_id_required();
+        };
+        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+            return feature_id_required();
+        };
+        let Some(gap_id) = gap_part.strip_suffix("/order") else {
+            return gap_id_required();
+        };
+        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+            return feature_id_required();
+        }
+        match self
+            .work_item_service(refine_dir)
+            .order_gap_in_feature(feature_id, gap_id)
+        {
+            Ok(feature) => ApiResponse::json(
+                200,
+                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_feature_unorder_gap(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "unorder Feature Gaps");
+        let Some(rest) = request.path.strip_prefix("/work/features/") else {
+            return feature_id_required();
+        };
+        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+            return feature_id_required();
+        };
+        let Some(gap_id) = gap_part.strip_suffix("/unorder") else {
+            return gap_id_required();
+        };
+        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+            return feature_id_required();
+        }
+        match self
+            .work_item_service(refine_dir)
+            .unorder_gap_in_feature(feature_id, gap_id)
         {
             Ok(feature) => ApiResponse::json(
                 200,

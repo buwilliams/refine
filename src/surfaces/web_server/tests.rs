@@ -1433,6 +1433,35 @@ fn web_server_creates_features_and_updates_membership() {
     assert_eq!(show.body["feature"]["gap_count"], 1);
     assert_eq!(show.body["feature"]["gaps"][0]["id"], "GAP1");
 
+    let unorder_gap = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/work/features/FEA1/gaps/GAP1/unorder".to_string(),
+        body: None,
+    });
+    assert_eq!(unorder_gap.status, 200);
+    let show = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/work/features/FEA1".to_string(),
+        body: None,
+    });
+    assert_eq!(
+        show.body["feature"]["gaps"][0]["feature_order"],
+        json!(null)
+    );
+
+    let order_gap = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/work/features/FEA1/gaps/GAP1/order".to_string(),
+        body: None,
+    });
+    assert_eq!(order_gap.status, 200);
+    let show = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/work/features/FEA1".to_string(),
+        body: None,
+    });
+    assert_eq!(show.body["feature"]["gaps"][0]["feature_order"], json!(1));
+
     let remove_gap = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/work/features/FEA1/gaps/GAP1".to_string(),

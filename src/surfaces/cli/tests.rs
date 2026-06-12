@@ -992,6 +992,38 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
         Cli::try_parse_from([
             "refine",
             "feature",
+            "unorder-gap",
+            "FEA1",
+            "GAP1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let unordered = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    assert!(unordered.contains("\"feature_order\": null"));
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "feature",
+            "order-gap",
+            "FEA1",
+            "GAP1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let ordered = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    assert!(ordered.contains("\"feature_order\": 1"));
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "feature",
             "remove-gap",
             "FEA1",
             "GAP1",

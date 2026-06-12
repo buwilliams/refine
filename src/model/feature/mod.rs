@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use serde::{Deserialize, Serialize};
 
 use crate::model::Timestamp;
@@ -60,6 +62,19 @@ pub struct FeatureGapBlockingNotice {
     pub blocked_count: usize,
     pub next_blocked_gap_id: Option<String>,
     pub message: String,
+}
+
+pub fn is_ordered_feature_gap(feature_order: Option<i64>) -> bool {
+    feature_order.is_some()
+}
+
+pub fn compare_feature_gap_order(a_order: Option<i64>, b_order: Option<i64>) -> Ordering {
+    match (a_order, b_order) {
+        (Some(a_order), Some(b_order)) => a_order.cmp(&b_order),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
 }
 
 impl FeatureRollup {
@@ -150,10 +165,7 @@ pub fn failed_gap_feature_blocking_notice(
         .cloned()
         .collect::<Vec<_>>();
     blocked_gaps.sort_by(|a, b| {
-        a.feature_order
-            .unwrap_or(i64::MAX)
-            .cmp(&b.feature_order.unwrap_or(i64::MAX))
-            .then_with(|| a.id.cmp(&b.id))
+        compare_feature_gap_order(a.feature_order, b.feature_order).then_with(|| a.id.cmp(&b.id))
     });
     if blocked_gaps.is_empty() {
         return None;

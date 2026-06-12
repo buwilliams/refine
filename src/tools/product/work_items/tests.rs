@@ -156,6 +156,24 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
         Some(2)
     );
 
+    let feature = service.unorder_gap_in_feature("FEA1", "GAP1").unwrap();
+    assert_eq!(feature.gap_ids, vec!["GAP2", "GAP1"]);
+    assert_eq!(
+        service.show_gap_summary("GAP1").unwrap().gap.feature_order,
+        None
+    );
+    assert_eq!(
+        service.show_gap_summary("GAP2").unwrap().gap.feature_order,
+        Some(1)
+    );
+
+    let feature = service.order_gap_in_feature("FEA1", "GAP1").unwrap();
+    assert_eq!(feature.gap_ids, vec!["GAP2", "GAP1"]);
+    assert_eq!(
+        service.show_gap_summary("GAP1").unwrap().gap.feature_order,
+        Some(2)
+    );
+
     let feature = service.remove_gap_from_feature("FEA1", "GAP1").unwrap();
     assert_eq!(feature.gap_ids, vec!["GAP2"]);
     assert_eq!(

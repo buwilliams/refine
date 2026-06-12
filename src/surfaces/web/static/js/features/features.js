@@ -338,8 +338,11 @@ function renderFeatureGapTable(gaps, options = {}) {
   } : null;
   const rows = visible.length ? visible.map((gap, idx) => {
     const globalIdx = start + idx;
+    const ordered = gap.feature_order !== null && gap.feature_order !== undefined;
+    const previousOrdered = ordered ? findOrderedFeatureGap(gaps, globalIdx, -1) : null;
+    const nextOrdered = ordered ? findOrderedFeatureGap(gaps, globalIdx, 1) : null;
     return `
-    <tr data-feature-gap-row="${htmlEscape(gap.id)}" data-testid="feature-gap-row">
+    <tr data-feature-gap-row="${htmlEscape(gap.id)}" data-feature-gap-ordered="${ordered ? "1" : "0"}" data-testid="feature-gap-row">
       ${actions ? `<td class="feature-gap-drag-cell" data-label="Move">
         <button type="button" class="feature-gap-drag-handle" draggable="true"
                 data-feature-drag-gap="${htmlEscape(gap.id)}"
@@ -356,7 +359,7 @@ function renderFeatureGapTable(gaps, options = {}) {
           </svg>
         </button>
       </td>` : ""}
-      <td data-label="Order" data-testid="feature-gap-order">${gap.feature_order || ""}</td>
+      <td data-label="Order" data-testid="feature-gap-order">${ordered ? htmlEscape(gap.feature_order) : '<span class="muted">Unordered</span>'}</td>
       <td data-label="Gap"><a href="#/gaps/${encodeURIComponent(gap.id)}" data-testid="feature-gap-link">${htmlEscape(gap.name || gap.id)}</a></td>
       <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}" data-testid="feature-gap-status">${workflowStatusLabel(gap.status || "backlog")}</span></td>
       <td data-label="Priority" data-testid="feature-gap-priority">${htmlEscape(gap.priority || "low")}</td>
@@ -365,20 +368,25 @@ function renderFeatureGapTable(gaps, options = {}) {
       <td data-label="Updated" data-testid="feature-gap-updated">${fmtTime(gap.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
+          <button class="secondary small feature-gap-icon-btn" data-feature-order-toggle="${ordered ? "unorder" : "order"}"
+                  data-gap-id="${htmlEscape(gap.id)}"
+                  data-testid="feature-gap-order-toggle"
+                  aria-label="${ordered ? "Remove" : "Add"} ${htmlEscape(gap.name || gap.id)} ${ordered ? "from" : "to"} Feature order"
+                  title="${ordered ? "Remove from order" : "Add to order"}">${featureGapActionIcon(ordered ? "list-minus" : "list-plus")}</button>
           <button class="secondary small feature-gap-icon-btn" data-feature-move="up"
                   data-gap-id="${htmlEscape(gap.id)}"
-                  data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}"
+                  data-neighbor-id="${htmlEscape(previousOrdered?.id || "")}"
                   data-testid="feature-gap-move-up"
                   aria-label="Move ${htmlEscape(gap.name || gap.id)} up"
                   title="Move up"
-                  ${globalIdx === 0 ? "disabled" : ""}>${featureGapActionIcon("chevron-up")}</button>
+                  ${!previousOrdered ? "disabled" : ""}>${featureGapActionIcon("chevron-up")}</button>
           <button class="secondary small feature-gap-icon-btn" data-feature-move="down"
                   data-gap-id="${htmlEscape(gap.id)}"
-                  data-neighbor-id="${htmlEscape(gaps[globalIdx + 1]?.id || "")}"
+                  data-neighbor-id="${htmlEscape(nextOrdered?.id || "")}"
                   data-testid="feature-gap-move-down"
                   aria-label="Move ${htmlEscape(gap.name || gap.id)} down"
                   title="Move down"
-                  ${globalIdx === gaps.length - 1 ? "disabled" : ""}>${featureGapActionIcon("chevron-down")}</button>
+                  ${!nextOrdered ? "disabled" : ""}>${featureGapActionIcon("chevron-down")}</button>
           <button class="secondary small feature-gap-icon-btn" data-feature-delete-gap="${htmlEscape(gap.id)}"
                   data-testid="feature-gap-delete"
                   aria-label="Delete ${htmlEscape(gap.name || gap.id)}"
@@ -398,10 +406,20 @@ function renderFeatureGapTable(gaps, options = {}) {
     ${pageMeta ? renderPaginationControls("feature-modal-gaps", pageMeta, visible.length, "gap") : ""}`;
 }
 
+function findOrderedFeatureGap(gaps, fromIndex, direction) {
+  for (let i = fromIndex + direction; i >= 0 && i < gaps.length; i += direction) {
+    const candidate = gaps[i];
+    if (candidate?.feature_order !== null && candidate?.feature_order !== undefined) return candidate;
+  }
+  return null;
+}
+
 function featureGapActionIcon(name) {
   const icons = {
     "chevron-up": '<path d="M6 15l6-6 6 6"></path>',
     "chevron-down": '<path d="M6 9l6 6 6-6"></path>',
+    "list-plus": '<path d="M8 6h10"></path><path d="M8 12h6"></path><path d="M8 18h6"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path><path d="M18 15v6"></path><path d="M15 18h6"></path>',
+    "list-minus": '<path d="M8 6h10"></path><path d="M8 12h10"></path><path d="M8 18h6"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path><path d="M16 18h6"></path>',
     trash: '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
   };
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
@@ -544,7 +562,7 @@ function openFeatureModal(feature = null, options = {}) {
           ${reporterOptions}
         </select>
         ${feature ? `<div class="feature-modal-gap-heading">
-          <div class="modal-title compact">Ordered Gaps</div>
+          <div class="modal-title compact">Feature Gaps</div>
           <div class="actions feature-gap-heading-actions">
             <button type="button" class="secondary small feature-gap-add-btn"
                     data-feature-new-gap data-testid="feature-new-gap" aria-label="New Gap" title="New Gap">+</button>
@@ -729,7 +747,7 @@ function bindFeatureGapDragReorder(root, featureId, onChanged) {
     handle.addEventListener("click", (e) => e.preventDefault());
     handle.addEventListener("dragstart", (e) => {
       draggedGapId = handle.dataset.featureDragGap || "";
-      if (!draggedGapId) {
+      if (!draggedGapId || handle.closest("[data-feature-gap-row]")?.dataset.featureGapOrdered !== "1") {
         e.preventDefault();
         return;
       }
@@ -746,7 +764,7 @@ function bindFeatureGapDragReorder(root, featureId, onChanged) {
     row.addEventListener("dragover", (e) => {
       if (!draggedGapId) return;
       const targetGapId = row.dataset.featureGapRow || "";
-      if (!targetGapId || targetGapId === draggedGapId) return;
+      if (!targetGapId || targetGapId === draggedGapId || row.dataset.featureGapOrdered !== "1") return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       const rect = row.getBoundingClientRect();
@@ -803,6 +821,20 @@ function bindFeatureGapActions(root, featureId, onChanged) {
         await onChanged?.();
       } catch (e) {
         showActionError(e, "Reorder failed");
+      }
+    });
+  });
+  root.querySelectorAll("[data-feature-order-toggle]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const gapId = btn.dataset.gapId;
+      const action = btn.dataset.featureOrderToggle;
+      if (!gapId || !["order", "unorder"].includes(action)) return;
+      try {
+        await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/${action}`);
+        toast(action === "order" ? "Gap added to Feature order" : "Gap removed from Feature order", "info");
+        await onChanged?.();
+      } catch (e) {
+        showActionError(e, "Feature order update failed");
       }
     });
   });

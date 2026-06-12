@@ -7,7 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Utc;
 use serde_json::{Map, Value};
 
-use crate::model::feature::{Feature, FeatureDetail, failed_gap_feature_blocking_notice};
+use crate::model::feature::{
+    Feature, FeatureDetail, compare_feature_gap_order, failed_gap_feature_blocking_notice,
+    is_ordered_feature_gap,
+};
 use crate::model::gap::{Gap, GapPriority};
 use crate::model::workflow::{
     FeatureOperation, GapOperation, GapStatus, feature_operation_allowed, gap_operation_allowed,
@@ -269,9 +272,7 @@ impl FileWorkItemService {
                 .map(|projection| projection.gap.clone())
                 .collect::<Vec<_>>();
             feature_gaps.sort_by(|a, b| {
-                a.feature_order
-                    .unwrap_or(i64::MAX)
-                    .cmp(&b.feature_order.unwrap_or(i64::MAX))
+                compare_feature_gap_order(a.feature_order, b.feature_order)
                     .then_with(|| a.id.cmp(&b.id))
             });
             if let Some(notice) = failed_gap_feature_blocking_notice(&current.gap, &feature_gaps) {
@@ -504,6 +505,52 @@ impl FileWorkItemService {
         self.show_feature_summary(feature_id)
     }
 
+    pub fn order_gap_in_feature(
+        &self,
+        feature_id: &str,
+        gap_id: &str,
+    ) -> RefineResult<FeatureSummaryProjection> {
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
+        let current_gap = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current_gap)?;
+        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+            return Err(RefineError::Conflict(format!(
+                "Gap {gap_id} is not assigned to Feature {feature_id}"
+            )));
+        }
+        validate_gap_operation(&current_gap.gap.status, &GapOperation::ReorderInFeature)?;
+        if is_ordered_feature_gap(current_gap.gap.feature_order) {
+            return self.show_feature_summary(feature_id);
+        }
+        let next_order = self.next_feature_order(feature_id)?;
+        self.set_gap_feature_membership(gap_id, Some(feature_id), Some(next_order))?;
+        self.show_feature_summary(feature_id)
+    }
+
+    pub fn unorder_gap_in_feature(
+        &self,
+        feature_id: &str,
+        gap_id: &str,
+    ) -> RefineResult<FeatureSummaryProjection> {
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
+        let current_gap = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current_gap)?;
+        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+            return Err(RefineError::Conflict(format!(
+                "Gap {gap_id} is not assigned to Feature {feature_id}"
+            )));
+        }
+        validate_gap_operation(&current_gap.gap.status, &GapOperation::ReorderInFeature)?;
+        if !is_ordered_feature_gap(current_gap.gap.feature_order) {
+            return self.show_feature_summary(feature_id);
+        }
+        self.set_gap_feature_membership(gap_id, Some(feature_id), None)?;
+        self.compact_feature_orders(feature_id)?;
+        self.show_feature_summary(feature_id)
+    }
+
     pub fn reorder_gap_in_feature(
         &self,
         feature_id: &str,
@@ -529,12 +576,10 @@ impl FileWorkItemService {
             .list_gap_summaries()?
             .into_iter()
             .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
+            .filter(|gap| is_ordered_feature_gap(gap.gap.feature_order))
             .collect();
         gaps.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
         let Some(current_index) = gaps.iter().position(|gap| gap.gap.id == gap_id) else {
@@ -569,10 +614,7 @@ impl FileWorkItemService {
             .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
             .collect();
         gaps.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
         for gap in gaps {
@@ -1640,12 +1682,10 @@ impl FileWorkItemService {
             .list_gap_summaries()?
             .into_iter()
             .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
+            .filter(|gap| is_ordered_feature_gap(gap.gap.feature_order))
             .collect();
         gaps.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
         for (idx, gap) in gaps.iter().enumerate() {
@@ -1661,10 +1701,7 @@ impl FileWorkItemService {
             .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
             .collect();
         gaps.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
         Ok(gaps)

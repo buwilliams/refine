@@ -1463,6 +1463,48 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
+                FeatureAction::OrderGap {
+                    id,
+                    gap_id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .order_gap_in_feature(&id, &gap_id)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "feature": feature.feature,
+                    "gap_ids": feature.gap_ids,
+                    "rollup": feature.rollup
+                }))
+                .unwrap()
+            );
+            Ok(())
+        }
+        Commands::Feature {
+            action:
+                FeatureAction::UnorderGap {
+                    id,
+                    gap_id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .unorder_gap_in_feature(&id, &gap_id)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "feature": feature.feature,
+                    "gap_ids": feature.gap_ids,
+                    "rollup": feature.rollup
+                }))
+                .unwrap()
+            );
+            Ok(())
+        }
+        Commands::Feature {
+            action:
                 FeatureAction::Move {
                     id,
                     target,
@@ -2186,6 +2228,32 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
                 path_segment(&gap_id)
             ),
             Some(json!({ "order": order })),
+        )?,
+        FeatureAction::OrderGap {
+            id,
+            gap_id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/features/{}/gaps/{}/order",
+                path_segment(&id),
+                path_segment(&gap_id)
+            ),
+            None,
+        )?,
+        FeatureAction::UnorderGap {
+            id,
+            gap_id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/features/{}/gaps/{}/unorder",
+                path_segment(&id),
+                path_segment(&gap_id)
+            ),
+            None,
         )?,
         FeatureAction::Move {
             id,
@@ -2911,6 +2979,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | FeatureAction::AddGap { target_root, .. }
             | FeatureAction::RemoveGap { target_root, .. }
             | FeatureAction::ReorderGap { target_root, .. }
+            | FeatureAction::OrderGap { target_root, .. }
+            | FeatureAction::UnorderGap { target_root, .. }
             | FeatureAction::Move { target_root, .. }
             | FeatureAction::Cancel { target_root, .. }
             | FeatureAction::Delete { target_root, .. } => target_root.as_ref(),

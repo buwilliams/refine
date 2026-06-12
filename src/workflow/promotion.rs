@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 use crate::model::JsonObject;
+use crate::model::feature::compare_feature_gap_order;
 use crate::model::workflow::GapStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineResult;
@@ -47,10 +48,7 @@ impl BacklogPromotionService {
             .cloned()
             .collect::<Vec<_>>();
         candidates.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
                 .then_with(|| a.gap.updated.cmp(&b.gap.updated))
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
