@@ -611,7 +611,10 @@ impl InProcessWebServer {
         let repo_root = self
             .target_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        let refine_dir = self.current_refine_dir().ok().flatten();
+        let target_root = self.current_target_root().ok().flatten();
+        let refine_dir = target_root
+            .as_ref()
+            .map(|target_root| target_root.join(".refine"));
         let cache_key = diagnostics_cache_key(runtime_root, refine_dir.as_ref(), &repo_root);
         if !refresh {
             let cache = DIAGNOSTICS_CACHE
@@ -627,7 +630,7 @@ impl InProcessWebServer {
             Err(error) => return Err(error),
         };
         let doctor =
-            FileDiagnosticsService::new(refine_dir, runtime_root.clone(), repo_root).doctor()?;
+            FileDiagnosticsService::new(target_root, runtime_root.clone(), repo_root).doctor()?;
         let provider = projection
             .runtime
             .preflight

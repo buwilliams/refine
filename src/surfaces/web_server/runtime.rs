@@ -12,6 +12,7 @@ use crate::process::supervisor::operations::{
 };
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
+use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionSnapshot, RuntimeProjection,
@@ -47,21 +48,7 @@ static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectio
 
 impl InProcessWebServer {
     pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {
-        self.runtime_root.as_ref().map(|runtime_root| {
-            if runtime_root
-                .file_name()
-                .and_then(|value| value.to_str())
-                .and_then(|value| value.parse::<u16>().ok())
-                .is_some()
-            {
-                runtime_root
-                    .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or_else(|| runtime_root.clone())
-            } else {
-                runtime_root.clone()
-            }
-        })
+        self.runtime_root.clone()
     }
 
     pub(super) fn project_registry_service(&self) -> Option<FileProjectRegistryService> {
@@ -122,6 +109,19 @@ impl InProcessWebServer {
             FileWorkItemService::with_projection_cache(refine_dir, runtime_root.join("cache"))
         } else {
             FileWorkItemService::new(refine_dir)
+        }
+    }
+
+    pub(super) fn node_registry_service(
+        &self,
+        refine_dir: impl Into<PathBuf>,
+    ) -> FileNodeRegistryService {
+        let refine_dir = refine_dir.into();
+        match &self.runtime_root {
+            Some(runtime_root) => {
+                FileNodeRegistryService::with_active_root(refine_dir, runtime_root)
+            }
+            None => FileNodeRegistryService::new(refine_dir),
         }
     }
 

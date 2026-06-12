@@ -20,7 +20,7 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
-use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
+use crate::tools::product::nodes::{NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::tools::product::work_items::BulkGapSelection;
 use crate::workflow::WorkflowEngine;
@@ -441,7 +441,7 @@ impl InProcessWebServer {
                     "node id is required".to_string(),
                 ));
             }
-            return match FileNodeRegistryService::new(&refine_dir).create(node_id) {
+            return match self.node_registry_service(&refine_dir).create(node_id) {
                 Ok(_) => self.handle_nodes(),
                 Err(error) => error_response(error),
             };
@@ -456,7 +456,10 @@ impl InProcessWebServer {
                 "display_name is required".to_string(),
             ));
         }
-        match FileNodeRegistryService::new(&refine_dir).create_with_display_name(display_name) {
+        match self
+            .node_registry_service(&refine_dir)
+            .create_with_display_name(display_name)
+        {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
@@ -470,7 +473,7 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim();
-        match FileNodeRegistryService::new(refine_dir).activate(node_id) {
+        match self.node_registry_service(refine_dir).activate(node_id) {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
@@ -494,7 +497,10 @@ impl InProcessWebServer {
                 .map(str::to_string),
             archived: body.get("archived").and_then(|value| value.as_bool()),
         };
-        match FileNodeRegistryService::new(refine_dir).update(node_id, update) {
+        match self
+            .node_registry_service(refine_dir)
+            .update(node_id, update)
+        {
             Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
@@ -508,8 +514,9 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim();
-        if let Err(error) =
-            FileNodeRegistryService::new(&refine_dir).ensure_transfer_target(target_node_id)
+        if let Err(error) = self
+            .node_registry_service(&refine_dir)
+            .ensure_transfer_target(target_node_id)
         {
             return error_response(error);
         }
@@ -740,7 +747,8 @@ impl InProcessWebServer {
                 .entry(gap.gap.status.as_str().to_string())
                 .or_insert(0) += 1;
         }
-        FileNodeRegistryService::new(refine_dir).list_with_counts_response(counts)
+        self.node_registry_service(refine_dir)
+            .list_with_counts_response(counts)
     }
 
     pub(super) fn handle_target_app_status(&self) -> ApiResponse {

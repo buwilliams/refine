@@ -2814,8 +2814,10 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
 fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let temp_root = unique_temp_dir("http-node-transfer");
     let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
     for (id, name) in [
         ("GAP1", "Transfer One"),
         ("GAP2", "Transfer Two"),
@@ -2849,7 +2851,8 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     });
     assert_eq!(activated.status, 200);
     assert_eq!(activated.body["active_node_id"], "remote-qa");
-    assert!(refine_dir.join("active-node.json").exists());
+    assert!(runtime_root.join("active-node.json").exists());
+    assert!(!refine_dir.join("active-node.json").exists());
 
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4351,7 +4354,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&refine_dir).unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
@@ -4366,8 +4368,8 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(status.body["attached"], true);
     assert_eq!(status.body["target_root"], app_root.display().to_string());
     assert_eq!(status.body["apps"].as_array().unwrap().len(), 1);
-    assert!(app_registry_root.join("apps.json").exists());
-    assert!(!runtime_root.join("apps.json").exists());
+    assert!(runtime_root.join("apps.json").exists());
+    assert!(!temp_root.join("run/apps.json").exists());
 
     let app_status = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -4555,7 +4557,7 @@ fn web_server_project_attach_creates_missing_local_project() {
     );
     assert!(destination.join(".git").exists());
     assert!(destination.join(".refine/refine.json").exists());
-    assert!(!runtime_root.join("processes").exists());
+    assert!(runtime_root.join("processes").exists());
     assert!(!destination.join(".refine/runtime/processes").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -4717,7 +4719,6 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&refine_dir).unwrap();
     let mut server = server_with_projection();
     server.target_root = None;
@@ -4741,8 +4742,8 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     });
     assert_eq!(attached.status, 200);
     assert_eq!(attached.body["target_root"], app_root.display().to_string());
-    assert!(app_registry_root.join("apps.json").exists());
-    assert!(!runtime_root.join("apps.json").exists());
+    assert!(runtime_root.join("apps.json").exists());
+    assert!(!temp_root.join("run/apps.json").exists());
 
     let settings = server.handle(ApiRequest {
         method: "PATCH".to_string(),

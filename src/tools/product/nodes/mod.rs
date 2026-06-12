@@ -14,6 +14,7 @@ pub const ACTIVE_NODE_FILE: &str = "active-node.json";
 #[derive(Clone, Debug)]
 pub struct FileNodeRegistryService {
     pub refine_dir: PathBuf,
+    pub active_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -26,6 +27,17 @@ impl FileNodeRegistryService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            active_root: None,
+        }
+    }
+
+    pub fn with_active_root(
+        refine_dir: impl Into<PathBuf>,
+        active_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            refine_dir: refine_dir.into(),
+            active_root: Some(active_root.into()),
         }
     }
 
@@ -34,7 +46,10 @@ impl FileNodeRegistryService {
     }
 
     pub fn active_path(&self) -> PathBuf {
-        self.refine_dir.join(ACTIVE_NODE_FILE)
+        self.active_root
+            .as_ref()
+            .unwrap_or(&self.refine_dir)
+            .join(ACTIVE_NODE_FILE)
     }
 
     pub fn active_node_id(&self) -> RefineResult<String> {
@@ -471,6 +486,36 @@ mod tests {
         service.activate("default").unwrap();
         service.archive("node-1").unwrap();
         assert_eq!(service.show("node-1").unwrap()["node"]["archived"], true);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_node_registry_can_keep_active_selection_outside_shared_refine_dir() {
+        let temp_root = unique_temp_dir("nodes-active-root");
+        let refine_dir = temp_root.join("app/.refine");
+        let run_a = temp_root.join("run/8082");
+        let run_b = temp_root.join("run/8083");
+        let service_a = FileNodeRegistryService::with_active_root(&refine_dir, &run_a);
+        let service_b = FileNodeRegistryService::with_active_root(&refine_dir, &run_b);
+
+        service_a.create("node-a").unwrap();
+        service_a.create("node-b").unwrap();
+        service_a.activate("node-a").unwrap();
+        service_b.activate("node-b").unwrap();
+
+        assert_eq!(
+            service_a.list_response().unwrap()["active_node_id"],
+            "node-a"
+        );
+        assert_eq!(
+            service_b.list_response().unwrap()["active_node_id"],
+            "node-b"
+        );
+        assert!(refine_dir.join("nodes.json").exists());
+        assert!(!refine_dir.join("active-node.json").exists());
+        assert!(run_a.join("active-node.json").exists());
+        assert!(run_b.join("active-node.json").exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

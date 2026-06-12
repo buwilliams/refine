@@ -24,7 +24,6 @@ use crate::tools::product::imports::{
     FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
     import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
 };
-use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
@@ -593,11 +592,7 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| {
-                FileNodeRegistryService::new(refine_dir)
-                    .active_node_id()
-                    .ok()
-            })
+            .and_then(|refine_dir| self.node_registry_service(refine_dir).active_node_id().ok())
             .filter(|node_id| !node_id.trim().is_empty())
             .unwrap_or_else(|| "default".to_string())
     }
@@ -606,11 +601,7 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| {
-                FileNodeRegistryService::new(refine_dir)
-                    .list_response()
-                    .ok()
-            })
+            .and_then(|refine_dir| self.node_registry_service(refine_dir).list_response().ok())
             .and_then(|value| {
                 value
                     .get("nodes")

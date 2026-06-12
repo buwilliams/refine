@@ -9,6 +9,7 @@ use crate::model::project::{
 };
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_migration::FileProjectMigrationService;
 
 pub const APP_REGISTRY_FILE: &str = "apps.json";
@@ -131,7 +132,7 @@ impl FileProjectRegistryService {
             self.migrate_schema_if_safe(Path::new(current))?;
         }
         let attached = current.is_some();
-        project_status_for(registry, current, attached)
+        project_status_for(registry, current, attached, Some(&self.runtime_root))
     }
 
     pub fn register_path(
@@ -247,7 +248,7 @@ impl FileProjectRegistryService {
             true,
         );
         self.save(&registry)?;
-        project_status_for(registry, Some(display_path), true)
+        project_status_for(registry, Some(display_path), true, Some(&self.runtime_root))
     }
 
     pub fn create_local_project_at(
@@ -309,7 +310,7 @@ impl FileProjectRegistryService {
             app.last_used_at = Some(now_timestamp());
         }
         self.save(&registry)?;
-        project_status_for(registry, Some(path), true)
+        project_status_for(registry, Some(path), true, Some(&self.runtime_root))
     }
 
     pub fn migrate_current(&self) -> RefineResult<ProjectMigrationReport> {
@@ -444,7 +445,7 @@ impl ProjectRegistryService for FileProjectRegistryService {
         let mut registry = self.load()?;
         registry.active_app = None;
         self.save(&registry)?;
-        project_status_for(registry, None, false)
+        project_status_for(registry, None, false, Some(&self.runtime_root))
     }
 
     fn clone_app(
@@ -482,9 +483,14 @@ impl ProjectRegistryService for FileProjectRegistryService {
         let registry = self.load()?;
         if !path.trim().is_empty() {
             let app_path = normalize_app_path(path)?;
-            return project_status_for(registry, Some(app_path.display().to_string()), true);
+            return project_status_for(
+                registry,
+                Some(app_path.display().to_string()),
+                true,
+                Some(&self.runtime_root),
+            );
         }
-        project_status_for(registry, None, false)
+        project_status_for(registry, None, false, Some(&self.runtime_root))
     }
 }
 
@@ -492,6 +498,7 @@ fn project_status_for(
     registry: AppRegistry,
     current: Option<String>,
     attached: bool,
+    active_node_root: Option<&Path>,
 ) -> RefineResult<ProjectStatus> {
     let active_refine_dir = current
         .as_ref()
@@ -499,6 +506,11 @@ fn project_status_for(
     let schema = match &active_refine_dir {
         Some(root) => FileProjectMigrationService::new(root).status()?,
         None => detached_schema_status(),
+    };
+    let (active_node_id, active_node) = if attached {
+        active_node_status(active_refine_dir.as_deref(), active_node_root)
+    } else {
+        (None, None)
     };
     Ok(ProjectStatus {
         attached,
@@ -513,22 +525,49 @@ fn project_status_for(
         schema,
         maintenance: None,
         apps: registry,
-        active_node_id: if attached {
-            Some("default".to_string())
-        } else {
-            None
-        },
-        active_node: if attached {
-            Some("Default".to_string())
-        } else {
-            None
-        },
+        active_node_id,
+        active_node,
         message: if attached {
             None
         } else {
             Some("No refine project is attached.".to_string())
         },
     })
+}
+
+fn active_node_status(
+    active_refine_dir: Option<&Path>,
+    active_node_root: Option<&Path>,
+) -> (Option<String>, Option<String>) {
+    let Some(refine_dir) = active_refine_dir else {
+        return (Some("default".to_string()), Some("Default".to_string()));
+    };
+    let service = match active_node_root {
+        Some(root) => FileNodeRegistryService::with_active_root(refine_dir, root),
+        None => FileNodeRegistryService::new(refine_dir),
+    };
+    let active_node_id = service
+        .active_node_id()
+        .unwrap_or_else(|_| "default".to_string());
+    let active_node = service
+        .list_response()
+        .ok()
+        .and_then(|value| {
+            value
+                .get("nodes")
+                .and_then(|nodes| nodes.as_array())
+                .and_then(|nodes| {
+                    nodes.iter().find(|node| {
+                        node.get("id").and_then(|value| value.as_str())
+                            == Some(active_node_id.as_str())
+                    })
+                })
+                .and_then(|node| node.get("display_name"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "Default".to_string());
+    (Some(active_node_id), Some(active_node))
 }
 
 fn detached_schema_status() -> ProjectSchemaStatus {
@@ -560,6 +599,18 @@ fn upsert_app(registry: &mut AppRegistry, app: RegisteredApp, make_current: bool
     registry.apps.insert(key.clone(), app);
     if make_current {
         registry.active_app = Some(key);
+    }
+}
+
+fn normalize_refine_dir_path(path: PathBuf) -> PathBuf {
+    if path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value == ".refine")
+    {
+        path.parent().map(Path::to_path_buf).unwrap_or(path)
+    } else {
+        path
     }
 }
 
@@ -607,7 +658,7 @@ fn normalize_app_path(path: &str) -> RefineResult<PathBuf> {
             .map_err(|error| RefineError::Io(format!("failed to inspect cwd: {error}")))?
             .join(path)
     };
-    Ok(path)
+    Ok(normalize_refine_dir_path(path))
 }
 
 fn expand_home_path(raw: &str) -> PathBuf {
@@ -742,6 +793,40 @@ mod tests {
         assert_eq!(
             registry.active_app.as_deref(),
             Some(destination.to_str().unwrap())
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_project_registry_normalizes_refine_dir_inputs_before_persisting() {
+        let temp_root = unique_temp_dir("project-registry-refine-dir");
+        let runtime_root = temp_root.join("run/8080");
+        let app_root = temp_root.join("app");
+        fs::create_dir_all(app_root.join(".refine")).unwrap();
+        FileProjectMigrationService::new(app_root.join(".refine"))
+            .initialize_current_schema()
+            .unwrap();
+        let service = FileProjectRegistryService::new(&runtime_root, None);
+
+        let status = service
+            .attach(app_root.join(".refine").to_str().unwrap())
+            .unwrap();
+
+        assert_eq!(
+            status.target_root.as_deref(),
+            Some(app_root.to_str().unwrap())
+        );
+        let registry = service.load().unwrap();
+        assert_eq!(
+            registry.active_app.as_deref(),
+            Some(app_root.to_str().unwrap())
+        );
+        assert!(registry.apps.contains_key(app_root.to_str().unwrap()));
+        assert!(
+            !registry
+                .apps
+                .contains_key(app_root.join(".refine").to_str().unwrap())
         );
 
         fs::remove_dir_all(temp_root).unwrap();

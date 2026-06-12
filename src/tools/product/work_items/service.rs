@@ -79,6 +79,7 @@ fn validate_automated_gap_transition(from: &GapStatus, to: &GapStatus) -> Refine
 pub struct FileWorkItemService {
     pub refine_dir: PathBuf,
     pub projection_cache_dir: Option<PathBuf>,
+    pub active_node_root: Option<PathBuf>,
 }
 
 impl FileWorkItemService {
@@ -86,6 +87,7 @@ impl FileWorkItemService {
         Self {
             refine_dir: refine_dir.into(),
             projection_cache_dir: None,
+            active_node_root: None,
         }
     }
 
@@ -93,9 +95,12 @@ impl FileWorkItemService {
         refine_dir: impl Into<PathBuf>,
         cache_dir: impl Into<PathBuf>,
     ) -> Self {
+        let cache_dir = cache_dir.into();
+        let active_node_root = cache_dir.parent().map(PathBuf::from);
         Self {
             refine_dir: refine_dir.into(),
-            projection_cache_dir: Some(cache_dir.into()),
+            projection_cache_dir: Some(cache_dir),
+            active_node_root,
         }
     }
 
@@ -117,7 +122,16 @@ impl FileWorkItemService {
     }
 
     fn active_node_id(&self) -> RefineResult<String> {
-        FileNodeRegistryService::new(&self.refine_dir).active_node_id()
+        self.node_registry_service().active_node_id()
+    }
+
+    fn node_registry_service(&self) -> FileNodeRegistryService {
+        match &self.active_node_root {
+            Some(active_root) => {
+                FileNodeRegistryService::with_active_root(&self.refine_dir, active_root)
+            }
+            None => FileNodeRegistryService::new(&self.refine_dir),
+        }
     }
 
     fn ensure_gap_owned(&self, gap: &GapSummaryProjection) -> RefineResult<()> {
@@ -280,7 +294,7 @@ impl FileWorkItemService {
 
     fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
         let node_id = node_id.unwrap_or("default");
-        FileNodeRegistryService::new(&self.refine_dir)
+        self.node_registry_service()
             .show(node_id)
             .ok()
             .and_then(|value| {
