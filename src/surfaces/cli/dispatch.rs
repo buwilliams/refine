@@ -34,7 +34,7 @@ use crate::tools::product::project_registry::{FileProjectRegistryService, Projec
 use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
 };
-use crate::tools::product::work_items::{BulkGapFilter, BulkGapSelection, FileWorkItemService};
+use crate::tools::product::work_items::FileWorkItemService;
 
 use super::actions::*;
 use super::helpers::*;
@@ -260,16 +260,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
             let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .bulk_transfer_gaps_to_node(
-                    &id,
-                    BulkGapSelection {
-                        filter: BulkGapFilter::default(),
-                        selected_ids: Some(vec![item_id]),
-                        exclude_ids: Vec::new(),
-                    },
-                )?;
+                .transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
@@ -426,14 +418,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let service = FileClusterService::new(refine_dir_for_target_root(&target_root));
             service.transfer(&item_id, &id)?;
             let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .bulk_transfer_gaps_to_node(
-                    &id,
-                    BulkGapSelection {
-                        filter: BulkGapFilter::default(),
-                        selected_ids: Some(vec![item_id]),
-                        exclude_ids: Vec::new(),
-                    },
-                )?;
+                .transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
@@ -1533,6 +1518,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
+                FeatureAction::Transfer {
+                    id,
+                    node_id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .transfer_feature_to_node(&node_id, &id)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Feature {
+            action:
                 FeatureAction::Cancel {
                     id,
                     target_root: Some(target_root),
@@ -2264,6 +2262,15 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
             &format!("/work/features/{}/move", path_segment(&id)),
             Some(json!({ "status": target })),
         )?,
+        FeatureAction::Transfer {
+            id,
+            node_id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/features/{}/transfer", path_segment(&id)),
+            Some(json!({ "target_node_id": node_id })),
+        )?,
         FeatureAction::Cancel {
             id,
             target_root: None,
@@ -2576,7 +2583,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
             "/nodes/transfer-gaps",
             Some(json!({
                 "target_node_id": id,
-                "selected_ids": [item_id],
+                "item_id": item_id,
                 "exclude_ids": []
             })),
         )?,
@@ -2982,6 +2989,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | FeatureAction::OrderGap { target_root, .. }
             | FeatureAction::UnorderGap { target_root, .. }
             | FeatureAction::Move { target_root, .. }
+            | FeatureAction::Transfer { target_root, .. }
             | FeatureAction::Cancel { target_root, .. }
             | FeatureAction::Delete { target_root, .. } => target_root.as_ref(),
             FeatureAction::Import { target_root, .. } => Some(target_root),

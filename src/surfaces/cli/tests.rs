@@ -1671,6 +1671,95 @@ fn node_commands_use_shared_node_registry_service() {
 }
 
 #[test]
+fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
+    let temp_root = unique_temp_dir("cli-feature-node-transfer");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
+    for argv in [
+        vec![
+            "refine",
+            "node",
+            "create",
+            "node-1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ],
+        vec![
+            "refine",
+            "feature",
+            "create",
+            "Transfer Feature",
+            "--id",
+            "FEA1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ],
+        vec![
+            "refine",
+            "gap",
+            "create",
+            "Feature Gap",
+            "--id",
+            "GAP1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ],
+        vec![
+            "refine",
+            "feature",
+            "add-gap",
+            "FEA1",
+            "GAP1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ],
+    ] {
+        dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
+    }
+
+    let direct_gap = dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "node",
+            "transfer",
+            "node-1",
+            "GAP1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap_err();
+    assert!(
+        direct_gap
+            .to_string()
+            .contains("transfer the Feature instead"),
+        "{direct_gap}"
+    );
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "feature",
+            "transfer",
+            "FEA1",
+            "node-1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    let feature = fs::read_to_string(refine_dir.join("features/FE/A1/feature.json")).unwrap();
+    assert!(feature.contains("\"node_id\": \"node-1\""));
+    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    assert!(gap.contains("\"node_id\": \"node-1\""));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn cluster_commands_use_shared_cluster_service() {
     let temp_root = unique_temp_dir("cli-cluster-registry");
     let target_root = temp_root.clone();

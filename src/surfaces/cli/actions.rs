@@ -349,6 +349,13 @@ pub enum FeatureAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
+    Transfer {
+        id: String,
+        node_id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
     Cancel {
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]

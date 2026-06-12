@@ -698,6 +698,44 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
     fixture.assert_success("node transfer", &transfer);
     assert_eq!(fixture.gap_field(&gap_id, "node_id"), "transfer-node");
 
+    let feature = fixture.run_refine(&["feature", "create", "cli node transfer feature"]);
+    fixture.assert_success("feature create node transfer", &feature);
+    let feature_id = fixture.json_stdout(&feature)["feature"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let feature_gap_id = fixture.create_gap("node transfer feature member gap");
+    fixture.assert_success(
+        "feature add node transfer gap",
+        &fixture.run_refine(&["feature", "add-gap", &feature_id, &feature_gap_id]),
+    );
+    let direct_feature_gap_transfer =
+        fixture.run_refine(&["node", "transfer", "transfer-node", &feature_gap_id]);
+    assert!(
+        !direct_feature_gap_transfer.status.success(),
+        "Feature-owned Gap transfer unexpectedly succeeded"
+    );
+    assert!(
+        String::from_utf8_lossy(&direct_feature_gap_transfer.stderr)
+            .contains("transfer the Feature instead"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&direct_feature_gap_transfer.stderr)
+    );
+    fixture.assert_success(
+        "feature transfer node",
+        &fixture.run_refine(&["feature", "transfer", &feature_id, "transfer-node"]),
+    );
+    let transferred_feature = fixture.run_refine(&["feature", "show", &feature_id]);
+    fixture.assert_success("feature show transferred node", &transferred_feature);
+    assert_eq!(
+        fixture.json_stdout(&transferred_feature)["feature"]["node_id"],
+        "transfer-node"
+    );
+    assert_eq!(
+        fixture.gap_field(&feature_gap_id, "node_id"),
+        "transfer-node"
+    );
+
     fixture.assert_success(
         "node activate transfer for cleanup",
         &fixture.run_refine(&["node", "activate", "transfer-node"]),
@@ -705,6 +743,14 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
     fixture.assert_success(
         "gap delete transferred",
         &fixture.run_refine(&["gap", "delete", &gap_id]),
+    );
+    fixture.assert_success(
+        "gap delete transferred feature member",
+        &fixture.run_refine(&["gap", "delete", &feature_gap_id]),
+    );
+    fixture.assert_success(
+        "feature delete transferred",
+        &fixture.run_refine(&["feature", "delete", &feature_id]),
     );
     fixture.assert_success(
         "node activate default after transfer cleanup",

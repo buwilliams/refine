@@ -1749,6 +1749,43 @@ impl InProcessWebServer {
         }
     }
 
+    pub(super) fn handle_feature_transfer(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "transfer Feature to node");
+        let Some(feature_id) = request
+            .path
+            .strip_prefix("/work/features/")
+            .and_then(|path| path.strip_suffix("/transfer"))
+            .filter(|feature_id| !feature_id.is_empty() && !feature_id.contains('/'))
+        else {
+            return feature_id_required();
+        };
+        let Some(target_node_id) = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("target_node_id"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_node_id",
+                        "message": "body.target_node_id is required"
+                    }
+                }),
+            );
+        };
+        match self
+            .work_item_service(refine_dir)
+            .transfer_feature_to_node(target_node_id, feature_id)
+        {
+            Ok(result) => ApiResponse::json(200, json!(result)),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn handle_feature_cancel(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "cancel Features");
         let Some(feature_id) = request

@@ -617,6 +617,13 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
+            && request.path.ends_with("/transfer")
+        {
+            return self.handle_feature_transfer(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/features/")
             && request.path.ends_with("/cancel")
         {
             return self.handle_feature_cancel(request);

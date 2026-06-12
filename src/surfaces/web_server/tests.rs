@@ -2949,6 +2949,85 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
 }
 
 #[test]
+fn web_server_transfers_feature_ownership_as_a_unit() {
+    let temp_root = unique_temp_dir("http-feature-node-transfer");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root);
+
+    let create_node = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes".to_string(),
+        body: Some(json!({"id": "remote-node", "display_name": "Remote Node"})),
+    });
+    assert_eq!(create_node.status, 200);
+    let create_feature = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features".to_string(),
+        body: Some(json!({"id": "FEA1", "name": "Transfer Feature"})),
+    });
+    assert_eq!(create_feature.status, 201);
+    for (id, name) in [("GAP1", "Feature One"), ("GAP2", "Feature Two")] {
+        let gap = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/gaps".to_string(),
+            body: Some(json!({"id": id, "name": name})),
+        });
+        assert_eq!(gap.status, 201);
+        let assign = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: format!("/api/features/FEA1/gaps/{id}"),
+            body: None,
+        });
+        assert_eq!(assign.status, 200);
+    }
+
+    let direct_gap = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/transfer-gaps".to_string(),
+        body: Some(json!({
+            "item_id": "GAP1",
+            "target_node_id": "remote-node"
+        })),
+    });
+    assert_eq!(direct_gap.status, 409);
+    assert!(
+        direct_gap.body["error"]["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("transfer the Feature instead"),
+        "{direct_gap:#?}"
+    );
+
+    let transfer = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/transfer".to_string(),
+        body: Some(json!({"target_node_id": "remote-node"})),
+    });
+    assert_eq!(transfer.status, 200);
+    assert_eq!(transfer.body["updated"], 3);
+    assert_eq!(transfer.body["ids"], json!(["FEA1", "GAP1", "GAP2"]));
+    let feature = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/features/FEA1".to_string(),
+        body: None,
+    });
+    assert_eq!(feature.body["feature"]["node_id"], "remote-node");
+    for id in ["GAP1", "GAP2"] {
+        let gap = server.handle(ApiRequest {
+            method: "GET".to_string(),
+            path: format!("/api/gaps/{id}"),
+            body: None,
+        });
+        assert_eq!(gap.body["gap"]["node_id"], "remote-node");
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_manages_cluster_operations_over_nodes() {
     let temp_root = unique_temp_dir("http-cluster-registry");
     let refine_dir = temp_root.join(".refine");

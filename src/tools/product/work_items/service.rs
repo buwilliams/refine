@@ -846,35 +846,109 @@ impl FileWorkItemService {
         target_node_id: &str,
         selection: BulkGapSelection,
     ) -> RefineResult<BulkTransferNodeResult> {
-        let target_node_id = target_node_id.trim();
-        if target_node_id.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "target_node_id is required".to_string(),
-            ));
-        }
+        let target_node_id = self.validate_transfer_target_node(target_node_id)?;
         let (gaps, mut skipped_details) = self.select_bulk_gap_summaries(&selection, false)?;
         let mut ids = Vec::new();
         for gap in gaps {
-            if matches!(
-                gap.gap.status,
-                GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::Build
-            ) {
+            if let Some(reason) = gap_transfer_skip_reason(&gap) {
                 skipped_details.push(BulkSkippedDetail {
                     id: gap.gap.id,
-                    reason: format!("status:{}", gap.gap.status.as_str()),
+                    reason,
                 });
                 continue;
             }
-            self.set_gap_node_unchecked(&gap.gap.id, target_node_id)?;
+            self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
             ids.push(gap.gap.id);
         }
         Ok(BulkTransferNodeResult {
-            target_node_id: target_node_id.to_string(),
+            target_node_id,
             updated: ids.len(),
             ids,
             skipped: skipped_details.len(),
             skipped_details,
         })
+    }
+
+    pub fn transfer_gap_to_node(
+        &self,
+        target_node_id: &str,
+        gap_id: &str,
+    ) -> RefineResult<BulkTransferNodeResult> {
+        let target_node_id = self.validate_transfer_target_node(target_node_id)?;
+        let gap = self.show_gap_summary(gap_id)?;
+        validate_gap_transfer_to_node(&gap)?;
+        self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
+        Ok(BulkTransferNodeResult {
+            target_node_id,
+            updated: 1,
+            ids: vec![gap.gap.id],
+            skipped: 0,
+            skipped_details: Vec::new(),
+        })
+    }
+
+    pub fn transfer_feature_to_node(
+        &self,
+        target_node_id: &str,
+        feature_id: &str,
+    ) -> RefineResult<BulkTransferNodeResult> {
+        let target_node_id = self.validate_transfer_target_node(target_node_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        let mut gaps = Vec::new();
+        for gap_id in &feature.gap_ids {
+            let gap = self.show_gap_summary(gap_id)?;
+            if let Some(reason) = gap_status_transfer_skip_reason(&gap) {
+                return Err(RefineError::Conflict(format!(
+                    "Feature {} cannot transfer while Gap {} is not transferable ({reason})",
+                    feature.feature.id, gap.gap.id
+                )));
+            }
+            gaps.push(gap);
+        }
+        self.set_feature_node_unchecked(&feature.feature.id, &target_node_id)?;
+        let mut ids = vec![feature.feature.id];
+        for gap in gaps {
+            self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
+            ids.push(gap.gap.id);
+        }
+        Ok(BulkTransferNodeResult {
+            target_node_id,
+            updated: ids.len(),
+            ids,
+            skipped: 0,
+            skipped_details: Vec::new(),
+        })
+    }
+
+    pub fn transfer_item_to_node(
+        &self,
+        target_node_id: &str,
+        item_id: &str,
+    ) -> RefineResult<BulkTransferNodeResult> {
+        let item_id = item_id.trim();
+        if item_id.is_empty() {
+            return Err(RefineError::InvalidInput("item_id is required".to_string()));
+        }
+        match self.show_feature_summary(item_id) {
+            Ok(_) => self.transfer_feature_to_node(target_node_id, item_id),
+            Err(feature_error) => match self.transfer_gap_to_node(target_node_id, item_id) {
+                Ok(result) => Ok(result),
+                Err(gap_error)
+                    if matches!(
+                        feature_error.category(),
+                        crate::process::supervisor::errors::ErrorCategory::NotFound
+                    ) && matches!(
+                        gap_error.category(),
+                        crate::process::supervisor::errors::ErrorCategory::NotFound
+                    ) =>
+                {
+                    Err(RefineError::NotFound(format!(
+                        "Gap or Feature {item_id} was not found in refine state"
+                    )))
+                }
+                Err(gap_error) => Err(gap_error),
+            },
+        }
     }
 
     pub fn verify_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
@@ -1632,6 +1706,43 @@ impl FileWorkItemService {
         write_json_atomically(&gap_path, &value)
     }
 
+    fn set_feature_node_unchecked(&self, feature_id: &str, node_id: &str) -> RefineResult<()> {
+        let feature_path = feature_json_path(&self.refine_dir, feature_id);
+        let bytes = fs::read(&feature_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read Feature {}: {error}",
+                feature_path.display()
+            ))
+        })?;
+        let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse Feature {}: {error}",
+                feature_path.display()
+            ))
+        })?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "Feature {} is not a JSON object",
+                feature_path.display()
+            ))
+        })?;
+        object.insert("node_id".to_string(), Value::String(node_id.to_string()));
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&feature_path, &value)
+    }
+
+    fn validate_transfer_target_node(&self, target_node_id: &str) -> RefineResult<String> {
+        let target_node_id = target_node_id.trim();
+        if target_node_id.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "target_node_id is required".to_string(),
+            ));
+        }
+        self.node_registry_service()
+            .ensure_transfer_target(target_node_id)?;
+        Ok(target_node_id.to_string())
+    }
+
     fn set_latest_round_assignee(&self, gap_id: &str, assignee: &str) -> RefineResult<()> {
         let assignee = Self::validate_gap_assignee(assignee)?;
         let (gap_path, mut value) = self.read_gap_value(gap_id)?;
@@ -1878,6 +1989,43 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         }
     }
     true
+}
+
+fn gap_transfer_skip_reason(gap: &GapSummaryProjection) -> Option<String> {
+    if let Some(reason) = gap_status_transfer_skip_reason(gap) {
+        return Some(reason);
+    }
+    gap.gap
+        .feature_id
+        .as_ref()
+        .map(|feature_id| format!("feature:{feature_id}"))
+}
+
+fn gap_status_transfer_skip_reason(gap: &GapSummaryProjection) -> Option<String> {
+    if matches!(
+        gap.gap.status,
+        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::Build
+    ) {
+        Some(format!("status:{}", gap.gap.status.as_str()))
+    } else {
+        None
+    }
+}
+
+fn validate_gap_transfer_to_node(gap: &GapSummaryProjection) -> RefineResult<()> {
+    if let Some(feature_id) = gap.gap.feature_id.as_deref() {
+        return Err(RefineError::Conflict(format!(
+            "Gap {} is assigned to Feature {feature_id}; transfer the Feature instead",
+            gap.gap.id
+        )));
+    }
+    if let Some(reason) = gap_transfer_skip_reason(gap) {
+        return Err(RefineError::Conflict(format!(
+            "Gap {} is not transferable ({reason})",
+            gap.gap.id
+        )));
+    }
+    Ok(())
 }
 
 fn bulk_feature_matches_filter(

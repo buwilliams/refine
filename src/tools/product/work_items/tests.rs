@@ -510,6 +510,117 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
 }
 
 #[test]
+fn file_work_item_service_transfers_features_as_node_owned_units() {
+    let temp_root = unique_temp_dir("work-item-feature-transfer");
+    let refine_dir = temp_root.join(".refine");
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("remote-node").unwrap();
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.create_gap_summary("First", Some("GAP1")).unwrap();
+    service.create_gap_summary("Second", Some("GAP2")).unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+
+    let direct_gap = service
+        .transfer_gap_to_node("remote-node", "GAP1")
+        .unwrap_err();
+    assert!(
+        direct_gap
+            .to_string()
+            .contains("transfer the Feature instead"),
+        "{direct_gap}"
+    );
+    let bulk = service
+        .bulk_transfer_gaps_to_node(
+            "remote-node",
+            BulkGapSelection {
+                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(bulk.updated, 0);
+    assert_eq!(bulk.skipped, 2);
+    assert_eq!(bulk.skipped_details[0].reason, "feature:FEA1");
+
+    let transferred = service
+        .transfer_feature_to_node("remote-node", "FEA1")
+        .unwrap();
+    assert_eq!(transferred.updated, 3);
+    assert_eq!(transferred.ids, vec!["FEA1", "GAP1", "GAP2"]);
+    assert_eq!(
+        service
+            .show_feature_summary("FEA1")
+            .unwrap()
+            .feature
+            .node_id
+            .as_deref(),
+        Some("remote-node")
+    );
+    for gap_id in ["GAP1", "GAP2"] {
+        assert_eq!(
+            service
+                .show_gap_summary(gap_id)
+                .unwrap()
+                .gap
+                .node_id
+                .as_deref(),
+            Some("remote-node")
+        );
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_work_item_service_rejects_feature_transfer_with_active_member_gap() {
+    let temp_root = unique_temp_dir("work-item-feature-transfer-active");
+    let refine_dir = temp_root.join(".refine");
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("remote-node").unwrap();
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.create_gap_summary("Active", Some("GAP1")).unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service
+        .transition_gap_status("GAP1", GapStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .unwrap();
+
+    let err = service
+        .transfer_feature_to_node("remote-node", "FEA1")
+        .unwrap_err();
+    assert!(err.to_string().contains("status:in-progress"), "{err}");
+    assert_eq!(
+        service
+            .show_feature_summary("FEA1")
+            .unwrap()
+            .feature
+            .node_id
+            .as_deref(),
+        Some("default")
+    );
+    assert_eq!(
+        service
+            .show_gap_summary("GAP1")
+            .unwrap()
+            .gap
+            .node_id
+            .as_deref(),
+        Some("default")
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_work_item_service_rejects_invalid_manual_transition() {
     let temp_root = unique_temp_dir("work-item-invalid-transition");
     let refine_dir = temp_root.join(".refine");

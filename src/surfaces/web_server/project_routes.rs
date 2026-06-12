@@ -552,6 +552,20 @@ impl InProcessWebServer {
         {
             return error_response(error);
         }
+        if let Some(item_id) = body
+            .get("item_id")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return match self
+                .work_item_service(refine_dir)
+                .transfer_item_to_node(target_node_id, item_id)
+            {
+                Ok(result) => ApiResponse::json(200, json!(result)),
+                Err(error) => error_response(error),
+            };
+        }
         let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
@@ -752,13 +766,9 @@ impl InProcessWebServer {
         if let Err(error) = FileClusterService::new(&refine_dir).transfer(item_id, node_id) {
             return error_response(error);
         }
-        let selection = BulkGapSelection {
-            selected_ids: Some(vec![item_id.to_string()]),
-            ..BulkGapSelection::default()
-        };
         match self
             .work_item_service(refine_dir)
-            .bulk_transfer_gaps_to_node(node_id, selection)
+            .transfer_item_to_node(node_id, item_id)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
