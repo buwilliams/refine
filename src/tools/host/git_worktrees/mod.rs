@@ -41,6 +41,14 @@ pub struct GitCommitOutcome {
     pub has_changes_since_base: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MergedBranchCleanup {
+    pub branch: String,
+    pub worktree_path: Option<String>,
+    pub worktree_removed: bool,
+    pub branch_deleted: bool,
+}
+
 pub trait GitWorktreeService {
     fn inspect(&self, path: &str) -> RefineResult<GitStatus>;
     fn branch(&self, name: &str) -> RefineResult<String>;
@@ -182,6 +190,37 @@ impl FileGitWorktreeService {
             "ok",
             json!({"branch": branch, "force": force}),
         )
+    }
+
+    pub fn cleanup_merged_branch(&self, branch: &str) -> RefineResult<MergedBranchCleanup> {
+        validate_branch_name(branch)?;
+        let worktree_path = self.worktree_for_branch(branch)?;
+        let mut worktree_removed = false;
+        if let Some(path) = worktree_path.as_deref() {
+            if same_existing_path(path, &self.root) {
+                return Err(RefineError::Conflict(format!(
+                    "refusing to remove primary worktree {} for branch {branch}",
+                    path.display()
+                )));
+            }
+            self.remove_worktree(path, true)?;
+            worktree_removed = true;
+        }
+
+        let mut branch_deleted = false;
+        if self.branch_exists(branch)? {
+            self.delete_branch(branch, false)?;
+            branch_deleted = true;
+        }
+
+        let cleanup = MergedBranchCleanup {
+            branch: branch.to_string(),
+            worktree_path: worktree_path.map(|path| path.display().to_string()),
+            worktree_removed,
+            branch_deleted,
+        };
+        self.audit("merged_branch_cleanup", "ok", json!({"cleanup": &cleanup}))?;
+        Ok(cleanup)
     }
 
     pub fn has_commits_since(&self, base_branch: &str) -> RefineResult<bool> {
@@ -839,6 +878,13 @@ fn relative_child_path(root: &Path, child: &Path) -> Option<String> {
     Some(relative.to_string_lossy().replace('\\', "/"))
 }
 
+fn same_existing_path(left: &Path, right: &Path) -> bool {
+    fs::canonicalize(left)
+        .ok()
+        .zip(fs::canonicalize(right).ok())
+        .is_some_and(|(left, right)| left == right)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct HostCommandOutput {
     success: bool,
@@ -1132,6 +1178,49 @@ mod tests {
         assert!(git_stdout(&repo, &["status", "--porcelain=v1"]).contains("?? untracked.txt"));
         assert!(!path.join("staged.txt").exists());
         assert!(!path.join("untracked.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_cleans_merged_branch_worktree() {
+        let temp_root = unique_temp_dir("git-worktree-cleanup");
+        let repo = temp_root.join("repo");
+        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+
+        let branch = "refine/GAP1/round-1";
+        git(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        commit_file(&worktree_path, "feature.txt", "change\n", "feature");
+        git(&repo, &["merge", "--no-edit", branch]).unwrap();
+
+        let service = FileGitWorktreeService::new(&repo);
+        let cleanup = service.cleanup_merged_branch(branch).unwrap();
+        assert_eq!(cleanup.branch, branch);
+        assert_eq!(
+            cleanup.worktree_path.as_deref(),
+            Some(worktree_path.to_str().unwrap())
+        );
+        assert!(cleanup.worktree_removed);
+        assert!(cleanup.branch_deleted);
+        assert!(!worktree_path.exists());
+        assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains(branch));
+        assert!(!git_succeeds(
+            &repo,
+            &["rev-parse", "--verify", &format!("refs/heads/{branch}")]
+        ));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1466,6 +1555,17 @@ mod tests {
             String::from_utf8_lossy(&output.stderr)
         );
         String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn git_succeeds(repo: &Path, args: &[&str]) -> bool {
+        Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap()
+            .status
+            .success()
     }
 
     fn init_repo(repo: &Path) {

@@ -15,7 +15,9 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
+use crate::tools::host::git_worktrees::{
+    FileGitWorktreeService, GitWorktreeService, MergeResult, MergedBranchCleanup,
+};
 use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
 
@@ -32,6 +34,7 @@ pub struct MergerGapResult {
     pub operation_id: String,
     pub status: String,
     pub conflicts: Vec<String>,
+    pub cleanup: Option<MergedBranchCleanup>,
 }
 
 #[derive(Clone, Debug)]
@@ -111,10 +114,16 @@ impl FileMergerService {
         let mut result = git.merge(branch_name)?;
         for _ in 0..5 {
             if result.ok || !merge_message_has_index_lock(&result) {
+                if result.ok {
+                    git.cleanup_merged_branch(branch_name)?;
+                }
                 return Ok(result);
             }
             thread::sleep(Duration::from_millis(50));
             result = git.merge(branch_name)?;
+        }
+        if result.ok {
+            git.cleanup_merged_branch(branch_name)?;
         }
         Ok(result)
     }
@@ -147,12 +156,21 @@ impl FileMergerService {
                 operation_id: operation_id.to_string(),
                 status: "failed".to_string(),
                 conflicts: merge.conflicts,
+                cleanup: None,
             });
         }
+        let cleanup = git.cleanup_merged_branch(branch_name)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
             self.runtime_root.join("cache"),
         );
+        self.append_operation_log(
+            operation_id,
+            gap_id,
+            "info",
+            "Cleaned up merged Gap branch worktree",
+            Some(json_object(json!({"cleanup": &cleanup}))),
+        )?;
         work_items.advance_automated_gap_status(gap_id, GapStatus::Build)?;
         self.append_operation_log(
             operation_id,
@@ -177,6 +195,7 @@ impl FileMergerService {
                 "branch_name": branch_name,
                 "target_branch": target_branch,
                 "merge": merge,
+                "cleanup": &cleanup,
                 "final_status": "qa"
             }),
         )?;
@@ -187,6 +206,7 @@ impl FileMergerService {
             operation_id: operation_id.to_string(),
             status: "qa".to_string(),
             conflicts: Vec::new(),
+            cleanup: Some(cleanup),
         })
     }
 
@@ -372,6 +392,9 @@ mod tests {
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let first = merger.tick().unwrap().processed.unwrap();
         assert_eq!(first.gap_id, "GAP1");
+        assert_eq!(first.cleanup.as_ref().unwrap().branch, "refine/GAP1");
+        assert!(!first.cleanup.as_ref().unwrap().worktree_removed);
+        assert!(first.cleanup.as_ref().unwrap().branch_deleted);
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
             GapStatus::Qa
@@ -396,6 +419,112 @@ mod tests {
         assert_eq!(
             work_items.show_gap_summary("GAP2").unwrap().gap.status,
             GapStatus::Qa
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_merger_cleans_gap_worktree_and_branch_after_successful_tick() {
+        let temp_root = unique_temp_dir("merger-cleanup");
+        let repo = temp_root.join("repo");
+        let refine_dir = repo.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        fs::create_dir_all(&refine_dir).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+
+        let branch = "refine/GAP1/round-1";
+        git(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        commit_file(&worktree_path, "feature.txt", "change\n", "GAP1");
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items.create_gap_summary("GAP1", Some("GAP1")).unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+            .unwrap();
+        work_items
+            .advance_automated_gap_status("GAP1", GapStatus::ReadyMerge)
+            .unwrap();
+        work_items.set_gap_branch_name("GAP1", branch).unwrap();
+
+        let merger = FileMergerService::new(&runtime_root, &refine_dir);
+        let merged = merger.tick().unwrap().processed.unwrap();
+        let cleanup = merged.cleanup.unwrap();
+        assert_eq!(merged.gap_id, "GAP1");
+        assert_eq!(merged.status, "qa");
+        assert_eq!(cleanup.branch, branch);
+        assert_eq!(
+            cleanup.worktree_path.as_deref(),
+            Some(worktree_path.to_str().unwrap())
+        );
+        assert!(cleanup.worktree_removed);
+        assert!(cleanup.branch_deleted);
+        assert!(!worktree_path.exists());
+        assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains(branch));
+        assert!(!git_succeeds(
+            &repo,
+            &["rev-parse", "--verify", &format!("refs/heads/{branch}")]
+        ));
+        assert_eq!(
+            fs::read_to_string(repo.join("feature.txt")).unwrap(),
+            "change\n"
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn workflow_merge_cleans_gap_worktree_and_branch() {
+        let temp_root = unique_temp_dir("workflow-merge-cleanup");
+        let repo = temp_root.join("repo");
+        let refine_dir = repo.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        fs::create_dir_all(&refine_dir).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+
+        let branch = "refine/GAP1/round-1";
+        git(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        commit_file(&worktree_path, "workflow.txt", "change\n", "GAP1");
+
+        let merger = FileMergerService::new(&runtime_root, &refine_dir);
+        let merge = merger.merge_branch_for_workflow(branch).unwrap();
+        assert!(merge.ok);
+        assert!(!worktree_path.exists());
+        assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains(branch));
+        assert!(!git_succeeds(
+            &repo,
+            &["rev-parse", "--verify", &format!("refs/heads/{branch}")]
+        ));
+        assert_eq!(
+            fs::read_to_string(repo.join("workflow.txt")).unwrap(),
+            "change\n"
         );
 
         fs::remove_dir_all(temp_root).unwrap();
@@ -505,6 +634,17 @@ mod tests {
             String::from_utf8_lossy(&output.stderr)
         );
         String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn git_succeeds(repo: &Path, args: &[&str]) -> bool {
+        Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap()
+            .status
+            .success()
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
