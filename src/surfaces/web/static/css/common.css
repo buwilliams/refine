@@ -534,23 +534,14 @@ select {
   gap: 6px;
 }
 .settings-editable-preview.target-test-command-preview-single {
-  width: fit-content;
-  max-width: 100%;
-}
-.target-test-command-preview-single .target-test-command-preview-list {
-  width: fit-content;
-  max-width: 100%;
+  height: fit-content;
+  min-height: 0;
 }
 .target-test-command-preview-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-}
-.target-test-command-preview-single .target-test-command-preview-row {
-  display: inline-grid;
-  grid-template-columns: auto minmax(0, auto);
-  max-width: 100%;
 }
 .target-test-command-preview-row code {
   min-width: 0;
