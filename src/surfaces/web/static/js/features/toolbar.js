@@ -597,11 +597,11 @@ function drawToolbar() {
       <span class="toolbar-dock-label">TOOLBAR</span>
       <div class="toolbar-tabs">
         ${Object.entries(tabs).map(([id, t]) => `
-          <button class="toolbar-tab ${id === activeId ? "active" : ""}"
+          <button class="toolbar-tab ${id === activeId ? "active" : ""} ${toolbarTabActivityClass(t)}"
                   data-tab-id="${htmlEscape(id)}"
                   data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
-            ${htmlEscape(t.label)}${t.sessionId ? ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="active session"></span>` : ""}
+            ${htmlEscape(t.label)}${toolbarTabSessionDot(t)}
             ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID || id === TERMINAL_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
@@ -717,6 +717,47 @@ function toolbarTabTitle(tab) {
   if (tab.mode === "system") return "System operations";
   if (tab.mode === "terminal") return "Terminal";
   return tab.gapId || "Standalone chat";
+}
+
+function toolbarTabHasSessionIndicator(tab) {
+  return !!(tab && (tab.sessionId || tab.starting) && !["files", "system", "terminal"].includes(tab.mode));
+}
+
+function toolbarTabActivityClass(tab) {
+  if (!toolbarTabHasSessionIndicator(tab)) return "";
+  return chatActivityIsPulsing(tab) ? "toolbar-tab-working" : "toolbar-tab-ready";
+}
+
+function toolbarTabSessionDot(tab) {
+  if (!toolbarTabHasSessionIndicator(tab)) return "";
+  const title = chatActivityIsPulsing(tab) ? "agent working" : "active session";
+  return ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="${title}"></span>`;
+}
+
+function syncToolbarTabActivityIndicators() {
+  const root = $("#toolbar-dock");
+  if (!root) return;
+  $$(".toolbar-tab", root).forEach((el) => {
+    const tab = chatState.tabs[el.dataset.tabId || ""];
+    const stateClass = toolbarTabActivityClass(tab);
+    const hasIndicator = toolbarTabHasSessionIndicator(tab);
+    el.classList.toggle("toolbar-tab-working", stateClass === "toolbar-tab-working");
+    el.classList.toggle("toolbar-tab-ready", stateClass === "toolbar-tab-ready");
+    let dot = el.querySelector(".toolbar-tab-dot");
+    if (!hasIndicator) {
+      dot?.remove();
+      return;
+    }
+    if (!dot) {
+      dot = document.createElement("span");
+      dot.className = "toolbar-tab-dot";
+      dot.dataset.testid = "toolbar-tab-dot";
+      el.insertBefore(dot, el.querySelector(".toolbar-tab-close"));
+    }
+    if (dot) {
+      dot.title = chatActivityIsPulsing(tab) ? "agent working" : "active session";
+    }
+  });
 }
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
@@ -2255,6 +2296,7 @@ function applyPendingIndicator(tab) {
         <span></span><span></span><span></span>
       </span>` : ""}<span>${htmlEscape(chatStatusLine(tab))}</span>`;
   }
+  syncToolbarTabActivityIndicators();
   syncChatActionButtons(tab);
 }
 
@@ -2369,6 +2411,7 @@ function handleChatSseEvent(payload) {
   if (changed) markChatActivityPulse(tab);
   saveChatStateToStorage();
   if (wasPending !== tab.pending) refreshProcessesTabForChatChange();
+  syncToolbarTabActivityIndicators();
   if (chatState.tabs[chatState.activeTabId] === tab) {
     if (payload.closed === true || event.role === "user") {
       drawToolbar();

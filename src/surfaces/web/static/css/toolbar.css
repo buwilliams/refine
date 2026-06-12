@@ -169,13 +169,34 @@ button.toolbar-tab:hover:not(:disabled),
   color: var(--muted);
   border-radius: 50%;
 }
+.toolbar-tab:hover .toolbar-tab-close { color: currentColor; }
 .toolbar-tab-close:hover { background: var(--border); color: var(--fg); }
+.toolbar-tab:hover .toolbar-tab-close:hover { background: rgba(255, 255, 255, 0.18); color: currentColor; }
 .toolbar-tab-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--success);
+}
+.toolbar-tab.toolbar-tab-ready .toolbar-tab-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-bg);
+}
+.toolbar-tab.toolbar-tab-working .toolbar-tab-dot {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-bg);
+  animation: toolbar-tab-working-pulse 0.8s ease-in-out infinite;
+}
+@keyframes toolbar-tab-working-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.35);
+  }
 }
 
 /* Bordered container that wraps the chat output and activity state
