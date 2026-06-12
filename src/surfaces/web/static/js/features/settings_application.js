@@ -142,6 +142,7 @@ function renderTargetAppTestCommandsField(settings = {}, options = {}) {
   const id = options.id || "s-target-test-commands";
   const title = options.label || "Target-app tests";
   const description = options.description || "CLI commands Refine runs for workflow QA.";
+  const previewClass = commands.length === 1 ? " target-test-command-preview-single" : "";
   return `
     <div class="form-row settings-editable-field target-test-commands-field"
          data-settings-editable-field
@@ -159,7 +160,7 @@ function renderTargetAppTestCommandsField(settings = {}, options = {}) {
           ${settingsMarkdownIcon("edit")}
         </button>
       </div>
-      <div class="settings-editable-preview" data-settings-editable-preview>
+      <div class="settings-editable-preview${previewClass}" data-settings-editable-preview>
         ${renderTargetAppTestCommandsPreview(commands)}
       </div>
       <div class="settings-editable-editor" data-settings-editable-editor hidden>
@@ -195,6 +196,7 @@ function bindTargetAppTestCommandList(root = document) {
       value.dataset.settingsPreviewValue = targetAppTestCommandsSummary(commands);
       value.dataset.settingsPreviewHtml = renderTargetAppTestCommandsPreview(commands);
       updateSettingsEditablePreview(field);
+      syncTargetAppTestCommandsPreviewSizing(field, commands);
     };
 
     const bindRows = () => {
@@ -228,7 +230,14 @@ function bindTargetAppTestCommandList(root = document) {
     value.dataset.settingsPreviewHtml = renderTargetAppTestCommandsPreview(initial);
     bindRows();
     updateSettingsEditablePreview(field);
+    syncTargetAppTestCommandsPreviewSizing(field, initial);
   });
+}
+
+function syncTargetAppTestCommandsPreviewSizing(field, commands) {
+  const preview = field?.querySelector("[data-settings-editable-preview]");
+  if (!preview) return;
+  preview.classList.toggle("target-test-command-preview-single", commands.length === 1);
 }
 
 async function autosaveSettingsTargetAppTests(root = document) {

@@ -35,6 +35,12 @@ pub struct MergeResult {
     pub message: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GitCommitOutcome {
+    pub commit: String,
+    pub has_changes_since_base: bool,
+}
+
 pub trait GitWorktreeService {
     fn inspect(&self, path: &str) -> RefineResult<GitStatus>;
     fn branch(&self, name: &str) -> RefineResult<String>;
@@ -199,6 +205,55 @@ impl FileGitWorktreeService {
             return self.head_commit().map(Some);
         }
         Ok(None)
+    }
+
+    pub fn commit_or_clean_noop_since(
+        &self,
+        message: &str,
+        pathspecs: &[String],
+        base_branch: &str,
+    ) -> RefineResult<GitCommitOutcome> {
+        if let Some(commit) = self.current_clean_commit_since(base_branch)? {
+            self.audit_existing_commit(&commit, message, pathspecs, base_branch)?;
+            return Ok(GitCommitOutcome {
+                commit,
+                has_changes_since_base: true,
+            });
+        }
+        match self.commit_inner(message, pathspecs, false) {
+            Ok(commit) => Ok(GitCommitOutcome {
+                commit,
+                has_changes_since_base: true,
+            }),
+            Err(error) if is_nothing_to_commit_error(&error) => {
+                if let Some(commit) = self.current_clean_commit_since(base_branch)? {
+                    self.audit_existing_commit(&commit, message, pathspecs, base_branch)?;
+                    Ok(GitCommitOutcome {
+                        commit,
+                        has_changes_since_base: true,
+                    })
+                } else if self.is_clean()? {
+                    let commit = self.head_commit()?;
+                    self.audit(
+                        "commit_noop",
+                        "ok",
+                        json!({
+                            "commit": commit,
+                            "message": message,
+                            "pathspecs": pathspecs,
+                            "base_branch": base_branch
+                        }),
+                    )?;
+                    Ok(GitCommitOutcome {
+                        commit,
+                        has_changes_since_base: false,
+                    })
+                } else {
+                    Err(error)
+                }
+            }
+            Err(error) => Err(error),
+        }
     }
 
     fn audit_existing_commit(

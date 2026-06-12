@@ -156,23 +156,36 @@ impl WorkflowBehavior for WorkflowImplementation {
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
-        let commit = match worktree_git.commit_or_current_if_clean_since(
+        let commit = match worktree_git.commit_or_clean_noop_since(
             &format!("Implement {} round {}", ctx.gap_id, ctx.round_idx + 1),
             &[],
             &target_branch,
         ) {
-            Ok(commit) => commit,
+            Ok(outcome) => outcome,
             Err(error) => return fail(ctx, "commit", error),
         };
-        ctx.log(
-            "git",
-            &format!("Committed implementation branch {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "commit": commit,
-                "worktree": worktree_path
-            }))),
-        )?;
+        if commit.has_changes_since_base {
+            ctx.log(
+                "git",
+                &format!("Committed implementation branch {branch}"),
+                Some(json_object(json!({
+                    "branch": branch,
+                    "commit": commit.commit,
+                    "worktree": worktree_path
+                }))),
+            )?;
+        } else {
+            ctx.log(
+                "git",
+                "No implementation changes to commit",
+                Some(json_object(json!({
+                    "branch": branch,
+                    "commit": commit.commit,
+                    "worktree": worktree_path,
+                    "target_branch": target_branch
+                }))),
+            )?;
+        }
 
         let governance = match evaluate_workflow_governance(ctx, &worktree_path, &agent_cwd) {
             Ok(evaluation) => evaluation,
@@ -191,7 +204,8 @@ impl WorkflowBehavior for WorkflowImplementation {
 
         ctx.agent_cwd = Some(agent_cwd);
         ctx.provider_output = Some(provider_output);
-        ctx.commit = Some(commit);
+        ctx.implementation_changed = commit.has_changes_since_base;
+        ctx.commit = Some(commit.commit);
         ctx.request_transition(GapStatus::InProgress, GapStatus::ReadyMerge)?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GapStatus::InProgress,
@@ -399,6 +413,18 @@ fn revert_merged_commit_after_quality_failure(ctx: &WorkflowContext<'_>) -> Refi
     let branch = ctx.require_branch()?.to_string();
     let commit = ctx.require_commit()?.to_string();
     let worktree_path = ctx.require_worktree_path()?.to_string();
+    if !ctx.implementation_changed {
+        ctx.log(
+            "quality",
+            "No implementation commit to revert after quality failure",
+            Some(json_object(json!({
+                "branch": branch,
+                "commit": commit,
+                "worktree": worktree_path
+            }))),
+        )?;
+        return Ok(());
+    }
     let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
     let target_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
     target_git.switch(&target_branch)?;

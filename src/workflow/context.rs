@@ -27,6 +27,7 @@ pub struct WorkflowContext<'a> {
     pub agent_cwd: Option<PathBuf>,
     pub provider_output: Option<String>,
     pub commit: Option<String>,
+    pub implementation_changed: bool,
     pub merge: Option<MergeResult>,
     pub final_status: Option<GapStatus>,
 }
@@ -56,6 +57,7 @@ impl<'a> WorkflowContext<'a> {
             agent_cwd: None,
             provider_output: None,
             commit: None,
+            implementation_changed: false,
             merge: None,
             final_status: None,
         }
