@@ -146,11 +146,7 @@ fn web_server_routes_work_gap_queries_through_projection() {
 #[test]
 fn web_server_structures_dashboard_attention_and_runtime_banner() {
     let mut server = server_with_projection();
-    server
-        .projection
-        .dashboard
-        .attention_indicators
-        .push("1 failed Gap(s) need recovery".to_string());
+    server.projection.gaps.get_mut("GAP1").unwrap().gap.status = GapStatus::Failed;
     server.projection.runtime.supervisor = json!({"runner_reachable": false}).as_object().cloned();
 
     let response = server.handle(ApiRequest {
@@ -2882,6 +2878,23 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     });
     assert_eq!(all_node_gaps.status, 200);
     assert_eq!(all_node_gaps.body["page"]["total"], 3);
+    let current_dashboard = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+    assert_eq!(current_dashboard.status, 200);
+    assert_eq!(current_dashboard.body["node_filter"], "current");
+    assert_eq!(current_dashboard.body["active_node_id"], "remote-qa");
+    assert_eq!(current_dashboard.body["counts"]["backlog"], 2);
+    let all_dashboard = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard?node=all".to_string(),
+        body: None,
+    });
+    assert_eq!(all_dashboard.status, 200);
+    assert_eq!(all_dashboard.body["node_filter"], "all");
+    assert_eq!(all_dashboard.body["counts"]["backlog"], 3);
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),

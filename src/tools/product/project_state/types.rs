@@ -101,6 +101,24 @@ pub struct DashboardProjection {
     pub recent_activity_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DashboardProjectionQuery {
+    pub node: Option<String>,
+    pub current_node_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DashboardProjectionSummary {
+    pub node_filter: String,
+    pub current_node_id: String,
+    pub counts: BTreeMap<GapStatus, usize>,
+    pub all_node_counts: BTreeMap<GapStatus, usize>,
+    pub reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    pub assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    pub attention_indicators: Vec<String>,
+    pub recent_activity_ids: Vec<String>,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct RuntimeProjection {
     pub supervisor: Option<JsonObject>,

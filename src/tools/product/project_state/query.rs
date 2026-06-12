@@ -10,6 +10,7 @@ use super::types::*;
 
 pub trait ProjectionQuery {
     fn status_counts(&self) -> BTreeMap<GapStatus, usize>;
+    fn dashboard_summary(&self, query: DashboardProjectionQuery) -> DashboardProjectionSummary;
     fn gap_ids_for_status(&self, status: &GapStatus) -> Vec<String>;
     fn feature_rollup(&self, feature_id: &str) -> Option<FeatureRollup>;
     fn list_gaps(&self, query: GapProjectionQuery) -> GapProjectionList;
@@ -28,6 +29,96 @@ impl ProjectionQuery for ProjectionSnapshot {
             *counts.entry(projection.gap.status.clone()).or_insert(0) += 1;
         }
         counts
+    }
+
+    fn dashboard_summary(&self, query: DashboardProjectionQuery) -> DashboardProjectionSummary {
+        let current_node_id = query
+            .current_node_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("default")
+            .to_string();
+        let node_filter = if query.node.as_deref() == Some("all") {
+            "all".to_string()
+        } else {
+            "current".to_string()
+        };
+        let scoped_gaps = self
+            .gaps
+            .values()
+            .filter(|projection| {
+                gap_matches_node(
+                    projection.gap.node_id.as_deref(),
+                    &node_filter,
+                    Some(current_node_id.as_str()),
+                )
+            })
+            .collect::<Vec<_>>();
+        let counts = gap_status_counts(scoped_gaps.iter().map(|gap| &gap.gap.status));
+        let all_node_counts = gap_status_counts(self.gaps.values().map(|gap| &gap.gap.status));
+        let mut reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
+        let mut assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
+        for gap in &scoped_gaps {
+            let reporter = gap
+                .gap
+                .reporter
+                .clone()
+                .filter(|reporter| !reporter.is_empty())
+                .unwrap_or_else(|| "unknown".to_string());
+            *reporter_stats
+                .entry(reporter)
+                .or_default()
+                .entry(gap.gap.status.clone())
+                .or_default() += 1;
+            let assignee = gap
+                .gap
+                .assignee
+                .clone()
+                .filter(|assignee| !assignee.is_empty())
+                .unwrap_or_else(|| "unassigned".to_string());
+            *assignee_stats
+                .entry(assignee)
+                .or_default()
+                .entry(gap.gap.status.clone())
+                .or_default() += 1;
+        }
+        let failed_count = counts.get(&GapStatus::Failed).copied().unwrap_or_default();
+        let attention_indicators = if failed_count > 0 {
+            vec![format!("{failed_count} failed Gap(s) need recovery")]
+        } else {
+            Vec::new()
+        };
+        let recent_activity_ids = self
+            .dashboard
+            .recent_activity_ids
+            .iter()
+            .filter(|activity_id| {
+                self.activity
+                    .get(*activity_id)
+                    .and_then(|activity| activity.entry.gap_id.as_deref())
+                    .and_then(|gap_id| self.gaps.get(gap_id))
+                    .map(|gap| {
+                        gap_matches_node(
+                            gap.gap.node_id.as_deref(),
+                            &node_filter,
+                            Some(current_node_id.as_str()),
+                        )
+                    })
+                    .unwrap_or(node_filter == "all")
+            })
+            .cloned()
+            .collect();
+        DashboardProjectionSummary {
+            node_filter,
+            current_node_id,
+            counts,
+            all_node_counts,
+            reporter_stats,
+            assignee_stats,
+            attention_indicators,
+            recent_activity_ids,
+        }
     }
 
     fn gap_ids_for_status(&self, status: &GapStatus) -> Vec<String> {
@@ -184,19 +275,12 @@ fn gap_matches(
         .filter(|value| !value.trim().is_empty())
     {
         match node {
-            "all" => {}
-            "current" => {
-                if gap.node_id.as_deref() != query.current_node_id.as_deref().or(Some("default")) {
-                    return false;
-                }
-            }
-            "unknown" => {
-                if gap.node_id.is_some() {
-                    return false;
-                }
-            }
             value => {
-                if gap.node_id.as_deref() != Some(value) {
+                if !gap_matches_node(
+                    gap.node_id.as_deref(),
+                    value,
+                    query.current_node_id.as_deref(),
+                ) {
                     return false;
                 }
             }
@@ -459,16 +543,12 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
         .filter(|value| !value.trim().is_empty())
     {
         match node {
-            "all" => {}
-            "current" => {
-                if feature.node_id.as_deref()
-                    != query.current_node_id.as_deref().or(Some("default"))
-                {
-                    return false;
-                }
-            }
             value => {
-                if feature.node_id.as_deref() != Some(value) {
+                if !gap_matches_node(
+                    feature.node_id.as_deref(),
+                    value,
+                    query.current_node_id.as_deref(),
+                ) {
                     return false;
                 }
             }
@@ -498,6 +578,15 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
         }
     }
     true
+}
+
+fn gap_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&str>) -> bool {
+    match node {
+        "all" => true,
+        "current" => owner.unwrap_or("default") == current_node_id.unwrap_or("default"),
+        "unknown" => owner.is_none(),
+        value => owner == Some(value),
+    }
 }
 
 fn sort_gaps(rows: &mut [GapIndexProjection], sort: &str, dir: &str) {

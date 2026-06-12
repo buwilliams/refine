@@ -20,8 +20,9 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
-use crate::tools::product::nodes::{NodeUpdate, detached_nodes_response};
+use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
+use crate::tools::product::project_state::{DashboardProjectionQuery, ProjectionQuery};
 use crate::tools::product::work_items::BulkGapSelection;
 use crate::workflow::WorkflowEngine;
 
@@ -86,6 +87,25 @@ fn dashboard_attention_items(indicators: &[String], runner_reachable: bool) -> V
         }));
     }
     items
+}
+
+fn dashboard_active_node(service: &FileNodeRegistryService) -> RefineResult<(String, String)> {
+    let active_node_id = service.active_node_id()?;
+    if active_node_id == "default" {
+        return Ok((active_node_id, "Default".to_string()));
+    }
+    let active_node_display_name = service
+        .show(&active_node_id)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("node")
+                .and_then(|node| node.get("display_name"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| active_node_id.clone());
+    Ok((active_node_id, active_node_display_name))
 }
 
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {
@@ -361,21 +381,15 @@ fn parse_generated_governance_rules(output: &str) -> Vec<Value> {
 
 impl InProcessWebServer {
     pub(super) fn handle_dashboard(&self, raw_path: &str) -> ApiResponse {
-        let attached = match self.current_target_root() {
-            Ok(value) => value.is_some(),
+        let current_target_root = match self.current_target_root() {
+            Ok(value) => value,
             Err(error) => return error_response(error),
         };
+        let attached = current_target_root.is_some();
         let projection = match self.current_projection_with_runtime() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };
-        let activity = projection
-            .dashboard
-            .recent_activity_ids
-            .iter()
-            .filter_map(|activity_id| projection.activity.get(activity_id))
-            .map(|activity| activity.entry.clone())
-            .collect::<Vec<_>>();
         let process = runtime_process_summary_value(&projection.runtime);
         let preflight = projection
             .runtime
@@ -388,11 +402,29 @@ impl InProcessWebServer {
         } else {
             "current"
         };
-        let counts = if node_filter == "all" {
-            projection.dashboard.all_node_status_counts.clone()
-        } else {
-            projection.dashboard.current_node_status_counts.clone()
+        let (active_node_id, active_node_display_name) = match current_target_root
+            .as_ref()
+            .map(|target_root| target_root.join(".refine"))
+        {
+            Some(refine_dir) => {
+                let service = self.node_registry_service(refine_dir);
+                match dashboard_active_node(&service) {
+                    Ok(active_node) => active_node,
+                    Err(error) => return error_response(error),
+                }
+            }
+            None => ("default".to_string(), "Default".to_string()),
         };
+        let dashboard = projection.dashboard_summary(DashboardProjectionQuery {
+            node: Some(node_filter.to_string()),
+            current_node_id: Some(active_node_id.clone()),
+        });
+        let activity = dashboard
+            .recent_activity_ids
+            .iter()
+            .filter_map(|activity_id| projection.activity.get(activity_id))
+            .map(|activity| activity.entry.clone())
+            .collect::<Vec<_>>();
         let runner_reachable = process
             .get("runner_reachable")
             .and_then(|value| value.as_bool())
@@ -400,23 +432,23 @@ impl InProcessWebServer {
         ApiResponse::json(
             200,
             json!({
-                "counts": counts,
-                "all_node_counts": projection.dashboard.all_node_status_counts,
+                "counts": dashboard.counts,
+                "all_node_counts": dashboard.all_node_counts,
                 "running": [],
                 "merger": null,
                 "governance": null,
                 "preflight": preflight,
                 "activity": activity,
                 "runner_reachable": runner_reachable,
-                "assignee_stats": assignee_stats_rows(&projection.dashboard.assignee_stats),
-                "reporter_stats": assignee_stats_rows(&projection.dashboard.assignee_stats),
-                "node_scope": node_filter,
-                "node_filter": node_filter,
+                "assignee_stats": assignee_stats_rows(&dashboard.assignee_stats),
+                "reporter_stats": assignee_stats_rows(&dashboard.reporter_stats),
+                "node_scope": dashboard.node_filter,
+                "node_filter": dashboard.node_filter,
                 "quality_timing": self.quality_timing_setting(),
-                "active_node_id": "default",
-                "active_node_display_name": "Default",
+                "active_node_id": dashboard.current_node_id,
+                "active_node_display_name": active_node_display_name,
                 "needs_attention": dashboard_attention_items(
-                    &projection.dashboard.attention_indicators,
+                    &dashboard.attention_indicators,
                     runner_reachable
                 ),
                 "attached": attached

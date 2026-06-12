@@ -502,6 +502,49 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
             .and_then(|counts| counts.get(&GapStatus::Todo)),
         Some(&1)
     );
+    let default_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("current".to_string()),
+        current_node_id: Some("default".to_string()),
+    });
+    assert_eq!(default_dashboard.node_filter, "current");
+    assert_eq!(default_dashboard.counts.get(&GapStatus::Todo), Some(&1));
+    assert_eq!(default_dashboard.counts.get(&GapStatus::Failed), None);
+    assert_eq!(
+        default_dashboard
+            .assignee_stats
+            .get("Coder")
+            .and_then(|counts| counts.get(&GapStatus::Todo)),
+        Some(&1)
+    );
+    assert!(!default_dashboard.assignee_stats.contains_key("unassigned"));
+    assert_eq!(
+        default_dashboard.recent_activity_ids,
+        vec!["round-log:GAP1:1:0".to_string()]
+    );
+    let remote_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("current".to_string()),
+        current_node_id: Some("node-b".to_string()),
+    });
+    assert_eq!(remote_dashboard.counts.get(&GapStatus::Failed), Some(&1));
+    assert_eq!(remote_dashboard.counts.get(&GapStatus::Todo), None);
+    assert_eq!(remote_dashboard.attention_indicators.len(), 1);
+    assert_eq!(
+        remote_dashboard.recent_activity_ids,
+        vec!["act-1".to_string()]
+    );
+    let all_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("all".to_string()),
+        current_node_id: Some("node-b".to_string()),
+    });
+    assert_eq!(all_dashboard.counts, all_dashboard.all_node_counts);
+    assert_eq!(
+        all_dashboard.recent_activity_ids,
+        vec![
+            "round-log:GAP1:1:0".to_string(),
+            "act-2".to_string(),
+            "act-1".to_string()
+        ]
+    );
     assert_eq!(snapshot.activity.len(), 3);
     assert_eq!(
         snapshot.gaps["GAP1"].activity_ids,
