@@ -176,6 +176,9 @@
 .gaps-col-select {
   width: 32px;
 }
+.features-col-select {
+  width: 32px;
+}
 .gaps-name-cell {
   overflow-wrap: anywhere;
 }
@@ -199,6 +202,9 @@
   width: 20%;
 }
 .features-col-reporter {
+  width: 15%;
+}
+.features-col-assignee {
   width: 15%;
 }
 .features-col-node {

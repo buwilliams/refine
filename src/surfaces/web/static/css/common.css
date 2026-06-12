@@ -1364,16 +1364,19 @@ select {
   color: var(--accent);
 }
 
-/* Bulk-action selection column on the Gaps list. Narrow + centered;
+/* Bulk-action selection column on work-item lists. Narrow + centered;
    only rendered when the filter shell is expanded. */
 .table th.gap-select-col,
-.table td.gap-select-col {
+.table td.gap-select-col,
+.table th.feature-select-col,
+.table td.feature-select-col {
   width: 32px;
   padding-left: 12px;
   padding-right: 4px;
   text-align: center;
 }
-.table td.gap-select-col input[type="checkbox"] {
+.table td.gap-select-col input[type="checkbox"],
+.table td.feature-select-col input[type="checkbox"] {
   cursor: pointer;
 }
 .filter-row {

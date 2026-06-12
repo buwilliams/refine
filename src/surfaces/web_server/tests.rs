@@ -1816,6 +1816,12 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
         body: Some(json!({"id": "FEA1", "name": "Bulk Feature"})),
     });
     assert_eq!(create_feature.status, 201);
+    let create_second_feature = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features".to_string(),
+        body: Some(json!({"id": "FEA2", "name": "Bulk Feature Two"})),
+    });
+    assert_eq!(create_second_feature.status, 201);
 
     let bulk_status = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1841,6 +1847,31 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
             .contains("\"feature_id\": \"FEA1\""),
         true
     );
+
+    let bulk_feature_update = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["FEA1", "FEA2"],
+            "update": {"reporter": "Feature Reporter"}
+        })),
+    });
+    assert_eq!(bulk_feature_update.status, 200);
+    assert_eq!(bulk_feature_update.body["updated"], 2);
+    assert!(
+        fs::read_to_string(refine_dir.join("features/FE/A2/feature.json"))
+            .unwrap()
+            .contains("\"reporter\": \"Feature Reporter\"")
+    );
+
+    let bulk_feature_delete = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/bulk/delete".to_string(),
+        body: Some(json!({"selected_ids": ["FEA2"]})),
+    });
+    assert_eq!(bulk_feature_delete.status, 200);
+    assert_eq!(bulk_feature_delete.body["deleted"], 1);
+    assert!(!refine_dir.join("features/FE/A2/feature.json").exists());
 
     let bulk_delete = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -3000,6 +3031,18 @@ fn web_server_transfers_feature_ownership_as_a_unit() {
             .contains("transfer the Feature instead"),
         "{direct_gap:#?}"
     );
+
+    let bulk_transfer = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/transfer-features".to_string(),
+        body: Some(json!({
+            "selected_ids": ["FEA1"],
+            "target_node_id": "remote-node"
+        })),
+    });
+    assert_eq!(bulk_transfer.status, 200);
+    assert_eq!(bulk_transfer.body["updated"], 3);
+    assert_eq!(bulk_transfer.body["ids"], json!(["FEA1", "GAP1", "GAP2"]));
 
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),

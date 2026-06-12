@@ -356,6 +356,51 @@ registerCommand({
 });
 
 registerCommand({
+  id: "features.select_page",
+  title: "Features: select page",
+  group: "Features",
+  aliases: ["features-select-page"],
+  visible: () => state.currentRoute === "features",
+  run: () => selectCurrentFeaturesPage(),
+});
+
+registerCommand({
+  id: "features.bulk.reporter",
+  title: "Bulk: set selected Feature reporter",
+  group: "Features",
+  aliases: ["features-bulk-reporter"],
+  visible: () => state.currentRoute === "features",
+  run: () => openFeatureBulkModal("reporter"),
+});
+
+registerCommand({
+  id: "features.bulk.assignee",
+  title: "Bulk: set selected Feature assignee",
+  group: "Features",
+  aliases: ["features-bulk-assignee"],
+  visible: () => state.currentRoute === "features",
+  run: () => openFeatureBulkModal("assignee"),
+});
+
+registerCommand({
+  id: "features.bulk.transfer_node",
+  title: "Bulk: transfer selected Features to node",
+  group: "Features",
+  aliases: ["features-bulk-node"],
+  visible: () => state.currentRoute === "features",
+  run: () => openFeatureBulkTransferNodeModal(),
+});
+
+registerCommand({
+  id: "features.bulk.delete",
+  title: "Bulk: delete selected Features",
+  group: "Features",
+  aliases: ["features-bulk-delete"],
+  visible: () => state.currentRoute === "features",
+  run: () => confirmFeatureBulkDelete(),
+});
+
+registerCommand({
   id: "gaps.bulk.status",
   title: "Bulk: set selected Gap status",
   group: "Gaps",

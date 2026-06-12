@@ -414,7 +414,7 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
                 selected_ids: Some(vec!["FEA1".to_string()]),
                 ..Default::default()
             },
-            "Feature Reviewer",
+            BulkFeatureUpdate::Assignee("Feature Reviewer".to_string()),
         )
         .unwrap();
     assert_eq!(feature_assignee_result.updated, 1);
@@ -426,6 +426,25 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
             .assignee
             .as_deref(),
         Some("Feature Reviewer")
+    );
+    let feature_reporter_result = service
+        .bulk_update_features(
+            BulkFeatureSelection {
+                selected_ids: Some(vec!["FEA1".to_string()]),
+                ..Default::default()
+            },
+            BulkFeatureUpdate::Reporter("Feature Reporter".to_string()),
+        )
+        .unwrap();
+    assert_eq!(feature_reporter_result.updated, 1);
+    assert_eq!(
+        service
+            .show_feature_summary("FEA1")
+            .unwrap()
+            .feature
+            .reporter
+            .as_deref(),
+        Some("Feature Reporter")
     );
     let assign_result = service
         .bulk_assign_gaps_to_feature(
@@ -451,6 +470,31 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
     assert_eq!(delete_result.deleted, 2);
     assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
     assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_work_item_service_bulk_deletes_features() {
+    let temp_root = unique_temp_dir("work-item-feature-bulk-delete");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_feature_summary("Bulk Feature", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.create_gap_summary("First", Some("GAP1")).unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+
+    let deleted = service
+        .bulk_delete_features(BulkFeatureSelection {
+            selected_ids: Some(vec!["FEA1".to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(deleted.deleted, 1);
+    assert_eq!(deleted.ids, vec!["FEA1"]);
+    assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
+    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -545,6 +589,29 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
     assert_eq!(bulk.updated, 0);
     assert_eq!(bulk.skipped, 2);
     assert_eq!(bulk.skipped_details[0].reason, "feature:FEA1");
+
+    let bulk_feature = service
+        .bulk_transfer_features_to_node(
+            "remote-node",
+            BulkFeatureSelection {
+                selected_ids: Some(vec!["FEA1".to_string()]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(bulk_feature.updated, 3);
+    assert_eq!(bulk_feature.ids, vec!["FEA1", "GAP1", "GAP2"]);
+    assert_eq!(
+        service
+            .show_feature_summary("FEA1")
+            .unwrap()
+            .feature
+            .node_id
+            .as_deref(),
+        Some("remote-node")
+    );
+
+    service.transfer_feature_to_node("default", "FEA1").unwrap();
 
     let transferred = service
         .transfer_feature_to_node("remote-node", "FEA1")

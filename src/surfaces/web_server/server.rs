@@ -215,6 +215,10 @@ impl InProcessWebServer {
             return self.handle_node_transfer_gaps(request);
         }
 
+        if request.method == "POST" && request.path == "/nodes/transfer-features" {
+            return self.handle_node_transfer_features(request);
+        }
+
         if request.method == "POST" && request.path == "/nodes/copy-settings" {
             return self.handle_node_copy_settings(request);
         }
@@ -563,6 +567,10 @@ impl InProcessWebServer {
 
         if request.method == "POST" && request.path == "/work/features/bulk" {
             return self.handle_feature_bulk_update(request);
+        }
+
+        if request.method == "POST" && request.path == "/work/features/bulk/delete" {
+            return self.handle_feature_bulk_delete(request);
         }
 
         if request.method == "POST"

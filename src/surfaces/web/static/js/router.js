@@ -74,6 +74,9 @@ function navigate() {
   if (prevRoute === "gaps" && r.route !== "gaps") {
     resetGapsSelection();
   }
+  if (prevRoute === "features" && r.route !== "features") {
+    resetFeaturesSelection();
+  }
   if (r.route === "gaps_detail") {
     // Gap detail is now a modal layered on top of the current screen, so
     // the user keeps their underlying context (Dashboard, Gaps list, etc.)

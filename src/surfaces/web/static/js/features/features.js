@@ -15,6 +15,10 @@ const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([
 ]);
 
 let _featureModalRoot = null;
+let featuresSelectAllMatching = true;
+const featuresExcludedIds = new Set();
+const featuresIncludedIds = new Set();
+let _lastFeaturesRender = null;
 
 function featuresHash(parts) {
   const next = new URLSearchParams();
@@ -53,13 +57,15 @@ async function renderFeaturesList() {
   if (renderNoProjectIfDetached("Features")) return;
   renderBanners([]);
   const f = featuresFilterFromHash();
+  const filterShell = document.getElementById("features-filter-shell");
+  const filterShellOpen = filterShell ? filterShell.open : false;
   $("#main").innerHTML = `
     <div class="page-title-row">
       <h2>Features</h2>
     </div>
-    <details class="filter-shell" id="features-filter-shell" data-testid="features-filter-shell">
+    <details class="filter-shell" id="features-filter-shell" data-testid="features-filter-shell"${filterShellOpen ? " open" : ""}>
       <summary data-testid="features-filter-summary">
-        <span class="filter-shell-title">Filters</span>
+        <span class="filter-shell-title">Filters &amp; bulk actions</span>
         <span class="spacer"></span>
         <span class="muted small"><span id="features-count" data-testid="features-count"></span></span>
         <span id="features-filtered" class="filter-pill" data-testid="features-filtered-pill" hidden>Filtered</span>
@@ -101,8 +107,15 @@ async function renderFeaturesList() {
                 `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
             </select>
             <span class="spacer"></span>
-            <button class="secondary" id="features-bulk-assignee" data-testid="features-bulk-assignee">Assignee…</button>
             <button class="secondary" id="features-clear" data-testid="features-clear-filters">Clear filters</button>
+          </div>
+          <div class="filter-row filter-row-bulk">
+            <span class="muted small">Bulk update selected:</span>
+            <button class="secondary small" id="features-select-page" data-testid="features-select-page">Select page</button>
+            <button class="secondary small" id="features-bulk-reporter" data-testid="features-bulk-reporter">Reporter…</button>
+            <button class="secondary small" id="features-bulk-assignee" data-testid="features-bulk-assignee">Assignee…</button>
+            <button class="secondary small" id="features-bulk-transfer-node" data-testid="features-bulk-transfer-node">Node…</button>
+            <button class="secondary small" id="features-bulk-delete" data-testid="features-bulk-delete">Delete…</button>
           </div>
         </div>
       </div>
@@ -125,7 +138,16 @@ async function renderFeaturesList() {
     history.replaceState(null, "", "#/features");
     renderFeaturesList();
   });
-  $("#features-bulk-assignee")?.addEventListener("click", () => openFeatureBulkAssigneeModal());
+  bindCommand("#features-select-page", "features.select_page");
+  bindCommand("#features-bulk-reporter", "features.bulk.reporter");
+  bindCommand("#features-bulk-assignee", "features.bulk.assignee");
+  bindCommand("#features-bulk-transfer-node", "features.bulk.transfer_node");
+  bindCommand("#features-bulk-delete", "features.bulk.delete");
+  $("#features-filter-shell").addEventListener("toggle", () => {
+    if (_lastFeaturesRender) {
+      drawFeaturesTable(_lastFeaturesRender.features, _lastFeaturesRender.state);
+    }
+  });
   await refreshFeaturesTable();
 }
 
@@ -158,11 +180,15 @@ async function refreshFeaturesTable() {
     if (value !== "" && value != null) params.set(key, String(value));
   }
   const data = await api("GET", `/api/features?${params}`);
-  drawFeaturesTable(data.features || [], { ...f, pageMeta: data.page || {} });
+  const renderState = { ...f, pageMeta: data.page || {} };
+  _lastFeaturesRender = { features: data.features || [], state: renderState };
+  drawFeaturesTable(_lastFeaturesRender.features, renderState);
 }
 
 function drawFeaturesTable(features, stateForRender) {
   const root = $("#features-table");
+  const shell = document.getElementById("features-filter-shell");
+  const showSelection = !!(shell && shell.open);
   const page = stateForRender.pageMeta || {};
   const total = page.total ?? ((page.offset || 0) + features.length + (page.has_more ? 1 : 0));
   $("#features-count").textContent = `${total} feature${total === 1 ? "" : "s"}`;
@@ -179,8 +205,19 @@ function drawFeaturesTable(features, stateForRender) {
   }
   const rows = features.length ? features.map((entry) => {
     const feature = normalizeFeatureEntry(entry);
+    const selected = _isFeatureSelected(feature.id);
+    const cell = showSelection
+      ? `<td class="feature-select-col" data-label="Select">
+           <input type="checkbox" class="feature-select"
+                  data-testid="features-row-select"
+                  data-id="${htmlEscape(feature.id)}"
+                  ${selected ? "checked" : ""}
+                  aria-label="Select feature ${htmlEscape(feature.name || feature.id)}">
+         </td>`
+      : "";
     return `
     <tr data-feature-id="${htmlEscape(feature.id)}" data-testid="features-row">
+      ${cell}
       <td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
       <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
       <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
@@ -191,11 +228,19 @@ function drawFeaturesTable(features, stateForRender) {
       <td class="muted small" data-label="Updated">${fmtTime(feature.updated)}</td>
     </tr>`;
   }).join("") : `
-    <tr><td colspan="8" class="muted">No Features match the current filters.</td></tr>`;
+    <tr><td colspan="${showSelection ? 9 : 8}" class="muted">No Features match the current filters.</td></tr>`;
+  const selectionHead = showSelection
+    ? `<th class="feature-select-col">
+         <input type="checkbox" id="feature-select-all"
+                data-testid="features-select-all"
+                aria-label="Select all matching Features">
+       </th>`
+    : "";
   root.innerHTML = `
     <div class="table-scroll">
       <table class="table features-table mobile-card-table">
         <colgroup>
+          ${showSelection ? '<col class="features-col-select">' : ""}
           <col class="features-col-name">
           <col class="features-col-status">
           <col class="features-col-progress">
@@ -206,6 +251,7 @@ function drawFeaturesTable(features, stateForRender) {
           <col class="features-col-updated">
         </colgroup>
         <thead><tr>
+          ${selectionHead}
           ${featureSortHeader("name", "Name", stateForRender)}
           ${featureSortHeader("status", "Status", stateForRender)}
           <th>Progress</th>
@@ -229,10 +275,42 @@ function drawFeaturesTable(features, stateForRender) {
   });
   $$("#features-table tbody tr[data-feature-id]").forEach((row) => {
     row.addEventListener("click", (e) => {
+      if (e.target.closest(".feature-select-col")) return;
       if (e.target.closest("a, button, input, select, textarea")) return;
       location.hash = `#/features/${encodeURIComponent(row.dataset.featureId)}`;
     });
   });
+  $$(".feature-select", root).forEach((cb) => {
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", (e) => {
+      const id = e.target.dataset.id;
+      if (featuresSelectAllMatching) {
+        if (e.target.checked) featuresExcludedIds.delete(id);
+        else featuresExcludedIds.add(id);
+      } else if (e.target.checked) {
+        featuresIncludedIds.add(id);
+      } else {
+        featuresIncludedIds.delete(id);
+      }
+      _updateFeatureSelectAllState(features.map((entry) => normalizeFeatureEntry(entry)));
+    });
+  });
+  const selectAll = root.querySelector("#feature-select-all");
+  if (selectAll) {
+    const normalized = features.map((entry) => normalizeFeatureEntry(entry));
+    _updateFeatureSelectAllState(normalized);
+    selectAll.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const shouldCheck = selectAll.checked;
+      featuresSelectAllMatching = shouldCheck;
+      featuresExcludedIds.clear();
+      featuresIncludedIds.clear();
+      $$(".feature-select", root).forEach((cb) => {
+        cb.checked = shouldCheck;
+      });
+      selectAll.indeterminate = false;
+    });
+  }
   bindPaginationControls($("#features-table"), "features", (pageNo) =>
     updateFeaturesFilter({ page: pageNo }));
 }
@@ -273,39 +351,215 @@ function featureBulkFilterFromHash() {
   return filter;
 }
 
-async function openFeatureBulkAssigneeModal() {
+function resetFeaturesSelection() {
+  featuresSelectAllMatching = true;
+  featuresExcludedIds.clear();
+  featuresIncludedIds.clear();
+}
+
+function selectCurrentFeaturesPage() {
+  const features = (_lastFeaturesRender?.features || []).map((entry) => normalizeFeatureEntry(entry));
+  if (!features.length) {
+    toast("No Features on this page.", "warn");
+    return;
+  }
+  featuresSelectAllMatching = false;
+  featuresExcludedIds.clear();
+  featuresIncludedIds.clear();
+  for (const feature of features) featuresIncludedIds.add(feature.id);
+  drawFeaturesTable(_lastFeaturesRender.features, _lastFeaturesRender.state);
+}
+
+function _isFeatureSelected(id) {
+  return featuresSelectAllMatching
+    ? !featuresExcludedIds.has(id)
+    : featuresIncludedIds.has(id);
+}
+
+function _featureSelectionRequestFields() {
+  if (featuresSelectAllMatching) {
+    return { exclude_ids: Array.from(featuresExcludedIds) };
+  }
+  return { selected_ids: Array.from(featuresIncludedIds) };
+}
+
+function _hasAnyFeatureSelection() {
+  return featuresSelectAllMatching || featuresIncludedIds.size > 0;
+}
+
+function _featureSelectionCountText(noun = "selected") {
+  if (featuresSelectAllMatching) {
+    if (featuresExcludedIds.size) {
+      return `all matching Features except ${featuresExcludedIds.size} excluded`;
+    }
+    return "all matching Features selected";
+  }
+  const selectedCount = featuresIncludedIds.size;
+  const visibleIds = (_lastFeaturesRender?.features || [])
+    .map((entry) => normalizeFeatureEntry(entry).id);
+  const currentPageOnly = visibleIds.length > 0
+    && visibleIds.length === selectedCount
+    && visibleIds.every((id) => featuresIncludedIds.has(id));
+  if (currentPageOnly) {
+    return `${selectedCount} Features on this page ${noun}`;
+  }
+  return `${selectedCount} explicitly ${noun}`;
+}
+
+function _updateFeatureSelectAllState(features) {
+  const master = document.getElementById("feature-select-all");
+  if (!master) return;
+  if (!features.length && !featuresIncludedIds.size) {
+    master.checked = false;
+    master.indeterminate = false;
+  } else if (featuresSelectAllMatching && featuresExcludedIds.size === 0) {
+    master.checked = true;
+    master.indeterminate = false;
+  } else if (!featuresSelectAllMatching && featuresIncludedIds.size === 0) {
+    master.checked = false;
+    master.indeterminate = false;
+  } else {
+    master.checked = false;
+    master.indeterminate = true;
+  }
+}
+
+async function openFeatureBulkModal(field) {
   const filter = featureBulkFilterFromHash();
   const filterDesc = describeFeatureFilter(filter);
+  const selectionFields = _featureSelectionRequestFields();
+  if (!_hasAnyFeatureSelection()) {
+    toast("No Features selected.", "warn");
+    return;
+  }
+  const countText = _featureSelectionCountText("selected");
+  const label = { reporter: "Reporter", assignee: "Assignee" }[field];
   const opts = (state.reporters || [])
     .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
     .join("");
   const body = () => `
-    <div class="modal-title">Bulk set assignee</div>
+    <div class="modal-title">Bulk set ${htmlEscape(label.toLowerCase())}</div>
     <div class="modal-body">
       <div class="muted small" style="margin-bottom:8px">
-        Applies to ${htmlEscape(filterDesc)}.
+        Applies to ${htmlEscape(countText || "all matching")} —
+        ${htmlEscape(filterDesc)}.
       </div>
-      <label for="feature-bulk-assignee-value">New assignee</label>
-      <select class="modal-input" id="feature-bulk-assignee-value" data-testid="feature-bulk-assignee-value" style="width:100%">
-        <option value="">— pick assignee —</option>
+      <label for="feature-bulk-${htmlEscape(field)}-value">New ${htmlEscape(label.toLowerCase())}</label>
+      <select class="modal-input" id="feature-bulk-${htmlEscape(field)}-value" data-testid="feature-bulk-${htmlEscape(field)}-value" style="width:100%">
+        <option value="">— pick ${htmlEscape(label.toLowerCase())} —</option>
         ${opts}
       </select>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel data-testid="feature-bulk-assignee-cancel">Cancel</button>
-      <button data-ok data-testid="feature-bulk-assignee-apply">Apply</button>
+      <button class="secondary" data-cancel data-testid="feature-bulk-cancel">Cancel</button>
+      <button data-ok data-testid="feature-bulk-apply">Apply</button>
     </div>`;
-  const assignee = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
-  if (assignee === null || !assignee) return;
+  const next = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
+  if (next === null || !next) return;
   try {
     const r = await api("POST", "/api/features/bulk", {
-      filter,
-      update: { assignee },
+      filter, ...selectionFields, update: { [field]: next },
     });
     toast(`Updated ${r.updated} feature${r.updated === 1 ? "" : "s"}`, "info");
     await refreshFeaturesTable();
   } catch (e) {
     await showActionError(e, "Feature bulk update failed");
+  }
+}
+
+async function openFeatureBulkTransferNodeModal() {
+  const filter = featureBulkFilterFromHash();
+  const filterDesc = describeFeatureFilter(filter);
+  const selectionFields = _featureSelectionRequestFields();
+  if (!_hasAnyFeatureSelection()) {
+    toast("No Features selected.", "warn");
+    return;
+  }
+  const countText = _featureSelectionCountText("selected");
+
+  let nodes = state.project?.nodes || [];
+  try {
+    const snap = await api("GET", "/api/nodes");
+    nodes = snap.nodes || [];
+    state.project = {
+      ...(state.project || {}),
+      nodes,
+      active_node_id: snap.active_node_id || state.project?.active_node_id || "",
+    };
+  } catch {
+  }
+  const choices = nodes.filter((inst) => !inst.archived);
+  if (!choices.length) {
+    toast("No active nodes available.", "warn");
+    return;
+  }
+  const opts = choices.map((inst) => `
+    <option value="${htmlEscape(inst.id)}">${htmlEscape(inst.display_name || inst.id)}</option>
+  `).join("");
+  const body = () => `
+    <div class="modal-title">Transfer to node</div>
+    <div class="modal-body">
+      <div class="muted small" style="margin-bottom:8px">
+        Applies to ${htmlEscape(countText || "all matching")} —
+        ${htmlEscape(filterDesc)}.
+      </div>
+      <label for="feature-bulk-transfer-node-value">Target node</label>
+      <select class="modal-input" id="feature-bulk-transfer-node-value" data-testid="feature-bulk-transfer-node-value" style="width:100%">
+        ${opts}
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        A Feature moves with its Gaps. Features with active Gaps are skipped.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel data-testid="feature-bulk-transfer-cancel">Cancel</button>
+      <button data-ok data-testid="feature-bulk-transfer-apply">Transfer</button>
+    </div>`;
+  const target = await _openModal(body, { cancel: null, ok: choices[0].id }, ".modal-input");
+  if (target === null) return;
+  try {
+    const r = await api("POST", "/api/nodes/transfer-features", {
+      filter, ...selectionFields, target_node_id: target,
+    });
+    toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
+    await refreshFeaturesTable();
+  } catch (e) {
+    await showActionError(e, "Feature transfer failed");
+  }
+}
+
+async function confirmFeatureBulkDelete() {
+  const filter = featureBulkFilterFromHash();
+  const filterDesc = describeFeatureFilter(filter);
+  const selectionFields = _featureSelectionRequestFields();
+  if (!_hasAnyFeatureSelection()) {
+    toast("No Features selected.", "warn");
+    return;
+  }
+  const countText = _featureSelectionCountText("selected features");
+  const ok = await modalConfirm(
+    `Permanently delete ${countText} (${filterDesc})? This also deletes their assigned Gaps and cannot be undone.`,
+    {
+      title: "Delete Features",
+      okLabel: `Delete ${countText}`,
+      cancelLabel: "Keep them",
+      danger: true,
+    },
+  );
+  if (!ok) return;
+  try {
+    const r = await api("POST", "/api/features/bulk/delete", {
+      filter, ...selectionFields,
+    });
+    const failedN = (r.failures || []).length;
+    if (failedN) {
+      toast(`Deleted ${r.deleted} feature${r.deleted === 1 ? "" : "s"}, ${failedN} failed.`, "warn");
+    } else {
+      toast(`Deleted ${r.deleted} feature${r.deleted === 1 ? "" : "s"}.`, "info");
+    }
+    await refreshFeaturesTable();
+  } catch (e) {
+    await showActionError(e, "Feature bulk delete failed");
   }
 }
 

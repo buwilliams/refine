@@ -774,10 +774,22 @@ impl FileWorkItemService {
     pub fn bulk_update_features(
         &self,
         selection: BulkFeatureSelection,
-        assignee: &str,
+        update: BulkFeatureUpdate,
     ) -> RefineResult<BulkUpdateResult> {
-        let assignee = assignee.trim();
-        if !valid_reporter_name(assignee) {
+        let (field, raw_value) = match update {
+            BulkFeatureUpdate::Reporter(value) => {
+                ("reporter".to_string(), value.trim().to_string())
+            }
+            BulkFeatureUpdate::Assignee(value) => {
+                ("assignee".to_string(), value.trim().to_string())
+            }
+        };
+        if field == "reporter" && !valid_reporter_name(&raw_value) {
+            return Err(RefineError::InvalidInput(
+                "invalid reporter name".to_string(),
+            ));
+        }
+        if field == "assignee" && !valid_reporter_name(&raw_value) {
             return Err(RefineError::InvalidInput(
                 "invalid assignee name".to_string(),
             ));
@@ -786,18 +798,56 @@ impl FileWorkItemService {
         let mut ids = Vec::new();
         for feature in features {
             self.ensure_feature_owned(&feature)?;
-            self.set_feature_assignee_unchecked(&feature.feature.id, assignee)?;
+            match field.as_str() {
+                "reporter" => {
+                    self.update_feature_metadata_summary(
+                        &feature.feature.id,
+                        None,
+                        None,
+                        Some(&raw_value),
+                        None,
+                    )?;
+                }
+                "assignee" => {
+                    self.update_feature_metadata_summary(
+                        &feature.feature.id,
+                        None,
+                        None,
+                        None,
+                        Some(&raw_value),
+                    )?;
+                }
+                _ => unreachable!(),
+            }
             ids.push(feature.feature.id);
         }
         Ok(BulkUpdateResult {
             updated: ids.len(),
             ids,
-            field: "assignee".to_string(),
-            value: assignee.to_string(),
+            field,
+            value: raw_value,
             skipped: 0,
             skipped_details: Vec::new(),
             failed: 0,
             failures: Vec::new(),
+        })
+    }
+
+    pub fn bulk_delete_features(
+        &self,
+        selection: BulkFeatureSelection,
+    ) -> RefineResult<BulkDeleteResult> {
+        let features = self.select_bulk_feature_summaries(&selection)?;
+        let mut ids = Vec::new();
+        for feature in features {
+            self.delete_feature_record(&feature.feature.id)?;
+            ids.push(feature.feature.id);
+        }
+        Ok(BulkDeleteResult {
+            deleted: ids.len(),
+            ids,
+            failures: Vec::new(),
+            failed: 0,
         })
     }
 
@@ -917,6 +967,50 @@ impl FileWorkItemService {
             ids,
             skipped: 0,
             skipped_details: Vec::new(),
+        })
+    }
+
+    pub fn bulk_transfer_features_to_node(
+        &self,
+        target_node_id: &str,
+        selection: BulkFeatureSelection,
+    ) -> RefineResult<BulkTransferNodeResult> {
+        let target_node_id = self.validate_transfer_target_node(target_node_id)?;
+        let features = self.select_bulk_feature_summaries(&selection)?;
+        let mut ids = Vec::new();
+        let mut skipped_details = Vec::new();
+        for feature in features {
+            self.ensure_feature_owned(&feature)?;
+            let mut gaps = Vec::new();
+            let mut skip_reason = None;
+            for gap_id in &feature.gap_ids {
+                let gap = self.show_gap_summary(gap_id)?;
+                if let Some(reason) = gap_status_transfer_skip_reason(&gap) {
+                    skip_reason = Some(format!("gap:{}:{reason}", gap.gap.id));
+                    break;
+                }
+                gaps.push(gap);
+            }
+            if let Some(reason) = skip_reason {
+                skipped_details.push(BulkSkippedDetail {
+                    id: feature.feature.id,
+                    reason,
+                });
+                continue;
+            }
+            self.set_feature_node_unchecked(&feature.feature.id, &target_node_id)?;
+            ids.push(feature.feature.id);
+            for gap in gaps {
+                self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
+                ids.push(gap.gap.id);
+            }
+        }
+        Ok(BulkTransferNodeResult {
+            target_node_id,
+            updated: ids.len(),
+            ids,
+            skipped: skipped_details.len(),
+            skipped_details,
         })
     }
 
@@ -1666,33 +1760,6 @@ impl FileWorkItemService {
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&gap_path, &value)
-    }
-
-    fn set_feature_assignee_unchecked(&self, feature_id: &str, assignee: &str) -> RefineResult<()> {
-        let feature = self.show_feature_summary(feature_id)?;
-        self.ensure_feature_owned(&feature)?;
-        let feature_path = feature_json_path(&self.refine_dir, feature_id);
-        let bytes = fs::read(&feature_path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read Feature {}: {error}",
-                feature_path.display()
-            ))
-        })?;
-        let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse Feature {}: {error}",
-                feature_path.display()
-            ))
-        })?;
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!(
-                "Feature {} is not a JSON object",
-                feature_path.display()
-            ))
-        })?;
-        object.insert("assignee".to_string(), Value::String(assignee.to_string()));
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&feature_path, &value)
     }
 
     fn set_gap_node_unchecked(&self, gap_id: &str, node_id: &str) -> RefineResult<()> {

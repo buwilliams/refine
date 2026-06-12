@@ -49,6 +49,13 @@ pub struct BulkFeatureSelection {
     pub exclude_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BulkFeatureUpdate {
+    Reporter(String),
+    Assignee(String),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct BulkSkippedDetail {
     pub id: String,
