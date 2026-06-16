@@ -371,15 +371,15 @@ fn static_work_item_tables_use_shared_readable_name_layout() {
     assert!(common_css.contains(".work-items-table"));
     assert!(common_css.contains(".work-item-name-col"));
     assert!(common_css.contains(".work-item-name-cell"));
-    assert!(common_css.contains("overflow-x: auto"));
+    assert!(!common_css.contains(".table-scroll {\n  max-width: 100%;\n  overflow-x: auto;"));
+    assert!(!common_css.contains("min-width: var(--work-items-table-min-width"));
     assert!(common_css.contains("overflow-wrap: break-word"));
     assert!(common_css.contains("word-break: normal"));
+    assert!(common_css.contains("width: var(--work-item-select-width, 4%)"));
 
-    assert!(gaps_css.contains("--work-items-table-min-width: 1220px"));
-    assert!(gaps_css.contains("--work-items-table-min-width: 1320px"));
-    assert!(gaps_css.contains("--work-item-name-width: 28%"));
-    assert!(gaps_css.contains("--work-item-name-width: 26%"));
-    assert!(gaps_css.contains(".features-col-next {\n  width: 18%;"));
+    assert_eq!(gaps_css.matches("--work-item-name-width: 20%").count(), 2);
+    assert!(gaps_css.contains("--work-item-select-width: 4%"));
+    assert!(gaps_css.contains(".features-col-next {\n  width: 17%;"));
     assert!(gaps_css.contains(".features-col-updated {\n  width: 9%;"));
     assert!(!gaps_css.contains(".features-name-cell {\n  overflow-wrap: anywhere;"));
 

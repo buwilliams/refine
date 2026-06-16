@@ -579,10 +579,8 @@ select {
 }
 .table-scroll {
   max-width: 100%;
-  overflow-x: auto;
 }
 .work-items-table {
-  min-width: var(--work-items-table-min-width, 980px);
   table-layout: fixed;
 }
 .work-items-table .work-item-name-col {
@@ -620,9 +618,6 @@ select {
   .mobile-card-table {
     border-collapse: separate;
     border-spacing: 0;
-  }
-  .mobile-card-table.work-items-table {
-    min-width: 0;
   }
   .mobile-card-table colgroup,
   .mobile-card-table thead {
@@ -1388,7 +1383,7 @@ select {
 .table td.gap-select-col,
 .table th.feature-select-col,
 .table td.feature-select-col {
-  width: 32px;
+  width: var(--work-item-select-width, 4%);
   padding-left: 12px;
   padding-right: 4px;
   text-align: center;
