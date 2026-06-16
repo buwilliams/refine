@@ -2,19 +2,14 @@
 
 Refine is an agentic software delivery system that runs locally against a user's application repository. It coordinates agents and humans through Gaps, workflow state, provider CLIs, local processes, and a browser UI so software changes can move from request to implementation to human review.
 
-Use this document when an agent is responsible for installing Refine. Follow the steps in order, ask the user only the questions needed for the chosen install path, and do not claim installation succeeded until the CLI reports a healthy running system or you have reported the exact blocker.
+Use this document when an agent is responsible for installing Refine. Follow the steps in order, ask the user only the questions needed for the chosen install path, confirm where Refine should be installed when you cannot infer it, and do not claim installation succeeded until the CLI reports a healthy running system or you have reported the exact blocker.
 
 ## Prerequisites
 
-Recommended package manager: Homebrew. When it is not already available, suggest installing it with:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
 - Run on Linux, macOS, or Ubuntu/WSL. Windows users should open Ubuntu through WSL first.
 - Use a `bash` shell with network access.
-- Make sure the user can approve dependency installation or choose to install missing dependencies manually.
+- Determine which dependency sources are available on this host before installing anything: system package managers, existing corporate mirrors, preinstalled toolchains, or manual user setup.
+- Make sure the user can approve dependency installation from the available source or choose to install missing dependencies manually.
 - Install or repair required dependencies before cloning or updating Refine: `curl`, `git`, a C compiler/linker, and Rust Cargo.
 - If using a real provider, make sure the user can complete that provider's CLI authentication on this host.
 
@@ -25,12 +20,13 @@ Ask only when the answer is not clear from the user's environment, prior convers
 - Which agent provider should Refine use: `claude`, `codex`, `gemini`, or `copilot`?
 - Where should Refine be installed? Default: `$HOME/refine`.
 - Which UI port should Refine use? Default: `8082`.
-- Which package manager should the agent use for missing dependencies: `apt`, `brew`, or manual user setup?
+- Which available dependency source should the agent use for missing tools?
 - Should missing provider CLI installation or provider authentication happen now, or should the user complete it later?
 
 ## Install Refine
 
-1. Check for required tools and install missing dependencies with the user's approved package manager. Do not use `scripts/install.sh`; the agent should make dependency and package-manager choices explicitly.
+1. Resolve the Refine checkout path before running install commands. If an existing Refine checkout or a user preference is not clear, ask where to install Refine and use `$HOME/refine` as the default.
+2. Check for required tools, identify reachable dependency sources, and install missing dependencies only from a source the user approves. Do not use `scripts/install.sh`; the agent should make dependency choices explicitly.
 
 ```bash
 curl --version
@@ -39,14 +35,14 @@ cc --version
 cargo --version
 ```
 
-2. If Refine is already installed, update the checkout through the CLI and skip the fresh clone:
+3. If Refine is already installed, update the checkout through the CLI and skip the fresh clone:
 
 ```bash
 cd <refine-checkout>
 ./r system update --yes
 ```
 
-3. For a fresh install, copy the latest published release files without a `.git` directory:
+4. For a fresh install, copy the latest published release files without a `.git` directory:
 
 ```bash
 latest="$(
@@ -62,7 +58,7 @@ tar -C "$tmp/refine" --exclude .git -cf - . | tar -C <refine-checkout> -xf -
 rm -rf "$tmp"
 ```
 
-4. Always compile the host-local release binary and mark the checkout as deployed. Do this after either `./r system update` or a fresh clone so `./r` uses `bin/refine` instead of running through Cargo:
+5. Always compile the host-local release binary and mark the checkout as deployed. Do this after either `./r system update` or a fresh clone so `./r` uses `bin/refine` instead of running through Cargo:
 
 ```bash
 cd <refine-checkout>
@@ -72,7 +68,7 @@ install -m 755 target/release/refine bin/refine
 printf 'mode=deployed\nrelease_bin=bin/refine\n' > .refine-deployed
 ```
 
-5. Configure the selected provider:
+6. Configure the selected provider:
 
 ```bash
 cd <refine-checkout>
@@ -80,8 +76,8 @@ cd <refine-checkout>
 ./r agent detect
 ```
 
-6. If the selected provider CLI is missing, install or authenticate it only after the user approves. Treat Refine installation and provider readiness separately.
-7. Use the matching provider auth command when the user approves auth now:
+7. If the selected provider CLI is missing, install or authenticate it only after the user approves. Treat Refine installation and provider readiness separately.
+8. Use the matching provider auth command when the user approves auth now:
 
 ```bash
 claude
