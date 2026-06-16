@@ -14,7 +14,13 @@ refine is an agentic software delivery system that coordinates people and agents
 Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
 
 ```bash
-https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/agent-install.md
+Follow instructions found at: https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/agent-install.md
+```
+
+Or have your agent ensure system dependencies are installed:
+
+```bash
+Install or repair required dependencies for Refine: curl, git, a C compiler/linker, and Rust Cargo.
 ```
 
 ## Install yourself
