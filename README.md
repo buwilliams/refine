@@ -49,7 +49,7 @@ wsl --install
 
 After Ubuntu opens, use the Install yourself one-liner above.
 
-### Dependencies on Corporate Firewall
+### Ubuntu Dependencies in Corporate Firewall
 
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential rustc cargo
