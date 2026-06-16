@@ -20,7 +20,7 @@ Follow instructions found at: https://raw.githubusercontent.com/buwilliams/refin
 Or have your agent ensure system dependencies are installed:
 
 ```bash
-Install or repair required dependencies for Refine: curl, git, a C compiler/linker, and Rust Cargo.
+Install or repair required system dependencies: curl, git, a C compiler/linker, and Rust Cargo.
 ```
 
 ## Install yourself
@@ -48,6 +48,12 @@ wsl --install
 ```
 
 After Ubuntu opens, use the Install yourself one-liner above.
+
+### Dependencies on Corporate Firewall
+
+```bash
+sudo apt-get update && sudo apt-get install -y build-essential rustc cargo
+```
 
 ## Tests
 
