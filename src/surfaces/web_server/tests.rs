@@ -5345,6 +5345,51 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn web_server_target_app_status_is_passive_when_background_launches_are_stopped() {
+    let temp_root = unique_temp_dir("http-target-status-passive");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&temp_root).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/settings".to_string(),
+        body: Some(json!({
+            "target_app_url": "http://127.0.0.1:3000",
+            "target_app_status_command": "printf ok"
+        })),
+    });
+    FileProcessSupervisor::new(&runtime_root)
+        .set_background_processes_stopped(true)
+        .unwrap();
+
+    let status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/target-app/status".to_string(),
+        body: None,
+    });
+    assert_eq!(status.status, 200);
+    assert_eq!(status.body["app_url"], "http://127.0.0.1:3000");
+    assert_eq!(status.body["has_status_checks"], true);
+    assert_eq!(status.body["state"], "unknown");
+
+    let health = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/target-app/health".to_string(),
+        body: None,
+    });
+    assert_eq!(health.status, 409);
+    assert_eq!(
+        health.body["error"]["message"],
+        "background process launch is stopped"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn server_with_projection() -> InProcessWebServer {
     let mut gaps = BTreeMap::new();
     gaps.insert(

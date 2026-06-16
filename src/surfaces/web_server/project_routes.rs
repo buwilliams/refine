@@ -801,7 +801,7 @@ impl InProcessWebServer {
     pub(super) fn handle_target_app_status(&self) -> ApiResponse {
         match self
             .target_app_service()
-            .and_then(|service| service.status())
+            .and_then(|service| service.snapshot())
         {
             Ok(snapshot) => ApiResponse::json(200, self.target_app_response(snapshot)),
             Err(error) => error_response(error),
