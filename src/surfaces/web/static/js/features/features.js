@@ -218,7 +218,7 @@ function drawFeaturesTable(features, stateForRender) {
     return `
     <tr data-feature-id="${htmlEscape(feature.id)}" data-testid="features-row">
       ${cell}
-      <td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
+      <td class="work-item-name-cell features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
       <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
       <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
       <td data-label="Next">${feature.next_gap ? htmlEscape(feature.next_gap.name || feature.next_gap.id) : '<span class="muted small">-</span>'}</td>
@@ -238,10 +238,10 @@ function drawFeaturesTable(features, stateForRender) {
     : "";
   root.innerHTML = `
     <div class="table-scroll">
-      <table class="table features-table mobile-card-table">
+      <table class="table work-items-table features-table mobile-card-table">
         <colgroup>
           ${showSelection ? '<col class="features-col-select">' : ""}
-          <col class="features-col-name">
+          <col class="work-item-name-col features-col-name">
           <col class="features-col-status">
           <col class="features-col-progress">
           <col class="features-col-next">

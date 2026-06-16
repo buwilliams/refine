@@ -452,47 +452,49 @@ function drawGapsTable(gaps, state) {
        </th>`
     : "";
   root.innerHTML = `
-    <table class="table gaps-table mobile-card-table">
-      <colgroup>
-        ${showSelection ? '<col class="gaps-col-select">' : ""}
-        <col class="gaps-col-name">
-        <col class="gaps-col-status">
-        <col class="gaps-col-priority">
-        <col class="gaps-col-reporter">
-        <col class="gaps-col-assignee">
-        <col class="gaps-col-feature">
-        <col class="gaps-col-node">
-        <col class="gaps-col-updated">
-      </colgroup>
-      <thead><tr>${selectionHead}${sortHeads}</tr></thead>
-      <tbody>
-        ${gaps.map((g) => {
-          const selected = _isGapSelected(g.id);
-          const cell = showSelection
-            ? `<td class="gap-select-col" data-label="Select">
-                 <input type="checkbox" class="gap-select"
-                        data-testid="gaps-row-select"
-                        data-id="${g.id}"
-                        ${selected ? "checked" : ""}
-                        aria-label="Select gap ${htmlEscape(g.name)}">
-               </td>`
-            : "";
-          return `<tr data-id="${g.id}" data-testid="gaps-row">
-            ${cell}
-            <td class="gaps-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
-            <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
-            <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
-            <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
-            <td class="muted small" data-label="Assignee">${g.assignee ? htmlEscape(g.assignee) : "—"}</td>
-            <td class="muted small" data-label="Feature">${renderGapFeatureCell(g)}</td>
-            <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
-            <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
-          </tr>`;
-        }).join("")}
-      </tbody>
-	    </table>
-      ${renderPaginationControls("gaps", state.page, gaps.length, "gap")}
-	  `;
+    <div class="table-scroll">
+      <table class="table work-items-table gaps-table mobile-card-table">
+        <colgroup>
+          ${showSelection ? '<col class="gaps-col-select">' : ""}
+          <col class="work-item-name-col gaps-col-name">
+          <col class="gaps-col-status">
+          <col class="gaps-col-priority">
+          <col class="gaps-col-reporter">
+          <col class="gaps-col-assignee">
+          <col class="gaps-col-feature">
+          <col class="gaps-col-node">
+          <col class="gaps-col-updated">
+        </colgroup>
+        <thead><tr>${selectionHead}${sortHeads}</tr></thead>
+        <tbody>
+          ${gaps.map((g) => {
+            const selected = _isGapSelected(g.id);
+            const cell = showSelection
+              ? `<td class="gap-select-col" data-label="Select">
+                   <input type="checkbox" class="gap-select"
+                          data-testid="gaps-row-select"
+                          data-id="${g.id}"
+                          ${selected ? "checked" : ""}
+                          aria-label="Select gap ${htmlEscape(g.name)}">
+                 </td>`
+              : "";
+            return `<tr data-id="${g.id}" data-testid="gaps-row">
+              ${cell}
+              <td class="work-item-name-cell gaps-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
+              <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
+              <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
+              <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
+              <td class="muted small" data-label="Assignee">${g.assignee ? htmlEscape(g.assignee) : "—"}</td>
+              <td class="muted small" data-label="Feature">${renderGapFeatureCell(g)}</td>
+              <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
+              <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+    ${renderPaginationControls("gaps", state.page, gaps.length, "gap")}
+		  `;
   bindPaginationControls(root, "gaps", (page) =>
     updateGapsFilter({ page }));
   // Row click navigates to gap detail — but a click on the checkbox (or

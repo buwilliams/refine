@@ -577,6 +577,21 @@ select {
   border-collapse: separate;
   border-spacing: 0;
 }
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.work-items-table {
+  min-width: var(--work-items-table-min-width, 980px);
+  table-layout: fixed;
+}
+.work-items-table .work-item-name-col {
+  width: var(--work-item-name-width, auto);
+}
+.work-items-table .work-item-name-cell {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
 .table th, .table td {
   text-align: left;
   padding: 12px;
@@ -605,6 +620,9 @@ select {
   .mobile-card-table {
     border-collapse: separate;
     border-spacing: 0;
+  }
+  .mobile-card-table.work-items-table {
+    min-width: 0;
   }
   .mobile-card-table colgroup,
   .mobile-card-table thead {

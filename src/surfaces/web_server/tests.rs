@@ -361,6 +361,36 @@ fn static_import_modal_exposes_feature_import_surface() {
 }
 
 #[test]
+fn static_work_item_tables_use_shared_readable_name_layout() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();
+    let gaps_css = fs::read_to_string(static_root.join("css/gaps.css")).unwrap();
+    let gaps_list = fs::read_to_string(static_root.join("js/features/gaps-list.js")).unwrap();
+    let features = fs::read_to_string(static_root.join("js/features/features.js")).unwrap();
+
+    assert!(common_css.contains(".work-items-table"));
+    assert!(common_css.contains(".work-item-name-col"));
+    assert!(common_css.contains(".work-item-name-cell"));
+    assert!(common_css.contains("overflow-x: auto"));
+    assert!(common_css.contains("overflow-wrap: break-word"));
+    assert!(common_css.contains("word-break: normal"));
+
+    assert!(gaps_css.contains("--work-items-table-min-width: 1220px"));
+    assert!(gaps_css.contains("--work-items-table-min-width: 1320px"));
+    assert!(gaps_css.contains("--work-item-name-width: 28%"));
+    assert!(gaps_css.contains("--work-item-name-width: 26%"));
+    assert!(gaps_css.contains(".features-col-next {\n  width: 18%;"));
+    assert!(gaps_css.contains(".features-col-updated {\n  width: 9%;"));
+    assert!(!gaps_css.contains(".features-name-cell {\n  overflow-wrap: anywhere;"));
+
+    for source in [gaps_list.as_str(), features.as_str()] {
+        assert!(source.contains("work-items-table"));
+        assert!(source.contains("work-item-name-col"));
+        assert!(source.contains("work-item-name-cell"));
+    }
+}
+
+#[test]
 fn static_gap_detail_logs_feature_blocking_notice_to_system() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let gaps_detail = fs::read_to_string(static_root.join("js/features/gaps-detail.js")).unwrap();
