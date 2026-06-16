@@ -470,7 +470,7 @@ impl FileSecurityService {
     ) -> RefineResult<Self> {
         let runtime_root = runtime_root.into();
         let refine_dir = refine_dir.into();
-        let settings = FileSettingsService::new(refine_dir).load()?;
+        let settings = FileSettingsService::with_active_root(refine_dir, &runtime_root).load()?;
         let allowed_commands = settings
             .get("allowed_commands")
             .and_then(|value| value.as_str())

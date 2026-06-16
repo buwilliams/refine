@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use chrono::Utc;
 use serde_json::{Value, json};
 
-use crate::model::node::{ActiveNodeSelection, Node, NodeRegistry, NodeSettings};
+use crate::model::JsonObject;
+use crate::model::node::{ActiveNodeSelection, Node, NodeRegistry};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const NODE_REGISTRY_FILE: &str = "nodes.json";
@@ -111,6 +112,7 @@ impl FileNodeRegistryService {
             display_name: id.clone(),
             created_at: now.clone(),
             updated_at: now,
+            settings: JsonObject::new(),
             enabled: true,
             ssh_host: String::new(),
             ssh_user: String::new(),
@@ -141,6 +143,7 @@ impl FileNodeRegistryService {
             display_name: display_name.to_string(),
             created_at: now.clone(),
             updated_at: now,
+            settings: JsonObject::new(),
             enabled: true,
             ssh_host: String::new(),
             ssh_user: String::new(),
@@ -233,17 +236,12 @@ impl FileNodeRegistryService {
 
     pub fn settings(&self, id: &str) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
-        if !registry.nodes.iter().any(|node| node.id == id) {
+        let Some(node) = registry.nodes.iter().find(|node| node.id == id) else {
             return Err(RefineError::NotFound(format!("node {id} was not found")));
-        }
+        };
         Ok(json!({
             "node_id": id,
-            "settings": NodeSettings {
-                application: Default::default(),
-                runtime: Default::default(),
-                target_app_config: Default::default(),
-                target_app_runtime: Default::default(),
-            }
+            "settings": node.settings
         }))
     }
 
@@ -342,6 +340,7 @@ fn default_node(id: &str, display_name: &str) -> Node {
         display_name: display_name.to_string(),
         created_at: now.clone(),
         updated_at: now,
+        settings: JsonObject::new(),
         enabled: true,
         ssh_host: String::new(),
         ssh_user: String::new(),

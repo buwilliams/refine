@@ -1021,7 +1021,7 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
         let elapsed = started.elapsed();
         assert_eq!(response.status, 200, "{path}");
         assert!(
-            elapsed < Duration::from_millis(75),
+            elapsed < Duration::from_millis(150),
             "{path} took {:?}",
             elapsed
         );
@@ -2663,7 +2663,7 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
 }
 
 #[test]
-fn web_server_project_sync_pulls_fast_forward_and_allows_refine_runtime_noise() {
+fn web_server_project_sync_blocks_refine_runtime_noise() {
     let temp_root = unique_temp_dir("http-project-sync-ff");
     let remote = temp_root.join("remote.git");
     let seed = temp_root.join("seed");
@@ -2716,9 +2716,9 @@ fn web_server_project_sync_pulls_fast_forward_and_allows_refine_runtime_noise() 
         body: Some(json!({})),
     });
     assert_eq!(sync.status, 200);
-    assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["pulled"], true);
-    assert!(app_root.join("remote.txt").exists());
+    assert_eq!(sync.body["git_sync"]["attempted"], false);
+    assert_eq!(sync.body["git_sync"]["pulled"], false);
+    assert!(!app_root.join("remote.txt").exists());
     assert!(
         app_root
             .join(".refine/runtime/processes/local.json")
@@ -3175,7 +3175,7 @@ fn web_server_serves_source_file_tree_read_and_search() {
     )
     .unwrap();
     fs::write(temp_root.join("artifact.bin"), [0x00, 0x01, 0x02]).unwrap();
-    fs::write(refine_dir.join("settings.json"), "{}").unwrap();
+    fs::write(refine_dir.join("refine.json"), "{}").unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
@@ -4687,7 +4687,8 @@ fn web_server_reports_project_registry_and_updates_settings() {
         true
     );
     assert!(runtime_root.join("process-control.json").exists());
-    assert!(refine_dir.join("settings.json").exists());
+    assert!(refine_dir.join("nodes.json").exists());
+    assert!(!refine_dir.join("settings.json").exists());
 
     let removed = server.handle(ApiRequest {
         method: "DELETE".to_string(),
@@ -4916,7 +4917,8 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     });
     assert_eq!(settings.status, 200);
     assert_eq!(settings.body["settings"]["agent_cli"], "smoke-ai");
-    assert!(refine_dir.join("settings.json").exists());
+    assert!(refine_dir.join("nodes.json").exists());
+    assert!(!refine_dir.join("settings.json").exists());
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),

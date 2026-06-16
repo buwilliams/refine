@@ -36,24 +36,29 @@ struct ProjectSyncGitResult {
     detail: Option<String>,
 }
 
-fn configured_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> String {
+fn configured_provider_from_settings(
+    refine_dir: &std::path::Path,
+    active_root: Option<&std::path::Path>,
+    body: &Value,
+) -> String {
     body.get("provider")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|provider| !provider.is_empty())
         .map(str::to_string)
         .or_else(|| {
-            FileSettingsService::new(refine_dir)
-                .load()
-                .ok()
-                .and_then(|settings| {
-                    settings
-                        .get("agent_cli")
-                        .and_then(Value::as_str)
-                        .map(str::trim)
-                        .filter(|provider| !provider.is_empty())
-                        .map(str::to_string)
-                })
+            let service = match active_root {
+                Some(active_root) => FileSettingsService::with_active_root(refine_dir, active_root),
+                None => FileSettingsService::new(refine_dir),
+            };
+            service.load().ok().and_then(|settings| {
+                settings
+                    .get("agent_cli")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|provider| !provider.is_empty())
+                    .map(str::to_string)
+            })
         })
         .or_else(|| {
             provider_status_value().ok().and_then(|status| {
@@ -244,7 +249,7 @@ fn sync_attached_project_git_state(
 
 fn project_sync_status_line_blocks_pull(line: &str) -> bool {
     let path = line.get(3..).unwrap_or("").trim();
-    !path.starts_with(".refine/runtime/")
+    !path.is_empty()
 }
 
 fn run_project_git(
@@ -917,7 +922,11 @@ impl InProcessWebServer {
         let mut raw = String::new();
         let config = match self.current_refine_dir() {
             Ok(Some(refine_dir)) => {
-                provider = configured_provider_from_settings(&refine_dir, body);
+                provider = configured_provider_from_settings(
+                    &refine_dir,
+                    self.runtime_root.as_deref(),
+                    body,
+                );
                 match HostAgentProviderService::new().invoke(ProviderInvocation {
                     provider: provider.clone(),
                     prompt: target_app_generation_prompt(&service.target_root),
@@ -949,8 +958,7 @@ impl InProcessWebServer {
                 if persist_settings {
                     match self.current_refine_dir() {
                         Ok(Some(refine_dir)) => {
-                            if let Err(error) =
-                                FileSettingsService::new(&refine_dir).update(&settings)
+                            if let Err(error) = self.settings_service(&refine_dir).update(&settings)
                             {
                                 return error_response(error);
                             }
@@ -1276,7 +1284,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_settings_get(&self) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "read settings");
-        match FileSettingsService::new(refine_dir).list_response() {
+        match self.settings_service(refine_dir).list_response() {
             Ok(value) => ApiResponse::json(200, self.with_runtime_settings(value)),
             Err(error) => error_response(error),
         }
@@ -1317,7 +1325,7 @@ impl InProcessWebServer {
                 Err(error) => return error_response(error),
             }
         }
-        match FileSettingsService::new(&refine_dir).update(&body) {
+        match self.settings_service(&refine_dir).update(&body) {
             Ok(value) => {
                 if let Some(runtime_root) = &self.runtime_root {
                     match self.current_target_root() {
@@ -1414,7 +1422,8 @@ impl InProcessWebServer {
             ));
         }
 
-        let provider = configured_provider_from_settings(&refine_dir, &body);
+        let provider =
+            configured_provider_from_settings(&refine_dir, self.runtime_root.as_deref(), &body);
         let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
             provider: provider.clone(),

@@ -26,7 +26,8 @@ impl BacklogPromotionService {
     }
 
     pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
-        let settings = FileSettingsService::new(&self.refine_dir).load()?;
+        let settings =
+            FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
         let threshold = setting_i64(&settings, "backlog_promote_after_seconds", 3600);
         if threshold < 0 {
             return Ok(0);
@@ -35,7 +36,9 @@ impl BacklogPromotionService {
             FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root)
                 .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         let service = FileWorkItemService::new(&self.refine_dir);
-        let active_node_id = FileNodeRegistryService::new(&self.refine_dir).active_node_id()?;
+        let active_node_id =
+            FileNodeRegistryService::with_active_root(&self.refine_dir, &self.runtime_root)
+                .active_node_id()?;
         let now = Utc::now();
         let mut candidates = snapshot
             .gaps

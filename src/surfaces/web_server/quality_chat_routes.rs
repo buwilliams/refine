@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use crate::process::subprocess::FileProcessSupervisor;
-use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::config::ConfigService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::quality::{
     FileQualityService, QualityCheckRequest, QualityOperationRunner, QualityService,
@@ -18,7 +18,7 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| FileSettingsService::new(refine_dir).load().ok())
+            .and_then(|refine_dir| self.settings_service(refine_dir).load().ok())
             .and_then(|settings| {
                 settings
                     .get("quality_timing")
@@ -78,7 +78,7 @@ impl InProcessWebServer {
             .current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|root| FileSettingsService::new(root).load().ok())
+            .and_then(|root| self.settings_service(root).load().ok())
             .unwrap_or_default();
         let get = |key: &str| {
             settings
@@ -245,7 +245,7 @@ impl InProcessWebServer {
             .or_else(|| body.get("mode"))
             .and_then(|value| value.as_str());
         let configured_provider = || {
-            FileSettingsService::new(&refine_dir)
+            self.settings_service(&refine_dir)
                 .load()
                 .ok()
                 .and_then(|settings| {

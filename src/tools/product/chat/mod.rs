@@ -349,7 +349,8 @@ impl FileChatService {
             ));
         }
 
-        let settings = FileSettingsService::new(&self.refine_dir).load()?;
+        let settings =
+            FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
         let target_branch = settings
             .get("merge_target_branch")
             .and_then(Value::as_str)
@@ -1471,11 +1472,13 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("What should I test?"))
         );
-        assert!(
-            read.progress_lines
-                .iter()
-                .any(|line| line.contains("Provider turn completed"))
-        );
+        let record = service.load_record(&session.id).unwrap();
+        assert!(record.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|line| line.contains("Provider turn completed"))
+        }));
         assert!(
             read.lines
                 .iter()

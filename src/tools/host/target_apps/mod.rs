@@ -626,7 +626,7 @@ impl FileTargetAppService {
     }
 
     fn settings(&self) -> RefineResult<JsonObject> {
-        FileSettingsService::new(&self.refine_dir).load()
+        FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()
     }
 
     fn state_path(&self) -> PathBuf {

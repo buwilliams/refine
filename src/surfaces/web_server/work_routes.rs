@@ -375,24 +375,29 @@ fn nonempty_import_option(value: &str) -> Option<&str> {
     (!trimmed.is_empty()).then_some(trimmed)
 }
 
-fn import_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> String {
+fn import_provider_from_settings(
+    refine_dir: &std::path::Path,
+    active_root: Option<&std::path::Path>,
+    body: &Value,
+) -> String {
     body.get("provider")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|provider| !provider.is_empty())
         .map(str::to_string)
         .or_else(|| {
-            FileSettingsService::new(refine_dir)
-                .load()
-                .ok()
-                .and_then(|settings| {
-                    settings
-                        .get("agent_cli")
-                        .and_then(Value::as_str)
-                        .map(str::trim)
-                        .filter(|provider| !provider.is_empty())
-                        .map(str::to_string)
-                })
+            let service = match active_root {
+                Some(active_root) => FileSettingsService::with_active_root(refine_dir, active_root),
+                None => FileSettingsService::new(refine_dir),
+            };
+            service.load().ok().and_then(|settings| {
+                settings
+                    .get("agent_cli")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|provider| !provider.is_empty())
+                    .map(str::to_string)
+            })
         })
         .or_else(|| {
             provider_status_value().ok().and_then(|status| {
@@ -2685,7 +2690,8 @@ impl InProcessWebServer {
             .map(str::trim)
             .unwrap_or("import");
         let reporter = body.get("reporter").and_then(|value| value.as_str());
-        let provider = import_provider_from_settings(&refine_dir, &body);
+        let provider =
+            import_provider_from_settings(&refine_dir, self.runtime_root.as_deref(), &body);
         let force_provider = body
             .get("force_provider")
             .or_else(|| body.get("forceProvider"))

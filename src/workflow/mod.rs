@@ -185,7 +185,8 @@ impl WorkflowEngine {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
             let refine_dir = target_root.join(".refine");
-            let settings = FileSettingsService::new(&refine_dir).load()?;
+            let settings =
+                FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
@@ -207,7 +208,9 @@ impl WorkflowEngine {
             );
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
             policy.target_app_id = target_root.display().to_string();
-            policy.active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
+            policy.active_node_id =
+                FileNodeRegistryService::with_active_root(&refine_dir, &self.runtime_root)
+                    .active_node_id()?;
         }
         Ok(policy)
     }
@@ -531,7 +534,8 @@ impl WorkflowEngine {
             self.runtime_root.join("cache"),
         );
         let round_idx = ensure_workflow_round(&work_items, &claim.gap_id)?;
-        let settings = FileSettingsService::new(&refine_dir).load()?;
+        let settings =
+            FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let mut ctx = WorkflowContext::new(
             &self.runtime_root,
             target_root,
@@ -1660,6 +1664,9 @@ mod tests {
         work_items
             .transition_gap_status("REMOTE", GapStatus::Todo)
             .unwrap();
+        FileNodeRegistryService::new(&refine_dir)
+            .create("remote-node")
+            .unwrap();
         work_items
             .bulk_transfer_gaps_to_node(
                 "remote-node",
@@ -1669,15 +1676,12 @@ mod tests {
                 },
             )
             .unwrap();
-        FileNodeRegistryService::new(&refine_dir)
-            .create("remote-node")
-            .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 1);
         assert!(automation.claim("REMOTE").is_err());
 
-        FileNodeRegistryService::new(&refine_dir)
+        FileNodeRegistryService::with_active_root(&refine_dir, &runtime_root)
             .activate("remote-node")
             .unwrap();
         let remote_automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);

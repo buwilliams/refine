@@ -69,7 +69,8 @@ impl FileMergerService {
             return Ok(MergerTickResult { processed: None });
         };
         let gap_id = gap.gap.id.clone();
-        let settings = FileSettingsService::new(&self.refine_dir).load()?;
+        let settings =
+            FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
         let branch_name = gap
             .gap
             .branch_name

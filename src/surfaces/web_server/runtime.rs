@@ -6,6 +6,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::supervisor::config::FileSettingsService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
@@ -100,6 +101,14 @@ impl InProcessWebServer {
             FileChatService::with_runtime_root(refine_dir, runtime_root)
         } else {
             FileChatService::new(refine_dir)
+        }
+    }
+
+    pub(super) fn settings_service(&self, refine_dir: impl Into<PathBuf>) -> FileSettingsService {
+        let refine_dir = refine_dir.into();
+        match &self.runtime_root {
+            Some(runtime_root) => FileSettingsService::with_active_root(refine_dir, runtime_root),
+            None => FileSettingsService::new(refine_dir),
         }
     }
 

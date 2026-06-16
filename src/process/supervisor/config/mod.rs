@@ -6,8 +6,10 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
+use crate::model::node::Node;
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
+use crate::tools::product::nodes::FileNodeRegistryService;
 
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const GOVERNANCE_FILE: &str = "governance.json";
@@ -23,17 +25,29 @@ pub trait ConfigService {
 #[derive(Clone, Debug)]
 pub struct FileSettingsService {
     pub refine_dir: PathBuf,
+    pub active_root: Option<PathBuf>,
 }
 
 impl FileSettingsService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            active_root: None,
+        }
+    }
+
+    pub fn with_active_root(
+        refine_dir: impl Into<PathBuf>,
+        active_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            refine_dir: refine_dir.into(),
+            active_root: Some(active_root.into()),
         }
     }
 
     pub fn path(&self) -> PathBuf {
-        self.refine_dir.join(SETTINGS_FILE)
+        FileNodeRegistryService::new(&self.refine_dir).registry_path()
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
@@ -75,21 +89,48 @@ impl FileSettingsService {
     }
 
     fn write(&self, settings: &JsonObject) -> RefineResult<()> {
-        if let Some(parent) = self.path().parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to create settings directory {}: {error}",
-                    parent.display()
-                ))
-            })?;
+        let service = self.node_registry_service();
+        let active_node_id = service.active_node_id()?;
+        let mut registry = service.load_registry()?;
+        let now = now_timestamp();
+        if !registry.nodes.iter().any(|node| node.id == active_node_id) {
+            registry.nodes.push(settings_node(&active_node_id, &now));
         }
-        let encoded = serde_json::to_string_pretty(settings).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode settings: {error}"))
-        })?;
-        let path = self.path();
-        fs::write(&path, format!("{encoded}\n")).map_err(|error| {
+        let Some(node) = registry
+            .nodes
+            .iter_mut()
+            .find(|node| node.id == active_node_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "node {active_node_id} was not found"
+            )));
+        };
+        node.settings = settings.clone();
+        node.updated_at = now;
+        service.save_registry(&registry)
+    }
+
+    fn node_registry_service(&self) -> FileNodeRegistryService {
+        match &self.active_root {
+            Some(active_root) => {
+                FileNodeRegistryService::with_active_root(&self.refine_dir, active_root)
+            }
+            None => FileNodeRegistryService::new(&self.refine_dir),
+        }
+    }
+
+    fn legacy_path(&self) -> PathBuf {
+        self.refine_dir.join(SETTINGS_FILE)
+    }
+
+    fn remove_legacy_settings(&self) -> RefineResult<()> {
+        let path = self.legacy_path();
+        if !path.exists() {
+            return Ok(());
+        }
+        fs::remove_file(&path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to write settings {}: {error}",
+                "failed to remove legacy settings {}: {error}",
                 path.display()
             ))
         })
@@ -98,34 +139,25 @@ impl FileSettingsService {
 
 impl ConfigService for FileSettingsService {
     fn load(&self) -> RefineResult<JsonObject> {
-        let path = self.path();
-        if !path.exists() {
-            return Ok(default_settings());
-        }
-        let bytes = fs::read_to_string(&path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read settings {}: {error}",
-                path.display()
-            ))
-        })?;
-        let raw = serde_json::from_str::<serde_json::Value>(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse settings {}: {error}",
-                path.display()
-            ))
-        })?;
-        let Some(object) = raw.as_object() else {
-            return Ok(default_settings());
-        };
+        let service = self.node_registry_service();
+        let active_node_id = service.active_node_id()?;
+        let registry = service.load_registry()?;
+        let stored = registry
+            .nodes
+            .iter()
+            .find(|node| node.id == active_node_id)
+            .map(|node| node.settings.clone())
+            .unwrap_or_default();
         let mut settings = default_settings();
         let mut migrated = false;
-        for (key, value) in object {
+        self.remove_legacy_settings()?;
+        for (key, value) in stored {
             if allowed_settings().contains(key.as_str()) {
-                settings.insert(key.clone(), Value::String(normalize_setting(key, value)?));
-            } else if let Some(new_key) = legacy_setting_key(key) {
+                settings.insert(key.clone(), Value::String(normalize_setting(&key, &value)?));
+            } else if let Some(new_key) = legacy_setting_key(&key) {
                 settings.insert(
                     new_key.to_string(),
-                    Value::String(normalize_setting(new_key, value)?),
+                    Value::String(normalize_setting(new_key, &value)?),
                 );
                 migrated = true;
             }
@@ -1047,6 +1079,30 @@ fn rewrite_reporter_field(value: Option<&mut Value>, old: &str, new: &str) -> bo
     false
 }
 
+fn settings_node(id: &str, now: &str) -> Node {
+    Node {
+        id: id.to_string(),
+        display_name: if id == "default" {
+            "Default".to_string()
+        } else {
+            id.to_string()
+        },
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+        settings: JsonObject::new(),
+        enabled: true,
+        ssh_host: String::new(),
+        ssh_user: String::new(),
+        ssh_identity_path: String::new(),
+        ssh_port: 22,
+        refine_checkout: "~/refine".to_string(),
+        target_app_path: String::new(),
+        refine_port: 8082,
+        health: None,
+        archived: false,
+    }
+}
+
 fn normalize_reporter_name(name: &str) -> RefineResult<String> {
     let clean = name.trim();
     if clean.is_empty() {
@@ -1088,23 +1144,32 @@ mod tests {
         assert_eq!(updated["settings"]["parallel_run_cap"], "4");
         assert_eq!(updated["settings"]["paused"], "1");
         assert!(service.path().exists());
+        assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_settings_service_migrates_target_app_build_settings() {
+    fn file_settings_service_normalizes_node_stored_build_settings() {
         let temp_root = unique_temp_dir("settings-build-migration");
         let refine_dir = temp_root.join(".refine");
         fs::create_dir_all(&refine_dir).unwrap();
         fs::write(
-            refine_dir.join(SETTINGS_FILE),
+            refine_dir.join("nodes.json"),
             serde_json::to_string_pretty(&json!({
-                "target_app_rebuild_command": "npm run build",
-                "target_app_rebuild_timeout_seconds": "45",
-                "target_app_auto_rebuild": "daily",
-                "target_app_auto_rebuild_hour_utc": "4",
-                "quality_timing": "post_rebuild"
+                "nodes": [{
+                    "id": "default",
+                    "display_name": "Default",
+                    "created_at": "2026-06-16T00:00:00Z",
+                    "updated_at": "2026-06-16T00:00:00Z",
+                    "settings": {
+                        "target_app_rebuild_command": "npm run build",
+                        "target_app_rebuild_timeout_seconds": "45",
+                        "target_app_auto_rebuild": "daily",
+                        "target_app_auto_rebuild_hour_utc": "4",
+                        "quality_timing": "post_rebuild"
+                    }
+                }]
             }))
             .unwrap(),
         )
@@ -1120,6 +1185,7 @@ mod tests {
         let written = fs::read_to_string(service.path()).unwrap();
         assert!(written.contains("target_app_build_command"));
         assert!(!written.contains("target_app_rebuild_command"));
+        assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

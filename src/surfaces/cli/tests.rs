@@ -1535,8 +1535,8 @@ fn log_bundle_exports_redacted_support_bundle() {
     let runtime_root = temp_root.join("run");
     fs::create_dir_all(&refine_dir).unwrap();
     fs::write(
-        refine_dir.join("settings.json"),
-        r#"{"provider_token":"secret-value","visible":"ok"}"#,
+        refine_dir.join("nodes.json"),
+        r#"{"nodes":[{"id":"default","display_name":"Default","created_at":"2026-06-16T00:00:00Z","updated_at":"2026-06-16T00:00:00Z","settings":{"provider_token":"secret-value","visible":"ok"}}]}"#,
     )
     .unwrap();
 

@@ -61,8 +61,8 @@ impl SupportBundleService for FileSupportBundleService {
             .map(|report| json!(report))
             .unwrap_or_else(|error| json!({"error": error.to_string()}));
         let chat_sessions = read_chat_sessions(&self.refine_dir)?;
-        let settings_path = self.refine_dir.join("settings.json");
-        let settings = read_json_if_exists(&settings_path)?;
+        let nodes_path = self.refine_dir.join("nodes.json");
+        let nodes = read_json_if_exists(&nodes_path)?;
         let bundle = json!({
             "created_at": now_timestamp(),
             "redacted": redact_secrets,
@@ -70,7 +70,7 @@ impl SupportBundleService for FileSupportBundleService {
             "activity": activity,
             "metrics": metrics,
             "chat_sessions": chat_sessions,
-            "settings": settings
+            "nodes": nodes
         });
         let bundle = if redact_secrets {
             redact_json(bundle)
@@ -194,8 +194,8 @@ mod tests {
         let runtime_root = temp_root.join("run");
         fs::create_dir_all(&refine_dir).unwrap();
         fs::write(
-            refine_dir.join("settings.json"),
-            r#"{"api_token":"secret","safe":"visible"}"#,
+            refine_dir.join("nodes.json"),
+            r#"{"nodes":[{"id":"default","display_name":"Default","created_at":"2026-06-16T00:00:00Z","updated_at":"2026-06-16T00:00:00Z","settings":{"api_token":"secret","safe":"visible"}}]}"#,
         )
         .unwrap();
         FileActivityService::new(&refine_dir)

@@ -222,7 +222,7 @@ fn seed_remote(remote: &Path, seed: &Path) {
 }
 
 fn commit_and_push_refine_state(app_root: &Path, message: &str) {
-    git(app_root, &["add", ".refine", ":(exclude).refine/runtime"]);
+    git(app_root, &["add", ".refine"]);
     git(app_root, &["commit", "-q", "-m", message]);
     git(app_root, &["push", "origin", "main"]);
 }

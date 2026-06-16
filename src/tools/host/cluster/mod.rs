@@ -723,6 +723,7 @@ fn default_node(id: &str) -> Node {
     Node {
         id: id.to_string(),
         display_name: id.to_string(),
+        settings: Default::default(),
         ssh_host: String::new(),
         ssh_user: String::new(),
         ssh_identity_path: String::new(),

@@ -441,9 +441,12 @@ impl FileGitWorktreeService {
     }
 
     fn process_runtime_root(&self) -> PathBuf {
-        self.runtime_root
-            .clone()
-            .unwrap_or_else(|| self.root.join(".refine/runtime"))
+        self.runtime_root.clone().unwrap_or_else(|| {
+            std::env::temp_dir()
+                .join("refine")
+                .join("git-worktrees")
+                .join(sanitize_runtime_component(&self.root.display().to_string()))
+        })
     }
 
     fn conflicts(&self) -> RefineResult<Vec<String>> {
@@ -978,6 +981,23 @@ fn is_refine_owned_artifact(path: &str) -> bool {
         || path.starts_with("target/")
 }
 
+fn sanitize_runtime_component(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    let out = out.trim_matches('-');
+    if out.is_empty() {
+        "root".to_string()
+    } else {
+        out.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -1468,31 +1488,25 @@ mod tests {
     }
 
     #[test]
-    fn file_git_worktree_service_hard_reset_preserves_refine_runtime_and_removes_other_noise() {
+    fn file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise() {
         let temp_root = unique_temp_dir("git-hard-reset-runtime");
         let repo = temp_root.join("repo");
+        let runtime_root = temp_root.join("run/8080");
         fs::create_dir_all(&repo).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "committed\n", "initial");
         fs::write(repo.join("app.txt"), "dirty\n").unwrap();
         fs::write(repo.join("untracked.txt"), "remove\n").unwrap();
-        fs::create_dir_all(repo.join(".refine/runtime/processes")).unwrap();
-        fs::write(repo.join(".refine/runtime/processes/pid.json"), "{}\n").unwrap();
+        fs::create_dir_all(runtime_root.join("processes")).unwrap();
+        fs::write(runtime_root.join("processes/pid.json"), "{}\n").unwrap();
         fs::create_dir_all(repo.join("run/8080")).unwrap();
         fs::write(repo.join("run/8080/state.json"), "{}\n").unwrap();
         fs::create_dir_all(repo.join("target/tmp")).unwrap();
         fs::write(repo.join("target/tmp/build.txt"), "build\n").unwrap();
 
-        let service =
-            FileGitWorktreeService::with_runtime_root(&repo, repo.join(".refine/runtime"));
+        let service = FileGitWorktreeService::with_runtime_root(&repo, &runtime_root);
         let status = service.inspect("").unwrap();
         assert!(status.dirty_user_changes);
-        assert!(
-            status
-                .refine_owned_artifacts
-                .iter()
-                .any(|path| path == ".refine/")
-        );
         assert!(
             status
                 .refine_owned_artifacts
@@ -1513,7 +1527,7 @@ mod tests {
             "committed\n"
         );
         assert!(!repo.join("untracked.txt").exists());
-        assert!(repo.join(".refine/runtime/processes/pid.json").exists());
+        assert!(runtime_root.join("processes/pid.json").exists());
         assert!(repo.join("run/8080/state.json").exists());
         assert!(repo.join("target/tmp/build.txt").exists());
 

@@ -6,14 +6,12 @@ use serde_json::{Value, json};
 
 use crate::model::JsonObject;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessPauseState, ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ProcessPauseState, ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::tools::product::project_state::RuntimeProjection;
-
-const LEGACY_PROCESS_ROOT_ENTRY_LIMIT: usize = 512;
 
 #[derive(Clone, Debug)]
 pub struct FileProcessStatusService {
@@ -61,22 +59,14 @@ pub fn process_summary_value_with_chat_sessions(
     let pause_state = supervisor.pause_state()?;
     let mut process_values = Vec::new();
     let mut seen_process_ids = BTreeSet::new();
-    for process_root in process_roots(runtime_root, refine_dir) {
-        let supervisor = FileProcessSupervisor::new(&process_root);
-        let processes = if process_root == runtime_root {
-            supervisor.recover()?
-        } else {
-            supervisor.recover_owner(ProcessOwner::TargetApp)?
-        };
-        for process in processes {
-            if !seen_process_ids.insert(process.id.clone()) {
-                continue;
-            }
-            let mut value = process.api_json();
-            apply_process_management_actions(&mut value, &pause_state);
-            if is_current_process_api_value(&value) {
-                process_values.push(value);
-            }
+    for process in supervisor.recover()? {
+        if !seen_process_ids.insert(process.id.clone()) {
+            continue;
+        }
+        let mut value = process.api_json();
+        apply_process_management_actions(&mut value, &pause_state);
+        if is_current_process_api_value(&value) {
+            process_values.push(value);
         }
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
@@ -160,32 +150,6 @@ pub fn runtime_process_status_value(runtime: &RuntimeProjection) -> Value {
 pub fn is_current_process_object(process: &JsonObject) -> bool {
     let status = process.get("status").and_then(Value::as_str).unwrap_or("");
     !is_terminal_process_status(status)
-}
-
-fn process_roots(runtime_root: &Path, refine_dir: Option<&Path>) -> Vec<PathBuf> {
-    let mut roots = vec![runtime_root.to_path_buf()];
-    if let Some(refine_dir) = refine_dir {
-        let project_runtime_root = refine_dir.join("runtime");
-        if project_runtime_root != runtime_root
-            && should_scan_legacy_process_root(&project_runtime_root)
-        {
-            roots.push(project_runtime_root);
-        }
-    }
-    roots
-}
-
-fn should_scan_legacy_process_root(project_runtime_root: &Path) -> bool {
-    let processes_dir = project_runtime_root.join("processes");
-    if !processes_dir.exists() {
-        return true;
-    }
-    fs::read_dir(&processes_dir)
-        .map(|entries| {
-            entries.take(LEGACY_PROCESS_ROOT_ENTRY_LIMIT + 1).count()
-                <= LEGACY_PROCESS_ROOT_ENTRY_LIMIT
-        })
-        .unwrap_or(false)
 }
 
 fn append_chat_session_processes(
@@ -434,32 +398,4 @@ fn validate_process_id(process_id: &str) -> RefineResult<()> {
         ));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn process_roots_skip_oversized_legacy_runtime_process_registry() {
-        let temp_root = std::env::temp_dir().join(format!(
-            "refine-legacy-process-roots-{}",
-            uuid::Uuid::new_v4()
-        ));
-        let runtime_root = temp_root.join("run/8080");
-        let refine_dir = temp_root.join("app/.refine");
-        let legacy_processes = refine_dir.join("runtime/processes");
-        fs::create_dir_all(&runtime_root).unwrap();
-        fs::create_dir_all(&legacy_processes).unwrap();
-        for index in 0..=LEGACY_PROCESS_ROOT_ENTRY_LIMIT {
-            fs::write(legacy_processes.join(format!("proc-{index}.json")), "{}").unwrap();
-        }
-
-        assert_eq!(
-            process_roots(&runtime_root, Some(&refine_dir)),
-            vec![runtime_root]
-        );
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
 }
