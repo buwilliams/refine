@@ -1,16 +1,17 @@
 :root {
   color-scheme: light;
-  --ink: #17201f;
-  --muted: #596966;
-  --line: #d8e2df;
+  --ink: #051936;
+  --muted: #516078;
+  --line: #d8e0e8;
   --paper: #f7f3ea;
-  --surface: #fffdf7;
-  --soft: #e8f1ec;
-  --blue: #275e91;
-  --green: #2e6b4f;
-  --rust: #a84e32;
-  --gold: #d6aa3f;
-  --shadow: 0 18px 50px rgba(29, 43, 39, 0.14);
+  --band: #edf4ef;
+  --surface: #ffffff;
+  --soft: #eef4ff;
+  --blue: #1f6feb;
+  --green: #1f6feb;
+  --rust: #516078;
+  --gold: #8bbcff;
+  --shadow: 0 18px 50px rgba(5, 25, 54, 0.12);
 }
 
 * {
@@ -49,7 +50,7 @@ img {
   min-height: 72px;
   padding: 14px clamp(18px, 4vw, 56px);
   background: rgba(247, 243, 234, 0.92);
-  border-bottom: 1px solid rgba(39, 94, 145, 0.16);
+  border-bottom: 1px solid rgba(216, 224, 232, 0.9);
   backdrop-filter: blur(16px);
 }
 
@@ -84,12 +85,12 @@ img {
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(23, 32, 31, 0.08);
+  box-shadow: 0 6px 16px rgba(5, 25, 54, 0.08);
 }
 
 .menu-button:hover,
 .menu-button[aria-expanded="true"] {
-  border-color: rgba(39, 94, 145, 0.35);
+  border-color: rgba(31, 111, 235, 0.35);
   color: var(--blue);
 }
 
@@ -218,7 +219,7 @@ h1 {
 
 .hero-lede {
   max-width: 650px;
-  color: #364844;
+  color: var(--muted);
   font-size: clamp(1.08rem, 2vw, 1.35rem);
 }
 
@@ -242,9 +243,9 @@ h1 {
 }
 
 .button.primary {
-  background: var(--ink);
-  color: #fffaf0;
-  border-color: var(--ink);
+  background: var(--blue);
+  color: #ffffff;
+  border-color: var(--blue);
 }
 
 .button.secondary {
@@ -266,21 +267,21 @@ h1 {
 }
 
 .screenshot-link:focus-visible {
-  outline: 3px solid rgba(39, 94, 145, 0.55);
+  outline: 3px solid rgba(31, 111, 235, 0.48);
   outline-offset: 4px;
 }
 
 .hero-media img {
   width: 100%;
   height: auto;
-  border: 1px solid rgba(23, 32, 31, 0.14);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   box-shadow: var(--shadow);
 }
 
 .screenshot-link:hover img {
-  border-color: rgba(39, 94, 145, 0.42);
+  border-color: rgba(31, 111, 235, 0.42);
 }
 
 .section {
@@ -318,7 +319,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: 0 10px 28px rgba(29, 43, 39, 0.08);
+  box-shadow: 0 10px 28px rgba(5, 25, 54, 0.08);
 }
 
 .feature-grid article {
@@ -328,8 +329,16 @@ h1 {
 .feature-index {
   display: block;
   margin-bottom: 34px;
-  color: var(--rust);
+  color: var(--blue);
   font-weight: 850;
+}
+
+.feature-grid article:nth-child(2) .feature-index {
+  color: var(--blue);
+}
+
+.feature-grid article:nth-child(3) .feature-index {
+  color: var(--blue);
 }
 
 .feature-grid h3,
@@ -402,11 +411,11 @@ h1 {
 
 .carousel-slide img {
   width: 100%;
-  border: 1px solid rgba(23, 32, 31, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
   height: auto;
   background: transparent;
-  box-shadow: 0 16px 40px rgba(29, 43, 39, 0.13);
+  box-shadow: 0 16px 40px rgba(5, 25, 54, 0.13);
 }
 
 .carousel-slide figcaption {
@@ -437,13 +446,13 @@ h1 {
 }
 
 .carousel-button:hover {
-  border-color: rgba(39, 94, 145, 0.35);
+  border-color: rgba(31, 111, 235, 0.35);
   color: var(--blue);
 }
 
 .carousel-button:focus-visible,
 .carousel-dot:focus-visible {
-  outline: 3px solid rgba(39, 94, 145, 0.55);
+  outline: 3px solid rgba(31, 111, 235, 0.48);
   outline-offset: 3px;
 }
 
@@ -469,19 +478,19 @@ h1 {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: #b7c5c0;
+  background: #c9d6e3;
   cursor: pointer;
 }
 
 .carousel-dot[aria-current="true"] {
   width: 28px;
-  background: var(--green);
+  background: var(--blue);
 }
 
 .start-section,
 .agents-section {
-  background: #edf4ef;
-  border-block: 1px solid rgba(46, 107, 79, 0.14);
+  background: var(--band);
+  border-block: 1px solid rgba(31, 111, 235, 0.12);
 }
 
 .start-layout {
@@ -495,7 +504,7 @@ h1 {
 }
 
 .install-panel.accent {
-  border-color: rgba(39, 94, 145, 0.32);
+  border-color: rgba(31, 111, 235, 0.32);
 }
 
 .panel-heading {
@@ -533,13 +542,13 @@ h1 {
 
 .copy-button:hover,
 .copy-button.copied {
-  border-color: rgba(46, 107, 79, 0.55);
+  border-color: rgba(18, 184, 173, 0.55);
   background: var(--soft);
   color: var(--green);
 }
 
 .copy-button.copy-failed {
-  border-color: rgba(168, 78, 50, 0.55);
+  border-color: rgba(237, 138, 0, 0.55);
   color: var(--rust);
 }
 
@@ -572,26 +581,26 @@ h1 {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #18231f;
-  border-color: #33443f;
-  color: #f7f3ea;
+  background: #051936;
+  border-color: #203756;
+  color: #f6f8fb;
 }
 
 .copy-button-on-code:hover,
 .copy-button-on-code.copied {
-  background: #24362f;
-  border-color: #89a99b;
-  color: #dcece4;
+  background: #0b2a5a;
+  border-color: #4c8dff;
+  color: #ffffff;
 }
 
 pre {
   overflow-x: auto;
   margin: 18px 0;
   padding: 18px;
-  border: 1px solid #253531;
+  border: 1px solid #203756;
   border-radius: 8px;
-  background: #101816;
-  color: #f7f3ea;
+  background: #06162f;
+  color: #f6f8fb;
   font-size: 0.92rem;
   line-height: 1.5;
 }
@@ -619,7 +628,7 @@ code {
 }
 
 .docs-card:hover {
-  border-color: rgba(39, 94, 145, 0.45);
+  border-color: rgba(31, 111, 235, 0.45);
   transform: translateY(-1px);
 }
 
@@ -648,9 +657,9 @@ code {
   gap: 10px;
   align-items: center;
   padding: 10px;
-  border: 1px solid rgba(46, 107, 79, 0.22);
+  border: 1px solid rgba(31, 111, 235, 0.18);
   border-radius: 8px;
-  background: rgba(255, 253, 247, 0.84);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .url-row a {
@@ -681,7 +690,7 @@ code {
 }
 
 .reader-body {
-  background: #f6f4ee;
+  background: var(--paper);
 }
 
 .reader-shell {
@@ -719,7 +728,7 @@ code {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfaf6;
+  background: #f6f8fb;
 }
 
 .markdown-content + .doc-pager {
@@ -804,7 +813,7 @@ code {
 
 .markdown-content p,
 .markdown-content li {
-  color: #384844;
+  color: var(--muted);
   font-size: 1.03rem;
 }
 
@@ -824,8 +833,8 @@ code {
 .markdown-content code {
   padding: 0.12em 0.32em;
   border-radius: 5px;
-  background: #e9eee8;
-  color: #1f3e37;
+  background: #eef4ff;
+  color: #0b2a5a;
   font-size: 0.92em;
 }
 
