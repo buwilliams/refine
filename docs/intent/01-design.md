@@ -20,9 +20,9 @@ Refine names those concerns by product intent:
 
 - Surfaces are the interaction points for people and agents.
 - Capabilities are the active powers that move work, run processes, and use tools.
-- Foundation is the durable conceptual base: model, node, state, storage, and target app.
+- Foundation is the durable conceptual base: node, model, and target app.
 
-Storage is part of the foundation because flat files, Git, and caches are not just implementation details. They protect local ownership, inspectability, performance, and agent readability.
+State and storage are part of the target-app foundation because flat files, Git, runtime state, and caches are not just implementation details. They protect local ownership, inspectability, performance, recoverability, and agent readability.
 
 ### Surfaces
 
@@ -44,11 +44,11 @@ Since Refine is intended for any user, the Desktop and Browser are the easiest c
 
 Refine should be understood through three system levels:
 
-- Foundation: the durable model, node, state, storage, and target-app concepts.
+- Foundation: the durable node, model, and target-app concepts.
 - Capabilities: the active powers that move work, run processes, use tools, apply guidance, import work, and evaluate outcomes.
 - Surfaces: the ways people and agents interact with those capabilities.
 
-The foundation should remain small. It defines the concepts future agents must preserve: Gap, Feature, node ownership, workflow state, target-app state, logs, settings, and runtime state. These concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
+The foundation should remain small. It defines the concepts future agents must preserve: node, Gap, Feature, target app, target-app state, logs, settings, and runtime state. These concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
 
 The capabilities should be shared. Workflow, process management, tools, guidance, import, quality, governance, merge, and evidence should not belong to one UI, command, or agent integration. They are the system's durable powers. Every surface should call into them rather than reimplementing them.
 

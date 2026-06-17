@@ -25,11 +25,9 @@ These documents should help people and agents understand the product from the in
 
 - [Design](01-design.md)
 - Foundation
-  - [Models](02-foundation/01-models.md)
-  - [Node](02-foundation/02-node.md)
-  - [State](02-foundation/03-state.md)
-  - [Storage](02-foundation/04-storage.md)
-  - [Target App](02-foundation/05-target-app.md)
+  - [Node](02-foundation/01-node.md)
+  - [Models](02-foundation/02-models.md)
+  - [Target App](02-foundation/03-target-app.md)
 - Capabilities
   - [Workflow](03-capabilities/01-workflow.md)
   - [Process](03-capabilities/02-process.md)
