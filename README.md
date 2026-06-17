@@ -53,12 +53,6 @@ wsl --install
 
 After Ubuntu opens, use the Install yourself one-liner above.
 
-### Ubuntu Dependencies in Corporate Firewall
-
-```bash
-sudo apt-get update && sudo apt-get install -y build-essential rustc cargo
-```
-
 ## Tests
 
 Use `./r test` as the authoritative test entrypoint. The default command runs only the in-crate Rust unit tests; integration suites are opt-in.
