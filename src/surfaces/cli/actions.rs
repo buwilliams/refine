@@ -52,6 +52,16 @@ pub enum Commands {
         #[command(subcommand)]
         action: SystemAction,
     },
+    Website {
+        #[arg(long, default_value_t = 8099)]
+        port: u16,
+        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
+        bind_address: IpAddr,
+        #[arg(long, default_value = ".")]
+        static_root: PathBuf,
+        #[arg(long)]
+        once: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

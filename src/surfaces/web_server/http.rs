@@ -18,7 +18,7 @@ use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
-use pulldown_cmark::{CowStr, Event as MarkdownEvent, Options, Parser, Tag, html};
+use pulldown_cmark::{CowStr, Event as MarkdownEvent, Options, Parser, Tag, TagEnd, html};
 use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
@@ -215,6 +215,10 @@ impl LocalHttpDaemon {
 
     pub fn serve_once(&self, listener: TcpListener) -> RefineResult<()> {
         self.serve_listener(listener, Some(serve_once_shutdown()))
+    }
+
+    pub fn serve_static(&self, listener: TcpListener) -> RefineResult<()> {
+        self.serve_listener(listener, None)
     }
 
     pub fn serve_until_unhealthy(
@@ -1139,9 +1143,17 @@ fn website_markdown_path_allowed(path: &str) -> bool {
         && (path == "README.md" || (path.starts_with("docs/") && path.ends_with(".md")))
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DocsNavItem {
+    title: String,
+    path: String,
+}
+
 fn render_markdown_html(static_root: &Path, path: &str, markdown: &str) -> String {
     let rendered = render_markdown_fragment(path, markdown);
-    let nav = render_docs_toc(static_root);
+    let docs_toc = docs_toc_markdown(static_root);
+    let nav = render_docs_toc_from_markdown(&docs_toc);
+    let pager = render_docs_pager(path, &docs_nav_items(&docs_toc));
     let escaped_path = escape_html(path);
     format!(
         r#"<!doctype html>
@@ -1152,6 +1164,7 @@ fn render_markdown_html(static_root: &Path, path: &str, markdown: &str) -> Strin
     <title>{escaped_path} - Refine Docs</title>
     <link rel="icon" href="/src/surfaces/web/static/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/src/surfaces/website/assets/site.css">
+    <script src="/src/surfaces/website/assets/site.js" defer></script>
   </head>
   <body class="reader-body">
     <header class="site-header">
@@ -1159,19 +1172,44 @@ fn render_markdown_html(static_root: &Path, path: &str, markdown: &str) -> Strin
         <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
         <span>Refine</span>
       </a>
-      <nav aria-label="Documentation">
-        <a href="/#start">Get Started</a>
-        <a href="/#docs">Docs</a>
-        <a href="/{escaped_path}">Raw Markdown</a>
-      </nav>
+      <div class="site-menu-shell">
+        <button
+          class="menu-button"
+          type="button"
+          data-menu-toggle
+          aria-controls="site-menu"
+          aria-expanded="false"
+          aria-label="Open navigation menu"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 7h16"></path>
+            <path d="M4 12h16"></path>
+            <path d="M4 17h16"></path>
+          </svg>
+        </button>
+        <div class="site-menu" id="site-menu" data-menu-panel hidden>
+          <nav aria-label="Primary">
+            <a href="/">Home</a>
+            <a href="/#product">Product</a>
+            <a href="/#start">Get Started</a>
+            <a href="/#docs">Docs</a>
+            <a href="/#agents">Agents</a>
+            <a href="/read/docs/agent-install.md">Install</a>
+            <a href="/{escaped_path}">Raw Markdown</a>
+            <a href="https://github.com/buwilliams/refine">GitHub</a>
+          </nav>
+          <div class="menu-docs" aria-label="Documentation sections">
+            {nav}
+          </div>
+        </div>
+      </div>
     </header>
     <main class="reader-shell">
-      <aside class="reader-nav" aria-label="Documentation sections">
-        {nav}
-      </aside>
       <article class="markdown-card">
         <div class="doc-meta">{escaped_path}</div>
+        {pager}
         <div class="markdown-content">{rendered}</div>
+        {pager}
       </article>
     </main>
   </body>
@@ -1179,17 +1217,105 @@ fn render_markdown_html(static_root: &Path, path: &str, markdown: &str) -> Strin
     )
 }
 
-fn render_docs_toc(static_root: &Path) -> String {
+fn docs_toc_markdown(static_root: &Path) -> String {
     let readme_path = static_root.join("docs/intent/README.md");
     let Ok(readme) = fs::read_to_string(readme_path) else {
-        return r#"<h2>Docs</h2><ul><li><a href="/read/docs/intent/README.md">Intent overview</a></li></ul>"#
-            .to_string();
+        return "- [Intent overview](README.md)".to_string();
     };
-    let toc = extract_table_of_contents(&readme).unwrap_or_else(|| {
+    extract_table_of_contents(&readme).unwrap_or_else(|| {
         "- [Intent overview](README.md)\n- [Design](01-design.md)\n- [Agent install](../agent-install.md)"
             .to_string()
-    });
+    })
+}
+
+fn render_docs_toc_from_markdown(toc: &str) -> String {
     render_markdown_fragment("docs/intent/README.md", &format!("## Docs\n{toc}"))
+}
+
+fn docs_nav_items(toc: &str) -> Vec<DocsNavItem> {
+    let mut items = vec![
+        DocsNavItem {
+            title: "Agent Install Runbook".to_string(),
+            path: "docs/agent-install.md".to_string(),
+        },
+        DocsNavItem {
+            title: "Organizing Principles".to_string(),
+            path: "docs/intent/README.md".to_string(),
+        },
+    ];
+    let mut current_link: Option<(String, String)> = None;
+    for event in Parser::new_ext(toc, Options::empty()) {
+        match event {
+            MarkdownEvent::Start(Tag::Link { dest_url, .. }) => {
+                let destination = dest_url.to_string();
+                if destination.ends_with(".md") && !destination.starts_with('#') {
+                    current_link = Some((destination, String::new()));
+                }
+            }
+            MarkdownEvent::Text(text) | MarkdownEvent::Code(text) => {
+                if let Some((_, label)) = current_link.as_mut() {
+                    label.push_str(text.as_ref());
+                }
+            }
+            MarkdownEvent::End(TagEnd::Link) => {
+                if let Some((destination, label)) = current_link.take() {
+                    let rewritten = rewrite_markdown_link("docs/intent/README.md", &destination);
+                    if let Some(path) = rewritten.strip_prefix("/read/") {
+                        let title = label.trim();
+                        if !title.is_empty() {
+                            push_unique_docs_nav_item(
+                                &mut items,
+                                DocsNavItem {
+                                    title: title.to_string(),
+                                    path: path.to_string(),
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    items
+}
+
+fn push_unique_docs_nav_item(items: &mut Vec<DocsNavItem>, item: DocsNavItem) {
+    if !items.iter().any(|existing| existing.path == item.path) {
+        items.push(item);
+    }
+}
+
+fn render_docs_pager(path: &str, items: &[DocsNavItem]) -> String {
+    let current_index = items.iter().position(|item| item.path == path);
+    let previous = current_index
+        .and_then(|index| index.checked_sub(1))
+        .and_then(|index| items.get(index));
+    let next = current_index.and_then(|index| items.get(index + 1));
+    format!(
+        r#"<nav class="doc-pager" aria-label="Document navigation">
+          {}
+          <a class="doc-pager-toc" href="/read/docs/intent/README.md">Table of contents</a>
+          {}
+        </nav>"#,
+        render_docs_pager_edge("Previous", previous),
+        render_docs_pager_edge("Next", next)
+    )
+}
+
+fn render_docs_pager_edge(label: &str, item: Option<&DocsNavItem>) -> String {
+    match item {
+        Some(item) => format!(
+            r#"<a class="doc-pager-link" href="/read/{}"><span>{}</span><strong>{}</strong></a>"#,
+            escape_html(&item.path),
+            label,
+            escape_html(&item.title)
+        ),
+        None => format!(
+            r#"<span class="doc-pager-link doc-pager-link-disabled" aria-disabled="true"><span>{label}</span><strong>{}</strong></span>"#,
+            if label == "Previous" { "Start" } else { "End" }
+        ),
+    }
 }
 
 fn extract_table_of_contents(markdown: &str) -> Option<String> {

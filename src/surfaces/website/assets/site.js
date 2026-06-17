@@ -53,6 +53,55 @@
     });
   }
 
+  function closeMenu(toggle, panel) {
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Open navigation menu");
+    panel.hidden = true;
+  }
+
+  function openMenu(toggle, panel) {
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Close navigation menu");
+    panel.hidden = false;
+  }
+
+  function wireMenus() {
+    document.querySelectorAll("[data-menu-toggle]").forEach((toggle) => {
+      const panelId = toggle.getAttribute("aria-controls");
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!panel) {
+        return;
+      }
+
+      toggle.addEventListener("click", () => {
+        if (panel.hidden) {
+          openMenu(toggle, panel);
+        } else {
+          closeMenu(toggle, panel);
+        }
+      });
+
+      panel.querySelectorAll("a").forEach((link) => {
+        link.addEventListener("click", () => closeMenu(toggle, panel));
+      });
+
+      document.addEventListener("click", (event) => {
+        if (panel.hidden || toggle.contains(event.target) || panel.contains(event.target)) {
+          return;
+        }
+        closeMenu(toggle, panel);
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !panel.hidden) {
+          closeMenu(toggle, panel);
+          toggle.focus();
+        }
+      });
+    });
+  }
+
   fillOriginText();
   wireCopyButtons();
+  wireMenus();
 })();

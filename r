@@ -193,87 +193,6 @@ print_test_dry_run() {
   esac
 }
 
-print_website_usage() {
-  cat >&2 <<'EOF'
-Usage: ./r website [OPTIONS]
-
-Run the public website surface locally from this checkout.
-
-Options:
-  --port PORT             Port to bind. Default: 8099 or REFINE_WEBSITE_PORT.
-  --bind-address ADDRESS  Address to bind. Default: 127.0.0.1 or REFINE_WEBSITE_BIND_ADDRESS.
-  --runtime-root PATH     Runtime root. Default: /tmp/refine-website-runtime or REFINE_WEBSITE_RUNTIME_ROOT.
-  --once                  Serve one request, then stop.
-  -h, --help              Show this help.
-EOF
-}
-
-build_website_args() {
-  local port="${REFINE_WEBSITE_PORT:-8099}"
-  local bind_address="${REFINE_WEBSITE_BIND_ADDRESS:-127.0.0.1}"
-  local runtime_root="${REFINE_WEBSITE_RUNTIME_ROOT:-/tmp/refine-website-runtime}"
-  local once="0"
-
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --port)
-        if [ "$#" -lt 2 ]; then
-          printf 'refine: ./r website --port requires a value\n' >&2
-          print_website_usage
-          exit 2
-        fi
-        port="$2"
-        shift 2
-        ;;
-      --bind-address)
-        if [ "$#" -lt 2 ]; then
-          printf 'refine: ./r website --bind-address requires a value\n' >&2
-          print_website_usage
-          exit 2
-        fi
-        bind_address="$2"
-        shift 2
-        ;;
-      --runtime-root)
-        if [ "$#" -lt 2 ]; then
-          printf 'refine: ./r website --runtime-root requires a value\n' >&2
-          print_website_usage
-          exit 2
-        fi
-        runtime_root="$2"
-        shift 2
-        ;;
-      --once)
-        once="1"
-        shift
-        ;;
-      help|--help|-h)
-        print_website_usage
-        exit 0
-        ;;
-      --*)
-        printf 'refine: unknown ./r website option: %s\n' "$1" >&2
-        print_website_usage
-        exit 2
-        ;;
-      *)
-        printf 'refine: ./r website does not accept positional arguments: %s\n' "$1" >&2
-        print_website_usage
-        exit 2
-        ;;
-    esac
-  done
-
-  WEBSITE_ARGS=(system start --foreground \
-    --bind-address "$bind_address" \
-    --port "$port" \
-    --runtime-root "$runtime_root" \
-    --static-root "$ROOT")
-  if [ "$once" = "1" ]; then
-    WEBSITE_ARGS+=(--once)
-  fi
-}
-
 if [ "${1:-}" = "test" ]; then
   shift
   if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
@@ -281,15 +200,6 @@ if [ "${1:-}" = "test" ]; then
     exit 0
   fi
   run_test_command "$@"
-fi
-
-if [ "${1:-}" = "website" ]; then
-  shift
-  : "${REFINE_AGENT_WORKFLOW_DISABLED:=1}"
-  export REFINE_AGENT_WORKFLOW_DISABLED
-  WEBSITE_ARGS=()
-  build_website_args "$@"
-  set -- "${WEBSITE_ARGS[@]}"
 fi
 
 SELECTED_MODE="$(select_mode)"

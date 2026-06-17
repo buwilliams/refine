@@ -18,13 +18,33 @@
         <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
         <span>Refine</span>
       </a>
-      <nav aria-label="Primary">
-        <a href="#product">Product</a>
-        <a href="#start">Get Started</a>
-        <a href="#docs">Docs</a>
-        <a href="#agents">Agents</a>
-      </nav>
-      <a class="header-action" href="/read/docs/agent-install.md">Install</a>
+      <div class="site-menu-shell">
+        <button
+          class="menu-button"
+          type="button"
+          data-menu-toggle
+          aria-controls="site-menu"
+          aria-expanded="false"
+          aria-label="Open navigation menu"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 7h16"></path>
+            <path d="M4 12h16"></path>
+            <path d="M4 17h16"></path>
+          </svg>
+        </button>
+        <div class="site-menu" id="site-menu" data-menu-panel hidden>
+          <nav aria-label="Primary">
+            <a href="#product">Product</a>
+            <a href="#start">Get Started</a>
+            <a href="#docs">Docs</a>
+            <a href="#agents">Agents</a>
+            <a href="/read/docs/agent-install.md">Install</a>
+            <a href="/read/docs/intent/README.md">Intent docs</a>
+            <a href="https://github.com/buwilliams/refine">GitHub</a>
+          </nav>
+        </div>
+      </div>
     </header>
 
     <main>

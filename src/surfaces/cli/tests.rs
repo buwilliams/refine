@@ -153,6 +153,44 @@ fn system_start_owns_foreground_web_options() {
 }
 
 #[test]
+fn website_command_owns_static_site_options() {
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "website",
+        "--port",
+        "0",
+        "--bind-address",
+        "0.0.0.0",
+        "--static-root",
+        ".",
+        "--once",
+    ])
+    .unwrap();
+    let Commands::Website {
+        port,
+        bind_address,
+        static_root,
+        once,
+    } = parsed.command
+    else {
+        panic!("expected website command");
+    };
+    assert_eq!(port, 0);
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+    assert_eq!(static_root, PathBuf::from("."));
+    assert!(once);
+    assert_eq!(
+        explicit_target_root_path(&Commands::Website {
+            port,
+            bind_address,
+            static_root,
+            once,
+        }),
+        None
+    );
+}
+
+#[test]
 fn system_lifecycle_commands_default_to_8082() {
     for (verb, expected) in [
         ("start", "Start"),

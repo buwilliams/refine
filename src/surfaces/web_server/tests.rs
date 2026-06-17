@@ -1015,7 +1015,32 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     let rendered_doc = String::from_utf8(rendered_doc.body).unwrap();
     assert!(rendered_doc.contains("<h1>Agent Install Runbook</h1>"));
     assert!(rendered_doc.contains("Raw Markdown"));
+    assert!(
+        rendered_doc.contains(r#"<div class="menu-docs" aria-label="Documentation sections">"#)
+    );
+    assert!(!rendered_doc.contains(r#"class="reader-nav""#));
+    assert_eq!(rendered_doc.matches(r#"class="doc-pager""#).count(), 2);
+    assert!(rendered_doc.contains(r#">Table of contents</a>"#));
+    assert!(
+        rendered_doc.contains(r#"<a class="doc-pager-link" href="/read/docs/intent/README.md"><span>Next</span><strong>Organizing Principles</strong></a>"#)
+    );
     assert!(rendered_doc.contains("/read/docs/intent/02-foundation/01-node.md"));
+
+    let design_doc = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/read/docs/intent/01-design.md".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(design_doc.status, 200);
+    let design_doc = String::from_utf8(design_doc.body).unwrap();
+    assert_eq!(design_doc.matches(r#"class="doc-pager""#).count(), 2);
+    assert!(design_doc.contains(
+        r#"<a class="doc-pager-link" href="/read/docs/intent/README.md"><span>Previous</span><strong>Organizing Principles</strong></a>"#
+    ));
+    assert!(
+        design_doc.contains(r#"<a class="doc-pager-link" href="/read/docs/intent/02-foundation/01-node.md"><span>Next</span><strong>Node</strong></a>"#)
+    );
 
     let intent_toc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
