@@ -9,6 +9,10 @@ refine is an agentic software delivery system that coordinates people and agents
 - **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Personal AI** - install refine and manage your node cluster with your favorite agent.
 
+## Intent
+
+The full design intent of Refine is documented at [Intent](docs/intent/README.md). You can learn the most by reading these documents.
+
 ## Install with your agent
 
 Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
