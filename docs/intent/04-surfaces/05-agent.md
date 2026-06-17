@@ -2,7 +2,7 @@
 
 ## Key Ideas
 
-- **First-Class Reader**: agents should be able to understand Refine from files, intent docs, state, and shared capabilities.
+- **CLI-First Understanding**: agents should be able to understand and operate Refine through the CLI interface.
 - **Installed Agents Over Platform APIs**: Refine should use local agent CLIs and host tools where possible instead of forcing a remote integration model.
 - **Guided Autonomy**: agents should have enough context to act independently while leaving evidence and recovery paths.
 - **Tools, Not Owners**: agents execute workflow steps and use tools; they should not redefine workflow semantics on their own.
@@ -10,13 +10,15 @@
 
 ## Purpose
 
-The agent surface exists because Refine is designed for AI-assisted and eventually AI-led software work. Agents need a way to read project intent, inspect work state, run shared capabilities, produce changes, and hand work back for quality, review, merge, or further automation.
+The agent surface exists because Refine is designed for AI-assisted and eventually AI-led software work. Agents need a reliable interface for understanding the application, inspecting work, running shared capabilities, producing changes, and handing work back for quality, review, merge, or further automation.
+
+The CLI should be the primary agent-facing interface because it is explicit, scriptable, low-state, and close to the host environment. Agents may still read files, guidance, logs, and intent when useful, but they should not need to reverse-engineer Refine's internals to operate the product.
 
 Refine should not assume agents are only chatbots. They are workers, reviewers, planners, importers, diagnosers, and future orchestrators.
 
 ## Expected Role
 
-Agents should use the same product concepts as people: Gap, Feature, workflow state, guidance, governance, logs, changes, and processes. Their outputs should become durable work evidence, not disappear into provider transcripts.
+Agents should use the same product concepts as people through the CLI and shared capability surfaces: Gap, Feature, workflow state, guidance, governance, logs, changes, and processes. Their outputs should become durable work evidence, not disappear into provider transcripts.
 
 Current implementation details that matter to intent:
 
