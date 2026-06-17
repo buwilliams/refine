@@ -22,7 +22,7 @@ When a Gap is in-progress:
 
 - A node owns the active attempt.
 - Refine records the workflow claim, provider or actor, target app, and execution context.
-- Agents use guidance, governance, tools, files, terminal/process execution, and target-app commands to act on the work.
+- Agents use guidance, governance, tools, files, terminal/process execution, and target-app lifecycle context to act on the work.
 - Process output, logs, changed files, agent output, and intermediate evidence should remain observable.
 - Other nodes should not silently duplicate the same active work.
 - On success, the work should produce a reviewable handoff and move toward ready-merge or another appropriate next state.

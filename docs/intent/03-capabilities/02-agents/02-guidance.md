@@ -20,7 +20,7 @@ Guidance is a capability because Refine uses it to shape action. It should affec
 
 Guidance should sit between raw user instruction and automated action. It should be reusable by workflow, tools, quality, governance, import, surfaces, and agents.
 
-The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app commands, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class target-app context that workflow and tools can reuse.
+The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app lifecycle instructions, deterministic checks, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class target-app context that workflow and tools can reuse.
 
 Guidance should not become a wall of policy text that agents ignore. It should be specific, current, structured enough to retrieve, and close enough to the work that it changes outcomes.
 

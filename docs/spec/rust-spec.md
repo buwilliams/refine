@@ -702,8 +702,9 @@ Owns abstractions for: configure, start, stop, restart, status, rebuild, open, d
 
 Requirements:
 
-- Target-app commands are configured per app.
-- The daemon runs configured commands in the target app's environment.
+- Target-app lifecycle instructions are configured per app for start, stop, and build.
+- The daemon asks the configured agent to perform lifecycle work in the target app's environment.
+- Deterministic target-app test and status commands may still be configured per app.
 - Long-running target-app processes are supervised and visible.
 - Rebuild and status checks produce structured results.
 - Target-app failures do not crash the daemon or block unrelated Refine

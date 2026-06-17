@@ -16,7 +16,7 @@ The point is not to prevent all mistakes. The point is to make the system prove 
 
 ## Expected Role
 
-Quality should sit between implementation and trust. It should connect target-app commands, process execution, workflow state, logs, changes, guidance, governance, and review.
+Quality should sit between implementation and trust. It should connect target-app lifecycle context, deterministic checks, process execution, workflow state, logs, changes, guidance, governance, and review.
 
 Current implementation details that matter to intent:
 

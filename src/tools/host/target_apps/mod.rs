@@ -14,6 +14,9 @@ use crate::process::subprocess::{
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
+use crate::tools::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 
 pub const TARGET_APP_STATE_FILE: &str = "target-app-state.json";
 
@@ -49,6 +52,9 @@ pub struct TargetAppSnapshot {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TargetAppGeneratedConfig {
+    pub start_instructions: String,
+    pub stop_instructions: String,
+    pub build_instructions: String,
     pub start_command: String,
     pub stop_command: String,
     pub build_command: String,
@@ -127,11 +133,39 @@ impl FileTargetAppService {
 
     pub fn start(&self) -> RefineResult<TargetAppSnapshot> {
         let settings = self.settings()?;
+        let instructions = setting(&settings, "target_app_start_instructions");
         let command = setting(&settings, "target_app_start_command");
+        if !instructions.trim().is_empty() {
+            let operation =
+                self.run_agent_lifecycle("start", &instructions, &settings, Default::default());
+            let ok = operation.exit_code == Some(0);
+            let snapshot = TargetAppSnapshot {
+                ok,
+                state: if ok { "running" } else { "failed" }.to_string(),
+                message: operation_message(&operation),
+                last_check_at: String::new(),
+                last_check_ok: ok,
+                last_check_message: operation_message(&operation),
+                last_health_at: String::new(),
+                last_health_ok: ok,
+                last_health_message: operation_message(&operation),
+                last_error: if ok {
+                    String::new()
+                } else {
+                    operation_message(&operation)
+                },
+                last_operation_id: operation.id.clone(),
+                last_operation: Some(operation),
+                process_id: None,
+                pid: None,
+            };
+            self.save_snapshot(&snapshot)?;
+            return Ok(snapshot);
+        }
         if command.trim().is_empty() {
             let mut snapshot = self.load_snapshot()?;
             snapshot.ok = true;
-            snapshot.message = "No target-app start command is configured.".to_string();
+            snapshot.message = "No target-app start instructions are configured.".to_string();
             snapshot.state = "unknown".to_string();
             self.save_snapshot(&snapshot)?;
             return Ok(snapshot);
@@ -187,8 +221,11 @@ impl FileTargetAppService {
 
     pub fn stop(&self) -> RefineResult<TargetAppSnapshot> {
         let settings = self.settings()?;
+        let instructions = setting(&settings, "target_app_stop_instructions");
         let command = setting(&settings, "target_app_stop_command");
-        let operation = if command.trim().is_empty() {
+        let operation = if !instructions.trim().is_empty() {
+            self.run_agent_lifecycle("stop", &instructions, &settings, Default::default())
+        } else if command.trim().is_empty() {
             TargetAppOperation {
                 id: new_operation_id("target-stop"),
                 kind: "stop".to_string(),
@@ -237,17 +274,52 @@ impl FileTargetAppService {
         process_metadata: Map<String, Value>,
     ) -> RefineResult<TargetAppSnapshot> {
         let settings = self.settings()?;
+        let instructions = first_nonempty(&[
+            setting(&settings, "target_app_build_instructions"),
+            setting(&settings, "target_app_rebuild_instructions"),
+        ]);
         let command = setting(&settings, "target_app_build_command");
+        if !instructions.trim().is_empty() {
+            let operation =
+                self.run_agent_lifecycle("build", &instructions, &settings, process_metadata);
+            let ok = operation.exit_code == Some(0);
+            let snapshot = TargetAppSnapshot {
+                ok,
+                state: if ok { "stopped" } else { "failed" }.to_string(),
+                message: operation_message(&operation),
+                last_check_at: String::new(),
+                last_check_ok: ok,
+                last_check_message: operation_message(&operation),
+                last_health_at: String::new(),
+                last_health_ok: ok,
+                last_health_message: operation_message(&operation),
+                last_error: if ok {
+                    String::new()
+                } else {
+                    operation_message(&operation)
+                },
+                last_operation_id: operation.id.clone(),
+                last_operation: Some(operation),
+                process_id: None,
+                pid: None,
+            };
+            self.save_snapshot(&snapshot)?;
+            return Ok(snapshot);
+        }
         if command.trim().is_empty() {
             let mut snapshot = self.load_snapshot()?;
             snapshot.ok = true;
             snapshot.state = "stopped".to_string();
-            snapshot.message = "No target-app build command is configured.".to_string();
+            snapshot.message = "No target-app build instructions are configured.".to_string();
             snapshot.last_check_ok = true;
             snapshot.last_check_message = snapshot.message.clone();
             snapshot.last_health_ok = true;
             snapshot.last_health_message = snapshot.message.clone();
             snapshot.last_error = String::new();
+            snapshot.last_operation_id = String::new();
+            snapshot.last_operation = None;
+            snapshot.process_id = None;
+            snapshot.pid = None;
             self.save_snapshot(&snapshot)?;
             return Ok(snapshot);
         }
@@ -338,6 +410,12 @@ impl FileTargetAppService {
     pub fn generate_config(&self) -> RefineResult<TargetAppGeneratedConfig> {
         let settings = self.settings()?;
         let mut config = TargetAppGeneratedConfig {
+            start_instructions: setting(&settings, "target_app_start_instructions"),
+            stop_instructions: setting(&settings, "target_app_stop_instructions"),
+            build_instructions: first_nonempty(&[
+                setting(&settings, "target_app_build_instructions"),
+                setting(&settings, "target_app_rebuild_instructions"),
+            ]),
             start_command: setting(&settings, "target_app_start_command"),
             stop_command: setting(&settings, "target_app_stop_command"),
             build_command: setting(&settings, "target_app_build_command"),
@@ -379,20 +457,25 @@ impl FileTargetAppService {
         let mut notes = Vec::new();
         if clear_generated_wrapper_entrypoints(&mut config) {
             notes.push(
-                "Ignored existing manage-app wrapper entrypoints while regenerating lifecycle commands."
+                "Ignored existing manage-app wrapper entrypoints while regenerating lifecycle instructions."
                     .to_string(),
             );
         }
         let project_root = self.command_cwd(&settings);
         if project_root.join("package.json").exists() {
             apply_package_json_defaults(&project_root, &mut config)?;
-            notes.push("Detected package.json and generated npm-compatible commands.".to_string());
+            notes.push(
+                "Detected package.json and generated npm-compatible lifecycle instructions."
+                    .to_string(),
+            );
         } else if project_root.join("Cargo.toml").exists() {
             fill_if_empty(&mut config.start_command, "cargo run");
             fill_if_empty(&mut config.build_command, "cargo build");
             fill_if_empty(&mut config.test_command, "cargo test");
             fill_if_empty(&mut config.status_command, "cargo check --quiet");
-            notes.push("Detected Cargo.toml and generated cargo commands.".to_string());
+            notes.push(
+                "Detected Cargo.toml and generated cargo lifecycle instructions.".to_string(),
+            );
         } else if project_root.join("Makefile").exists() || project_root.join("makefile").exists() {
             let makefile = if project_root.join("Makefile").exists() {
                 project_root.join("Makefile")
@@ -400,7 +483,9 @@ impl FileTargetAppService {
                 project_root.join("makefile")
             };
             apply_makefile_defaults(&makefile, &mut config)?;
-            notes.push("Detected Makefile targets and generated make commands.".to_string());
+            notes.push(
+                "Detected Makefile targets and generated make lifecycle instructions.".to_string(),
+            );
         } else {
             notes.push("No package.json, Cargo.toml, or Makefile was detected; preserved existing target-app settings.".to_string());
         }
@@ -422,9 +507,10 @@ impl FileTargetAppService {
                 "sh -c 'lsof -ti tcp:{} | xargs -r kill'",
                 config.tcp_check_port
             );
-            notes.push("Generated stop command targets the configured TCP port.".to_string());
+            notes.push("Generated stop instruction targets the configured TCP port.".to_string());
         }
         apply_static_web_server_defaults(&project_root, &mut config, &mut notes);
+        convert_lifecycle_commands_to_instructions(&mut config);
         config.notes = notes.join(" ");
         Ok(config)
     }
@@ -512,6 +598,61 @@ impl FileTargetAppService {
             ProcessOwner::Quality,
             "quality",
         )
+    }
+
+    fn run_agent_lifecycle(
+        &self,
+        kind: &str,
+        instructions: &str,
+        settings: &JsonObject,
+        mut process_metadata: Map<String, Value>,
+    ) -> TargetAppOperation {
+        let started_at = now_timestamp();
+        process_metadata.insert(
+            "target_app_action".to_string(),
+            Value::String(kind.to_string()),
+        );
+        process_metadata.insert(
+            "target_root".to_string(),
+            Value::String(self.target_root.display().to_string()),
+        );
+        let provider = setting(settings, "agent_cli")
+            .trim()
+            .to_string()
+            .if_empty("claude");
+        let cwd = self.command_cwd(settings);
+        let prompt =
+            target_app_lifecycle_prompt(kind, instructions, settings, &self.target_root, &cwd);
+        let result = HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"))
+            .invoke(ProviderInvocation {
+                provider,
+                prompt,
+                session_id: None,
+                cwd: Some(cwd.display().to_string()),
+                process_metadata,
+            });
+        match result {
+            Ok(output) => TargetAppOperation {
+                id: new_operation_id(&format!("target-{kind}")),
+                kind: kind.to_string(),
+                state: "complete".to_string(),
+                started_at,
+                finished_at: now_timestamp(),
+                exit_code: Some(0),
+                stdout: output.trim().to_string(),
+                stderr: String::new(),
+            },
+            Err(error) => TargetAppOperation {
+                id: new_operation_id(&format!("target-{kind}")),
+                kind: kind.to_string(),
+                state: "failed".to_string(),
+                started_at,
+                finished_at: now_timestamp(),
+                exit_code: Some(1),
+                stdout: String::new(),
+                stderr: error.to_string(),
+            },
+        }
     }
 
     fn run_owned_command(
@@ -1017,6 +1158,88 @@ fn fill_if_empty(value: &mut String, fallback: &str) {
     }
 }
 
+trait EmptyStringFallback {
+    fn if_empty(self, fallback: &str) -> String;
+}
+
+impl EmptyStringFallback for String {
+    fn if_empty(self, fallback: &str) -> String {
+        if self.trim().is_empty() {
+            fallback.to_string()
+        } else {
+            self
+        }
+    }
+}
+
+fn convert_lifecycle_commands_to_instructions(config: &mut TargetAppGeneratedConfig) {
+    if config.start_instructions.trim().is_empty() && !config.start_command.trim().is_empty() {
+        config.start_instructions = command_backed_instruction("start", &config.start_command);
+    }
+    if config.stop_instructions.trim().is_empty() && !config.stop_command.trim().is_empty() {
+        config.stop_instructions = command_backed_instruction("stop", &config.stop_command);
+    }
+    if config.build_instructions.trim().is_empty() && !config.build_command.trim().is_empty() {
+        config.build_instructions = command_backed_instruction("build", &config.build_command);
+    }
+    config.start_command.clear();
+    config.stop_command.clear();
+    config.build_command.clear();
+}
+
+fn command_backed_instruction(kind: &str, command: &str) -> String {
+    match kind {
+        "start" => format!(
+            "Start the target app. Use `{}` as the initial approach, but inspect the project and adapt if dependencies, ports, environment, or long-running process handling require it. Leave the app running in the background when appropriate, verify configured health checks when possible, and report the exact command and evidence.",
+            command.trim()
+        ),
+        "stop" => format!(
+            "Stop the target app. Use `{}` as the initial approach, but inspect the project and adapt if the process was started differently. Confirm the app is no longer reachable when possible and report the evidence.",
+            command.trim()
+        ),
+        "build" => format!(
+            "Build or rebuild the target app. Use `{}` as the initial approach, but inspect failures, install or repair project-local dependencies when safe, rerun the build as needed, and report exact blockers if the build cannot be completed.",
+            command.trim()
+        ),
+        _ => command.trim().to_string(),
+    }
+}
+
+fn target_app_lifecycle_prompt(
+    kind: &str,
+    instructions: &str,
+    settings: &JsonObject,
+    target_root: &Path,
+    cwd: &Path,
+) -> String {
+    let env_json = setting(settings, "target_app_env_json");
+    let health_url = first_nonempty(&[
+        setting(settings, "target_app_http_check_url"),
+        setting(settings, "target_app_health_url"),
+        setting(settings, "target_app_url"),
+    ]);
+    let tcp_host = setting(settings, "target_app_tcp_check_host");
+    let tcp_port = setting(settings, "target_app_tcp_check_port");
+    let status_command = setting(settings, "target_app_status_command");
+    let process_command = setting(settings, "target_app_process_check_command");
+    format!(
+        "You are operating the target application for Refine.\n\nAction: {kind}\nTarget root: {}\nWorking directory: {}\nEnvironment overrides JSON: {}\nHealth URL: {}\nTCP check: {} {}\nStatus command hint: {}\nProcess check hint: {}\n\nInstructions:\n{}\n\nUse the host tools available in the working directory. Prefer durable, project-appropriate fixes over a brittle one-liner. If you start a long-running process, make sure this turn can finish after the app is started. If the action cannot be completed, explain the blocker and the evidence.",
+        target_root.display(),
+        cwd.display(),
+        if env_json.trim().is_empty() {
+            "{}"
+        } else {
+            env_json.trim()
+        },
+        health_url,
+        tcp_host,
+        tcp_port,
+        status_command,
+        process_command,
+        instructions.trim()
+    )
+}
+
 fn append_note(notes: &mut String, note: &str) {
     if notes.trim().is_empty() {
         *notes = note.to_string();
@@ -1365,7 +1588,10 @@ mod tests {
         let built = service.build().unwrap();
         assert!(built.ok);
         assert_eq!(built.state, "stopped");
-        assert_eq!(built.message, "No target-app build command is configured.");
+        assert_eq!(
+            built.message,
+            "No target-app build instructions are configured."
+        );
         assert!(built.last_check_ok);
         assert!(built.last_health_ok);
         assert_eq!(built.last_error, "");
@@ -1410,6 +1636,73 @@ mod tests {
         );
         service.stop().unwrap();
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn target_app_service_runs_lifecycle_instructions_with_agent_provider() {
+        let temp_root = unique_temp_dir("target-app-agent-lifecycle");
+        let refine_dir = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::write(&smoke_ai, "#!/bin/sh\nprintf 'agent lifecycle ok\\n'\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "target_app_start_instructions": "Start the target app and verify it.",
+                "target_app_stop_instructions": "Stop the target app and verify it.",
+                "target_app_build_instructions": "Build the target app and report evidence.",
+                "target_app_cwd": target_root.to_str().unwrap()
+            }))
+            .unwrap();
+        let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
+
+        let started = service.start().unwrap();
+        assert_eq!(started.state, "running");
+        assert_eq!(
+            started.last_operation.as_ref().unwrap().stdout,
+            "agent lifecycle ok"
+        );
+        assert!(started.process_id.is_none());
+
+        let built = service.build().unwrap();
+        assert!(built.ok);
+        assert_eq!(built.last_operation.as_ref().unwrap().kind, "build");
+        assert_eq!(
+            built.last_operation.as_ref().unwrap().stdout,
+            "agent lifecycle ok"
+        );
+
+        let stopped = service.stop().unwrap();
+        assert_eq!(stopped.state, "stopped");
+        assert_eq!(
+            stopped.last_operation.as_ref().unwrap().stdout,
+            "agent lifecycle ok"
+        );
+
+        unsafe {
+            match previous {
+                Some(value) => std::env::set_var("REFINE_SMOKE_AI_PATH", value),
+                None => std::env::remove_var("REFINE_SMOKE_AI_PATH"),
+            }
+        }
         fs::remove_dir_all(temp_root).unwrap();
     }
 
@@ -1482,8 +1775,10 @@ mod tests {
         let generated = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root)
             .generate_config()
             .unwrap();
-        assert_eq!(generated.start_command, "pnpm run dev");
-        assert_eq!(generated.build_command, "pnpm run build");
+        assert_eq!(generated.start_command, "");
+        assert_eq!(generated.build_command, "");
+        assert!(generated.start_instructions.contains("pnpm run dev"));
+        assert!(generated.build_instructions.contains("pnpm run build"));
         assert_eq!(generated.test_command, "pnpm test");
         assert_eq!(generated.tcp_check_port, "5173");
         assert!(generated.notes.contains("package.json"));
@@ -1516,11 +1811,19 @@ mod tests {
         let generated = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root)
             .generate_config()
             .unwrap();
-        assert!(generated.start_command.contains("python3 -m http.server"));
-        assert!(generated.stop_command.contains("target-app.pid"));
-        assert_eq!(
-            generated.build_command,
-            "printf 'No build step configured; static server uses current files.\\n'"
+        assert!(generated.start_command.is_empty());
+        assert!(generated.stop_command.is_empty());
+        assert!(generated.build_command.is_empty());
+        assert!(
+            generated
+                .start_instructions
+                .contains("python3 -m http.server")
+        );
+        assert!(generated.stop_instructions.contains("target-app.pid"));
+        assert!(
+            generated
+                .build_instructions
+                .contains("No build step configured")
         );
         assert_eq!(
             generated.status_command,
@@ -1561,27 +1864,28 @@ mod tests {
             .unwrap();
 
         let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
-        let mut generated = service.generate_config().unwrap();
-        service.write_manage_app_wrapper(&mut generated).unwrap();
+        let generated = service.generate_config().unwrap();
 
-        assert_eq!(generated.start_command, "./.refine/manage-app.sh start");
-        assert_eq!(generated.stop_command, "./.refine/manage-app.sh stop");
-        assert_eq!(generated.build_command, "./.refine/manage-app.sh build");
-        assert_eq!(generated.test_command, "./.refine/manage-app.sh test");
-        assert_eq!(generated.status_command, "./.refine/manage-app.sh status");
+        assert!(generated.start_command.is_empty());
+        assert!(generated.stop_command.is_empty());
+        assert!(generated.build_command.is_empty());
+        assert_eq!(generated.test_command, "npm test");
+        assert_eq!(
+            generated.status_command,
+            format!("curl -fsS 'http://127.0.0.1:{port}/' >/dev/null")
+        );
+        assert!(
+            generated
+                .start_instructions
+                .contains("python3 -m http.server")
+        );
+        assert!(generated.stop_instructions.contains("target-app.pid"));
         assert!(
             generated
                 .notes
                 .contains("Ignored existing manage-app wrapper entrypoints")
         );
-        let wrapper = fs::read_to_string(target_root.join(".refine/manage-app.sh")).unwrap();
-        assert!(!wrapper.contains("START_COMMAND='./.refine/manage-app.sh start'"));
-        assert!(!wrapper.contains("STOP_COMMAND='./.refine/manage-app.sh stop'"));
-        assert!(!wrapper.contains("BUILD_COMMAND='./.refine/manage-app.sh build'"));
-        assert!(!wrapper.contains("TEST_COMMAND='./.refine/manage-app.sh test'"));
-        assert!(!wrapper.contains("STATUS_COMMAND='./.refine/manage-app.sh status'"));
-        assert!(wrapper.contains("python3 -m http.server"));
-        assert!(wrapper.contains("STATUS_COMMAND='curl -fsS"));
+        assert!(!target_root.join(".refine/manage-app.sh").exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1597,6 +1901,9 @@ mod tests {
         fs::create_dir_all(&inner_root).unwrap();
 
         let mut config = TargetAppGeneratedConfig {
+            start_instructions: String::new(),
+            stop_instructions: String::new(),
+            build_instructions: String::new(),
             start_command: "printf \"$WRAP_VALUE\" > ../started".to_string(),
             stop_command: String::new(),
             build_command: "printf built > ../built".to_string(),
@@ -1668,6 +1975,9 @@ mod tests {
         fs::write(target_root.join("index.html"), "<h1>AI static app</h1>").unwrap();
 
         let mut config = TargetAppGeneratedConfig {
+            start_instructions: String::new(),
+            stop_instructions: String::new(),
+            build_instructions: String::new(),
             start_command: String::new(),
             stop_command: String::new(),
             build_command: String::new(),

@@ -31,7 +31,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/target-app",
-        capability: "target app lifecycle, health, generated commands",
+        capability: "target app lifecycle, health, generated instructions",
     },
     ApiRouteGroup {
         prefix: "/work",

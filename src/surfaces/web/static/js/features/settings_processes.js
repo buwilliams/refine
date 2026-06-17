@@ -159,6 +159,12 @@ function syntheticTargetAppProcess() {
     has_start_command: false,
     has_stop_command: false,
     has_build_command: false,
+    has_start_instructions: false,
+    has_stop_instructions: false,
+    has_build_instructions: false,
+    has_start_action: false,
+    has_stop_action: false,
+    has_build_action: false,
     has_status_checks: false,
   };
   return {
@@ -506,10 +512,12 @@ function renderProcessActions(proc) {
     const isRunning = snap.state === "running" || snap.state === "degraded";
     const isStopped = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
     const showStop = targetAppShowsStopAction(snap.state);
+    const hasStartAction = snap.has_start_action ?? snap.has_start_instructions ?? snap.has_start_command;
+    const hasStopAction = snap.has_stop_action ?? snap.has_stop_instructions ?? snap.has_stop_command;
     return `
       <span class="target-app-action-slot">
-        <button id="s-target-run-start" data-testid="process-target-app-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
-        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
+        <button id="s-target-run-start" data-testid="process-target-app-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !hasStartAction ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
+        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !hasStopAction ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
       <button class="secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""}>Build</button>
       <button class="secondary" id="s-target-sync-now" data-testid="process-target-app-sync">Sync</button>
@@ -812,13 +820,16 @@ function drawTargetAppStatusBlock(snap) {
     const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
     const inFlight   = snap.state === "starting" || snap.state === "stopping" || snap.state === "building";
     const showStop = targetAppShowsStopAction(snap.state);
+    const hasStartAction = snap.has_start_action ?? snap.has_start_instructions ?? snap.has_start_command;
+    const hasStopAction = snap.has_stop_action ?? snap.has_stop_instructions ?? snap.has_stop_command;
+    const hasBuildAction = snap.has_build_action ?? snap.has_build_instructions ?? snap.has_build_command;
     setTargetAppActionVisible(startBtn, !showStop);
     setTargetAppActionVisible(stopBtn, showStop);
-    startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;
+    startBtn.disabled = showStop || isRunning || inFlight || !hasStartAction;
     buildBtn.disabled = inFlight;
-    stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;
-    if (!snap.has_start_command) {
-      startBtn.title = "Configure a start command above first.";
+    stopBtn.disabled  = !showStop || isStopped || inFlight || !hasStopAction;
+    if (!hasStartAction) {
+      startBtn.title = "Configure start instructions first.";
     } else if (isRunning) {
       startBtn.title = "Application is already running.";
     } else if (inFlight) {
@@ -826,8 +837,8 @@ function drawTargetAppStatusBlock(snap) {
     } else {
       startBtn.title = "";
     }
-    if (!snap.has_stop_command) {
-      stopBtn.title = "Configure a stop command above first.";
+    if (!hasStopAction) {
+      stopBtn.title = "Configure stop instructions first.";
     } else if (isStopped) {
       stopBtn.title = "Application is already stopped.";
     } else if (inFlight) {
@@ -837,8 +848,8 @@ function drawTargetAppStatusBlock(snap) {
     }
     if (inFlight) {
       buildBtn.title = "Application state is changing.";
-    } else if (!snap.has_build_command) {
-      buildBtn.title = "No build command configured; build will still run the stop/start sequence.";
+    } else if (!hasBuildAction) {
+      buildBtn.title = "No build instructions configured; build is a no-op.";
     } else {
       buildBtn.title = "";
     }

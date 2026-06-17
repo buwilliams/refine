@@ -34,7 +34,7 @@ The Agents capability should sit between Refine's intent and the outside world. 
 - select tools appropriate to the work;
 - create or refine Gaps and Features from imports, chats, plans, and source material;
 - implement changes in an isolated Git branch or worktree when appropriate;
-- run or request target-app commands, tests, diagnostics, and quality checks;
+- run or request target-app lifecycle work, tests, diagnostics, and quality checks;
 - attach logs, diffs, quality output, source context, and reasoning summaries to work;
 - prepare changes for review and merge without bypassing workflow;
 - recover from failures with enough evidence for another agent, node, or person to continue.

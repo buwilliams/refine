@@ -98,18 +98,16 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
     <section class="settings-section">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
-        <strong>Generate with AI</strong> analyses the codebase, writes a
-        <code>.refine/manage-app.sh</code> wrapper with timestamped logging,
-        and points the commands below at it
-        (<code>./.refine/manage-app.sh start|stop|build|test|status</code>).
-        Refine runs the saved commands directly on the host. You can override
-        any field — including swapping in your own commands.
+        <strong>Generate with AI</strong> analyses the codebase and writes
+        agent instructions for starting, stopping, and building the target app.
+        Refine asks the configured agent to perform those lifecycle actions so
+        setup, dependency, and recovery work can be handled in context.
       </p>
-      ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
+      ${(s.target_app_start_command || s.target_app_stop_command || s.target_app_build_command || s.target_app_health_url) ? `
         <p class="muted small" style="color:var(--warn)">
-          Legacy prose target-app settings are present. Use Processes → Runner
+          Legacy command target-app settings are present. Use Processes → Runner
           workers → target-app config generator to convert them into structured
-          commands.
+          agent instructions.
         </p>` : ""}
       ${renderSettingsEditableField({
         id: "s-target-app-url",
@@ -123,37 +121,37 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
                          value="${htmlEscape(s.target_app_url || "")}">`,
       })}
       ${renderSettingsEditableField({
-        id: "s-target-start-command",
-        label: "Start command",
+        id: "s-target-start-instructions",
+        label: "Start instructions",
         guideItemId: "application-start",
-        description: "one-line shell command that starts the app and returns promptly.",
-        valueLabel: s.target_app_start_command || "",
-        control: `<input type="text" id="s-target-start-command"
-                         data-testid="target-app-start-command"
-                         placeholder="./.refine/manage-app.sh start"
-                         value="${htmlEscape(s.target_app_start_command || "")}">`,
+        description: "agent guidance for starting the app and verifying it is usable.",
+        valueLabel: s.target_app_start_instructions || "",
+        control: `<textarea id="s-target-start-instructions"
+                            data-testid="target-app-start-instructions"
+                            rows="3"
+                            placeholder="Start the app, repair setup issues if needed, leave it running, and verify the configured URL.">${htmlEscape(s.target_app_start_instructions || "")}</textarea>`,
       })}
       ${renderSettingsEditableField({
-        id: "s-target-stop-command",
-        label: "Stop command",
+        id: "s-target-stop-instructions",
+        label: "Stop instructions",
         guideItemId: "application-stop",
-        description: "one-line shell command that stops the app; should be idempotent when practical.",
-        valueLabel: s.target_app_stop_command || "",
-        control: `<input type="text" id="s-target-stop-command"
-                         data-testid="target-app-stop-command"
-                         placeholder="./.refine/manage-app.sh stop"
-                         value="${htmlEscape(s.target_app_stop_command || "")}">`,
+        description: "agent guidance for stopping the app and confirming it is down.",
+        valueLabel: s.target_app_stop_instructions || "",
+        control: `<textarea id="s-target-stop-instructions"
+                            data-testid="target-app-stop-instructions"
+                            rows="3"
+                            placeholder="Stop any target-app processes for this repo and confirm the local URL or port is no longer reachable.">${htmlEscape(s.target_app_stop_instructions || "")}</textarea>`,
       })}
       ${renderSettingsEditableField({
-        id: "s-target-build-command",
-        label: "Build command",
+        id: "s-target-build-instructions",
+        label: "Build instructions",
         guideItemId: "application-build",
-        description: "one-line shell command that prepares generated artifacts for review.",
-        valueLabel: s.target_app_build_command || "",
-        control: `<input type="text" id="s-target-build-command"
-                         data-testid="target-app-build-command"
-                         placeholder="./.refine/manage-app.sh build"
-                         value="${htmlEscape(s.target_app_build_command || "")}">`,
+        description: "agent guidance for rebuilding the app and resolving expected setup issues.",
+        valueLabel: s.target_app_build_instructions || "",
+        control: `<textarea id="s-target-build-instructions"
+                            data-testid="target-app-build-instructions"
+                            rows="4"
+                            placeholder="Build the app, install or repair project-local dependencies when safe, rerun after fixes, and report blockers with evidence.">${htmlEscape(s.target_app_build_instructions || "")}</textarea>`,
       })}
       ${renderTargetAppTestCommandsField(s, {
         guideItemId: "application-test",
@@ -197,7 +195,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         valueLabel: s.target_app_status_command || "",
         control: `<input type="text" id="s-target-status-command"
                          data-testid="target-app-status-command"
-                         placeholder="./.refine/manage-app.sh status"
+                         placeholder="curl -fsS http://127.0.0.1:3000/ >/dev/null"
                          value="${htmlEscape(s.target_app_status_command || "")}">`,
       })}
       ${renderSettingsEditableField({
@@ -311,9 +309,12 @@ function collectSettingsApplicationPayload() {
     agent_subpath: $("#s-subpath").value,
     merge_target_branch: $("#s-merge-target").value,
     target_app_url: $("#s-target-app-url").value,
-    target_app_start_command: $("#s-target-start-command").value,
-    target_app_stop_command: $("#s-target-stop-command").value,
-    target_app_build_command: $("#s-target-build-command").value,
+    target_app_start_instructions: $("#s-target-start-instructions").value,
+    target_app_stop_instructions: $("#s-target-stop-instructions").value,
+    target_app_build_instructions: $("#s-target-build-instructions").value,
+    target_app_start_command: "",
+    target_app_stop_command: "",
+    target_app_build_command: "",
     target_app_test_commands: $("#s-target-test-commands").value,
     target_app_auto_build: $("#s-target-auto-build").value,
     target_app_auto_build_hour_utc: $("#s-target-auto-build-hour-utc").value,
@@ -348,9 +349,9 @@ function applyGeneratedTargetAppConfig(cfg) {
     const el = $(id);
     if (el) el.value = value == null ? "" : String(value);
   };
-  set("#s-target-start-command", cfg.start_command || "");
-  set("#s-target-stop-command", cfg.stop_command || "");
-  set("#s-target-build-command", cfg.build_command || "");
+  set("#s-target-start-instructions", cfg.start_instructions || cfg.start_command || "");
+  set("#s-target-stop-instructions", cfg.stop_instructions || cfg.stop_command || "");
+  set("#s-target-build-instructions", cfg.build_instructions || cfg.build_command || "");
   set("#s-target-test-commands", targetAppTestCommandsValue(
     cfg.test_command ? [{ command: cfg.test_command, enabled: true }] : [],
   ));
@@ -504,7 +505,7 @@ function bindNodeApplicationConfigControls() {
   bindTargetAppTestCommandList(root);
   bindSettingsAutosave(
     root,
-    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-build-command, #s-target-test-commands, #s-target-auto-build, #s-target-auto-build-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-build-timeout, #s-target-test-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
+    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-instructions, #s-target-stop-instructions, #s-target-build-instructions, #s-target-test-commands, #s-target-auto-build, #s-target-auto-build-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-build-timeout, #s-target-test-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
     autosaveSettingsApplication,
     { event: "settings-editable-commit" },
   );

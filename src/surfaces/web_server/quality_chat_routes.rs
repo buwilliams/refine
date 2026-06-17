@@ -95,15 +95,20 @@ impl InProcessWebServer {
             "has_start_command": !get("target_app_start_command").trim().is_empty(),
             "has_stop_command": !get("target_app_stop_command").trim().is_empty(),
             "has_build_command": !get("target_app_build_command").trim().is_empty(),
+            "has_start_instructions": !get("target_app_start_instructions").trim().is_empty(),
+            "has_stop_instructions": !get("target_app_stop_instructions").trim().is_empty(),
+            "has_build_instructions": !get("target_app_build_instructions").trim().is_empty(),
             "has_test_command": !get("target_app_test_command").trim().is_empty(),
             "has_status_checks": !get("target_app_status_command").trim().is_empty()
                 || !get("target_app_http_check_url").trim().is_empty()
                 || !get("target_app_tcp_check_host").trim().is_empty()
                 || !get("target_app_process_check_command").trim().is_empty(),
-            "has_start_instructions": !get("target_app_start_command").trim().is_empty()
-                || !get("target_app_start_instructions").trim().is_empty(),
-            "has_stop_instructions": !get("target_app_stop_command").trim().is_empty()
-                || !get("target_app_stop_instructions").trim().is_empty(),
+            "has_start_action": !get("target_app_start_instructions").trim().is_empty()
+                || !get("target_app_start_command").trim().is_empty(),
+            "has_stop_action": !get("target_app_stop_instructions").trim().is_empty()
+                || !get("target_app_stop_command").trim().is_empty(),
+            "has_build_action": !get("target_app_build_instructions").trim().is_empty()
+                || !get("target_app_build_command").trim().is_empty(),
             "last_check_at": snapshot.last_check_at,
             "last_check_ok": snapshot.last_check_ok,
             "last_check_message": snapshot.last_check_message,
@@ -121,8 +126,9 @@ impl InProcessWebServer {
             "auto_build_last_finished_at": "",
             "auto_build_last_ok": false,
             "auto_build_last_message": "",
-            "legacy_config_present": !get("target_app_start_instructions").trim().is_empty()
-                || !get("target_app_stop_instructions").trim().is_empty()
+            "legacy_config_present": !get("target_app_start_command").trim().is_empty()
+                || !get("target_app_stop_command").trim().is_empty()
+                || !get("target_app_build_command").trim().is_empty()
                 || !get("target_app_health_url").trim().is_empty(),
             "message": snapshot.message
         })

@@ -16,12 +16,12 @@ This surface turns project-specific operational knowledge into durable settings 
 
 ## Expected Role
 
-Target App should expose app attachment, app switching, generated commands, start/stop/rebuild behavior, health checks, and test command configuration.
+Target App should expose app attachment, app switching, generated lifecycle instructions, start/stop/rebuild behavior, health checks, and test command configuration.
 
 Current implementation details that matter to intent:
 
 - project status and app registry state determine the active app;
-- target-app commands live in settings and can be generated;
+- target-app lifecycle instructions live in settings and can be generated;
 - target-app lifecycle should run through shared host services and supervised processes;
 - detached state should render explicit setup and app-management options;
 - quality checks should use target-app test settings rather than browser-only scaffolding.
@@ -30,6 +30,6 @@ Target App should be practical. It should help Refine operate the real project w
 
 ## Future Direction
 
-Future Target App behavior should be increasingly inferential. Agents should inspect the repo, infer commands, run checks, explain failures, and update configuration with reviewable evidence.
+Future Target App behavior should be increasingly inferential. Agents should inspect the repo, infer lifecycle instructions and checks, run checks, explain failures, and update configuration with reviewable evidence.
 
 At larger scale, target-app concepts may extend across many repos and services, but the same intent remains: Refine must know what software it is acting on and how to verify that software still works.

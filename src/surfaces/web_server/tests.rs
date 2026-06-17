@@ -5388,27 +5388,30 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         body: Some(json!({"kind": "all", "provider": "__local__"})),
     });
     assert_eq!(generated.status, 200);
-    assert_eq!(
-        generated.body["config"]["start_command"],
-        "./.refine/manage-app.sh start"
+    assert!(
+        generated.body["config"]["start_instructions"]
+            .as_str()
+            .unwrap()
+            .contains("npm run dev")
     );
+    assert_eq!(generated.body["config"]["start_command"], "");
     assert_eq!(
-        generated.body["settings"]["target_app_build_command"],
-        "./.refine/manage-app.sh build"
+        generated.body["settings"]["target_app_build_instructions"]
+            .as_str()
+            .unwrap()
+            .contains("npm run build"),
+        true
     );
     assert_eq!(
         generated.body["settings"]["target_app_test_command"],
-        "./.refine/manage-app.sh test"
+        "npm test"
     );
     assert_eq!(
         generated.body["settings"]["target_app_test_commands"],
-        r#"[{"command":"./.refine/manage-app.sh test","enabled":true}]"#
+        r#"[{"command":"npm test","enabled":true}]"#
     );
     assert_eq!(generated.body["config"]["tcp_check_port"], "3000");
-    let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
-    assert!(wrapper.contains("START_COMMAND='npm run dev'"));
-    assert!(wrapper.contains("BUILD_COMMAND='npm run build'"));
-    assert!(wrapper.contains("TEST_COMMAND='npm test'"));
+    assert!(!temp_root.join(".refine/manage-app.sh").exists());
 
     let generated_operation = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -5426,24 +5429,32 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let registry = FileOperationRegistry::new(&runtime_root);
     let generated_operation =
         wait_for_operation_status(&registry, generated_operation_id, OperationState::Succeeded);
-    assert_eq!(
-        generated_operation.result["config"]["start_command"],
-        "./.refine/manage-app.sh start"
+    assert!(
+        generated_operation.result["config"]["start_instructions"]
+            .as_str()
+            .unwrap()
+            .contains("npm run dev")
     );
+    assert_eq!(generated_operation.result["config"]["start_command"], "");
     let settings = FileSettingsService::new(&refine_dir).load().unwrap();
-    assert_eq!(
-        settings["target_app_start_command"],
-        "./.refine/manage-app.sh start"
+    assert!(
+        settings["target_app_start_instructions"]
+            .as_str()
+            .unwrap()
+            .contains("npm run dev")
     );
-    assert_eq!(
-        settings["target_app_test_command"],
-        "./.refine/manage-app.sh test"
-    );
+    assert_eq!(settings["target_app_test_command"], "npm test");
     assert_eq!(
         settings["target_app_test_commands"],
-        r#"[{"command":"./.refine/manage-app.sh test","enabled":true}]"#
+        r#"[{"command":"npm test","enabled":true}]"#
     );
 
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({
+            "target_app_build_instructions": "",
+            "target_app_build_command": ""
+        }))
+        .unwrap();
     let rebuild = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/target-app-builder/build".to_string(),

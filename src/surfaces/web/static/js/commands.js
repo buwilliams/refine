@@ -756,7 +756,7 @@ registerCommand({
   group: "AI",
   aliases: ["generate-app-config", "target-generate"],
   confirm: () => modalConfirm(
-    "Ask the agent to analyse the codebase, write .refine/manage-app.sh, and point the start/stop/build/test/status commands at it? This can take a minute or two and overwrites the saved target-app fields and any existing .refine/manage-app.sh.",
+    "Ask the agent to analyse the codebase and generate start/stop/build instructions plus test/status checks? This can take a minute or two and overwrites the saved target-app fields.",
     { title: "Generate target-app config", okLabel: "Generate" },
   ),
   run: async ({ button } = {}) => {

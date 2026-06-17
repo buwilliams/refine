@@ -26,7 +26,7 @@ Target App should be the foundation that ties durable work to the real project. 
 - runtime state for the local daemon, processes, operations, claims, and caches;
 - workflow state that explains what can happen next;
 - projection snapshots and other derived state that keep the product fast without becoming authoritative;
-- target-app commands for start, stop, rebuild, test, and health checks;
+- target-app lifecycle instructions for start, stop, and rebuild, plus deterministic commands for tests and health checks;
 - guidance, governance, quality settings, reporters, and app-specific defaults;
 - Git repository, branch, and worktree context.
 

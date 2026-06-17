@@ -131,7 +131,7 @@ impl DiagnosticsService for FileDiagnosticsService {
                 } else {
                     "no project attached".to_string()
                 },
-                "target-app commands and registered processes are supervised by the native daemon"
+                "target-app lifecycle instructions and registered processes are supervised by the native daemon"
                     .to_string(),
             ],
             git: vec![git_status],

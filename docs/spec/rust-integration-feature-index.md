@@ -111,7 +111,7 @@ Nav & Guide: Manage Drop-down
 			Target App Config
 				Scope label, Copy from node, Generate with AI
 				Application scope: agent subpath, merge target branch
-				Target app: URL, start/stop/build/test/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
+				Target app: URL, start/stop/build agent instructions, test/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
 				Optional checks: HTTP URL, TCP host + port, process check command
 			Refine Runtime Config
 				Scope label, Copy from node

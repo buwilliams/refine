@@ -30,6 +30,6 @@ Settings should avoid overfetching and avoid hiding invalid states. If Refine is
 
 ## Future Direction
 
-Future settings should become more inferential. Agents should be able to inspect the project, propose target-app commands, explain tradeoffs, and safely update configuration with evidence.
+Future settings should become more inferential. Agents should be able to inspect the project, propose target-app lifecycle instructions and deterministic checks, explain tradeoffs, and safely update configuration with evidence.
 
 The surface should move toward guided configuration and reviewable changes, not a growing form full of disconnected knobs.

@@ -459,6 +459,7 @@ fn default_settings() -> JsonObject {
         ("paused", "0"),
         ("target_app_start_instructions", ""),
         ("target_app_stop_instructions", ""),
+        ("target_app_build_instructions", ""),
         ("target_app_health_url", ""),
         ("target_app_url", ""),
         ("target_app_start_command", ""),
@@ -514,6 +515,7 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "paused",
         "target_app_start_instructions",
         "target_app_stop_instructions",
+        "target_app_build_instructions",
         "target_app_health_url",
         "target_app_url",
         "target_app_start_command",
@@ -544,6 +546,7 @@ fn allowed_settings() -> BTreeSet<&'static str> {
 fn legacy_setting_key(key: &str) -> Option<&'static str> {
     match key {
         "target_app_rebuild_command" => Some("target_app_build_command"),
+        "target_app_rebuild_instructions" => Some("target_app_build_instructions"),
         "target_app_rebuild_timeout_seconds" => Some("target_app_build_timeout_seconds"),
         "target_app_auto_rebuild" => Some("target_app_auto_build"),
         "target_app_auto_rebuild_hour_utc" => Some("target_app_auto_build_hour_utc"),
@@ -1164,6 +1167,7 @@ mod tests {
                     "updated_at": "2026-06-16T00:00:00Z",
                     "settings": {
                         "target_app_rebuild_command": "npm run build",
+                        "target_app_rebuild_instructions": "Build and repair setup issues",
                         "target_app_rebuild_timeout_seconds": "45",
                         "target_app_auto_rebuild": "daily",
                         "target_app_auto_rebuild_hour_utc": "4",
@@ -1178,13 +1182,19 @@ mod tests {
         let service = FileSettingsService::new(&refine_dir);
         let settings = service.load().unwrap();
         assert_eq!(settings["target_app_build_command"], "npm run build");
+        assert_eq!(
+            settings["target_app_build_instructions"],
+            "Build and repair setup issues"
+        );
         assert_eq!(settings["target_app_build_timeout_seconds"], "45");
         assert_eq!(settings["target_app_auto_build"], "daily");
         assert_eq!(settings["target_app_auto_build_hour_utc"], "4");
         assert_eq!(settings["quality_timing"], "post_build");
         let written = fs::read_to_string(service.path()).unwrap();
         assert!(written.contains("target_app_build_command"));
+        assert!(written.contains("target_app_build_instructions"));
         assert!(!written.contains("target_app_rebuild_command"));
+        assert!(!written.contains("target_app_rebuild_instructions"));
         assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
         fs::remove_dir_all(temp_root).unwrap();

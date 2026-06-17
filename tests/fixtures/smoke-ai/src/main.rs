@@ -14,7 +14,7 @@ const ROUND: &str = "smoke-ai round actual behavior => smoke-ai round target beh
 const STANDALONE_GAP: &str =
     "smoke-ai standalone actual behavior => smoke-ai standalone target behavior\n";
 const PREFLIGHT: &str = "hello\n";
-const TARGET_APP: &str = "{\n  \"kind\": \"target-app\",\n  \"ok\": true,\n  \"message\": \"refine-smoke target app check passed\",\n  \"start_command\": \"printf smoke-ai-target-start\",\n  \"stop_command\": \"printf smoke-ai-target-stop\",\n  \"build_command\": \"printf smoke-ai-target-build\",\n  \"status_command\": \"printf smoke-ai-target-status\",\n  \"cwd\": \".\",\n  \"env\": {\"REFINE_SMOKE_TARGET\": \"1\"},\n  \"start_timeout_seconds\": 11,\n  \"stop_timeout_seconds\": 12,\n  \"build_timeout_seconds\": 13,\n  \"status_timeout_seconds\": 14,\n  \"log_path\": \"target/refine-smoke-target.log\",\n  \"http_check_url\": \"http://127.0.0.1:3456/health\",\n  \"tcp_check_host\": \"127.0.0.1\",\n  \"tcp_check_port\": \"3456\",\n  \"process_check_command\": \"printf smoke-ai-target-process\",\n  \"notes\": \"smoke-ai target-app generated config\"\n}\n";
+const TARGET_APP: &str = "{\n  \"kind\": \"target-app\",\n  \"ok\": true,\n  \"message\": \"refine-smoke target app check passed\",\n  \"start_instructions\": \"Start the smoke target app and report smoke-ai-target-start when complete.\",\n  \"stop_instructions\": \"Stop the smoke target app and report smoke-ai-target-stop when complete.\",\n  \"build_instructions\": \"Build the smoke target app and report smoke-ai-target-build when complete.\",\n  \"test_command\": \"printf smoke-ai-target-test\",\n  \"status_command\": \"printf smoke-ai-target-status\",\n  \"cwd\": \".\",\n  \"env\": {\"REFINE_SMOKE_TARGET\": \"1\"},\n  \"start_timeout_seconds\": 11,\n  \"stop_timeout_seconds\": 12,\n  \"build_timeout_seconds\": 13,\n  \"test_timeout_seconds\": 15,\n  \"status_timeout_seconds\": 14,\n  \"log_path\": \"target/refine-smoke-target.log\",\n  \"http_check_url\": \"http://127.0.0.1:3456/health\",\n  \"tcp_check_host\": \"127.0.0.1\",\n  \"tcp_check_port\": \"3456\",\n  \"process_check_command\": \"printf smoke-ai-target-process\",\n  \"notes\": \"smoke-ai target-app generated config\"\n}\n";
 
 const MATCHERS: &[(&str, &[&str], &str, &str)] = &[
     (
@@ -60,7 +60,7 @@ const MATCHERS: &[(&str, &[&str], &str, &str)] = &[
     ),
     (
         "target-app",
-        &["target app", "health", "start command", "build"],
+        &["target app", "health", "start instructions", "build"],
         "target-app.json",
         TARGET_APP,
     ),

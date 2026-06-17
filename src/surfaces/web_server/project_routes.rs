@@ -122,13 +122,13 @@ fn governance_generation_prompt(product: &str, constitution: &str) -> String {
 
 fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
     format!(
-        "Analyze this target app codebase and generate lifecycle commands for Refine to wrap. \
-         Return only JSON with kind=target-app and fields start_command, stop_command, \
-         build_command, test_command, status_command, cwd, env, \
+        "Analyze this target app codebase and generate agent instructions for Refine target-app lifecycle work. \
+         Return only JSON with kind=target-app and fields start_instructions, stop_instructions, \
+         build_instructions, test_command, status_command, cwd, env, \
          start_timeout_seconds, stop_timeout_seconds, build_timeout_seconds, \
          test_timeout_seconds, status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
-         process_check_command, and notes. Do not write files; Refine will write \
-         .refine/manage-app.sh from your analysis.\n\nProject root: {}",
+         process_check_command, and notes. The start/stop/build fields are instructions for an agent, not shell commands. \
+         Test and status fields may remain commands because Refine uses them as deterministic checks.\n\nProject root: {}",
         target_root.display()
     )
 }
@@ -272,21 +272,37 @@ fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedC
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
-    let start_command = target_config_string(cfg, "start_command", "");
-    let build_command = target_config_string(cfg, "build_command", "");
+    let start_instructions = first_non_empty(
+        &target_config_string(cfg, "start_instructions", ""),
+        &target_config_string(cfg, "start_command", ""),
+    );
+    let stop_instructions = first_non_empty(
+        &target_config_string(cfg, "stop_instructions", ""),
+        &target_config_string(cfg, "stop_command", ""),
+    );
+    let build_instructions = first_non_empty(
+        &target_config_string(cfg, "build_instructions", ""),
+        &first_non_empty(
+            &target_config_string(cfg, "rebuild_instructions", ""),
+            &target_config_string(cfg, "build_command", ""),
+        ),
+    );
     let test_command = target_config_string(cfg, "test_command", "");
     let status_command = target_config_string(cfg, "status_command", "");
-    if start_command.is_empty()
-        && build_command.is_empty()
+    if start_instructions.is_empty()
+        && build_instructions.is_empty()
         && test_command.is_empty()
         && status_command.is_empty()
     {
         return None;
     }
     Some(TargetAppGeneratedConfig {
-        start_command,
-        stop_command: target_config_string(cfg, "stop_command", ""),
-        build_command,
+        start_instructions,
+        stop_instructions,
+        build_instructions,
+        start_command: String::new(),
+        stop_command: String::new(),
+        build_command: String::new(),
         test_command,
         status_command,
         cwd: target_config_string(cfg, "cwd", "."),
@@ -307,6 +323,9 @@ fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedC
 
 fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
     json!({
+        "target_app_start_instructions": config.start_instructions.clone(),
+        "target_app_stop_instructions": config.stop_instructions.clone(),
+        "target_app_build_instructions": config.build_instructions.clone(),
         "target_app_start_command": config.start_command.clone(),
         "target_app_stop_command": config.stop_command.clone(),
         "target_app_build_command": config.build_command.clone(),
@@ -950,10 +969,7 @@ impl InProcessWebServer {
             Err(error) => Err(error),
         };
         match config {
-            Ok(mut config) => {
-                if let Err(error) = service.write_manage_app_wrapper(&mut config) {
-                    return error_response(error);
-                }
+            Ok(config) => {
                 let settings = target_app_generated_settings(&config);
                 if persist_settings {
                     match self.current_refine_dir() {
@@ -994,9 +1010,14 @@ impl InProcessWebServer {
             .and_then(|service| service.build())
         {
             Ok(snapshot) => {
+                let queued = snapshot.ok
+                    && snapshot
+                        .last_operation
+                        .as_ref()
+                        .map(|operation| operation.kind == "build")
+                        .unwrap_or(false);
                 let mut value = self.target_app_response(snapshot);
-                value["queued"] =
-                    json!(value.get("ok").and_then(|ok| ok.as_bool()).unwrap_or(false));
+                value["queued"] = json!(queued);
                 ApiResponse::json(200, value)
             }
             Err(error) => error_response(error),
