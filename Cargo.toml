@@ -69,3 +69,4 @@ tokio-stream = "0.1"
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync"] }
 portable-pty = "0.8"
+pulldown-cmark = "0.12"

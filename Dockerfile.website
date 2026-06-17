@@ -1,0 +1,16 @@
+FROM rust:1-bookworm AS builder
+
+WORKDIR /app
+COPY . .
+RUN cargo build --release --locked --bin refine
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+COPY --from=builder /app/target/release/refine /usr/local/bin/refine
+COPY . .
+
+ENV REFINE_AGENT_WORKFLOW_DISABLED=1
+EXPOSE 8080
+
+CMD ["refine", "system", "start", "--foreground", "--bind-address", "0.0.0.0", "--port", "8080", "--runtime-root", "/tmp/refine-runtime", "--static-root", "."]

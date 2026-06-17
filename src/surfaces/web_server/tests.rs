@@ -969,6 +969,78 @@ fn local_http_daemon_serves_static_assets() {
 }
 
 #[test]
+fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
+    let daemon = LocalHttpDaemon {
+        server: server_with_projection(),
+        static_root: Some(repo_root),
+    };
+
+    let index = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(index.status, 200);
+    assert_eq!(index.content_type, "text/html; charset=utf-8");
+    assert!(
+        String::from_utf8(index.body)
+            .unwrap()
+            .contains("Agentic Software Delivery")
+    );
+
+    let raw_doc = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/docs/agent-install.md".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(raw_doc.status, 200);
+    assert_eq!(raw_doc.content_type, "text/markdown; charset=utf-8");
+    assert!(
+        String::from_utf8(raw_doc.body)
+            .unwrap()
+            .contains("# Agent Install Runbook")
+    );
+
+    let rendered_doc = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/read/docs/agent-install.md".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(rendered_doc.status, 200);
+    assert_eq!(rendered_doc.content_type, "text/html; charset=utf-8");
+    let rendered_doc = String::from_utf8(rendered_doc.body).unwrap();
+    assert!(rendered_doc.contains("<h1>Agent Install Runbook</h1>"));
+    assert!(rendered_doc.contains("Raw Markdown"));
+    assert!(rendered_doc.contains("/read/docs/intent/02-foundation/01-node.md"));
+
+    let intent_toc = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/read/docs/intent/README.md".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(intent_toc.status, 200);
+    let intent_toc = String::from_utf8(intent_toc.body).unwrap();
+    assert!(intent_toc.contains(r#"href="/read/docs/intent/01-design.md""#));
+    assert!(
+        intent_toc
+            .contains(r#"href="/read/docs/intent/03-capabilities/03-workflow/00-overview.md""#)
+    );
+
+    let hidden = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/Cargo.toml".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_ne!(hidden.status, 200);
+}
+
+#[test]
 fn local_http_daemon_reports_startup_cache_progress() {
     let daemon = LocalHttpDaemon {
         server: server_with_projection(),

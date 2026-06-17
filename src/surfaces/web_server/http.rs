@@ -18,6 +18,7 @@ use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
+use pulldown_cmark::{CowStr, Event as MarkdownEvent, Options, Parser, Tag, html};
 use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
@@ -364,7 +365,9 @@ impl LocalHttpDaemon {
             }
         }
 
-        if let Some(response) = self.try_static_response(&request.path) {
+        if request.method == "GET"
+            && let Some(response) = self.try_static_response(&request.path)
+        {
             return self.with_request_metric(&request, "static", started, response);
         }
 
@@ -447,11 +450,23 @@ impl LocalHttpDaemon {
 
     fn try_static_response(&self, path: &str) -> Option<WireResponse> {
         let static_root = self.static_root.as_ref()?;
+        let path = path.split('?').next().unwrap_or(path);
+        let website_mode = website_index_path(static_root).is_file();
+
+        if website_mode && (path == "/read" || path.starts_with("/read/")) {
+            return Some(render_markdown_document(static_root, path));
+        }
+
         let relative = match path {
+            "/" if website_mode => PathBuf::from("src/surfaces/website/index.html"),
             "/" => PathBuf::from("index.html"),
             path => {
                 let trimmed = path.trim_start_matches('/');
-                let trimmed = trimmed.strip_prefix("static/").unwrap_or(trimmed);
+                let trimmed = if website_mode {
+                    trimmed
+                } else {
+                    trimmed.strip_prefix("static/").unwrap_or(trimmed)
+                };
                 if trimmed.contains("..") || trimmed.starts_with('/') {
                     return Some(WireResponse::json(ApiResponse::json(
                         400,
@@ -462,6 +477,9 @@ impl LocalHttpDaemon {
                             }
                         }),
                     )));
+                }
+                if website_mode && !website_public_path_allowed(trimmed) {
+                    return None;
                 }
                 PathBuf::from(trimmed)
             }
@@ -1048,12 +1066,241 @@ fn is_within(root: &Path, path: &Path) -> bool {
     path.starts_with(root)
 }
 
+fn website_index_path(static_root: &Path) -> PathBuf {
+    static_root.join("src/surfaces/website/index.html")
+}
+
+fn website_public_path_allowed(path: &str) -> bool {
+    path == "README.md"
+        || path == "LICENSE"
+        || path == "scripts/install.sh"
+        || path.starts_with("docs/")
+        || path == "src/surfaces/website/index.html"
+        || path.starts_with("src/surfaces/website/assets/")
+        || path.starts_with("src/surfaces/web/static/images/")
+}
+
+fn render_markdown_document(static_root: &Path, path: &str) -> WireResponse {
+    let requested = path
+        .trim_start_matches("/read")
+        .trim_start_matches('/')
+        .trim();
+    let document = if requested.is_empty() {
+        "docs/intent/README.md"
+    } else {
+        requested
+    };
+    if !website_markdown_path_allowed(document) {
+        return WireResponse::json(ApiResponse::json(
+            400,
+            json!({
+                "error": {
+                    "code": "invalid_markdown_path",
+                    "message": "markdown reader only serves README.md and docs/**/*.md"
+                }
+            }),
+        ));
+    }
+    let full_path = static_root.join(document);
+    if !is_within(static_root, &full_path) || !full_path.is_file() {
+        return WireResponse::json(ApiResponse::json(
+            404,
+            json!({
+                "error": {
+                    "code": "markdown_not_found",
+                    "message": "markdown document was not found"
+                }
+            }),
+        ));
+    }
+    let markdown = match fs::read_to_string(&full_path) {
+        Ok(markdown) => markdown,
+        Err(error) => {
+            return WireResponse::json(ApiResponse::json(
+                500,
+                json!({
+                    "error": {
+                        "code": "markdown_read_failed",
+                        "message": format!("failed to read markdown document: {error}")
+                    }
+                }),
+            ));
+        }
+    };
+    WireResponse::bytes(
+        200,
+        "text/html; charset=utf-8",
+        render_markdown_html(static_root, document, &markdown).into_bytes(),
+    )
+}
+
+fn website_markdown_path_allowed(path: &str) -> bool {
+    !path.contains("..")
+        && (path == "README.md" || (path.starts_with("docs/") && path.ends_with(".md")))
+}
+
+fn render_markdown_html(static_root: &Path, path: &str, markdown: &str) -> String {
+    let rendered = render_markdown_fragment(path, markdown);
+    let nav = render_docs_toc(static_root);
+    let escaped_path = escape_html(path);
+    format!(
+        r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{escaped_path} - Refine Docs</title>
+    <link rel="icon" href="/src/surfaces/web/static/images/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/src/surfaces/website/assets/site.css">
+  </head>
+  <body class="reader-body">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Refine home">
+        <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
+        <span>Refine</span>
+      </a>
+      <nav aria-label="Documentation">
+        <a href="/#start">Get Started</a>
+        <a href="/#docs">Docs</a>
+        <a href="/{escaped_path}">Raw Markdown</a>
+      </nav>
+    </header>
+    <main class="reader-shell">
+      <aside class="reader-nav" aria-label="Documentation sections">
+        {nav}
+      </aside>
+      <article class="markdown-card">
+        <div class="doc-meta">{escaped_path}</div>
+        <div class="markdown-content">{rendered}</div>
+      </article>
+    </main>
+  </body>
+</html>"#
+    )
+}
+
+fn render_docs_toc(static_root: &Path) -> String {
+    let readme_path = static_root.join("docs/intent/README.md");
+    let Ok(readme) = fs::read_to_string(readme_path) else {
+        return r#"<h2>Docs</h2><ul><li><a href="/read/docs/intent/README.md">Intent overview</a></li></ul>"#
+            .to_string();
+    };
+    let toc = extract_table_of_contents(&readme).unwrap_or_else(|| {
+        "- [Intent overview](README.md)\n- [Design](01-design.md)\n- [Agent install](../agent-install.md)"
+            .to_string()
+    });
+    render_markdown_fragment("docs/intent/README.md", &format!("## Docs\n{toc}"))
+}
+
+fn extract_table_of_contents(markdown: &str) -> Option<String> {
+    let mut lines = Vec::new();
+    let mut in_toc = false;
+    for line in markdown.lines() {
+        if line.trim() == "## Table Of Contents" {
+            in_toc = true;
+            continue;
+        }
+        if in_toc && line.starts_with("## ") {
+            break;
+        }
+        if in_toc {
+            lines.push(line);
+        }
+    }
+    let toc = lines.join("\n").trim().to_string();
+    if toc.is_empty() { None } else { Some(toc) }
+}
+
+fn render_markdown_fragment(path: &str, markdown: &str) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    let parser =
+        Parser::new_ext(markdown, options).map(|event| rewrite_markdown_event(path, event));
+    let mut rendered = String::new();
+    html::push_html(&mut rendered, parser);
+    rendered
+}
+
+fn rewrite_markdown_event<'a>(path: &str, event: MarkdownEvent<'a>) -> MarkdownEvent<'a> {
+    match event {
+        MarkdownEvent::Start(Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => MarkdownEvent::Start(Tag::Link {
+            link_type,
+            dest_url: CowStr::from(rewrite_markdown_link(path, dest_url.as_ref())),
+            title,
+            id,
+        }),
+        other => other,
+    }
+}
+
+fn rewrite_markdown_link(path: &str, destination: &str) -> String {
+    if destination.starts_with("http:")
+        || destination.starts_with("https:")
+        || destination.starts_with("mailto:")
+        || destination.starts_with('#')
+        || destination.starts_with('/')
+    {
+        return destination.to_string();
+    }
+
+    let (target, anchor) = destination
+        .split_once('#')
+        .map(|(target, anchor)| (target, format!("#{anchor}")))
+        .unwrap_or((destination, String::new()));
+    if !target.ends_with(".md") {
+        return destination.to_string();
+    }
+
+    let base = path.rsplit_once('/').map(|(base, _)| base).unwrap_or("");
+    let joined = if base.is_empty() {
+        target.to_string()
+    } else {
+        format!("{base}/{target}")
+    };
+    match normalize_markdown_path(&joined) {
+        Some(normalized) => format!("/read/{normalized}{anchor}"),
+        None => destination.to_string(),
+    }
+}
+
+fn normalize_markdown_path(path: &str) -> Option<String> {
+    let mut parts = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            value => parts.push(value),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 fn content_type_for_path(path: &Path) -> &'static str {
     match path.extension().and_then(|extension| extension.to_str()) {
         Some("html") => "text/html; charset=utf-8",
         Some("css") => "text/css; charset=utf-8",
         Some("js") => "application/javascript; charset=utf-8",
         Some("json") => "application/json",
+        Some("md") | Some("markdown") => "text/markdown; charset=utf-8",
+        Some("sh") => "text/x-shellscript; charset=utf-8",
+        Some("txt") => "text/plain; charset=utf-8",
         Some("svg") => "image/svg+xml",
         Some("png") => "image/png",
         _ => "application/octet-stream",

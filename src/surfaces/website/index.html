@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Refine - Agentic Software Delivery</title>
+    <meta
+      name="description"
+      content="Refine coordinates people and AI agents across local repositories, workflow state, Git, quality checks, and review."
+    >
+    <link rel="icon" href="/src/surfaces/web/static/images/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/src/surfaces/website/assets/site.css">
+    <script src="/src/surfaces/website/assets/site.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Refine home">
+        <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
+        <span>Refine</span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#product">Product</a>
+        <a href="#start">Get Started</a>
+        <a href="#docs">Docs</a>
+        <a href="#agents">Agents</a>
+      </nav>
+      <a class="header-action" href="/read/docs/agent-install.md">Install</a>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Local agentic software delivery</p>
+          <h1 id="hero-title">Coordinate people and agents with the tools you already use.</h1>
+          <p class="hero-lede">
+            Refine turns product feedback into Gaps, guides AI agents through implementation, and
+            keeps evidence, quality, Git, and review close to your local workflow.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button primary" href="#start">Start locally</a>
+            <a class="button secondary" href="/read/docs/intent/README.md">Read the intent</a>
+          </div>
+        </div>
+        <div class="hero-media" aria-label="Refine browser interface preview">
+          <img src="/src/surfaces/web/static/images/screenshot.png" alt="Refine dashboard showing workflow, gaps, and system activity">
+        </div>
+      </section>
+
+      <section id="product" class="section product-section" aria-labelledby="product-title">
+        <div class="section-heading">
+          <p class="eyebrow">What Refine does</p>
+          <h2 id="product-title">A delivery system built around Gaps, automation, and review.</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <span class="feature-index">01</span>
+            <h3>Open software work to the whole team</h3>
+            <p>
+              Anyone who can explain what the app does today and what it should do instead can
+              create meaningful work. Refine keeps planning, Gaps, chat, and verification together.
+            </p>
+          </article>
+          <article>
+            <span class="feature-index">02</span>
+            <h3>Coordinate an agent fleet</h3>
+            <p>
+              Agents work through local CLIs, Git branches, worktrees, processes, nodes, and shared
+              workflow state instead of isolated chat transcripts.
+            </p>
+          </article>
+          <article>
+            <span class="feature-index">03</span>
+            <h3>Govern through mitigation</h3>
+            <p>
+              Refine relies on Git, flat files, logs, quality checks, governance, and review so
+              powerful agent work remains inspectable and recoverable.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="showcase" aria-label="Refine interface examples">
+        <figure>
+          <img src="/src/surfaces/web/static/images/ss-2-gaps.png" alt="Refine Gaps list">
+          <figcaption>Track Gaps from request through review.</figcaption>
+        </figure>
+        <figure>
+          <img src="/src/surfaces/web/static/images/ss-5-chat.png" alt="Refine agent chat">
+          <figcaption>Give agents context without losing product state.</figcaption>
+        </figure>
+        <figure>
+          <img src="/src/surfaces/web/static/images/ss-3-logs.png" alt="Refine logs and evidence">
+          <figcaption>Keep logs, quality output, and activity visible.</figcaption>
+        </figure>
+      </section>
+
+      <section id="start" class="section start-section" aria-labelledby="start-title">
+        <div class="section-heading">
+          <p class="eyebrow">Get Started</p>
+          <h2 id="start-title">Install Refine locally, then attach the app you want agents to work on.</h2>
+        </div>
+        <div class="start-layout">
+          <article class="install-panel">
+            <div class="panel-heading">
+              <h3>Install yourself</h3>
+              <a href="/scripts/install.sh">raw script</a>
+            </div>
+            <div class="code-copy">
+              <pre><code data-origin-template="curl -fsSL {origin}/scripts/install.sh | bash">curl -fsSL /scripts/install.sh | bash</code></pre>
+              <button
+                class="copy-button copy-button-on-code"
+                type="button"
+                data-copy-template="curl -fsSL {origin}/scripts/install.sh | bash"
+                aria-label="Copy install command"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M8 8h10v12H8z"></path>
+                  <path d="M6 16H4V4h12v2"></path>
+                </svg>
+              </button>
+            </div>
+            <p>
+              The installer checks the host, installs or repairs missing tools when approved,
+              starts Refine, and opens the browser UI on your machine.
+            </p>
+          </article>
+          <article class="install-panel accent">
+            <div class="panel-heading">
+              <h3>Install with your agent</h3>
+              <a href="/docs/agent-install.md">raw runbook</a>
+            </div>
+            <div class="code-copy">
+              <pre><code data-origin-template="Follow instructions found at:
+{origin}/docs/agent-install.md">Follow instructions found at:
+/docs/agent-install.md</code></pre>
+              <button
+                class="copy-button copy-button-on-code"
+                type="button"
+                data-copy-template="Follow instructions found at:
+{origin}/docs/agent-install.md"
+                aria-label="Copy agent install instructions"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M8 8h10v12H8z"></path>
+                  <path d="M6 16H4V4h12v2"></path>
+                </svg>
+              </button>
+            </div>
+            <p>
+              Give this URL to Codex, OpenClaw, Claude Code, Gemini, Copilot, or another coding
+              agent so it can install Refine with explicit checks and report exact blockers.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="docs" class="section docs-section" aria-labelledby="docs-title">
+        <div class="section-heading">
+          <p class="eyebrow">Documentation</p>
+          <h2 id="docs-title">Understand how Refine works.</h2>
+          <p>
+            Start with the intent docs to see the design, foundation, capabilities, and surfaces
+            that shape the product.
+          </p>
+        </div>
+        <div class="docs-actions">
+          <a class="button primary" href="/read/docs/intent/README.md">Open documentation</a>
+          <a class="button secondary" href="/read/docs/agent-install.md">Agent install runbook</a>
+        </div>
+      </section>
+
+      <section id="agents" class="section agents-section" aria-labelledby="agents-title">
+        <div>
+          <p class="eyebrow">Agent URLs</p>
+          <h2 id="agents-title">Direct, non-GitHub URLs for automation.</h2>
+          <p>
+            Fly serves repository files directly, so coding agents can fetch install instructions,
+            scripts, and intent docs without depending on raw GitHub access.
+          </p>
+        </div>
+        <div class="url-list">
+          <div class="url-row">
+            <a href="/docs/agent-install.md"><code data-origin-path="/docs/agent-install.md">/docs/agent-install.md</code></a>
+            <button class="copy-button" type="button" data-copy-path="/docs/agent-install.md" aria-label="Copy agent install URL">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 8h10v12H8z"></path>
+                <path d="M6 16H4V4h12v2"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="url-row">
+            <a href="/scripts/install.sh"><code data-origin-path="/scripts/install.sh">/scripts/install.sh</code></a>
+            <button class="copy-button" type="button" data-copy-path="/scripts/install.sh" aria-label="Copy install script URL">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 8h10v12H8z"></path>
+                <path d="M6 16H4V4h12v2"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="url-row">
+            <a href="/docs/intent/README.md"><code data-origin-path="/docs/intent/README.md">/docs/intent/README.md</code></a>
+            <button class="copy-button" type="button" data-copy-path="/docs/intent/README.md" aria-label="Copy intent docs URL">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 8h10v12H8z"></path>
+                <path d="M6 16H4V4h12v2"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="url-row">
+            <a href="/read/docs/intent/01-design.md"><code data-origin-path="/read/docs/intent/01-design.md">/read/docs/intent/01-design.md</code></a>
+            <button class="copy-button" type="button" data-copy-path="/read/docs/intent/01-design.md" aria-label="Copy rendered design docs URL">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 8h10v12H8z"></path>
+                <path d="M6 16H4V4h12v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Refine is MIT licensed and designed for local ownership.</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/buwilliams/refine">GitHub</a>
+        <a href="/LICENSE">License</a>
+      </nav>
+    </footer>
+  </body>
+</html>
