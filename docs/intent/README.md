@@ -23,15 +23,15 @@ These documents should help people and agents understand the product from the in
 
 ## Table Of Contents
 
-- [01 Design](01-design.md)
-- 02 Foundation
+- [Design](01-design.md)
+- Foundation
   - [Models](02-foundation/01-models.md)
   - [Decentralized Scale](02-foundation/02-decentralized-scale.md)
   - [State](02-foundation/03-state.md)
   - [Storage](02-foundation/04-storage.md)
   - [Guidance](02-foundation/05-guidance.md)
   - [Project App Context](02-foundation/06-project-app-context.md)
-- 03 Capabilities
+- Capabilities
   - [Workflow](03-capabilities/01-workflow.md)
   - [Process](03-capabilities/02-process.md)
   - [Tools](03-capabilities/03-tools.md)
@@ -39,12 +39,12 @@ These documents should help people and agents understand the product from the in
   - [Governance](03-capabilities/05-governance.md)
   - [Merge, Review, And Git Worktrees](03-capabilities/06-merge-review-git-worktrees.md)
   - [Activity And Evidence](03-capabilities/07-activity-evidence.md)
-- 04 Surfaces
+- Surfaces
   - [Surface Principles](04-surfaces/01-surface-principles.md)
   - [CLI](04-surfaces/02-cli.md)
-  - 03 Browser Desktop
+  - Browser Desktop
     - [Overview](04-surfaces/03-browser-desktop/00-overview.md)
-    - 01 Shared Components
+    - Shared Components
       - [Overview](04-surfaces/03-browser-desktop/01-shared-components/00-overview.md)
       - [Table](04-surfaces/03-browser-desktop/01-shared-components/01-table.md)
       - [Pagination](04-surfaces/03-browser-desktop/01-shared-components/02-pagination.md)
