@@ -24,7 +24,7 @@ Current implementation details that matter to intent:
 - quality runs should be supervised processes when they execute commands;
 - workflow should use quality evidence before moving work toward merge or done;
 - failures should be visible in logs, System, Gap evidence, or review surfaces;
-- quality settings should be shared project context, not hidden UI state.
+- quality settings should be shared target-app context, not hidden UI state.
 
 Quality should be strict enough to reveal risk and flexible enough to fit different projects. Refine should not assume every app has the same test command, build step, or verification style.
 

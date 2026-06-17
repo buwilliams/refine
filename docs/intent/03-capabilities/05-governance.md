@@ -6,7 +6,7 @@
 - **Project Intent**: governance captures what the project cares about beyond a single Gap.
 - **Agent Context**: agents should receive governance concerns before they act, not after they cause avoidable damage.
 - **Review Pressure**: governance should shape which changes need evidence, escalation, or human judgment.
-- **Durable And Editable**: governance should be stored as project context that people and agents can inspect.
+- **Durable And Editable**: governance should be stored as target-app context that people and agents can inspect.
 
 ## Purpose
 

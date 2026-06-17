@@ -18,7 +18,7 @@ Guidance turns product intent into durable material that agents can use. It shou
 
 Guidance should sit between raw user instruction and automated action. It should inform planning, implementation, QA, review, import extraction, generated target-app configuration, and future agent-native workflows.
 
-The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app commands, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class project context that workflow and tools can reuse.
+The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app commands, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class target-app context that workflow and tools can reuse.
 
 Guidance should not become a wall of policy text that agents ignore. It should be specific, current, structured enough to retrieve, and close enough to the work that it changes outcomes.
 

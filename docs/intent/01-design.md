@@ -20,7 +20,7 @@ Refine names those concerns by product intent:
 
 - Surfaces are the interaction points for people and agents.
 - Capabilities are the active powers that move work, run processes, and use tools.
-- Foundation is the durable conceptual base: model, node, state, storage, guidance, and project context.
+- Foundation is the durable conceptual base: model, node, state, storage, guidance, and target app.
 
 Storage is part of the foundation because flat files, Git, and caches are not just implementation details. They protect local ownership, inspectability, performance, and agent readability.
 
@@ -44,7 +44,7 @@ Since Refine is intended for any user, the Desktop and Browser are the easiest c
 
 Refine should be understood through three system levels:
 
-- Foundation: the durable model, node, state, storage, guidance, and project-context concepts.
+- Foundation: the durable model, node, state, storage, guidance, and target-app concepts.
 - Capabilities: the active powers that move work, run processes, and use tools.
 - Surfaces: the ways people and agents interact with those capabilities.
 

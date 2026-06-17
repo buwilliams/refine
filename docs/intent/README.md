@@ -30,7 +30,7 @@ These documents should help people and agents understand the product from the in
   - [State](02-foundation/03-state.md)
   - [Storage](02-foundation/04-storage.md)
   - [Guidance](02-foundation/05-guidance.md)
-  - [Project App Context](02-foundation/06-project-app-context.md)
+  - [Target App](02-foundation/06-target-app.md)
 - Capabilities
   - [Workflow](03-capabilities/01-workflow.md)
   - [Process](03-capabilities/02-process.md)
