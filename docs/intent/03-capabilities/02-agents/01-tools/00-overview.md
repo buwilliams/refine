@@ -14,6 +14,8 @@ Tools are how Refine acts on the world. They connect the model and workflow to t
 
 Tools should not be confused with UI widgets. A button may expose a tool, but the tool itself should live in shared backend capability so other surfaces and future agents can use it.
 
+This section is the parent for tool-backed agent capabilities. Import gets its own child document because it is a major tool flow: turning external plans, transcripts, files, and issue lists into structured Gaps and Features.
+
 ## Expected Role
 
 The tools capability should make Refine useful without requiring users to adopt new infrastructure. It should wrap existing local systems in product-aware behavior.

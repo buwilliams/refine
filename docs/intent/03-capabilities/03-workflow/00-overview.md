@@ -18,6 +18,19 @@ The point is not scheduling for its own sake. The point is durable state advance
 
 The workflow capability should be the primary engine of Refine's agentic behavior. It coordinates work across model state, process execution, Git worktrees, quality checks, merge behavior, provider invocation, node ownership, and user review.
 
+The workflow lifecycle is:
+
+- backlog: captured work waits until it is ready for action;
+- todo: actionable work becomes eligible for claiming;
+- in-progress: a node owns the active attempt and agents or processes act;
+- ready-merge: a reviewable change exists and needs handoff;
+- build: the target app is assembled or prepared when applicable;
+- qa: checks gather evidence that the work behaves as intended;
+- review: evidence and judgment decide whether the work is acceptable;
+- done: the intended outcome is complete and evidence remains inspectable;
+- failed: the attempt did not complete, but evidence supports recovery;
+- cancelled: the work is intentionally stopped.
+
 Current implementation details that matter to intent:
 
 - `WorkflowEngine` owns workflow-state advancement.
