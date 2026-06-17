@@ -29,6 +29,6 @@ Tables should avoid one-off custom list designs unless the data genuinely requir
 
 ## Future Direction
 
-Future tables should become more evidence-aware and agent-aware. They may show confidence, risk, dependency, ownership, claim state, or review readiness.
+Future tables should become more evidence-aware and agent-aware. They may show confidence, risk, dependency, node ownership, claim state, or review readiness.
 
 The principle should remain: dense, predictable, operational scanning over decorative layout.

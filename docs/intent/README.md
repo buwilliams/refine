@@ -26,7 +26,7 @@ These documents should help people and agents understand the product from the in
 - [Design](01-design.md)
 - Foundation
   - [Models](02-foundation/01-models.md)
-  - [Decentralized Scale](02-foundation/02-decentralized-scale.md)
+  - [Node](02-foundation/02-node.md)
   - [State](02-foundation/03-state.md)
   - [Storage](02-foundation/04-storage.md)
   - [Guidance](02-foundation/05-guidance.md)
