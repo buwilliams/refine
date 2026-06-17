@@ -1,27 +1,6 @@
 # Organizing Principles
 
-## Key Ideas
-
-- **Intent Over Implementation**: these documents explain why Refine exists, why each part exists, and what outcomes each part should preserve.
-- **Table Of Contents As Design**: the file layout should make the system understandable before any file is opened.
-- **Consistent Vocabulary**: use the same words for the same concepts across every document.
-- **Purpose First**: describe each feature by its purpose, expected role, and future direction before naming implementation details.
-- **Implementation As Evidence**: include technical details only when they explain or protect intent.
-- **Future AI Readers**: write so stronger future agents can preserve the design even when they change the code.
-
-## Purpose
-
-The intent folder is the durable explanation of Refine's design. It is not a changelog, implementation manual, or product marketing site. It is the place where the system states what it is trying to become and what must remain true as the implementation changes.
-
-These documents should help people and agents understand the product from the inside out:
-
-- what Refine believes about work,
-- what each system area is responsible for,
-- why each feature exists,
-- what outcomes the feature should create,
-- what future versions should preserve or improve.
-
-## Table Of Contents
+## Table of Contents
 
 - [Design](01-design.md)
 - Foundation
@@ -84,6 +63,27 @@ These documents should help people and agents understand the product from the in
     - [Footer](04-surfaces/03-browser-desktop/22-footer.md)
   - [API](04-surfaces/04-api.md)
   - [Agent](04-surfaces/05-agent.md)
+
+## Key Ideas
+
+- **Intent Over Implementation**: these documents explain why Refine exists, why each part exists, and what outcomes each part should preserve.
+- **Table of Contents As Design**: the file layout should make the system understandable before any file is opened.
+- **Consistent Vocabulary**: use the same words for the same concepts across every document.
+- **Purpose First**: describe each feature by its purpose, expected role, and future direction before naming implementation details.
+- **Implementation As Evidence**: include technical details only when they explain or protect intent.
+- **Future AI Readers**: write so stronger future agents can preserve the design even when they change the code.
+
+## Purpose
+
+The intent folder is the durable explanation of Refine's design. It is not a changelog, implementation manual, or product marketing site. It is the place where the system states what it is trying to become and what must remain true as the implementation changes.
+
+These documents should help people and agents understand the product from the inside out:
+
+- what Refine believes about work,
+- what each system area is responsible for,
+- why each feature exists,
+- what outcomes the feature should create,
+- what future versions should preserve or improve.
 
 ## Document Shape
 
