@@ -14,11 +14,13 @@
 
 ## System
 
-Refine should be understood through its own product levels rather than a generic application stack:
+Most software systems are commonly explained in terms of presentation, business logic, and persistence. That framing helps explain the kinds of concerns Refine must handle: interaction, action, and durable state.
 
-- Foundation: the durable concepts Refine depends on.
-- Capabilities: the active powers Refine provides.
-- Surfaces: the ways people and agents interact with Refine.
+Refine names those concerns by product intent:
+
+- Surfaces are the interaction points for people and agents.
+- Capabilities are the active powers that move work, run processes, and use tools.
+- Foundation is the durable conceptual base: model, state, storage, and guidance.
 
 Storage is part of the foundation because flat files, Git, and caches are not just implementation details. They protect local ownership, inspectability, performance, and agent readability.
 
