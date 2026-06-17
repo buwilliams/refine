@@ -12,6 +12,8 @@
 
 The Import surface exists because work often starts outside Refine: spreadsheets, CSVs, planning notes, chat transcripts, bug lists, audits, and AI-generated plans.
 
+This surface exposes the shared Import capability. It should make extraction, draft review, deduplication, and persistence usable in the browser without turning import into browser-only behavior.
+
 Import should make that material useful without forcing users to manually create every Gap. It should preserve review and correction before durable state changes.
 
 ## Expected Role

@@ -14,9 +14,11 @@ Guidance exists because AI agents do better work when they have explicit product
 
 Guidance turns product intent into durable material that agents can use. It should help answer: what kind of software is this, what matters, what should not be broken, what standards govern work, and how should uncertain tradeoffs be handled?
 
+Guidance is a capability because Refine uses it to shape action. It should affect planning, implementation, quality, review, import, generated target-app configuration, and future agent-native workflows.
+
 ## Expected Role
 
-Guidance should sit between raw user instruction and automated action. It should inform planning, implementation, QA, review, import extraction, generated target-app configuration, and future agent-native workflows.
+Guidance should sit between raw user instruction and automated action. It should be reusable by workflow, tools, quality, governance, import, surfaces, and agents.
 
 The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app commands, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class target-app context that workflow and tools can reuse.
 
