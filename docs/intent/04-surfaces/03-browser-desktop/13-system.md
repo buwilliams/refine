@@ -2,8 +2,32 @@
 
 ## Key Ideas
 
+- **Canonical Local Notices**: user-visible UI notices and errors should land in System, not only transient toasts.
+- **Operational Memory**: System should show recent starts, queues, completions, errors, and local actions.
+- **Immediate Context**: System is for what the user needs to know now, while Logs are for deeper audit.
+- **Shared Event Bridge**: early UI events should queue until the System panel is ready.
+
 ## Purpose
+
+The System surface exists to make local Refine activity visible while the user works. It is the place to see immediate operational notices without leaving the current page.
+
+It should prevent silent failure. If an import queues, a draft finishes, a UI error occurs, a blocking notice is produced, or a background operation changes state, System should be a natural destination.
 
 ## Expected Role
 
+System should be the short-term operational log inside the toolbar. It should complement durable activity logs and process views.
+
+Current implementation details that matter to intent:
+
+- `recordUiNotice` and `recordUiError` bridge UI events into System behavior;
+- pending System operations queue before toolbar initialization;
+- System filters distinguish info, started, queued, completed, and errors;
+- failed blocking Gap notices and other important UI messages should be visible here.
+
+System should not be only a toast sink. It should make local operations inspectable and reduce surprise.
+
 ## Future Direction
+
+Future System views should summarize agent fleet activity, risk signals, interrupted work, required approvals, and recovery recommendations.
+
+As automation grows, System should become the user's immediate situational-awareness layer.
