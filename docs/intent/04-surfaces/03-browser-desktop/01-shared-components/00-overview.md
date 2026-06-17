@@ -14,6 +14,8 @@ Shared components exist so Refine feels like one system rather than a pile of pa
 
 These components also help future agents reason about the UI. A table should mean sortable, filterable, scan-friendly data. A modal should mean contextual detail or confirmation without losing the underlying page. A status pill should mean workflow state, not arbitrary decoration.
 
+This section is the parent for reusable browser-desktop component intent. Components with enough product significance, such as tables and pagination, get their own child documents so their expected behavior can stay precise without making every page doc repeat the same rules.
+
 ## Expected Role
 
 Shared components should carry common behavior across Gaps, Features, Logs, Changes, Settings, Processes, Toolbar, Guide, and future surfaces.

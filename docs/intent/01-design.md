@@ -2,7 +2,7 @@
 
 ## Key Ideas
 
-- **AI Agent First**: separate surfaces from core logic to make Refine agent first. Prefer installed AI agents through CLIs over direct provider APIs.
+- **AI Agent First**: separate surfaces from the shared model and capabilities to make Refine agent first. Prefer installed AI agents through CLIs over direct provider APIs.
 - **Decentralized**: use flat files + Git + system caching instead of leveraging databases.
 - **Simple Nomenclature**: anyone can describe "a gap", what something does today and what it should do next. AIs do well when they are given outcomes with enough environmental considerations (context).
 - **Performant**: use low-level programming language (Rust) for maximum performance.
@@ -14,10 +14,13 @@
 
 ## System
 
-A typical system can be viewed as layers: presentation, business logic, and persistence. For the Refine system this translates to:
-- Surfaces (Presentation)
-- Core (Business Logic)
-- Flat files (Persistence)
+Refine should be understood through its own product levels rather than a generic application stack:
+
+- Foundation: the durable concepts Refine depends on.
+- Capabilities: the active powers Refine provides.
+- Surfaces: the ways people and agents interact with Refine.
+
+Storage is part of the foundation because flat files, Git, and caches are not just implementation details. They protect local ownership, inspectability, performance, and agent readability.
 
 ### Surfaces
 

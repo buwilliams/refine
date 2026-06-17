@@ -23,22 +23,31 @@ These documents should help people and agents understand the product from the in
 
 ## Table Of Contents
 
-- [Design](01-design.md)
-- Foundation
+- [01 Design](01-design.md)
+- 02 Foundation
   - [Models](02-foundation/01-models.md)
   - [State](02-foundation/02-state.md)
   - [Storage](02-foundation/03-storage.md)
   - [Guidance](02-foundation/04-guidance.md)
-- Capabilities
+  - [Project App Context](02-foundation/05-project-app-context.md)
+  - [Nodes And Distribution](02-foundation/06-nodes-distribution.md)
+- 03 Capabilities
   - [Workflow](03-capabilities/01-workflow.md)
   - [Process](03-capabilities/02-process.md)
   - [Tools](03-capabilities/03-tools.md)
-- Surfaces
+  - [Quality](03-capabilities/04-quality.md)
+  - [Governance](03-capabilities/05-governance.md)
+  - [Merge, Review, And Git Worktrees](03-capabilities/06-merge-review-git-worktrees.md)
+  - [Activity And Evidence](03-capabilities/07-activity-evidence.md)
+- 04 Surfaces
   - [Surface Principles](04-surfaces/01-surface-principles.md)
   - [CLI](04-surfaces/02-cli.md)
-  - Browser Desktop
+  - 03 Browser Desktop
     - [Overview](04-surfaces/03-browser-desktop/00-overview.md)
-    - [Shared Components](04-surfaces/03-browser-desktop/01-shared-components.md)
+    - 01 Shared Components
+      - [Overview](04-surfaces/03-browser-desktop/01-shared-components/00-overview.md)
+      - [Table](04-surfaces/03-browser-desktop/01-shared-components/01-table.md)
+      - [Pagination](04-surfaces/03-browser-desktop/01-shared-components/02-pagination.md)
     - [Nav](04-surfaces/03-browser-desktop/02-nav.md)
     - [Command Palette](04-surfaces/03-browser-desktop/03-command-palette.md)
     - [Main](04-surfaces/03-browser-desktop/04-main.md)
@@ -52,16 +61,14 @@ These documents should help people and agents understand the product from the in
     - [Settings](04-surfaces/03-browser-desktop/12-settings.md)
     - [Guide](04-surfaces/03-browser-desktop/13-guide.md)
     - [Target App](04-surfaces/03-browser-desktop/14-target-app.md)
-    - [Table](04-surfaces/03-browser-desktop/15-table.md)
-    - [Pagination](04-surfaces/03-browser-desktop/16-pagination.md)
-    - [Toolbar](04-surfaces/03-browser-desktop/17-toolbar.md)
-    - [System](04-surfaces/03-browser-desktop/18-system.md)
-    - [Processes](04-surfaces/03-browser-desktop/19-processes.md)
-    - [Files](04-surfaces/03-browser-desktop/20-files.md)
-    - [Terminal](04-surfaces/03-browser-desktop/21-terminal.md)
-    - [Chat](04-surfaces/03-browser-desktop/22-chat.md)
-    - [Standalone](04-surfaces/03-browser-desktop/23-standalone.md)
-    - [Footer](04-surfaces/03-browser-desktop/24-footer.md)
+    - [Toolbar](04-surfaces/03-browser-desktop/15-toolbar.md)
+    - [System](04-surfaces/03-browser-desktop/16-system.md)
+    - [Processes](04-surfaces/03-browser-desktop/17-processes.md)
+    - [Files](04-surfaces/03-browser-desktop/18-files.md)
+    - [Terminal](04-surfaces/03-browser-desktop/19-terminal.md)
+    - [Chat](04-surfaces/03-browser-desktop/20-chat.md)
+    - [Standalone](04-surfaces/03-browser-desktop/21-standalone.md)
+    - [Footer](04-surfaces/03-browser-desktop/22-footer.md)
   - [API](04-surfaces/04-api.md)
   - [Agent](04-surfaces/05-agent.md)
 
