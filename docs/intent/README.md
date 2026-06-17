@@ -26,11 +26,11 @@ These documents should help people and agents understand the product from the in
 - [01 Design](01-design.md)
 - 02 Foundation
   - [Models](02-foundation/01-models.md)
-  - [State](02-foundation/02-state.md)
-  - [Storage](02-foundation/03-storage.md)
-  - [Guidance](02-foundation/04-guidance.md)
-  - [Project App Context](02-foundation/05-project-app-context.md)
-  - [Nodes And Distribution](02-foundation/06-nodes-distribution.md)
+  - [Decentralized Scale](02-foundation/02-decentralized-scale.md)
+  - [State](02-foundation/03-state.md)
+  - [Storage](02-foundation/04-storage.md)
+  - [Guidance](02-foundation/05-guidance.md)
+  - [Project App Context](02-foundation/06-project-app-context.md)
 - 03 Capabilities
   - [Workflow](03-capabilities/01-workflow.md)
   - [Process](03-capabilities/02-process.md)
