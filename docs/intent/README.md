@@ -1,6 +1,4 @@
-# Organizing Principles
-
-## Table of Contents
+# Table of Contents
 
 - [Design](01-design.md)
 - Foundation
