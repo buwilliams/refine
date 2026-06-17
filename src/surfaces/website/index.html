@@ -6,7 +6,7 @@
     <title>Refine - Agentic Software Delivery</title>
     <meta
       name="description"
-      content="Refine coordinates people and AI agents across local repositories, workflow state, Git, quality checks, and review."
+      content="Refine coordinates people and AI agents across local repositories, workflow state, processes, nodes, Git, quality checks, and review."
     >
     <link rel="icon" href="/src/surfaces/web/static/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/src/surfaces/website/assets/site.css">
@@ -53,8 +53,9 @@
           <p class="eyebrow">Local agentic software delivery</p>
           <h1 id="hero-title">Coordinate people and agents with the tools you already use.</h1>
           <p class="hero-lede">
-            Refine turns product feedback into Gaps, guides AI agents through implementation, and
-            keeps evidence, quality, Git, and review close to your local workflow.
+            Refine turns product feedback into Gaps, guides agents through planning and
+            implementation, and keeps files, terminals, nodes, processes, evidence, Git, and review
+            close to your local workflow.
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="button primary" href="#start">Start locally</a>
@@ -62,56 +63,184 @@
           </div>
         </div>
         <div class="hero-media" aria-label="Refine browser interface preview">
-          <img src="/src/surfaces/web/static/images/screenshot.png" alt="Refine dashboard showing workflow, gaps, and system activity">
+          <a
+            class="screenshot-link"
+            href="/src/surfaces/website/assets/ss-1-dashboard.png"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open full resolution dashboard screenshot"
+          >
+            <img
+              src="/src/surfaces/website/assets/ss-1-dashboard.png"
+              width="1922"
+              height="1168"
+              alt="Refine dashboard showing workflow, gaps, and system activity"
+            >
+          </a>
         </div>
       </section>
 
       <section id="product" class="section product-section" aria-labelledby="product-title">
         <div class="section-heading">
           <p class="eyebrow">What Refine does</p>
-          <h2 id="product-title">A delivery system built around Gaps, automation, and review.</h2>
+          <h2 id="product-title">Your team's agentic software delivery system.</h2>
         </div>
         <div class="feature-grid">
           <article>
             <span class="feature-index">01</span>
-            <h3>Open software work to the whole team</h3>
+            <h3>Empower your team</h3>
             <p>
-              Anyone who can explain what the app does today and what it should do instead can
-              create meaningful work. Refine keeps planning, Gaps, chat, and verification together.
+              Extend product feedback and app edits to your whole team. Keep planning, features,
+              Gaps, chat, and human verification in one workflow so work moves without losing
+              context.
             </p>
           </article>
           <article>
             <span class="feature-index">02</span>
-            <h3>Coordinate an agent fleet</h3>
+            <h3>Agent fleet</h3>
             <p>
-              Agents work through local CLIs, Git branches, worktrees, processes, nodes, and shared
-              workflow state instead of isolated chat transcripts.
+              Coordinate agents across decentralized repositories, branches, processes, and node
+              clusters. Cheap feedback loops keep agent work moving while git keeps everyone in
+              sync.
             </p>
           </article>
           <article>
             <span class="feature-index">03</span>
-            <h3>Govern through mitigation</h3>
+            <h3>Governance</h3>
             <p>
-              Refine relies on Git, flat files, logs, quality checks, governance, and review so
-              powerful agent work remains inspectable and recoverable.
+              Keep agent work aligned with your product intent, local rules, and requirements.
+              Review stays grounded before changes merge.
             </p>
           </article>
         </div>
       </section>
 
-      <section class="showcase" aria-label="Refine interface examples">
-        <figure>
-          <img src="/src/surfaces/web/static/images/ss-2-gaps.png" alt="Refine Gaps list">
-          <figcaption>Track Gaps from request through review.</figcaption>
-        </figure>
-        <figure>
-          <img src="/src/surfaces/web/static/images/ss-5-chat.png" alt="Refine agent chat">
-          <figcaption>Give agents context without losing product state.</figcaption>
-        </figure>
-        <figure>
-          <img src="/src/surfaces/web/static/images/ss-3-logs.png" alt="Refine logs and evidence">
-          <figcaption>Keep logs, quality output, and activity visible.</figcaption>
-        </figure>
+      <section class="showcase section" aria-labelledby="screenshots-title">
+        <div class="section-heading">
+          <p class="eyebrow">Product Screens</p>
+          <h2 id="screenshots-title">A focused view of the surfaces agents work through.</h2>
+        </div>
+        <div class="carousel" data-carousel>
+          <div class="carousel-viewport">
+            <div class="carousel-track" data-carousel-track>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-1-dashboard.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution dashboard screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-1-dashboard.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine dashboard"
+                  >
+                </a>
+                <figcaption>Track progress from the dashboard.</figcaption>
+              </figure>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-2-gaps.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution Gaps screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-2-gaps.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine Gaps list"
+                  >
+                </a>
+                <figcaption>Move Gaps from request through review.</figcaption>
+              </figure>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-3-dev-tools.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution developer tools screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-3-dev-tools.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine developer tools screen"
+                  >
+                </a>
+                <figcaption>Complete developer tools at your fingertips.</figcaption>
+              </figure>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-4-nodes.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution nodes screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-4-nodes.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine nodes screen"
+                  >
+                </a>
+                <figcaption>Scale agentic work across nodes.</figcaption>
+              </figure>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-5-plan-mode.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution plan mode screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-5-plan-mode.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine plan mode screen"
+                  >
+                </a>
+                <figcaption>Plan Mode allows you to brainstorm with AI.</figcaption>
+              </figure>
+              <figure class="carousel-slide">
+                <a
+                  class="screenshot-link"
+                  href="/src/surfaces/website/assets/ss-6-processes.png"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open full resolution processes screenshot"
+                >
+                  <img
+                    src="/src/surfaces/website/assets/ss-6-processes.png"
+                    width="1922"
+                    height="1168"
+                    alt="Refine processes screen"
+                  >
+                </a>
+                <figcaption>Battle-tested process management at scale.</figcaption>
+              </figure>
+            </div>
+          </div>
+          <div class="carousel-controls" aria-label="Product screenshot carousel controls">
+            <button class="carousel-button" type="button" data-carousel-prev aria-label="Previous screenshot">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m15 18-6-6 6-6"></path>
+              </svg>
+            </button>
+            <div class="carousel-dots" data-carousel-dots></div>
+            <button class="carousel-button" type="button" data-carousel-next aria-label="Next screenshot">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m9 18 6-6-6-6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
       </section>
 
       <section id="start" class="section start-section" aria-labelledby="start-title">

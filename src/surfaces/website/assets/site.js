@@ -101,7 +101,112 @@
     });
   }
 
+  function wireCarousels() {
+    document.querySelectorAll("[data-carousel]").forEach((carousel) => {
+      const track = carousel.querySelector("[data-carousel-track]");
+      const realSlides = Array.from(carousel.querySelectorAll(".carousel-slide"));
+      const previous = carousel.querySelector("[data-carousel-prev]");
+      const next = carousel.querySelector("[data-carousel-next]");
+      const dotsHost = carousel.querySelector("[data-carousel-dots]");
+      if (!track || !realSlides.length || !previous || !next || !dotsHost) {
+        return;
+      }
+
+      const firstClone = realSlides[0].cloneNode(true);
+      const lastClone = realSlides[realSlides.length - 1].cloneNode(true);
+      firstClone.dataset.carouselClone = "true";
+      lastClone.dataset.carouselClone = "true";
+      firstClone.dataset.carouselTargetIndex = String(realSlides.length + 1);
+      lastClone.dataset.carouselTargetIndex = "0";
+      track.prepend(lastClone);
+      track.append(firstClone);
+
+      const slides = Array.from(track.querySelectorAll(".carousel-slide"));
+      let index = 1;
+      const dots = realSlides.map((slide, slideIndex) => {
+        slide.dataset.carouselTargetIndex = String(slideIndex + 1);
+        const dot = document.createElement("button");
+        dot.className = "carousel-dot";
+        dot.type = "button";
+        dot.setAttribute("aria-label", `Show screenshot ${slideIndex + 1}`);
+        dot.addEventListener("click", () => showSlide(slideIndex + 1));
+        dotsHost.append(dot);
+        slide.setAttribute("aria-label", `Screenshot ${slideIndex + 1} of ${realSlides.length}`);
+        return dot;
+      });
+
+      function getDotIndex() {
+        if (index === 0) {
+          return realSlides.length - 1;
+        }
+        if (index === slides.length - 1) {
+          return 0;
+        }
+        return index - 1;
+      }
+
+      function setIndex(nextIndex, options = {}) {
+        index = nextIndex;
+        track.classList.toggle("is-snapping", options.animate === false);
+        carousel.style.setProperty("--carousel-index", index);
+        slides.forEach((slide, slideIndex) => {
+          const active = slideIndex === index;
+          slide.classList.toggle("is-active", active);
+          slide.setAttribute("aria-hidden", active ? "false" : "true");
+          slide.querySelectorAll("a, button").forEach((element) => {
+            element.tabIndex = active ? 0 : -1;
+          });
+        });
+        const activeDotIndex = getDotIndex();
+        dots.forEach((dot, dotIndex) => {
+          if (dotIndex === activeDotIndex) {
+            dot.setAttribute("aria-current", "true");
+          } else {
+            dot.removeAttribute("aria-current");
+          }
+        });
+      }
+
+      function showSlide(nextIndex) {
+        setIndex(nextIndex, { animate: true });
+      }
+
+      previous.addEventListener("click", () => showSlide(index - 1));
+      next.addEventListener("click", () => showSlide(index + 1));
+      carousel.addEventListener("click", (event) => {
+        const slide = event.target.closest(".carousel-slide");
+        if (!slide || slide.classList.contains("is-active")) {
+          return;
+        }
+        const targetIndex = Number(slide.dataset.carouselTargetIndex);
+        if (Number.isFinite(targetIndex)) {
+          event.preventDefault();
+          showSlide(targetIndex);
+        }
+      });
+      track.addEventListener("transitionend", () => {
+        if (index === 0) {
+          setIndex(realSlides.length, { animate: false });
+        } else if (index === slides.length - 1) {
+          setIndex(1, { animate: false });
+        }
+        requestAnimationFrame(() => track.classList.remove("is-snapping"));
+      });
+      carousel.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          showSlide(index - 1);
+        } else if (event.key === "ArrowRight") {
+          showSlide(index + 1);
+        }
+      });
+
+      setIndex(1, { animate: false });
+      requestAnimationFrame(() => track.classList.remove("is-snapping"));
+    });
+  }
+
   fillOriginText();
   wireCopyButtons();
   wireMenus();
+  wireCarousels();
 })();
