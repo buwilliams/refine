@@ -1501,7 +1501,6 @@ fn render_markdown_html(path: &str, markdown: &str) -> String {
     <header class="site-header">
       <a class="brand" href="/" aria-label="Refine home">
         <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
-        <span>Refine</span>
       </a>
       <div class="site-menu-shell">
         <button
@@ -1573,7 +1572,6 @@ fn render_docs_landing_page() -> WireResponse {
     <header class="site-header">
       <a class="brand" href="/" aria-label="Refine home">
         <img src="/src/surfaces/web/static/images/refine_logo_transparent.png" alt="">
-        <span>Refine</span>
       </a>
       <div class="site-menu-shell">
         <button

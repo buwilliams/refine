@@ -57,16 +57,14 @@ img {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   color: var(--ink);
-  font-size: 1.02rem;
-  font-weight: 800;
   text-decoration: none;
 }
 
 .brand img {
-  width: 36px;
-  height: 36px;
+  display: block;
+  width: 120px;
+  height: auto;
   object-fit: contain;
 }
 
