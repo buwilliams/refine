@@ -218,16 +218,13 @@ impl WorkflowEngine {
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
         let mut state = self.load_state()?;
         state.policy = self.policy()?;
-        let promoted = match self.refine_dir() {
-            Some(refine_dir) => match self.ensure_automation_running(&state) {
-                Ok(()) => self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?,
-                Err(RefineError::Conflict(_)) => 0,
-                Err(error) => return Err(error),
-            },
-            None => 0,
+        let runnable = match self.ensure_automation_running(&state) {
+            Ok(()) => true,
+            Err(RefineError::Conflict(_)) => false,
+            Err(error) => return Err(error),
         };
         self.save_state(&mut state)?;
-        Ok(promoted)
+        if runnable { self.promote() } else { Ok(0) }
     }
 
     pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
@@ -1558,7 +1555,8 @@ mod tests {
         assert_eq!(state.policy.global_limit, 7);
         assert_eq!(state.policy.per_node_limit, 7);
         assert_eq!(state.policy.provider, "smoke-ai");
-        assert!(state.claims.is_empty());
+        assert_eq!(state.claims.len(), 1);
+        assert_eq!(state.claims[0].gap_id, "GAP1");
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
             GapStatus::Todo
@@ -1606,6 +1604,9 @@ mod tests {
             work_items.show_gap_summary("REMOTE").unwrap().gap.status,
             GapStatus::Backlog
         );
+        let state = automation.load_state().unwrap();
+        assert_eq!(state.claims.len(), 1);
+        assert_eq!(state.claims[0].gap_id, "LOCAL");
 
         fs::remove_dir_all(temp_root).unwrap();
     }
