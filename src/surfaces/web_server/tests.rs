@@ -4016,8 +4016,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         body: None,
     });
     assert_eq!(summary.status, 200);
-    assert_eq!(summary.body["agent_count"], 1);
-    assert_eq!(summary.body["process_count"], 6);
+    assert_eq!(summary.body["agent_count"], 2);
+    assert_eq!(summary.body["process_count"], 7);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -4879,24 +4879,26 @@ fn web_server_applies_runtime_settings_updates_immediately() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
-    let created = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Instant runtime settings"})),
-    });
-    assert_eq!(created.status, 201);
+    for id in ["GAP1", "GAP2", "GAP3"] {
+        let created = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/gaps".to_string(),
+            body: Some(json!({"id": id, "name": format!("Instant runtime settings {id}")})),
+        });
+        assert_eq!(created.status, 201);
+    }
 
     let updated = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
         body: Some(json!({
-            "parallel_run_cap": 6,
-            "parallel_per_node_cap": 6,
+            "parallel_run_cap": 2,
+            "parallel_per_node_cap": 2,
             "backlog_promote_after_seconds": "0"
         })),
     });
     assert_eq!(updated.status, 200);
-    assert_eq!(updated.body["settings"]["parallel_run_cap"], "6");
+    assert_eq!(updated.body["settings"]["parallel_run_cap"], "2");
     assert_eq!(
         updated.body["settings"]["backlog_promote_after_seconds"],
         "0"
@@ -4904,9 +4906,26 @@ fn web_server_applies_runtime_settings_updates_immediately() {
 
     let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
     let state: serde_json::Value = serde_json::from_str(&state).unwrap();
-    assert_eq!(state["policy"]["global_limit"], 6);
-    assert_eq!(state["policy"]["per_node_limit"], 6);
-    assert_eq!(state["claims"].as_array().unwrap().len(), 0);
+    assert_eq!(state["policy"]["global_limit"], 2);
+    assert_eq!(state["policy"]["per_node_limit"], 2);
+    assert_eq!(state["claims"].as_array().unwrap().len(), 2);
+
+    let raised = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/settings".to_string(),
+        body: Some(json!({
+            "parallel_run_cap": 3,
+            "parallel_per_node_cap": 3
+        })),
+    });
+    assert_eq!(raised.status, 200);
+    assert_eq!(raised.body["settings"]["parallel_run_cap"], "3");
+
+    let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
+    let state: serde_json::Value = serde_json::from_str(&state).unwrap();
+    assert_eq!(state["policy"]["global_limit"], 3);
+    assert_eq!(state["policy"]["per_node_limit"], 3);
+    assert_eq!(state["claims"].as_array().unwrap().len(), 3);
 
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
