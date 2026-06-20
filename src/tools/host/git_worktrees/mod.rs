@@ -29,6 +29,12 @@ pub struct GitChange {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GitHeadRef {
+    pub branch: Option<String>,
+    pub commit: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MergeResult {
     pub ok: bool,
     pub conflicts: Vec<String>,
@@ -118,6 +124,34 @@ impl FileGitWorktreeService {
             .split('\x1e')
             .filter_map(parse_git_change)
             .collect::<Vec<_>>())
+    }
+
+    pub fn head_ref(&self) -> RefineResult<GitHeadRef> {
+        let branch_output = self.git_raw(&["branch", "--show-current"])?;
+        let branch = if branch_output.success {
+            let branch = stdout(branch_output)?.trim().to_string();
+            if branch.is_empty() {
+                None
+            } else {
+                Some(branch)
+            }
+        } else {
+            None
+        };
+
+        let commit_output = self.git_raw(&["rev-parse", "--verify", "HEAD^{commit}"])?;
+        let commit = if commit_output.success {
+            let commit = stdout(commit_output)?.trim().to_string();
+            if commit.is_empty() {
+                None
+            } else {
+                Some(commit)
+            }
+        } else {
+            None
+        };
+
+        Ok(GitHeadRef { branch, commit })
     }
 
     pub fn git_path(&self, path: &str) -> RefineResult<PathBuf> {

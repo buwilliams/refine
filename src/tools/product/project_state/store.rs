@@ -405,17 +405,9 @@ impl FileProjectStateStore {
     fn git_head_fingerprint(&self) -> Option<SourceFingerprint> {
         let target_root = self.target_root()?;
         let service = self.git_service(target_root);
-        let branch = service
-            .inspect("")
-            .ok()
-            .and_then(|status| status.branch)
-            .unwrap_or_default();
-        let latest = service
-            .recent_changes(1)
-            .ok()
-            .and_then(|changes| changes.into_iter().next())
-            .map(|change| change.commit)
-            .unwrap_or_default();
+        let head = service.head_ref().ok()?;
+        let branch = head.branch.unwrap_or_default();
+        let latest = head.commit.unwrap_or_default();
         if branch.is_empty() && latest.is_empty() {
             return None;
         }
