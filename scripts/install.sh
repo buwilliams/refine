@@ -26,6 +26,7 @@ REFINE_INSTALL_UPDATE_ONLY="${REFINE_INSTALL_UPDATE_ONLY:-0}"
 REFINE_INSTALL_PACKAGE_MANAGER="${REFINE_INSTALL_PACKAGE_MANAGER:-}"
 REFINE_INSTALL_HOMEBREW_URL="${REFINE_INSTALL_HOMEBREW_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 REFINE_INSTALL_ALLOW_TEST_PROVIDERS="${REFINE_INSTALL_ALLOW_TEST_PROVIDERS:-0}"
+REFINE_INSTALL_STATUS_INTERVAL="${REFINE_INSTALL_STATUS_INTERVAL:-15}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
 REFINE_TEST_PROVIDER_OPTIONS="smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
@@ -85,6 +86,7 @@ Environment:
   REFINE_INSTALL_UPDATE_ONLY=1      Upgrade/build/repair only; do not start Refine.
   REFINE_INSTALL_PACKAGE_MANAGER    Package manager for installer dependencies. Only brew is supported.
   REFINE_INSTALL_HOMEBREW_URL       Homebrew install script URL.
+  REFINE_INSTALL_STATUS_INTERVAL    Seconds between long-running operation status lines. Defaults to 15; set 0 to disable.
 EOF
 }
 
@@ -430,12 +432,71 @@ run() {
   "$@"
 }
 
+install_status_interval() {
+  case "$REFINE_INSTALL_STATUS_INTERVAL" in
+    ''|*[!0-9]*)
+      printf '15\n'
+      ;;
+    *)
+      printf '%s\n' "$REFINE_INSTALL_STATUS_INTERVAL"
+      ;;
+  esac
+}
+
+run_with_status() {
+  local label="$1"
+  shift
+  local status=0
+  local heartbeat_pid=""
+  local interval
+
+  if dry_run; then
+    log_detail "${DIM}+ $*${RESET}"
+    return 0
+  fi
+
+  info "$label"
+  interval="$(install_status_interval)"
+  if [ "$INSTALL_LOG_READY" = "1" ] && [ "$interval" -gt 0 ] 2>/dev/null; then
+    (
+      local elapsed=0
+      while :; do
+        sleep "$interval" || exit 0
+        elapsed=$((elapsed + interval))
+        say "${CYAN}[info]${RESET}  Still working: $label (${elapsed}s elapsed). Details: $INSTALL_LOG"
+      done
+    ) &
+    heartbeat_pid="$!"
+  fi
+
+  "$@"
+  status=$?
+
+  if [ -n "$heartbeat_pid" ]; then
+    kill "$heartbeat_pid" >/dev/null 2>&1 || true
+    wait "$heartbeat_pid" 2>/dev/null || true
+  fi
+
+  if [ "$status" -eq 0 ]; then
+    ok "$label complete"
+  else
+    warn "$label failed (exit $status)"
+  fi
+  return "$status"
+}
+
 run_shell() {
   if dry_run; then
     log_detail "${DIM}+ $*${RESET}"
     return 0
   fi
   sh -c "$*"
+}
+
+run_shell_with_status() {
+  local label="$1"
+  shift
+  run_with_status "$label" sh -c "$*"
 }
 
 prompt() {
@@ -725,7 +786,7 @@ install_packages() {
   fi
   case "$pm" in
     brew)
-      run brew install $packages
+      run_with_status "Installing missing packages with brew: $packages" brew install $packages
       ;;
   esac
 }
@@ -899,12 +960,12 @@ download_and_run() {
     return 0
   fi
   tmp="$(mktemp)"
-  if ! curl -fsSL "$url" -o "$tmp"; then
+  if ! run_with_status "Downloading $label" curl -fsSL "$url" -o "$tmp"; then
     rm -f "$tmp"
     warn "Could not download $label from $url"
     return 1
   fi
-  if ! "$runner" "$tmp"; then
+  if ! run_with_status "Running $label" "$runner" "$tmp"; then
     rm -f "$tmp"
     warn "$label failed"
     return 1
@@ -923,12 +984,12 @@ install_rust_toolchain() {
     return 0
   fi
   tmp="$(mktemp)"
-  if ! curl -fsSL https://sh.rustup.rs -o "$tmp"; then
+  if ! run_with_status "Downloading rustup installer" curl -fsSL https://sh.rustup.rs -o "$tmp"; then
     rm -f "$tmp"
     warn "Could not download rustup"
     return 1
   fi
-  if ! sh "$tmp" -y; then
+  if ! run_with_status "Running rustup installer" sh "$tmp" -y; then
     rm -f "$tmp"
     warn "rustup installer failed"
     return 1
@@ -995,19 +1056,19 @@ install_homebrew_package_manager() {
     return 0
   fi
   tmp="$(mktemp)" || return 1
-  if ! curl -fsSL "$REFINE_INSTALL_HOMEBREW_URL" -o "$tmp"; then
+  if ! run_with_status "Downloading Homebrew installer" curl -fsSL "$REFINE_INSTALL_HOMEBREW_URL" -o "$tmp"; then
     rm -f "$tmp"
     warn "Could not download Homebrew installer from $REFINE_INSTALL_HOMEBREW_URL"
     return 1
   fi
   if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
-    NONINTERACTIVE=1 bash "$tmp" || {
+    run_with_status "Running Homebrew installer" env NONINTERACTIVE=1 bash "$tmp" || {
       rm -f "$tmp"
       warn "Homebrew installer failed"
       return 1
     }
   else
-    bash "$tmp" || {
+    run_with_status "Running Homebrew installer" bash "$tmp" || {
       rm -f "$tmp"
       warn "Homebrew installer failed"
       return 1
@@ -1200,7 +1261,7 @@ ensure_provider_cli() {
     else
       ensure_node_for_provider || true
       if have npm && confirm "Install $provider CLI with npm: $install_cmd" "y"; then
-        run_shell "$install_cmd" || warn "$install_cmd failed"
+        run_shell_with_status "Installing $provider CLI" "$install_cmd" || warn "$install_cmd failed"
       fi
     fi
   fi
@@ -1212,7 +1273,7 @@ ensure_provider_cli() {
       return 0
     fi
     if confirm "Run provider login/check now: $login_cmd" "n"; then
-      run_shell "$login_cmd" || warn_issue \
+      run_shell_with_status "Running $provider login/check" "$login_cmd" || warn_issue \
         "$provider login/check" \
         "Provider auth lets Refine start agent sessions with $provider." \
         "Run $login_cmd, then re-run install.sh if Refine still cannot start agent work." \
@@ -1321,7 +1382,7 @@ upgrade_refine_checkout() {
   if [ "$force" = "0" ]; then
     return 0
   fi
-  run git -C "$checkout" fetch --tags origin || {
+  run_with_status "Fetching Refine release tags" git -C "$checkout" fetch --tags origin || {
     warn "Could not fetch Refine release tags. Keeping existing checkout."
     return 0
   }
@@ -1347,7 +1408,7 @@ upgrade_refine_checkout() {
     warn "Commit or stash changes, then re-run this installer."
     return 0
   fi
-  run git -C "$checkout" checkout --detach "$latest" || {
+  run_with_status "Switching Refine checkout to $latest" git -C "$checkout" checkout --detach "$latest" || {
     warn "Could not switch Refine checkout to $latest. Keeping existing checkout."
     return 0
   }
@@ -1380,7 +1441,7 @@ refresh_unpacked_refine_checkout() {
     "Check temporary-directory permissions, then re-run install.sh." \
     "Could not create a temporary release workspace."
   source="$tmp/refine"
-  git clone --depth 1 --branch "$latest" "$REFINE_REPO_URL" "$source" || {
+  run_with_status "Cloning Refine release $latest" git clone --depth 1 --branch "$latest" "$REFINE_REPO_URL" "$source" || {
     rm -rf "$tmp"
     die_issue \
       "Refine release clone" \
@@ -1460,7 +1521,7 @@ clone_or_update_refine() {
   if dry_run; then
     log_detail "${DIM}+ git clone --branch '$latest' '$REFINE_REPO_URL' '$checkout'${RESET}"
   else
-    git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout" || die_issue \
+    run_with_status "Cloning Refine release $latest" git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout" || die_issue \
       "Refine clone" \
       "The installer needs the Refine checkout before it can configure or start Refine." \
       "Check git/network access to $REFINE_REPO_URL, then re-run install.sh." \
@@ -1501,7 +1562,7 @@ build_refine_release() {
     "The installer needs to enter the Refine checkout before building the release binary." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  run cargo build --release --locked || die_issue \
+  run_with_status "Building optimized Refine binary" cargo build --release --locked || die_issue \
     "Refine release build" \
     "Installed Refine runs from an optimized production binary so restarts do not depend on Cargo." \
     "Run manually: cd $REFINE_CHECKOUT && cargo build --release --locked, then re-run install.sh." \
@@ -1573,7 +1634,7 @@ repair_existing_refine_install() {
         ;;
     esac
     repaired="1"
-    run ./r system repair --port "$port" --runtime-root "$REFINE_INSTALL_RUNTIME_ROOT" || die_issue \
+    run_with_status "Repairing Refine service on port $port" ./r system repair --port "$port" --runtime-root "$REFINE_INSTALL_RUNTIME_ROOT" || die_issue \
       "Refine service repair" \
       "Persistent services must be refreshed so they point at the deployed Refine binary." \
       "Run manually: $(refine_manual_prefix) system repair --port $port --runtime-root $REFINE_INSTALL_RUNTIME_ROOT" \
@@ -1608,7 +1669,7 @@ target_from_remote() {
       "Choose an empty target app path or an existing git checkout, then re-run install.sh." \
       "$path exists and is not empty. Choose another target app path."
   else
-    run git clone "$remote" "$path" || die_issue \
+    run_with_status "Cloning target app" git clone "$remote" "$path" || die_issue \
       "Target app clone" \
       "Refine needs a target application repository to attach work to." \
       "Check git/network access to $remote, then re-run install.sh." \
@@ -1730,7 +1791,7 @@ start_refine() {
   port="$(prompt "Refine port" "$(resolve_refine_port)")"
   bind_address="$(resolve_bind_address)"
   if has_systemd && confirm "Prepare Refine as a persistent service with: ./r system install --target linux-cli-web --port $port" "y"; then
-    if run ./r system install --target linux-cli-web --port "$port" --runtime-root run; then
+    if run_with_status "Installing Refine persistent service on port $port" ./r system install --target linux-cli-web --port "$port" --runtime-root run; then
       ok "Refine installed as a persistent service"
     else
       warn_issue \
@@ -1784,7 +1845,7 @@ restart_refine_after_upgrade() {
     "The installer needs to enter the Refine checkout before restarting Refine." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  if run ./r system restart --port "$port" --runtime-root run; then
+  if run_with_status "Restarting Refine service on port $port" ./r system restart --port "$port" --runtime-root run; then
     ok "Refine restarted"
   else
     warn_issue \
