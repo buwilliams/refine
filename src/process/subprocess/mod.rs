@@ -911,8 +911,34 @@ fn process_command(spec: &ManagedProcessSpec) -> Command {
             command.env_remove(key);
         }
     }
+    configure_detached_process(&mut command, &spec.owner);
     command
 }
+
+#[cfg(unix)]
+fn configure_detached_process(command: &mut Command, owner: &ProcessOwner) {
+    if owner != &ProcessOwner::Daemon {
+        return;
+    }
+
+    use std::os::unix::process::CommandExt;
+
+    unsafe extern "C" {
+        fn setsid() -> i32;
+    }
+
+    unsafe {
+        command.pre_exec(|| {
+            if setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+}
+
+#[cfg(not(unix))]
+fn configure_detached_process(_command: &mut Command, _owner: &ProcessOwner) {}
 
 const AGENT_DIRECT_API_KEY_ENV: &[&str] = &[
     "ANTHROPIC_API_KEY",

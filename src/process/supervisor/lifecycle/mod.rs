@@ -285,14 +285,7 @@ pub fn http_probe(port: u16) -> RefineResult<()> {
 }
 
 fn detached_command_parts(exe: &std::path::Path) -> (String, Vec<String>) {
-    #[cfg(unix)]
-    {
-        ("setsid".to_string(), vec![exe.display().to_string()])
-    }
-    #[cfg(not(unix))]
-    {
-        (exe.display().to_string(), Vec::new())
-    }
+    (exe.display().to_string(), Vec::new())
 }
 
 fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) {
@@ -541,6 +534,14 @@ mod tests {
         );
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn detached_daemon_command_uses_executable_directly() {
+        let exe = PathBuf::from("/usr/local/bin/refine");
+        let (command, args) = detached_command_parts(&exe);
+        assert_eq!(command, exe.display().to_string());
+        assert!(args.is_empty());
     }
 
     #[test]
