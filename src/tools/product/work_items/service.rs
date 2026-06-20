@@ -480,8 +480,13 @@ impl FileWorkItemService {
         let current_gap = self.show_gap_summary(gap_id)?;
         self.ensure_gap_owned(&current_gap)?;
         validate_gap_operation(&current_gap.gap.status, &GapOperation::AssignToFeature)?;
-        let next_order = self.next_feature_order(feature_id)?;
-        self.set_gap_feature_membership(gap_id, Some(feature_id), Some(next_order))?;
+        let old_feature_id = current_gap.gap.feature_id.clone();
+        self.set_gap_feature_membership(gap_id, Some(feature_id), None)?;
+        if let Some(old_feature_id) = old_feature_id
+            && old_feature_id != feature_id
+        {
+            let _ = self.compact_feature_orders(&old_feature_id);
+        }
         self.show_feature_summary(feature_id)
     }
 
@@ -592,6 +597,19 @@ impl FileWorkItemService {
         gaps.insert(insert_index, gap);
         for (idx, gap) in gaps.iter().enumerate() {
             self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), Some(idx as i64 + 1))?;
+        }
+        self.show_feature_summary(feature_id)
+    }
+
+    pub fn order_gaps_in_feature(
+        &self,
+        feature_id: &str,
+        gap_ids: &[String],
+    ) -> RefineResult<FeatureSummaryProjection> {
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
+        for gap_id in gap_ids {
+            self.order_gap_in_feature(feature_id, gap_id)?;
         }
         self.show_feature_summary(feature_id)
     }
@@ -859,7 +877,6 @@ impl FileWorkItemService {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
         let (gaps, mut skipped_details) = self.select_bulk_gap_summaries(&selection, false)?;
-        let mut next_order = self.next_feature_order(feature_id)?;
         let mut old_feature_ids = BTreeSet::new();
         let mut ids = Vec::new();
         for gap in gaps {
@@ -875,8 +892,7 @@ impl FileWorkItemService {
             if let Some(old_feature_id) = &gap.gap.feature_id {
                 old_feature_ids.insert(old_feature_id.clone());
             }
-            self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), Some(next_order))?;
-            next_order += 1;
+            self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), None)?;
             ids.push(gap.gap.id);
         }
         for old_feature_id in old_feature_ids {

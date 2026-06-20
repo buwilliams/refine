@@ -72,6 +72,7 @@ function importDraftPayload(draft) {
     priority: draft.priority,
     node_id: (draft.node_id || "").trim(),
     duplicate_decision: draft.duplicateDecision || "",
+    dependency_names: Array.isArray(draft.dependency_names) ? draft.dependency_names : [],
   };
 }
 

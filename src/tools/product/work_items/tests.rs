@@ -153,32 +153,32 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
     assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
     assert_eq!(
         service.show_gap_summary("GAP2").unwrap().gap.feature_order,
-        Some(2)
+        None
     );
 
     let feature = service.unorder_gap_in_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP2", "GAP1"]);
+    assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
     assert_eq!(
         service.show_gap_summary("GAP1").unwrap().gap.feature_order,
         None
     );
     assert_eq!(
         service.show_gap_summary("GAP2").unwrap().gap.feature_order,
-        Some(1)
+        None
     );
 
     let feature = service.order_gap_in_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP2", "GAP1"]);
+    assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
     assert_eq!(
         service.show_gap_summary("GAP1").unwrap().gap.feature_order,
-        Some(2)
+        Some(1)
     );
 
     let feature = service.remove_gap_from_feature("FEA1", "GAP1").unwrap();
     assert_eq!(feature.gap_ids, vec!["GAP2"]);
     assert_eq!(
         service.show_gap_summary("GAP2").unwrap().gap.feature_order,
-        Some(1)
+        None
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -198,6 +198,9 @@ fn file_work_item_service_reorders_and_moves_feature_workflow() {
     service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
     service.assign_gap_to_feature("FEA1", "GAP3").unwrap();
+    for gap_id in ["GAP1", "GAP2", "GAP3"] {
+        service.order_gap_in_feature("FEA1", gap_id).unwrap();
+    }
 
     let reordered = service.reorder_gap_in_feature("FEA1", "GAP3", 1).unwrap();
     assert_eq!(reordered.gap_ids, vec!["GAP3", "GAP1", "GAP2"]);
@@ -228,6 +231,8 @@ fn file_work_item_service_exposes_failed_feature_blocking_notice_on_gap_detail()
         .unwrap();
     service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+    service.order_gap_in_feature("FEA1", "GAP1").unwrap();
+    service.order_gap_in_feature("FEA1", "GAP2").unwrap();
     service
         .transition_gap_status("GAP1", GapStatus::Todo)
         .unwrap();

@@ -1262,6 +1262,8 @@ fn web_server_gap_detail_exposes_failed_feature_blocking_notice() {
         .unwrap();
     service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+    service.order_gap_in_feature("FEA1", "GAP1").unwrap();
+    service.order_gap_in_feature("FEA1", "GAP2").unwrap();
     service
         .transition_gap_status("GAP1", GapStatus::Todo)
         .unwrap();
@@ -1636,6 +1638,11 @@ fn web_server_reorders_and_moves_feature_workflow() {
             method: "POST".to_string(),
             path: "/work/features/FEA1/gaps".to_string(),
             body: Some(json!({"gap_id": gap_id})),
+        });
+        server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: format!("/work/features/FEA1/gaps/{gap_id}/order"),
+            body: None,
         });
     }
 
@@ -2111,6 +2118,7 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     assert_eq!(gap.body["gap"]["reporter"], "QA");
     assert_eq!(gap.body["gap"]["round_count"], 1);
     assert_eq!(gap.body["gap"]["feature_id"], feature_id);
+    assert_eq!(gap.body["gap"]["feature_order"], json!(null));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

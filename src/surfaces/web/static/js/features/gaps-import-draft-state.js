@@ -5,6 +5,11 @@ function normalizeImportDraft(draft) {
     target: draft.target || "",
     reporter: draft.reporter || state.lastReporter || "",
     priority: String(draft.priority || "low").toLowerCase(),
+    dependency_names: Array.isArray(draft.dependency_names)
+      ? draft.dependency_names
+      : Array.isArray(draft.depends_on)
+        ? draft.depends_on
+        : [],
     duplicate: draft.duplicate || null,
     duplicateDecision: draft.duplicateDecision || "",
     node_id: draft.node_id || "",

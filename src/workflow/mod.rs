@@ -1444,6 +1444,7 @@ mod tests {
         for id in ["GAP1", "GAP2", "GAP3"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items.assign_gap_to_feature("FEA1", id).unwrap();
+            work_items.order_gap_in_feature("FEA1", id).unwrap();
         }
         FileSettingsService::new(&refine_dir)
             .update(&json!({"backlog_promote_after_seconds": "0"}))
@@ -1721,9 +1722,9 @@ mod tests {
                 .unwrap();
             work_items.assign_gap_to_feature("FEAT1", id).unwrap();
         }
-        work_items
-            .unorder_gap_in_feature("FEAT1", "UNORDERED")
-            .unwrap();
+        for id in ["FIRST", "SECOND"] {
+            work_items.order_gap_in_feature("FEAT1", id).unwrap();
+        }
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert!(automation.claim("SECOND").is_err());

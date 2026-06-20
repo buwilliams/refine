@@ -1024,7 +1024,7 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
 
     let assigned = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(assigned.contains("\"feature_id\": \"FEA1\""));
-    assert!(assigned.contains("\"feature_order\": 1"));
+    assert!(assigned.contains("\"feature_order\": null"));
 
     dispatch(
         Cli::try_parse_from([
@@ -1232,6 +1232,21 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
                 "refine",
                 "feature",
                 "add-gap",
+                "FEA1",
+                gap_id,
+                "--target-root",
+                target_root.to_str().unwrap(),
+            ])
+            .unwrap(),
+        )
+        .unwrap();
+    }
+    for gap_id in ["GAP1", "GAP2"] {
+        dispatch(
+            Cli::try_parse_from([
+                "refine",
+                "feature",
+                "order-gap",
                 "FEA1",
                 gap_id,
                 "--target-root",

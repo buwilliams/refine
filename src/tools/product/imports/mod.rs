@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
@@ -18,6 +19,8 @@ pub struct ImportDraft {
     pub priority: String,
     #[serde(default)]
     pub duplicate_decision: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependency_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -69,6 +72,7 @@ impl FileImportService {
                         .map(str::to_string),
                     priority: "low".to_string(),
                     duplicate_decision: String::new(),
+                    dependency_names: Vec::new(),
                 }
             })
             .collect::<Vec<_>>();
@@ -124,6 +128,7 @@ impl FileImportService {
                 .filter(|assignee| !assignee.is_empty()),
                 priority,
                 duplicate_decision: String::new(),
+                dependency_names: Vec::new(),
             });
         }
         Ok(drafts)
@@ -181,6 +186,7 @@ impl FileImportService {
     ) -> RefineResult<ImportPersistResult> {
         let work_items = FileWorkItemService::new(&self.refine_dir);
         let mut gap_ids = Vec::new();
+        let mut created_drafts = Vec::new();
         if let Some(feature_id) = feature_id {
             work_items.show_feature_summary(feature_id)?;
         }
@@ -208,7 +214,11 @@ impl FileImportService {
             if let Some(feature_id) = feature_id {
                 work_items.assign_gap_to_feature(feature_id, &gap.gap.id)?;
             }
-            gap_ids.push(gap.gap.id);
+            gap_ids.push(gap.gap.id.clone());
+            created_drafts.push((draft, gap.gap.id));
+        }
+        if let Some(feature_id) = feature_id {
+            order_feature_dependency_drafts(&work_items, feature_id, &created_drafts)?;
         }
         Ok(ImportPersistResult {
             created: gap_ids.len(),
@@ -312,7 +322,116 @@ fn import_draft_from_value(
         assignee: (!assignee.is_empty()).then_some(assignee),
         priority,
         duplicate_decision: field("duplicate_decision").to_string(),
+        dependency_names: string_list_field(
+            object,
+            &[
+                "dependency_names",
+                "depends_on",
+                "dependencies",
+                "after",
+                "requires",
+            ],
+        ),
     })
+}
+
+pub fn order_feature_dependency_drafts(
+    work_items: &FileWorkItemService,
+    feature_id: &str,
+    created_drafts: &[(ImportDraft, String)],
+) -> RefineResult<()> {
+    let ordered_gap_ids = dependency_ordered_gap_ids(created_drafts);
+    if !ordered_gap_ids.is_empty() {
+        work_items.order_gaps_in_feature(feature_id, &ordered_gap_ids)?;
+    }
+    Ok(())
+}
+
+fn dependency_ordered_gap_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<String> {
+    let mut name_to_gap_id = BTreeMap::new();
+    let mut position_by_gap_id = BTreeMap::new();
+    for (index, (draft, gap_id)) in created_drafts.iter().enumerate() {
+        position_by_gap_id.insert(gap_id.clone(), index);
+        for key in [&draft.name, &gap_id] {
+            let key = normalize_dependency_key(key);
+            if !key.is_empty() {
+                name_to_gap_id.insert(key, gap_id.clone());
+            }
+        }
+    }
+
+    let mut edges: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut involved = BTreeSet::new();
+    for (draft, gap_id) in created_drafts {
+        for dependency in &draft.dependency_names {
+            let dependency_key = normalize_dependency_key(dependency);
+            let Some(prerequisite_id) = name_to_gap_id.get(&dependency_key) else {
+                continue;
+            };
+            if prerequisite_id == gap_id {
+                continue;
+            }
+            edges
+                .entry(prerequisite_id.clone())
+                .or_default()
+                .insert(gap_id.clone());
+            involved.insert(prerequisite_id.clone());
+            involved.insert(gap_id.clone());
+        }
+    }
+    if involved.is_empty() {
+        return Vec::new();
+    }
+
+    let mut incoming: BTreeMap<String, usize> = involved
+        .iter()
+        .map(|gap_id| (gap_id.clone(), 0usize))
+        .collect();
+    for dependents in edges.values() {
+        for dependent in dependents {
+            if let Some(count) = incoming.get_mut(dependent) {
+                *count += 1;
+            }
+        }
+    }
+
+    let mut ordered = Vec::new();
+    loop {
+        let Some(next_id) = incoming
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .min_by_key(|(gap_id, _)| {
+                position_by_gap_id
+                    .get(*gap_id)
+                    .copied()
+                    .unwrap_or(usize::MAX)
+            })
+            .map(|(gap_id, _)| gap_id.clone())
+        else {
+            break;
+        };
+        incoming.remove(&next_id);
+        ordered.push(next_id.clone());
+        if let Some(dependents) = edges.get(&next_id) {
+            for dependent in dependents {
+                if let Some(count) = incoming.get_mut(dependent) {
+                    *count = count.saturating_sub(1);
+                }
+            }
+        }
+    }
+
+    if !incoming.is_empty() {
+        let mut fallback = involved.into_iter().collect::<Vec<_>>();
+        fallback.sort_by_key(|gap_id| {
+            position_by_gap_id
+                .get(gap_id)
+                .copied()
+                .unwrap_or(usize::MAX)
+        });
+        return fallback;
+    }
+    ordered
 }
 
 fn parse_csv_rows(text: &str) -> RefineResult<Vec<Vec<String>>> {
@@ -395,9 +514,9 @@ pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
         "plan" => {
             "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
              one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
-             \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
-             \"priority\":\"low\"}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
-             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\"}]}. The feature name and \
+            \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
+             \"priority\":\"low\",\"depends_on\":[]}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
+             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\",\"depends_on\":[]}]}. The feature name and \
              description must describe the user's \
              product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
              extraction, or how the plan was created. Draft every concrete implementation gap \
@@ -405,7 +524,9 @@ pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
              data model and API work, frontend state and interaction work, workflow/integration \
              work, migrations or compatibility work, and test/verification work when the \
              transcript implies them. Each Gap must be independently actionable with actual and \
-             target states."
+             target states. Leave depends_on empty by default. Add depends_on only for real \
+             prerequisites where one Gap cannot be implemented safely before another, such as \
+             sorting or adding items to a list before the list exists."
         }
         "round" => {
             "Draft Round data from this Gap chat transcript. Return only one actual => target line."
@@ -664,6 +785,37 @@ fn string_field<'a>(object: &'a Map<String, Value>, keys: &[&str]) -> &'a str {
         .trim()
 }
 
+fn string_list_field(object: &Map<String, Value>, keys: &[&str]) -> Vec<String> {
+    keys.iter()
+        .find_map(|key| object.get(*key))
+        .map(string_list_value)
+        .unwrap_or_default()
+}
+
+fn string_list_value(value: &Value) -> Vec<String> {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .filter_map(Value::as_str)
+            .flat_map(split_dependency_names)
+            .collect(),
+        Value::String(value) => split_dependency_names(value).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn split_dependency_names(value: &str) -> impl Iterator<Item = String> + '_ {
+    value
+        .split([',', '\n', ';'])
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn normalize_dependency_key(value: &str) -> String {
+    collapse_ws(value).to_lowercase()
+}
+
 fn plan_feature_destination_from_value(value: &Value) -> Option<PlanFeatureDestination> {
     let feature = match value {
         Value::Object(object) => object
@@ -784,7 +936,62 @@ mod tests {
             .show_gap_summary(&result.gap_ids[0])
             .unwrap();
         assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
+        assert_eq!(gap.gap.feature_order, None);
         assert_eq!(gap.gap.reporter.as_deref(), Some("Reporter"));
+
+        std::fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_import_service_orders_only_dependency_connected_feature_gaps() {
+        let temp_root = unique_temp_dir("import-dependencies");
+        let refine_dir = temp_root.join(".refine");
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_feature_summary("Feature", Some("FEA1"), None, None, None)
+            .unwrap();
+
+        let result = FileImportService::new(&refine_dir)
+            .import_from_text(
+                &json!({
+                    "drafts": [
+                        {
+                            "name": "Create saved list",
+                            "actual": "There is no saved list.",
+                            "target": "A saved list exists.",
+                            "priority": "medium"
+                        },
+                        {
+                            "name": "Sort saved list",
+                            "actual": "The saved list is unsorted.",
+                            "target": "Users can sort the saved list.",
+                            "priority": "medium",
+                            "depends_on": ["Create saved list"]
+                        },
+                        {
+                            "name": "Tune empty state",
+                            "actual": "The empty state is generic.",
+                            "target": "The empty state is product-specific.",
+                            "priority": "low"
+                        }
+                    ]
+                })
+                .to_string(),
+                false,
+                None,
+                Some("FEA1"),
+            )
+            .unwrap();
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        let gaps = result
+            .gap_ids
+            .iter()
+            .map(|id| work_items.show_gap_summary(id).unwrap().gap)
+            .collect::<Vec<_>>();
+        assert_eq!(gaps[0].feature_order, Some(1));
+        assert_eq!(gaps[1].feature_order, Some(2));
+        assert_eq!(gaps[2].feature_order, None);
 
         std::fs::remove_dir_all(temp_root).unwrap();
     }

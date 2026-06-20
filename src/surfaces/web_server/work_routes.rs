@@ -22,7 +22,8 @@ use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery}
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::imports::{
     FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
-    import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
+    import_extraction_prompt, order_feature_dependency_drafts, parse_provider_import_result,
+    parse_structured_import_result,
 };
 use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
@@ -267,6 +268,7 @@ fn persist_import_draft_with_duplicate_decision(
     feature_id: Option<&str>,
     actions: &mut ImportDuplicateActions,
     created_gap_ids: &mut Vec<String>,
+    created_drafts: &mut Vec<(ImportDraft, String)>,
 ) -> Result<Option<String>, RefineError> {
     let decision = draft.duplicate_decision.trim();
     if !decision.is_empty() && decision != "original" {
@@ -367,6 +369,7 @@ fn persist_import_draft_with_duplicate_decision(
     if let Some(feature_id) = feature_id {
         service.assign_gap_to_feature(feature_id, &gap.gap.id)?;
     }
+    created_drafts.push((draft.clone(), gap.gap.id.clone()));
     Ok(Some(gap.gap.id))
 }
 
@@ -3098,6 +3101,7 @@ impl InProcessWebServer {
                 .map_err(ImportPersistWorkerError::Failed)?;
         }
         let total = drafts.len();
+        let mut created_drafts = Vec::new();
         for draft in drafts {
             if import_operation_cancelled(registry, operation_id) {
                 return Err(ImportPersistWorkerError::Cancelled);
@@ -3108,6 +3112,7 @@ impl InProcessWebServer {
                 feature_id,
                 duplicate_actions,
                 created_gap_ids,
+                &mut created_drafts,
             )
             .map_err(ImportPersistWorkerError::Failed)?
             {
@@ -3125,6 +3130,10 @@ impl InProcessWebServer {
         }
         if import_operation_cancelled(registry, operation_id) {
             return Err(ImportPersistWorkerError::Cancelled);
+        }
+        if let Some(feature_id) = feature_id {
+            order_feature_dependency_drafts(service, feature_id, &created_drafts)
+                .map_err(ImportPersistWorkerError::Failed)?;
         }
         Ok(())
     }
@@ -3166,6 +3175,7 @@ impl InProcessWebServer {
         };
         let import_result = if failures.is_empty() {
             let mut gap_ids = Vec::new();
+            let mut created_drafts = Vec::new();
             let mut duplicate_actions = ImportDuplicateActions::default();
             let result: Result<crate::tools::product::imports::ImportPersistResult, RefineError> =
                 (|| {
@@ -3179,9 +3189,13 @@ impl InProcessWebServer {
                             feature_id.as_deref(),
                             &mut duplicate_actions,
                             &mut gap_ids,
+                            &mut created_drafts,
                         )? {
                             let _ = gap_id;
                         }
+                    }
+                    if let Some(feature_id) = feature_id.as_deref() {
+                        order_feature_dependency_drafts(&service, feature_id, &created_drafts)?;
                     }
                     Ok(crate::tools::product::imports::ImportPersistResult {
                         created: gap_ids.len(),
