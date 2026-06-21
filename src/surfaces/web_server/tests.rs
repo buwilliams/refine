@@ -361,6 +361,17 @@ fn static_import_modal_exposes_feature_import_surface() {
 }
 
 #[test]
+fn static_plan_chat_shows_initial_design_prompt() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+
+    assert!(toolbar.contains("function renderChatOutput"));
+    assert!(toolbar.contains("What do you want to design together?"));
+    assert!(toolbar.contains("renderChatOutput(active)"));
+    assert!(toolbar.contains("renderChatOutput(tab)"));
+}
+
+#[test]
 fn static_work_item_tables_use_shared_readable_name_layout() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();

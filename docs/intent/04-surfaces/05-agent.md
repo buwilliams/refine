@@ -26,6 +26,7 @@ Current implementation details that matter to intent:
 - workflow invokes agents as part of shared state advancement.
 - chat sessions can attach to Gaps or run standalone.
 - standalone sessions can work in Git worktrees and submit ready-merge Gaps.
+- Plan Mode and spec-like import can turn selected intent into reviewable Feature and Gap drafts.
 - guidance, governance, quality, and target-app settings provide context for agent work.
 
 Agents should be powerful enough to get real work done and observable enough that people and other agents can understand what happened.

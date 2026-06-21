@@ -1179,14 +1179,16 @@ impl FileChatService {
 fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
     if record.mode.eq_ignore_ascii_case("plan") {
         return "Plan Mode drafts the whole picture of the software. Respond with a product \
-                spec that defines the software purpose, the major features it should include, \
-                the user/system surfaces where those features appear, and the technical \
-                implementation work required to build them. Include enough concrete behavior, \
-                backend/data model work, frontend state and interaction work, workflow or \
-                integration changes, and test/verification work that the Draft Feature action can \
-                later extract implementation-ready Features and Gaps from the transcript. Do not \
-                reduce the answer to generic strategy, prioritization advice, or a single \
-                suggested next action.";
+                spec that defines the software purpose, audience, success criteria, constraints, \
+                major behavior, and the technical work required to build it. Use architecture \
+                lenses such as durable state, logic and code organization, surfaces, integrations, \
+                performance, recovery, and verification when they clarify the work, but do not \
+                force a fixed checklist or categories that do not fit the domain. Include enough \
+                concrete behavior, implementation tradeoffs, natural build order, and test or \
+                verification work that the Draft Feature action can later extract \
+                implementation-ready Features and Gaps from the transcript. Do not reduce the \
+                answer to generic strategy, prioritization advice, or a single suggested next \
+                action.";
     }
     match &record.attachment {
         ChatAttachment::Gap(_) => {
@@ -1577,12 +1579,17 @@ mod tests {
         assert!(prompt.contains("Plan Mode drafts the whole picture of the software"));
         assert!(prompt.contains("product spec"));
         assert!(prompt.contains("software purpose"));
-        assert!(prompt.contains("major features"));
-        assert!(prompt.contains("user/system surfaces"));
-        assert!(prompt.contains("technical implementation work"));
-        assert!(prompt.contains("backend/data model work"));
-        assert!(prompt.contains("frontend state and interaction work"));
-        assert!(prompt.contains("test/verification work"));
+        assert!(prompt.contains("audience"));
+        assert!(prompt.contains("success criteria"));
+        assert!(prompt.contains("constraints"));
+        assert!(prompt.contains("surfaces"));
+        assert!(prompt.contains("technical work"));
+        assert!(prompt.contains("architecture lenses"));
+        assert!(prompt.contains("durable state"));
+        assert!(prompt.contains("logic and code organization"));
+        assert!(prompt.contains("do not force a fixed checklist"));
+        assert!(prompt.contains("natural build order"));
+        assert!(prompt.contains("test or verification work"));
         assert!(prompt.contains("implementation-ready Features and Gaps"));
         assert!(prompt.contains("Do not reduce the answer to generic strategy"));
         assert!(!prompt.contains("highest-leverage"));

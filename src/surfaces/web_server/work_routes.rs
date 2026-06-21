@@ -255,10 +255,23 @@ Provider notes after JSON."#;
         assert!(prompt.contains("feature"));
         assert!(prompt.contains("implementation_gaps"));
         assert!(prompt.contains("Draft every concrete implementation gap"));
-        assert!(prompt.contains("backend data model and API work"));
-        assert!(prompt.contains("test/verification work"));
+        assert!(prompt.contains("architecture"));
+        assert!(prompt.contains("durable state"));
+        assert!(prompt.contains("logic and code organization"));
+        assert!(prompt.contains("do not force"));
+        assert!(prompt.contains("natural build order"));
+        assert!(prompt.contains("verification"));
         assert!(prompt.contains("do not mention Refine"));
         assert!(prompt.contains("Product Spec"));
+    }
+
+    #[test]
+    fn feature_spec_import_prompt_uses_architecture_lenses() {
+        let prompt = import_extraction_prompt("Build a budget app.", "feature import");
+        assert!(prompt.contains("Plan or feature-spec source"));
+        assert!(prompt.contains("architecture"));
+        assert!(prompt.contains("do not force"));
+        assert!(prompt.contains("natural build order"));
     }
 }
 

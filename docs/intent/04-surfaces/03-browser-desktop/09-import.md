@@ -7,6 +7,7 @@
 - **Shared Persistence**: imported work should enter the same Gap and Feature model as manually created work.
 - **Deduplication**: import should help avoid duplicate or overlapping work.
 - **Bridge From Unstructured To Structured**: import converts messy source material into actionable work.
+- **Source-Sensitive Extraction**: feature specs and Plan transcripts can be decomposed more deeply than simple lists.
 
 ## Purpose
 
@@ -18,12 +19,13 @@ Import should make that material useful without forcing users to manually create
 
 ## Expected Role
 
-Import should support CSV parsing, AI extraction, draft review, deduplication, Feature assignment, standalone Gap creation, and persistence through shared work item services.
+Import should support CSV parsing, AI extraction, draft review, deduplication, Feature assignment, standalone Gap creation, and persistence through shared work item services. It should use architecture-aware extraction for Plan/spec-like input, while keeping CSV rows, issue lists, bug lists, and short notes direct.
 
 Current implementation details that matter to intent:
 
 - import flows are exposed through the Gaps navigation and toolbar-related drafting flows;
 - draft state and draft tables are separate UI concerns;
+- feature-spec extraction may create one Feature plus dependency-aware Gap drafts;
 - background extraction should be visible through operations and System notices;
 - final persistence should use shared Gap and Feature creation behavior.
 

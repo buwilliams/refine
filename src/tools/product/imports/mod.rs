@@ -511,8 +511,8 @@ fn nonempty_option(value: &str) -> Option<&str> {
 
 pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
     let instruction = match purpose {
-        "plan" => {
-            "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
+        "plan" | "feature import" | "feature_spec" | "feature-spec" | "spec" => {
+            "Extract one product Feature and its Gaps from this Plan or feature-spec source. Return only \
              one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
             \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
              \"priority\":\"low\",\"depends_on\":[]}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
@@ -520,13 +520,14 @@ pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
              description must describe the user's \
              product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
              extraction, or how the plan was created. Draft every concrete implementation gap \
-             needed to build the feature, not only user-visible product behavior. Include backend \
-             data model and API work, frontend state and interaction work, workflow/integration \
-             work, migrations or compatibility work, and test/verification work when the \
-             transcript implies them. Each Gap must be independently actionable with actual and \
-             target states. Leave depends_on empty by default. Add depends_on only for real \
-             prerequisites where one Gap cannot be implemented safely before another, such as \
-             sorting or adding items to a list before the list exists."
+             needed to build the feature, not only user-visible product behavior. Use architecture \
+             lenses such as durable state, logic and code organization, surfaces, integrations, \
+             performance, recovery, and verification only when they clarify the work; do not force \
+             categories that do not fit the domain. Preserve the plan's natural build order. Each \
+             Gap must be independently actionable with actual and target states. Leave depends_on \
+             empty by default. Add depends_on only for real prerequisites where one Gap cannot be \
+             implemented safely before another, such as sorting or adding items to a list before \
+             the list exists."
         }
         "round" => {
             "Draft Round data from this Gap chat transcript. Return only one actual => target line."

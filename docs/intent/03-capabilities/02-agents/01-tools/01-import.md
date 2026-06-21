@@ -7,6 +7,7 @@
 - **Review Before Persist**: AI extraction should produce drafts users can inspect before saving.
 - **Shared Work Model**: imported work should enter the same Gap and Feature model as manually created work.
 - **Deduplication And Evidence**: import should help avoid duplicate work and preserve source context where possible.
+- **Planning When Appropriate**: long specs and Plan transcripts may use architecture-aware extraction, but simple imports should stay direct.
 
 ## Purpose
 
@@ -30,10 +31,14 @@ Import should sit between raw source material and durable work state. It should 
 
 Import should not create a parallel work format. Its successful output should be ordinary Refine work: Gaps, Features, notes, ordering, source context, and evidence that workflow and agents can use.
 
+AI Import should adapt to the source material. A long product spec or Plan transcript can be decomposed with architecture lenses such as persistence, logic, surfaces, integrations, recovery, and tests. A CSV, bug list, issue list, or short note should be imported directly into draft work without forcing those lenses.
+
 Current implementation details that matter to intent:
 
 - import flows are exposed through browser work surfaces;
 - draft state and draft tables are review concerns before persistence;
+- Plan/spec-like extraction uses broader planning guidance before producing ordinary drafts;
+- CSV, issue-list, and simple AI extraction remain direct draft creation paths;
 - background extraction should be visible through operations and System notices;
 - final persistence should use shared Gap and Feature creation behavior.
 

@@ -820,7 +820,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           Worktree: <code>${htmlEscape(standaloneWorktreePath)}</code>
         </div>` : ""}
       <div class="chat-output-box">
-        <div id="chat-output" class="chat-output" data-testid="chat-output">${mdToHtml(active.output || "")}</div>
+        <div id="chat-output" class="chat-output" data-testid="chat-output">${renderChatOutput(active)}</div>
         <button type="button"
                 id="chat-activity-toggle"
                 class="chat-activity-toggle"
@@ -854,6 +854,13 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
         <button id="btn-chat-send" class="primary" data-testid="chat-send" ${active.sending ? "disabled" : ""}>Send</button>
       </div>
     `;
+}
+
+function renderChatOutput(tab) {
+  if (tab?.mode === "plan" && !String(tab.output || "").trim()) {
+    return mdToHtml("What do you want to design together?");
+  }
+  return mdToHtml(tab?.output || "");
 }
 
 function allQueuedMessages(tab) {
@@ -3146,7 +3153,7 @@ function renderActiveChatTranscript(tab) {
   const out = $("#chat-output");
   if (out) {
     const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 50;
-    out.innerHTML = mdToHtml(tab.output || "");
+    out.innerHTML = renderChatOutput(tab);
     if (atBottom) out.scrollTop = out.scrollHeight;
   }
   const progress = $("#chat-progress");

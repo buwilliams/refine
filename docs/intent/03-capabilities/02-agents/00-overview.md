@@ -19,18 +19,20 @@ This capability folds together the concerns that make agent work useful instead 
 - governance shapes risk, judgment, and review pressure;
 - tools let agents act on the target app, files, Git, commands, imports, diagnostics, and work items;
 - quality checks produce evidence before confidence;
+- planning turns uncertain ideas into reviewable product and implementation intent;
 - activity and evidence preserve what happened and why;
 - Git worktrees, review, and merge make changes inspectable and recoverable.
 
 Agents should not own the meaning of workflow. Workflow decides how work advances. Process runs commands and long-lived execution. Agents use both to produce useful changes with durable evidence.
 
-The child documents in this section describe the supporting capabilities agents need. They are grouped under Agents because their primary purpose is to help agents understand work, act on the target app, prove what happened, and hand changes back safely. Import belongs under Tools because it is a tool-backed way to turn unstructured source material into ordinary Refine work.
+The child documents in this section describe the supporting capabilities agents need. They are grouped under Agents because their primary purpose is to help agents understand work, act on the target app, prove what happened, and hand changes back safely. Planning belongs here because it helps users and agents shape intent before work exists. Import belongs under Tools because it is a tool-backed way to turn unstructured source material into ordinary Refine work.
 
 ## Expected Role
 
 The Agents capability should sit between Refine's intent and the outside world. It should help agents:
 
 - read target-app context, guidance, governance, settings, and existing work;
+- explore ideas and shape selected plans into reviewable Features and Gaps;
 - select tools appropriate to the work;
 - create or refine Gaps and Features from imports, chats, plans, and source material;
 - implement changes in an isolated Git branch or worktree when appropriate;
