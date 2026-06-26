@@ -62,6 +62,7 @@
     - [Footer](04-surfaces/03-browser-desktop/22-footer.md)
   - [API](04-surfaces/04-api.md)
   - [Agent](04-surfaces/05-agent.md)
+  - [MCP](04-surfaces/06-mcp.md)
 
 ## Key Ideas
 

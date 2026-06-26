@@ -75,6 +75,8 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
         format!("/system{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/upgrade") {
         format!("/upgrade{rest}")
+    } else if let Some(rest) = path.strip_prefix("/api/mcp") {
+        format!("/mcp{rest}")
     } else {
         path.to_string()
     };

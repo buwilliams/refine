@@ -131,8 +131,8 @@
             <h3>Agent fleet</h3>
             <p>
               Coordinate agents across decentralized repositories, branches, processes, and node
-              clusters. Cheap feedback loops keep agent work moving while git keeps everyone in
-              sync.
+              clusters. Connect any MCP client to the always-on local endpoint, and cheap feedback
+              loops keep agent work moving while git keeps everyone in sync.
             </p>
           </article>
           <article>
@@ -356,6 +356,11 @@
           <p>
             Fly serves repository files directly, so coding agents can fetch install instructions,
             scripts, and intent docs without depending on raw GitHub access.
+          </p>
+          <p>
+            And once Refine is running, the daemon always exposes a Model Context Protocol (MCP)
+            endpoint at <code>/mcp</code>, so any MCP client can read status, Gaps, and Features or
+            drive Refine over the same shared capabilities every other surface uses.
           </p>
         </div>
         <div class="url-list">

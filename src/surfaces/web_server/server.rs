@@ -1,9 +1,31 @@
 use serde_json::json;
 
 use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::surfaces::mcp;
 
 use super::support::*;
 use super::*;
+
+/// Bridge MCP tool calls back through the shared daemon API so the MCP surface
+/// reuses the same capability dispatch as every other surface.
+impl mcp::McpToolDispatcher for InProcessWebServer {
+    fn dispatch_tool(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<serde_json::Value>,
+    ) -> mcp::McpDispatchResult {
+        let response = self.handle(ApiRequest {
+            method: method.to_string(),
+            path: path.to_string(),
+            body,
+        });
+        mcp::McpDispatchResult {
+            status: response.status,
+            body: response.body,
+        }
+    }
+}
 
 impl InProcessWebServer {
     pub fn handle(&self, request: ApiRequest) -> ApiResponse {
@@ -23,6 +45,10 @@ impl InProcessWebServer {
     fn handle_inner(&self, mut request: ApiRequest) -> ApiResponse {
         let raw_path = request.path.clone();
         request.path = normalize_api_path(&request.path);
+
+        if request.path == mcp::MCP_ROUTE {
+            return self.handle_mcp(&request);
+        }
 
         if request.method == "GET" && request.path == "/system/version" {
             return ApiResponse::json(
@@ -775,6 +801,58 @@ impl InProcessWebServer {
     }
 }
 
+impl InProcessWebServer {
+    /// Serve the always-available MCP surface. `GET` reports server identity and
+    /// how to call it; `POST` carries a JSON-RPC 2.0 payload that the MCP surface
+    /// answers, dispatching each tool call back through the shared daemon API.
+    fn handle_mcp(&self, request: &ApiRequest) -> ApiResponse {
+        if request.method == "GET" {
+            return ApiResponse::json(
+                200,
+                json!({
+                    "protocol": "mcp",
+                    "protocolVersion": mcp::MCP_PROTOCOL_VERSION,
+                    "serverInfo": {
+                        "name": mcp::MCP_SERVER_NAME,
+                        "version": env!("CARGO_PKG_VERSION"),
+                    },
+                    "transport": "POST a JSON-RPC 2.0 message to /mcp",
+                }),
+            );
+        }
+        if request.method != "POST" {
+            return ApiResponse::json(
+                405,
+                json!({
+                    "error": {
+                        "code": "method_not_allowed",
+                        "message": "MCP endpoint accepts GET or POST"
+                    }
+                }),
+            );
+        }
+        let Some(payload) = request.body.as_ref() else {
+            return ApiResponse::json(
+                200,
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": null,
+                    "error": {"code": -32700, "message": "MCP request body must be a JSON-RPC message"}
+                }),
+            );
+        };
+        match mcp::handle_payload(payload, self) {
+            // Notifications-only payloads take no reply; acknowledge with 202.
+            None => ApiResponse {
+                status: 202,
+                content_type: "application/json".to_string(),
+                body: serde_json::Value::Null,
+            },
+            Some(response) => ApiResponse::json(200, response),
+        }
+    }
+}
+
 fn terminal_session_route(path: &str, suffix: &str) -> Option<String> {
     let rest = path.strip_prefix("/terminal/")?;
     let session_id = rest.strip_suffix(suffix)?;
@@ -786,7 +864,9 @@ fn terminal_session_route(path: &str, suffix: &str) -> Option<String> {
 
 fn should_refresh_projection_after_mutation(path: &str) -> bool {
     let path = normalize_api_path(path);
-    !path.starts_with("/terminal/") && path != "/project/sync"
+    // The MCP surface refreshes the cache through the inner tool dispatch when a
+    // tool actually mutates state, so the outer `/mcp` POST itself is exempt.
+    !path.starts_with("/terminal/") && path != "/project/sync" && path != mcp::MCP_ROUTE
 }
 
 #[cfg(test)]

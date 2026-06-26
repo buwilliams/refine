@@ -39,6 +39,39 @@ use crate::tools::product::project_state::{
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[test]
+fn web_server_serves_mcp_surface_through_daemon() {
+    let server = server_with_projection();
+
+    // The MCP surface is mounted by the always-on daemon web server, so a
+    // JSON-RPC tools/call reaches a real capability route without any extra
+    // process or transport.
+    let response = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/mcp".to_string(),
+        body: Some(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "refine_list_gaps", "arguments": {}},
+        })),
+    });
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["result"]["isError"], false);
+    let gaps = &response.body["result"]["structuredContent"]["gaps"];
+    assert!(gaps.as_array().is_some());
+
+    // GET reports server identity so clients can discover the surface.
+    let identity = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/mcp".to_string(),
+        body: None,
+    });
+    assert_eq!(identity.status, 200);
+    assert_eq!(identity.body["serverInfo"]["name"], "refine");
+}
+
+#[test]
 fn web_server_routes_work_gap_queries_through_projection() {
     let mut server = server_with_projection();
     server.projection.gaps.insert(
@@ -3784,14 +3817,17 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             exit_code: None,
         })
         .unwrap();
-    supervisor
+    // Launch a real, long-lived agent process so it stays alive (and counted)
+    // through the assertions below. A short-lived command would exit before the
+    // summary call and be pruned by liveness recovery, racing the agent count.
+    let launched_agent = supervisor
         .launch(crate::process::subprocess::ManagedProcessSpec {
             owner: crate::process::subprocess::ProcessOwner::Agent,
-            command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
             args: if cfg!(windows) {
-                vec!["/C".to_string(), "echo agent".to_string()]
+                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
             } else {
-                vec!["-c".to_string(), "echo agent".to_string()]
+                vec!["30".to_string()]
             },
             cwd: None,
             env: Vec::new(),
@@ -4180,6 +4216,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         cached.runtime.supervisor.unwrap()["agents_paused"],
         json!(false)
     );
+
+    // Terminate the long-lived agent so the test leaves no orphaned process.
+    let _ = supervisor.signal(&launched_agent.id, "terminate");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
