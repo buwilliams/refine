@@ -158,7 +158,7 @@ fn website_command_owns_static_site_options() {
     let Commands::Website { bind_address, .. } = parsed.command else {
         panic!("expected website command");
     };
-    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
 
     let parsed = Cli::try_parse_from([
         "refine",
