@@ -124,7 +124,7 @@ fn system_start_owns_foreground_web_options() {
         panic!("expected system start command");
     };
     assert_eq!(port, 0);
-    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
     assert_eq!(runtime_root, PathBuf::from("run"));
     assert!(once);
     assert!(!foreground);
@@ -154,6 +154,12 @@ fn system_start_owns_foreground_web_options() {
 
 #[test]
 fn website_command_owns_static_site_options() {
+    let parsed = Cli::try_parse_from(["refine", "website"]).unwrap();
+    let Commands::Website { bind_address, .. } = parsed.command else {
+        panic!("expected website command");
+    };
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+
     let parsed = Cli::try_parse_from([
         "refine",
         "website",

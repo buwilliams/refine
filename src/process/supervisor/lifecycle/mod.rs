@@ -45,7 +45,7 @@ impl Default for BackgroundDaemonConfig {
     fn default() -> Self {
         Self {
             port: 0,
-            bind_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            bind_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             cache_dir: None,
             static_root: None,
         }
@@ -517,7 +517,7 @@ mod tests {
 
         let result = service.start_background_daemon(BackgroundDaemonConfig {
             port: 4555,
-            bind_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            bind_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             cache_dir: None,
             static_root: None,
         });

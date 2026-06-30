@@ -55,7 +55,7 @@ pub enum Commands {
     Website {
         #[arg(long, default_value_t = 8099)]
         port: u16,
-        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
+        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::UNSPECIFIED))]
         bind_address: IpAddr,
         #[arg(long, default_value = ".")]
         static_root: PathBuf,
@@ -718,7 +718,7 @@ pub enum SystemAction {
     Start {
         #[arg(long, default_value_t = 8082)]
         port: u16,
-        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
+        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::UNSPECIFIED))]
         bind_address: IpAddr,
         #[arg(long)]
         cache_dir: Option<PathBuf>,

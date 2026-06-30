@@ -384,19 +384,11 @@ resolve_refine_port() {
   printf '%s\n' "$port"
 }
 
-running_in_container() {
-  [ -f /.dockerenv ] && return 0
-  [ -f /run/.containerenv ] && return 0
-  grep -qaE '/(docker|containerd|kubepods|libpod)(/|[-:])' /proc/1/cgroup 2>/dev/null
-}
-
 resolve_bind_address() {
   if [ -n "$REFINE_BIND_ADDRESS" ]; then
     printf '%s\n' "$REFINE_BIND_ADDRESS"
-  elif running_in_container; then
-    printf '0.0.0.0\n'
   else
-    printf '127.0.0.1\n'
+    printf '0.0.0.0\n'
   fi
 }
 
