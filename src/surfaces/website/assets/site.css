@@ -313,8 +313,7 @@ h1 {
   font-size: 1.08rem;
 }
 
-.section-heading h2,
-.agents-section h2 {
+.section-heading h2 {
   margin-bottom: 0;
   font-size: clamp(2rem, 5vw, 4.3rem);
   line-height: 1;
@@ -363,8 +362,7 @@ h1 {
 }
 
 .feature-grid p,
-.install-panel p,
-.agents-section p {
+.install-panel p {
   color: var(--muted);
 }
 
@@ -563,8 +561,8 @@ h1 {
   background: var(--blue);
 }
 
-.start-section,
-.agents-section {
+.compare-section,
+.start-section {
   background: var(--band);
   border-block: 1px solid rgba(31, 111, 235, 0.12);
 }
@@ -713,36 +711,6 @@ code {
   font-size: 0.76rem;
   font-weight: 850;
   text-transform: uppercase;
-}
-
-.agents-section {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1.1fr);
-  gap: 36px;
-  align-items: start;
-}
-
-.url-list {
-  display: grid;
-  gap: 10px;
-}
-
-.url-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid rgba(31, 111, 235, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
-}
-
-.url-row a {
-  overflow-wrap: anywhere;
-  padding: 4px 6px;
-  color: var(--blue);
-  text-decoration: none;
 }
 
 .site-footer {
@@ -1034,7 +1002,6 @@ code {
   }
 
   .hero,
-  .agents-section,
   .docs-orientation,
   .reader-shell {
     grid-template-columns: 1fr;
