@@ -368,6 +368,68 @@ h1 {
   color: var(--muted);
 }
 
+.compare-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(5, 25, 54, 0.08);
+}
+
+.compare-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 0.98rem;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.compare-table thead th {
+  border-top: 0;
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.compare-table tbody th {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.compare-table td {
+  color: var(--muted);
+}
+
+.compare-table .compare-refine {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.compare-table thead .compare-refine {
+  color: var(--blue);
+}
+
+.compare-table .mark {
+  font-weight: 750;
+}
+
+.compare-table .mark.yes {
+  color: var(--blue);
+}
+
+.compare-table .mark.no {
+  color: var(--muted);
+}
+
 .showcase {
   padding-top: 0;
 }
