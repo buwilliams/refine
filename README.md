@@ -5,7 +5,7 @@
 refine coordinates agents at scale with the tools you already use. It is not another agent harness — it is the management layer on top of your agents, orchestrating work across distributed machines. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software. Build new apps, implement features, and fix bugs while keeping feedback cheap, local, and repeatable.
 
 - **Empower your team** - extend product feedback and app edits to your whole team. Keep planning, features, Gaps, chat, and human verification in one workflow so work moves without losing context.
-- **Agent Fleet** - orchestrate your agent fleet across decentralized repositories, branches, processes, and node clusters. Cheap feedback loops keep agent work moving while git keeps everyone in sync.
+- **Agent Fleet** - orchestrate your agent fleet across decentralized repositories, branches, processes, and your node cluster. Cheap feedback loops keep agent work moving while git keeps everyone in sync.
 - **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Personal AI** - install refine and manage your node cluster with your favorite agent.
 
