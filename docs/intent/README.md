@@ -5,6 +5,7 @@
   - [Node](02-foundation/01-node.md)
   - [Models](02-foundation/02-models.md)
   - [Target App](02-foundation/03-target-app.md)
+  - [Fleet](02-foundation/04-fleet.md)
 - Capabilities
   - [Process](03-capabilities/01-process.md)
   - Agents
