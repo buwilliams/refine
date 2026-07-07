@@ -19,6 +19,7 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
+use crate::tools::host::fleet::FileFleetService;
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
@@ -682,6 +683,14 @@ impl InProcessWebServer {
                 .and_then(|value| value.as_str())
                 .map(str::to_string),
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
+            provider: body
+                .get("provider")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            provisioning: body
+                .get("provisioning")
+                .and_then(|value| value.as_object())
+                .cloned(),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
         let service = FileClusterService::new(refine_dir);
@@ -796,6 +805,124 @@ impl InProcessWebServer {
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_fleet_providers(&self) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "list fleet providers");
+        match FileFleetService::new(refine_dir).providers_response() {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_remote_node_provision(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "provision node");
+        let Some(node_id) = request
+            .path
+            .strip_prefix("/cluster/nodes/")
+            .and_then(|path| path.strip_suffix("/provision"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let provider = body
+            .get("provider")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let dry_run = body
+            .get("dry_run")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        match self
+            .fleet_service(refine_dir)
+            .provision_response(node_id, provider, dry_run)
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_remote_node_deprovision(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "deprovision node");
+        let Some(node_id) = request
+            .path
+            .strip_prefix("/cluster/nodes/")
+            .and_then(|path| path.strip_suffix("/deprovision"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let dry_run = body
+            .get("dry_run")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        match self
+            .fleet_service(refine_dir)
+            .deprovision_response(node_id, dry_run)
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_remote_node_provision_status(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "check node provisioning");
+        let Some(node_id) = request
+            .path
+            .strip_prefix("/cluster/nodes/")
+            .and_then(|path| path.strip_suffix("/provision-status"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
+        };
+        match self
+            .fleet_service(refine_dir)
+            .provision_status_response(node_id)
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_cluster_distribute(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "distribute work");
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let to = body
+            .get("to")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let converge = body
+            .get("converge")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let dry_run = body
+            .get("dry_run")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let service = if let Some(runtime_root) = &self.runtime_root {
+            FileClusterService::with_runtime_root(refine_dir, runtime_root)
+        } else {
+            FileClusterService::new(refine_dir)
+        };
+        match service.distribute_response(to, converge, dry_run) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    fn fleet_service(&self, refine_dir: PathBuf) -> FileFleetService {
+        if let Some(runtime_root) = &self.runtime_root {
+            FileFleetService::with_runtime_root(refine_dir, runtime_root)
+        } else {
+            FileFleetService::new(refine_dir)
         }
     }
 

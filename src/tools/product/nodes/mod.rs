@@ -121,6 +121,8 @@ impl FileNodeRegistryService {
             refine_checkout: "~/refine".to_string(),
             target_app_path: String::new(),
             refine_port: 8082,
+            provider: String::new(),
+            provisioning: JsonObject::new(),
             health: None,
             archived: false,
         });
@@ -152,6 +154,8 @@ impl FileNodeRegistryService {
             refine_checkout: "~/refine".to_string(),
             target_app_path: String::new(),
             refine_port: 8082,
+            provider: String::new(),
+            provisioning: JsonObject::new(),
             health: None,
             archived: false,
         };
@@ -349,6 +353,8 @@ fn default_node(id: &str, display_name: &str) -> Node {
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
         refine_port: 8082,
+        provider: String::new(),
+        provisioning: JsonObject::new(),
         health: None,
         archived: false,
     }
@@ -373,6 +379,8 @@ fn node_value(node: &Node, active: bool) -> Value {
         "refine_checkout": node.refine_checkout,
         "target_app_path": node.target_app_path,
         "refine_port": node.refine_port,
+        "provider": node.provider,
+        "provisioning": node.provisioning,
         "health": node.health,
         "archived": node.archived,
         "active": active,

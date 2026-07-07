@@ -15,7 +15,7 @@ use crate::model::gap::{Gap, GapPriority};
 use crate::model::workflow::{
     FeatureOperation, GapOperation, GapStatus, feature_operation_allowed, gap_operation_allowed,
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
-    is_feature_protected_status, user_status_transition,
+    is_feature_protected_status, is_terminal_status, user_status_transition,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
@@ -1027,6 +1027,130 @@ impl FileWorkItemService {
             ids,
             skipped: skipped_details.len(),
             skipped_details,
+        })
+    }
+
+    /// Reassigns node ownership of eligible Gaps across the given nodes.
+    /// Distribute is the one sanctioned exception to node ownership
+    /// enforcement: unclaimed work may move regardless of which node owns it,
+    /// because reassignment is the transfer. Eligible means captured or
+    /// actionable (backlog/todo) with no active claim; converge instead moves
+    /// reviewable Gaps home to a single review node. Feature-bound gaps are
+    /// skipped so Feature ordering stays intact — transfer the Feature to move
+    /// them as a unit.
+    pub fn distribute_gaps_across_nodes(
+        &self,
+        target_node_ids: &[String],
+        converge: bool,
+        claimed_gap_ids: &BTreeSet<String>,
+        dry_run: bool,
+    ) -> RefineResult<DistributeResult> {
+        if target_node_ids.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "distribute requires at least one enabled, healthy node".to_string(),
+            ));
+        }
+        let mut node_ids = Vec::new();
+        for node_id in target_node_ids {
+            let node_id = self.validate_transfer_target_node(node_id)?;
+            if !node_ids.contains(&node_id) {
+                node_ids.push(node_id);
+            }
+        }
+        if converge && node_ids.len() != 1 {
+            return Err(RefineError::InvalidInput(
+                "converge moves reviewable gaps to exactly one review node".to_string(),
+            ));
+        }
+        let mut summaries = self.list_gap_summaries()?;
+        summaries.sort_by(|a, b| {
+            a.gap
+                .created
+                .cmp(&b.gap.created)
+                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        });
+        let mut eligible = Vec::new();
+        let mut skipped_details = Vec::new();
+        let mut load: Vec<usize> = vec![0; node_ids.len()];
+        for gap in &summaries {
+            let owner = gap
+                .gap
+                .node_id
+                .clone()
+                .unwrap_or_else(|| "default".to_string());
+            let matches = if converge {
+                gap.gap.status == GapStatus::Review
+            } else {
+                matches!(gap.gap.status, GapStatus::Backlog | GapStatus::Todo)
+            };
+            if !matches {
+                if !is_terminal_status(&gap.gap.status) {
+                    if let Some(index) = node_ids.iter().position(|id| *id == owner) {
+                        load[index] += 1;
+                    }
+                }
+                continue;
+            }
+            if let Some(feature_id) = gap.gap.feature_id.as_deref() {
+                skipped_details.push(BulkSkippedDetail {
+                    id: gap.gap.id.clone(),
+                    reason: format!("feature:{feature_id}"),
+                });
+                if let Some(index) = node_ids.iter().position(|id| *id == owner) {
+                    load[index] += 1;
+                }
+                continue;
+            }
+            if claimed_gap_ids.contains(&gap.gap.id) {
+                skipped_details.push(BulkSkippedDetail {
+                    id: gap.gap.id.clone(),
+                    reason: "claimed".to_string(),
+                });
+                if let Some(index) = node_ids.iter().position(|id| *id == owner) {
+                    load[index] += 1;
+                }
+                continue;
+            }
+            eligible.push((gap.gap.id.clone(), owner));
+        }
+        let mut moves = Vec::new();
+        for (gap_id, owner) in &eligible {
+            let target_index = load
+                .iter()
+                .enumerate()
+                .min_by_key(|(index, count)| (**count, *index))
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+            let to_node_id = node_ids[target_index].clone();
+            load[target_index] += 1;
+            if to_node_id != *owner {
+                moves.push(DistributeMove {
+                    gap_id: gap_id.clone(),
+                    from_node_id: owner.clone(),
+                    to_node_id,
+                });
+            }
+        }
+        if !dry_run {
+            for entry in &moves {
+                self.set_gap_node_unchecked(&entry.gap_id, &entry.to_node_id)?;
+            }
+        }
+        Ok(DistributeResult {
+            strategy: if converge {
+                "converge".to_string()
+            } else if node_ids.len() == 1 {
+                "fill".to_string()
+            } else {
+                "spread".to_string()
+            },
+            node_ids,
+            eligible: eligible.len(),
+            moved: moves.len(),
+            moves,
+            skipped: skipped_details.len(),
+            skipped_details,
+            dry_run,
         })
     }
 

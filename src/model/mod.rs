@@ -1,5 +1,6 @@
 pub mod cluster;
 pub mod feature;
+pub mod fleet;
 pub mod gap;
 pub mod log;
 pub mod node;

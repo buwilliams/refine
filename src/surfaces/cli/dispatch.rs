@@ -23,6 +23,7 @@ use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemote
 use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
 };
+use crate::tools::host::fleet::FileFleetService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -318,10 +319,16 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     refine_checkout,
                     target_app_path,
                     refine_port,
+                    provider,
+                    provisioning,
                     enabled,
                     target_root: Some(target_root),
                 },
         } => {
+            let provisioning = provisioning
+                .as_deref()
+                .map(parse_provisioning_object)
+                .transpose()?;
             let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .upsert_node(
                     &id,
@@ -334,6 +341,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                         refine_checkout,
                         target_app_path,
                         refine_port: refine_port.map(u64::from),
+                        provider,
+                        provisioning,
                         enabled,
                     },
                 )?;
@@ -386,6 +395,70 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         } => {
             let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .bootstrap_node_response(&id, dry_run)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
+                ClusterAction::Providers {
+                    target_root: Some(target_root),
+                },
+        } => {
+            let providers = FileFleetService::new(refine_dir_for_target_root(&target_root))
+                .providers_response()?;
+            println!("{}", serde_json::to_string_pretty(&providers).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
+                ClusterAction::Provision {
+                    id,
+                    provider,
+                    dry_run,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root))
+                .provision_response(&id, provider.as_deref(), dry_run)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
+                ClusterAction::Deprovision {
+                    id,
+                    dry_run,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root))
+                .deprovision_response(&id, dry_run)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
+                ClusterAction::ProvisionStatus {
+                    id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root))
+                .provision_status_response(&id)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
+                ClusterAction::Distribute {
+                    to,
+                    converge,
+                    dry_run,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
+                .distribute_response(to.as_deref(), converge, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
@@ -2675,23 +2748,33 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
             refine_checkout,
             target_app_path,
             refine_port,
+            provider,
+            provisioning,
             enabled,
             target_root: None,
-        } => daemon_json(
-            "PATCH",
-            &format!("/cluster/nodes/{}", path_segment(&id)),
-            Some(remote_node_edit_body(
-                display_name,
-                ssh_host,
-                ssh_user,
-                ssh_identity_path,
-                ssh_port,
-                refine_checkout,
-                target_app_path,
-                refine_port,
-                enabled,
-            )),
-        )?,
+        } => {
+            let provisioning = provisioning
+                .as_deref()
+                .map(parse_provisioning_object)
+                .transpose()?;
+            daemon_json(
+                "PATCH",
+                &format!("/cluster/nodes/{}", path_segment(&id)),
+                Some(remote_node_edit_body(
+                    display_name,
+                    ssh_host,
+                    ssh_user,
+                    ssh_identity_path,
+                    ssh_port,
+                    refine_checkout,
+                    target_app_path,
+                    refine_port,
+                    provider,
+                    provisioning,
+                    enabled,
+                )),
+            )?
+        }
         ClusterAction::EnableNode {
             id,
             target_root: None,
@@ -2733,6 +2816,46 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
             "POST",
             &format!("/cluster/nodes/{}/run", path_segment(&id)),
             Some(json!({ "command": command })),
+        )?,
+        ClusterAction::Providers { target_root: None } => {
+            daemon_json("GET", "/cluster/providers", None)?
+        }
+        ClusterAction::Provision {
+            id,
+            provider,
+            dry_run,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/provision", path_segment(&id)),
+            Some(json!({ "provider": provider, "dry_run": dry_run })),
+        )?,
+        ClusterAction::Deprovision {
+            id,
+            dry_run,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/deprovision", path_segment(&id)),
+            Some(json!({ "dry_run": dry_run })),
+        )?,
+        ClusterAction::ProvisionStatus {
+            id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/provision-status", path_segment(&id)),
+            None,
+        )?,
+        ClusterAction::Distribute {
+            to,
+            converge,
+            dry_run,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            "/cluster/distribute",
+            Some(json!({ "to": to, "converge": converge, "dry_run": dry_run })),
         )?,
         ClusterAction::Transfer {
             id,
@@ -2794,6 +2917,8 @@ fn remote_node_edit_body(
     refine_checkout: Option<String>,
     target_app_path: Option<String>,
     refine_port: Option<u16>,
+    provider: Option<String>,
+    provisioning: Option<crate::model::JsonObject>,
     enabled: Option<bool>,
 ) -> serde_json::Value {
     let mut body = serde_json::Map::new();
@@ -2821,10 +2946,28 @@ fn remote_node_edit_body(
     if let Some(value) = refine_port {
         body.insert("refine_port".to_string(), json!(value));
     }
+    if let Some(value) = provider {
+        body.insert("provider".to_string(), json!(value));
+    }
+    if let Some(value) = provisioning {
+        body.insert("provisioning".to_string(), json!(value));
+    }
     if let Some(value) = enabled {
         body.insert("enabled".to_string(), json!(value));
     }
     serde_json::Value::Object(body)
+}
+
+fn parse_provisioning_object(raw: &str) -> RefineResult<crate::model::JsonObject> {
+    let value: serde_json::Value = serde_json::from_str(raw).map_err(|error| {
+        RefineError::InvalidInput(format!("provisioning must be a JSON object: {error}"))
+    })?;
+    match value {
+        serde_json::Value::Object(object) => Ok(object),
+        _ => Err(RefineError::InvalidInput(
+            "provisioning must be a JSON object".to_string(),
+        )),
+    }
 }
 
 fn daemon_json(
@@ -3060,6 +3203,11 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ClusterAction::DisableNode { target_root, .. }
             | ClusterAction::RemoveNode { target_root, .. }
             | ClusterAction::Bootstrap { target_root, .. }
+            | ClusterAction::Providers { target_root }
+            | ClusterAction::Provision { target_root, .. }
+            | ClusterAction::Deprovision { target_root, .. }
+            | ClusterAction::ProvisionStatus { target_root, .. }
+            | ClusterAction::Distribute { target_root, .. }
             | ClusterAction::Sync { target_root }
             | ClusterAction::Run { target_root, .. }
             | ClusterAction::Transfer { target_root, .. }

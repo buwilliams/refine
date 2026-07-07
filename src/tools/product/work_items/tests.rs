@@ -721,6 +721,125 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn distribute_spreads_eligible_gaps_evenly_across_nodes() {
+    let temp_root = unique_temp_dir("distribute-spread");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("node-a").unwrap();
+    nodes.create("node-b").unwrap();
+    for index in 1..=6 {
+        service
+            .create_gap_summary(&format!("Gap {index}"), Some(&format!("GAP{index}")))
+            .unwrap();
+    }
+
+    let targets = vec![
+        "default".to_string(),
+        "node-a".to_string(),
+        "node-b".to_string(),
+    ];
+    let result = service
+        .distribute_gaps_across_nodes(&targets, false, &std::collections::BTreeSet::new(), false)
+        .unwrap();
+
+    assert_eq!(result.strategy, "spread");
+    assert_eq!(result.eligible, 6);
+    let mut counts = std::collections::BTreeMap::new();
+    for gap in service.list_gap_summaries().unwrap() {
+        let owner = gap.gap.node_id.unwrap_or_else(|| "default".to_string());
+        *counts.entry(owner).or_insert(0usize) += 1;
+    }
+    assert_eq!(counts.get("default"), Some(&2));
+    assert_eq!(counts.get("node-a"), Some(&2));
+    assert_eq!(counts.get("node-b"), Some(&2));
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn distribute_converge_moves_only_reviewable_gaps_to_review_node() {
+    let temp_root = unique_temp_dir("distribute-converge");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("worker").unwrap();
+    service
+        .create_gap_summary("Reviewable", Some("GAP1"))
+        .unwrap();
+    service
+        .create_gap_summary("Still backlog", Some("GAP2"))
+        .unwrap();
+    service.transfer_gap_to_node("worker", "GAP1").unwrap();
+    service.transfer_gap_to_node("worker", "GAP2").unwrap();
+    // Review is a workflow-owned state; write it directly for the fixture.
+    let gap_path = refine_dir.join("gaps/GA/P1/gap.json");
+    let updated = fs::read_to_string(&gap_path)
+        .unwrap()
+        .replace("\"backlog\"", "\"review\"");
+    fs::write(&gap_path, updated).unwrap();
+
+    let targets = vec!["default".to_string()];
+    let result = service
+        .distribute_gaps_across_nodes(&targets, true, &std::collections::BTreeSet::new(), false)
+        .unwrap();
+
+    assert_eq!(result.strategy, "converge");
+    assert_eq!(result.moved, 1);
+    assert_eq!(result.moves[0].gap_id, "GAP1");
+    assert_eq!(result.moves[0].to_node_id, "default");
+    let backlog_gap = service.show_gap_summary("GAP2").unwrap();
+    assert_eq!(backlog_gap.gap.node_id.as_deref(), Some("worker"));
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn distribute_skips_feature_and_claimed_gaps_and_honors_dry_run() {
+    let temp_root = unique_temp_dir("distribute-skips");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("node-a").unwrap();
+    service
+        .create_gap_summary("In feature", Some("GAP1"))
+        .unwrap();
+    service.create_gap_summary("Claimed", Some("GAP2")).unwrap();
+    service.create_gap_summary("Free", Some("GAP3")).unwrap();
+    service
+        .create_feature_summary("Feature", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+
+    let mut claimed = std::collections::BTreeSet::new();
+    claimed.insert("GAP2".to_string());
+    let targets = vec!["node-a".to_string()];
+    let result = service
+        .distribute_gaps_across_nodes(&targets, false, &claimed, true)
+        .unwrap();
+
+    assert_eq!(result.strategy, "fill");
+    assert!(result.dry_run);
+    assert_eq!(result.moved, 1);
+    assert_eq!(result.moves[0].gap_id, "GAP3");
+    assert_eq!(result.skipped, 2);
+    let reasons: Vec<&str> = result
+        .skipped_details
+        .iter()
+        .map(|detail| detail.reason.as_str())
+        .collect();
+    assert!(reasons.contains(&"feature:FEA1"));
+    assert!(reasons.contains(&"claimed"));
+    let free_gap = service.show_gap_summary("GAP3").unwrap();
+    assert_eq!(
+        free_gap
+            .gap
+            .node_id
+            .unwrap_or_else(|| "default".to_string()),
+        "default"
+    );
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

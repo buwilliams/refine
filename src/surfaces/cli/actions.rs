@@ -529,6 +529,10 @@ pub enum ClusterAction {
         #[arg(long)]
         refine_port: Option<u16>,
         #[arg(long)]
+        provider: Option<String>,
+        #[arg(long, help = "JSON object of provider provisioning overrides")]
+        provisioning: Option<String>,
+        #[arg(long)]
         enabled: Option<bool>,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -554,6 +558,46 @@ pub enum ClusterAction {
     },
     Bootstrap {
         id: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    Providers {
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    Provision {
+        id: String,
+        #[arg(long)]
+        provider: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    Deprovision {
+        id: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    ProvisionStatus {
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    Distribute {
+        #[arg(long)]
+        to: Option<String>,
+        #[arg(long)]
+        converge: bool,
         #[arg(long)]
         dry_run: bool,
         #[cfg_attr(test, arg(long, hide = true))]

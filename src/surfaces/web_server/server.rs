@@ -257,6 +257,35 @@ impl InProcessWebServer {
             return self.handle_cluster();
         }
 
+        if request.method == "GET" && request.path == "/cluster/providers" {
+            return self.handle_fleet_providers();
+        }
+
+        if request.method == "POST" && request.path == "/cluster/distribute" {
+            return self.handle_cluster_distribute(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/cluster/nodes/")
+            && request.path.ends_with("/provision-status")
+        {
+            return self.handle_remote_node_provision_status(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/cluster/nodes/")
+            && request.path.ends_with("/provision")
+        {
+            return self.handle_remote_node_provision(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/cluster/nodes/")
+            && request.path.ends_with("/deprovision")
+        {
+            return self.handle_remote_node_deprovision(request);
+        }
+
         if request.method == "POST" && request.path == "/cluster/nodes" {
             return self.handle_remote_node_upsert(request, None);
         }

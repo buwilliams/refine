@@ -167,6 +167,14 @@ Distributed/node commands:
 ./r cluster list
 ./r cluster maintenance
 ./r cluster sync
+./r cluster providers
+./r cluster provision <node-id> [--provider fly] [--dry-run]
+./r cluster provision-status <node-id>
+./r cluster deprovision <node-id> [--dry-run]
+./r cluster distribute [--to <node-id>] [--converge] [--dry-run]
 ```
+
+Fleet provisioning (creating cloud worker nodes from configuration) is
+specified in `docs/spec/fleet-provisioning.md`.
 
 When a command fails, report the exact command, exit code, stdout/stderr summary, and any relevant log path. Prefer CLI evidence over guessing from browser state.

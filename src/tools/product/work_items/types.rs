@@ -101,6 +101,25 @@ pub struct BulkTransferNodeResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct DistributeMove {
+    pub gap_id: String,
+    pub from_node_id: String,
+    pub to_node_id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct DistributeResult {
+    pub strategy: String,
+    pub node_ids: Vec<String>,
+    pub eligible: usize,
+    pub moved: usize,
+    pub moves: Vec<DistributeMove>,
+    pub skipped: usize,
+    pub skipped_details: Vec<BulkSkippedDetail>,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct WorkflowEnforcementSummary {
     pub ok: bool,
     pub checked: usize,

@@ -1,14 +1,21 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::model::JsonObject;
 use crate::model::cluster::{
     Cluster, ClusterHealth, RemoteRunResult, valid_node_id, valid_ssh_host, valid_ssh_user,
 };
+use crate::model::fleet::valid_provider_name as valid_fleet_provider_name;
 use crate::model::node::{Node, NodeRegistry};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
+use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::{
+    WORKFLOW_AUTOMATION_STATE_FILE, WorkflowAutomationState, WorkflowClaimState,
+};
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 
@@ -39,7 +46,7 @@ pub struct FileClusterService {
     pub runtime_root: Option<PathBuf>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct NodeRemoteUpdate {
     pub display_name: Option<String>,
     pub ssh_host: Option<String>,
@@ -49,6 +56,8 @@ pub struct NodeRemoteUpdate {
     pub refine_checkout: Option<String>,
     pub target_app_path: Option<String>,
     pub refine_port: Option<u64>,
+    pub provider: Option<String>,
+    pub provisioning: Option<JsonObject>,
     pub enabled: Option<bool>,
 }
 
@@ -163,6 +172,18 @@ impl FileClusterService {
         if let Some(target_app_path) = update.target_app_path {
             node.target_app_path = target_app_path.trim().to_string();
         }
+        if let Some(provider) = update.provider {
+            let provider = provider.trim();
+            if !provider.is_empty() && !valid_fleet_provider_name(provider) {
+                return Err(RefineError::InvalidInput(
+                    "provider must be lowercase alphanumeric, underscore, or hyphen".to_string(),
+                ));
+            }
+            node.provider = provider.to_string();
+        }
+        if let Some(provisioning) = update.provisioning {
+            node.provisioning = provisioning;
+        }
         if let Some(enabled) = update.enabled {
             node.enabled = enabled;
         }
@@ -263,6 +284,70 @@ impl FileClusterService {
             "ok": result.ok,
             "result": result
         }))
+    }
+
+    /// Distribute is the mechanism for moving work between nodes: it
+    /// reassigns ownership of eligible Gaps across enabled, healthy nodes.
+    /// With `to`, all eligible Gaps fill that one node; with `converge`,
+    /// reviewable Gaps move home to the given review node instead.
+    pub fn distribute_response(
+        &self,
+        to: Option<&str>,
+        converge: bool,
+        dry_run: bool,
+    ) -> RefineResult<serde_json::Value> {
+        let cluster = self.registry()?;
+        if converge && to.is_none() {
+            return Err(RefineError::InvalidInput(
+                "converge requires a target review node (--to)".to_string(),
+            ));
+        }
+        let targets: Vec<String> = match to {
+            Some(node_id) => {
+                validate_remote_node_enabled(&cluster, node_id)?;
+                vec![node_id.to_string()]
+            }
+            None => cluster
+                .nodes
+                .iter()
+                .filter(|node| node.enabled && node_health_allows_distribution(node))
+                .map(|node| node.id.clone())
+                .collect(),
+        };
+        let claimed = self.active_claim_gap_ids();
+        let result = FileWorkItemService::new(&self.refine_dir)
+            .distribute_gaps_across_nodes(&targets, converge, &claimed, dry_run)?;
+        Ok(serde_json::json!({
+            "ok": true,
+            "distribute": result
+        }))
+    }
+
+    /// Gaps with an active claim are pinned to their node; distribution only
+    /// moves unclaimed work. Claims live in runtime state, so this is empty
+    /// when no runtime root is configured.
+    fn active_claim_gap_ids(&self) -> BTreeSet<String> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return BTreeSet::new();
+        };
+        let path = runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE);
+        let Ok(bytes) = fs::read(&path) else {
+            return BTreeSet::new();
+        };
+        let Ok(state) = serde_json::from_slice::<WorkflowAutomationState>(&bytes) else {
+            return BTreeSet::new();
+        };
+        state
+            .claims
+            .into_iter()
+            .filter(|claim| {
+                matches!(
+                    claim.state,
+                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
+                )
+            })
+            .map(|claim| claim.gap_id)
+            .collect()
     }
 
     pub fn sync_response(&self) -> RefineResult<serde_json::Value> {
@@ -444,6 +529,16 @@ impl FileClusterService {
             .unwrap_or_else(|| self.refine_dir.join("runtime"));
         FileSecurityService::from_project_settings(runtime_root, &self.refine_dir)
     }
+}
+
+/// Health is reported, not assumed: nodes without a recorded health check are
+/// distributable (a fleet of one never runs bootstrap), but nodes that last
+/// reported failed or deprovisioned are not.
+fn node_health_allows_distribution(node: &Node) -> bool {
+    node.health
+        .as_ref()
+        .map(|health| health.status != "failed" && health.status != "deprovisioned")
+        .unwrap_or(true)
 }
 
 pub fn validate_remote_node_enabled(cluster: &Cluster, node_id: &str) -> RefineResult<()> {
@@ -731,6 +826,8 @@ fn default_node(id: &str) -> Node {
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
         refine_port: 8082,
+        provider: String::new(),
+        provisioning: JsonObject::new(),
         enabled: true,
         health: None,
         created_at: now.clone(),
@@ -986,6 +1083,52 @@ mod tests {
         assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
         let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
         assert!(audit.contains("\"outcome\":\"denied\""));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn distribute_targets_only_enabled_healthy_nodes() {
+        let temp_root = unique_temp_dir("cluster-distribute");
+        let refine_dir = temp_root.join(".refine");
+        let service = FileClusterService::new(&refine_dir);
+        service.add_node("worker-up").unwrap();
+        service.add_node("worker-down").unwrap();
+        service.add_node("worker-broken").unwrap();
+        service.set_enabled("worker-down", false).unwrap();
+        {
+            let registry_service = FileNodeRegistryService::new(&refine_dir);
+            let mut registry = registry_service.load_registry().unwrap();
+            let broken = registry
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == "worker-broken")
+                .unwrap();
+            broken.health = Some(ClusterHealth {
+                status: "failed".to_string(),
+                checked_at: now_timestamp(),
+                details: None,
+            });
+            registry_service.save_registry(&registry).unwrap();
+        }
+        crate::tools::product::work_items::FileWorkItemService::new(&refine_dir)
+            .create_gap_summary("Distributable", Some("GAP1"))
+            .unwrap();
+
+        let response = service.distribute_response(None, false, true).unwrap();
+        let node_ids: Vec<&str> = response["distribute"]["node_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap())
+            .collect();
+        assert!(node_ids.contains(&"default"));
+        assert!(node_ids.contains(&"worker-up"));
+        assert!(!node_ids.contains(&"worker-down"));
+        assert!(!node_ids.contains(&"worker-broken"));
+
+        let converge_error = service.distribute_response(None, true, true).unwrap_err();
+        assert!(matches!(converge_error, RefineError::InvalidInput(_)));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
