@@ -177,4 +177,19 @@ Distributed/node commands:
 Fleet provisioning (creating cloud worker nodes from configuration) is
 specified in `docs/spec/fleet-provisioning.md`.
 
+## Operating Refine after install
+
+If you are an agent operating Refine for a user (not just installing it),
+three entry points make the surface self-navigating — prefer them over
+reading source code:
+
+- `./r next` — recommends the next operations from current project and fleet
+  state, each with the exact command. Call it whenever you are deciding what
+  to do next.
+- `./r commands` — machine-readable JSON catalog of every CLI command with
+  descriptions. Load once instead of exploring `--help` per subcommand.
+- `docs/runbooks/` — task-oriented guides (stand up a fleet worker,
+  distribute and converge work) with preconditions, user questions,
+  verification, and undo steps.
+
 When a command fails, report the exact command, exit code, stdout/stderr summary, and any relevant log path. Prefer CLI evidence over guessing from browser state.

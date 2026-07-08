@@ -25,9 +25,27 @@ RUN mkdir -p bin \
 
 FROM debian:bookworm-slim
 
+# Comma-separated agent provider CLIs to bake into the worker
+# (claude, codex, gemini). Empty skips the install.
+ARG AGENT_PROVIDERS=""
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git openssh-client \
     && rm -rf /var/lib/apt/lists/*
+
+RUN if [ -n "$AGENT_PROVIDERS" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends nodejs npm \
+        && rm -rf /var/lib/apt/lists/* \
+        && for provider in $(printf '%s' "$AGENT_PROVIDERS" | tr ',' ' '); do \
+            case "$provider" in \
+                claude) npm install -g @anthropic-ai/claude-code ;; \
+                codex) npm install -g @openai/codex ;; \
+                gemini) npm install -g @google/gemini-cli ;; \
+                *) echo "unknown agent provider: $provider" >&2; exit 1 ;; \
+            esac; \
+        done; \
+    fi
 
 WORKDIR /app
 COPY --from=builder /build/refine /app
@@ -37,4 +55,8 @@ RUN rm -rf /app/target && ln -s /app/bin/refine /usr/local/bin/refine
 # directory and syncs through the shared Git remote, never on this machine.
 EXPOSE 8080
 
-CMD ["refine", "system", "start", "--foreground", "--port", "8080", "--runtime-root", "run"]
+# node init turns the machine into a working fleet member from injected
+# secrets (REFINE_NODE_ID, REFINE_TARGET_REPO_URL, REFINE_AGENT_PROVIDERS,
+# provider API key). Init failure still starts the daemon so operators can
+# inspect and repair via `cluster run`.
+CMD ["/bin/sh", "-c", "refine node init; exec refine system start --foreground --port 8080 --runtime-root run"]

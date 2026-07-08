@@ -24,12 +24,14 @@ use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
 };
 use crate::tools::host::fleet::FileFleetService;
+use crate::tools::host::fleet::worker::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::imports::FileImportService;
+use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
 use crate::tools::product::project_state::{
@@ -510,6 +512,23 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let maintenance = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .maintenance_response()?;
             println!("{}", serde_json::to_string_pretty(&maintenance).unwrap());
+            Ok(())
+        }
+        Commands::Next {
+            target_root: Some(target_root),
+        } => {
+            let next = FileNextActionsService::new(refine_dir_for_target_root(&target_root))
+                .next_response()?;
+            println!("{}", serde_json::to_string_pretty(&next).unwrap());
+            Ok(())
+        }
+        Commands::Next { target_root: None } => {
+            let next = daemon_json("GET", "/guidance/next", None)?;
+            print_json(&next);
+            Ok(())
+        }
+        Commands::Commands => {
+            print_json(&super::catalog::commands_catalog());
             Ok(())
         }
         Commands::Log {
@@ -2619,6 +2638,33 @@ fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
 
 fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
     let response = match action {
+        // Init runs locally: it is how a freshly provisioned machine becomes
+        // a working node before any daemon exists to proxy through.
+        NodeAction::Init {
+            node_id,
+            repo_url,
+            target_path,
+            agent_providers,
+            runtime_root,
+            port,
+        } => {
+            let report = initialize_worker(WorkerInitOptions {
+                node_id,
+                repo_url,
+                target_path,
+                agent_providers,
+                runtime_root: absolute_cli_path(runtime_root)?,
+                port,
+            })?;
+            let ok = report.get("ok").and_then(|value| value.as_bool()) == Some(true);
+            print_json(&report);
+            if !ok {
+                return Err(RefineError::InvalidInput(
+                    "node init did not complete; see steps above".to_string(),
+                ));
+            }
+            return Ok(());
+        }
         NodeAction::List { target_root: None } => daemon_json("GET", "/nodes", None)?,
         NodeAction::Show {
             id,
@@ -3193,6 +3239,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | NodeAction::Rename { target_root, .. }
             | NodeAction::Settings { target_root, .. }
             | NodeAction::Transfer { target_root, .. } => target_root.as_ref(),
+            NodeAction::Init { .. } => None,
         },
         Commands::Cluster { action } => match action {
             ClusterAction::List { target_root }
@@ -3223,6 +3270,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         },
         Commands::Agent { .. } => None,
         Commands::Website { .. } => None,
+        Commands::Next { target_root } => target_root.as_ref(),
+        Commands::Commands => None,
         Commands::System { action } => match action {
             SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
             SystemAction::Install { .. }

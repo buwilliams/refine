@@ -3,9 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::model::JsonObject;
+use crate::model::cluster::RemoteRunResult;
 use crate::model::fleet::{
     CURRENT_FLEET_SCHEMA_VERSION, FleetCommandStep, FleetConfig, FleetOperation,
-    FleetProviderConfig, FleetStepResult, render_argv, render_template, valid_provider_name,
+    FleetProviderConfig, FleetStepResult, render_step, render_template, valid_provider_name,
 };
 use crate::model::node::{Node, NodeHealth};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
@@ -13,6 +14,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
 use crate::tools::host::deployed_update::discover_refine_checkout;
 use crate::tools::product::nodes::FileNodeRegistryService;
+
+pub mod worker;
 
 pub const FLEET_CONFIG_FILE: &str = "fleet.json";
 
@@ -190,7 +193,8 @@ impl FileFleetService {
                 operation.as_str()
             )));
         }
-        let placeholders = placeholder_values(&provider_name, provider, &registry.nodes[index])?;
+        let placeholders =
+            self.placeholder_values(&provider_name, provider, &registry.nodes[index])?;
         let credential_env = credential_environment(provider, &registry.nodes[index], dry_run)?;
         let results = self.run_steps(steps, &placeholders, &credential_env, dry_run)?;
         let ok = results
@@ -229,13 +233,35 @@ impl FileFleetService {
         let mut results = Vec::new();
         let mut failed = false;
         for step in steps {
-            let argv = render_argv(&step.argv, placeholders).map_err(RefineError::InvalidInput)?;
-            if argv.is_empty() {
+            let rendered =
+                render_step(&step.argv, placeholders).map_err(RefineError::InvalidInput)?;
+            if rendered.exec_argv.is_empty() {
                 return Err(RefineError::InvalidInput(
                     "fleet command step has an empty argv".to_string(),
                 ));
             }
-            let display = argv.join(" ");
+            let display = rendered.display();
+            if !rendered.missing_env.is_empty() {
+                let names = rendered.missing_env.join(", ");
+                if step.skip_if_unset {
+                    results.push(FleetStepResult {
+                        command: display,
+                        exit_code: None,
+                        stdout: String::new(),
+                        stderr: String::new(),
+                        ok: true,
+                        allow_failure: step.allow_failure,
+                        executed: false,
+                        skipped: Some(format!("environment not set: {names}")),
+                    });
+                    continue;
+                }
+                if !dry_run {
+                    return Err(RefineError::InvalidInput(format!(
+                        "step `{display}` requires environment variables that are not set: {names}"
+                    )));
+                }
+            }
             if dry_run || failed {
                 results.push(FleetStepResult {
                     command: display,
@@ -245,6 +271,7 @@ impl FileFleetService {
                     ok: dry_run,
                     allow_failure: step.allow_failure,
                     executed: false,
+                    skipped: None,
                 });
                 continue;
             }
@@ -255,14 +282,14 @@ impl FileFleetService {
             )
             .run_to_completion(ManagedProcessSpec {
                 owner: ProcessOwner::Maintenance,
-                command: argv[0].clone(),
-                args: argv[1..].to_vec(),
+                command: rendered.exec_argv[0].clone(),
+                args: rendered.exec_argv[1..].to_vec(),
                 cwd: None,
                 env: credential_env.to_vec(),
                 stdin: None,
                 limits: None,
                 authorization_command: Some(display.clone()),
-                sensitive: false,
+                sensitive: step.sensitive,
                 metadata: Default::default(),
             })?;
             let ok = output.success();
@@ -274,12 +301,78 @@ impl FileFleetService {
                 ok,
                 allow_failure: step.allow_failure,
                 executed: true,
+                skipped: None,
             });
             if !ok && !step.allow_failure {
                 failed = true;
             }
         }
         Ok(results)
+    }
+
+    /// Runs a command on a provider-managed node through the provider's exec
+    /// template (e.g. `fly ssh console -C <command>`). This is how
+    /// `cluster run` reaches nodes that have no SSH configuration.
+    pub fn exec_remote(&self, node_id: &str, command: &str) -> RefineResult<RemoteRunResult> {
+        let command = command.trim();
+        if command.is_empty() {
+            return Err(RefineError::InvalidInput("command is required".to_string()));
+        }
+        let nodes = FileNodeRegistryService::new(&self.refine_dir);
+        let registry = nodes.load_registry()?;
+        let Some(node) = registry
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id && !node.archived)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "node {node_id} was not found"
+            )));
+        };
+        let config = self.load_config()?;
+        let provider_name = resolve_provider_name(&config, node, None)?;
+        let Some(provider) = config.providers.get(&provider_name) else {
+            return Err(RefineError::NotFound(format!(
+                "fleet provider {provider_name} is not defined"
+            )));
+        };
+        if provider.exec.is_empty() {
+            return Err(RefineError::InvalidInput(format!(
+                "fleet provider {provider_name} does not define an exec command"
+            )));
+        }
+        let mut placeholders = self.placeholder_values(&provider_name, provider, node)?;
+        placeholders.insert("command".to_string(), command.to_string());
+        let security = self.security()?;
+        security.authorize_host_command("cluster", command)?;
+        let rendered =
+            render_step(&provider.exec, &placeholders).map_err(RefineError::InvalidInput)?;
+        let credential_env = credential_environment(provider, node, false)?;
+        let output = FileProcessSupervisor::with_allowed_commands(
+            security.runtime_root.clone(),
+            security.allowed_commands.iter().cloned(),
+        )
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Maintenance,
+            command: rendered.exec_argv[0].clone(),
+            args: rendered.exec_argv[1..].to_vec(),
+            cwd: None,
+            env: credential_env,
+            stdin: None,
+            limits: None,
+            authorization_command: Some(command.to_string()),
+            sensitive: false,
+            metadata: Default::default(),
+        })?;
+        Ok(RemoteRunResult {
+            node_id: node_id.to_string(),
+            command: rendered.display(),
+            remote_command: command.to_string(),
+            exit_code: output.process.exit_code,
+            stdout: output.stdout.trim().to_string(),
+            stderr: output.stderr.trim().to_string(),
+            ok: output.success(),
+        })
     }
 
     fn security(&self) -> RefineResult<FileSecurityService> {
@@ -327,31 +420,59 @@ fn operation_steps(
 /// Builds the placeholder map: computed values (node identity, checkout
 /// assets), then provider defaults, then the node's provisioning overrides.
 /// Default and override values may themselves reference earlier placeholders.
-fn placeholder_values(
-    provider_name: &str,
-    provider: &FleetProviderConfig,
-    node: &Node,
-) -> RefineResult<BTreeMap<String, String>> {
-    let mut values = BTreeMap::new();
-    values.insert("node_id".to_string(), node.id.clone());
-    values.insert("refine_port".to_string(), node.refine_port.to_string());
-    values.insert("binary".to_string(), provider.binary.clone());
-    if let Ok(checkout) = discover_refine_checkout() {
-        values.insert(
-            "fleet_dir".to_string(),
-            checkout
-                .join("scripts/fleet")
-                .join(provider_name)
-                .display()
-                .to_string(),
-        );
+impl FileFleetService {
+    fn placeholder_values(
+        &self,
+        provider_name: &str,
+        provider: &FleetProviderConfig,
+        node: &Node,
+    ) -> RefineResult<BTreeMap<String, String>> {
+        let mut values = BTreeMap::new();
+        values.insert("node_id".to_string(), node.id.clone());
+        values.insert("refine_port".to_string(), node.refine_port.to_string());
+        values.insert("binary".to_string(), provider.binary.clone());
+        if let Ok(checkout) = discover_refine_checkout() {
+            values.insert(
+                "fleet_dir".to_string(),
+                checkout
+                    .join("scripts/fleet")
+                    .join(provider_name)
+                    .display()
+                    .to_string(),
+            );
+        }
+        if let Some(url) = self.target_repo_url() {
+            values.insert("target_repo_url".to_string(), url);
+        }
+        merge_placeholder_object(&mut values, &provider.defaults)?;
+        merge_placeholder_object(&mut values, &node.provisioning)?;
+        if !values.contains_key("app_name") {
+            values.insert("app_name".to_string(), format!("refine-{}", node.id));
+        }
+        if !values.contains_key("target_repo_url") {
+            values.insert("target_repo_url".to_string(), String::new());
+        }
+        Ok(values)
     }
-    merge_placeholder_object(&mut values, &provider.defaults)?;
-    merge_placeholder_object(&mut values, &node.provisioning)?;
-    if !values.contains_key("app_name") {
-        values.insert("app_name".to_string(), format!("refine-{}", node.id));
+
+    /// The attached target app is the parent of `.refine`; its `origin`
+    /// remote is what workers clone so durable state syncs through the same
+    /// shared remote. Overridable per node via provisioning
+    /// `target_repo_url`.
+    fn target_repo_url(&self) -> Option<String> {
+        let target_root = self.refine_dir.parent()?;
+        let output = std::process::Command::new("git")
+            .args(["-C", &target_root.display().to_string()])
+            .args(["remote", "get-url", "origin"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        (!url.is_empty()).then_some(url)
     }
-    Ok(values)
 }
 
 fn merge_placeholder_object(
@@ -456,6 +577,7 @@ fn builtin_fly_provider() -> FleetProviderConfig {
         serde_json::json!("https://github.com/buwilliams/refine.git"),
     );
     defaults.insert("refine_ref".to_string(), serde_json::json!("main"));
+    defaults.insert("agent_providers".to_string(), serde_json::json!("claude"));
     FleetProviderConfig {
         display_name: "Fly.io".to_string(),
         binary: "fly".to_string(),
@@ -474,6 +596,28 @@ fn builtin_fly_provider() -> FleetProviderConfig {
                     "--yes",
                 ]),
                 allow_failure: true,
+                ..FleetCommandStep::default()
+            },
+            // Worker identity + agent credentials as Fly secrets, read at
+            // boot by `refine node init`. The API key reference stays literal
+            // in recorded commands; the step is skipped when no key is
+            // exported.
+            FleetCommandStep {
+                argv: string_vec(&[
+                    "{binary}",
+                    "secrets",
+                    "set",
+                    "--app",
+                    "{app_name}",
+                    "--stage",
+                    "REFINE_NODE_ID={node_id}",
+                    "REFINE_TARGET_REPO_URL={target_repo_url}",
+                    "REFINE_AGENT_PROVIDERS={agent_providers}",
+                    "ANTHROPIC_API_KEY={env:ANTHROPIC_API_KEY}",
+                ]),
+                sensitive: true,
+                skip_if_unset: true,
+                ..FleetCommandStep::default()
             },
             FleetCommandStep {
                 argv: string_vec(&[
@@ -489,26 +633,38 @@ fn builtin_fly_provider() -> FleetProviderConfig {
                     "REFINE_REF={refine_ref}",
                     "--build-arg",
                     "REFINE_REPO_URL={repo_url}",
+                    "--build-arg",
+                    "AGENT_PROVIDERS={agent_providers}",
                     "--regions",
                     "{region}",
                     "--vm-size",
                     "{vm_size}",
                     "--vm-memory",
                     "{vm_memory}",
+                    "--ha=false",
                     "--remote-only",
                     "--yes",
                 ]),
-                allow_failure: false,
+                ..FleetCommandStep::default()
             },
         ],
         deprovision: vec![FleetCommandStep {
             argv: string_vec(&["{binary}", "apps", "destroy", "{app_name}", "--yes"]),
-            allow_failure: false,
+            ..FleetCommandStep::default()
         }],
         status: vec![FleetCommandStep {
             argv: string_vec(&["{binary}", "status", "--app", "{app_name}", "--json"]),
-            allow_failure: false,
+            ..FleetCommandStep::default()
         }],
+        exec: string_vec(&[
+            "{binary}",
+            "ssh",
+            "console",
+            "--app",
+            "{app_name}",
+            "--command",
+            "{command}",
+        ]),
     }
 }
 
@@ -569,14 +725,21 @@ mod tests {
         assert_eq!(response["dry_run"], true);
         assert_eq!(response["provider"], "fly");
         let steps = response["steps"].as_array().unwrap();
-        assert_eq!(steps.len(), 2);
+        assert_eq!(steps.len(), 3);
         let create = steps[0]["command"].as_str().unwrap();
         assert!(create.starts_with("fly apps create refine-worker-1"));
         assert_eq!(steps[0]["executed"], false);
-        let deploy = steps[1]["command"].as_str().unwrap();
+        // the secrets step never renders the API key into the command
+        let secrets = steps[1]["command"].as_str().unwrap();
+        assert!(secrets.contains("fly secrets set"));
+        assert!(secrets.contains("REFINE_NODE_ID=worker-1"));
+        assert!(secrets.contains("ANTHROPIC_API_KEY={env:ANTHROPIC_API_KEY}"));
+        let deploy = steps[2]["command"].as_str().unwrap();
         assert!(deploy.contains("fly deploy --app refine-worker-1"));
         assert!(deploy.contains("--build-arg REFINE_REF=main"));
+        assert!(deploy.contains("--build-arg AGENT_PROVIDERS=claude"));
         assert!(deploy.contains("--regions iad"));
+        assert!(deploy.contains("--ha=false"));
         // dry run must not stamp provider/health into the registry
         let node = FileClusterService::new(&fleet.refine_dir)
             .show("worker-1")
@@ -607,7 +770,7 @@ mod tests {
         nodes.save_registry(&registry).unwrap();
 
         let response = fleet.provision_response("worker-2", None, true).unwrap();
-        let deploy = response["steps"][1]["command"].as_str().unwrap();
+        let deploy = response["steps"][2]["command"].as_str().unwrap();
         assert!(deploy.contains("--app custom-worker-2"));
         assert!(deploy.contains("--regions syd"));
         assert!(deploy.contains("REFINE_REF=3.1.6"));
@@ -719,6 +882,77 @@ mod tests {
             .provision_response("worker-6", None, false)
             .unwrap_err();
         assert!(error.to_string().contains("requires credentials"));
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn steps_with_unset_env_are_skipped_not_failed_when_marked() {
+        let (temp_root, fleet) = service_with_node("fleet-skip", "worker-8");
+        fs::write(
+            fleet.config_path(),
+            serde_json::json!({
+                "default_provider": "skippy",
+                "providers": {
+                    "skippy": {
+                        "binary": "echo",
+                        "provision": [
+                            {"argv": ["echo", "secret={env:REFINE_TEST_UNSET_SECRET}"], "sensitive": true, "skip_if_unset": true},
+                            ["echo", "provisioned-{node_id}"]
+                        ]
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let response = fleet.provision_response("worker-8", None, false).unwrap();
+        assert_eq!(response["ok"], true, "response: {response}");
+        let steps = response["steps"].as_array().unwrap();
+        assert_eq!(steps[0]["executed"], false);
+        assert!(
+            steps[0]["skipped"]
+                .as_str()
+                .unwrap()
+                .contains("REFINE_TEST_UNSET_SECRET")
+        );
+        assert_eq!(steps[1]["executed"], true);
+        assert!(
+            steps[1]["stdout"]
+                .as_str()
+                .unwrap()
+                .contains("provisioned-worker-8")
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn exec_remote_uses_provider_exec_template() {
+        let (temp_root, fleet) = service_with_node("fleet-exec", "worker-9");
+        fs::write(
+            fleet.config_path(),
+            serde_json::json!({
+                "default_provider": "echoer",
+                "providers": {
+                    "echoer": {
+                        "binary": "echo",
+                        "provision": [["echo", "up"]],
+                        "exec": ["echo", "exec-on-{app_name}:", "{command}"]
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let result = fleet
+            .exec_remote("worker-9", "refine system status")
+            .unwrap();
+        assert!(result.ok);
+        assert_eq!(result.remote_command, "refine system status");
+        assert!(
+            result
+                .stdout
+                .contains("exec-on-refine-worker-9: refine system status")
+        );
         fs::remove_dir_all(temp_root).unwrap();
     }
 

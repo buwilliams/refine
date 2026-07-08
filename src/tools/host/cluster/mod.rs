@@ -11,6 +11,7 @@ use crate::model::node::{Node, NodeRegistry};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
+use crate::tools::host::fleet::FileFleetService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::{
@@ -461,6 +462,17 @@ impl ClusterService for FileClusterService {
                 "node {node_id} was not found"
             )));
         };
+        // Provider-managed nodes exec through the provider (e.g.
+        // `fly ssh console`) instead of raw SSH.
+        if !node.provider.trim().is_empty() {
+            let fleet = match &self.runtime_root {
+                Some(runtime_root) => {
+                    FileFleetService::with_runtime_root(&self.refine_dir, runtime_root)
+                }
+                None => FileFleetService::new(&self.refine_dir),
+            };
+            return fleet.exec_remote(node_id, command);
+        }
         if !valid_ssh_host(&node.ssh_host) {
             return Err(RefineError::InvalidInput(
                 "ssh_host must be configured before running remote commands".to_string(),

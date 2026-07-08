@@ -10,6 +10,7 @@ use serde_json::json;
 fn main() {
     let result = match std::env::args().nth(1).as_deref() {
         Some("api-contract") => print_api_contract(),
+        Some("cli-reference") => write_cli_reference(),
         Some("check-static-assets") => check_static_assets(),
         Some("runtime-layout") => print_runtime_layout(),
         Some("test-unit") => test_unit(),
@@ -238,6 +239,16 @@ fn print_api_contract() -> Result<(), String> {
         }))
         .map_err(|error| format!("failed to encode API contract: {error}"))?
     );
+    Ok(())
+}
+
+fn write_cli_reference() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    let path = repo_root.join("docs/spec/cli-reference.md");
+    let markdown = refine::surfaces::cli::command_reference_markdown();
+    fs::write(&path, &markdown)
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
+    println!("wrote {} ({} bytes)", path.display(), markdown.len());
     Ok(())
 }
 

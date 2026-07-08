@@ -511,6 +511,10 @@ impl InProcessWebServer {
             return self.handle_governance_generate_rules(request);
         }
 
+        if request.method == "GET" && request.path == "/guidance/next" {
+            return self.handle_guidance_next();
+        }
+
         if request.method == "GET" && request.path == "/guidance" {
             return self.handle_guidance_list();
         }

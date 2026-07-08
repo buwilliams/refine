@@ -21,6 +21,7 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::fleet::FileFleetService;
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
+use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::tools::product::project_state::{DashboardProjectionQuery, ProjectionQuery};
@@ -923,6 +924,19 @@ impl InProcessWebServer {
             FileFleetService::with_runtime_root(refine_dir, runtime_root)
         } else {
             FileFleetService::new(refine_dir)
+        }
+    }
+
+    pub(super) fn handle_guidance_next(&self) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "suggest next actions");
+        let service = if let Some(runtime_root) = &self.runtime_root {
+            FileNextActionsService::with_runtime_root(refine_dir, runtime_root)
+        } else {
+            FileNextActionsService::new(refine_dir)
+        };
+        match service.next_response() {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
         }
     }
 
