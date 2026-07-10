@@ -17,8 +17,10 @@ source code:
 
 Runbooks:
 
-- [Stand up a fleet worker](fleet-standup.md) — create, provision, and verify
-  a cloud worker node.
+- [Install Refine](install.md) — install or update Refine, configure an agent
+  provider, start the daemon, and verify the result.
+- [Provision a fleet worker](provision.md) — create and verify a worker using
+  provider tools while Refine owns node identity and work.
 - [Distribute and converge work](distribute-and-converge.md) — move Gaps to
   workers and bring reviewable work home.
 

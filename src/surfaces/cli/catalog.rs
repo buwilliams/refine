@@ -145,7 +145,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_lists_fleet_commands_with_descriptions() {
+    fn catalog_lists_cluster_commands_with_descriptions() {
         let catalog = commands_catalog();
         let commands = catalog["commands"].as_array().unwrap();
         let cluster = commands
@@ -158,7 +158,7 @@ mod tests {
             .iter()
             .map(|subcommand| subcommand["name"].as_str().unwrap())
             .collect();
-        for expected in ["provision", "deprovision", "distribute", "providers"] {
+        for expected in ["distribute", "sync", "run"] {
             assert!(names.contains(&expected), "missing {expected}: {names:?}");
         }
         assert!(commands.iter().any(|command| command["name"] == "next"));

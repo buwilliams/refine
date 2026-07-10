@@ -105,8 +105,8 @@ product explains itself, never because reading was banned.
   (Codex, Gemini) are separate columns of the same scorecard, not the same
   test.
 - The cloud scenario with a shim validates *discoverability*, not cloud
-  behavior; the real-provider path is validated separately (see
-  `docs/spec/fleet-provisioning.md`).
+  behavior; the real-provider procedure lives in
+  `docs/runbooks/provision.md`.
 - An ablated no-source variant may be run once as a diagnostic — to learn
   which scenarios are passable *only* via source — but the product is never
   graded on it.
@@ -115,8 +115,8 @@ product explains itself, never because reading was banned.
 
 Each run produces a findings report: per-scenario outcome, cost metrics,
 route (docs vs source), and a ranked stall list where every stall maps to a
-concrete Gap ("agent looked for `refine deploy`; never found
-`cluster provision`" → naming/help-text Gap). Fixes are then implemented and
+concrete Gap ("agent looked for `refine deploy`; never found the provisioning
+runbook" → naming/help-text Gap). Fixes are then implemented and
 the same scenarios re-run; the loop closes when the realistic tier passes
 cheaply and the design tier passes at all.
 

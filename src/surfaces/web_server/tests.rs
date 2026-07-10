@@ -1049,7 +1049,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
-        path: "/docs/agent-install.md".to_string(),
+        path: "/docs/runbooks/install.md".to_string(),
         headers: BTreeMap::new(),
         body: None,
     });
@@ -1058,19 +1058,32 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert!(
         String::from_utf8(raw_doc.body)
             .unwrap()
-            .contains("# Agent Install Runbook")
+            .contains("# Install Refine")
+    );
+
+    let compatibility_doc = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/docs/agent-install.md".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(compatibility_doc.status, 200);
+    assert!(
+        String::from_utf8(compatibility_doc.body)
+            .unwrap()
+            .contains("docs/runbooks/install.md")
     );
 
     let rendered_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
-        path: "/read/docs/agent-install.md".to_string(),
+        path: "/read/docs/runbooks/install.md".to_string(),
         headers: BTreeMap::new(),
         body: None,
     });
     assert_eq!(rendered_doc.status, 200);
     assert_eq!(rendered_doc.content_type, "text/html; charset=utf-8");
     let rendered_doc = String::from_utf8(rendered_doc.body).unwrap();
-    assert!(rendered_doc.contains("<h1>Agent Install Runbook</h1>"));
+    assert!(rendered_doc.contains("<h1>Install Refine</h1>"));
     assert!(rendered_doc.contains("Raw Markdown"));
     assert!(
         rendered_doc.contains(r#"<div class="menu-docs" aria-label="Documentation sections">"#)
@@ -2831,7 +2844,10 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     assert_eq!(no_repo.status, 200);
     assert_eq!(no_repo.body["git_sync"]["attempted"], false);
     assert_eq!(no_repo.body["git_sync"]["pulled"], false);
-    assert!(no_repo.body["git_sync"]["detail"].is_null());
+    assert_eq!(
+        no_repo.body["git_sync"]["detail"],
+        "Target app is not a Git repository."
+    );
 
     git(&app_root, &["init", "-b", "main"]).unwrap();
     git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -2848,14 +2864,14 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     assert_eq!(missing_upstream.body["git_sync"]["attempted"], false);
     assert_eq!(
         missing_upstream.body["git_sync"]["detail"],
-        "No upstream branch configured."
+        "No upstream branch is configured."
     );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn web_server_project_sync_blocks_refine_runtime_noise() {
+fn web_server_project_sync_ignores_refine_runtime_noise() {
     let temp_root = unique_temp_dir("http-project-sync-ff");
     let remote = temp_root.join("remote.git");
     let seed = temp_root.join("seed");
@@ -2908,9 +2924,9 @@ fn web_server_project_sync_blocks_refine_runtime_noise() {
         body: Some(json!({})),
     });
     assert_eq!(sync.status, 200);
-    assert_eq!(sync.body["git_sync"]["attempted"], false);
-    assert_eq!(sync.body["git_sync"]["pulled"], false);
-    assert!(!app_root.join("remote.txt").exists());
+    assert_eq!(sync.body["git_sync"]["attempted"], true);
+    assert_eq!(sync.body["git_sync"]["pulled"], true);
+    assert!(app_root.join("remote.txt").exists());
     assert!(
         app_root
             .join(".refine/runtime/processes/local.json")
@@ -2940,9 +2956,11 @@ fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
     });
     assert_eq!(sync.status, 200);
     assert_eq!(sync.body["git_sync"]["attempted"], false);
-    assert_eq!(
-        sync.body["git_sync"]["detail"],
-        "Local worktree changes present; skipped upstream pull."
+    assert!(
+        sync.body["git_sync"]["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("local.txt")
     );
     assert!(!app_root.join("remote.txt").exists());
     assert_eq!(
@@ -2954,7 +2972,7 @@ fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
 }
 
 #[test]
-fn web_server_project_sync_reports_pull_failure_for_diverged_branch() {
+fn web_server_project_sync_rebases_and_pushes_diverged_branch() {
     let temp_root = unique_temp_dir("http-project-sync-diverged");
     let (seed, app_root) = seeded_remote_clone(&temp_root);
     git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -2975,14 +2993,11 @@ fn web_server_project_sync_reports_pull_failure_for_diverged_branch() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_ne!(sync.status, 200);
-    assert!(
-        sync.body["error"]["message"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("failed to sync project state from upstream")
-    );
-    assert!(!app_root.join("remote.txt").exists());
+    assert_eq!(sync.status, 200);
+    assert_eq!(sync.body["git_sync"]["attempted"], true);
+    assert_eq!(sync.body["git_sync"]["pulled"], true);
+    assert_eq!(sync.body["git_sync"]["pushed"], true);
+    assert!(app_root.join("remote.txt").exists());
     assert!(app_root.join("local.txt").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -5861,7 +5876,10 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    let temp_root = std::env::temp_dir()
+        .canonicalize()
+        .unwrap_or_else(|_| std::env::temp_dir());
+    temp_root.join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
 
 fn percent_encode_for_test(value: &str) -> String {

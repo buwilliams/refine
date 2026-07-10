@@ -69,7 +69,7 @@ Migrate the current project's on-disk Refine state to the latest schema and repo
 
 ### `refine project sync`
 
-Rebuild the project projection (Gap/Feature caches) from on-disk state. Run after external edits to .refine data; optionally persists the snapshot to a cache directory
+Commit durable Refine state, pull/rebase and push the current branch, then rebuild projections. Uncommitted target-app files are left untouched; optionally persists the projection snapshot
 
 - `--cache-dir` — Cache directory to persist the rebuilt projection snapshot into
 
@@ -383,7 +383,7 @@ Transfer ownership of a Gap or Feature (by item id) to the given node
 
 ## `refine cluster`
 
-Operate the cluster (the fleet of nodes): register, provision, and bootstrap nodes, distribute unclaimed Gap ownership, and run remote commands
+Operate the cluster (the fleet of nodes): register and bootstrap nodes, distribute unclaimed Gap ownership, and run remote commands
 
 ### `refine cluster list`
 
@@ -397,13 +397,13 @@ Show one fleet node's full cluster record
 
 ### `refine cluster add-node`
 
-Register a new node in the cluster so it can be configured, provisioned, and receive distributed work
+Register a new node in the cluster so it can be configured and receive distributed work
 
 - `<ID>` (required) — Node id to add
 
 ### `refine cluster edit-node`
 
-Edit a cluster node's connection and provisioning settings: SSH details, paths, ports, and provider
+Edit a cluster node's connection settings: SSH details, paths, and ports
 
 - `<ID>` (required) — Node id to edit
 - `--display-name` — New display name
@@ -414,8 +414,6 @@ Edit a cluster node's connection and provisioning settings: SSH details, paths, 
 - `--refine-checkout` — Path to the Refine checkout on the node
 - `--target-app-path` — Path to the target app checkout on the node
 - `--refine-port` — Port the node's Refine daemon listens on
-- `--provider` — Provisioning provider for this node (e.g. "fly")
-- `--provisioning` — JSON object of provider provisioning overrides
 - `--enabled` — Enable or disable the node for work distribution
 
 ### `refine cluster enable-node`
@@ -443,31 +441,6 @@ SSH-bootstrap a manually configured node by git-pulling its Refine checkout. Req
 - `<ID>` (required) — Node id to bootstrap
 - `--dry-run` — Print the commands that would run without executing them
 
-### `refine cluster providers`
-
-List configured fleet provisioning providers (built-in fly plus .refine/fleet.json entries)
-
-### `refine cluster provision`
-
-Create and deploy a cloud worker machine for a registered node via its provider (e.g. Fly.io). Use --dry-run to preview the provider commands without running them
-
-- `<ID>` (required) — Node id to provision
-- `--provider` — Provider to provision with (defaults to the node's configured provider)
-- `--dry-run` — Print the provider commands that would run without executing them
-
-### `refine cluster deprovision`
-
-Destroy the node's cloud app via its provider and disable the node
-
-- `<ID>` (required) — Node id to deprovision
-- `--dry-run` — Print the provider commands that would run without executing them
-
-### `refine cluster provision-status`
-
-Run the provider's status command for a node and refresh its recorded health
-
-- `<ID>` (required) — Node id to check
-
 ### `refine cluster distribute`
 
 Reassign eligible unclaimed Gap ownership across the fleet. Spreads across enabled healthy nodes by default, fills one node with --to, or converges reviewable Gaps home with --converge --to <node>
@@ -478,11 +451,11 @@ Reassign eligible unclaimed Gap ownership across the fleet. Spreads across enabl
 
 ### `refine cluster sync`
 
-Reload the cluster registry (merging any legacy records) and report the enabled node count
+Commit durable Refine state, pull/rebase upstream changes, and push the current branch
 
 ### `refine cluster run`
 
-Run an authorized command on a node over SSH or the provider exec channel and print the result
+Run an authorized command on a node over SSH and print the result
 
 - `<ID>` (required) — Node id to run the command on
 - `<COMMAND>` (required) — Command line to execute on the node

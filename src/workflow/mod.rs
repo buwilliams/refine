@@ -19,6 +19,7 @@ use crate::model::workflow::GapStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
@@ -481,6 +482,13 @@ impl WorkflowEngine {
     }
 
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
+        if let Some(target_root) = &self.target_root {
+            return with_repository_git_lock(target_root, || self.evaluate_workflow_locked());
+        }
+        self.evaluate_workflow_locked()
+    }
+
+    fn evaluate_workflow_locked(&self) -> RefineResult<WorkflowPassResult> {
         let promoted = self.promote()?;
         let steps = self.execute_claimed_work()?;
         let state = self.load_state()?;

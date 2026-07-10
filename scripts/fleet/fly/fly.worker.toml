@@ -1,6 +1,6 @@
 # Fleet worker config for Fly.io. The app name comes from
-# `refine cluster provision` (--app), and VM size/region come from provider
-# defaults or the node's provisioning settings.
+# `docs/runbooks/provision.md` (--app), and VM size/region are chosen by the
+# operating agent with the user.
 #
 # Workers are private by default: fleet state converges through the shared
 # Git remote, so no inbound HTTP is required. To reach a worker's web UI, use

@@ -41,7 +41,6 @@ fn two_daemons_sync_refine_state_through_shared_git_remote() {
     let first_label = format!("multi-instance first {}", now_millis());
     let first_gap = instance_a.create_gap(&first_label);
     assert!(!first_gap.is_empty());
-    commit_and_push_refine_state(&app_a, "instance A adds first gap");
 
     let sync_b = instance_b.api_json("POST", "/api/project/sync", json!({}));
     assert_eq!(sync_b["ok"], true, "{sync_b:#}");
@@ -52,7 +51,6 @@ fn two_daemons_sync_refine_state_through_shared_git_remote() {
     let second_label = format!("multi-instance second {}", now_millis());
     let second_gap = instance_b.create_gap(&second_label);
     assert!(!second_gap.is_empty());
-    commit_and_push_refine_state(&app_b, "instance B adds second gap");
 
     let sync_a = instance_a.api_json("POST", "/api/project/sync", json!({}));
     assert_eq!(sync_a["ok"], true, "{sync_a:#}");
@@ -219,12 +217,6 @@ fn seed_remote(remote: &Path, seed: &Path) {
     git(seed, &["branch", "-M", "main"]);
     git(seed, &["remote", "add", "origin", remote.to_str().unwrap()]);
     git(seed, &["push", "-u", "origin", "main"]);
-}
-
-fn commit_and_push_refine_state(app_root: &Path, message: &str) {
-    git(app_root, &["add", ".refine"]);
-    git(app_root, &["commit", "-q", "-m", message]);
-    git(app_root, &["push", "origin", "main"]);
 }
 
 fn configure_repo(root: &Path) {

@@ -2,16 +2,13 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::model::JsonObject;
 use crate::model::cluster::{
     Cluster, ClusterHealth, RemoteRunResult, valid_node_id, valid_ssh_host, valid_ssh_user,
 };
-use crate::model::fleet::valid_provider_name as valid_fleet_provider_name;
 use crate::model::node::{Node, NodeRegistry};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
-use crate::tools::host::fleet::FileFleetService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::{
@@ -57,8 +54,6 @@ pub struct NodeRemoteUpdate {
     pub refine_checkout: Option<String>,
     pub target_app_path: Option<String>,
     pub refine_port: Option<u64>,
-    pub provider: Option<String>,
-    pub provisioning: Option<JsonObject>,
     pub enabled: Option<bool>,
 }
 
@@ -172,18 +167,6 @@ impl FileClusterService {
         }
         if let Some(target_app_path) = update.target_app_path {
             node.target_app_path = target_app_path.trim().to_string();
-        }
-        if let Some(provider) = update.provider {
-            let provider = provider.trim();
-            if !provider.is_empty() && !valid_fleet_provider_name(provider) {
-                return Err(RefineError::InvalidInput(
-                    "provider must be lowercase alphanumeric, underscore, or hyphen".to_string(),
-                ));
-            }
-            node.provider = provider.to_string();
-        }
-        if let Some(provisioning) = update.provisioning {
-            node.provisioning = provisioning;
         }
         if let Some(enabled) = update.enabled {
             node.enabled = enabled;
@@ -351,15 +334,6 @@ impl FileClusterService {
             .collect()
     }
 
-    pub fn sync_response(&self) -> RefineResult<serde_json::Value> {
-        let cluster = self.registry()?;
-        Ok(serde_json::json!({
-            "ok": true,
-            "synced": cluster.nodes.iter().filter(|node| node.enabled).count(),
-            "cluster": cluster
-        }))
-    }
-
     pub fn maintenance_response(&self) -> RefineResult<serde_json::Value> {
         let cluster = self.maintenance(true, None)?;
         Ok(serde_json::json!({
@@ -462,17 +436,6 @@ impl ClusterService for FileClusterService {
                 "node {node_id} was not found"
             )));
         };
-        // Provider-managed nodes exec through the provider (e.g.
-        // `fly ssh console`) instead of raw SSH.
-        if !node.provider.trim().is_empty() {
-            let fleet = match &self.runtime_root {
-                Some(runtime_root) => {
-                    FileFleetService::with_runtime_root(&self.refine_dir, runtime_root)
-                }
-                None => FileFleetService::new(&self.refine_dir),
-            };
-            return fleet.exec_remote(node_id, command);
-        }
         if !valid_ssh_host(&node.ssh_host) {
             return Err(RefineError::InvalidInput(
                 "ssh_host must be configured before running remote commands".to_string(),
@@ -838,8 +801,6 @@ fn default_node(id: &str) -> Node {
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
         refine_port: 8082,
-        provider: String::new(),
-        provisioning: JsonObject::new(),
         enabled: true,
         health: None,
         created_at: now.clone(),

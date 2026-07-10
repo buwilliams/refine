@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
@@ -124,6 +125,7 @@ static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry
     OnceLock::new();
 
 const AGENT_WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
+const DEFAULT_GIT_SYNC_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
@@ -132,6 +134,11 @@ pub struct LocalHttpDaemon {
 }
 
 pub(super) struct AgentWorkflowLoop {
+    stop: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
+}
+
+pub(super) struct GitSyncLoop {
     stop: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
@@ -147,6 +154,13 @@ impl AgentWorkflowLoop {
 }
 
 impl Drop for AgentWorkflowLoop {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        let _ = self.handle.take();
+    }
+}
+
+impl Drop for GitSyncLoop {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         let _ = self.handle.take();
@@ -232,6 +246,7 @@ impl LocalHttpDaemon {
         } else {
             Some(self.start_agent_automation_loop(AGENT_WORKFLOW_INTERVAL))
         };
+        let _git_sync_loop = self.start_git_sync_loop();
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
     }
 
@@ -252,6 +267,27 @@ impl LocalHttpDaemon {
             }
         });
         AgentWorkflowLoop {
+            stop,
+            handle: Some(handle),
+        }
+    }
+
+    fn start_git_sync_loop(&self) -> GitSyncLoop {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let server = self.server.clone();
+        let handle = thread::spawn(move || {
+            while !thread_stop.load(Ordering::Relaxed) {
+                let (enabled, interval) =
+                    git_sync_configuration(&server).unwrap_or((true, DEFAULT_GIT_SYNC_INTERVAL));
+                if enabled {
+                    let _ = server.try_sync_current_project_git();
+                    let _ = server.refresh_projection_cache_after_mutation();
+                }
+                sleep_until_stopped(&thread_stop, interval);
+            }
+        });
+        GitSyncLoop {
             stop,
             handle: Some(handle),
         }
@@ -845,10 +881,64 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     };
     let automation = WorkflowEngine::with_target_root(runtime_root, target_root);
     let result = automation.evaluate_workflow();
+    let _ = server.sync_current_project_git();
     let refresh_result = server.refresh_projection_cache_after_mutation();
     result?;
     refresh_result?;
     Ok(())
+}
+
+fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<(bool, Duration)> {
+    let Some(runtime_root) = &server.runtime_root else {
+        return Ok((false, DEFAULT_GIT_SYNC_INTERVAL));
+    };
+    let Some(refine_dir) = server.current_refine_dir()? else {
+        return Ok((false, DEFAULT_GIT_SYNC_INTERVAL));
+    };
+    let settings = FileSettingsService::with_active_root(refine_dir, runtime_root).load()?;
+    Ok(git_sync_schedule(
+        settings.get("project_update_pulse_interval_seconds"),
+    ))
+}
+
+fn git_sync_schedule(value: Option<&Value>) -> (bool, Duration) {
+    let seconds = value
+        .and_then(Value::as_str)
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(DEFAULT_GIT_SYNC_INTERVAL.as_secs() as i64);
+    if seconds <= 0 {
+        return (false, DEFAULT_GIT_SYNC_INTERVAL);
+    }
+    (true, Duration::from_secs(seconds as u64))
+}
+
+#[cfg(test)]
+mod git_sync_schedule_tests {
+    use super::*;
+
+    #[test]
+    fn project_update_pulse_controls_git_sync_cadence() {
+        assert_eq!(git_sync_schedule(None), (true, Duration::from_secs(300)));
+        assert_eq!(
+            git_sync_schedule(Some(&Value::String("30".to_string()))),
+            (true, Duration::from_secs(30))
+        );
+        assert_eq!(
+            git_sync_schedule(Some(&Value::String("-1".to_string()))),
+            (false, Duration::from_secs(300))
+        );
+    }
+}
+
+fn sleep_until_stopped(stop: &AtomicBool, duration: Duration) {
+    let deadline = Instant::now() + duration;
+    while !stop.load(Ordering::Relaxed) {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        thread::sleep(remaining.min(Duration::from_secs(1)));
+    }
 }
 
 fn agent_automation_loop_disabled() -> bool {
@@ -1469,7 +1559,7 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
         title: "Install",
         items: &[DocsNavEntry {
             title: "Agent Install Runbook",
-            path: "docs/agent-install.md",
+            path: "docs/runbooks/install.md",
             summary: "A direct install path for coding agents.",
         }],
     },
@@ -1524,7 +1614,7 @@ fn render_markdown_html(path: &str, markdown: &str) -> String {
             <a href="/#start">Get Started</a>
             <a href="/docs">Docs</a>
             <a href="/#agents">Agents</a>
-            <a href="/read/docs/agent-install.md">Install</a>
+            <a href="/read/docs/runbooks/install.md">Install</a>
             <a href="/{escaped_path}">Raw Markdown</a>
             <a href="https://github.com/buwilliams/refine">GitHub</a>
           </nav>
@@ -1594,7 +1684,7 @@ fn render_docs_landing_page() -> WireResponse {
             <a href="/#product">Product</a>
             <a href="/#start">Get Started</a>
             <a href="/docs" aria-current="page">Docs</a>
-            <a href="/read/docs/agent-install.md">Install</a>
+            <a href="/read/docs/runbooks/install.md">Install</a>
             <a href="https://github.com/buwilliams/refine">GitHub</a>
           </nav>
           <div class="menu-docs" aria-label="Documentation sections">
@@ -1614,7 +1704,7 @@ fn render_docs_landing_page() -> WireResponse {
         </p>
         <div class="hero-actions" aria-label="Docs starting points">
           <a class="button primary" href="/read/docs/intent/01-design.md">Read the system design</a>
-          <a class="button secondary" href="/read/docs/agent-install.md">Install with an agent</a>
+          <a class="button secondary" href="/read/docs/runbooks/install.md">Install with an agent</a>
         </div>
       </section>
 

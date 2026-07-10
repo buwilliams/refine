@@ -45,7 +45,7 @@ pub enum Commands {
         #[command(subcommand)]
         action: NodeAction,
     },
-    /// Operate the cluster (the fleet of nodes): register, provision, and bootstrap nodes,
+    /// Operate the cluster (the fleet of nodes): register and bootstrap nodes,
     /// distribute unclaimed Gap ownership, and run remote commands.
     Cluster {
         #[command(subcommand)]
@@ -191,8 +191,8 @@ pub enum ProjectAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Rebuild the project projection (Gap/Feature caches) from on-disk state.
-    /// Run after external edits to .refine data; optionally persists the snapshot to a cache directory.
+    /// Commit durable Refine state, pull/rebase and push the current branch, then rebuild projections.
+    /// Uncommitted target-app files are left untouched; optionally persists the projection snapshot.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -708,7 +708,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Register a new node in the cluster so it can be configured, provisioned, and receive distributed work.
+    /// Register a new node in the cluster so it can be configured and receive distributed work.
     AddNode {
         /// Node id to add.
         id: String,
@@ -716,7 +716,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Edit a cluster node's connection and provisioning settings: SSH details, paths, ports, and provider.
+    /// Edit a cluster node's connection settings: SSH details, paths, and ports.
     EditNode {
         /// Node id to edit.
         id: String,
@@ -744,11 +744,6 @@ pub enum ClusterAction {
         /// Port the node's Refine daemon listens on.
         #[arg(long)]
         refine_port: Option<u16>,
-        /// Provisioning provider for this node (e.g. "fly").
-        #[arg(long)]
-        provider: Option<String>,
-        #[arg(long, help = "JSON object of provider provisioning overrides")]
-        provisioning: Option<String>,
         /// Enable or disable the node for work distribution.
         #[arg(long)]
         enabled: Option<bool>,
@@ -792,46 +787,6 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// List configured fleet provisioning providers (built-in fly plus .refine/fleet.json entries).
-    Providers {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Create and deploy a cloud worker machine for a registered node via its provider (e.g. Fly.io).
-    /// Use --dry-run to preview the provider commands without running them.
-    Provision {
-        /// Node id to provision.
-        id: String,
-        /// Provider to provision with (defaults to the node's configured provider).
-        #[arg(long)]
-        provider: Option<String>,
-        /// Print the provider commands that would run without executing them.
-        #[arg(long)]
-        dry_run: bool,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Destroy the node's cloud app via its provider and disable the node.
-    Deprovision {
-        /// Node id to deprovision.
-        id: String,
-        /// Print the provider commands that would run without executing them.
-        #[arg(long)]
-        dry_run: bool,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Run the provider's status command for a node and refresh its recorded health.
-    ProvisionStatus {
-        /// Node id to check.
-        id: String,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
     /// Reassign eligible unclaimed Gap ownership across the fleet.
     /// Spreads across enabled healthy nodes by default, fills one node with --to,
     /// or converges reviewable Gaps home with --converge --to <node>.
@@ -849,13 +804,13 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Reload the cluster registry (merging any legacy records) and report the enabled node count.
+    /// Commit durable Refine state, pull/rebase upstream changes, and push the current branch.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Run an authorized command on a node over SSH or the provider exec channel and print the result.
+    /// Run an authorized command on a node over SSH and print the result.
     Run {
         /// Node id to run the command on.
         id: String,

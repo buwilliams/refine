@@ -79,11 +79,6 @@ impl FileNextActionsService {
             .iter()
             .filter(|node| node.enabled && !node.archived)
             .collect();
-        let unprovisioned: Vec<String> = enabled_nodes
-            .iter()
-            .filter(|node| !node.provider.trim().is_empty() && node.health.is_none())
-            .map(|node| node.id.clone())
-            .collect();
         let failed: Vec<String> = enabled_nodes
             .iter()
             .filter(|node| {
@@ -119,17 +114,7 @@ impl FileNextActionsService {
                 &format!(
                     "Node {node_id} last reported failed health; inspect before sending work to it."
                 ),
-                &format!("refine cluster provision-status {node_id}"),
-            );
-        }
-        for node_id in &unprovisioned {
-            suggest(
-                &mut suggestions,
-                "provision-node",
-                &format!(
-                    "Node {node_id} is configured for a cloud provider but has never been provisioned."
-                ),
-                &format!("refine cluster provision {node_id} --dry-run"),
+                &format!("refine cluster show {node_id}"),
             );
         }
         if !stranded_review.is_empty() {
@@ -247,18 +232,12 @@ mod tests {
     }
 
     #[test]
-    fn next_suggests_provisioning_distribution_and_convergence() {
+    fn next_suggests_distribution_and_convergence() {
         let temp_root = unique_temp_dir("guidance-fleet");
         let refine_dir = temp_root.join(".refine");
         let cluster = FileClusterService::new(&refine_dir);
         cluster
-            .upsert_node(
-                "fly-worker-1",
-                NodeRemoteUpdate {
-                    provider: Some("fly".to_string()),
-                    ..NodeRemoteUpdate::default()
-                },
-            )
+            .upsert_node("fly-worker-1", NodeRemoteUpdate::default())
             .unwrap();
         let work = FileWorkItemService::new(&refine_dir);
         work.create_gap_summary("Gap A", Some("GAP1")).unwrap();
@@ -281,7 +260,6 @@ mod tests {
             .iter()
             .map(|suggestion| suggestion["id"].as_str().unwrap())
             .collect();
-        assert!(ids.contains(&"provision-node"), "ids: {ids:?}");
         assert!(ids.contains(&"distribute-work"), "ids: {ids:?}");
         assert!(ids.contains(&"converge-reviewables"), "ids: {ids:?}");
         let commands: Vec<&str> = response["suggestions"]
@@ -290,7 +268,6 @@ mod tests {
             .iter()
             .map(|suggestion| suggestion["command"].as_str().unwrap())
             .collect();
-        assert!(commands.contains(&"refine cluster provision fly-worker-1 --dry-run"));
         assert!(commands.contains(&"refine cluster distribute --converge --to default"));
         fs::remove_dir_all(temp_root).unwrap();
     }

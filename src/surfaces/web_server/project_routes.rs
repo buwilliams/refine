@@ -19,7 +19,7 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
-use crate::tools::host::fleet::FileFleetService;
+use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
@@ -30,13 +30,6 @@ use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
-
-#[derive(Clone, Debug, Default)]
-struct ProjectSyncGitResult {
-    attempted: bool,
-    pulled: bool,
-    detail: Option<String>,
-}
 
 fn configured_provider_from_settings(
     refine_dir: &std::path::Path,
@@ -165,105 +158,6 @@ fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
                 .and_then(|text| text.trim().parse::<u64>().ok())
         })
         .unwrap_or(fallback)
-}
-
-fn sync_attached_project_git_state(
-    refine_dir: &std::path::Path,
-) -> RefineResult<ProjectSyncGitResult> {
-    let Some(target_root) = refine_dir.parent() else {
-        return Ok(ProjectSyncGitResult::default());
-    };
-    if !target_root.join(".git").exists() {
-        return Ok(ProjectSyncGitResult::default());
-    }
-
-    let inside = run_project_git(target_root, &["rev-parse", "--is-inside-work-tree"])?;
-    if !inside.status.success() || String::from_utf8_lossy(&inside.stdout).trim() != "true" {
-        return Ok(ProjectSyncGitResult::default());
-    }
-
-    let upstream = run_project_git(
-        target_root,
-        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
-    )?;
-    if !upstream.status.success() {
-        return Ok(ProjectSyncGitResult {
-            attempted: false,
-            pulled: false,
-            detail: Some("No upstream branch configured.".to_string()),
-        });
-    }
-
-    let status = run_project_git(target_root, &["status", "--porcelain=v1", "-uall"])?;
-    if !status.status.success() {
-        let stderr = String::from_utf8_lossy(&status.stderr).trim().to_string();
-        return Err(RefineError::Conflict(format!(
-            "failed to inspect project worktree before sync{}",
-            if stderr.is_empty() {
-                String::new()
-            } else {
-                format!(": {stderr}")
-            }
-        )));
-    }
-    let blocking_changes = String::from_utf8_lossy(&status.stdout)
-        .lines()
-        .any(project_sync_status_line_blocks_pull);
-    if blocking_changes {
-        return Ok(ProjectSyncGitResult {
-            attempted: false,
-            pulled: false,
-            detail: Some("Local worktree changes present; skipped upstream pull.".to_string()),
-        });
-    }
-
-    let pull = run_project_git(target_root, &["pull", "--ff-only"])?;
-    if !pull.status.success() {
-        let stderr = String::from_utf8_lossy(&pull.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&pull.stdout).trim().to_string();
-        let detail = if stderr.is_empty() { stdout } else { stderr };
-        return Err(RefineError::Conflict(format!(
-            "failed to sync project state from upstream{}",
-            if detail.is_empty() {
-                String::new()
-            } else {
-                format!(": {detail}")
-            }
-        )));
-    }
-    let stdout = String::from_utf8_lossy(&pull.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&pull.stderr).trim().to_string();
-    let detail = [stdout.as_str(), stderr.as_str()]
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
-    Ok(ProjectSyncGitResult {
-        attempted: true,
-        pulled: !detail.contains("Already up to date."),
-        detail: if detail.is_empty() {
-            None
-        } else {
-            Some(detail)
-        },
-    })
-}
-
-fn project_sync_status_line_blocks_pull(line: &str) -> bool {
-    let path = line.get(3..).unwrap_or("").trim();
-    !path.is_empty()
-}
-
-fn run_project_git(
-    target_root: &std::path::Path,
-    args: &[&str],
-) -> RefineResult<std::process::Output> {
-    std::process::Command::new("git")
-        .args(args)
-        .current_dir(target_root)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to run git {}: {error}", args.join(" "))))
 }
 
 fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedConfig> {
@@ -684,14 +578,6 @@ impl InProcessWebServer {
                 .and_then(|value| value.as_str())
                 .map(str::to_string),
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
-            provider: body
-                .get("provider")
-                .and_then(|value| value.as_str())
-                .map(str::to_string),
-            provisioning: body
-                .get("provisioning")
-                .and_then(|value| value.as_object())
-                .cloned(),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
         let service = FileClusterService::new(refine_dir);
@@ -809,89 +695,6 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_fleet_providers(&self) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "list fleet providers");
-        match FileFleetService::new(refine_dir).providers_response() {
-            Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_remote_node_provision(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "provision node");
-        let Some(node_id) = request
-            .path
-            .strip_prefix("/cluster/nodes/")
-            .and_then(|path| path.strip_suffix("/provision"))
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        else {
-            return error_response(RefineError::InvalidInput("node id is required".to_string()));
-        };
-        let body = request.body.unwrap_or_else(|| json!({}));
-        let provider = body
-            .get("provider")
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty());
-        let dry_run = body
-            .get("dry_run")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        match self
-            .fleet_service(refine_dir)
-            .provision_response(node_id, provider, dry_run)
-        {
-            Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_remote_node_deprovision(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "deprovision node");
-        let Some(node_id) = request
-            .path
-            .strip_prefix("/cluster/nodes/")
-            .and_then(|path| path.strip_suffix("/deprovision"))
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        else {
-            return error_response(RefineError::InvalidInput("node id is required".to_string()));
-        };
-        let body = request.body.unwrap_or_else(|| json!({}));
-        let dry_run = body
-            .get("dry_run")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        match self
-            .fleet_service(refine_dir)
-            .deprovision_response(node_id, dry_run)
-        {
-            Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_remote_node_provision_status(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "check node provisioning");
-        let Some(node_id) = request
-            .path
-            .strip_prefix("/cluster/nodes/")
-            .and_then(|path| path.strip_suffix("/provision-status"))
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        else {
-            return error_response(RefineError::InvalidInput("node id is required".to_string()));
-        };
-        match self
-            .fleet_service(refine_dir)
-            .provision_status_response(node_id)
-        {
-            Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
-        }
-    }
-
     pub(super) fn handle_cluster_distribute(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "distribute work");
         let body = request.body.unwrap_or_else(|| json!({}));
@@ -916,14 +719,6 @@ impl InProcessWebServer {
         match service.distribute_response(to, converge, dry_run) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
-        }
-    }
-
-    fn fleet_service(&self, refine_dir: PathBuf) -> FileFleetService {
-        if let Some(runtime_root) = &self.runtime_root {
-            FileFleetService::with_runtime_root(refine_dir, runtime_root)
-        } else {
-            FileFleetService::new(refine_dir)
         }
     }
 
@@ -1411,12 +1206,18 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
-        let git_sync = match self.current_refine_dir() {
-            Ok(Some(refine_dir)) => match sync_attached_project_git_state(&refine_dir) {
-                Ok(result) => result,
-                Err(error) => return error_response(error),
-            },
-            Ok(None) => ProjectSyncGitResult::default(),
+        let git_sync = match self.current_target_root() {
+            Ok(Some(target_root)) => {
+                let runtime_root = self
+                    .runtime_root
+                    .clone()
+                    .unwrap_or_else(|| target_root.join(".refine/runtime"));
+                match FileGitSyncService::new(target_root, runtime_root).sync() {
+                    Ok(result) => result,
+                    Err(error) => return error_response(error),
+                }
+            }
+            Ok(None) => GitSyncResult::default(),
             Err(error) => return error_response(error),
         };
         let projection = if self.runtime_root.is_some() {
@@ -1440,7 +1241,11 @@ impl InProcessWebServer {
                 "feature_count": projection.features.len(),
                 "git_sync": {
                     "attempted": git_sync.attempted,
+                    "committed": git_sync.committed,
                     "pulled": git_sync.pulled,
+                    "pushed": git_sync.pushed,
+                    "branch": git_sync.branch,
+                    "commit": git_sync.commit,
                     "detail": git_sync.detail
                 }
             }),

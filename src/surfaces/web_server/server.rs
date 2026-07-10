@@ -32,6 +32,12 @@ impl InProcessWebServer {
         let method = request.method.clone();
         let path = request.path.clone();
         let response = self.handle_inner(request);
+        if method != "GET" && response.status < 400 && should_sync_git_after_mutation(&path) {
+            // The mutation has already succeeded locally. A transient remote
+            // failure must not rewrite that response; the periodic sync loop
+            // retries it and manual `project sync` reports exact failures.
+            let _ = self.try_sync_current_project_git();
+        }
         if method != "GET"
             && response.status < 400
             && should_refresh_projection_after_mutation(&path)
@@ -257,33 +263,8 @@ impl InProcessWebServer {
             return self.handle_cluster();
         }
 
-        if request.method == "GET" && request.path == "/cluster/providers" {
-            return self.handle_fleet_providers();
-        }
-
         if request.method == "POST" && request.path == "/cluster/distribute" {
             return self.handle_cluster_distribute(request);
-        }
-
-        if request.method == "POST"
-            && request.path.starts_with("/cluster/nodes/")
-            && request.path.ends_with("/provision-status")
-        {
-            return self.handle_remote_node_provision_status(request);
-        }
-
-        if request.method == "POST"
-            && request.path.starts_with("/cluster/nodes/")
-            && request.path.ends_with("/provision")
-        {
-            return self.handle_remote_node_provision(request);
-        }
-
-        if request.method == "POST"
-            && request.path.starts_with("/cluster/nodes/")
-            && request.path.ends_with("/deprovision")
-        {
-            return self.handle_remote_node_deprovision(request);
         }
 
         if request.method == "POST" && request.path == "/cluster/nodes" {
@@ -902,6 +883,25 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     !path.starts_with("/terminal/") && path != "/project/sync" && path != mcp::MCP_ROUTE
 }
 
+fn should_sync_git_after_mutation(path: &str) -> bool {
+    let path = normalize_api_path(path);
+    [
+        "/work",
+        "/gaps",
+        "/features",
+        "/nodes",
+        "/cluster",
+        "/settings",
+        "/governance",
+        "/guidance",
+        "/reporters",
+        "/import",
+        "/chat",
+    ]
+    .iter()
+    .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -923,6 +923,16 @@ mod tests {
         assert!(should_refresh_projection_after_mutation(
             "/api/gaps/GAP1/start"
         ));
+    }
+
+    #[test]
+    fn durable_project_mutations_trigger_git_sync() {
+        assert!(should_sync_git_after_mutation("/api/gaps/GAP1/start"));
+        assert!(should_sync_git_after_mutation("/cluster/distribute"));
+        assert!(should_sync_git_after_mutation("/settings"));
+        assert!(!should_sync_git_after_mutation("/project/sync"));
+        assert!(!should_sync_git_after_mutation("/terminal/session"));
+        assert!(!should_sync_git_after_mutation("/processes/agents"));
     }
 }
 

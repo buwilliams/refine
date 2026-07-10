@@ -18,7 +18,7 @@ The full design intent of Refine is documented at [Intent](docs/intent/README.md
 Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
 
 ```bash
-Follow instructions found at: https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/agent-install.md
+Follow instructions found at: https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/runbooks/install.md
 ```
 
 Or have your agent ensure system dependencies are installed:

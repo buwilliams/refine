@@ -1101,8 +1101,6 @@ fn settings_node(id: &str, now: &str) -> Node {
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
         refine_port: 8082,
-        provider: String::new(),
-        provisioning: JsonObject::new(),
         health: None,
         archived: false,
     }

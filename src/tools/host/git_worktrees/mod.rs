@@ -1637,6 +1637,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+        let temp_root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap_or_else(|_| std::env::temp_dir());
+        temp_root.join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
     }
 }

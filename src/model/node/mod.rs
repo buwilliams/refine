@@ -26,10 +26,6 @@ pub struct Node {
     pub target_app_path: String,
     #[serde(default = "default_refine_port")]
     pub refine_port: u16,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub provider: String,
-    #[serde(default, skip_serializing_if = "JsonObject::is_empty")]
-    pub provisioning: JsonObject,
     #[serde(default)]
     pub health: Option<NodeHealth>,
     #[serde(default)]

@@ -166,7 +166,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
         },
         McpTool {
             name: "refine_next",
-            description: "Recommend the next operations for the active project and its fleet, each with the exact CLI command to run. Start here when deciding what to do: it reports unprovisioned or failed nodes, work that should be distributed, and reviewable work waiting to converge.",
+            description: "Recommend the next operations for the active project and its fleet, each with the exact CLI command to run. Start here when deciding what to do: it reports failed nodes, work that should be distributed, and reviewable work waiting to converge.",
             input_schema: empty_schema,
             binding: ToolBinding::Api {
                 method: "GET",
