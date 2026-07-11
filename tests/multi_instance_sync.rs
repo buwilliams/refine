@@ -39,25 +39,25 @@ fn two_daemons_sync_refine_state_through_shared_git_remote() {
     let mut instance_b = RefineInstance::start("b", &runtime_b, &app_b, &artifacts);
 
     let first_label = format!("multi-instance first {}", now_millis());
-    let first_gap = instance_a.create_gap(&first_label);
-    assert!(!first_gap.is_empty());
+    let first_goal = instance_a.create_goal(&first_label);
+    assert!(!first_goal.is_empty());
 
     let sync_b = instance_b.api_json("POST", "/api/project/sync", json!({}));
     assert_eq!(sync_b["ok"], true, "{sync_b:#}");
     assert_eq!(sync_b["git_sync"]["attempted"], true, "{sync_b:#}");
-    assert_eq!(sync_b["gap_count"], 1, "{sync_b:#}");
-    instance_b.assert_gap_visible(&first_label);
+    assert_eq!(sync_b["goal_count"], 1, "{sync_b:#}");
+    instance_b.assert_goal_visible(&first_label);
 
     let second_label = format!("multi-instance second {}", now_millis());
-    let second_gap = instance_b.create_gap(&second_label);
-    assert!(!second_gap.is_empty());
+    let second_goal = instance_b.create_goal(&second_label);
+    assert!(!second_goal.is_empty());
 
     let sync_a = instance_a.api_json("POST", "/api/project/sync", json!({}));
     assert_eq!(sync_a["ok"], true, "{sync_a:#}");
     assert_eq!(sync_a["git_sync"]["attempted"], true, "{sync_a:#}");
-    assert_eq!(sync_a["gap_count"], 2, "{sync_a:#}");
-    instance_a.assert_gap_visible(&first_label);
-    instance_a.assert_gap_visible(&second_label);
+    assert_eq!(sync_a["goal_count"], 2, "{sync_a:#}");
+    instance_a.assert_goal_visible(&first_label);
+    instance_a.assert_goal_visible(&second_label);
 
     instance_b.stop();
     instance_a.stop();
@@ -123,18 +123,17 @@ impl RefineInstance {
             .unwrap_or_else(|error| panic!("{method} {path} returned invalid JSON: {error}"))
     }
 
-    fn create_gap(&self, label: &str) -> String {
+    fn create_goal(&self, label: &str) -> String {
         let payload = self.api_json(
             "POST",
-            "/api/gaps",
+            "/api/goals",
             json!({
                 "reporter": "multi-instance",
-                "actual": format!("{label} actual"),
-                "target": format!("{label} target"),
+                "prompt": format!("{label} prompt"),
                 "priority": "high"
             }),
         );
-        let id = payload["gap"]["id"]
+        let id = payload["goal"]["id"]
             .as_str()
             .unwrap_or_default()
             .to_string();
@@ -142,13 +141,14 @@ impl RefineInstance {
         id
     }
 
-    fn assert_gap_visible(&self, label: &str) {
-        let path = format!("/api/gaps?q={}&node=all&limit=50", query_component(label));
+    fn assert_goal_visible(&self, label: &str) {
+        let path = format!("/api/goals?q={}&node=all&limit=50", query_component(label));
         let payload = self.api_json("GET", &path, json!({}));
-        let gaps = payload["gaps"].as_array().cloned().unwrap_or_default();
+        let goals = payload["goals"].as_array().cloned().unwrap_or_default();
         assert!(
-            gaps.iter()
-                .any(|gap| gap["name"].as_str().unwrap_or_default().contains(label)),
+            goals
+                .iter()
+                .any(|goal| goal["name"].as_str().unwrap_or_default().contains(label)),
             "{label} was not visible in instance on port {}\n{payload:#}",
             self.port
         );

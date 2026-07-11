@@ -23,8 +23,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[test]
 fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
     let target_root = PathBuf::from("/tmp/refine-state");
-    let command = Commands::Gap {
-        action: GapAction::Create {
+    let command = Commands::Goal {
+        action: GoalAction::Create {
             name: "direct write".to_string(),
             target_root: Some(target_root.clone()),
             id: None,
@@ -64,14 +64,14 @@ fn project_sync_rebuilds_projection_from_cli_surface() {
     let temp_root = unique_temp_dir("cli-project-sync");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
-    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    fs::create_dir_all(&gap_dir).unwrap();
+    fs::create_dir_all(&goal_dir).unwrap();
     fs::write(
-        gap_dir.join("gap.json"),
+        goal_dir.join("goal.json"),
         r#"{
-              "id": "GAP1",
-              "name": "CLI visible Gap",
+              "id": "GOAL1",
+              "name": "CLI visible Goal",
               "status": "done",
               "created": "2026-01-01T00:00:00Z",
               "updated": "2026-01-02T00:00:00Z",
@@ -466,7 +466,7 @@ fn project_attach_runs_legacy_refine_migration() {
     .unwrap();
     let config: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(refine_dir.join("refine.json")).unwrap()).unwrap();
-    assert_eq!(config["schema_version"], 1);
+    assert_eq!(config["schema_version"], 2);
 
     dispatch(
         Cli::try_parse_from([
@@ -720,27 +720,27 @@ fn system_ps_lists_and_stops_supervised_processes() {
 }
 
 #[test]
-fn gap_create_list_show_use_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-gap-create");
+fn goal_create_list_show_use_shared_file_work_item_service() {
+    let temp_root = unique_temp_dir("cli-goal-create");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
 
     let create = Cli::try_parse_from([
         "refine",
-        "gap",
+        "goal",
         "create",
-        "CLI Gap",
+        "CLI Goal",
         "--target-root",
         target_root.to_str().unwrap(),
         "--id",
-        "GAP1",
+        "GOAL1",
     ])
     .unwrap();
     dispatch(create).unwrap();
 
     let list = Cli::try_parse_from([
         "refine",
-        "gap",
+        "goal",
         "list",
         "--target-root",
         target_root.to_str().unwrap(),
@@ -750,36 +750,36 @@ fn gap_create_list_show_use_shared_file_work_item_service() {
 
     let show = Cli::try_parse_from([
         "refine",
-        "gap",
+        "goal",
         "show",
-        "GAP1",
+        "GOAL1",
         "--target-root",
         target_root.to_str().unwrap(),
     ])
     .unwrap();
     dispatch(show).unwrap();
 
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
-    assert!(written.contains("\"name\": \"CLI Gap\""));
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
+    assert!(written.contains("\"name\": \"CLI Goal\""));
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn gap_edit_note_delete_use_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-gap-edit-note-delete");
+fn goal_edit_note_delete_use_shared_file_work_item_service() {
+    let temp_root = unique_temp_dir("cli-goal-edit-note-delete");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
 
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
             "Original",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
@@ -787,9 +787,9 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "edit",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
             "--name",
@@ -803,9 +803,9 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "note",
-            "GAP1",
+            "GOAL1",
             "CLI note",
             "--target-root",
             target_root.to_str().unwrap(),
@@ -816,7 +816,7 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
     )
     .unwrap();
 
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"name\": \"Renamed\""));
     assert!(written.contains("\"priority\": \"medium\""));
     assert!(written.contains("\"body\": \"CLI note\""));
@@ -824,34 +824,34 @@ fn gap_edit_note_delete_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "delete",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn gap_round_append_and_edit_use_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-gap-rounds");
+fn goal_round_append_and_edit_use_shared_file_work_item_service() {
+    let temp_root = unique_temp_dir("cli-goal-rounds");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Round Gap",
+            "Round Goal",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
@@ -859,17 +859,15 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "round",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
             "--reporter",
             "Reporter",
-            "--actual",
-            "Actual",
-            "--target",
-            "Target",
+            "--prompt",
+            "Initial prompt",
         ])
         .unwrap(),
     )
@@ -877,81 +875,80 @@ fn gap_round_append_and_edit_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "round",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
             "--edit-latest",
             "--reporter",
             "Reviewer",
-            "--actual",
-            "Revised",
+            "--prompt",
+            "Revised prompt",
         ])
         .unwrap(),
     )
     .unwrap();
 
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
-    assert!(written.contains("\"actual\": \"Revised\""));
-    assert!(written.contains("\"target\": \"Target\""));
+    assert!(written.contains("\"prompt\": \"Revised prompt\""));
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn gap_merge_and_undo_use_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-gap-merge-undo");
+fn goal_merge_and_undo_use_shared_file_work_item_service() {
+    let temp_root = unique_temp_dir("cli-goal-merge-undo");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Merge Gap",
+            "Merge Goal",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
     .unwrap();
-    let gap_path = refine_dir.join("gaps/GA/P1/gap.json");
+    let goal_path = refine_dir.join("goals/GO/AL1/goal.json");
     let mut value: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&gap_path).unwrap()).unwrap();
+        serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
     value["status"] = serde_json::Value::String("ready-merge".to_string());
-    fs::write(&gap_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
+    fs::write(&goal_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
 
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "merge",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let written = fs::read_to_string(&gap_path).unwrap();
+    let written = fs::read_to_string(&goal_path).unwrap();
     assert!(written.contains("\"status\": \"done\""));
 
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "undo",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let written = fs::read_to_string(&gap_path).unwrap();
+    let written = fs::read_to_string(&goal_path).unwrap();
     assert!(written.contains("\"status\": \"review\""));
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -966,13 +963,13 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Gap One",
+            "Goal One",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
@@ -995,9 +992,9 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
         Cli::try_parse_from([
             "refine",
             "feature",
-            "add-gap",
+            "add-goal",
             "FEA1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
@@ -1028,7 +1025,7 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
     )
     .unwrap();
 
-    let assigned = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let assigned = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(assigned.contains("\"feature_id\": \"FEA1\""));
     assert!(assigned.contains("\"feature_order\": null"));
 
@@ -1036,68 +1033,68 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
         Cli::try_parse_from([
             "refine",
             "feature",
-            "unorder-gap",
+            "unorder-goal",
             "FEA1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let unordered = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let unordered = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(unordered.contains("\"feature_order\": null"));
 
     dispatch(
         Cli::try_parse_from([
             "refine",
             "feature",
-            "order-gap",
+            "order-goal",
             "FEA1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let ordered = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let ordered = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(ordered.contains("\"feature_order\": 1"));
 
     dispatch(
         Cli::try_parse_from([
             "refine",
             "feature",
-            "remove-gap",
+            "remove-goal",
             "FEA1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
         .unwrap(),
     )
     .unwrap();
-    let removed = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let removed = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(removed.contains("\"feature_id\": null"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
-    let temp_root = unique_temp_dir("cli-gap-lifecycle");
+fn cli_goal_lifecycle_membership_and_feature_edit_use_tool_services() {
+    let temp_root = unique_temp_dir("cli-goal-lifecycle");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
     for (command, args) in [
         (
-            "gap",
+            "goal",
             vec![
                 "create",
-                "Lifecycle Gap",
+                "Lifecycle Goal",
                 "--target-root",
                 target_root.to_str().unwrap(),
                 "--id",
-                "GAP1",
+                "GOAL1",
             ],
         ),
         (
@@ -1120,9 +1117,9 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "assign-feature",
-            "GAP1",
+            "GOAL1",
             "FEA1",
             "--target-root",
             target_root.to_str().unwrap(),
@@ -1131,7 +1128,7 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"feature_id\": \"FEA1\"")
     );
@@ -1161,9 +1158,9 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "remove-feature",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
@@ -1171,7 +1168,7 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"feature_id\": null")
     );
@@ -1179,9 +1176,9 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "start",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
@@ -1189,7 +1186,7 @@ fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"status\": \"in-progress\"")
     );
@@ -1202,11 +1199,11 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-reorder-move");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
-    for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
+    for (id, name) in [("GOAL1", "Goal One"), ("GOAL2", "Goal Two")] {
         dispatch(
             Cli::try_parse_from([
                 "refine",
-                "gap",
+                "goal",
                 "create",
                 name,
                 "--target-root",
@@ -1232,14 +1229,14 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
         .unwrap(),
     )
     .unwrap();
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         dispatch(
             Cli::try_parse_from([
                 "refine",
                 "feature",
-                "add-gap",
+                "add-goal",
                 "FEA1",
-                gap_id,
+                goal_id,
                 "--target-root",
                 target_root.to_str().unwrap(),
             ])
@@ -1247,14 +1244,14 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
         )
         .unwrap();
     }
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         dispatch(
             Cli::try_parse_from([
                 "refine",
                 "feature",
-                "order-gap",
+                "order-goal",
                 "FEA1",
-                gap_id,
+                goal_id,
                 "--target-root",
                 target_root.to_str().unwrap(),
             ])
@@ -1266,9 +1263,9 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
         Cli::try_parse_from([
             "refine",
             "feature",
-            "reorder-gap",
+            "reorder-goal",
             "FEA1",
-            "GAP2",
+            "GOAL2",
             "1",
             "--target-root",
             target_root.to_str().unwrap(),
@@ -1277,7 +1274,7 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P2/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL2/goal.json"))
             .unwrap()
             .contains("\"feature_order\": 1")
     );
@@ -1296,7 +1293,7 @@ fn feature_reorder_and_move_use_shared_file_work_item_service() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
@@ -1309,11 +1306,11 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-cancel-delete");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
-    for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
+    for (id, name) in [("GOAL1", "Goal One"), ("GOAL2", "Goal Two")] {
         dispatch(
             Cli::try_parse_from([
                 "refine",
-                "gap",
+                "goal",
                 "create",
                 name,
                 "--target-root",
@@ -1339,14 +1336,14 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
         .unwrap(),
     )
     .unwrap();
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         dispatch(
             Cli::try_parse_from([
                 "refine",
                 "feature",
-                "add-gap",
+                "add-goal",
                 "FEA1",
-                gap_id,
+                goal_id,
                 "--target-root",
                 target_root.to_str().unwrap(),
             ])
@@ -1368,7 +1365,7 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
     )
     .unwrap();
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"status\": \"cancelled\"")
     );
@@ -1386,8 +1383,8 @@ fn feature_cancel_and_delete_use_shared_file_work_item_service() {
     )
     .unwrap();
     assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL2/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1414,7 +1411,7 @@ fn feature_import_uses_shared_import_service() {
     let csv = temp_root.join("import.csv");
     fs::write(
         &csv,
-        "actual,target,reporter,priority\nBroken flow,Fixed flow,QA,high\n",
+        "prompt,reporter,priority\nFix the broken flow,QA,high\n",
     )
     .unwrap();
 
@@ -1438,10 +1435,10 @@ fn feature_import_uses_shared_import_service() {
     let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
-    let gap = snapshot.gaps.values().next().unwrap();
-    assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
-    assert_eq!(gap.gap.priority.as_str(), "high");
-    assert_eq!(gap.gap.reporter.as_deref(), Some("QA"));
+    let goal = snapshot.goals.values().next().unwrap();
+    assert_eq!(goal.goal.feature_id.as_deref(), Some("FEA1"));
+    assert_eq!(goal.goal.priority.as_str(), "high");
+    assert_eq!(goal.goal.reporter.as_deref(), Some("QA"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1472,7 +1469,7 @@ fn feature_import_parses_structured_project_spec_with_shared_import_service() {
             "features": [
                 {
                     "name": "Transactions",
-                    "gaps": [
+                    "goals": [
                         {
                             "title": "Categorize transactions",
                             "current_state": "Transactions are uncategorized.",
@@ -1505,11 +1502,11 @@ fn feature_import_parses_structured_project_spec_with_shared_import_service() {
     let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
-    let gap = snapshot.gaps.values().next().unwrap();
-    assert_eq!(gap.gap.name, "Categorize transactions");
-    assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
-    assert_eq!(gap.gap.priority.as_str(), "medium");
-    assert_eq!(gap.gap.reporter.as_deref(), Some("Product"));
+    let goal = snapshot.goals.values().next().unwrap();
+    assert_eq!(goal.goal.name, "Categorize transactions");
+    assert_eq!(goal.goal.feature_id.as_deref(), Some("FEA1"));
+    assert_eq!(goal.goal.priority.as_str(), "medium");
+    assert_eq!(goal.goal.reporter.as_deref(), Some("Product"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1524,7 +1521,7 @@ fn log_commands_use_shared_activity_service() {
         "Build failed",
         "error",
         "quality",
-        Some("GAP1".to_string()),
+        Some("GOAL1".to_string()),
         Some("agent".to_string()),
     );
     let first_id = first.id.clone();
@@ -1561,8 +1558,8 @@ fn log_commands_use_shared_activity_service() {
             target_root.to_str().unwrap(),
             "--severity",
             "error",
-            "--gap-id",
-            "GAP1",
+            "--goal-id",
+            "GOAL1",
         ],
         vec![
             "refine",
@@ -1637,13 +1634,13 @@ fn node_commands_use_shared_node_registry_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Owned Gap",
+            "Owned Goal",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
@@ -1695,7 +1692,7 @@ fn node_commands_use_shared_node_registry_service() {
             "node",
             "transfer",
             "node-1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
@@ -1719,8 +1716,8 @@ fn node_commands_use_shared_node_registry_service() {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
-    assert!(gap.contains("\"node_id\": \"node-1\""));
+    let goal = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
+    assert!(goal.contains("\"node_id\": \"node-1\""));
     let nodes: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(refine_dir.join("nodes.json")).unwrap()).unwrap();
     assert_eq!(nodes["nodes"][1]["display_name"], "Node One");
@@ -1730,7 +1727,7 @@ fn node_commands_use_shared_node_registry_service() {
 }
 
 #[test]
-fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
+fn feature_transfer_command_moves_feature_and_member_goals_between_nodes() {
     let temp_root = unique_temp_dir("cli-feature-node-transfer");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
@@ -1755,20 +1752,20 @@ fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
         ],
         vec![
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Feature Gap",
+            "Feature Goal",
             "--id",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
             "feature",
-            "add-gap",
+            "add-goal",
             "FEA1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
@@ -1776,13 +1773,13 @@ fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let direct_gap = dispatch(
+    let direct_goal = dispatch(
         Cli::try_parse_from([
             "refine",
             "node",
             "transfer",
             "node-1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ])
@@ -1790,10 +1787,10 @@ fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
     )
     .unwrap_err();
     assert!(
-        direct_gap
+        direct_goal
             .to_string()
             .contains("transfer the Feature instead"),
-        "{direct_gap}"
+        "{direct_goal}"
     );
 
     dispatch(
@@ -1812,8 +1809,8 @@ fn feature_transfer_command_moves_feature_and_member_gaps_between_nodes() {
 
     let feature = fs::read_to_string(refine_dir.join("features/FE/A1/feature.json")).unwrap();
     assert!(feature.contains("\"node_id\": \"node-1\""));
-    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
-    assert!(gap.contains("\"node_id\": \"node-1\""));
+    let goal = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
+    assert!(goal.contains("\"node_id\": \"node-1\""));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1826,13 +1823,13 @@ fn cluster_commands_use_shared_cluster_service() {
     dispatch(
         Cli::try_parse_from([
             "refine",
-            "gap",
+            "goal",
             "create",
-            "Cluster Gap",
+            "Cluster Goal",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
-            "GAP1",
+            "GOAL1",
         ])
         .unwrap(),
     )
@@ -1935,7 +1932,7 @@ fn cluster_commands_use_shared_cluster_service() {
             "cluster",
             "transfer",
             "node-1",
-            "GAP1",
+            "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
@@ -1965,8 +1962,8 @@ fn cluster_commands_use_shared_cluster_service() {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
-    assert!(gap.contains("\"node_id\": \"node-1\""));
+    let goal = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
+    assert!(goal.contains("\"node_id\": \"node-1\""));
     assert!(!refine_dir.join("cluster.json").exists());
     let nodes: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(refine_dir.join("nodes.json")).unwrap()).unwrap();

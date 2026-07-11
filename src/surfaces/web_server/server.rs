@@ -243,8 +243,8 @@ impl InProcessWebServer {
             return self.handle_node_activate(request);
         }
 
-        if request.method == "POST" && request.path == "/nodes/transfer-gaps" {
-            return self.handle_node_transfer_gaps(request);
+        if request.method == "POST" && request.path == "/nodes/transfer-goals" {
+            return self.handle_node_transfer_goals(request);
         }
 
         if request.method == "POST" && request.path == "/nodes/transfer-features" {
@@ -589,16 +589,16 @@ impl InProcessWebServer {
             return self.handle_chat_stop(request);
         }
 
-        if request.method == "POST" && request.path == "/work/gaps" {
-            return self.handle_gap_create(request);
+        if request.method == "POST" && request.path == "/work/goals" {
+            return self.handle_goal_create(request);
         }
 
-        if request.method == "POST" && request.path == "/work/gaps/bulk" {
-            return self.handle_gap_bulk_update(request);
+        if request.method == "POST" && request.path == "/work/goals/bulk" {
+            return self.handle_goal_bulk_update(request);
         }
 
-        if request.method == "POST" && request.path == "/work/gaps/bulk/delete" {
-            return self.handle_gap_bulk_delete(request);
+        if request.method == "POST" && request.path == "/work/goals/bulk/delete" {
+            return self.handle_goal_bulk_delete(request);
         }
 
         if request.method == "POST" && request.path == "/work/features" {
@@ -615,45 +615,45 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
-            && request.path.ends_with("/gaps/bulk")
+            && request.path.ends_with("/goals/bulk")
         {
-            return self.handle_feature_bulk_assign_gaps(request);
+            return self.handle_feature_bulk_assign_goals(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
-            && request.path.ends_with("/gaps")
+            && request.path.ends_with("/goals")
         {
-            return self.handle_feature_add_gap(request);
+            return self.handle_feature_add_goal(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
             && request.path.ends_with("/order")
         {
-            return self.handle_feature_order_gap(request);
+            return self.handle_feature_order_goal(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
             && request.path.ends_with("/unorder")
         {
-            return self.handle_feature_unorder_gap(request);
+            return self.handle_feature_unorder_goal(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
-            && request.path.contains("/gaps/")
+            && request.path.contains("/goals/")
             && !request.path.ends_with("/reorder")
         {
-            return self.handle_feature_add_gap_path(request);
+            return self.handle_feature_add_goal_path(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
             && request.path.ends_with("/reorder")
         {
-            return self.handle_feature_reorder_gap(request);
+            return self.handle_feature_reorder_goal(request);
         }
 
         if request.method == "POST"
@@ -683,63 +683,63 @@ impl InProcessWebServer {
 
         if request.method == "DELETE"
             && request.path.starts_with("/work/features/")
-            && request.path.contains("/gaps/")
+            && request.path.contains("/goals/")
         {
-            return self.handle_feature_remove_gap(request);
+            return self.handle_feature_remove_goal(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/notes")
         {
-            return self.handle_gap_note(request);
+            return self.handle_goal_note(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/rounds")
         {
-            return self.handle_gap_round_append(request);
+            return self.handle_goal_round_append(request);
         }
 
         if request.method == "PATCH"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/rounds/latest")
         {
-            return self.handle_gap_round_edit_latest(request);
+            return self.handle_goal_round_edit_latest(request);
         }
 
         if request.method == "PATCH"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/rounds/latest/evaluation")
         {
-            return self.handle_gap_round_evaluation_update(request);
+            return self.handle_goal_round_evaluation_update(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.contains("/rounds/")
             && request.path.ends_with("/logs")
         {
-            return self.handle_gap_round_log_append(request);
+            return self.handle_goal_round_log_append(request);
         }
 
         if request.method == "GET"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/logs")
         {
-            return self.handle_gap_logs(request);
+            return self.handle_goal_logs(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/transition")
         {
-            return self.handle_gap_transition(request);
+            return self.handle_goal_transition(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && (request.path.ends_with("/start")
                 || request.path.ends_with("/verify")
                 || request.path.ends_with("/retry-quality")
@@ -748,26 +748,26 @@ impl InProcessWebServer {
                 || request.path.ends_with("/merge")
                 || request.path.ends_with("/undo"))
         {
-            return self.handle_gap_action(request);
+            return self.handle_goal_action(request);
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/work/gaps/")
+            && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/cancel")
         {
-            return self.handle_gap_cancel(request);
+            return self.handle_goal_cancel(request);
         }
 
-        if request.method == "PATCH" && request.path.starts_with("/work/gaps/") {
-            return self.handle_gap_update(request);
+        if request.method == "PATCH" && request.path.starts_with("/work/goals/") {
+            return self.handle_goal_update(request);
         }
 
-        if request.method == "DELETE" && request.path.starts_with("/work/gaps/") {
-            return self.handle_gap_delete(request);
+        if request.method == "DELETE" && request.path.starts_with("/work/goals/") {
+            return self.handle_goal_delete(request);
         }
 
-        if request.method == "GET" && request.path.starts_with("/work/gaps/") {
-            return self.handle_gap_show(request);
+        if request.method == "GET" && request.path.starts_with("/work/goals/") {
+            return self.handle_goal_show(request);
         }
 
         if request.method == "GET" && request.path.starts_with("/work/features/") {
@@ -778,8 +778,8 @@ impl InProcessWebServer {
             return self.handle_feature_delete(request);
         }
 
-        if request.method == "GET" && request.path == "/work/gaps" {
-            return self.handle_gaps_list(&raw_path);
+        if request.method == "GET" && request.path == "/work/goals" {
+            return self.handle_goals_list(&raw_path);
         }
 
         if request.method == "GET" && request.path == "/work/features" {
@@ -887,7 +887,7 @@ fn should_sync_git_after_mutation(path: &str) -> bool {
     let path = normalize_api_path(path);
     [
         "/work",
-        "/gaps",
+        "/goals",
         "/features",
         "/nodes",
         "/cluster",
@@ -921,13 +921,13 @@ mod tests {
             "/api/project/sync"
         ));
         assert!(should_refresh_projection_after_mutation(
-            "/api/gaps/GAP1/start"
+            "/api/goals/GOAL1/start"
         ));
     }
 
     #[test]
     fn durable_project_mutations_trigger_git_sync() {
-        assert!(should_sync_git_after_mutation("/api/gaps/GAP1/start"));
+        assert!(should_sync_git_after_mutation("/api/goals/GOAL1/start"));
         assert!(should_sync_git_after_mutation("/cluster/distribute"));
         assert!(should_sync_git_after_mutation("/settings"));
         assert!(!should_sync_git_after_mutation("/project/sync"));

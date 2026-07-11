@@ -10,9 +10,9 @@ const state = {
   dashboard: null,
   needsAttentionBanners: [],
   currentRoute: null,
-  currentGap: null,
-  // The hash that's "underneath" the Gap detail modal. Updated whenever
-  // navigate() runs for a route other than gaps_detail. Used to restore
+  currentGoal: null,
+  // The hash that's "underneath" the Goal detail modal. Updated whenever
+  // navigate() runs for a route other than goals_detail. Used to restore
   // the URL when the modal is dismissed so the page the user came from
   // is what they land back on.
   underlayHash: "#/",
@@ -158,9 +158,9 @@ function hasAttachedProject() {
 function clearProjectScopedUiState() {
   state.reporters = [];
   state.dashboard = null;
-  state.currentGap = null;
-  if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
-  if (typeof gapsIncludedIds !== "undefined") gapsIncludedIds.clear();
+  state.currentGoal = null;
+  if (typeof goalsExcludedIds !== "undefined") goalsExcludedIds.clear();
+  if (typeof goalsIncludedIds !== "undefined") goalsIncludedIds.clear();
   setLastReporter("");
   populateAllReporterDropdowns();
   updateActiveNodeLabel();
@@ -244,7 +244,7 @@ function screenDataCacheablePath(path) {
     "/api/project/status",
     "/api/apps/status",
     "/api/dashboard",
-    "/api/gaps",
+    "/api/goals",
     "/api/features",
     "/api/activity",
     "/api/changes",
@@ -292,7 +292,7 @@ function defaultScreenDataPaths() {
     "/api/project/status",
     "/api/dashboard?node=current",
     "/api/features?limit=50&offset=0",
-    "/api/gaps?limit=50&offset=0&facets=1",
+    "/api/goals?limit=50&offset=0&facets=1",
     "/api/activity?limit=50&offset=0&facets=1",
     "/api/changes?limit=50&offset=0",
     "/api/nodes",
@@ -411,7 +411,7 @@ async function api(method, path, body, options = {}) {
       invalidateScreenDataCache();
       if (
         path !== "/api/project/sync" &&
-        /^\/api\/(project|apps|gaps|features|activity|changes|nodes|settings|cache)\b/.test(path)
+        /^\/api\/(project|apps|goals|features|activity|changes|nodes|settings|cache)\b/.test(path)
       ) {
         scheduleMainScreenPrefetch({ force: true, delayMs: 250 });
       }
@@ -875,7 +875,7 @@ function scheduleStartupProjectSync() {
       await syncProjectUpdates({ silent: true });
       invalidateScreenDataCache();
       if (state.currentRoute === "dashboard") refreshDashboard();
-      if (state.currentRoute === "gaps") refreshGapsTable();
+      if (state.currentRoute === "goals") refreshGoalsTable();
       if (state.currentRoute === "logs") loadLogs();
       if (state.currentRoute === "changes") loadChanges();
       if (["settings", "node", "project"].includes(state.currentRoute || "")) {
@@ -1144,9 +1144,9 @@ async function applyProjectAttachResult(result, options = {}) {
   }
   updateActiveNodeLabel();
   state.dashboard = null;
-  state.currentGap = null;
+  state.currentGoal = null;
   state.underlayHash = "#/node/application";
-  if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
+  if (typeof goalsExcludedIds !== "undefined") goalsExcludedIds.clear();
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
@@ -1285,7 +1285,7 @@ function backgroundOperationActiveMessage(err) {
 
 async function showActionError(err, fallbackPrefix = "") {
   if (isNodeOwnershipError(err)) {
-    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another node.", {
+    await modalAlert(err.message || "This action is not allowed because the Goal is owned by another node.", {
       kind: "error",
     });
     return;
@@ -1508,7 +1508,7 @@ async function refreshNodeScopedState({ selectReporterFallback = false } = {}) {
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
   state.reporters = [];
   state.dashboard = null;
-  state.currentGap = null;
+  state.currentGoal = null;
   setLastReporter("");
   populateAllReporterDropdowns();
   await refreshReporters({ selectFallback: selectReporterFallback });
@@ -1587,7 +1587,7 @@ function setLastReporter(name) {
   // selected reporter so the form replaces the "pick a reporter" notice.
   if (wasEmpty && name) {
     const r = state.currentRoute;
-    if (r === "gaps_new" || r === "gaps_import" || r === "gaps_detail") {
+    if (r === "goals_new" || r === "goals_import" || r === "goals_detail") {
       navigate();
     }
   }
@@ -1629,10 +1629,10 @@ document.addEventListener("click", (e) => {
   if (menuSummary) {
     closeTopbarMenus(menuSummary);
   }
-  if (e.target.closest("#btn-new-gap")) {
+  if (e.target.closest("#btn-new-goal")) {
     e.preventDefault();
     closeTopbarMenus();
-    runCommand("gap.new");
+    runCommand("goal.new");
   } else if (e.target.closest("#btn-plan")) {
     e.preventDefault();
     closeTopbarMenus();
@@ -1640,7 +1640,7 @@ document.addEventListener("click", (e) => {
   } else if (e.target.closest("#btn-import")) {
     e.preventDefault();
     closeTopbarMenus();
-    runCommand("gap.import");
+    runCommand("goal.import");
   } else if (e.target.closest("#btn-refine-issue, #btn-refine-issue-menu")) {
     e.preventDefault();
     closeTopbarMenus();
@@ -1729,7 +1729,7 @@ function initSSE() {
         });
       }
     } catch {}
-    // Refresh dashboard activity if visible; refresh current gap if relevant.
+    // Refresh dashboard activity if visible; refresh current goal if relevant.
     // Route through the silent `refresh*` paths — not `render*` — so the
     // screen doesn't blink back to `Loading…` on every event.
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
@@ -1745,7 +1745,7 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     // Refresh only the table on background updates so an in-progress
     // keystroke in the search box isn't interrupted by a full re-render.
-    if (state.currentRoute === "gaps") refreshGapsTable();
+    if (state.currentRoute === "goals") refreshGoalsTable();
     if (state.currentRoute === "logs") loadLogs();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
@@ -1753,8 +1753,8 @@ function initSSE() {
     // Changes screen: the Merge agent can land a new merge commit;
     // a cancellation flips an existing row's Undo button state.
     if (state.currentRoute === "changes") loadChanges();
-    if (state.currentRoute === "gaps_detail" && state.currentGap) {
-      loadGapDetail(state.currentGap);
+    if (state.currentRoute === "goals_detail" && state.currentGoal) {
+      loadGoalDetail(state.currentGoal);
     }
   });
   sseSource.addEventListener("target_app_state", () => {
@@ -1776,7 +1776,7 @@ function initSSE() {
     await refreshProjectStatus();
     if (
       state.currentRoute === "features" ||
-      state.currentRoute === "gaps" ||
+      state.currentRoute === "goals" ||
       state.currentRoute === "dashboard" ||
       (state.currentRoute === "node"
         && document.querySelector('[data-tab-pane="reporters"].active'))
@@ -1786,12 +1786,12 @@ function initSSE() {
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    if (state.currentRoute === "gaps") refreshGapsTable();
+    if (state.currentRoute === "goals") refreshGoalsTable();
     if (state.currentRoute === "logs") loadLogs();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) refreshCurrentSettingsSurface();
     if (state.currentRoute === "changes") loadChanges();
-    if (state.currentRoute === "gaps_detail" && state.currentGap) {
-      loadGapDetail(state.currentGap);
+    if (state.currentRoute === "goals_detail" && state.currentGoal) {
+      loadGoalDetail(state.currentGoal);
     }
   });
   sseSource.addEventListener("round_log_added", () => {

@@ -8,17 +8,17 @@
 
 ## Purpose
 
-Backlog exists so Refine can preserve work without pretending every known Gap should be acted on now. Imported, drafted, uncertain, or future work needs a durable place where it can be inspected and refined.
+Backlog exists so Refine can preserve work without pretending every known Goal should be acted on now. Imported, drafted, uncertain, or future work needs a durable place where it can be inspected and refined.
 
 ## Expected Role
 
-Backlog should protect intent while delaying commitment. A backlog Gap should still be readable, attributable, and connected to Features or source context, but it should not consume workflow capacity until it is promoted.
+Backlog should protect intent while delaying commitment. A backlog Goal should still be readable, attributable, and connected to Features or source context, but it should not consume workflow capacity until it is promoted.
 
-Promotion from backlog to todo should be explicit or policy-driven. It should preserve the Gap's context and make clear why the work is now eligible for action.
+Promotion from backlog to todo should be explicit or policy-driven. It should preserve the Goal's context and make clear why the work is now eligible for action.
 
 ## What Happens
 
-When a Gap is in backlog:
+When a Goal is in backlog:
 
 - Refine stores the work as durable target-app state.
 - Users or agents can inspect, edit, enrich, deduplicate, prioritize, or attach it to a Feature.

@@ -50,7 +50,7 @@ Effort: High (11 commits, 1 milestone)
 
 Milestones started: multi-node architecture.
 
-Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flow, active Gap cancellation during transfer, target app build, guidance.
+Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flow, active Goal cancellation during transfer, target app build, guidance.
 
 ## Day 8: 2026-05-20 (Wednesday)
 
@@ -58,7 +58,7 @@ Effort: Extreme (44 commits, 2 milestones)
 
 Milestones started: per-port Refine runtimes; cache/import/background-operation hardening.
 
-Huge systems day: backend isolation, gap ownership, node hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background operations.
+Huge systems day: backend isolation, goal ownership, node hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background operations.
 
 ## Day 9: 2026-05-21 (Thursday)
 
@@ -82,7 +82,7 @@ Effort: Extreme (35 commits, 2 milestones)
 
 Milestones started: recoverable import/reporter workflows; pre-merge Quality gate.
 
-Workflow breadth: recoverable and paginated Gap imports, duplicate review, reporter merge, target-app sync, agent status in nav, pre-merge Quality, Copilot provider support, and performance event pagination.
+Workflow breadth: recoverable and paginated Goal imports, duplicate review, reporter merge, target-app sync, agent status in nav, pre-merge Quality, Copilot provider support, and performance event pagination.
 
 ## Day 12: 2026-05-24 (Sunday)
 
@@ -154,15 +154,15 @@ Effort: High (16 commits, 5 milestones)
 
 Milestones started: Logs screen parity; CLI ergonomics; distributed cluster nodes; template packaging; runtime worker recovery hardening.
 
-Logs and CLI ergonomics sharpened, then the distributed runtime took over: the gap-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped workflow/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Gap failures.
+Logs and CLI ergonomics sharpened, then the distributed runtime took over: the goal-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped workflow/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Goal failures.
 
 ## Day 21: 2026-06-02 (Tuesday)
 
 Effort: Very High (22 commits, 5 milestones)
 
-Milestones started: supervisor-owned app switching; CLI/API operation centralization; port-scoped runtime correctness; black-box harness isolation; Gap chat workflow polish.
+Milestones started: supervisor-owned app switching; CLI/API operation centralization; port-scoped runtime correctness; black-box harness isolation; Goal chat workflow polish.
 
-Runtime ownership became much stricter: app state moved under checkout-local `run/<port>`, legacy runtime state was quarantined during migration, target apps stopped needing `/run/` ignores, status output listed every runtime port, and restart handling stopped letting old supervisors unlink newer sockets. The CLI and API also converged on shared operation logic with configured-port defaults, while the black-box harness stopped disturbing live supervisors. Product work kept pace with round extraction from Gap chat, round-count filters, owner labels, inline Gap metadata, and a chevron-driven activity panel in the Chat dock.
+Runtime ownership became much stricter: app state moved under checkout-local `run/<port>`, legacy runtime state was quarantined during migration, target apps stopped needing `/run/` ignores, status output listed every runtime port, and restart handling stopped letting old supervisors unlink newer sockets. The CLI and API also converged on shared operation logic with configured-port defaults, while the black-box harness stopped disturbing live supervisors. Product work kept pace with round extraction from Goal chat, round-count filters, owner labels, inline Goal metadata, and a chevron-driven activity panel in the Chat dock.
 
 ## Day 22: 2026-06-03 (Wednesday)
 
@@ -170,7 +170,7 @@ Effort: Very High (19 commits, 5 milestones)
 
 Milestones started: supervisor control-plane completion; live-port test isolation; app setup and README polish; failure-state cleanup; System operations observability.
 
-The supervisor became the real runtime control plane: CLI and UI calls now route backend work, target-app operations, attach, and switch actions through the supervisor instead of reaching for worker sockets directly. The test harness was pushed away from live port 8080, stale Gap failure noise was suppressed, merge workflow state persisted more reliably, README positioning and the new logo landed, app setup gained clearer clone-destination handling, extracted rounds respect the selected reporter, upgrade status moved into System, and the toolbar gained a System operations stream with multi-select status filters and a larger default history.
+The supervisor became the real runtime control plane: CLI and UI calls now route backend work, target-app operations, attach, and switch actions through the supervisor instead of reaching for worker sockets directly. The test harness was pushed away from live port 8080, stale Goal failure noise was suppressed, merge workflow state persisted more reliably, README positioning and the new logo landed, app setup gained clearer clone-destination handling, extracted rounds respect the selected reporter, upgrade status moved into System, and the toolbar gained a System operations stream with multi-select status filters and a larger default history.
 
 ## Day 23: 2026-06-04 (Thursday)
 
@@ -178,7 +178,7 @@ Effort: Very High (19 commits, 5 milestones)
 
 Milestones started: Feature workflow execution; Guide tabs and help polish; update/status visibility; chat and toolbar ergonomics; runtime cache/merger diagnostics.
 
-Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Gaps got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Gap preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the Merger.
+Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Goals got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Goal preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the Merger.
 
 ## Day 24: 2026-06-05 (Friday)
 
@@ -194,7 +194,7 @@ Effort: High (13 commits, 4 milestones)
 
 Milestones started: Axum web server migration; Rust web UI regression fixes; provider/chat reliability; Guide and runtime navigation polish.
 
-The Rust web surface stabilized around Axum and sharper runtime behavior: startup performance improved, management navigation and Guide field targets were corrected, system status learned to show running ports, and web Gap creation kept compatibility with the browser payload. Chat and provider paths were hardened through queued input, CLI auth for agent launches, provider success parsing, first-message focus preservation, and duplicate-send prevention across toolbar chat surfaces.
+The Rust web surface stabilized around Axum and sharper runtime behavior: startup performance improved, management navigation and Guide field targets were corrected, system status learned to show running ports, and web Goal creation kept compatibility with the browser payload. Chat and provider paths were hardened through queued input, CLI auth for agent launches, provider success parsing, first-message focus preservation, and duplicate-send prevention across toolbar chat surfaces.
 
 ## Day 26: 2026-06-07 (Sunday)
 
@@ -210,7 +210,7 @@ Effort: Extreme (52 commits, 7 milestones)
 
 Milestones started: full Rust release gate; multi-instance and cluster coverage; target-app and chat workflow fixes; installer/release hardening; UI regression cleanup; manual Docker release testing; 3.0 patch releases.
 
-The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Gap drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and 3.0 patch releases, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports and Docker-safe bind defaults. Long UI and workflow paths covering Features, Gaps, CSV import, chat, governance, and Settings were stabilized before the next patch release.
+The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Goal drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and 3.0 patch releases, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports and Docker-safe bind defaults. Long UI and workflow paths covering Features, Goals, CSV import, chat, governance, and Settings were stabilized before the next patch release.
 
 ## Day 28: 2026-06-09 (Tuesday)
 

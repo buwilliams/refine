@@ -1,6 +1,6 @@
 pub mod cluster;
 pub mod feature;
-pub mod gap;
+pub mod goal;
 pub mod log;
 pub mod node;
 pub mod project;

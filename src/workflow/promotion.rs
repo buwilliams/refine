@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 use crate::model::JsonObject;
-use crate::model::feature::compare_feature_gap_order;
-use crate::model::workflow::GapStatus;
+use crate::model::feature::compare_feature_goal_order;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
+use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug)]
@@ -41,23 +41,23 @@ impl BacklogPromotionService {
                 .active_node_id()?;
         let now = Utc::now();
         let mut candidates = snapshot
-            .gaps
+            .goals
             .values()
-            .filter(|projection| projection.gap.status == GapStatus::Backlog)
+            .filter(|projection| projection.goal.status == GoalStatus::Backlog)
             .filter(|projection| {
-                projection.gap.node_id.as_deref().unwrap_or("default") == active_node_id
+                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
             })
-            .filter(|projection| backlog_gap_age_seconds(projection, now) >= Some(threshold))
+            .filter(|projection| backlog_goal_age_seconds(projection, now) >= Some(threshold))
             .cloned()
             .collect::<Vec<_>>();
         candidates.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.updated.cmp(&b.gap.updated))
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.updated.cmp(&b.goal.updated))
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
         let mut promoted = 0;
-        for gap in candidates {
-            service.transition_gap_status(&gap.gap.id, GapStatus::Todo)?;
+        for goal in candidates {
+            service.transition_goal_status(&goal.goal.id, GoalStatus::Todo)?;
             promoted += 1;
         }
         Ok(promoted)
@@ -72,8 +72,8 @@ fn setting_i64(settings: &JsonObject, key: &str, fallback: i64) -> i64 {
         .unwrap_or(fallback)
 }
 
-fn backlog_gap_age_seconds(gap: &GapSummaryProjection, now: DateTime<Utc>) -> Option<i64> {
-    DateTime::parse_from_rfc3339(&gap.gap.updated)
+fn backlog_goal_age_seconds(goal: &GoalSummaryProjection, now: DateTime<Utc>) -> Option<i64> {
+    DateTime::parse_from_rfc3339(&goal.goal.updated)
         .ok()
         .map(|timestamp| {
             now.signed_duration_since(timestamp.with_timezone(&Utc))

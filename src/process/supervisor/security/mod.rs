@@ -784,15 +784,15 @@ mod tests {
     fn file_security_service_audits_and_enforces_host_command_allowlist() {
         let temp_root = unique_temp_dir("security");
         let security =
-            FileSecurityService::with_allowed_commands(&temp_root, ["gap.create", "gap.edit"]);
+            FileSecurityService::with_allowed_commands(&temp_root, ["goal.create", "goal.edit"]);
 
         assert_eq!(
             security.redact("Authorization token=secret"),
             "Authorization token=[redacted]"
         );
-        security.audit("cli", "gap.edit").unwrap();
+        security.audit("cli", "goal.edit").unwrap();
         security
-            .authorize_host_command("process_supervisor", "gap.create --dry-run")
+            .authorize_host_command("process_supervisor", "goal.create --dry-run")
             .unwrap();
         assert!(
             security

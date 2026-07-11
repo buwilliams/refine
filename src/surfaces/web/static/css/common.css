@@ -708,7 +708,7 @@ select {
 .agents-process-table .idle-col { width: 68px; }
 .agents-process-table .agent-actions-col { width: 92px; }
 .runner-workers-table .worker-col { width: 160px; }
-.runner-workers-table .gap-col { width: 120px; }
+.runner-workers-table .goal-col { width: 120px; }
 .runner-workers-table .queue-col { width: 72px; }
 .runner-workers-table .worker-actions-col { width: 188px; }
 .runner-workers-table td:first-child {
@@ -1379,8 +1379,8 @@ select {
 
 /* Bulk-action selection column on work-item lists. Narrow + centered;
    only rendered when the filter shell is expanded. */
-.table th.gap-select-col,
-.table td.gap-select-col,
+.table th.goal-select-col,
+.table td.goal-select-col,
 .table th.feature-select-col,
 .table td.feature-select-col {
   width: var(--work-item-select-width, 4%);
@@ -1388,7 +1388,7 @@ select {
   padding-right: 4px;
   text-align: center;
 }
-.table td.gap-select-col input[type="checkbox"],
+.table td.goal-select-col input[type="checkbox"],
 .table td.feature-select-col input[type="checkbox"] {
   cursor: pointer;
 }
@@ -1411,7 +1411,7 @@ select {
 .filter-row input[type="text"] { width: auto; }
 .filter-row input[type="number"].filter-number { width: 112px; }
 .filter-row .filter-grow { flex: 1; min-width: 240px; }
-.filter-row .filter-gap-id { width: 220px; }
+.filter-row .filter-goal-id { width: 220px; }
 .pagination {
   display: flex;
   align-items: center;
@@ -1420,7 +1420,7 @@ select {
   flex-wrap: wrap;
 }
 
-.gap-detail h2 { font-size: 22px; }
+.goal-detail h2 { font-size: 22px; }
 .round {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
@@ -1513,8 +1513,7 @@ select {
 .import-drafts-table .import-col-name { width: 18%; }
 .import-drafts-table .import-col-reporter { width: 14%; }
 .import-drafts-table .import-col-priority { width: 104px; }
-.import-drafts-table .import-col-actual,
-.import-drafts-table .import-col-target { width: auto; }
+.import-drafts-table .import-col-prompt { width: auto; }
 .import-drafts-table tr.needs-resolution {
   background: var(--warn-bg);
 }

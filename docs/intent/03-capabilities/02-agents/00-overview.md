@@ -32,9 +32,9 @@ The child documents in this section describe the supporting capabilities agents 
 The Agents capability should sit between Refine's intent and the outside world. It should help agents:
 
 - read target-app context, guidance, governance, settings, and existing work;
-- explore ideas and shape selected plans into reviewable Features and Gaps;
+- explore ideas and shape selected plans into reviewable Features and Goals;
 - select tools appropriate to the work;
-- create or refine Gaps and Features from imports, chats, plans, and source material;
+- create or refine Goals and Features from imports, chats, plans, and source material;
 - implement changes in an isolated Git branch or worktree when appropriate;
 - run or request target-app lifecycle work, tests, diagnostics, and quality checks;
 - attach logs, diffs, quality output, source context, and reasoning summaries to work;
@@ -54,7 +54,7 @@ The Agents capability should remain powerful. Refine's safety posture is mitigat
 
 ## Future Direction
 
-Future agents should become the main actors in Refine. They may decompose Features, import plans, implement Gaps, run quality checks, review other agents, resolve conflicts, prepare merges, update guidance, and coordinate across nodes.
+Future agents should become the main actors in Refine. They may decompose Features, import plans, implement Goals, run quality checks, review other agents, resolve conflicts, prepare merges, update guidance, and coordinate across nodes.
 
 As agents improve, the capability should become less transcript-bound and more evidence-aware. Agents should produce structured plans, source links, tests, risk summaries, dependency graphs, review notes, merge summaries, and recovery proposals.
 

@@ -11,7 +11,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 pub trait LogService {
     fn append(&self, entry: LogEntry) -> RefineResult<()>;
     fn query(&self, query: LogQuery) -> RefineResult<Vec<LogEntry>>;
-    fn round_logs(&self, gap_id: &str, round_idx: usize) -> RefineResult<Vec<RoundLogEntry>>;
+    fn round_logs(&self, goal_id: &str, round_idx: usize) -> RefineResult<Vec<RoundLogEntry>>;
     fn tail(&self, category: Option<&str>) -> RefineResult<String>;
 }
 
@@ -29,25 +29,25 @@ impl FileLogService {
 
     pub fn append_round_log(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         round_idx: usize,
         mut entry: LogEntry,
     ) -> RefineResult<RoundLogEntry> {
         if entry.datetime.trim().is_empty() {
             entry.datetime = now_timestamp();
         }
-        if entry.gap_id.is_none() {
-            entry.gap_id = Some(gap_id.to_string());
+        if entry.goal_id.is_none() {
+            entry.goal_id = Some(goal_id.to_string());
         }
         let round_entry = RoundLogEntry {
             entry,
             round_idx: Some(round_idx),
         };
-        let path = gap_logs_path(&self.refine_dir, gap_id);
+        let path = goal_logs_path(&self.refine_dir, goal_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to create Gap log directory {}: {error}",
+                    "failed to create Goal log directory {}: {error}",
                     parent.display()
                 ))
             })?;
@@ -58,7 +58,7 @@ impl FileLogService {
             .open(&path)
             .map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to open Gap log sidecar {}: {error}",
+                    "failed to open Goal log sidecar {}: {error}",
                     path.display()
                 ))
             })?;
@@ -67,7 +67,7 @@ impl FileLogService {
         })?;
         writeln!(file, "{encoded}").map_err(|error| {
             RefineError::Io(format!(
-                "failed to append Gap log sidecar {}: {error}",
+                "failed to append Goal log sidecar {}: {error}",
                 path.display()
             ))
         })?;
@@ -76,12 +76,12 @@ impl FileLogService {
 
     pub fn page_round_logs(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         round_idx: usize,
         limit: usize,
         offset: usize,
     ) -> RefineResult<(Vec<RoundLogEntry>, bool, usize)> {
-        let mut entries = self.round_logs(gap_id, round_idx)?;
+        let mut entries = self.round_logs(goal_id, round_idx)?;
         entries.sort_by(|a, b| {
             a.entry
                 .datetime
@@ -95,18 +95,18 @@ impl FileLogService {
         Ok((page, has_more, total))
     }
 
-    pub fn all_round_logs(&self, gap_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
-        self.read_sidecar(gap_id)
+    pub fn all_round_logs(&self, goal_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
+        self.read_sidecar(goal_id)
     }
 
-    fn read_sidecar(&self, gap_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
-        let path = gap_logs_path(&self.refine_dir, gap_id);
+    fn read_sidecar(&self, goal_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
+        let path = goal_logs_path(&self.refine_dir, goal_id);
         if !path.exists() {
             return Ok(Vec::new());
         }
         let file = fs::File::open(&path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to open Gap log sidecar {}: {error}",
+                "failed to open Goal log sidecar {}: {error}",
                 path.display()
             ))
         })?;
@@ -114,7 +114,7 @@ impl FileLogService {
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to read Gap log sidecar {}: {error}",
+                    "failed to read Goal log sidecar {}: {error}",
                     path.display()
                 ))
             })?;
@@ -123,7 +123,7 @@ impl FileLogService {
             }
             let entry = parse_round_log_line(&line).map_err(|error| {
                 RefineError::Serialization(format!(
-                    "failed to parse Gap log sidecar {}: {error}",
+                    "failed to parse Goal log sidecar {}: {error}",
                     path.display()
                 ))
             })?;
@@ -148,7 +148,7 @@ fn normalize_round_log_value(value: Value) -> Value {
             "details": null,
             "actions": [],
             "actor": null,
-            "gap_id": null,
+            "goal_id": null,
             "round_idx": null
         }),
         Value::Object(mut object) => {
@@ -173,29 +173,28 @@ fn normalize_round_log_value(value: Value) -> Value {
 
 impl LogService for FileLogService {
     fn append(&self, entry: LogEntry) -> RefineResult<()> {
-        let gap_id = entry
-            .gap_id
-            .clone()
-            .ok_or_else(|| RefineError::InvalidInput("round log gap_id is required".to_string()))?;
-        self.append_round_log(&gap_id, 0, entry)?;
+        let goal_id = entry.goal_id.clone().ok_or_else(|| {
+            RefineError::InvalidInput("round log goal_id is required".to_string())
+        })?;
+        self.append_round_log(&goal_id, 0, entry)?;
         Ok(())
     }
 
     fn query(&self, query: LogQuery) -> RefineResult<Vec<LogEntry>> {
-        let gap_id = query
-            .gap_id
-            .ok_or_else(|| RefineError::InvalidInput("gap_id is required".to_string()))?;
+        let goal_id = query
+            .goal_id
+            .ok_or_else(|| RefineError::InvalidInput("goal_id is required".to_string()))?;
         let round_idx = query.offset.unwrap_or(0);
         Ok(self
-            .round_logs(&gap_id, round_idx)?
+            .round_logs(&goal_id, round_idx)?
             .into_iter()
             .map(|entry| entry.entry)
             .collect())
     }
 
-    fn round_logs(&self, gap_id: &str, round_idx: usize) -> RefineResult<Vec<RoundLogEntry>> {
+    fn round_logs(&self, goal_id: &str, round_idx: usize) -> RefineResult<Vec<RoundLogEntry>> {
         Ok(self
-            .read_sidecar(gap_id)?
+            .read_sidecar(goal_id)?
             .into_iter()
             .filter(|entry| entry.round_idx == Some(round_idx))
             .collect())
@@ -213,12 +212,12 @@ fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-fn gap_logs_path(refine_dir: &Path, gap_id: &str) -> PathBuf {
-    let gap_id = gap_id.to_uppercase();
+fn goal_logs_path(refine_dir: &Path, goal_id: &str) -> PathBuf {
+    let goal_id = goal_id.to_uppercase();
     refine_dir
-        .join("gaps")
-        .join(&gap_id[..2])
-        .join(&gap_id[2..])
+        .join("goals")
+        .join(&goal_id[..2])
+        .join(&goal_id[2..])
         .join("logs.jsonl")
 }
 
@@ -240,17 +239,17 @@ mod tests {
             details: None,
             actions: Vec::new(),
             actor: Some("refine".to_string()),
-            gap_id: None,
+            goal_id: None,
         };
-        let written = service.append_round_log("GAP1", 1, entry).unwrap();
+        let written = service.append_round_log("GOAL1", 1, entry).unwrap();
         assert_eq!(written.round_idx, Some(1));
-        assert!(refine_dir.join("gaps/GA/P1/logs.jsonl").exists());
+        assert!(refine_dir.join("goals/GO/AL1/logs.jsonl").exists());
 
-        let (page, has_more, total) = service.page_round_logs("GAP1", 1, 50, 0).unwrap();
+        let (page, has_more, total) = service.page_round_logs("GOAL1", 1, 50, 0).unwrap();
         assert!(!has_more);
         assert_eq!(total, 1);
-        assert_eq!(page[0].entry.gap_id.as_deref(), Some("GAP1"));
-        assert_eq!(service.round_logs("GAP1", 0).unwrap().len(), 0);
+        assert_eq!(page[0].entry.goal_id.as_deref(), Some("GOAL1"));
+        assert_eq!(service.round_logs("GOAL1", 0).unwrap().len(), 0);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -259,16 +258,16 @@ mod tests {
     fn file_log_service_tolerates_legacy_string_details_in_round_sidecar() {
         let temp_root = unique_temp_dir("round-logs-legacy-details");
         let refine_dir = temp_root.join(".refine");
-        let path = gap_logs_path(&refine_dir, "GAP1");
+        let path = goal_logs_path(&refine_dir, "GOAL1");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
             &path,
-            r#"{"datetime":"2026-06-06T00:00:00Z","severity":"warn","category":"quality","message":"Provider note","details":"Moving code into src/ may be acceptable","actions":[],"actor":"refine","gap_id":"GAP1","round_idx":1}"#,
+            r#"{"datetime":"2026-06-06T00:00:00Z","severity":"warn","category":"quality","message":"Provider note","details":"Moving code into src/ may be acceptable","actions":[],"actor":"refine","goal_id":"GOAL1","round_idx":1}"#,
         )
         .unwrap();
 
         let service = FileLogService::new(&refine_dir);
-        let logs = service.round_logs("GAP1", 1).unwrap();
+        let logs = service.round_logs("GOAL1", 1).unwrap();
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].entry.message, "Provider note");

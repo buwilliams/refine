@@ -309,13 +309,13 @@ button.toolbar-tab:hover:not(:disabled),
   white-space: nowrap;
 }
 
-.chat-gap-link {
+.chat-goal-link {
   font-size: 13px;
   font-weight: 650;
   color: var(--accent);
   text-decoration: none;
 }
-.chat-gap-link:hover { text-decoration: underline; }
+.chat-goal-link:hover { text-decoration: underline; }
 
 .chat-progress-panel {
   border-top: 1px solid var(--color-border-subtle);

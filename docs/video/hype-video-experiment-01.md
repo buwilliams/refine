@@ -16,7 +16,7 @@ Value proposition:
 
 - **Decentralized:** Local repo, git, provider, machine, existing processes, and
   infrastructure.
-- **Cheap feedback loops:** Gaps turn feedback into reviewable agent work.
+- **Cheap feedback loops:** Goals turn feedback into reviewable agent work.
 - **Planning and chat:** People can think, steer, and follow up in context.
 - **Quality automation:** Guidance, Governance, and Quality align the work.
 - **Human verification:** People review before anything is done.
@@ -42,15 +42,15 @@ Then move directly into capabilities.
 Record short OBS clips with clean cursor movement, no waiting, and no private
 data visible.
 
-- **Intro:** Refine dashboard loaded with real-looking Gaps, activity, statuses,
+- **Intro:** Refine dashboard loaded with real-looking Goals, activity, statuses,
   and agent state.
 - **Dashboard:** needs attention, running agents, review queue, and recent
   activity.
-- **New Gap:** `+ New Gap`, reporter/context selector, actual behavior, target
+- **New Goal:** `+ New Goal`, reporter/context selector, actionable prompt
   behavior, and submit.
 - **Import:** paste a bug report, customer note, meeting transcript, or feature spec;
-  show extracted draft Gaps and the review/confirm flow.
-- **Plan / Chat:** create-menu Plan flow and attached `Open Chat` on a Gap.
+  show extracted draft Goals and the review/confirm flow.
+- **Plan / Chat:** create-menu Plan flow and attached `Open Chat` on a Goal.
 - **Agent workflow:** status movement through `todo`, `in-progress`,
   `ready-merge`, `review`, and `done`.
 - **Quality:** Quality gate and test evidence, preferably including a
@@ -78,13 +78,13 @@ Use this as the base narration, paced around 80 seconds:
 > Refine helps teams build, fix, and verify software with agents, without giving
 > up local ownership or human control.
 >
-> Start with a Gap: what the app does now, what it should do instead, and who
+> Start with a Goal: what the app does now, what it should do instead, and who
 > reported it.
 >
 > Create one manually, or paste a bug report, customer note, or meeting
 > transcript. Refine turns real feedback into reviewable work.
 >
-> Each Gap gets its own agent run, its own branch, and its own worktree, so
+> Each Goal gets its own agent run, its own branch, and its own worktree, so
 > multiple changes can move at once while git keeps the work isolated and
 > traceable.
 >
@@ -118,10 +118,10 @@ state user value, not just name UI features.
 | --- | --- | --- | --- |
 | 0-4s | Opening question | Fast dashboard montage | Agentic software delivery? |
 | 4-8s | Reveal | Refine title, dashboard, top nav | Introducing Refine |
-| 8-18s | Capture work | `+ New Gap`, actual/target fields, reporter | Product intent becomes work |
-| 18-28s | Import | Paste messy feedback, extracted draft Gaps | Feedback becomes Gaps |
+| 8-18s | Capture work | `+ New Goal`, prompt field, reporter | Product intent becomes work |
+| 18-28s | Import | Paste messy feedback, extracted draft Goals | Feedback becomes Goals |
 | 28-42s | Agents running | Status changes, activity feed, running indicator | Parallel work, clean git |
-| 42-58s | Review and steer | Gap detail, logs, Chat, Files/Changes, `Verify` | Humans approve what ships |
+| 42-58s | Review and steer | Goal detail, logs, Chat, Files/Changes, `Verify` | Humans approve what ships |
 | 58-70s | Quality/control | Quality, Guidance, Governance | Automation follows intent |
 | 70-84s | Operations | Processes, workers, pause/resume, target app controls | Runtime you can operate |
 | 84-94s | CTA | Install command and polished dashboard final frame | Start shipping verified changes |
@@ -130,7 +130,7 @@ state user value, not just name UI features.
 
 - Keep UI clips between 3 and 7 seconds.
 - Trim all waits, loading time, and repeated cursor movement.
-- Use quick zooms on meaningful states: created Gap, extracted drafts, running
+- Use quick zooms on meaningful states: created Goal, extracted drafts, running
   agent, review, verify, Quality result, and process table.
 - Keep hype music energetic but low enough for narration to stay clear.
 - Use captions as short value statements tied to the visible capability.

@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::model::JsonObject;
 use crate::model::log::LogEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::MergeResult;
@@ -16,7 +16,7 @@ pub struct WorkflowContext<'a> {
     pub runtime_root: &'a Path,
     pub target_root: &'a Path,
     pub claim_id: String,
-    pub gap_id: String,
+    pub goal_id: String,
     pub provider: String,
     pub execution_id: &'a str,
     pub round_idx: usize,
@@ -29,7 +29,7 @@ pub struct WorkflowContext<'a> {
     pub commit: Option<String>,
     pub implementation_changed: bool,
     pub merge: Option<MergeResult>,
-    pub final_status: Option<GapStatus>,
+    pub final_status: Option<GoalStatus>,
 }
 
 impl<'a> WorkflowContext<'a> {
@@ -46,7 +46,7 @@ impl<'a> WorkflowContext<'a> {
             runtime_root,
             target_root,
             claim_id: claim.claim_id,
-            gap_id: claim.gap_id,
+            goal_id: claim.goal_id,
             provider: claim.provider,
             execution_id,
             round_idx,
@@ -75,9 +75,9 @@ impl<'a> WorkflowContext<'a> {
         self.target_root.join(".refine")
     }
 
-    pub fn request_transition(&mut self, from: GapStatus, to: GapStatus) -> RefineResult<()> {
+    pub fn request_transition(&mut self, from: GoalStatus, to: GoalStatus) -> RefineResult<()> {
         self.work_items
-            .advance_automated_gap_status(&self.gap_id, to.clone())?;
+            .advance_automated_goal_status(&self.goal_id, to.clone())?;
         self.log(
             "state",
             &format!(
@@ -100,7 +100,7 @@ impl<'a> WorkflowContext<'a> {
             .entry("execution_id".to_string())
             .or_insert_with(|| json!(self.execution_id));
         FileLogService::new(self.refine_dir()).append_round_log(
-            &self.gap_id,
+            &self.goal_id,
             self.round_idx,
             LogEntry {
                 datetime: now_timestamp(),
@@ -110,7 +110,7 @@ impl<'a> WorkflowContext<'a> {
                 details: Some(details),
                 actions: Vec::new(),
                 actor: Some("refine".to_string()),
-                gap_id: Some(self.gap_id.clone()),
+                goal_id: Some(self.goal_id.clone()),
             },
         )?;
         Ok(())
@@ -119,7 +119,7 @@ impl<'a> WorkflowContext<'a> {
     pub fn fail(&self, category: &str, error: &RefineError) -> RefineResult<()> {
         let _ = self
             .work_items
-            .advance_automated_gap_status(&self.gap_id, GapStatus::Failed);
+            .advance_automated_goal_status(&self.goal_id, GoalStatus::Failed);
         self.log(
             category,
             &format!("Workflow failed: {error}"),
@@ -130,7 +130,7 @@ impl<'a> WorkflowContext<'a> {
     pub fn workflow_process_metadata(&self, workflow_state: &str, behavior: &str) -> JsonObject {
         workflow_subprocess_metadata(
             self.execution_id,
-            &self.gap_id,
+            &self.goal_id,
             workflow_state,
             behavior,
             Some(self.round_idx),
@@ -140,30 +140,30 @@ impl<'a> WorkflowContext<'a> {
     pub fn require_branch(&self) -> RefineResult<&str> {
         self.branch
             .as_deref()
-            .ok_or_else(|| missing_artifact("branch", &self.gap_id))
+            .ok_or_else(|| missing_artifact("branch", &self.goal_id))
     }
 
     pub fn require_worktree_path(&self) -> RefineResult<&str> {
         self.worktree_path
             .as_deref()
-            .ok_or_else(|| missing_artifact("worktree", &self.gap_id))
+            .ok_or_else(|| missing_artifact("worktree", &self.goal_id))
     }
 
     pub fn require_agent_cwd(&self) -> RefineResult<&Path> {
         self.agent_cwd
             .as_deref()
-            .ok_or_else(|| missing_artifact("agent cwd", &self.gap_id))
+            .ok_or_else(|| missing_artifact("agent cwd", &self.goal_id))
     }
 
     pub fn require_commit(&self) -> RefineResult<&str> {
         self.commit
             .as_deref()
-            .ok_or_else(|| missing_artifact("commit", &self.gap_id))
+            .ok_or_else(|| missing_artifact("commit", &self.goal_id))
     }
 }
 
-fn missing_artifact(name: &str, gap_id: &str) -> RefineError {
+fn missing_artifact(name: &str, goal_id: &str) -> RefineError {
     RefineError::Conflict(format!(
-        "workflow artifact {name} is missing for Gap {gap_id}"
+        "workflow artifact {name} is missing for Goal {goal_id}"
     ))
 }

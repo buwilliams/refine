@@ -49,7 +49,7 @@ fn tools_list_exposes_the_catalog() {
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
     assert!(names.contains(&"refine_system_status"));
-    assert!(names.contains(&"refine_list_gaps"));
+    assert!(names.contains(&"refine_list_goals"));
     assert!(names.contains(&"refine_request"));
     // Every advertised tool must carry an input schema.
     assert!(tools.iter().all(|tool| tool["inputSchema"].is_object()));
@@ -76,11 +76,11 @@ fn tool_call_substitutes_path_parameters() {
         "jsonrpc": "2.0",
         "id": 4,
         "method": "tools/call",
-        "params": {"name": "refine_show_gap", "arguments": {"gap_id": "GAP1"}},
+        "params": {"name": "refine_show_goal", "arguments": {"goal_id": "GOAL1"}},
     }));
     assert_eq!(
         response["result"]["structuredContent"]["path"],
-        "/work/gaps/GAP1"
+        "/work/goals/GOAL1"
     );
 }
 
@@ -92,12 +92,12 @@ fn passthrough_tool_forwards_method_path_and_body() {
         "method": "tools/call",
         "params": {
             "name": "refine_request",
-            "arguments": {"method": "post", "path": "/work/gaps", "body": {"name": "x"}},
+            "arguments": {"method": "post", "path": "/work/goals", "body": {"name": "x"}},
         },
     }));
     let echoed = &response["result"]["structuredContent"];
     assert_eq!(echoed["method"], "POST");
-    assert_eq!(echoed["path"], "/work/gaps");
+    assert_eq!(echoed["path"], "/work/goals");
     assert_eq!(echoed["body"]["name"], "x");
 }
 
@@ -107,7 +107,7 @@ fn missing_path_parameter_is_a_tool_error_not_a_protocol_error() {
         "jsonrpc": "2.0",
         "id": 6,
         "method": "tools/call",
-        "params": {"name": "refine_show_gap", "arguments": {}},
+        "params": {"name": "refine_show_goal", "arguments": {}},
     }));
     assert!(response.get("error").is_none());
     assert_eq!(response["result"]["isError"], true);

@@ -22,8 +22,8 @@ function renderSettingsReportersTab(reps, activeNodeLabel) {
         <button id="r-add" data-testid="reporter-add">+ Add reporter</button>
       </div>
       <p class="muted small" style="margin-top:6px">
-        Renaming a reporter cascades through every Gap's rounds so historical
-        data stays in sync. Merging a reporter moves its Gaps to another
+        Renaming a reporter cascades through every Goal's rounds so historical
+        data stays in sync. Merging a reporter moves its Goals to another
         reporter and removes the old reporter from the dropdown. Removing a
         reporter only affects the dropdown — historical rounds keep their
         original reporter string so audit history is preserved.
@@ -106,7 +106,7 @@ function openReporterMergeModal(source) {
     <div class="modal-title">Merge reporter</div>
     <div class="modal-body">
       <p class="muted" style="margin-top:0">
-        Move every Gap reported by <strong>${htmlEscape(source.name)}</strong>
+        Move every Goal reported by <strong>${htmlEscape(source.name)}</strong>
         to another reporter, then remove <strong>${htmlEscape(source.name)}</strong>
         from the dropdown.
       </p>

@@ -98,21 +98,21 @@ impl IntegrationFixture {
         );
     }
 
-    pub fn create_gap(&self, name: &str) -> String {
-        let output = self.run_refine(&["gap", "create", name]);
-        self.assert_success("gap create", &output);
+    pub fn create_goal(&self, name: &str) -> String {
+        let output = self.run_refine(&["goal", "create", name]);
+        self.assert_success("goal create", &output);
         let value = self.json_stdout(&output);
-        value["gap"]["id"]
+        value["goal"]["id"]
             .as_str()
-            .expect("gap create should return gap.id")
+            .expect("goal create should return goal.id")
             .to_string()
     }
 
     #[allow(dead_code)]
-    pub fn gap_field(&self, id: &str, field: &str) -> serde_json::Value {
-        let output = self.run_refine(&["gap", "show", id]);
-        self.assert_success("gap show", &output);
-        self.json_stdout(&output)["gap"][field].clone()
+    pub fn goal_field(&self, id: &str, field: &str) -> serde_json::Value {
+        let output = self.run_refine(&["goal", "show", id]);
+        self.assert_success("goal show", &output);
+        self.json_stdout(&output)["goal"][field].clone()
     }
 
     pub fn api_json(&self, method: &str, path: &str, body: serde_json::Value) -> serde_json::Value {

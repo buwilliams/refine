@@ -122,8 +122,8 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
     runner_reachable: runnerReachable,
     pid: null,
     details: workflowPaused
-      ? "Workflow automation is paused; Gap agents, QA, builds, and merges wait."
-      : "Workflow automation can run Gap agents, QA, builds, and merges.",
+      ? "Workflow automation is paused; Goal agents, QA, builds, and merges wait."
+      : "Workflow automation can run Goal agents, QA, builds, and merges.",
     agents_paused: agentsPaused,
     background_processes_stopped: backgroundStopped,
     actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
@@ -329,13 +329,13 @@ function renderAgentProcessRow(proc, anchorMs) {
     ? `<span class="js-idle-tick" data-base="${Number(proc.idle_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.idle_seconds || 0)}</span>`
     : `<span class="muted small">-</span>`;
   const label = kind === "chat"
-    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
-    : proc.gap_id
-    ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+    ? `${htmlEscape(proc.mode === "goal" ? "Goal chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
+    : proc.goal_id
+    ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
     : htmlEscape(proc.label || "Agent");
   const context = kind === "chat"
-    ? proc.gap_id
-      ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+    ? proc.goal_id
+      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
       : "standalone"
     : proc.round_idx != null
     ? String(Number(proc.round_idx) + 1)
@@ -361,12 +361,12 @@ function renderSubprocessProcessRow(proc, anchorMs) {
     ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
     : `<span class="muted small">-</span>`;
   const label = kind === "chat"
-    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
-    : kind === "agent" && proc.gap_id
-      ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+    ? `${htmlEscape(proc.mode === "goal" ? "Goal chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
+    : kind === "agent" && proc.goal_id
+      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
       : htmlEscape(proc.label || processKindLabel(kind));
   const details = [
-    proc.gap_id ? `Gap ${proc.gap_id}` : "",
+    proc.goal_id ? `Goal ${proc.goal_id}` : "",
     proc.round_idx != null ? `round ${Number(proc.round_idx) + 1}` : "",
     managedProcessDetails(proc),
   ].filter(Boolean).join(" · ");
@@ -492,7 +492,7 @@ function processActionIds(proc) {
 
 function isSupportedProcessActionId(proc, actionId) {
   if (["pause_workflow", "unpause_workflow", "hard_reset_worktree"].includes(actionId)) return true;
-  if (actionId === "cancel_agent") return proc.kind === "agent" && !!proc.gap_id;
+  if (actionId === "cancel_agent") return proc.kind === "agent" && !!proc.goal_id;
   if (actionId === "stop_chat" || actionId === "stop") return proc.kind === "chat" && !!proc.session_id;
   return false;
 }
@@ -500,8 +500,8 @@ function isSupportedProcessActionId(proc, actionId) {
 function renderProcessActions(proc) {
   const actionIds = processActionIds(proc);
   if (actionIds) return renderProcessActionButtons(proc, actionIds);
-  if (proc.kind === "agent" && proc.gap_id) {
-    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
+  if (proc.kind === "agent" && proc.goal_id) {
+    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
   }
   if (proc.kind === "chat" && proc.session_id) {
     return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
@@ -544,8 +544,8 @@ function renderProcessActionButton(proc, actionId) {
     const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
     return `<button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${disabled ? "disabled" : ""}>Hard reset worktree</button>`;
   }
-  if (actionId === "cancel_agent" && proc.kind === "agent" && proc.gap_id) {
-    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
+  if (actionId === "cancel_agent" && proc.kind === "agent" && proc.goal_id) {
+    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
   }
   if ((actionId === "stop_chat" || actionId === "stop") && proc.kind === "chat" && proc.session_id) {
     return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
@@ -610,7 +610,7 @@ function renderRunnerWorkRow(work, anchorMs) {
     : `<span class="muted small">-</span>`;
   const queued = Number(work.queued || 0);
   const details = [
-    work.gap_id ? `Gap ${work.gap_id}` : "",
+    work.goal_id ? `Goal ${work.goal_id}` : "",
     queued ? `queue ${fmtCount(queued)}` : "",
     work.details || work.last_outcome || "",
   ].filter(Boolean).join(" · ");
@@ -666,8 +666,8 @@ function runnerWorkKindLabel(kind) {
     activity_log_cleanup: "activity log cleanup",
     import_prepare: "import preparer",
     import_persist: "import persister",
-    bulk_update_gaps: "bulk Gap updater",
-    bulk_delete_gaps: "bulk Gap deleter",
+    bulk_update_goals: "bulk Goal updater",
+    bulk_delete_goals: "bulk Goal deleter",
   }[kind] || "worker";
 }
 
@@ -887,7 +887,7 @@ function bindSettingsProcessesTab(s) {
       const shouldPause = b.dataset.toggleWorkflow === "pause";
       const ok = shouldPause
         ? await modalConfirm(
-            "Pause workflow automation? Refine will stop launching Gap agents, QA, builds, and merges until you unpause.",
+            "Pause workflow automation? Refine will stop launching Goal agents, QA, builds, and merges until you unpause.",
             { title: "Pause Workflow", okLabel: "Pause Workflow", danger: true },
           )
         : true;
@@ -907,14 +907,14 @@ function bindSettingsProcessesTab(s) {
     b.addEventListener("click", async () => {
       const id = b.dataset.cancelAgent;
       const ok = await modalConfirm(
-        "Cancel this Gap's running subprocess?",
+        "Cancel this Goal's running subprocess?",
         { title: "Cancel run", okLabel: "Cancel run", danger: true,
           cancelLabel: "Keep running" },
       );
       if (!ok) return;
       await withButtonBusy(b, "Cancelling…", async () => {
         try {
-          await api("POST", `/api/gaps/${id}/cancel`);
+          await api("POST", `/api/goals/${id}/cancel`);
           await refreshProcessesSettingsTab();
         } catch (e) { await showActionError(e); }
       });

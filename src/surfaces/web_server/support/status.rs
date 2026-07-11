@@ -40,29 +40,29 @@ pub(in crate::surfaces::web_server) struct RuntimeReconcileSummary {
 pub(in crate::surfaces::web_server) fn runtime_record_matches(
     process: &ManagedProcess,
     feature_id: &str,
-    gap_ids: &[String],
+    goal_ids: &[String],
 ) -> bool {
-    process_text_matches(process.label.as_deref(), feature_id, gap_ids)
-        || process_text_matches(process.details.as_deref(), feature_id, gap_ids)
+    process_text_matches(process.label.as_deref(), feature_id, goal_ids)
+        || process_text_matches(process.details.as_deref(), feature_id, goal_ids)
 }
 
 pub(in crate::surfaces::web_server) fn operation_owner_matches(
     owner: &str,
     feature_id: &str,
-    gap_ids: &[String],
+    goal_ids: &[String],
 ) -> bool {
-    process_text_matches(Some(owner), feature_id, gap_ids)
+    process_text_matches(Some(owner), feature_id, goal_ids)
 }
 
 pub(in crate::surfaces::web_server) fn process_text_matches(
     text: Option<&str>,
     feature_id: &str,
-    gap_ids: &[String],
+    goal_ids: &[String],
 ) -> bool {
     let Some(text) = text else {
         return false;
     };
-    text.contains(feature_id) || gap_ids.iter().any(|gap_id| text.contains(gap_id))
+    text.contains(feature_id) || goal_ids.iter().any(|goal_id| text.contains(goal_id))
 }
 
 pub(in crate::surfaces::web_server) fn target_root_unavailable(action: &str) -> ApiResponse {

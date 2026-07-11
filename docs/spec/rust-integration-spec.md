@@ -85,7 +85,7 @@ surfaces:
 - `system status`, `system doctor`, and `system api-groups`.
 - `project status`, `attach`, `switch`, `detach`, `register`, `clone`,
   `remove`, `migrate`, and `sync`.
-- Gap lifecycle commands: create, list, show, edit, note, round, workflow
+- Goal lifecycle commands: create, list, show, edit, note, round, workflow
   movement, retry, verify, merge, undo, and delete.
 - Feature lifecycle and membership commands.
 - Node registry and cluster-operation commands.

@@ -7,10 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::model::feature::{FeatureIndexProjection, FeatureRollup, compare_feature_gap_order};
-use crate::model::gap::GapIndexProjection;
+use crate::model::feature::{FeatureIndexProjection, FeatureRollup, compare_feature_goal_order};
+use crate::model::goal::GoalIndexProjection;
 use crate::model::log::{ActivityEntry, RoundLogEntry};
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
@@ -97,7 +97,7 @@ impl FileProjectStateStore {
 
     pub fn collect_source_fingerprints(&self) -> RefineResult<BTreeMap<String, SourceFingerprint>> {
         let mut source_fingerprints = BTreeMap::new();
-        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "gap.json")? {
+        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
@@ -105,7 +105,7 @@ impl FileProjectStateStore {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
-        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "logs.jsonl")? {
+        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
@@ -192,7 +192,7 @@ impl FileProjectStateStore {
         })
     }
 
-    fn project_gap(&self, path: &Path) -> RefineResult<Option<GapSummaryProjection>> {
+    fn project_goal(&self, path: &Path) -> RefineResult<Option<GoalSummaryProjection>> {
         let value = Self::read_json(path)?;
         let Some(object) = value.as_object() else {
             return Ok(None);
@@ -208,7 +208,7 @@ impl FileProjectStateStore {
             .cloned()
             .unwrap_or_default();
         let valid_rounds: Vec<&Value> = rounds.iter().filter(|round| round.is_object()).collect();
-        let reporter = gap_reporter(object, &valid_rounds);
+        let reporter = goal_reporter(object, &valid_rounds);
         let assignee = latest_round_assignee(object, &valid_rounds);
         let notes = object
             .get("notes")
@@ -216,7 +216,7 @@ impl FileProjectStateStore {
             .cloned()
             .unwrap_or_default();
         let mut searchable_parts = vec![
-            text(object.get("name")).unwrap_or_else(|| "Untitled Gap".to_string()),
+            text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
             reporter.clone().unwrap_or_default(),
             assignee.clone().unwrap_or_default(),
         ];
@@ -227,7 +227,7 @@ impl FileProjectStateStore {
         }
         for round in &valid_rounds {
             if let Some(round) = round.as_object() {
-                for key in ["reporter", "assignee", "actual", "target"] {
+                for key in ["reporter", "assignee", "prompt"] {
                     if let Some(value) = text(round.get(key)) {
                         searchable_parts.push(value);
                     }
@@ -235,12 +235,12 @@ impl FileProjectStateStore {
             }
         }
 
-        Ok(Some(GapSummaryProjection {
-            gap: GapIndexProjection {
+        Ok(Some(GoalSummaryProjection {
+            goal: GoalIndexProjection {
                 id,
-                name: text(object.get("name")).unwrap_or_else(|| "Untitled Gap".to_string()),
-                status: gap_status(object.get("status")),
-                priority: gap_priority(object.get("priority")),
+                name: text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
+                status: goal_status(object.get("status")),
+                priority: goal_priority(object.get("priority")),
                 reporter,
                 assignee,
                 round_count: valid_rounds.len(),
@@ -335,18 +335,18 @@ impl FileProjectStateStore {
         Ok(activity)
     }
 
-    fn project_gap_round_activity(
+    fn project_goal_round_activity(
         &self,
-        gaps: &BTreeMap<String, GapSummaryProjection>,
+        goals: &BTreeMap<String, GoalSummaryProjection>,
     ) -> RefineResult<BTreeMap<String, ActivitySummaryProjection>> {
         let log_service = FileLogService::new(&self.refine_dir);
         let mut activity = BTreeMap::new();
-        for gap_id in gaps.keys() {
-            if gap_id.len() < 2 {
+        for goal_id in goals.keys() {
+            if goal_id.len() < 2 {
                 continue;
             }
-            for (index, log) in log_service.all_round_logs(gap_id)?.into_iter().enumerate() {
-                let entry = round_log_activity_entry(gap_id, index, log);
+            for (index, log) in log_service.all_round_logs(goal_id)?.into_iter().enumerate() {
+                let entry = round_log_activity_entry(goal_id, index, log);
                 let searchable_text = activity_searchable_text(&entry);
                 activity.insert(
                     entry.id.clone(),
@@ -362,7 +362,7 @@ impl FileProjectStateStore {
 
     fn project_changes(
         &self,
-        gaps: &BTreeMap<String, GapSummaryProjection>,
+        goals: &BTreeMap<String, GoalSummaryProjection>,
     ) -> BTreeMap<String, ChangeSummaryProjection> {
         let Some(target_root) = self.target_root() else {
             return BTreeMap::new();
@@ -377,17 +377,17 @@ impl FileProjectStateStore {
             .enumerate()
             .filter_map(|(order, change)| {
                 let branch = change.branch.or_else(|| branch.clone());
-                let joined_gap = matching_change_gap(gaps, branch.as_deref(), &change.subject)?;
+                let joined_goal = matching_change_goal(goals, branch.as_deref(), &change.subject)?;
                 let projection = ChangeSummaryProjection {
                     commit: change.commit,
                     committed_time: change.committed_time,
                     subject: change.subject,
-                    gap_id: Some(joined_gap.gap.id.clone()),
+                    goal_id: Some(joined_goal.goal.id.clone()),
                     branch,
-                    gap_name: Some(joined_gap.gap.name.clone()),
-                    gap_status: Some(joined_gap.gap.status.clone()),
-                    gap_priority: Some(joined_gap.gap.priority.as_str().to_string()),
-                    gap_assignee: joined_gap.gap.assignee.clone(),
+                    goal_name: Some(joined_goal.goal.name.clone()),
+                    goal_status: Some(joined_goal.goal.status.clone()),
+                    goal_priority: Some(joined_goal.goal.priority.as_str().to_string()),
+                    goal_assignee: joined_goal.goal.assignee.clone(),
                     searchable_text: String::new(),
                     order,
                 };
@@ -428,23 +428,23 @@ impl FileProjectStateStore {
     }
 }
 
-fn round_log_activity_entry(gap_id: &str, index: usize, mut log: RoundLogEntry) -> ActivityEntry {
+fn round_log_activity_entry(goal_id: &str, index: usize, mut log: RoundLogEntry) -> ActivityEntry {
     let round_idx = log.round_idx.unwrap_or(0);
     let details = log.entry.details.take();
     ActivityEntry {
-        id: format!("round-log:{gap_id}:{round_idx}:{index}"),
+        id: format!("round-log:{goal_id}:{round_idx}:{index}"),
         datetime: log.entry.datetime,
         severity: log.entry.severity,
         category: log.entry.category,
         message: log.entry.message,
-        gap_id: Some(gap_id.to_string()),
+        goal_id: Some(goal_id.to_string()),
         actor: log.entry.actor,
         details,
         actions: log.entry.actions,
     }
 }
 
-fn gap_reporter(
+fn goal_reporter(
     object: &serde_json::Map<String, Value>,
     valid_rounds: &[&Value],
 ) -> Option<String> {
@@ -552,18 +552,18 @@ impl ProjectStateStore for FileProjectStateStore {
 
     fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot> {
         let mut source_fingerprints = BTreeMap::new();
-        let mut gaps = BTreeMap::new();
+        let mut goals = BTreeMap::new();
         let mut features = BTreeMap::new();
-        let gap_paths = Self::collect_json_files(&self.refine_dir.join("gaps"), "gap.json")?;
+        let goal_paths = Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")?;
         let feature_paths =
             Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")?;
         let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
 
-        for path in gap_paths {
+        for path in goal_paths {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path.clone(), Self::fingerprint(&path)?);
-            if let Some(projection) = self.project_gap(&path)? {
-                gaps.insert(projection.gap.id.clone(), projection);
+            if let Some(projection) = self.project_goal(&path)? {
+                goals.insert(projection.goal.id.clone(), projection);
             }
         }
 
@@ -571,23 +571,23 @@ impl ProjectStateStore for FileProjectStateStore {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path.clone(), Self::fingerprint(&path)?);
             if let Some(feature) = self.project_feature(&path)? {
-                let mut feature_gaps: Vec<GapIndexProjection> = gaps
+                let mut feature_goals: Vec<GoalIndexProjection> = goals
                     .values()
-                    .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature.id.as_str()))
-                    .map(|gap| gap.gap.clone())
+                    .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature.id.as_str()))
+                    .map(|goal| goal.goal.clone())
                     .collect();
-                feature_gaps.sort_by(|a, b| {
-                    compare_feature_gap_order(a.feature_order, b.feature_order)
+                feature_goals.sort_by(|a, b| {
+                    compare_feature_goal_order(a.feature_order, b.feature_order)
                         .then_with(|| a.id.cmp(&b.id))
                 });
-                let rollup = FeatureRollup::derive(&feature_gaps);
-                let gap_ids = feature_gaps.into_iter().map(|gap| gap.id).collect();
+                let rollup = FeatureRollup::derive(&feature_goals);
+                let goal_ids = feature_goals.into_iter().map(|goal| goal.id).collect();
                 features.insert(
                     feature.id.clone(),
                     FeatureSummaryProjection {
                         feature,
                         status: rollup.status.clone(),
-                        gap_ids,
+                        goal_ids,
                         rollup,
                     },
                 );
@@ -596,12 +596,12 @@ impl ProjectStateStore for FileProjectStateStore {
 
         let activity = self.project_activity()?;
         let mut activity = activity;
-        activity.extend(self.project_gap_round_activity(&gaps)?);
+        activity.extend(self.project_goal_round_activity(&goals)?);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&activity_path)?);
         }
-        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "logs.jsonl")? {
+        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
@@ -609,10 +609,10 @@ impl ProjectStateStore for FileProjectStateStore {
             source_fingerprints.insert(fingerprint.path.clone(), fingerprint);
         }
         for (activity_id, projection) in &activity {
-            if let Some(gap_id) = projection.entry.gap_id.as_deref()
-                && let Some(gap) = gaps.get_mut(gap_id)
+            if let Some(goal_id) = projection.entry.goal_id.as_deref()
+                && let Some(goal) = goals.get_mut(goal_id)
             {
-                gap.activity_ids.push(activity_id.clone());
+                goal.activity_ids.push(activity_id.clone());
             }
         }
         let mut recent_activity = activity.values().collect::<Vec<_>>();
@@ -628,17 +628,19 @@ impl ProjectStateStore for FileProjectStateStore {
             .map(|activity| activity.entry.id.clone())
             .collect::<Vec<_>>();
 
-        let all_node_status_counts = gap_status_counts(gaps.values().map(|gap| &gap.gap.status));
-        let current_node_status_counts = gap_status_counts(
-            gaps.values()
-                .filter(|gap| gap.gap.node_id.as_deref().unwrap_or("default") == "default")
-                .map(|gap| &gap.gap.status),
+        let all_node_status_counts =
+            goal_status_counts(goals.values().map(|goal| &goal.goal.status));
+        let current_node_status_counts = goal_status_counts(
+            goals
+                .values()
+                .filter(|goal| goal.goal.node_id.as_deref().unwrap_or("default") == "default")
+                .map(|goal| &goal.goal.status),
         );
-        let mut reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
-        let mut assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
-        for gap in gaps.values() {
-            let reporter = gap
-                .gap
+        let mut reporter_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
+        let mut assignee_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
+        for goal in goals.values() {
+            let reporter = goal
+                .goal
                 .reporter
                 .clone()
                 .filter(|reporter| !reporter.is_empty())
@@ -646,10 +648,10 @@ impl ProjectStateStore for FileProjectStateStore {
             *reporter_stats
                 .entry(reporter)
                 .or_default()
-                .entry(gap.gap.status.clone())
+                .entry(goal.goal.status.clone())
                 .or_default() += 1;
-            let assignee = gap
-                .gap
+            let assignee = goal
+                .goal
                 .assignee
                 .clone()
                 .filter(|assignee| !assignee.is_empty())
@@ -657,25 +659,25 @@ impl ProjectStateStore for FileProjectStateStore {
             *assignee_stats
                 .entry(assignee)
                 .or_default()
-                .entry(gap.gap.status.clone())
+                .entry(goal.goal.status.clone())
                 .or_default() += 1;
         }
         let failed_count = all_node_status_counts
-            .get(&GapStatus::Failed)
+            .get(&GoalStatus::Failed)
             .copied()
             .unwrap_or_default();
         let attention_indicators = if failed_count > 0 {
-            vec![format!("{failed_count} failed Gap(s) need recovery")]
+            vec![format!("{failed_count} failed Goal(s) need recovery")]
         } else {
             Vec::new()
         };
-        let changes = self.project_changes(&gaps);
+        let changes = self.project_changes(&goals);
 
         Ok(ProjectionSnapshot {
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "unknown".to_string(),
             source_fingerprints,
-            gaps,
+            goals,
             features,
             activity,
             changes,

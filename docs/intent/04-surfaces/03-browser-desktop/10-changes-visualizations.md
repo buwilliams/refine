@@ -9,9 +9,9 @@
 
 ## Purpose
 
-Changes visualizations exist to show how Refine work lands in the codebase. They connect merge commits back to Gaps and help users understand recent software movement.
+Changes visualizations exist to show how Refine work lands in the codebase. They connect merge commits back to Goals and help users understand recent software movement.
 
-This surface should answer: what changed, when did it change, which Gap caused it, and can it be undone safely?
+This surface should answer: what changed, when did it change, which Goal caused it, and can it be undone safely?
 
 ## Expected Role
 
@@ -20,8 +20,8 @@ The Changes screen should combine visualization, filtering, table inspection, an
 Current implementation details that matter to intent:
 
 - Changes list refine merge commits on the configured merge target branch;
-- rows link commits to Gaps through Gap trailers or projection data;
-- Undo runs a revert-style operation and moves the Gap to cancelled when appropriate;
+- rows link commits to Goals through Goal trailers or projection data;
+- Undo runs a revert-style operation and moves the Goal to cancelled when appropriate;
 - visualization buckets changes by selected period;
 - filters and pagination align with the shared list pattern.
 

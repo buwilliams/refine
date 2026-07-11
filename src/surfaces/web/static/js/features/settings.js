@@ -937,10 +937,10 @@ function drawSqliteCacheProgress(progress = {}) {
   const total = Number(progress.total || 0);
   const completed = Number(progress.completed || 0);
   const message = progress.message || (
-    total ? `Processing ${completed} of ${total} Gaps` : "Rebuilding projection cache"
+    total ? `Processing ${completed} of ${total} Goals` : "Rebuilding projection cache"
   );
   const detail = total
-    ? `${Math.min(completed, total)} / ${total} Gap${total === 1 ? "" : "s"} processed`
+    ? `${Math.min(completed, total)} / ${total} Goal${total === 1 ? "" : "s"} processed`
     : "Preparing rebuild";
   root.style.display = "";
   root.innerHTML = `

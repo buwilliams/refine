@@ -8,7 +8,7 @@ use std::thread;
 use chrono::Utc;
 use serde_json::{Value, json};
 
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
@@ -25,7 +25,7 @@ use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::tools::product::project_state::{DashboardProjectionQuery, ProjectionQuery};
-use crate::tools::product::work_items::BulkGapSelection;
+use crate::tools::product::work_items::BulkGoalSelection;
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;
@@ -458,8 +458,8 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_node_transfer_gaps(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "transfer Gaps to node");
+    pub(super) fn handle_node_transfer_goals(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "transfer Goals to node");
         let body = request.body.unwrap_or_else(|| json!({}));
         let target_node_id = body
             .get("target_node_id")
@@ -486,13 +486,13 @@ impl InProcessWebServer {
                 Err(error) => error_response(error),
             };
         }
-        let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
+        let selection = match serde_json::from_value::<BulkGoalSelection>(body.clone()) {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
         match self
             .work_item_service(refine_dir)
-            .bulk_transfer_gaps_to_node(target_node_id, selection)
+            .bulk_transfer_goals_to_node(target_node_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
@@ -741,12 +741,17 @@ impl InProcessWebServer {
         };
         let projection = self.current_projection()?;
         let mut counts: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
-        for gap in projection.gaps.values() {
-            let node_id = gap.gap.node_id.as_deref().unwrap_or("default").to_string();
+        for goal in projection.goals.values() {
+            let node_id = goal
+                .goal
+                .node_id
+                .as_deref()
+                .unwrap_or("default")
+                .to_string();
             *counts
                 .entry(node_id)
                 .or_default()
-                .entry(gap.gap.status.as_str().to_string())
+                .entry(goal.goal.status.as_str().to_string())
                 .or_insert(0) += 1;
         }
         self.node_registry_service(refine_dir)
@@ -1237,7 +1242,7 @@ impl InProcessWebServer {
                 "ok": true,
                 "message": "Project state projection rebuilt.",
                 "projection_version": projection.version,
-                "gap_count": projection.gaps.len(),
+                "goal_count": projection.goals.len(),
                 "feature_count": projection.features.len(),
                 "git_sync": {
                     "attempted": git_sync.attempted,
@@ -1535,20 +1540,20 @@ impl InProcessWebServer {
 }
 
 fn assignee_stats_rows(
-    assignee_stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    assignee_stats: &BTreeMap<String, BTreeMap<GoalStatus, usize>>,
 ) -> Vec<Value> {
     assignee_stats
         .iter()
         .filter(|(assignee, _)| assignee.as_str() != "unassigned")
         .map(|(assignee, counts)| {
             let assigned = counts.values().copied().sum::<usize>();
-            let done = counts.get(&GapStatus::Done).copied().unwrap_or_default();
+            let done = counts.get(&GoalStatus::Done).copied().unwrap_or_default();
             let cancelled = counts
-                .get(&GapStatus::Cancelled)
+                .get(&GoalStatus::Cancelled)
                 .copied()
                 .unwrap_or_default();
             let active = assigned.saturating_sub(done + cancelled);
-            let assigned_review = counts.get(&GapStatus::Review).copied().unwrap_or_default();
+            let assigned_review = counts.get(&GoalStatus::Review).copied().unwrap_or_default();
             let completion_rate = if assigned == 0 {
                 0.0
             } else {

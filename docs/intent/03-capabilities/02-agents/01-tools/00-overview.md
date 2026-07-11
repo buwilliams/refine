@@ -14,7 +14,7 @@ Tools are how Refine acts on the world. They connect the model and workflow to t
 
 Tools should not be confused with UI widgets. A button may expose a tool, but the tool itself should live in shared backend capability so other surfaces and future agents can use it.
 
-This section is the parent for tool-backed agent capabilities. Import gets its own child document because it is a major tool flow: turning external plans, transcripts, files, and issue lists into structured Gaps and Features.
+This section is the parent for tool-backed agent capabilities. Import gets its own child document because it is a major tool flow: turning external plans, transcripts, files, and issue lists into structured Goals and Features.
 
 ## Expected Role
 
@@ -25,7 +25,7 @@ Current implementation details that matter to intent:
 - host tools cover agent providers, clusters, deployed updates, Git worktrees, installation, quality, and target apps.
 - product tools cover chat, imports, merging, nodes, project migration, project registry, project state, and work items.
 - observability tools cover activity, diagnostics, logs, metrics, processes, and support bundles.
-- the work item service centralizes Gap and Feature behavior so surfaces share the same rules.
+- the work item service centralizes Goal and Feature behavior so surfaces share the same rules.
 - chat and standalone worktree behavior are product tools, not browser-only behavior.
 
 Tools should be powerful. Refine's safety posture is mitigation greater than prevention: use Git, logs, governance, quality checks, review, and observability to make powerful actions recoverable and accountable.

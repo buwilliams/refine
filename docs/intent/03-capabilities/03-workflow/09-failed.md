@@ -16,17 +16,17 @@ The state should make failure visible and useful rather than hiding it behind lo
 
 Failed should preserve process output, agent notes, quality failures, governance findings, changed files, and any partial progress. It should support recovery rounds, new instructions, reassignment, or cancellation.
 
-Failed should also protect ordered work. If a failed Gap blocks a Feature, Refine should make that relationship visible.
+Failed should also protect ordered work. If a failed Goal blocks a Feature, Refine should make that relationship visible.
 
 ## What Happens
 
-When a Gap is failed:
+When a Goal is failed:
 
 - Refine stops treating the current attempt as successful.
 - Failure evidence is preserved: process output, provider output, quality failures, governance findings, logs, changed files, and error messages.
 - Active claims should be closed or made recoverable.
 - Users or agents can inspect the failure and choose a recovery path: retry, submit a new round, split the work, reassign it, cancel it, or leave it failed.
-- If the Gap blocks ordered Feature work, that blockage should be visible.
+- If the Goal blocks ordered Feature work, that blockage should be visible.
 - Failed state should be a decision point, not an evidence sink.
 
 ## Future Direction

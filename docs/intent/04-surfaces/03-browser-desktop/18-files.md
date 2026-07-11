@@ -9,7 +9,7 @@
 
 ## Purpose
 
-The Files surface exists to keep code context close to work context. When reviewing a Gap, discussing with an agent, or diagnosing a change, users often need to inspect source files.
+The Files surface exists to keep code context close to work context. When reviewing a Goal, discussing with an agent, or diagnosing a change, users often need to inspect source files.
 
 Files should help users and agents connect Refine work back to the actual project.
 
@@ -29,6 +29,6 @@ Files should not become a full IDE. It should provide enough source visibility t
 
 ## Future Direction
 
-Future Files behavior may support semantic search, agent-generated context bundles, diff-aware navigation, and evidence links from Gaps to source locations.
+Future Files behavior may support semantic search, agent-generated context bundles, diff-aware navigation, and evidence links from Goals to source locations.
 
 The goal is source context that improves work quality without turning Refine into a heavyweight editor.

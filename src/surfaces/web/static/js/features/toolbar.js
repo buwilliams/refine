@@ -1,7 +1,7 @@
 // ---- Toolbar ----------------------------------------------------------------
 
 // chatState holds one tab per chat: the permanent "standalone" tab plus one
-// per Gap that the user opened via Open Chat. Each tab carries its own
+// per Goal that the user opened via Open Chat. Each tab carries its own
 // session id, accumulated output, and closed-reason. Only the active tab is
 // polled; output for other tabs accumulates server-side in the runner's
 // per-session deque until the user switches to that tab.
@@ -18,7 +18,7 @@ const SYSTEM_LOG_FILTERS = [
   { status: "complete", label: "Completed" },
   { status: "error", label: "Errors" },
 ];
-const GAP_CHAT_ROUND_STATUSES = new Set([
+const GOAL_CHAT_ROUND_STATUSES = new Set([
   "backlog", "todo", "review", "done", "failed", "cancelled",
 ]);
 const FILES_TREE_MAX_DEPTH = 3;
@@ -32,7 +32,7 @@ let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
 const chatState = {
-  tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
+  tabs: {},                // tabId → { goalId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
@@ -83,7 +83,7 @@ let terminalEventSource = null;
 function ensureStandaloneTab() {
   if (!chatState.tabs.standalone) {
     chatState.tabs.standalone = {
-      gapId: null, label: "Standalone", mode: "standalone",
+      goalId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
       agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
@@ -98,7 +98,7 @@ function ensureStandaloneTab() {
 function ensureFilesTab() {
   if (!chatState.tabs[FILES_TAB_ID]) {
     chatState.tabs[FILES_TAB_ID] = {
-      gapId: null, label: "Files", mode: "files",
+      goalId: null, label: "Files", mode: "files",
       sessionId: null, output: "", closedReason: null,
       agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
@@ -109,7 +109,7 @@ function ensureFilesTab() {
 function ensureSystemTab() {
   if (!chatState.tabs[SYSTEM_TAB_ID]) {
     chatState.tabs[SYSTEM_TAB_ID] = {
-      gapId: null, label: "System", mode: "system",
+      goalId: null, label: "System", mode: "system",
       sessionId: null, output: "", closedReason: null,
       agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
@@ -120,7 +120,7 @@ function ensureSystemTab() {
 function ensureTerminalTab() {
   if (!chatState.tabs[TERMINAL_TAB_ID]) {
     chatState.tabs[TERMINAL_TAB_ID] = {
-      gapId: null, label: "Terminal", mode: "terminal",
+      goalId: null, label: "Terminal", mode: "terminal",
       sessionId: null, output: "", closedReason: null,
       agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
@@ -214,9 +214,9 @@ function saveChatStateToStorage() {
   const tabs = {};
   for (const [id, t] of Object.entries(chatState.tabs)) {
       tabs[id] = {
-        gapId: t.gapId, label: t.label,
-        mode: t.mode || (t.gapId ? "gap" : id === "plan" ? "plan" : "standalone"),
-        gapStatus: t.gapStatus || "",
+        goalId: t.goalId, label: t.label,
+        mode: t.mode || (t.goalId ? "goal" : id === "plan" ? "plan" : "standalone"),
+        goalStatus: t.goalStatus || "",
         sessionId: t.sessionId,
         output: (t.output || "").slice(-50_000),
         progress: (t.progress || "").slice(-20_000),
@@ -365,40 +365,40 @@ function observeToolbarSize() {
 
 function observeChatDockSize() { observeToolbarSize(); }
 
-// Opens the dock and (optionally) ensures a tab for a specific gap is active.
-// Wired up by the "Open Chat" button on the gap detail page and by any
-// surviving `#/chat?gap=...` deep links. For gap tabs with no live session,
-// kicks off a chat session immediately so the runner can inject the Gap
+// Opens the dock and (optionally) ensures a tab for a specific goal is active.
+// Wired up by the "Open Chat" button on the goal detail page and by any
+// surviving `#/chat?goal=...` deep links. For goal tabs with no live session,
+// kicks off a chat session immediately so the runner can inject the Goal
 // context into the provider session before the user types.
-function openChatDock({ gapId = null, gapStatus = null } = {}) {
+function openChatDock({ goalId = null, goalStatus = null } = {}) {
   ensureStandaloneTab();
-  if (gapId) {
-    if (!chatState.tabs[gapId]) {
-      chatState.tabs[gapId] = {
-        gapId,
-        label: `Gap ${gapId.slice(0, 8)}…`,
-        mode: "gap",
-        gapStatus: gapStatus || "",
+  if (goalId) {
+    if (!chatState.tabs[goalId]) {
+      chatState.tabs[goalId] = {
+        goalId,
+        label: `Goal ${goalId.slice(0, 8)}…`,
+        mode: "goal",
+        goalStatus: goalStatus || "",
         sessionId: null, output: "", progress: "", showProgress: true,
         closedReason: null, agentResponded: false, sentUserInput: false,
         queuedMessages: [], localQueuedMessages: [], starting: false,
       };
-    } else if (gapStatus) {
-      chatState.tabs[gapId].gapStatus = gapStatus;
+    } else if (goalStatus) {
+      chatState.tabs[goalId].goalStatus = goalStatus;
     }
-    chatState.activeTabId = gapId;
+    chatState.activeTabId = goalId;
   }
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
-  if (gapId) {
-    const t = chatState.tabs[gapId];
-    if (t && !t.sessionId) startGapChatSession(t);
+  if (goalId) {
+    const t = chatState.tabs[goalId];
+    if (t && !t.sessionId) startGoalChatSession(t);
   }
 }
 
-async function renderGapPlan() {
-  await renderGapsList();
+async function renderGoalPlan() {
+  await renderGoalsList();
   openPlanChatDock();
 }
 
@@ -406,7 +406,7 @@ function ensurePlanTab() {
   ensureStandaloneTab();
   if (!chatState.tabs.plan) {
     chatState.tabs.plan = {
-      gapId: null,
+      goalId: null,
       label: "Plan",
       mode: "plan",
       sessionId: null,
@@ -470,13 +470,13 @@ async function startPlanChatSession(tab) {
   }
 }
 
-async function startGapChatSession(tab) {
+async function startGoalChatSession(tab) {
   if (!tab || tab.starting || tab.sessionId) return;
   tab.starting = true;
   saveChatStateToStorage();
   applyPendingIndicator(tab);
   try {
-    const r = await api("POST", "/api/chat/start", { gap_id: tab.gapId });
+    const r = await api("POST", "/api/chat/start", { goal_id: tab.goalId });
     tab.sessionId = r.session_id;
     tab.closedReason = null;
     tab.progress = "";
@@ -524,7 +524,7 @@ async function startStandaloneChatSession(tab) {
 async function ensureChatSession(tab) {
   if (!tab || tab.sessionId || tab.starting) return;
   if (tab.mode === "plan") await startPlanChatSession(tab);
-  else if (tab.gapId) await startGapChatSession(tab);
+  else if (tab.goalId) await startGoalChatSession(tab);
   else await startStandaloneChatSession(tab);
 }
 
@@ -568,13 +568,13 @@ function drawToolbar() {
   const terminalActive = active.mode === "terminal";
   const hasSession = !!active.sessionId;
 
-  const startLabel = active.gapId
-    ? `Start attached to Gap ${active.gapId.slice(0, 10)}…`
+  const startLabel = active.goalId
+    ? `Start attached to Goal ${active.goalId.slice(0, 10)}…`
     : active.mode === "plan"
       ? "Start plan"
     : "Start standalone";
   const toggleLabel = hasSession
-    ? (active.gapId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
+    ? (active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
@@ -641,7 +641,7 @@ function drawToolbar() {
   if (chatState.open && !filesActive && !systemActive && !terminalActive) {
     const out = $("#chat-output");
     if (out) out.scrollTop = out.scrollHeight;
-    if (active.gapId && !active.gapStatus) refreshGapChatStatus(active.gapId);
+    if (active.goalId && !active.goalStatus) refreshGoalChatStatus(active.goalId);
   }
 
   $$(".toolbar-tab", root).forEach((el) => {
@@ -672,10 +672,10 @@ function drawToolbar() {
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
   if (!filesActive && !systemActive && !terminalActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
-    $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
-    $("#btn-standalone-draft-gap")?.addEventListener("click", draftGapFromStandaloneChat);
+    $("#btn-plan-draft")?.addEventListener("click", draftGoalsFromPlan);
+    $("#btn-standalone-draft-goal")?.addEventListener("click", draftGoalFromStandaloneChat);
     $("#btn-standalone-submit-merge")?.addEventListener("click", submitStandaloneChatForMerge);
-    $("#btn-gap-round-extract")?.addEventListener("click", extractRoundFromGapChat);
+    $("#btn-goal-round-extract")?.addEventListener("click", extractRoundFromGoalChat);
     $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
     $("#chat-activity-toggle")?.addEventListener("click", toggleChatProgress);
     $("#chat-input")?.addEventListener("keydown", (e) => {
@@ -716,7 +716,7 @@ function toolbarTabTitle(tab) {
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
   if (tab.mode === "terminal") return "Terminal";
-  return tab.gapId || "Standalone chat";
+  return tab.goalId || "Standalone chat";
 }
 
 function toolbarTabHasSessionIndicator(tab) {
@@ -782,29 +782,29 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             Draft Feature
           </button>` : ""}
         ${active.mode === "standalone" ? `
-          <button id="btn-standalone-draft-gap" class="secondary" data-testid="standalone-draft-gap"
-                  ${standaloneChatCanDraftGap(active) ? "" : "disabled"}>
-            Draft Gap
+          <button id="btn-standalone-draft-goal" class="secondary" data-testid="standalone-draft-goal"
+                  ${standaloneChatCanDraftGoal(active) ? "" : "disabled"}>
+            Draft Goal
           </button>
           <button id="btn-standalone-submit-merge" class="secondary" data-testid="standalone-submit-merge"
                   ${standaloneChatCanSubmitReadyMerge(active) ? "" : "disabled"}>
             Submit Worktree
           </button>` : ""}
-        ${active.gapId ? `
-          <button id="btn-gap-round-extract" class="secondary" data-testid="gap-draft-round"
-                  ${gapChatCanExtractRound(active) ? "" : "disabled"}>
+        ${active.goalId ? `
+          <button id="btn-goal-round-extract" class="secondary" data-testid="goal-draft-round"
+                  ${goalChatCanExtractRound(active) ? "" : "disabled"}>
             Draft Round
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary" data-testid="chat-clear"
                 ${(active.output || active.progress || active.sessionId || queuedMessages.length) ? "" : "disabled"}>
           Clear history
         </button>
-        ${active.gapId ? `
-          <a id="chat-gap-link" class="chat-gap-link"
-             data-testid="chat-gap-link"
-             href="#/gaps/${encodeURIComponent(active.gapId)}"
-             title="Open Gap ${htmlEscape(active.gapId)}">
-            Gap ${htmlEscape(active.gapId.slice(0, 10))}…
+        ${active.goalId ? `
+          <a id="chat-goal-link" class="chat-goal-link"
+             data-testid="chat-goal-link"
+             href="#/goals/${encodeURIComponent(active.goalId)}"
+             title="Open Goal ${htmlEscape(active.goalId)}">
+            Goal ${htmlEscape(active.goalId.slice(0, 10))}…
           </a>` : ""}
         <span class="spacer"></span>
         <span id="chat-status" class="muted small${chatActivityIsPulsing(active) ? " chat-status-working" : ""}" data-testid="chat-status">
@@ -2342,9 +2342,9 @@ function chatInputPlaceholder(tab) {
 
 function syncChatActionButtons(tab) {
   syncPlanDraftButton(tab);
-  syncStandaloneDraftGapButton(tab);
+  syncStandaloneDraftGoalButton(tab);
   syncStandaloneSubmitMergeButton(tab);
-  syncGapRoundExtractButton(tab);
+  syncGoalRoundExtractButton(tab);
 }
 
 function syncPlanDraftButton(tab) {
@@ -2353,10 +2353,10 @@ function syncPlanDraftButton(tab) {
   btn.disabled = !planHasAgentResponse(tab);
 }
 
-function syncStandaloneDraftGapButton(tab) {
-  const btn = $("#btn-standalone-draft-gap");
+function syncStandaloneDraftGoalButton(tab) {
+  const btn = $("#btn-standalone-draft-goal");
   if (!btn || !tab || tab.mode !== "standalone") return;
-  btn.disabled = !standaloneChatCanDraftGap(tab);
+  btn.disabled = !standaloneChatCanDraftGoal(tab);
 }
 
 function syncStandaloneSubmitMergeButton(tab) {
@@ -2365,10 +2365,10 @@ function syncStandaloneSubmitMergeButton(tab) {
   btn.disabled = !standaloneChatCanSubmitReadyMerge(tab);
 }
 
-function syncGapRoundExtractButton(tab) {
-  const btn = $("#btn-gap-round-extract");
-  if (!btn || !tab || !tab.gapId) return;
-  btn.disabled = !gapChatCanExtractRound(tab);
+function syncGoalRoundExtractButton(tab) {
+  const btn = $("#btn-goal-round-extract");
+  if (!btn || !tab || !tab.goalId) return;
+  btn.disabled = !goalChatCanExtractRound(tab);
 }
 
 function handleChatSseEvent(payload) {
@@ -2554,7 +2554,7 @@ function planHasAgentResponse(tab) {
     });
 }
 
-function standaloneChatCanDraftGap(tab) {
+function standaloneChatCanDraftGoal(tab) {
   return !!(
     tab
     && tab.mode === "standalone"
@@ -2573,17 +2573,17 @@ function standaloneChatCanSubmitReadyMerge(tab) {
   );
 }
 
-function gapChatCanExtractRound(tab) {
+function goalChatCanExtractRound(tab) {
   return !!(
     tab
-    && tab.gapId
-    && GAP_CHAT_ROUND_STATUSES.has(tab.gapStatus || "")
+    && tab.goalId
+    && GOAL_CHAT_ROUND_STATUSES.has(tab.goalStatus || "")
     && !tab.pending
-    && gapChatTranscriptText(tab)
+    && goalChatTranscriptText(tab)
   );
 }
 
-function gapChatTranscriptText(tab) {
+function goalChatTranscriptText(tab) {
   const lines = String(tab?.output || "")
     .split(/\r?\n/)
     .filter((line) => !line.startsWith("[refine]"));
@@ -2591,7 +2591,7 @@ function gapChatTranscriptText(tab) {
   return lines.join("\n").trim();
 }
 
-async function draftGapsFromPlan() {
+async function draftGoalsFromPlan() {
   const t = chatState.tabs.plan;
   if (!t) return;
   const transcript = planTranscriptText(t);
@@ -2606,7 +2606,7 @@ async function draftGapsFromPlan() {
     toast("Plan drafting is unavailable.", "error");
     return;
   }
-  toast("Extracting Plan Feature and Gaps in the background.", "info");
+  toast("Extracting Plan Feature and Goals in the background.", "info");
   recordUiNotice("Plan Draft extraction started", {
     kind: "info",
     source: "background-operation",
@@ -2622,12 +2622,12 @@ async function draftGapsFromPlan() {
   }
 }
 
-async function draftGapFromStandaloneChat() {
+async function draftGoalFromStandaloneChat() {
   const t = chatState.tabs.standalone;
   if (!t) return;
   const transcript = standaloneChatTranscriptText(t);
   if (!transcript) {
-    toast("Wait for the agent to respond before drafting a Gap.", "error");
+    toast("Wait for the agent to respond before drafting a Goal.", "error");
     return;
   }
   if (!state.lastReporter) {
@@ -2635,10 +2635,10 @@ async function draftGapFromStandaloneChat() {
     return;
   }
   if (typeof extractImportDrafts !== "function") {
-    toast("Gap drafting is unavailable.", "error");
+    toast("Goal drafting is unavailable.", "error");
     return;
   }
-  openStandaloneGapDraftModalFromText(transcript);
+  openStandaloneGoalDraftModalFromText(transcript);
   minimizeToolbar();
 }
 
@@ -2656,23 +2656,23 @@ async function submitStandaloneChatForMerge() {
   minimizeToolbar();
 }
 
-function openStandaloneGapDraftModalFromText(transcript) {
+function openStandaloneGoalDraftModalFromText(transcript) {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="standalone-gap-draft-modal"
-         aria-labelledby="standalone-gap-draft-title">
-      <div class="modal-title" id="standalone-gap-draft-title">Draft Gap</div>
+         data-testid="standalone-goal-draft-modal"
+         aria-labelledby="standalone-goal-draft-title">
+      <div class="modal-title" id="standalone-goal-draft-title">Draft Goal</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
-          Review the drafted Gap before saving it as standalone work.
+          Review the drafted Goal before saving it as standalone work.
         </div>
-        <div id="standalone-gap-draft-body" data-testid="standalone-gap-draft-body"></div>
+        <div id="standalone-goal-draft-body" data-testid="standalone-goal-draft-body"></div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="standalone-gap-draft-cancel">Cancel</button>
-        <button id="btn-save-standalone-gap-draft" data-testid="standalone-gap-draft-submit" disabled>Create Gap</button>
+        <button class="secondary" data-cancel data-testid="standalone-goal-draft-cancel">Cancel</button>
+        <button id="btn-save-standalone-goal-draft" data-testid="standalone-goal-draft-submit" disabled>Create Goal</button>
       </div>
     </div>
   `;
@@ -2697,9 +2697,9 @@ function openStandaloneGapDraftModalFromText(transcript) {
     if (e.target === root) close();
   });
   root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("#standalone-gap-draft-body");
-  const saveButton = root.querySelector("#btn-save-standalone-gap-draft");
-  loadStandaloneGapDraft({
+  const bodyRoot = root.querySelector("#standalone-goal-draft-body");
+  const saveButton = root.querySelector("#btn-save-standalone-goal-draft");
+  loadStandaloneGoalDraft({
     transcript,
     root,
     bodyRoot,
@@ -2709,19 +2709,19 @@ function openStandaloneGapDraftModalFromText(transcript) {
   }).catch((e) => {
     if (e.name === "AbortError") return;
     if (bodyRoot) {
-      bodyRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message || "Gap drafting failed")}</p>`;
+      bodyRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message || "Goal drafting failed")}</p>`;
     }
   });
 }
 
-async function loadStandaloneGapDraft({ transcript, root, bodyRoot, saveButton, close, signal }) {
-  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_gap" });
+async function loadStandaloneGoalDraft({ transcript, root, bodyRoot, saveButton, close, signal }) {
+  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_goal" });
   if (signal.aborted) return;
   const draft = (drafts || []).find((item) => {
-    return String(item?.actual || item?.target || item?.name || "").trim();
+    return String(item?.prompt || item?.name || "").trim();
   });
   if (!draft) {
-    bodyRoot.innerHTML = `<p class="muted">No Gap draft extracted.</p>`;
+    bodyRoot.innerHTML = `<p class="muted">No Goal draft extracted.</p>`;
     return;
   }
   const reporter = state.lastReporter || draft.reporter || "";
@@ -2730,18 +2730,14 @@ async function loadStandaloneGapDraft({ transcript, root, bodyRoot, saveButton, 
       ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
       : ""}
     <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form id="standalone-gap-draft-form" class="round-form">
+    <form id="standalone-goal-draft-form" class="round-form">
       <div class="form-row">
-        <label>Actual (current behavior)</label>
-        <textarea name="actual" data-testid="standalone-gap-draft-actual">${htmlEscape(draft.actual || "")}</textarea>
-      </div>
-      <div class="form-row">
-        <label>Target (desired behavior)</label>
-        <textarea name="target" data-testid="standalone-gap-draft-target">${htmlEscape(draft.target || draft.name || "")}</textarea>
+        <label>Prompt</label>
+        <textarea name="prompt" data-testid="standalone-goal-draft-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
       </div>
       <div class="form-row">
         <label>Priority</label>
-        <select name="priority" data-testid="standalone-gap-draft-priority">
+        <select name="priority" data-testid="standalone-goal-draft-priority">
           ${["low", "medium", "high"].map((priority) => `
             <option value="${priority}" ${(draft.priority || "low") === priority ? "selected" : ""}>${priority[0].toUpperCase()}${priority.slice(1)}</option>
           `).join("")}
@@ -2751,35 +2747,33 @@ async function loadStandaloneGapDraft({ transcript, root, bodyRoot, saveButton, 
   `;
   saveButton.disabled = false;
   saveButton.addEventListener("click", async () => {
-    const form = root.querySelector("#standalone-gap-draft-form");
+    const form = root.querySelector("#standalone-goal-draft-form");
     if (!form) return;
     const fd = new FormData(form);
     const nextReporter = String(state.lastReporter || reporter || "").trim();
-    const actual = String(fd.get("actual") || "").trim();
-    const target = String(fd.get("target") || "").trim();
+    const prompt = String(fd.get("prompt") || "").trim();
     const priority = String(fd.get("priority") || "low").trim() || "low";
     if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!actual && !target) return toast("Provide actual or target", "error");
+    if (!prompt) return toast("Provide a prompt", "error");
     await withButtonBusy(saveButton, "Creating…", async () => {
       try {
-        const r = await api("POST", "/api/gaps", {
+        const r = await api("POST", "/api/goals", {
           reporter: nextReporter,
-          actual,
-          target,
+          prompt,
           priority,
         });
-        const gapId = r?.gap?.id || "";
+        const goalId = r?.goal?.id || "";
         const tab = chatState.tabs.standalone;
         if (tab) {
-          tab.output = `${tab.output || ""}\n[refine] Drafted this standalone chat into Gap ${gapId || "new"}.\n`;
+          tab.output = `${tab.output || ""}\n[refine] Drafted this standalone chat into Goal ${goalId || "new"}.\n`;
           saveChatStateToStorage();
           drawChat();
         }
-        toast("Gap created", "info");
+        toast("Goal created", "info");
         close();
-        if (gapId) location.hash = "#/gaps/" + encodeURIComponent(gapId);
+        if (goalId) location.hash = "#/goals/" + encodeURIComponent(goalId);
       } catch (err) {
-        await showActionError(err, "Could not create drafted Gap");
+        await showActionError(err, "Could not create drafted Goal");
       }
     });
   });
@@ -2796,7 +2790,7 @@ function openStandaloneReadyMergeModal(tab) {
       <div class="modal-title" id="standalone-ready-merge-title">Submit Worktree</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
-          Review the Gap details before handing the standalone worktree to the merge workflow.
+          Review the Goal details before handing the standalone worktree to the merge workflow.
         </div>
         <div class="muted small" style="margin-bottom:8px">
           Worktree: <code data-testid="standalone-ready-merge-worktree">${htmlEscape(tab.worktree?.path || "")}</code>
@@ -2849,10 +2843,10 @@ function openStandaloneReadyMergeModal(tab) {
 async function loadStandaloneReadyMergeDraft({ tab, transcript, root, bodyRoot, submitButton, close, signal }) {
   let draft = {};
   if (transcript && typeof extractImportDrafts === "function") {
-    const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_gap" });
+    const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_goal" });
     if (signal.aborted) return;
     draft = (drafts || []).find((item) => {
-      return String(item?.actual || item?.target || item?.name || "").trim();
+      return String(item?.prompt || item?.name || "").trim();
     }) || {};
   }
   renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButton, close });
@@ -2864,12 +2858,8 @@ function renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButt
     <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
     <form id="standalone-ready-merge-form" class="round-form">
       <div class="form-row">
-        <label>Actual (current behavior)</label>
-        <textarea name="actual" data-testid="standalone-ready-merge-actual">${htmlEscape(draft.actual || "")}</textarea>
-      </div>
-      <div class="form-row">
-        <label>Target (desired behavior)</label>
-        <textarea name="target" data-testid="standalone-ready-merge-target">${htmlEscape(draft.target || draft.name || "")}</textarea>
+        <label>Prompt</label>
+        <textarea name="prompt" data-testid="standalone-ready-merge-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
       </div>
       <div class="form-row">
         <label>Priority</label>
@@ -2887,32 +2877,30 @@ function renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButt
     if (!form) return;
     const fd = new FormData(form);
     const nextReporter = String(state.lastReporter || reporter || "").trim();
-    const actual = String(fd.get("actual") || "").trim();
-    const target = String(fd.get("target") || "").trim();
+    const prompt = String(fd.get("prompt") || "").trim();
     const priority = String(fd.get("priority") || "low").trim() || "low";
     if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!actual || !target) return toast("Provide actual and target", "error");
+    if (!prompt) return toast("Provide a prompt", "error");
     await withButtonBusy(submitButton, "Submitting…", async () => {
       try {
         const r = await api("POST", `/api/chat/${tab.sessionId}/submit-ready-merge`, {
           reporter: nextReporter,
-          actual,
-          target,
+          prompt,
           priority,
         });
-        const gapId = r?.gap?.id || "";
+        const goalId = r?.goal?.id || "";
         tab.sessionId = null;
         tab.pending = false;
         tab.closedReason = "submitted for ready-merge";
         tab.worktree = r?.worktree || tab.worktree || null;
-        if (tab.worktree && gapId) tab.worktree.submitted_gap_id = gapId;
-        tab.output = `${tab.output || ""}\n[refine] Submitted standalone worktree as ready-merge Gap ${gapId || "new"}.\n`;
+        if (tab.worktree && goalId) tab.worktree.submitted_goal_id = goalId;
+        tab.output = `${tab.output || ""}\n[refine] Submitted standalone worktree as ready-merge Goal ${goalId || "new"}.\n`;
         saveChatStateToStorage();
         refreshProcessesTabForChatChange();
         drawChat();
-        toast("Gap submitted for merge", "info");
+        toast("Goal submitted for merge", "info");
         close();
-        if (gapId) location.hash = "#/gaps/" + encodeURIComponent(gapId);
+        if (goalId) location.hash = "#/goals/" + encodeURIComponent(goalId);
       } catch (err) {
         await showActionError(err, "Could not submit standalone worktree");
       }
@@ -2920,21 +2908,21 @@ function renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButt
   });
 }
 
-async function extractRoundFromGapChat() {
+async function extractRoundFromGoalChat() {
   const tab = chatState.tabs[chatState.activeTabId];
-  if (!tab || !tab.gapId) return;
-  if (!tab.gapStatus) {
-    await refreshGapChatStatus(tab.gapId, { redraw: false });
+  if (!tab || !tab.goalId) return;
+  if (!tab.goalStatus) {
+    await refreshGoalChatStatus(tab.goalId, { redraw: false });
   }
-  if (!GAP_CHAT_ROUND_STATUSES.has(tab.gapStatus || "")) {
+  if (!GOAL_CHAT_ROUND_STATUSES.has(tab.goalStatus || "")) {
     toast(
-      `Cannot draft a round while the Gap is ${tab.gapStatus || "unknown"}.`,
+      `Cannot draft a round while the Goal is ${tab.goalStatus || "unknown"}.`,
       "error",
     );
-    syncGapRoundExtractButton(tab);
+    syncGoalRoundExtractButton(tab);
     return;
   }
-  const transcript = gapChatTranscriptText(tab);
+  const transcript = goalChatTranscriptText(tab);
   if (!transcript) {
     toast("Wait for the agent to respond before extracting a round.", "error");
     return;
@@ -2947,27 +2935,27 @@ async function extractRoundFromGapChat() {
     toast("Pick a reporter in the top-right selector", "error");
     return;
   }
-  openGapRoundExtractModal(tab.gapId, transcript);
+  openGoalRoundExtractModal(tab.goalId, transcript);
   minimizeToolbar();
 }
 
-function openGapRoundExtractModal(gapId, transcript) {
+function openGoalRoundExtractModal(goalId, transcript) {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="gap-round-extract-modal"
-         aria-labelledby="gap-round-extract-title">
-      <div class="modal-title" id="gap-round-extract-title">Extract round</div>
+         data-testid="goal-round-extract-modal"
+         aria-labelledby="goal-round-extract-title">
+      <div class="modal-title" id="goal-round-extract-title">Extract round</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
-          Review the extracted round before adding it to this Gap.
+          Review the extracted round before adding it to this Goal.
         </div>
-        <div id="gap-round-extract-body" data-testid="gap-round-extract-body"></div>
+        <div id="goal-round-extract-body" data-testid="goal-round-extract-body"></div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="gap-round-extract-cancel">Cancel</button>
-        <button id="btn-add-extracted-round" data-testid="gap-round-extract-submit" disabled>Add round</button>
+        <button class="secondary" data-cancel data-testid="goal-round-extract-cancel">Cancel</button>
+        <button id="btn-add-extracted-round" data-testid="goal-round-extract-submit" disabled>Add round</button>
       </div>
     </div>
   `;
@@ -2992,10 +2980,10 @@ function openGapRoundExtractModal(gapId, transcript) {
     if (e.target === root) close();
   });
   root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("#gap-round-extract-body");
+  const bodyRoot = root.querySelector("#goal-round-extract-body");
   const addButton = root.querySelector("#btn-add-extracted-round");
   loadExtractedRoundDraft({
-    gapId,
+    goalId,
     transcript,
     root,
     bodyRoot,
@@ -3010,13 +2998,11 @@ function openGapRoundExtractModal(gapId, transcript) {
   });
 }
 
-async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addButton, close, signal }) {
+async function loadExtractedRoundDraft({ goalId, transcript, root, bodyRoot, addButton, close, signal }) {
   const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "round" });
   if (signal.aborted) return;
   const draft = (drafts || []).find((item) => {
-    return String(item?.actual || "").trim() && String(item?.target || "").trim();
-  }) || (drafts || []).find((item) => {
-    return String(item?.actual || item?.target || "").trim();
+    return String(item?.prompt || "").trim();
   });
   if (!draft) {
     bodyRoot.innerHTML = `<p class="muted">No round draft extracted.</p>`;
@@ -3028,45 +3014,39 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
       ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
       : ""}
     <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form id="gap-round-extract-form" class="round-form">
+    <form id="goal-round-extract-form" class="round-form">
       <div class="form-row">
-        <label>Actual (current behavior)</label>
-        <textarea name="actual" data-testid="gap-round-extract-actual">${htmlEscape(draft.actual || "")}</textarea>
-      </div>
-      <div class="form-row">
-        <label>Target (desired behavior)</label>
-        <textarea name="target" data-testid="gap-round-extract-target">${htmlEscape(draft.target || "")}</textarea>
+        <label>Prompt</label>
+        <textarea name="prompt" data-testid="goal-round-extract-prompt">${htmlEscape(draft.prompt || "")}</textarea>
       </div>
     </form>
   `;
   addButton.disabled = false;
   addButton.addEventListener("click", async () => {
-    const form = root.querySelector("#gap-round-extract-form");
+    const form = root.querySelector("#goal-round-extract-form");
     if (!form) return;
     const fd = new FormData(form);
     const nextReporter = String(state.lastReporter || "").trim();
-    const actual = String(fd.get("actual") || "").trim();
-    const target = String(fd.get("target") || "").trim();
+    const prompt = String(fd.get("prompt") || "").trim();
     if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!actual && !target) return toast("Provide actual or target", "error");
+    if (!prompt) return toast("Provide a prompt", "error");
     await withButtonBusy(addButton, "Adding…", async () => {
       try {
-        await api("POST", `/api/gaps/${gapId}/rounds`, {
+        await api("POST", `/api/goals/${goalId}/rounds`, {
           reporter: nextReporter,
-          actual,
-          target,
+          prompt,
         });
-        const tab = chatState.tabs[gapId];
+        const tab = chatState.tabs[goalId];
         if (tab) {
-          tab.gapStatus = "todo";
-          tab.output = `${tab.output || ""}\n[refine] Extracted this chat into a new Gap round.\n`;
+          tab.goalStatus = "todo";
+          tab.output = `${tab.output || ""}\n[refine] Extracted this chat into a new Goal round.\n`;
           saveChatStateToStorage();
           drawChat();
         }
         toast("New round submitted", "info");
         close();
-        if (state.currentGap === gapId && typeof loadGapDetail === "function") {
-          await loadGapDetail(gapId);
+        if (state.currentGoal === goalId && typeof loadGoalDetail === "function") {
+          await loadGoalDetail(goalId);
         }
       } catch (err) {
         await showActionError(err, "Could not add extracted round");
@@ -3075,19 +3055,19 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
   });
 }
 
-async function refreshGapChatStatus(gapId, { redraw = true } = {}) {
-  const tab = chatState.tabs[gapId];
-  if (!tab || tab.gapStatusLoading) return;
-  tab.gapStatusLoading = true;
+async function refreshGoalChatStatus(goalId, { redraw = true } = {}) {
+  const tab = chatState.tabs[goalId];
+  if (!tab || tab.goalStatusLoading) return;
+  tab.goalStatusLoading = true;
   try {
-    const { gap } = await api("GET", "/api/gaps/" + encodeURIComponent(gapId));
-    if (gap?.status) tab.gapStatus = gap.status;
+    const { goal } = await api("GET", "/api/goals/" + encodeURIComponent(goalId));
+    if (goal?.status) tab.goalStatus = goal.status;
   } catch {
-    if (!tab.gapStatus) tab.gapStatus = "unknown";
+    if (!tab.goalStatus) tab.goalStatus = "unknown";
   } finally {
-    tab.gapStatusLoading = false;
+    tab.goalStatusLoading = false;
     saveChatStateToStorage();
-    if (redraw && chatState.activeTabId === gapId) drawToolbar();
+    if (redraw && chatState.activeTabId === goalId) drawToolbar();
   }
 }
 

@@ -1,18 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::log::RoundLogEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum GapPriority {
+pub enum GoalPriority {
     Low,
     Medium,
     High,
 }
 
-impl GapPriority {
+impl GoalPriority {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Low => "low",
@@ -32,11 +32,11 @@ impl GapPriority {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Gap {
+pub struct Goal {
     pub id: String,
     pub name: String,
-    pub status: GapStatus,
-    pub priority: GapPriority,
+    pub status: GoalStatus,
+    pub priority: GoalPriority,
     #[serde(default)]
     pub reporter: Option<String>,
     pub branch_name: Option<String>,
@@ -45,16 +45,16 @@ pub struct Gap {
     pub node_id: Option<String>,
     pub created: Timestamp,
     pub updated: Timestamp,
-    pub notes: Vec<GapNote>,
-    pub rounds: Vec<GapRound>,
+    pub notes: Vec<GoalNote>,
+    pub rounds: Vec<GoalRound>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GapIndexProjection {
+pub struct GoalIndexProjection {
     pub id: String,
     pub name: String,
-    pub status: GapStatus,
-    pub priority: GapPriority,
+    pub status: GoalStatus,
+    pub priority: GoalPriority,
     pub reporter: Option<String>,
     #[serde(default)]
     pub assignee: Option<String>,
@@ -69,7 +69,7 @@ pub struct GapIndexProjection {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GapNote {
+pub struct GoalNote {
     pub id: String,
     pub author: String,
     pub body: String,
@@ -78,12 +78,11 @@ pub struct GapNote {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GapRound {
+pub struct GoalRound {
     pub reporter: String,
     #[serde(default)]
     pub assignee: Option<String>,
-    pub actual: String,
-    pub target: String,
+    pub prompt: String,
     pub created: Timestamp,
     pub updated: Timestamp,
     pub guidance_decision: Option<String>,

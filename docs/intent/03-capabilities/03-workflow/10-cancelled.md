@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Cancelled exists so Refine can intentionally stop work without pretending it succeeded or failed accidentally. A Gap may become irrelevant, duplicate, unsafe, out of scope, or superseded by a different plan.
+Cancelled exists so Refine can intentionally stop work without pretending it succeeded or failed accidentally. A Goal may become irrelevant, duplicate, unsafe, out of scope, or superseded by a different plan.
 
 ## Expected Role
 
@@ -18,13 +18,13 @@ Cancellation should be visible to workflow, Features, agents, and surfaces. If c
 
 ## What Happens
 
-When a Gap is cancelled:
+When a Goal is cancelled:
 
 - Refine removes it from active workflow consideration.
 - Active claims, relevant processes, and pending automation should be stopped or released where appropriate.
 - The cancellation reason, history, logs, and relationships should remain inspectable.
 - Feature rollups and ordered work should account for the cancellation explicitly.
-- Future work may replace or supersede the cancelled Gap, but cancellation should not silently delete the record.
+- Future work may replace or supersede the cancelled Goal, but cancellation should not silently delete the record.
 
 ## Future Direction
 

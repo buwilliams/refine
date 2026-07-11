@@ -12,7 +12,7 @@
 
 The MCP surface exists so MCP-speaking AI clients can use Refine directly through the Model Context Protocol. It complements the CLI and HTTP API: where the CLI is the explicit, scriptable agent interface and the API is the contract between surfaces and the daemon, MCP is the standard protocol an external assistant already knows how to speak.
 
-It exists to lower the cost of agent integration. An agent should be able to attach to a running Refine daemon, list the available tools, and start reading status, Gaps, and Features or driving capability routes — without bespoke wiring for Refine's internals.
+It exists to lower the cost of agent integration. An agent should be able to attach to a running Refine daemon, list the available tools, and start reading status, Goals, and Features or driving capability routes — without bespoke wiring for Refine's internals.
 
 MCP is treated as a thin, always-on adapter. It is important because it widens who can operate Refine, but it is not the product center and it does not own any capability.
 
@@ -20,7 +20,7 @@ MCP is treated as a thin, always-on adapter. It is important because it widens w
 
 The MCP surface should be mounted by the daemon web server and reachable as soon as the daemon is up. It speaks JSON-RPC 2.0 and answers the core MCP methods: capability negotiation on `initialize`, tool discovery on `tools/list`, and tool execution on `tools/call`.
 
-Its tools should map onto real system capabilities the same way the API route groups do. Reads (system status, dashboard, Gaps, Features) should be first-class and safe. A general request tool should remain available as an escape hatch so an agent can reach any daemon route — including writes — without the catalog having to enumerate every capability up front.
+Its tools should map onto real system capabilities the same way the API route groups do. Reads (system status, dashboard, Goals, Features) should be first-class and safe. A general request tool should remain available as an escape hatch so an agent can reach any daemon route — including writes — without the catalog having to enumerate every capability up front.
 
 Because MCP delegates to the shared daemon API, it inherits the system's local-first security, idempotency, logging, and state-repair behavior rather than re-deriving them.
 

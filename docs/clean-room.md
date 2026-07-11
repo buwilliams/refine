@@ -10,7 +10,7 @@ with Refine, and what it costs them.
 
 It exists to answer one question with evidence instead of intuition: *is
 Refine agent-first friendly yet?* Every stall the clean-room agent hits is a
-discoverability gap to file; the baseline re-run is the acceptance test for
+discoverability goal to file; the baseline re-run is the acceptance test for
 fixing them.
 
 ## What the clean room removes — and what it deliberately keeps
@@ -73,7 +73,7 @@ affordances they assumed.
 Grading is mechanical, never the grader's product knowledge.
 
 **Completion** is verified against artifacts, not the agent's claims:
-state files (`nodes.json`, gap JSON, health), daemon responses, and the fly
+state files (`nodes.json`, goal JSON, health), daemon responses, and the fly
 shim log (did it run `apps create` + `deploy` with sane flags?).
 
 **Cost and route** come from the transcript:
@@ -91,7 +91,7 @@ shim log (did it run `apps create` + `deploy` with sane flags?).
 | Realistic UX | what users experience today | all scenarios complete within budget, zero BLOCKED |
 | Design bar | what `docs/intent/01-design.md` promises | scenarios complete with **zero source reads** |
 
-The per-scenario gap between tiers quantifies where discoverability is
+The per-scenario goal between tiers quantifies where discoverability is
 currently subsidized by source-readability. The design bar is a target
 state, not an enforced condition — source reads trend to zero because the
 product explains itself, never because reading was banned.
@@ -115,8 +115,8 @@ product explains itself, never because reading was banned.
 
 Each run produces a findings report: per-scenario outcome, cost metrics,
 route (docs vs source), and a ranked stall list where every stall maps to a
-concrete Gap ("agent looked for `refine deploy`; never found the provisioning
-runbook" → naming/help-text Gap). Fixes are then implemented and
+concrete Goal ("agent looked for `refine deploy`; never found the provisioning
+runbook" → naming/help-text Goal). Fixes are then implemented and
 the same scenarios re-run; the loop closes when the realistic tier passes
 cheaply and the design tier passes at all.
 

@@ -1,8 +1,7 @@
 function normalizeImportDraft(draft) {
   return {
     name: draft.name || "",
-    actual: draft.actual || "",
-    target: draft.target || "",
+    prompt: draft.prompt || "",
     reporter: draft.reporter || state.lastReporter || "",
     priority: String(draft.priority || "low").toLowerCase(),
     dependency_names: Array.isArray(draft.dependency_names)
@@ -27,7 +26,7 @@ function importDraftHiddenFromReview(draft) {
   return draft.duplicateDecision === "duplicate";
 }
 
-function importDraftCreatesGap(draft) {
+function importDraftCreatesGoal(draft) {
   const decision = draft.duplicateDecision || "";
   return !(
     decision === "duplicate"
@@ -37,7 +36,7 @@ function importDraftCreatesGap(draft) {
 }
 
 function importDraftCreateCount(drafts) {
-  return drafts.filter(importDraftCreatesGap).length;
+  return drafts.filter(importDraftCreatesGoal).length;
 }
 
 function updateImportPersistButton(root, draftState, featureDestination = null) {
@@ -50,7 +49,7 @@ function updateImportPersistButton(root, draftState, featureDestination = null) 
     : destination.mode === "existing"
       ? " to Feature"
       : "";
-  btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}${suffix}`;
+  btn.textContent = `Save (${count}) goal${count === 1 ? "" : "s"}${suffix}`;
 }
 
 function normalizeImportFeatureDestination(raw = null) {
@@ -73,7 +72,7 @@ function renderImportFeatureDestination(destination) {
       <div class="filter-row">
         <label class="checkbox-row">
           <input type="radio" name="import-feature-mode" value="standalone" data-testid="import-feature-mode-standalone" ${dest.mode === "standalone" ? "checked" : ""}>
-          <span>Standalone Gaps</span>
+          <span>Standalone Goals</span>
         </label>
         <label class="checkbox-row">
           <input type="radio" name="import-feature-mode" value="new" data-testid="import-feature-mode-new" ${dest.mode === "new" ? "checked" : ""}>
@@ -148,7 +147,7 @@ async function populateImportFeatureSelect(select) {
   select.innerHTML = features.length
     ? features.map((feature) => `
         <option value="${htmlEscape(feature.id)}" ${feature.id === selected ? "selected" : ""}>
-          ${htmlEscape(feature.name || feature.id)} · ${htmlEscape(feature.status || "backlog")} · ${feature.done_count || 0}/${feature.gap_count || 0} done
+          ${htmlEscape(feature.name || feature.id)} · ${htmlEscape(feature.status || "backlog")} · ${feature.done_count || 0}/${feature.goal_count || 0} done
         </option>`).join("")
     : `<option value="">No Features available</option>`;
 }
@@ -156,15 +155,15 @@ async function populateImportFeatureSelect(select) {
 function importFeatureDestinationSummary(dest) {
   if (dest.mode === "new") {
     return dest.newName
-      ? `Creates Feature "${dest.newName}" and saves imported Gaps in reviewed order.`
-      : "Creates a new Feature and saves imported Gaps in reviewed order.";
+      ? `Creates Feature "${dest.newName}" and saves imported Goals in reviewed order.`
+      : "Creates a new Feature and saves imported Goals in reviewed order.";
   }
   if (dest.mode === "existing") {
     return dest.existingId
-      ? `Appends imported Gaps to Feature ${dest.existingId} in reviewed order.`
+      ? `Appends imported Goals to Feature ${dest.existingId} in reviewed order.`
       : "Choose an existing Feature before saving.";
   }
-  return "Saves imported Gaps as standalone Gaps.";
+  return "Saves imported Goals as standalone Goals.";
 }
 
 function importFeatureDestinationPayload(destination) {

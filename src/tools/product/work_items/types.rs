@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BulkGapFilter {
+pub struct BulkGoalFilter {
     pub status: Option<String>,
     pub q: Option<String>,
     pub reporter: Option<String>,
@@ -14,9 +14,9 @@ pub struct BulkGapFilter {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BulkGapSelection {
+pub struct BulkGoalSelection {
     #[serde(default)]
-    pub filter: BulkGapFilter,
+    pub filter: BulkGoalFilter,
     pub selected_ids: Option<Vec<String>>,
     #[serde(default)]
     pub exclude_ids: Vec<String>,
@@ -24,7 +24,7 @@ pub struct BulkGapSelection {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum BulkGapUpdate {
+pub enum BulkGoalUpdate {
     Priority(String),
     Status(String),
     Reporter(String),
@@ -102,7 +102,7 @@ pub struct BulkTransferNodeResult {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct DistributeMove {
-    pub gap_id: String,
+    pub goal_id: String,
     pub from_node_id: String,
     pub to_node_id: String,
 }

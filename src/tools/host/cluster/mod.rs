@@ -32,7 +32,7 @@ pub struct ClusterBootstrapRequest {
 
 pub trait ClusterService {
     fn registry(&self) -> RefineResult<Cluster>;
-    fn transfer(&self, gap_or_feature_id: &str, node_id: &str) -> RefineResult<()>;
+    fn transfer(&self, goal_or_feature_id: &str, node_id: &str) -> RefineResult<()>;
     fn sync(&self) -> RefineResult<()>;
     fn run_remote(&self, node_id: &str, command: &str) -> RefineResult<RemoteRunResult>;
     fn maintenance(&self, active: bool, reason: Option<String>) -> RefineResult<Cluster>;
@@ -271,9 +271,9 @@ impl FileClusterService {
     }
 
     /// Distribute is the mechanism for moving work between nodes: it
-    /// reassigns ownership of eligible Gaps across enabled, healthy nodes.
-    /// With `to`, all eligible Gaps fill that one node; with `converge`,
-    /// reviewable Gaps move home to the given review node instead.
+    /// reassigns ownership of eligible Goals across enabled, healthy nodes.
+    /// With `to`, all eligible Goals fill that one node; with `converge`,
+    /// reviewable Goals move home to the given review node instead.
     pub fn distribute_response(
         &self,
         to: Option<&str>,
@@ -298,19 +298,19 @@ impl FileClusterService {
                 .map(|node| node.id.clone())
                 .collect(),
         };
-        let claimed = self.active_claim_gap_ids();
+        let claimed = self.active_claim_goal_ids();
         let result = FileWorkItemService::new(&self.refine_dir)
-            .distribute_gaps_across_nodes(&targets, converge, &claimed, dry_run)?;
+            .distribute_goals_across_nodes(&targets, converge, &claimed, dry_run)?;
         Ok(serde_json::json!({
             "ok": true,
             "distribute": result
         }))
     }
 
-    /// Gaps with an active claim are pinned to their node; distribution only
+    /// Goals with an active claim are pinned to their node; distribution only
     /// moves unclaimed work. Claims live in runtime state, so this is empty
     /// when no runtime root is configured.
-    fn active_claim_gap_ids(&self) -> BTreeSet<String> {
+    fn active_claim_goal_ids(&self) -> BTreeSet<String> {
         let Some(runtime_root) = &self.runtime_root else {
             return BTreeSet::new();
         };
@@ -330,7 +330,7 @@ impl FileClusterService {
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
                 )
             })
-            .map(|claim| claim.gap_id)
+            .map(|claim| claim.goal_id)
             .collect()
     }
 
@@ -420,7 +420,7 @@ impl ClusterService for FileClusterService {
         Ok(self.cluster_from_registry(registry))
     }
 
-    fn transfer(&self, _gap_or_feature_id: &str, node_id: &str) -> RefineResult<()> {
+    fn transfer(&self, _goal_or_feature_id: &str, node_id: &str) -> RefineResult<()> {
         validate_remote_node_enabled(&self.registry()?, node_id)
     }
 
@@ -964,7 +964,7 @@ mod tests {
         service.set_enabled("node-1", false).unwrap();
         assert_eq!(service.show("node-1").unwrap()["node"]["enabled"], false);
         service.set_enabled("node-1", true).unwrap();
-        service.transfer("GAP1", "node-1").unwrap();
+        service.transfer("GOAL1", "node-1").unwrap();
         service.sync().unwrap();
         service.maintenance_response().unwrap();
         service.remove_node("node-1").unwrap();
@@ -1085,7 +1085,7 @@ mod tests {
             registry_service.save_registry(&registry).unwrap();
         }
         crate::tools::product::work_items::FileWorkItemService::new(&refine_dir)
-            .create_gap_summary("Distributable", Some("GAP1"))
+            .create_goal_summary("Distributable", Some("GOAL1"))
             .unwrap();
 
         let response = service.distribute_response(None, false, true).unwrap();

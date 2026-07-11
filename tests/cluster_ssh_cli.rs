@@ -98,9 +98,9 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "stderr:\n{}",
         String::from_utf8_lossy(&disabled_run.stderr)
     );
-    let disabled_gap = fixture.create_gap("disabled cluster transfer gap");
+    let disabled_goal = fixture.create_goal("disabled cluster transfer goal");
     let disabled_transfer =
-        fixture.run_refine(&["cluster", "transfer", "docker-ssh", &disabled_gap]);
+        fixture.run_refine(&["cluster", "transfer", "docker-ssh", &disabled_goal]);
     assert!(
         !disabled_transfer.status.success(),
         "cluster transfer unexpectedly succeeded for disabled node"

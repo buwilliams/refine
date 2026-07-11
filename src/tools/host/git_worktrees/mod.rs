@@ -1240,12 +1240,12 @@ mod tests {
     fn file_git_worktree_service_cleans_merged_branch_worktree() {
         let temp_root = unique_temp_dir("git-worktree-cleanup");
         let repo = temp_root.join("repo");
-        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        let worktree_path = temp_root.join("repo-refine-GOAL1-round-1");
         fs::create_dir_all(&repo).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
 
-        let branch = "refine/GAP1/round-1";
+        let branch = "refine/GOAL1/round-1";
         git(
             &repo,
             &[

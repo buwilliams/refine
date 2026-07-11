@@ -32,7 +32,7 @@ pub struct PerformanceEvent {
     pub operation: String,
     pub elapsed_ms: f64,
     pub success: bool,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
     pub provider: Option<String>,
     pub query_mode: Option<String>,
     pub rows_returned: Option<u64>,
@@ -146,7 +146,7 @@ impl FileMetricsService {
             operation: operation.into(),
             elapsed_ms,
             success,
-            gap_id: None,
+            goal_id: None,
             provider: None,
             query_mode: None,
             rows_returned: None,
@@ -363,7 +363,7 @@ impl MetricsService for FileMetricsService {
             operation,
             elapsed_ms: sample.value,
             success,
-            gap_id: tags.get("gap_id").cloned(),
+            goal_id: tags.get("goal_id").cloned(),
             provider: tags.get("provider").cloned(),
             query_mode: tags.get("query_mode").cloned(),
             rows_returned: tags
@@ -477,8 +477,8 @@ fn event_tags(event: &PerformanceEvent) -> Vec<(String, String)> {
             if event.success { "true" } else { "false" }.to_string(),
         ),
     ];
-    if let Some(value) = &event.gap_id {
-        tags.push(("gap_id".to_string(), value.clone()));
+    if let Some(value) = &event.goal_id {
+        tags.push(("goal_id".to_string(), value.clone()));
     }
     if let Some(value) = &event.provider {
         tags.push(("provider".to_string(), value.clone()));
@@ -519,7 +519,7 @@ mod tests {
                 operation: "cache.rebuild".to_string(),
                 elapsed_ms: 50.0,
                 success: true,
-                gap_id: None,
+                goal_id: None,
                 provider: None,
                 query_mode: Some("full".to_string()),
                 rows_returned: Some(3),
@@ -578,7 +578,7 @@ mod tests {
             operation: "http.request".to_string(),
             elapsed_ms: 1.0,
             success: true,
-            gap_id: None,
+            goal_id: None,
             provider: None,
             query_mode: None,
             rows_returned: None,
@@ -591,7 +591,7 @@ mod tests {
             operation: "http.request".to_string(),
             elapsed_ms: 2.0,
             success: true,
-            gap_id: None,
+            goal_id: None,
             provider: None,
             query_mode: None,
             rows_returned: None,

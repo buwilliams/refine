@@ -1,4 +1,4 @@
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::RefineResult;
 use crate::workflow::context::WorkflowContext;
 
@@ -11,12 +11,12 @@ pub enum WorkflowAdvanceOutcome {
         reason: String,
     },
     Transition {
-        from: GapStatus,
-        to: GapStatus,
+        from: GoalStatus,
+        to: GoalStatus,
         reason: String,
     },
     Completed {
-        final_status: GapStatus,
+        final_status: GoalStatus,
         reason: String,
     },
     Failed {
@@ -25,7 +25,7 @@ pub enum WorkflowAdvanceOutcome {
 }
 
 pub trait WorkflowBehavior {
-    fn observes(&self) -> GapStatus;
+    fn observes(&self) -> GoalStatus;
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome>;
 }

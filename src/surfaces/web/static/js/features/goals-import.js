@@ -1,9 +1,8 @@
-// ---- Gaps: import -----------------------------------------------------------
+// ---- Goals: import -----------------------------------------------------------
 
 const IMPORT_SESSION_KEY = "refine_import_session_v1";
 const IMPORT_CSV_REQUIRED_FIELDS = [
-  "actual (text)",
-  "target (text)",
+  "prompt (text)",
   "reporter (text)",
   "priority (low, medium, high)",
 ];
@@ -14,22 +13,22 @@ const IMPORT_MODES = {
     action: "Extract Feature",
   },
   ai: {
-    label: "Import Gaps",
+    label: "Import Goals",
     action: "Extract drafts",
   },
   csv: {
-    label: "Import Gaps (.csv)",
+    label: "Import Goals (.csv)",
     action: "Parse CSV",
   },
   upload: {
-    label: "Upload Gaps (.csv)",
+    label: "Upload Goals (.csv)",
     action: "Parse upload",
   },
 };
 
-async function renderGapImport() {
-  // Import is a modal layered over the gaps list, mirroring New Gap.
-  await renderGapsList();
+async function renderGoalImport() {
+  // Import is a modal layered over the goals list, mirroring New Goal.
+  await renderGoalsList();
   openImportModal();
 }
 
@@ -38,8 +37,8 @@ let _importModalOpen = false;
 function recoverImportSessionOnLoad() {
   const session = readImportSession();
   if (!session || !importSessionIsDirty(session)) return false;
-  if (!location.hash.startsWith("#/gaps/import")) {
-    location.hash = "#/gaps/import";
+  if (!location.hash.startsWith("#/goals/import")) {
+    location.hash = "#/goals/import";
   }
   return true;
 }

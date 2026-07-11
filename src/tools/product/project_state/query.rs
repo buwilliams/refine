@@ -2,18 +2,18 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::model::feature::FeatureRollup;
-use crate::model::gap::{GapIndexProjection, GapPriority};
-use crate::model::workflow::GapStatus;
+use crate::model::goal::{GoalIndexProjection, GoalPriority};
+use crate::model::workflow::GoalStatus;
 
 use super::helpers::*;
 use super::types::*;
 
 pub trait ProjectionQuery {
-    fn status_counts(&self) -> BTreeMap<GapStatus, usize>;
+    fn status_counts(&self) -> BTreeMap<GoalStatus, usize>;
     fn dashboard_summary(&self, query: DashboardProjectionQuery) -> DashboardProjectionSummary;
-    fn gap_ids_for_status(&self, status: &GapStatus) -> Vec<String>;
+    fn goal_ids_for_status(&self, status: &GoalStatus) -> Vec<String>;
     fn feature_rollup(&self, feature_id: &str) -> Option<FeatureRollup>;
-    fn list_gaps(&self, query: GapProjectionQuery) -> GapProjectionList;
+    fn list_goals(&self, query: GoalProjectionQuery) -> GoalProjectionList;
     fn list_features(&self, query: FeatureProjectionQuery) -> FeatureProjectionList;
     fn list_activity(&self, query: ActivityProjectionQuery) -> ActivityProjectionList;
     fn list_changes(&self, query: ChangeProjectionQuery) -> ChangeProjectionList;
@@ -23,10 +23,10 @@ pub trait ProjectionQuery {
 }
 
 impl ProjectionQuery for ProjectionSnapshot {
-    fn status_counts(&self) -> BTreeMap<GapStatus, usize> {
+    fn status_counts(&self) -> BTreeMap<GoalStatus, usize> {
         let mut counts = BTreeMap::new();
-        for projection in self.gaps.values() {
-            *counts.entry(projection.gap.status.clone()).or_insert(0) += 1;
+        for projection in self.goals.values() {
+            *counts.entry(projection.goal.status.clone()).or_insert(0) += 1;
         }
         counts
     }
@@ -44,24 +44,24 @@ impl ProjectionQuery for ProjectionSnapshot {
         } else {
             "current".to_string()
         };
-        let scoped_gaps = self
-            .gaps
+        let scoped_goals = self
+            .goals
             .values()
             .filter(|projection| {
-                gap_matches_node(
-                    projection.gap.node_id.as_deref(),
+                goal_matches_node(
+                    projection.goal.node_id.as_deref(),
                     &node_filter,
                     Some(current_node_id.as_str()),
                 )
             })
             .collect::<Vec<_>>();
-        let counts = gap_status_counts(scoped_gaps.iter().map(|gap| &gap.gap.status));
-        let all_node_counts = gap_status_counts(self.gaps.values().map(|gap| &gap.gap.status));
-        let mut reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
-        let mut assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
-        for gap in &scoped_gaps {
-            let reporter = gap
-                .gap
+        let counts = goal_status_counts(scoped_goals.iter().map(|goal| &goal.goal.status));
+        let all_node_counts = goal_status_counts(self.goals.values().map(|goal| &goal.goal.status));
+        let mut reporter_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
+        let mut assignee_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
+        for goal in &scoped_goals {
+            let reporter = goal
+                .goal
                 .reporter
                 .clone()
                 .filter(|reporter| !reporter.is_empty())
@@ -69,10 +69,10 @@ impl ProjectionQuery for ProjectionSnapshot {
             *reporter_stats
                 .entry(reporter)
                 .or_default()
-                .entry(gap.gap.status.clone())
+                .entry(goal.goal.status.clone())
                 .or_default() += 1;
-            let assignee = gap
-                .gap
+            let assignee = goal
+                .goal
                 .assignee
                 .clone()
                 .filter(|assignee| !assignee.is_empty())
@@ -80,12 +80,12 @@ impl ProjectionQuery for ProjectionSnapshot {
             *assignee_stats
                 .entry(assignee)
                 .or_default()
-                .entry(gap.gap.status.clone())
+                .entry(goal.goal.status.clone())
                 .or_default() += 1;
         }
-        let failed_count = counts.get(&GapStatus::Failed).copied().unwrap_or_default();
+        let failed_count = counts.get(&GoalStatus::Failed).copied().unwrap_or_default();
         let attention_indicators = if failed_count > 0 {
-            vec![format!("{failed_count} failed Gap(s) need recovery")]
+            vec![format!("{failed_count} failed Goal(s) need recovery")]
         } else {
             Vec::new()
         };
@@ -96,11 +96,11 @@ impl ProjectionQuery for ProjectionSnapshot {
             .filter(|activity_id| {
                 self.activity
                     .get(*activity_id)
-                    .and_then(|activity| activity.entry.gap_id.as_deref())
-                    .and_then(|gap_id| self.gaps.get(gap_id))
-                    .map(|gap| {
-                        gap_matches_node(
-                            gap.gap.node_id.as_deref(),
+                    .and_then(|activity| activity.entry.goal_id.as_deref())
+                    .and_then(|goal_id| self.goals.get(goal_id))
+                    .map(|goal| {
+                        goal_matches_node(
+                            goal.goal.node_id.as_deref(),
                             &node_filter,
                             Some(current_node_id.as_str()),
                         )
@@ -121,12 +121,12 @@ impl ProjectionQuery for ProjectionSnapshot {
         }
     }
 
-    fn gap_ids_for_status(&self, status: &GapStatus) -> Vec<String> {
-        self.gaps
+    fn goal_ids_for_status(&self, status: &GoalStatus) -> Vec<String> {
+        self.goals
             .iter()
-            .filter_map(|(gap_id, projection)| {
-                if &projection.gap.status == status {
-                    Some(gap_id.clone())
+            .filter_map(|(goal_id, projection)| {
+                if &projection.goal.status == status {
+                    Some(goal_id.clone())
                 } else {
                     None
                 }
@@ -140,24 +140,24 @@ impl ProjectionQuery for ProjectionSnapshot {
             .map(|projection| projection.rollup.clone())
     }
 
-    fn list_gaps(&self, query: GapProjectionQuery) -> GapProjectionList {
+    fn list_goals(&self, query: GoalProjectionQuery) -> GoalProjectionList {
         let mut rows = self
-            .gaps
+            .goals
             .values()
-            .filter(|projection| gap_matches(self, projection, &query))
-            .map(|projection| projection.gap.clone())
+            .filter(|projection| goal_matches(self, projection, &query))
+            .map(|projection| projection.goal.clone())
             .collect::<Vec<_>>();
-        sort_gaps(&mut rows, &query.page.sort, &query.page.dir);
+        sort_goals(&mut rows, &query.page.sort, &query.page.dir);
         let total = rows.len();
-        let filtered_status_counts = gap_status_counts(rows.iter().map(|gap| &gap.status));
-        let matching_ids = rows.iter().map(|gap| gap.id.clone()).collect::<Vec<_>>();
-        let gaps = rows
+        let filtered_status_counts = goal_status_counts(rows.iter().map(|goal| &goal.status));
+        let matching_ids = rows.iter().map(|goal| goal.id.clone()).collect::<Vec<_>>();
+        let goals = rows
             .into_iter()
             .skip(query.page.offset)
             .take(query.page.limit)
             .collect();
-        GapProjectionList {
-            gaps,
+        GoalProjectionList {
+            goals,
             total,
             filtered_status_counts,
             matching_ids,
@@ -240,16 +240,16 @@ impl ProjectionQuery for ProjectionSnapshot {
     }
 }
 
-fn gap_matches(
+fn goal_matches(
     snapshot: &ProjectionSnapshot,
-    projection: &GapSummaryProjection,
-    query: &GapProjectionQuery,
+    projection: &GoalSummaryProjection,
+    query: &GoalProjectionQuery,
 ) -> bool {
-    let gap = &projection.gap;
+    let goal = &projection.goal;
     if query
         .status
         .as_ref()
-        .is_some_and(|status| &gap.status != status)
+        .is_some_and(|status| &goal.status != status)
     {
         return false;
     }
@@ -257,7 +257,7 @@ fn gap_matches(
         .reporter
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .is_some_and(|reporter| gap.reporter.as_deref() != Some(reporter))
+        .is_some_and(|reporter| goal.reporter.as_deref() != Some(reporter))
     {
         return false;
     }
@@ -265,7 +265,7 @@ fn gap_matches(
         .assignee
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .is_some_and(|assignee| gap.assignee.as_deref() != Some(assignee))
+        .is_some_and(|assignee| goal.assignee.as_deref() != Some(assignee))
     {
         return false;
     }
@@ -276,8 +276,8 @@ fn gap_matches(
     {
         match node {
             value => {
-                if !gap_matches_node(
-                    gap.node_id.as_deref(),
+                if !goal_matches_node(
+                    goal.node_id.as_deref(),
                     value,
                     query.current_node_id.as_deref(),
                 ) {
@@ -293,12 +293,12 @@ fn gap_matches(
     {
         match feature {
             "standalone" | "__standalone" | "none" => {
-                if gap.feature_id.is_some() {
+                if goal.feature_id.is_some() {
                     return false;
                 }
             }
             value => {
-                if gap.feature_id.as_deref() != Some(value) {
+                if goal.feature_id.as_deref() != Some(value) {
                     return false;
                 }
             }
@@ -306,13 +306,13 @@ fn gap_matches(
     }
     if query
         .rounds_gte
-        .is_some_and(|minimum| gap.round_count < minimum)
+        .is_some_and(|minimum| goal.round_count < minimum)
     {
         return false;
     }
     if query
         .rounds_lte
-        .is_some_and(|maximum| gap.round_count > maximum)
+        .is_some_and(|maximum| goal.round_count > maximum)
     {
         return false;
     }
@@ -322,14 +322,14 @@ fn gap_matches(
     if let Some(q) = query.q.as_deref().filter(|value| !value.trim().is_empty()) {
         let q = q.to_lowercase();
         if !projection.searchable_text.to_lowercase().contains(&q)
-            && !gap.id.to_lowercase().contains(&q)
-            && !gap.name.to_lowercase().contains(&q)
-            && !gap
+            && !goal.id.to_lowercase().contains(&q)
+            && !goal.name.to_lowercase().contains(&q)
+            && !goal
                 .reporter
                 .as_deref()
                 .map(|reporter| reporter.to_lowercase().contains(&q))
                 .unwrap_or(false)
-            && !gap
+            && !goal
                 .assignee
                 .as_deref()
                 .map(|assignee| assignee.to_lowercase().contains(&q))
@@ -343,8 +343,8 @@ fn gap_matches(
 
 fn activity_matches(
     snapshot: &ProjectionSnapshot,
-    projection: &GapSummaryProjection,
-    query: &GapProjectionQuery,
+    projection: &GoalSummaryProjection,
+    query: &GoalProjectionQuery,
 ) -> bool {
     let wants_activity = query
         .severity
@@ -399,10 +399,10 @@ fn activity_projection_matches(
 ) -> bool {
     let entry = &projection.entry;
     if query
-        .gap_id
+        .goal_id
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .is_some_and(|gap_id| entry.gap_id.as_deref() != Some(gap_id))
+        .is_some_and(|goal_id| entry.goal_id.as_deref() != Some(goal_id))
     {
         return false;
     }
@@ -447,17 +447,17 @@ fn change_projection_matches(
     query: &ChangeProjectionQuery,
 ) -> bool {
     if query
-        .gap_id
+        .goal_id
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .is_some_and(|gap_id| projection.gap_id.as_deref() != Some(gap_id))
+        .is_some_and(|goal_id| projection.goal_id.as_deref() != Some(goal_id))
     {
         return false;
     }
     if query
         .status
         .as_ref()
-        .is_some_and(|status| projection.gap_status.as_ref() != Some(status))
+        .is_some_and(|status| projection.goal_status.as_ref() != Some(status))
     {
         return false;
     }
@@ -465,7 +465,7 @@ fn change_projection_matches(
         .priority
         .as_deref()
         .filter(|value| !value.trim().is_empty())
-        .is_some_and(|priority| projection.gap_priority.as_deref() != Some(priority))
+        .is_some_and(|priority| projection.goal_priority.as_deref() != Some(priority))
     {
         return false;
     }
@@ -544,7 +544,7 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
     {
         match node {
             value => {
-                if !gap_matches_node(
+                if !goal_matches_node(
                     feature.node_id.as_deref(),
                     value,
                     query.current_node_id.as_deref(),
@@ -580,7 +580,7 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
     true
 }
 
-fn gap_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&str>) -> bool {
+fn goal_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&str>) -> bool {
     match node {
         "all" => true,
         "current" => owner.unwrap_or("default") == current_node_id.unwrap_or("default"),
@@ -589,7 +589,7 @@ fn gap_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&st
     }
 }
 
-fn sort_gaps(rows: &mut [GapIndexProjection], sort: &str, dir: &str) {
+fn sort_goals(rows: &mut [GoalIndexProjection], sort: &str, dir: &str) {
     rows.sort_by(|a, b| {
         let ordering = match sort {
             "name" => a.name.cmp(&b.name),
@@ -639,7 +639,7 @@ fn sort_activity(rows: &mut [ActivitySummaryProjection], sort: &str, dir: &str) 
             "severity" => a.entry.severity.cmp(&b.entry.severity),
             "category" => a.entry.category.cmp(&b.entry.category),
             "actor" => a.entry.actor.cmp(&b.entry.actor),
-            "gap_id" | "gap" => a.entry.gap_id.cmp(&b.entry.gap_id),
+            "goal_id" | "goal" => a.entry.goal_id.cmp(&b.entry.goal_id),
             "message" => a.entry.message.cmp(&b.entry.message),
             "id" => a.entry.id.cmp(&b.entry.id),
             _ => a.entry.datetime.cmp(&b.entry.datetime),
@@ -659,10 +659,10 @@ fn sort_changes(rows: &mut [ChangeSummaryProjection], sort: &str, dir: &str) {
             "commit" => a.commit.cmp(&b.commit),
             "subject" => a.subject.cmp(&b.subject),
             "branch" => a.branch.cmp(&b.branch),
-            "gap_id" | "gap" => a.gap_id.cmp(&b.gap_id),
-            "status" => a.gap_status.cmp(&b.gap_status),
-            "priority" => a.gap_priority.cmp(&b.gap_priority),
-            "assignee" => a.gap_assignee.cmp(&b.gap_assignee),
+            "goal_id" | "goal" => a.goal_id.cmp(&b.goal_id),
+            "status" => a.goal_status.cmp(&b.goal_status),
+            "priority" => a.goal_priority.cmp(&b.goal_priority),
+            "assignee" => a.goal_assignee.cmp(&b.goal_assignee),
             _ => b
                 .order
                 .cmp(&a.order)
@@ -677,10 +677,10 @@ fn sort_changes(rows: &mut [ChangeSummaryProjection], sort: &str, dir: &str) {
     });
 }
 
-fn priority_rank(priority: &GapPriority) -> u8 {
+fn priority_rank(priority: &GoalPriority) -> u8 {
     match priority {
-        GapPriority::Low => 0,
-        GapPriority::Medium => 1,
-        GapPriority::High => 2,
+        GoalPriority::Low => 0,
+        GoalPriority::Medium => 1,
+        GoalPriority::High => 2,
     }
 }

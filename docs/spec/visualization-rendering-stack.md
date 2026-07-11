@@ -52,7 +52,7 @@ add touch parity without rewriting sketch internals.
 ## Preview Strategy Boundary
 
 This decision does not require all gallery tiles to run live p5 instances.
-Preview behavior is a separate Gap. The rendering stack should support both
+Preview behavior is a separate Goal. The rendering stack should support both
 static captured thumbnails and live low-fidelity previews by keeping sketch
 lifecycle methods deterministic and cheap to mount.
 
@@ -70,5 +70,5 @@ behind the same sketch lifecycle contract.
 - Future sketches have a documented lifecycle and mounting contract.
 - Parameter controls, canvas input, resizing, reset, capture, and future sketch
   authoring are covered by the stack decision.
-- Later preview, touch, and performance Gaps can build on this contract without
+- Later preview, touch, and performance Goals can build on this contract without
   changing the selected stack.

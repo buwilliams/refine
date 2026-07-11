@@ -46,7 +46,7 @@
     - [Dashboard](04-surfaces/03-browser-desktop/05-dashboard.md)
     - [Workflow](04-surfaces/03-browser-desktop/06-workflow.md)
     - [Feature](04-surfaces/03-browser-desktop/07-feature.md)
-    - [Gap](04-surfaces/03-browser-desktop/08-gap.md)
+    - [Goal](04-surfaces/03-browser-desktop/08-goal.md)
     - [Import](04-surfaces/03-browser-desktop/09-import.md)
     - [Changes Visualizations](04-surfaces/03-browser-desktop/10-changes-visualizations.md)
     - [Log](04-surfaces/03-browser-desktop/11-log.md)

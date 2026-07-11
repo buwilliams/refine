@@ -107,7 +107,7 @@ async function extractPlanDraftsInBackground(text, options = {}) {
 function drawImportProgress(root, state) {
   const lineCount = Number(state.lineCount || 0);
   const draftCount = Number(state.draftCount || 0);
-  const itemLabel = state.feature ? "Feature and Gap" : "Gap";
+  const itemLabel = state.feature ? "Feature and Goal" : "Goal";
   const status = state.phase === "complete"
     ? `AI extracted ${draftCount} draft${draftCount === 1 ? "" : "s"}.`
     : `Asking the selected AI provider to extract ${itemLabel} drafts.`;
@@ -142,7 +142,7 @@ function planDraftPayloadFromResult(text, result) {
   const drafts = Array.isArray(result?.drafts) ? result.drafts : [];
   if (!drafts.length) {
     const err = new Error(
-      result?.error?.message || "Plan Draft extraction did not return any Gap drafts"
+      result?.error?.message || "Plan Draft extraction did not return any Goal drafts"
     );
     err.details = result?.error?.details;
     err.code = result?.error?.code || "empty_plan_drafts";
@@ -226,7 +226,7 @@ async function openPlanDraftModalFromDrafts(_text, drafts, featureDestination) {
       <div class="modal-title" id="plan-drafts-title">Plan drafts</div>
       <div class="modal-body" data-testid="plan-drafts-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
-          Review and edit drafted Gaps before saving.
+          Review and edit drafted Goals before saving.
         </div>
         <div id="import-drafts" class="import-drafts" data-testid="import-drafts"></div>
       </div>
@@ -365,8 +365,8 @@ function drawImportPrepareProgress(root, progress = {}) {
   const message = progress.message || "Preparing CSV import";
   const isParsing = /^Pars/i.test(message);
   const detail = total
-    ? `${completed} of ${total} Gaps ${isParsing ? "parsed" : "processed"}.`
-    : "Preparing imported Gaps for review.";
+    ? `${completed} of ${total} Goals ${isParsing ? "parsed" : "processed"}.`
+    : "Preparing imported Goals for review.";
   root.innerHTML = `
     <div class="loading-row">
       <span class="loading-spinner"></span>

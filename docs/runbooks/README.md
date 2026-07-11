@@ -21,7 +21,7 @@ Runbooks:
   provider, start the daemon, and verify the result.
 - [Provision a fleet worker](provision.md) — create and verify a worker using
   provider tools while Refine owns node identity and work.
-- [Distribute and converge work](distribute-and-converge.md) — move Gaps to
+- [Distribute and converge work](distribute-and-converge.md) — move Goals to
   workers and bring reviewable work home.
 
 Conventions: commands are shown as `refine …`; inside a source checkout use

@@ -692,7 +692,7 @@ fn workflow_execution_json(automation: &WorkflowEngine, execution_id: &str) -> R
     Ok(json!({
         "id": execution_id,
         "claim_id": claim.claim_id,
-        "gap_id": claim.gap_id,
+        "goal_id": claim.goal_id,
         "status": claim.state,
         "node_id": claim.node_id,
         "provider": claim.provider,

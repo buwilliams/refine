@@ -72,8 +72,8 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-pattern",
         label: "Branch name pattern",
         guideItemId: "runtime-branch-name-pattern",
-        valueLabel: s.branch_name_pattern || "refine/{gap_id}",
-        control: `<input type="text" id="s-pattern" data-testid="runtime-branch-name-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}">`,
+        valueLabel: s.branch_name_pattern || "refine/{goal_id}",
+        control: `<input type="text" id="s-pattern" data-testid="runtime-branch-name-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{goal_id}")}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-idle",
@@ -149,7 +149,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-backlog-promote",
         label: "Auto-promote backlog → todo",
         guideItemId: "runtime-backlog-promote",
-        description: "how long a Gap may sit in backlog before the Workflow Engine moves it to todo. Default 1 hour.",
+        description: "how long a Goal may sit in backlog before the Workflow Engine moves it to todo. Default 1 hour.",
         valueLabel: optionLabel(backlogOptions, backlogPromote),
         control: `<select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${backlogOptions.map(([v, lbl]) => `<option value="${v}" ${backlogPromote === v ? "selected" : ""}>${lbl}</option>`).join("")}
@@ -183,7 +183,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-cli",
         label: "Which AI provider refine drives",
         guideItemId: "runtime-ai-provider",
-        description: "used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.",
+        description: "used for Goal agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.",
         valueLabel: optionLabel(providerOptions, cli),
         control: `<select id="s-cli" data-testid="runtime-provider-select">
           ${providerOptions.map(([value, label]) => cliOption(value, label)).join("")}

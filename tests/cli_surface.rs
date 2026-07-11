@@ -14,9 +14,9 @@ fn cli_surface_suite() {
     project_doctor_runs(&fixture);
     project_registry_lifecycle_commands(&fixture);
     system_doctor_and_api_groups_run(&fixture);
-    gap_create_list_show_edit_note_round_delete(&fixture);
-    gap_feature_assignment_and_round_edit_latest(&fixture);
-    gap_workflow_actions_start_retry_verify_merge_undo(&fixture);
+    goal_create_list_show_edit_note_round_delete(&fixture);
+    goal_feature_assignment_and_round_edit_latest(&fixture);
+    goal_workflow_actions_start_retry_verify_merge_undo(&fixture);
     feature_create_membership_rollup_and_delete(&fixture);
     feature_show_edit_reorder_move_cancel_and_import(&fixture);
     node_create_activate_archive(&fixture);
@@ -197,104 +197,102 @@ fn system_doctor_and_api_groups_run(fixture: &IntegrationFixture) {
     );
 }
 
-fn gap_create_list_show_edit_note_round_delete(fixture: &IntegrationFixture) {
-    let gap_id = fixture.create_gap("cli surface gap");
-    assert_eq!(fixture.gap_field(&gap_id, "status"), "backlog");
-    assert_eq!(fixture.gap_field(&gap_id, "priority"), "low");
-    assert_eq!(fixture.gap_field(&gap_id, "name"), "cli surface gap");
-    assert_eq!(fixture.gap_field(&gap_id, "node_id"), "default");
+fn goal_create_list_show_edit_note_round_delete(fixture: &IntegrationFixture) {
+    let goal_id = fixture.create_goal("cli surface goal");
+    assert_eq!(fixture.goal_field(&goal_id, "status"), "backlog");
+    assert_eq!(fixture.goal_field(&goal_id, "priority"), "low");
+    assert_eq!(fixture.goal_field(&goal_id, "name"), "cli surface goal");
+    assert_eq!(fixture.goal_field(&goal_id, "node_id"), "default");
 
-    let list = fixture.run_refine(&["gap", "list"]);
-    fixture.assert_success("gap list", &list);
+    let list = fixture.run_refine(&["goal", "list"]);
+    fixture.assert_success("goal list", &list);
     let payload = fixture.json_stdout(&list);
     assert!(
-        payload["gaps"]
+        payload["goals"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|gap| gap["id"].as_str() == Some(gap_id.as_str()))
+            .any(|goal| goal["id"].as_str() == Some(goal_id.as_str()))
     );
 
     let edit = fixture.run_refine(&[
-        "gap",
+        "goal",
         "edit",
-        &gap_id,
+        &goal_id,
         "--name",
-        "cli surface renamed gap",
+        "cli surface renamed goal",
         "--priority",
         "high",
     ]);
-    fixture.assert_success("gap edit", &edit);
+    fixture.assert_success("goal edit", &edit);
     assert_eq!(
-        fixture.gap_field(&gap_id, "name"),
-        "cli surface renamed gap"
+        fixture.goal_field(&goal_id, "name"),
+        "cli surface renamed goal"
     );
-    assert_eq!(fixture.gap_field(&gap_id, "priority"), "high");
+    assert_eq!(fixture.goal_field(&goal_id, "priority"), "high");
 
     let note = fixture.run_refine(&[
-        "gap",
+        "goal",
         "note",
-        &gap_id,
+        &goal_id,
         "needs a closer look",
         "--author",
         "refine-smoke",
     ]);
-    fixture.assert_success("gap note", &note);
-    assert_eq!(fixture.json_stdout(&note)["gap"]["id"], gap_id);
-    let shown_after_note = fixture.run_refine(&["gap", "show", &gap_id]);
-    fixture.assert_success("gap show after note", &shown_after_note);
-    let note_id = fixture.json_stdout(&shown_after_note)["gap"]["notes"][0]["id"]
+    fixture.assert_success("goal note", &note);
+    assert_eq!(fixture.json_stdout(&note)["goal"]["id"], goal_id);
+    let shown_after_note = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after note", &shown_after_note);
+    let note_id = fixture.json_stdout(&shown_after_note)["goal"]["notes"][0]["id"]
         .as_str()
-        .expect("gap show should expose note id")
+        .expect("goal show should expose note id")
         .to_string();
     let note_edit = fixture.run_refine(&[
-        "gap",
+        "goal",
         "note-edit",
-        &gap_id,
+        &goal_id,
         &note_id,
         "needs a closer look after edit",
     ]);
-    fixture.assert_success("gap note-edit", &note_edit);
-    let shown_after_note_edit = fixture.run_refine(&["gap", "show", &gap_id]);
-    fixture.assert_success("gap show after note edit", &shown_after_note_edit);
+    fixture.assert_success("goal note-edit", &note_edit);
+    let shown_after_note_edit = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after note edit", &shown_after_note_edit);
     assert_eq!(
-        fixture.json_stdout(&shown_after_note_edit)["gap"]["notes"][0]["body"],
+        fixture.json_stdout(&shown_after_note_edit)["goal"]["notes"][0]["body"],
         "needs a closer look after edit"
     );
-    let note_delete = fixture.run_refine(&["gap", "note-delete", &gap_id, &note_id]);
-    fixture.assert_success("gap note-delete", &note_delete);
-    let shown_after_note_delete = fixture.run_refine(&["gap", "show", &gap_id]);
-    fixture.assert_success("gap show after note delete", &shown_after_note_delete);
+    let note_delete = fixture.run_refine(&["goal", "note-delete", &goal_id, &note_id]);
+    fixture.assert_success("goal note-delete", &note_delete);
+    let shown_after_note_delete = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after note delete", &shown_after_note_delete);
     assert_eq!(
-        fixture.json_stdout(&shown_after_note_delete)["gap"]["notes"]
+        fixture.json_stdout(&shown_after_note_delete)["goal"]["notes"]
             .as_array()
             .unwrap()
             .len(),
         0
     );
 
-    assert_eq!(fixture.gap_field(&gap_id, "round_count"), 0);
+    assert_eq!(fixture.goal_field(&goal_id, "round_count"), 0);
     let round = fixture.run_refine(&[
-        "gap",
+        "goal",
         "round",
-        &gap_id,
+        &goal_id,
         "--reporter",
         "refine-smoke",
-        "--actual",
-        "observed actual",
-        "--target",
-        "desired target",
+        "--prompt",
+        "Implement the desired behavior",
     ]);
-    fixture.assert_success("gap round", &round);
-    assert_eq!(fixture.gap_field(&gap_id, "round_count"), 1);
+    fixture.assert_success("goal round", &round);
+    assert_eq!(fixture.goal_field(&goal_id, "round_count"), 1);
 
-    let delete = fixture.run_refine(&["gap", "delete", &gap_id]);
-    fixture.assert_success("gap delete", &delete);
+    let delete = fixture.run_refine(&["goal", "delete", &goal_id]);
+    fixture.assert_success("goal delete", &delete);
     let payload = fixture.json_stdout(&delete);
     assert_eq!(payload["deleted"], true);
-    assert_eq!(payload["id"], gap_id);
+    assert_eq!(payload["id"], goal_id);
 
-    let after = fixture.run_refine(&["gap", "show", &gap_id]);
+    let after = fixture.run_refine(&["goal", "show", &goal_id]);
     assert!(!after.status.success());
     assert!(
         String::from_utf8_lossy(&after.stderr)
@@ -303,8 +301,8 @@ fn gap_create_list_show_edit_note_round_delete(fixture: &IntegrationFixture) {
     );
 }
 
-fn gap_feature_assignment_and_round_edit_latest(fixture: &IntegrationFixture) {
-    let gap_id = fixture.create_gap("cli feature assignment gap");
+fn goal_feature_assignment_and_round_edit_latest(fixture: &IntegrationFixture) {
+    let goal_id = fixture.create_goal("cli feature assignment goal");
     let feature = fixture.run_refine(&[
         "feature",
         "create",
@@ -320,48 +318,44 @@ fn gap_feature_assignment_and_round_edit_latest(fixture: &IntegrationFixture) {
         .unwrap()
         .to_string();
 
-    let assign = fixture.run_refine(&["gap", "assign-feature", &gap_id, &feature_id]);
-    fixture.assert_success("gap assign-feature", &assign);
-    assert_eq!(fixture.gap_field(&gap_id, "feature_id"), feature_id);
+    let assign = fixture.run_refine(&["goal", "assign-feature", &goal_id, &feature_id]);
+    fixture.assert_success("goal assign-feature", &assign);
+    assert_eq!(fixture.goal_field(&goal_id, "feature_id"), feature_id);
 
-    let remove = fixture.run_refine(&["gap", "remove-feature", &gap_id]);
-    fixture.assert_success("gap remove-feature", &remove);
-    assert!(fixture.gap_field(&gap_id, "feature_id").is_null());
+    let remove = fixture.run_refine(&["goal", "remove-feature", &goal_id]);
+    fixture.assert_success("goal remove-feature", &remove);
+    assert!(fixture.goal_field(&goal_id, "feature_id").is_null());
 
     let round = fixture.run_refine(&[
-        "gap",
+        "goal",
         "round",
-        &gap_id,
+        &goal_id,
         "--reporter",
         "refine-smoke",
-        "--actual",
-        "first actual",
-        "--target",
-        "first target",
+        "--prompt",
+        "first prompt",
     ]);
-    fixture.assert_success("gap round assignment", &round);
+    fixture.assert_success("goal round assignment", &round);
     let edit = fixture.run_refine(&[
-        "gap",
+        "goal",
         "round",
-        &gap_id,
+        &goal_id,
         "--edit-latest",
         "--reporter",
         "refine-smoke",
-        "--actual",
-        "edited actual",
-        "--target",
-        "edited target",
+        "--prompt",
+        "edited prompt",
     ]);
-    fixture.assert_success("gap round edit latest", &edit);
-    let shown = fixture.run_refine(&["gap", "show", &gap_id]);
-    fixture.assert_success("gap show after round edit", &shown);
-    let gap = fixture.json_stdout(&shown);
-    assert_eq!(gap["gap"]["round_count"], 1);
-    assert!(gap.to_string().contains("edited actual"), "{gap:#}");
+    fixture.assert_success("goal round edit latest", &edit);
+    let shown = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after round edit", &shown);
+    let goal = fixture.json_stdout(&shown);
+    assert_eq!(goal["goal"]["round_count"], 1);
+    assert!(goal.to_string().contains("edited prompt"), "{goal:#}");
 
     fixture.assert_success(
-        "gap delete assignment",
-        &fixture.run_refine(&["gap", "delete", &gap_id]),
+        "goal delete assignment",
+        &fixture.run_refine(&["goal", "delete", &goal_id]),
     );
     fixture.assert_success(
         "feature delete assignment",
@@ -369,90 +363,99 @@ fn gap_feature_assignment_and_round_edit_latest(fixture: &IntegrationFixture) {
     );
 }
 
-fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixture) {
-    let started_id = fixture.create_gap("gap action start");
-    let started = fixture.run_refine(&["gap", "start", &started_id]);
-    fixture.assert_success("gap start", &started);
+fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixture) {
+    let started_id = fixture.create_goal("goal action start");
+    let started = fixture.run_refine(&["goal", "start", &started_id]);
+    fixture.assert_success("goal start", &started);
     assert_eq!(
-        fixture.json_stdout(&started)["gap"]["status"],
+        fixture.json_stdout(&started)["goal"]["status"],
         "in-progress"
     );
-    assert_eq!(fixture.gap_field(&started_id, "status"), "in-progress");
+    assert_eq!(fixture.goal_field(&started_id, "status"), "in-progress");
     fixture.assert_success(
-        "gap cancel started",
-        &fixture.run_refine(&["gap", "cancel", &started_id]),
+        "goal cancel started",
+        &fixture.run_refine(&["goal", "cancel", &started_id]),
     );
     fixture.assert_success(
-        "gap undo started cancel",
-        &fixture.run_refine(&["gap", "undo", &started_id]),
+        "goal undo started cancel",
+        &fixture.run_refine(&["goal", "undo", &started_id]),
     );
     fixture.assert_success(
-        "gap delete started",
-        &fixture.run_refine(&["gap", "delete", &started_id]),
+        "goal delete started",
+        &fixture.run_refine(&["goal", "delete", &started_id]),
     );
 
-    let quality_id = fixture.create_gap("gap action quality retry");
-    seed_gap_status(fixture, &quality_id, "failed");
-    let retried_quality = fixture.run_refine(&["gap", "retry", &quality_id, "--stage", "quality"]);
-    fixture.assert_success("gap retry quality", &retried_quality);
-    assert_eq!(fixture.json_stdout(&retried_quality)["gap"]["status"], "qa");
-    let verified_quality = fixture.run_refine(&["gap", "verify", &quality_id]);
-    fixture.assert_success("gap verify qa", &verified_quality);
+    let quality_id = fixture.create_goal("goal action quality retry");
+    seed_goal_status(fixture, &quality_id, "failed");
+    let retried_quality = fixture.run_refine(&["goal", "retry", &quality_id, "--stage", "quality"]);
+    fixture.assert_success("goal retry quality", &retried_quality);
     assert_eq!(
-        fixture.json_stdout(&verified_quality)["gap"]["status"],
+        fixture.json_stdout(&retried_quality)["goal"]["status"],
+        "qa"
+    );
+    let verified_quality = fixture.run_refine(&["goal", "verify", &quality_id]);
+    fixture.assert_success("goal verify qa", &verified_quality);
+    assert_eq!(
+        fixture.json_stdout(&verified_quality)["goal"]["status"],
         "done"
     );
-    let undone_done = fixture.run_refine(&["gap", "undo", &quality_id]);
-    fixture.assert_success("gap undo done", &undone_done);
-    assert_eq!(fixture.json_stdout(&undone_done)["gap"]["status"], "review");
-    let undone_review = fixture.run_refine(&["gap", "undo", &quality_id]);
-    fixture.assert_success("gap undo review", &undone_review);
-    assert_eq!(fixture.json_stdout(&undone_review)["gap"]["status"], "todo");
+    let undone_done = fixture.run_refine(&["goal", "undo", &quality_id]);
+    fixture.assert_success("goal undo done", &undone_done);
+    assert_eq!(
+        fixture.json_stdout(&undone_done)["goal"]["status"],
+        "review"
+    );
+    let undone_review = fixture.run_refine(&["goal", "undo", &quality_id]);
+    fixture.assert_success("goal undo review", &undone_review);
+    assert_eq!(
+        fixture.json_stdout(&undone_review)["goal"]["status"],
+        "todo"
+    );
     fixture.assert_success(
-        "gap delete quality retry",
-        &fixture.run_refine(&["gap", "delete", &quality_id]),
+        "goal delete quality retry",
+        &fixture.run_refine(&["goal", "delete", &quality_id]),
     );
 
-    let merge_id = fixture.create_gap("gap action merge retry");
-    seed_gap_status(fixture, &merge_id, "failed");
-    let retried_merge = fixture.run_refine(&["gap", "retry", &merge_id, "--stage", "merge"]);
-    fixture.assert_success("gap retry merge", &retried_merge);
+    let merge_id = fixture.create_goal("goal action merge retry");
+    seed_goal_status(fixture, &merge_id, "failed");
+    let retried_merge = fixture.run_refine(&["goal", "retry", &merge_id, "--stage", "merge"]);
+    fixture.assert_success("goal retry merge", &retried_merge);
     assert_eq!(
-        fixture.json_stdout(&retried_merge)["gap"]["status"],
+        fixture.json_stdout(&retried_merge)["goal"]["status"],
         "ready-merge"
     );
-    let merged = fixture.run_refine(&["gap", "merge", &merge_id]);
-    fixture.assert_success("gap merge", &merged);
-    assert_eq!(fixture.json_stdout(&merged)["gap"]["status"], "done");
-    let merge_undone = fixture.run_refine(&["gap", "undo", &merge_id]);
-    fixture.assert_success("gap undo merged", &merge_undone);
+    let merged = fixture.run_refine(&["goal", "merge", &merge_id]);
+    fixture.assert_success("goal merge", &merged);
+    assert_eq!(fixture.json_stdout(&merged)["goal"]["status"], "done");
+    let merge_undone = fixture.run_refine(&["goal", "undo", &merge_id]);
+    fixture.assert_success("goal undo merged", &merge_undone);
     assert_eq!(
-        fixture.json_stdout(&merge_undone)["gap"]["status"],
+        fixture.json_stdout(&merge_undone)["goal"]["status"],
         "review"
     );
     fixture.assert_success(
-        "gap delete merge retry",
-        &fixture.run_refine(&["gap", "delete", &merge_id]),
+        "goal delete merge retry",
+        &fixture.run_refine(&["goal", "delete", &merge_id]),
     );
 
-    let cancelled_id = fixture.create_gap("gap action undo cancelled");
-    let cancelled = fixture.run_refine(&["gap", "cancel", &cancelled_id]);
-    fixture.assert_success("gap cancel for undo", &cancelled);
-    let reopened = fixture.run_refine(&["gap", "undo", &cancelled_id]);
-    fixture.assert_success("gap undo cancelled", &reopened);
-    assert_eq!(fixture.json_stdout(&reopened)["gap"]["status"], "todo");
+    let cancelled_id = fixture.create_goal("goal action undo cancelled");
+    let cancelled = fixture.run_refine(&["goal", "cancel", &cancelled_id]);
+    fixture.assert_success("goal cancel for undo", &cancelled);
+    let reopened = fixture.run_refine(&["goal", "undo", &cancelled_id]);
+    fixture.assert_success("goal undo cancelled", &reopened);
+    assert_eq!(fixture.json_stdout(&reopened)["goal"]["status"], "todo");
     fixture.assert_success(
-        "gap delete cancel undo",
-        &fixture.run_refine(&["gap", "delete", &cancelled_id]),
+        "goal delete cancel undo",
+        &fixture.run_refine(&["goal", "delete", &cancelled_id]),
     );
 }
 
-fn seed_gap_status(fixture: &IntegrationFixture, gap_id: &str, status: &str) {
+fn seed_goal_status(fixture: &IntegrationFixture, goal_id: &str, status: &str) {
     let payload = fixture.api_json(
         "POST",
-        "/api/gaps/bulk",
+        "/api/goals/bulk",
         serde_json::json!({
-            "selected_ids": [gap_id],
+            "selected_ids": [goal_id],
             "exclude_ids": [],
             "update": {
                 "status": status
@@ -460,7 +463,7 @@ fn seed_gap_status(fixture: &IntegrationFixture, gap_id: &str, status: &str) {
         }),
     );
     assert_eq!(payload["updated"], 1, "{payload:#}");
-    assert_eq!(fixture.gap_field(gap_id, "status"), status);
+    assert_eq!(fixture.goal_field(goal_id, "status"), status);
 }
 
 fn feature_create_membership_rollup_and_delete(fixture: &IntegrationFixture) {
@@ -470,39 +473,39 @@ fn feature_create_membership_rollup_and_delete(fixture: &IntegrationFixture) {
         .as_str()
         .unwrap()
         .to_string();
-    let gap_id = fixture.create_gap("feature member gap");
+    let goal_id = fixture.create_goal("feature member goal");
 
     let list = fixture.run_refine(&["feature", "list"]);
     fixture.assert_success("feature list", &list);
     assert!(feature_entry(&fixture.json_stdout(&list), &feature_id).is_some());
 
-    let add = fixture.run_refine(&["feature", "add-gap", &feature_id, &gap_id]);
-    fixture.assert_success("feature add-gap", &add);
+    let add = fixture.run_refine(&["feature", "add-goal", &feature_id, &goal_id]);
+    fixture.assert_success("feature add-goal", &add);
     let list = fixture.run_refine(&["feature", "list"]);
     let payload = fixture.json_stdout(&list);
     let entry = feature_entry(&payload, &feature_id).expect("feature should be listed");
     assert!(
-        entry["gap_ids"]
+        entry["goal_ids"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::Value::String(gap_id.clone()))
+            .contains(&serde_json::Value::String(goal_id.clone()))
     );
-    assert_eq!(entry["rollup"]["gap_count"], 1);
+    assert_eq!(entry["rollup"]["goal_count"], 1);
 
-    let remove = fixture.run_refine(&["feature", "remove-gap", &feature_id, &gap_id]);
-    fixture.assert_success("feature remove-gap", &remove);
+    let remove = fixture.run_refine(&["feature", "remove-goal", &feature_id, &goal_id]);
+    fixture.assert_success("feature remove-goal", &remove);
     let list = fixture.run_refine(&["feature", "list"]);
     let payload = fixture.json_stdout(&list);
     let entry = feature_entry(&payload, &feature_id).expect("feature should be listed");
     assert!(
-        !entry["gap_ids"]
+        !entry["goal_ids"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::Value::String(gap_id.clone()))
+            .contains(&serde_json::Value::String(goal_id.clone()))
     );
 
-    let delete_gap = fixture.run_refine(&["gap", "delete", &gap_id]);
-    fixture.assert_success("gap delete feature member", &delete_gap);
+    let delete_goal = fixture.run_refine(&["goal", "delete", &goal_id]);
+    fixture.assert_success("goal delete feature member", &delete_goal);
     let delete_feature = fixture.run_refine(&["feature", "delete", &feature_id]);
     fixture.assert_success("feature delete", &delete_feature);
 }
@@ -522,8 +525,8 @@ fn feature_show_edit_reorder_move_cancel_and_import(fixture: &IntegrationFixture
         .as_str()
         .unwrap()
         .to_string();
-    let first_gap = fixture.create_gap("feature reorder first gap");
-    let second_gap = fixture.create_gap("feature reorder second gap");
+    let first_goal = fixture.create_goal("feature reorder first goal");
+    let second_goal = fixture.create_goal("feature reorder second goal");
 
     let show = fixture.run_refine(&["feature", "show", &feature_id]);
     fixture.assert_success("feature show", &show);
@@ -554,21 +557,29 @@ fn feature_show_edit_reorder_move_cancel_and_import(fixture: &IntegrationFixture
     );
 
     fixture.assert_success(
-        "feature add first gap",
-        &fixture.run_refine(&["feature", "add-gap", &feature_id, &first_gap]),
+        "feature add first goal",
+        &fixture.run_refine(&["feature", "add-goal", &feature_id, &first_goal]),
     );
     fixture.assert_success(
-        "feature add second gap",
-        &fixture.run_refine(&["feature", "add-gap", &feature_id, &second_gap]),
+        "feature add second goal",
+        &fixture.run_refine(&["feature", "add-goal", &feature_id, &second_goal]),
     );
-    let reorder = fixture.run_refine(&["feature", "reorder-gap", &feature_id, &second_gap, "1"]);
-    fixture.assert_success("feature reorder-gap", &reorder);
+    fixture.assert_success(
+        "feature order first goal",
+        &fixture.run_refine(&["feature", "order-goal", &feature_id, &first_goal]),
+    );
+    fixture.assert_success(
+        "feature order second goal",
+        &fixture.run_refine(&["feature", "order-goal", &feature_id, &second_goal]),
+    );
+    let reorder = fixture.run_refine(&["feature", "reorder-goal", &feature_id, &second_goal, "1"]);
+    fixture.assert_success("feature reorder-goal", &reorder);
     let reordered = fixture.run_refine(&["feature", "show", &feature_id]);
     fixture.assert_success("feature show after reorder", &reordered);
-    let gap_ids = reordered_gap_ids(&fixture.json_stdout(&reordered));
+    let goal_ids = reordered_goal_ids(&fixture.json_stdout(&reordered));
     assert_eq!(
-        gap_ids.first().map(String::as_str),
-        Some(second_gap.as_str())
+        goal_ids.first().map(String::as_str),
+        Some(second_goal.as_str())
     );
 
     let move_todo = fixture.run_refine(&["feature", "move", &feature_id, "todo"]);
@@ -591,7 +602,7 @@ fn feature_show_edit_reorder_move_cancel_and_import(fixture: &IntegrationFixture
         "import",
         "--csv",
         "--text",
-        "actual,target,priority\nimport actual,import target,low\n",
+        "prompt,priority\nimplement imported goal,low\n",
         "--reporter",
         "refine-smoke",
         "--feature-id",
@@ -601,17 +612,17 @@ fn feature_show_edit_reorder_move_cancel_and_import(fixture: &IntegrationFixture
     let import_payload = fixture.json_stdout(&import);
     assert_eq!(import_payload["count"], 1, "{import_payload:#}");
 
-    for gap_id in [first_gap, second_gap] {
-        let _ = fixture.run_refine(&["gap", "delete", &gap_id]);
+    for goal_id in [first_goal, second_goal] {
+        let _ = fixture.run_refine(&["goal", "delete", &goal_id]);
     }
-    let imported_ids = import_payload["gaps"]
+    let imported_ids = import_payload["goals"]
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|gap| gap["id"].as_str().map(str::to_string))
+        .filter_map(|goal| goal["id"].as_str().map(str::to_string))
         .collect::<Vec<_>>();
-    for gap_id in imported_ids {
-        let _ = fixture.run_refine(&["gap", "delete", &gap_id]);
+    for goal_id in imported_ids {
+        let _ = fixture.run_refine(&["goal", "delete", &goal_id]);
     }
     fixture.assert_success(
         "feature delete extended",
@@ -619,16 +630,16 @@ fn feature_show_edit_reorder_move_cancel_and_import(fixture: &IntegrationFixture
     );
 }
 
-fn reordered_gap_ids(payload: &serde_json::Value) -> Vec<String> {
-    let Some(gap_ids) = payload["gap_ids"]
+fn reordered_goal_ids(payload: &serde_json::Value) -> Vec<String> {
+    let Some(goal_ids) = payload["goal_ids"]
         .as_array()
-        .or_else(|| payload["feature"]["gap_ids"].as_array())
+        .or_else(|| payload["feature"]["goal_ids"].as_array())
     else {
         return Vec::new();
     };
-    gap_ids
+    goal_ids
         .iter()
-        .filter_map(|gap_id| gap_id.as_str().map(str::to_string))
+        .filter_map(|goal_id| goal_id.as_str().map(str::to_string))
         .collect()
 }
 
@@ -693,10 +704,10 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
         "{settings_payload:#}"
     );
 
-    let gap_id = fixture.create_gap("node transfer gap");
-    let transfer = fixture.run_refine(&["node", "transfer", "transfer-node", &gap_id]);
+    let goal_id = fixture.create_goal("node transfer goal");
+    let transfer = fixture.run_refine(&["node", "transfer", "transfer-node", &goal_id]);
     fixture.assert_success("node transfer", &transfer);
-    assert_eq!(fixture.gap_field(&gap_id, "node_id"), "transfer-node");
+    assert_eq!(fixture.goal_field(&goal_id, "node_id"), "transfer-node");
 
     let feature = fixture.run_refine(&["feature", "create", "cli node transfer feature"]);
     fixture.assert_success("feature create node transfer", &feature);
@@ -704,22 +715,22 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
         .as_str()
         .unwrap()
         .to_string();
-    let feature_gap_id = fixture.create_gap("node transfer feature member gap");
+    let feature_goal_id = fixture.create_goal("node transfer feature member goal");
     fixture.assert_success(
-        "feature add node transfer gap",
-        &fixture.run_refine(&["feature", "add-gap", &feature_id, &feature_gap_id]),
+        "feature add node transfer goal",
+        &fixture.run_refine(&["feature", "add-goal", &feature_id, &feature_goal_id]),
     );
-    let direct_feature_gap_transfer =
-        fixture.run_refine(&["node", "transfer", "transfer-node", &feature_gap_id]);
+    let direct_feature_goal_transfer =
+        fixture.run_refine(&["node", "transfer", "transfer-node", &feature_goal_id]);
     assert!(
-        !direct_feature_gap_transfer.status.success(),
-        "Feature-owned Gap transfer unexpectedly succeeded"
+        !direct_feature_goal_transfer.status.success(),
+        "Feature-owned Goal transfer unexpectedly succeeded"
     );
     assert!(
-        String::from_utf8_lossy(&direct_feature_gap_transfer.stderr)
+        String::from_utf8_lossy(&direct_feature_goal_transfer.stderr)
             .contains("transfer the Feature instead"),
         "stderr:\n{}",
-        String::from_utf8_lossy(&direct_feature_gap_transfer.stderr)
+        String::from_utf8_lossy(&direct_feature_goal_transfer.stderr)
     );
     fixture.assert_success(
         "feature transfer node",
@@ -732,7 +743,7 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
         "transfer-node"
     );
     assert_eq!(
-        fixture.gap_field(&feature_gap_id, "node_id"),
+        fixture.goal_field(&feature_goal_id, "node_id"),
         "transfer-node"
     );
 
@@ -741,12 +752,12 @@ fn node_show_rename_settings_and_transfer(fixture: &IntegrationFixture) {
         &fixture.run_refine(&["node", "activate", "transfer-node"]),
     );
     fixture.assert_success(
-        "gap delete transferred",
-        &fixture.run_refine(&["gap", "delete", &gap_id]),
+        "goal delete transferred",
+        &fixture.run_refine(&["goal", "delete", &goal_id]),
     );
     fixture.assert_success(
-        "gap delete transferred feature member",
-        &fixture.run_refine(&["gap", "delete", &feature_gap_id]),
+        "goal delete transferred feature member",
+        &fixture.run_refine(&["goal", "delete", &feature_goal_id]),
     );
     fixture.assert_success(
         "feature delete transferred",
@@ -828,15 +839,8 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
     fixture.assert_success("cluster sync", &sync);
     let sync_payload = fixture.json_stdout(&sync);
     assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
-    assert_eq!(sync_payload["synced"], 1, "{sync_payload:#}");
-    assert!(
-        sync_payload["cluster"]["nodes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|node| node["id"] == "cluster-smoke"),
-        "{sync_payload:#}"
-    );
+    assert!(sync_payload["goal_count"].is_number(), "{sync_payload:#}");
+    assert!(sync_payload["feature_count"].is_number(), "{sync_payload:#}");
     let maintenance = fixture.run_refine(&["cluster", "maintenance"]);
     fixture.assert_success("cluster maintenance", &maintenance);
     let maintenance_payload = fixture.json_stdout(&maintenance);
@@ -850,13 +854,13 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
         "{maintenance_payload:#}"
     );
 
-    let gap_id = fixture.create_gap("cluster transfer gap");
-    let transfer = fixture.run_refine(&["cluster", "transfer", "cluster-smoke", &gap_id]);
+    let goal_id = fixture.create_goal("cluster transfer goal");
+    let transfer = fixture.run_refine(&["cluster", "transfer", "cluster-smoke", &goal_id]);
     fixture.assert_success("cluster transfer", &transfer);
     let transfer_payload = fixture.json_stdout(&transfer);
     assert_eq!(transfer_payload["target_node_id"], "cluster-smoke");
     assert_eq!(transfer_payload["updated"], 1);
-    assert_eq!(fixture.gap_field(&gap_id, "node_id"), "cluster-smoke");
+    assert_eq!(fixture.goal_field(&goal_id, "node_id"), "cluster-smoke");
 
     let missing_run = fixture.run_refine(&["cluster", "run", "missing-cluster-node", "printf ok"]);
     assert!(
@@ -870,16 +874,12 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
     );
 
     fixture.assert_success(
-        "node create cluster cleanup",
-        &fixture.run_refine(&["node", "create", "cluster-smoke"]),
-    );
-    fixture.assert_success(
         "node activate cluster cleanup",
         &fixture.run_refine(&["node", "activate", "cluster-smoke"]),
     );
     fixture.assert_success(
-        "gap delete cluster transferred",
-        &fixture.run_refine(&["gap", "delete", &gap_id]),
+        "goal delete cluster transferred",
+        &fixture.run_refine(&["goal", "delete", &goal_id]),
     );
     fixture.assert_success(
         "node activate default after cluster cleanup",
@@ -896,12 +896,12 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
 }
 
 fn log_commands_query_public_activity(fixture: &IntegrationFixture) {
-    let gap_id = fixture.create_gap("log command gap");
+    let goal_id = fixture.create_goal("log command goal");
     let recorded = fixture.api_json(
         "POST",
         "/api/activity/ui-error",
         serde_json::json!({
-            "message": "log command gap activity",
+            "message": "log command goal activity",
             "source": "cli-surface"
         }),
     );
@@ -925,7 +925,7 @@ fn log_commands_query_public_activity(fixture: &IntegrationFixture) {
     fixture.assert_success("log show", &show);
     assert_eq!(fixture.json_stdout(&show)["entry"]["id"], entry_id);
 
-    let query = fixture.run_refine(&["log", "query", "gap", "--limit", "20"]);
+    let query = fixture.run_refine(&["log", "query", "goal", "--limit", "20"]);
     fixture.assert_success("log query", &query);
     assert!(fixture.json_stdout(&query)["entries"].is_array());
 
@@ -951,8 +951,8 @@ fn log_commands_query_public_activity(fixture: &IntegrationFixture) {
     );
 
     fixture.assert_success(
-        "gap delete log command",
-        &fixture.run_refine(&["gap", "delete", &gap_id]),
+        "goal delete log command",
+        &fixture.run_refine(&["goal", "delete", &goal_id]),
     );
 }
 

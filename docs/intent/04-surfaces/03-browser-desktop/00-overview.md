@@ -10,7 +10,7 @@
 
 ## Purpose
 
-The browser-desktop surface exists to make agentic software work visible. It gives people a control room for Gaps, Features, workflow state, changes, logs, settings, target-app status, agent status, files, terminal sessions, and standalone conversations.
+The browser-desktop surface exists to make agentic software work visible. It gives people a control room for Goals, Features, workflow state, changes, logs, settings, target-app status, agent status, files, terminal sessions, and standalone conversations.
 
 It should reduce ambiguity. A user should be able to see what work exists, what state it is in, what agents are doing, what changed, what failed, and what can happen next.
 
@@ -22,7 +22,7 @@ Current implementation details that matter to intent:
 
 - the web UI is a vanilla JavaScript single-page app with no frontend build step;
 - the shell contains a topbar, banners, `#main`, toolbar dock, and Guide panel;
-- hash routing drives Dashboard, Features, Gaps, Changes, Logs, Settings, Node, Project, modals, import, and Plan flows;
+- hash routing drives Dashboard, Features, Goals, Changes, Logs, Settings, Node, Project, modals, import, and Plan flows;
 - static assets call the local daemon API for product and runtime state;
 - desktop should be understood as a packaging and accessibility surface over the same local capability.
 

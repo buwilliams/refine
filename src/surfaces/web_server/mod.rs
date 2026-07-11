@@ -35,7 +35,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/work",
-        capability: "Gaps, Features, imports, state transitions",
+        capability: "Goals, Features, imports, state transitions",
     },
     ApiRouteGroup {
         prefix: "/workflow",
@@ -47,7 +47,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/import",
-        capability: "Gap import extraction, CSV parsing, dedup, persist",
+        capability: "Goal import extraction, CSV parsing, dedup, persist",
     },
     ApiRouteGroup {
         prefix: "/dashboard",

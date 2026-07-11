@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::tools::host::installation::InstallTarget;
 
-/// Refine: agent fleet software delivery — track Gaps, run agent workflows, and operate a fleet of nodes.
+/// Refine: agent fleet software delivery — track Goals, run agent workflows, and operate a fleet of nodes.
 #[derive(Debug, Parser)]
 #[command(name = "refine")]
 #[command(about = "Refine - Your team's agentic software delivery system.")]
@@ -23,19 +23,19 @@ pub enum Commands {
         #[command(subcommand)]
         action: ProjectAction,
     },
-    /// Create and drive Gaps — units of work capturing the difference between actual and desired app behavior.
+    /// Create and drive Goals — prompt-driven units of work for the active app.
     /// Covers the full lifecycle: create, round, start, retry, verify, merge, undo.
-    Gap {
+    Goal {
         #[command(subcommand)]
-        action: GapAction,
+        action: GoalAction,
     },
-    /// Manage Features — named groups of ordered Gaps delivered together.
-    /// Group, order, move, transfer, and bulk-import Gaps under a Feature.
+    /// Manage Features — named groups of ordered Goals delivered together.
+    /// Group, order, move, transfer, and bulk-import Goals under a Feature.
     Feature {
         #[command(subcommand)]
         action: FeatureAction,
     },
-    /// Control the agent automation engine that advances Gaps through their workflow (pause/resume).
+    /// Control the agent automation engine that advances Goals through their workflow (pause/resume).
     Workflow {
         #[command(subcommand)]
         action: WorkflowAction,
@@ -46,7 +46,7 @@ pub enum Commands {
         action: NodeAction,
     },
     /// Operate the cluster (the fleet of nodes): register and bootstrap nodes,
-    /// distribute unclaimed Gap ownership, and run remote commands.
+    /// distribute unclaimed Goal ownership, and run remote commands.
     Cluster {
         #[command(subcommand)]
         action: ClusterAction,
@@ -216,50 +216,50 @@ pub enum ProjectAction {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum GapAction {
-    /// Create a new Gap — a unit of work describing the difference between actual and desired behavior.
-    /// It starts in the backlog; add a round to describe the behavior, then `gap start` to begin work.
+pub enum GoalAction {
+    /// Create a new prompt-driven Goal.
+    /// It starts in the backlog; add a round to describe the behavior, then `goal start` to begin work.
     Create {
-        /// Human-readable Gap name.
+        /// Human-readable Goal name.
         name: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
-        /// Explicit Gap id (generated when omitted).
+        /// Explicit Goal id (generated when omitted).
         #[arg(long)]
         id: Option<String>,
     },
-    /// List all Gaps with their status and ownership.
+    /// List all Goals with their status and ownership.
     List {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Show full detail for one Gap: status, rounds, notes, and ownership.
+    /// Show full detail for one Goal: status, rounds, notes, and ownership.
     Show {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Edit a Gap's metadata (name and/or priority). Only valid while the Gap's status allows editing.
+    /// Edit a Goal's metadata (name and/or priority). Only valid while the Goal's status allows editing.
     Edit {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
-        /// New Gap name.
+        /// New Goal name.
         #[arg(long)]
         name: Option<String>,
         /// New priority value.
         #[arg(long)]
         priority: Option<String>,
     },
-    /// Append a free-form note to a Gap for context that agents and humans should see.
+    /// Append a free-form note to a Goal for context that agents and humans should see.
     Note {
-        /// Gap id.
+        /// Goal id.
         id: String,
         /// Note text.
         body: String,
@@ -270,9 +270,9 @@ pub enum GapAction {
         #[arg(long, default_value = "")]
         author: String,
     },
-    /// Replace the body of an existing note on a Gap.
+    /// Replace the body of an existing note on a Goal.
     NoteEdit {
-        /// Gap id.
+        /// Goal id.
         id: String,
         /// Id of the note to edit.
         note_id: String,
@@ -282,9 +282,9 @@ pub enum GapAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Delete a note from a Gap.
+    /// Delete a note from a Goal.
     NoteDelete {
-        /// Gap id.
+        /// Goal id.
         id: String,
         /// Id of the note to delete.
         note_id: String,
@@ -292,10 +292,10 @@ pub enum GapAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Record a round on a Gap: a reporter's statement of actual vs target behavior.
-    /// Requires --reporter, --actual, and --target unless --edit-latest amends the newest round.
+    /// Record an actionable prompt as a round on a Goal.
+    /// Requires --reporter and --prompt unless --edit-latest amends the newest round.
     Round {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -303,35 +303,32 @@ pub enum GapAction {
         /// Who is reporting this round.
         #[arg(long)]
         reporter: Option<String>,
-        /// The actual (current) behavior observed.
+        /// The work prompt for the agent.
         #[arg(long)]
-        actual: Option<String>,
-        /// The target (desired) behavior.
-        #[arg(long)]
-        target: Option<String>,
+        prompt: Option<String>,
         /// Edit the most recent round instead of appending a new one.
         #[arg(long)]
         edit_latest: bool,
     },
-    /// Start work on a Gap: moves it from backlog/todo to in-progress so the agent workflow picks it up.
+    /// Start work on a Goal: moves it from backlog/todo to in-progress so the agent workflow picks it up.
     Start {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Cancel a Gap: any not-yet-done Gap becomes cancelled. Done Gaps cannot be cancelled (use undo first).
+    /// Cancel a Goal: any not-yet-done Goal becomes cancelled. Done Goals cannot be cancelled (use undo first).
     Cancel {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Retry a failed stage for a Gap: --stage quality returns it to QA, --stage merge to ready-merge.
+    /// Retry a failed stage for a Goal: --stage quality returns it to QA, --stage merge to ready-merge.
     Retry {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -340,51 +337,51 @@ pub enum GapAction {
         #[arg(long, default_value = "quality")]
         stage: String,
     },
-    /// Approve a Gap that is in review: marks it done after the change has been verified.
+    /// Approve a Goal that is in review: marks it done after the change has been verified.
     Verify {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Merge a ready-merge Gap and mark it done. Requires the Gap to be in the ready-merge status.
+    /// Merge a ready-merge Goal and mark it done. Requires the Goal to be in the ready-merge status.
     Merge {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Walk a Gap's status backwards: done goes to review; review or cancelled goes to todo.
+    /// Walk a Goal's status backwards: done goes to review; review or cancelled goes to todo.
     Undo {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Permanently delete a Gap record from project state. Irreversible; prefer cancel to keep history.
+    /// Permanently delete a Goal record from project state. Irreversible; prefer cancel to keep history.
     Delete {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Assign a Gap to a Feature so it is grouped and ordered with related work.
+    /// Assign a Goal to a Feature so it is grouped and ordered with related work.
     AssignFeature {
-        /// Gap id.
+        /// Goal id.
         id: String,
-        /// Feature id to assign the Gap to.
+        /// Feature id to assign the Goal to.
         feature_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Remove a Gap from its Feature. The Gap itself is kept.
+    /// Remove a Goal from its Feature. The Goal itself is kept.
     RemoveFeature {
-        /// Gap id.
+        /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -394,7 +391,7 @@ pub enum GapAction {
 
 #[derive(Debug, Subcommand)]
 pub enum FeatureAction {
-    /// Create a Feature — a named group of ordered Gaps delivered together.
+    /// Create a Feature — a named group of ordered Goals delivered together.
     Create {
         /// Human-readable Feature name.
         name: String,
@@ -417,7 +414,7 @@ pub enum FeatureAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Show one Feature with its Gaps and rollup status.
+    /// Show one Feature with its Goals and rollup status.
     Show {
         /// Feature id.
         id: String,
@@ -442,69 +439,69 @@ pub enum FeatureAction {
         #[arg(long)]
         reporter: Option<String>,
     },
-    /// Add an existing Gap to a Feature.
-    AddGap {
+    /// Add an existing Goal to a Feature.
+    AddGoal {
         /// Feature id.
         id: String,
-        /// Gap id to add to the Feature.
-        gap_id: String,
+        /// Goal id to add to the Feature.
+        goal_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Remove a Gap from a Feature. The Gap itself is kept.
-    RemoveGap {
+    /// Remove a Goal from a Feature. The Goal itself is kept.
+    RemoveGoal {
         /// Feature id.
         id: String,
-        /// Gap id to remove from the Feature.
-        gap_id: String,
+        /// Goal id to remove from the Feature.
+        goal_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Set a Gap's position within the Feature's ordered delivery sequence.
-    ReorderGap {
+    /// Set a Goal's position within the Feature's ordered delivery sequence.
+    ReorderGoal {
         /// Feature id.
         id: String,
-        /// Gap id to reposition.
-        gap_id: String,
-        /// New position in the Feature's ordered Gap sequence.
+        /// Goal id to reposition.
+        goal_id: String,
+        /// New position in the Feature's ordered Goal sequence.
         order: i64,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Add a Gap to the Feature's ordered delivery sequence.
-    OrderGap {
+    /// Add a Goal to the Feature's ordered delivery sequence.
+    OrderGoal {
         /// Feature id.
         id: String,
-        /// Gap id to add to the ordered sequence.
-        gap_id: String,
+        /// Goal id to add to the ordered sequence.
+        goal_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Remove a Gap from the Feature's ordered delivery sequence while keeping it in the Feature.
-    UnorderGap {
+    /// Remove a Goal from the Feature's ordered delivery sequence while keeping it in the Feature.
+    UnorderGoal {
         /// Feature id.
         id: String,
-        /// Gap id to remove from the ordered sequence.
-        gap_id: String,
+        /// Goal id to remove from the ordered sequence.
+        goal_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Move all of a Feature's eligible Gaps to a workflow stage (backlog or todo).
+    /// Move all of a Feature's eligible Goals to a workflow stage (backlog or todo).
     Move {
         /// Feature id.
         id: String,
-        /// Target status for the Feature's Gaps: "backlog" or "todo".
+        /// Target status for the Feature's Goals: "backlog" or "todo".
         target: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Transfer ownership of a Feature and its Gaps to another node in the fleet.
+    /// Transfer ownership of a Feature and its Goals to another node in the fleet.
     Transfer {
         /// Feature id.
         id: String,
@@ -514,7 +511,7 @@ pub enum FeatureAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Cancel a Feature: its cancellable Gaps are cancelled as well.
+    /// Cancel a Feature: its cancellable Goals are cancelled as well.
     Cancel {
         /// Feature id.
         id: String,
@@ -522,7 +519,7 @@ pub enum FeatureAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Permanently delete a Feature and its Gaps. Irreversible; prefer cancel to keep history.
+    /// Permanently delete a Feature and its Goals. Irreversible; prefer cancel to keep history.
     Delete {
         /// Feature id.
         id: String,
@@ -530,7 +527,7 @@ pub enum FeatureAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Bulk-import Gap drafts from text, structured JSON, or CSV, optionally attaching them to a Feature.
+    /// Bulk-import Goal drafts from text, structured JSON, or CSV, optionally attaching them to a Feature.
     Import {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
@@ -544,10 +541,10 @@ pub enum FeatureAction {
         /// Parse the input as CSV instead of structured or free text.
         #[arg(long)]
         csv: bool,
-        /// Reporter recorded on the imported Gaps.
+        /// Reporter recorded on the imported Goals.
         #[arg(long)]
         reporter: Option<String>,
-        /// Feature id to attach the imported Gaps to.
+        /// Feature id to attach the imported Goals to.
         #[arg(long)]
         feature_id: Option<String>,
     },
@@ -555,13 +552,13 @@ pub enum FeatureAction {
 
 #[derive(Debug, Subcommand)]
 pub enum WorkflowAction {
-    /// Pause the agent automation engine: no new Gap work is claimed until resumed.
+    /// Pause the agent automation engine: no new Goal work is claimed until resumed.
     Pause {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Resume the agent automation engine after a pause so agents claim Gap work again.
+    /// Resume the agent automation engine after a pause so agents claim Goal work again.
     Resume {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
@@ -570,7 +567,7 @@ pub enum WorkflowAction {
 }
 
 #[derive(Clone, Debug, ValueEnum)]
-pub enum CliGapStatus {
+pub enum CliGoalStatus {
     Backlog,
     Todo,
     InProgress,
@@ -583,19 +580,19 @@ pub enum CliGapStatus {
     Cancelled,
 }
 
-impl From<CliGapStatus> for GapStatus {
-    fn from(value: CliGapStatus) -> Self {
+impl From<CliGoalStatus> for GoalStatus {
+    fn from(value: CliGoalStatus) -> Self {
         match value {
-            CliGapStatus::Backlog => Self::Backlog,
-            CliGapStatus::Todo => Self::Todo,
-            CliGapStatus::InProgress => Self::InProgress,
-            CliGapStatus::Qa => Self::Qa,
-            CliGapStatus::ReadyMerge => Self::ReadyMerge,
-            CliGapStatus::Build => Self::Build,
-            CliGapStatus::Review => Self::Review,
-            CliGapStatus::Done => Self::Done,
-            CliGapStatus::Failed => Self::Failed,
-            CliGapStatus::Cancelled => Self::Cancelled,
+            CliGoalStatus::Backlog => Self::Backlog,
+            CliGoalStatus::Todo => Self::Todo,
+            CliGoalStatus::InProgress => Self::InProgress,
+            CliGoalStatus::Qa => Self::Qa,
+            CliGoalStatus::ReadyMerge => Self::ReadyMerge,
+            CliGoalStatus::Build => Self::Build,
+            CliGoalStatus::Review => Self::Review,
+            CliGoalStatus::Done => Self::Done,
+            CliGoalStatus::Failed => Self::Failed,
+            CliGoalStatus::Cancelled => Self::Cancelled,
         }
     }
 }
@@ -680,11 +677,11 @@ pub enum NodeAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Transfer ownership of a Gap or Feature (by item id) to the given node.
+    /// Transfer ownership of a Goal or Feature (by item id) to the given node.
     Transfer {
         /// Destination node id.
         id: String,
-        /// Gap or Feature id to transfer.
+        /// Goal or Feature id to transfer.
         item_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -787,14 +784,14 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Reassign eligible unclaimed Gap ownership across the fleet.
+    /// Reassign eligible unclaimed Goal ownership across the fleet.
     /// Spreads across enabled healthy nodes by default, fills one node with --to,
-    /// or converges reviewable Gaps home with --converge --to <node>.
+    /// or converges reviewable Goals home with --converge --to <node>.
     Distribute {
         /// Send all moves to this node instead of spreading across the fleet.
         #[arg(long)]
         to: Option<String>,
-        /// Converge reviewable Gaps back to the node given by --to.
+        /// Converge reviewable Goals back to the node given by --to.
         #[arg(long)]
         converge: bool,
         /// Plan the moves without applying them.
@@ -820,11 +817,11 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Transfer ownership of a Gap or Feature (by item id) to the given node, updating cluster records.
+    /// Transfer ownership of a Goal or Feature (by item id) to the given node, updating cluster records.
     Transfer {
         /// Destination node id.
         id: String,
-        /// Gap or Feature id to transfer.
+        /// Goal or Feature id to transfer.
         item_id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -879,9 +876,9 @@ pub enum LogAction {
         /// Number of matching entries to skip (for pagination).
         #[arg(long, default_value_t = 0)]
         offset: usize,
-        /// Only return entries for this Gap id.
+        /// Only return entries for this Goal id.
         #[arg(long)]
-        gap_id: Option<String>,
+        goal_id: Option<String>,
         /// Only return entries with this severity.
         #[arg(long)]
         severity: Option<String>,

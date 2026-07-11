@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Durable Evidence**: logs explain what happened across workflow, UI, agents, processes, and system operations.
-- **Filterable Activity**: users should be able to search and narrow logs by severity, category, actor, Gap, and time.
+- **Filterable Activity**: users should be able to search and narrow logs by severity, category, actor, Goal, and time.
 - **Shared Table Pattern**: Logs should align with other list surfaces.
 - **UI Errors Matter**: browser-visible failures should become activity, not disappear after a toast.
 
@@ -11,7 +11,7 @@
 
 The Log surface exists to make Refine auditable. It lets users and agents inspect system activity, workflow events, UI errors, process messages, and other evidence after the fact.
 
-Logs should reduce mystery. When a Gap failed, an import completed, a UI action errored, or a background job started, the system should leave a trail.
+Logs should reduce mystery. When a Goal failed, an import completed, a UI action errored, or a background job started, the system should leave a trail.
 
 ## Expected Role
 
@@ -20,7 +20,7 @@ The Logs UI should be a dense investigation surface. It should use filters, face
 Current implementation details that matter to intent:
 
 - Logs read activity through `/api/activity`;
-- filters include severity, category, actor, Gap ID, search text, period, limit, page, sort, and direction;
+- filters include severity, category, actor, Goal ID, search text, period, limit, page, sort, and direction;
 - UI errors can be recorded into activity;
 - server-provided facets populate filter controls;
 - boundary pagination supports large log sets.

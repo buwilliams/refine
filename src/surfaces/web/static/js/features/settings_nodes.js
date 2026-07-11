@@ -8,7 +8,7 @@ function renderSettingsNodesTab({
       <h3>${renderSettingsGuideLabel("Nodes", "node-manage")}</h3>
       <p class="scope-label muted small">Project-wide</p>
       <table class="table" data-testid="node-settings-table">
-        <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th>Host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>ID</th><th>Goals</th><th>Host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
         <tbody>
           ${nodes.map((inst) => {
             const counts = nodeCounts[inst.id] || {};
@@ -133,7 +133,7 @@ function bindSettingsNodesTab() {
   $$("[data-node-archive]").forEach((b) => b.addEventListener("click", async () => {
     closeNodeActionMenu(b);
     const ok = await modalConfirm(
-      "Archive this node? Gap ownership IDs stay unchanged and can still be transferred.",
+      "Archive this node? Goal ownership IDs stay unchanged and can still be transferred.",
       { title: "Archive node", okLabel: "Archive", danger: true },
     );
     if (!ok) return;

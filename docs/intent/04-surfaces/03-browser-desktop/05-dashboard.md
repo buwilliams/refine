@@ -20,7 +20,7 @@ The Dashboard should provide broad context without replacing deeper surfaces. Us
 Current implementation details that matter to intent:
 
 - dashboard data comes from daemon-backed projection and diagnostic summaries;
-- workflow visualization is shared with the Gaps screen;
+- workflow visualization is shared with the Goals screen;
 - target-app and agent status are part of the operating context;
 - detached/no-app mode should render a clear setup path rather than raw errors.
 

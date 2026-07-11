@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use serde::{Deserialize, Serialize};
 
 use crate::model::Timestamp;
-use crate::model::gap::GapIndexProjection;
-use crate::model::workflow::GapStatus;
+use crate::model::goal::GoalIndexProjection;
+use crate::model::workflow::GoalStatus;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Feature {
@@ -37,38 +37,38 @@ pub struct FeatureIndexProjection {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FeatureDetail {
     pub feature: Feature,
-    pub gaps: Vec<GapIndexProjection>,
+    pub goals: Vec<GoalIndexProjection>,
     pub node_display_name: Option<String>,
     pub rollup: FeatureRollup,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FeatureRollup {
-    pub status: GapStatus,
-    pub gap_count: usize,
+    pub status: GoalStatus,
+    pub goal_count: usize,
     pub done_count: usize,
     pub active_count: usize,
     pub failed_count: usize,
     pub cancelled_count: usize,
     pub blocked_count: usize,
-    pub next_gap: Option<String>,
+    pub next_goal: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct FeatureGapBlockingNotice {
+pub struct FeatureGoalBlockingNotice {
     pub feature_id: String,
-    pub blocking_gap_id: String,
-    pub blocked_gap_ids: Vec<String>,
+    pub blocking_goal_id: String,
+    pub blocked_goal_ids: Vec<String>,
     pub blocked_count: usize,
-    pub next_blocked_gap_id: Option<String>,
+    pub next_blocked_goal_id: Option<String>,
     pub message: String,
 }
 
-pub fn is_ordered_feature_gap(feature_order: Option<i64>) -> bool {
+pub fn is_ordered_feature_goal(feature_order: Option<i64>) -> bool {
     feature_order.is_some()
 }
 
-pub fn compare_feature_gap_order(a_order: Option<i64>, b_order: Option<i64>) -> Ordering {
+pub fn compare_feature_goal_order(a_order: Option<i64>, b_order: Option<i64>) -> Ordering {
     match (a_order, b_order) {
         (Some(a_order), Some(b_order)) => a_order.cmp(&b_order),
         (Some(_), None) => Ordering::Less,
@@ -78,82 +78,82 @@ pub fn compare_feature_gap_order(a_order: Option<i64>, b_order: Option<i64>) -> 
 }
 
 impl FeatureRollup {
-    pub fn derive(gaps: &[GapIndexProjection]) -> Self {
-        let gap_count = gaps.len();
-        let done_count = gaps
+    pub fn derive(goals: &[GoalIndexProjection]) -> Self {
+        let goal_count = goals.len();
+        let done_count = goals
             .iter()
-            .filter(|gap| gap.status == GapStatus::Done)
+            .filter(|goal| goal.status == GoalStatus::Done)
             .count();
-        let active_count = gaps
+        let active_count = goals
             .iter()
-            .filter(|gap| {
+            .filter(|goal| {
                 matches!(
-                    gap.status,
-                    GapStatus::InProgress
-                        | GapStatus::Qa
-                        | GapStatus::ReadyMerge
-                        | GapStatus::Build
-                        | GapStatus::Review
+                    goal.status,
+                    GoalStatus::InProgress
+                        | GoalStatus::Qa
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Review
                 )
             })
             .count();
-        let failed_count = gaps
+        let failed_count = goals
             .iter()
-            .filter(|gap| gap.status == GapStatus::Failed)
+            .filter(|goal| goal.status == GoalStatus::Failed)
             .count();
-        let cancelled_count = gaps
+        let cancelled_count = goals
             .iter()
-            .filter(|gap| gap.status == GapStatus::Cancelled)
+            .filter(|goal| goal.status == GoalStatus::Cancelled)
             .count();
-        let blocked_count = gaps
+        let blocked_count = goals
             .iter()
-            .filter(|gap| matches!(gap.status, GapStatus::Failed | GapStatus::Cancelled))
+            .filter(|goal| matches!(goal.status, GoalStatus::Failed | GoalStatus::Cancelled))
             .count();
-        let next_gap = gaps
+        let next_goal = goals
             .iter()
-            .find(|gap| matches!(gap.status, GapStatus::Todo | GapStatus::Backlog))
-            .map(|gap| gap.id.clone());
+            .find(|goal| matches!(goal.status, GoalStatus::Todo | GoalStatus::Backlog))
+            .map(|goal| goal.id.clone());
 
-        let status = if gap_count > 0 && done_count == gap_count {
-            GapStatus::Done
+        let status = if goal_count > 0 && done_count == goal_count {
+            GoalStatus::Done
         } else if active_count > 0 {
-            GapStatus::InProgress
+            GoalStatus::InProgress
         } else if failed_count > 0 {
-            GapStatus::Failed
-        } else if cancelled_count == gap_count && gap_count > 0 {
-            GapStatus::Cancelled
-        } else if gaps.iter().any(|gap| gap.status == GapStatus::Todo) {
-            GapStatus::Todo
+            GoalStatus::Failed
+        } else if cancelled_count == goal_count && goal_count > 0 {
+            GoalStatus::Cancelled
+        } else if goals.iter().any(|goal| goal.status == GoalStatus::Todo) {
+            GoalStatus::Todo
         } else {
-            GapStatus::Backlog
+            GoalStatus::Backlog
         };
 
         Self {
             status,
-            gap_count,
+            goal_count,
             done_count,
             active_count,
             failed_count,
             cancelled_count,
             blocked_count,
-            next_gap,
+            next_goal,
         }
     }
 }
 
-pub fn failed_gap_feature_blocking_notice(
-    gap: &GapIndexProjection,
-    feature_gaps: &[GapIndexProjection],
-) -> Option<FeatureGapBlockingNotice> {
-    if gap.status != GapStatus::Failed {
+pub fn failed_goal_feature_blocking_notice(
+    goal: &GoalIndexProjection,
+    feature_goals: &[GoalIndexProjection],
+) -> Option<FeatureGoalBlockingNotice> {
+    if goal.status != GoalStatus::Failed {
         return None;
     }
-    let feature_id = gap.feature_id.as_deref()?;
-    let feature_order = gap.feature_order?;
-    let node_id = gap.node_id.as_deref().unwrap_or("default");
-    let mut blocked_gaps = feature_gaps
+    let feature_id = goal.feature_id.as_deref()?;
+    let feature_order = goal.feature_order?;
+    let node_id = goal.node_id.as_deref().unwrap_or("default");
+    let mut blocked_goals = feature_goals
         .iter()
-        .filter(|other| other.id != gap.id)
+        .filter(|other| other.id != goal.id)
         .filter(|other| other.feature_id.as_deref() == Some(feature_id))
         .filter(|other| other.node_id.as_deref().unwrap_or("default") == node_id)
         .filter(|other| {
@@ -161,39 +161,39 @@ pub fn failed_gap_feature_blocking_notice(
                 .feature_order
                 .is_some_and(|order| order > feature_order)
         })
-        .filter(|other| !matches!(other.status, GapStatus::Done | GapStatus::Cancelled))
+        .filter(|other| !matches!(other.status, GoalStatus::Done | GoalStatus::Cancelled))
         .cloned()
         .collect::<Vec<_>>();
-    blocked_gaps.sort_by(|a, b| {
-        compare_feature_gap_order(a.feature_order, b.feature_order).then_with(|| a.id.cmp(&b.id))
+    blocked_goals.sort_by(|a, b| {
+        compare_feature_goal_order(a.feature_order, b.feature_order).then_with(|| a.id.cmp(&b.id))
     });
-    if blocked_gaps.is_empty() {
+    if blocked_goals.is_empty() {
         return None;
     }
-    let blocked_gap_ids = blocked_gaps
+    let blocked_goal_ids = blocked_goals
         .iter()
-        .map(|blocked_gap| blocked_gap.id.clone())
+        .map(|blocked_goal| blocked_goal.id.clone())
         .collect::<Vec<_>>();
-    let blocked_count = blocked_gap_ids.len();
-    let next_blocked_gap_id = blocked_gap_ids.first().cloned();
-    let plural = if blocked_count == 1 { "Gap" } else { "Gaps" };
-    let message = match next_blocked_gap_id.as_deref() {
+    let blocked_count = blocked_goal_ids.len();
+    let next_blocked_goal_id = blocked_goal_ids.first().cloned();
+    let plural = if blocked_count == 1 { "Goal" } else { "Goals" };
+    let message = match next_blocked_goal_id.as_deref() {
         Some(next) if blocked_count == 1 => format!(
-            "This failed Gap is blocking the next Gap in Feature {feature_id} ({next}). Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+            "This failed Goal is blocking the next Goal in Feature {feature_id} ({next}). Submit a recovery round so this Goal can finish, or cancel it to let later Feature work continue."
         ),
         Some(next) => format!(
-            "This failed Gap is blocking {blocked_count} later {plural} in Feature {feature_id}; next blocked Gap: {next}. Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+            "This failed Goal is blocking {blocked_count} later {plural} in Feature {feature_id}; next blocked Goal: {next}. Submit a recovery round so this Goal can finish, or cancel it to let later Feature work continue."
         ),
         None => format!(
-            "This failed Gap is blocking later Feature work in Feature {feature_id}. Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+            "This failed Goal is blocking later Feature work in Feature {feature_id}. Submit a recovery round so this Goal can finish, or cancel it to let later Feature work continue."
         ),
     };
-    Some(FeatureGapBlockingNotice {
+    Some(FeatureGoalBlockingNotice {
         feature_id: feature_id.to_string(),
-        blocking_gap_id: gap.id.clone(),
-        blocked_gap_ids,
+        blocking_goal_id: goal.id.clone(),
+        blocked_goal_ids,
         blocked_count,
-        next_blocked_gap_id,
+        next_blocked_goal_id,
         message,
     })
 }
@@ -201,52 +201,54 @@ pub fn failed_gap_feature_blocking_notice(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::gap::GapPriority;
+    use crate::model::goal::GoalPriority;
 
     #[test]
-    fn failed_gap_feature_blocking_notice_names_later_feature_work() {
-        let failed = gap("GAP1", GapStatus::Failed, Some(1));
-        let blocked = gap("GAP2", GapStatus::Todo, Some(2));
-        let done = gap("GAP3", GapStatus::Done, Some(3));
+    fn failed_goal_feature_blocking_notice_names_later_feature_work() {
+        let failed = goal("GOAL1", GoalStatus::Failed, Some(1));
+        let blocked = goal("GOAL2", GoalStatus::Todo, Some(2));
+        let done = goal("GOAL3", GoalStatus::Done, Some(3));
 
         let notice =
-            failed_gap_feature_blocking_notice(&failed, &[blocked.clone(), done, failed.clone()])
-                .expect("failed first Gap should block later unfinished Feature work");
+            failed_goal_feature_blocking_notice(&failed, &[blocked.clone(), done, failed.clone()])
+                .expect("failed first Goal should block later unfinished Feature work");
 
         assert_eq!(notice.feature_id, "FEA1");
-        assert_eq!(notice.blocking_gap_id, "GAP1");
-        assert_eq!(notice.blocked_gap_ids, vec!["GAP2"]);
-        assert_eq!(notice.next_blocked_gap_id.as_deref(), Some("GAP2"));
+        assert_eq!(notice.blocking_goal_id, "GOAL1");
+        assert_eq!(notice.blocked_goal_ids, vec!["GOAL2"]);
+        assert_eq!(notice.next_blocked_goal_id.as_deref(), Some("GOAL2"));
         assert!(
             notice
                 .message
-                .contains("This failed Gap is blocking the next Gap")
+                .contains("This failed Goal is blocking the next Goal")
         );
     }
 
     #[test]
-    fn failed_gap_feature_blocking_notice_ignores_unordered_or_terminal_work() {
-        let failed = gap("GAP1", GapStatus::Failed, Some(1));
-        let done = gap("GAP2", GapStatus::Done, Some(2));
-        let unordered = gap("GAP3", GapStatus::Todo, None);
-        let active = gap("GAP4", GapStatus::Todo, Some(0));
+    fn failed_goal_feature_blocking_notice_ignores_unordered_or_terminal_work() {
+        let failed = goal("GOAL1", GoalStatus::Failed, Some(1));
+        let done = goal("GOAL2", GoalStatus::Done, Some(2));
+        let unordered = goal("GOAL3", GoalStatus::Todo, None);
+        let active = goal("GOAL4", GoalStatus::Todo, Some(0));
 
-        assert!(failed_gap_feature_blocking_notice(&failed, &[done, unordered, active],).is_none());
         assert!(
-            failed_gap_feature_blocking_notice(
-                &gap("GAP1", GapStatus::Todo, Some(1)),
-                &[gap("GAP2", GapStatus::Todo, Some(2))],
+            failed_goal_feature_blocking_notice(&failed, &[done, unordered, active],).is_none()
+        );
+        assert!(
+            failed_goal_feature_blocking_notice(
+                &goal("GOAL1", GoalStatus::Todo, Some(1)),
+                &[goal("GOAL2", GoalStatus::Todo, Some(2))],
             )
             .is_none()
         );
     }
 
-    fn gap(id: &str, status: GapStatus, feature_order: Option<i64>) -> GapIndexProjection {
-        GapIndexProjection {
+    fn goal(id: &str, status: GoalStatus, feature_order: Option<i64>) -> GoalIndexProjection {
+        GoalIndexProjection {
             id: id.to_string(),
             name: id.to_string(),
             status,
-            priority: GapPriority::Medium,
+            priority: GoalPriority::Medium,
             reporter: None,
             assignee: None,
             round_count: 1,
@@ -256,7 +258,7 @@ mod tests {
             node_id: Some("default".to_string()),
             feature_id: Some("FEA1".to_string()),
             feature_order,
-            json_path: format!("gaps/{id}/gap.json"),
+            json_path: format!("goals/{id}/goal.json"),
         }
     }
 }

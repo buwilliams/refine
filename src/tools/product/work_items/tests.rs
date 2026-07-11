@@ -1,22 +1,22 @@
-use crate::model::gap::GapPriority;
+use crate::model::goal::GoalPriority;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
 use super::*;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn file_work_item_service_transitions_gap_via_refine_json() {
+fn file_work_item_service_transitions_goal_via_refine_json() {
     let temp_root = unique_temp_dir("work-item-transition");
     let refine_dir = temp_root.join(".refine");
-    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
-    fs::create_dir_all(&gap_dir).unwrap();
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
+    fs::create_dir_all(&goal_dir).unwrap();
     fs::write(
-        gap_dir.join("gap.json"),
+        goal_dir.join("goal.json"),
         r#"{
-              "id": "GAP1",
+              "id": "GOAL1",
               "name": "Transition me",
               "status": "backlog",
               "priority": "low",
@@ -28,9 +28,9 @@ fn file_work_item_service_transitions_gap_via_refine_json() {
     .unwrap();
 
     let updated =
-        FileWorkItemService::new(&refine_dir).transition_gap_status("GAP1", GapStatus::Todo);
-    assert_eq!(updated.unwrap().gap.status, GapStatus::Todo);
-    let written = fs::read_to_string(gap_dir.join("gap.json")).unwrap();
+        FileWorkItemService::new(&refine_dir).transition_goal_status("GOAL1", GoalStatus::Todo);
+    assert_eq!(updated.unwrap().goal.status, GoalStatus::Todo);
+    let written = fs::read_to_string(goal_dir.join("goal.json")).unwrap();
     assert!(written.contains("\"status\": \"todo\""));
     assert!(written.contains("\"updated\": \"20"));
     assert!(written.contains("Z\""));
@@ -38,20 +38,20 @@ fn file_work_item_service_transitions_gap_via_refine_json() {
 }
 
 #[test]
-fn file_work_item_service_creates_and_lists_gap_json() {
+fn file_work_item_service_creates_and_lists_goal_json() {
     let temp_root = unique_temp_dir("work-item-create");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
 
-    let gap = service
-        .create_gap_summary("Created from Rust", Some("GAP1"))
+    let goal = service
+        .create_goal_summary("Created from Rust", Some("GOAL1"))
         .unwrap();
-    assert_eq!(gap.gap.id, "GAP1");
-    assert_eq!(gap.gap.status, GapStatus::Backlog);
-    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert_eq!(service.list_gap_summaries().unwrap().len(), 1);
+    assert_eq!(goal.goal.id, "GOAL1");
+    assert_eq!(goal.goal.status, GoalStatus::Backlog);
+    assert!(refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert_eq!(service.list_goal_summaries().unwrap().len(), 1);
     assert_eq!(
-        service.show_gap_summary("GAP1").unwrap().gap.name,
+        service.show_goal_summary("GOAL1").unwrap().goal.name,
         "Created from Rust"
     );
 
@@ -59,36 +59,36 @@ fn file_work_item_service_creates_and_lists_gap_json() {
 }
 
 #[test]
-fn file_work_item_service_edits_notes_and_deletes_gap_json() {
+fn file_work_item_service_edits_notes_and_deletes_goal_json() {
     let temp_root = unique_temp_dir("work-item-edit-note-delete");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     service
-        .create_gap_summary("Original", Some("GAP1"))
+        .create_goal_summary("Original", Some("GOAL1"))
         .unwrap();
 
     let edited = service
-        .update_gap_metadata_summary(
-            "GAP1",
+        .update_goal_metadata_summary(
+            "GOAL1",
             Some("Renamed"),
             Some("high"),
             Some("Reporter"),
             None,
         )
         .unwrap();
-    assert_eq!(edited.gap.name, "Renamed");
-    assert_eq!(edited.gap.priority, GapPriority::High);
-    assert_eq!(edited.gap.reporter.as_deref(), Some("Reporter"));
+    assert_eq!(edited.goal.name, "Renamed");
+    assert_eq!(edited.goal.priority, GoalPriority::High);
+    assert_eq!(edited.goal.reporter.as_deref(), Some("Reporter"));
 
     service
-        .add_gap_note_summary("GAP1", "Reviewer", "Needs a note")
+        .add_goal_note_summary("GOAL1", "Reviewer", "Needs a note")
         .unwrap();
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"author\": \"Reviewer\""));
     assert!(written.contains("\"body\": \"Needs a note\""));
 
-    service.delete_gap_record("GAP1").unwrap();
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    service.delete_goal_record("GOAL1").unwrap();
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -98,41 +98,43 @@ fn file_work_item_service_appends_and_edits_latest_round() {
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     service
-        .create_gap_summary("Round Gap", Some("GAP1"))
+        .create_goal_summary("Round Goal", Some("GOAL1"))
         .unwrap();
 
-    let gap = service
-        .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+    let goal = service
+        .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
         .unwrap();
-    assert_eq!(gap.gap.round_count, 1);
-    let gap = service
-        .edit_latest_gap_round_summary(
-            "GAP1",
+    assert_eq!(goal.goal.round_count, 1);
+    let goal = service
+        .edit_latest_goal_round_summary(
+            "GOAL1",
             Some("Reviewer"),
             Some("Reviewer"),
-            Some("New actual"),
-            None,
+            Some("New prompt"),
         )
         .unwrap();
-    assert_eq!(gap.gap.reporter.as_deref(), Some("Reviewer"));
-    assert_eq!(gap.gap.assignee.as_deref(), Some("Reviewer"));
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    assert_eq!(goal.goal.reporter.as_deref(), Some("Reviewer"));
+    assert_eq!(goal.goal.assignee.as_deref(), Some("Reviewer"));
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
     assert!(written.contains("\"assignee\": \"Reviewer\""));
-    assert!(written.contains("\"actual\": \"New actual\""));
-    assert!(written.contains("\"target\": \"Target\""));
+    assert!(written.contains("\"prompt\": \"New prompt\""));
     assert!(written.contains("\"rule_state\": \"unclassified\""));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn file_work_item_service_creates_features_and_updates_gap_membership() {
+fn file_work_item_service_creates_features_and_updates_goal_membership() {
     let temp_root = unique_temp_dir("work-item-feature");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
-    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
-    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
+    service
+        .create_goal_summary("Goal A", Some("GOAL1"))
+        .unwrap();
+    service
+        .create_goal_summary("Goal B", Some("GOAL2"))
+        .unwrap();
 
     let feature = service
         .create_feature_summary(
@@ -147,37 +149,57 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
     assert_eq!(feature.feature.assignee.as_deref(), Some("Reviewer"));
     assert!(refine_dir.join("features/FE/A1/feature.json").exists());
 
-    let feature = service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP1"]);
-    let feature = service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
+    let feature = service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    assert_eq!(feature.goal_ids, vec!["GOAL1"]);
+    let feature = service.assign_goal_to_feature("FEA1", "GOAL2").unwrap();
+    assert_eq!(feature.goal_ids, vec!["GOAL1", "GOAL2"]);
     assert_eq!(
-        service.show_gap_summary("GAP2").unwrap().gap.feature_order,
+        service
+            .show_goal_summary("GOAL2")
+            .unwrap()
+            .goal
+            .feature_order,
         None
     );
 
-    let feature = service.unorder_gap_in_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
+    let feature = service.unorder_goal_in_feature("FEA1", "GOAL1").unwrap();
+    assert_eq!(feature.goal_ids, vec!["GOAL1", "GOAL2"]);
     assert_eq!(
-        service.show_gap_summary("GAP1").unwrap().gap.feature_order,
+        service
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .feature_order,
         None
     );
     assert_eq!(
-        service.show_gap_summary("GAP2").unwrap().gap.feature_order,
+        service
+            .show_goal_summary("GOAL2")
+            .unwrap()
+            .goal
+            .feature_order,
         None
     );
 
-    let feature = service.order_gap_in_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP1", "GAP2"]);
+    let feature = service.order_goal_in_feature("FEA1", "GOAL1").unwrap();
+    assert_eq!(feature.goal_ids, vec!["GOAL1", "GOAL2"]);
     assert_eq!(
-        service.show_gap_summary("GAP1").unwrap().gap.feature_order,
+        service
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .feature_order,
         Some(1)
     );
 
-    let feature = service.remove_gap_from_feature("FEA1", "GAP1").unwrap();
-    assert_eq!(feature.gap_ids, vec!["GAP2"]);
+    let feature = service.remove_goal_from_feature("FEA1", "GOAL1").unwrap();
+    assert_eq!(feature.goal_ids, vec!["GOAL2"]);
     assert_eq!(
-        service.show_gap_summary("GAP2").unwrap().gap.feature_order,
+        service
+            .show_goal_summary("GOAL2")
+            .unwrap()
+            .goal
+            .feature_order,
         None
     );
 
@@ -189,222 +211,232 @@ fn file_work_item_service_reorders_and_moves_feature_workflow() {
     let temp_root = unique_temp_dir("work-item-feature-workflow");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
-    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
-    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
-    service.create_gap_summary("Gap C", Some("GAP3")).unwrap();
+    service
+        .create_goal_summary("Goal A", Some("GOAL1"))
+        .unwrap();
+    service
+        .create_goal_summary("Goal B", Some("GOAL2"))
+        .unwrap();
+    service
+        .create_goal_summary("Goal C", Some("GOAL3"))
+        .unwrap();
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP3").unwrap();
-    for gap_id in ["GAP1", "GAP2", "GAP3"] {
-        service.order_gap_in_feature("FEA1", gap_id).unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL2").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL3").unwrap();
+    for goal_id in ["GOAL1", "GOAL2", "GOAL3"] {
+        service.order_goal_in_feature("FEA1", goal_id).unwrap();
     }
 
-    let reordered = service.reorder_gap_in_feature("FEA1", "GAP3", 1).unwrap();
-    assert_eq!(reordered.gap_ids, vec!["GAP3", "GAP1", "GAP2"]);
+    let reordered = service.reorder_goal_in_feature("FEA1", "GOAL3", 1).unwrap();
+    assert_eq!(reordered.goal_ids, vec!["GOAL3", "GOAL1", "GOAL2"]);
     service
-        .transition_gap_status("GAP2", GapStatus::Todo)
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
         .unwrap();
     let moved = service
-        .move_feature_workflow("FEA1", GapStatus::Backlog)
+        .move_feature_workflow("FEA1", GoalStatus::Backlog)
         .unwrap();
-    assert_eq!(moved.rollup.status, GapStatus::Backlog);
+    assert_eq!(moved.rollup.status, GoalStatus::Backlog);
     assert_eq!(
-        service.show_gap_summary("GAP2").unwrap().gap.status,
-        GapStatus::Backlog
+        service.show_goal_summary("GOAL2").unwrap().goal.status,
+        GoalStatus::Backlog
     );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn file_work_item_service_exposes_failed_feature_blocking_notice_on_gap_detail() {
+fn file_work_item_service_exposes_failed_feature_blocking_notice_on_goal_detail() {
     let temp_root = unique_temp_dir("work-item-feature-blocking-notice");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
-    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
-    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
+    service
+        .create_goal_summary("Goal A", Some("GOAL1"))
+        .unwrap();
+    service
+        .create_goal_summary("Goal B", Some("GOAL2"))
+        .unwrap();
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
-    service.order_gap_in_feature("FEA1", "GAP1").unwrap();
-    service.order_gap_in_feature("FEA1", "GAP2").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL2").unwrap();
+    service.order_goal_in_feature("FEA1", "GOAL1").unwrap();
+    service.order_goal_in_feature("FEA1", "GOAL2").unwrap();
     service
-        .transition_gap_status("GAP1", GapStatus::Todo)
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
         .unwrap();
     service
-        .advance_automated_gap_status("GAP1", GapStatus::Failed)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
         .unwrap();
     service
-        .transition_gap_status("GAP2", GapStatus::Todo)
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
         .unwrap();
 
-    let detail = service.show_gap_detail("GAP1").unwrap();
+    let detail = service.show_goal_detail("GOAL1").unwrap();
     let notice = &detail["feature_blocking_notice"];
     assert_eq!(notice["feature_id"], "FEA1");
-    assert_eq!(notice["blocking_gap_id"], "GAP1");
+    assert_eq!(notice["blocking_goal_id"], "GOAL1");
     assert_eq!(notice["blocked_count"], 1);
-    assert_eq!(notice["blocked_gap_ids"], json!(["GAP2"]));
+    assert_eq!(notice["blocked_goal_ids"], json!(["GOAL2"]));
     assert!(
         notice["message"]
             .as_str()
             .unwrap_or("")
-            .contains("blocking the next Gap")
+            .contains("blocking the next Goal")
     );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn file_work_item_service_cancels_and_deletes_features_through_gap_paths() {
+fn file_work_item_service_cancels_and_deletes_features_through_goal_paths() {
     let temp_root = unique_temp_dir("work-item-feature-cancel-delete");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     for (id, name) in [
-        ("GAP1", "Backlog Gap"),
-        ("GAP2", "Todo Gap"),
-        ("GAP3", "Done Gap"),
+        ("GOAL1", "Backlog Goal"),
+        ("GOAL2", "Todo Goal"),
+        ("GOAL3", "Done Goal"),
     ] {
-        service.create_gap_summary(name, Some(id)).unwrap();
+        service.create_goal_summary(name, Some(id)).unwrap();
     }
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    for gap_id in ["GAP1", "GAP2", "GAP3"] {
-        service.assign_gap_to_feature("FEA1", gap_id).unwrap();
+    for goal_id in ["GOAL1", "GOAL2", "GOAL3"] {
+        service.assign_goal_to_feature("FEA1", goal_id).unwrap();
     }
     service
-        .transition_gap_status("GAP2", GapStatus::Todo)
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
         .unwrap();
     service
-        .set_gap_status_unchecked("GAP3", &GapStatus::Done)
+        .set_goal_status_unchecked("GOAL3", &GoalStatus::Done)
         .unwrap();
 
     let cancelled = service.cancel_feature_summary("FEA1").unwrap();
     assert_eq!(cancelled.rollup.cancelled_count, 2);
     assert_eq!(
-        service.show_gap_summary("GAP1").unwrap().gap.status,
-        GapStatus::Cancelled
+        service.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Cancelled
     );
     assert_eq!(
-        service.show_gap_summary("GAP2").unwrap().gap.status,
-        GapStatus::Cancelled
+        service.show_goal_summary("GOAL2").unwrap().goal.status,
+        GoalStatus::Cancelled
     );
     assert_eq!(
-        service.show_gap_summary("GAP3").unwrap().gap.status,
-        GapStatus::Done
+        service.show_goal_summary("GOAL3").unwrap().goal.status,
+        GoalStatus::Done
     );
 
     service.delete_feature_record("FEA1").unwrap();
     assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P3/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL2/goal.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL3/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn file_work_item_service_merges_and_undoes_gap_workflow() {
+fn file_work_item_service_merges_and_undoes_goal_workflow() {
     let temp_root = unique_temp_dir("work-item-merge-undo");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     service
-        .create_gap_summary("Merge Gap", Some("GAP1"))
+        .create_goal_summary("Merge Goal", Some("GOAL1"))
         .unwrap();
     service
-        .set_gap_status_unchecked("GAP1", &GapStatus::ReadyMerge)
+        .set_goal_status_unchecked("GOAL1", &GoalStatus::ReadyMerge)
         .unwrap();
 
-    let merged = service.merge_gap_summary("GAP1").unwrap();
-    assert_eq!(merged.gap.status, GapStatus::Done);
+    let merged = service.merge_goal_summary("GOAL1").unwrap();
+    assert_eq!(merged.goal.status, GoalStatus::Done);
 
-    let undone = service.undo_gap_summary("GAP1").unwrap();
-    assert_eq!(undone.gap.status, GapStatus::Review);
-    let undone = service.undo_gap_summary("GAP1").unwrap();
-    assert_eq!(undone.gap.status, GapStatus::Todo);
+    let undone = service.undo_goal_summary("GOAL1").unwrap();
+    assert_eq!(undone.goal.status, GoalStatus::Review);
+    let undone = service.undo_goal_summary("GOAL1").unwrap();
+    assert_eq!(undone.goal.status, GoalStatus::Todo);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
+fn file_work_item_service_bulk_updates_deletes_and_assigns_goals() {
     let temp_root = unique_temp_dir("work-item-bulk");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     for (id, name) in [
-        ("GAP1", "Bulk one"),
-        ("GAP2", "Bulk two"),
-        ("GAP3", "Skip me"),
+        ("GOAL1", "Bulk one"),
+        ("GOAL2", "Bulk two"),
+        ("GOAL3", "Skip me"),
     ] {
-        service.create_gap_summary(name, Some(id)).unwrap();
+        service.create_goal_summary(name, Some(id)).unwrap();
         service
-            .append_gap_round_summary(id, "Original", "Actual", "Target")
+            .append_goal_round_summary(id, "Original", "Prompt")
             .unwrap();
     }
     service
-        .set_gap_status_unchecked("GAP3", &GapStatus::Qa)
+        .set_goal_status_unchecked("GOAL3", &GoalStatus::Qa)
         .unwrap();
 
     let status_result = service
-        .bulk_update_gaps(
-            BulkGapSelection {
+        .bulk_update_goals(
+            BulkGoalSelection {
                 selected_ids: Some(vec![
-                    "GAP1".to_string(),
-                    "GAP2".to_string(),
-                    "GAP3".to_string(),
+                    "GOAL1".to_string(),
+                    "GOAL2".to_string(),
+                    "GOAL3".to_string(),
                 ]),
                 ..Default::default()
             },
-            BulkGapUpdate::Status("todo".to_string()),
+            BulkGoalUpdate::Status("todo".to_string()),
         )
         .unwrap();
     assert_eq!(status_result.updated, 2);
     assert_eq!(status_result.skipped, 1);
     assert_eq!(
-        service.show_gap_summary("GAP1").unwrap().gap.status,
-        GapStatus::Todo
+        service.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Todo
     );
     assert_eq!(
-        service.show_gap_summary("GAP3").unwrap().gap.status,
-        GapStatus::Qa
+        service.show_goal_summary("GOAL3").unwrap().goal.status,
+        GoalStatus::Qa
     );
 
     let reporter_result = service
-        .bulk_update_gaps(
-            BulkGapSelection {
-                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+        .bulk_update_goals(
+            BulkGoalSelection {
+                selected_ids: Some(vec!["GOAL1".to_string(), "GOAL2".to_string()]),
                 ..Default::default()
             },
-            BulkGapUpdate::Reporter("Reviewer".to_string()),
+            BulkGoalUpdate::Reporter("Reviewer".to_string()),
         )
         .unwrap();
     assert_eq!(reporter_result.updated, 2);
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
 
     let assignee_result = service
-        .bulk_update_gaps(
-            BulkGapSelection {
-                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+        .bulk_update_goals(
+            BulkGoalSelection {
+                selected_ids: Some(vec!["GOAL1".to_string(), "GOAL2".to_string()]),
                 ..Default::default()
             },
-            BulkGapUpdate::Assignee("Assignee".to_string()),
+            BulkGoalUpdate::Assignee("Assignee".to_string()),
         )
         .unwrap();
     assert_eq!(assignee_result.updated, 2);
     assert_eq!(
         service
-            .show_gap_summary("GAP1")
+            .show_goal_summary("GOAL1")
             .unwrap()
-            .gap
+            .goal
             .assignee
             .as_deref(),
         Some("Assignee")
@@ -452,29 +484,29 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
         Some("Feature Reporter")
     );
     let assign_result = service
-        .bulk_assign_gaps_to_feature(
+        .bulk_assign_goals_to_feature(
             "FEA1",
-            BulkGapSelection {
-                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+            BulkGoalSelection {
+                selected_ids: Some(vec!["GOAL1".to_string(), "GOAL2".to_string()]),
                 ..Default::default()
             },
         )
         .unwrap();
     assert_eq!(assign_result.updated, 2);
     assert_eq!(
-        service.show_feature_summary("FEA1").unwrap().gap_ids,
-        vec!["GAP1", "GAP2"]
+        service.show_feature_summary("FEA1").unwrap().goal_ids,
+        vec!["GOAL1", "GOAL2"]
     );
 
     let delete_result = service
-        .bulk_delete_gaps(BulkGapSelection {
-            selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+        .bulk_delete_goals(BulkGoalSelection {
+            selected_ids: Some(vec!["GOAL1".to_string(), "GOAL2".to_string()]),
             ..Default::default()
         })
         .unwrap();
     assert_eq!(delete_result.deleted, 2);
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL2/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -487,8 +519,8 @@ fn file_work_item_service_bulk_deletes_features() {
     service
         .create_feature_summary("Bulk Feature", Some("FEA1"), None, None, None)
         .unwrap();
-    service.create_gap_summary("First", Some("GAP1")).unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service.create_goal_summary("First", Some("GOAL1")).unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
 
     let deleted = service
         .bulk_delete_features(BulkFeatureSelection {
@@ -499,7 +531,7 @@ fn file_work_item_service_bulk_deletes_features() {
     assert_eq!(deleted.deleted, 1);
     assert_eq!(deleted.ids, vec!["FEA1"]);
     assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -513,10 +545,10 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
     nodes.activate("remote-node").unwrap();
 
     let service = FileWorkItemService::new(&refine_dir);
-    let local_gap = service
-        .create_gap_summary("Remote-owned", Some("GAP1"))
+    let local_goal = service
+        .create_goal_summary("Remote-owned", Some("GOAL1"))
         .unwrap();
-    assert_eq!(local_gap.gap.node_id.as_deref(), Some("remote-node"));
+    assert_eq!(local_goal.goal.node_id.as_deref(), Some("remote-node"));
     let local_feature = service
         .create_feature_summary("Remote feature", Some("FEA1"), None, None, None)
         .unwrap();
@@ -527,7 +559,7 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
 
     nodes.activate("default").unwrap();
     let err = service
-        .update_gap_metadata_summary("GAP1", Some("Blocked"), None, None, None)
+        .update_goal_metadata_summary("GOAL1", Some("Blocked"), None, None, None)
         .unwrap_err();
     assert_eq!(
         err.category(),
@@ -542,18 +574,18 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
     );
 
     service
-        .bulk_transfer_gaps_to_node(
+        .bulk_transfer_goals_to_node(
             "default",
-            BulkGapSelection {
-                selected_ids: Some(vec!["GAP1".to_string()]),
+            BulkGoalSelection {
+                selected_ids: Some(vec!["GOAL1".to_string()]),
                 ..Default::default()
             },
         )
         .unwrap();
     let updated = service
-        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None, None, None)
+        .update_goal_metadata_summary("GOAL1", Some("Default-owned"), None, None, None)
         .unwrap();
-    assert_eq!(updated.gap.name, "Default-owned");
+    assert_eq!(updated.goal.name, "Default-owned");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -568,25 +600,27 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    service.create_gap_summary("First", Some("GAP1")).unwrap();
-    service.create_gap_summary("Second", Some("GAP2")).unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+    service.create_goal_summary("First", Some("GOAL1")).unwrap();
+    service
+        .create_goal_summary("Second", Some("GOAL2"))
+        .unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL2").unwrap();
 
-    let direct_gap = service
-        .transfer_gap_to_node("remote-node", "GAP1")
+    let direct_goal = service
+        .transfer_goal_to_node("remote-node", "GOAL1")
         .unwrap_err();
     assert!(
-        direct_gap
+        direct_goal
             .to_string()
             .contains("transfer the Feature instead"),
-        "{direct_gap}"
+        "{direct_goal}"
     );
     let bulk = service
-        .bulk_transfer_gaps_to_node(
+        .bulk_transfer_goals_to_node(
             "remote-node",
-            BulkGapSelection {
-                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+            BulkGoalSelection {
+                selected_ids: Some(vec!["GOAL1".to_string(), "GOAL2".to_string()]),
                 ..Default::default()
             },
         )
@@ -605,7 +639,7 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
         )
         .unwrap();
     assert_eq!(bulk_feature.updated, 3);
-    assert_eq!(bulk_feature.ids, vec!["FEA1", "GAP1", "GAP2"]);
+    assert_eq!(bulk_feature.ids, vec!["FEA1", "GOAL1", "GOAL2"]);
     assert_eq!(
         service
             .show_feature_summary("FEA1")
@@ -622,7 +656,7 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
         .transfer_feature_to_node("remote-node", "FEA1")
         .unwrap();
     assert_eq!(transferred.updated, 3);
-    assert_eq!(transferred.ids, vec!["FEA1", "GAP1", "GAP2"]);
+    assert_eq!(transferred.ids, vec!["FEA1", "GOAL1", "GOAL2"]);
     assert_eq!(
         service
             .show_feature_summary("FEA1")
@@ -632,12 +666,12 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
             .as_deref(),
         Some("remote-node")
     );
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         assert_eq!(
             service
-                .show_gap_summary(gap_id)
+                .show_goal_summary(goal_id)
                 .unwrap()
-                .gap
+                .goal
                 .node_id
                 .as_deref(),
             Some("remote-node")
@@ -648,7 +682,7 @@ fn file_work_item_service_transfers_features_as_node_owned_units() {
 }
 
 #[test]
-fn file_work_item_service_rejects_feature_transfer_with_active_member_gap() {
+fn file_work_item_service_rejects_feature_transfer_with_active_member_goal() {
     let temp_root = unique_temp_dir("work-item-feature-transfer-active");
     let refine_dir = temp_root.join(".refine");
     let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
@@ -657,13 +691,15 @@ fn file_work_item_service_rejects_feature_transfer_with_active_member_gap() {
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    service.create_gap_summary("Active", Some("GAP1")).unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     service
-        .transition_gap_status("GAP1", GapStatus::Todo)
+        .create_goal_summary("Active", Some("GOAL1"))
+        .unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
         .unwrap();
 
     let err = service
@@ -681,9 +717,9 @@ fn file_work_item_service_rejects_feature_transfer_with_active_member_gap() {
     );
     assert_eq!(
         service
-            .show_gap_summary("GAP1")
+            .show_goal_summary("GOAL1")
             .unwrap()
-            .gap
+            .goal
             .node_id
             .as_deref(),
         Some("default")
@@ -696,12 +732,12 @@ fn file_work_item_service_rejects_feature_transfer_with_active_member_gap() {
 fn file_work_item_service_rejects_invalid_manual_transition() {
     let temp_root = unique_temp_dir("work-item-invalid-transition");
     let refine_dir = temp_root.join(".refine");
-    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
-    fs::create_dir_all(&gap_dir).unwrap();
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
+    fs::create_dir_all(&goal_dir).unwrap();
     fs::write(
-        gap_dir.join("gap.json"),
+        goal_dir.join("goal.json"),
         r#"{
-              "id": "GAP1",
+              "id": "GOAL1",
               "name": "Transition me",
               "status": "backlog",
               "created": "2026-01-01T00:00:00Z",
@@ -712,7 +748,7 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
     .unwrap();
 
     let err = FileWorkItemService::new(&refine_dir)
-        .transition_gap_status("GAP1", GapStatus::InProgress)
+        .transition_goal_status("GOAL1", GoalStatus::InProgress)
         .unwrap_err();
     assert_eq!(
         err.category(),
@@ -722,7 +758,7 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
 }
 
 #[test]
-fn distribute_spreads_eligible_gaps_evenly_across_nodes() {
+fn distribute_spreads_eligible_goals_evenly_across_nodes() {
     let temp_root = unique_temp_dir("distribute-spread");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
@@ -731,7 +767,7 @@ fn distribute_spreads_eligible_gaps_evenly_across_nodes() {
     nodes.create("node-b").unwrap();
     for index in 1..=6 {
         service
-            .create_gap_summary(&format!("Gap {index}"), Some(&format!("GAP{index}")))
+            .create_goal_summary(&format!("Goal {index}"), Some(&format!("GOAL{index}")))
             .unwrap();
     }
 
@@ -741,14 +777,14 @@ fn distribute_spreads_eligible_gaps_evenly_across_nodes() {
         "node-b".to_string(),
     ];
     let result = service
-        .distribute_gaps_across_nodes(&targets, false, &std::collections::BTreeSet::new(), false)
+        .distribute_goals_across_nodes(&targets, false, &std::collections::BTreeSet::new(), false)
         .unwrap();
 
     assert_eq!(result.strategy, "spread");
     assert_eq!(result.eligible, 6);
     let mut counts = std::collections::BTreeMap::new();
-    for gap in service.list_gap_summaries().unwrap() {
-        let owner = gap.gap.node_id.unwrap_or_else(|| "default".to_string());
+    for goal in service.list_goal_summaries().unwrap() {
+        let owner = goal.goal.node_id.unwrap_or_else(|| "default".to_string());
         *counts.entry(owner).or_insert(0usize) += 1;
     }
     assert_eq!(counts.get("default"), Some(&2));
@@ -758,69 +794,71 @@ fn distribute_spreads_eligible_gaps_evenly_across_nodes() {
 }
 
 #[test]
-fn distribute_converge_moves_only_reviewable_gaps_to_review_node() {
+fn distribute_converge_moves_only_reviewable_goals_to_review_node() {
     let temp_root = unique_temp_dir("distribute-converge");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
     nodes.create("worker").unwrap();
     service
-        .create_gap_summary("Reviewable", Some("GAP1"))
+        .create_goal_summary("Reviewable", Some("GOAL1"))
         .unwrap();
     service
-        .create_gap_summary("Still backlog", Some("GAP2"))
+        .create_goal_summary("Still backlog", Some("GOAL2"))
         .unwrap();
-    service.transfer_gap_to_node("worker", "GAP1").unwrap();
-    service.transfer_gap_to_node("worker", "GAP2").unwrap();
+    service.transfer_goal_to_node("worker", "GOAL1").unwrap();
+    service.transfer_goal_to_node("worker", "GOAL2").unwrap();
     // Review is a workflow-owned state; write it directly for the fixture.
-    let gap_path = refine_dir.join("gaps/GA/P1/gap.json");
-    let updated = fs::read_to_string(&gap_path)
+    let goal_path = refine_dir.join("goals/GO/AL1/goal.json");
+    let updated = fs::read_to_string(&goal_path)
         .unwrap()
         .replace("\"backlog\"", "\"review\"");
-    fs::write(&gap_path, updated).unwrap();
+    fs::write(&goal_path, updated).unwrap();
 
     let targets = vec!["default".to_string()];
     let result = service
-        .distribute_gaps_across_nodes(&targets, true, &std::collections::BTreeSet::new(), false)
+        .distribute_goals_across_nodes(&targets, true, &std::collections::BTreeSet::new(), false)
         .unwrap();
 
     assert_eq!(result.strategy, "converge");
     assert_eq!(result.moved, 1);
-    assert_eq!(result.moves[0].gap_id, "GAP1");
+    assert_eq!(result.moves[0].goal_id, "GOAL1");
     assert_eq!(result.moves[0].to_node_id, "default");
-    let backlog_gap = service.show_gap_summary("GAP2").unwrap();
-    assert_eq!(backlog_gap.gap.node_id.as_deref(), Some("worker"));
+    let backlog_goal = service.show_goal_summary("GOAL2").unwrap();
+    assert_eq!(backlog_goal.goal.node_id.as_deref(), Some("worker"));
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn distribute_skips_feature_and_claimed_gaps_and_honors_dry_run() {
+fn distribute_skips_feature_and_claimed_goals_and_honors_dry_run() {
     let temp_root = unique_temp_dir("distribute-skips");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     let nodes = crate::tools::product::nodes::FileNodeRegistryService::new(&refine_dir);
     nodes.create("node-a").unwrap();
     service
-        .create_gap_summary("In feature", Some("GAP1"))
+        .create_goal_summary("In feature", Some("GOAL1"))
         .unwrap();
-    service.create_gap_summary("Claimed", Some("GAP2")).unwrap();
-    service.create_gap_summary("Free", Some("GAP3")).unwrap();
+    service
+        .create_goal_summary("Claimed", Some("GOAL2"))
+        .unwrap();
+    service.create_goal_summary("Free", Some("GOAL3")).unwrap();
     service
         .create_feature_summary("Feature", Some("FEA1"), None, None, None)
         .unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
 
     let mut claimed = std::collections::BTreeSet::new();
-    claimed.insert("GAP2".to_string());
+    claimed.insert("GOAL2".to_string());
     let targets = vec!["node-a".to_string()];
     let result = service
-        .distribute_gaps_across_nodes(&targets, false, &claimed, true)
+        .distribute_goals_across_nodes(&targets, false, &claimed, true)
         .unwrap();
 
     assert_eq!(result.strategy, "fill");
     assert!(result.dry_run);
     assert_eq!(result.moved, 1);
-    assert_eq!(result.moves[0].gap_id, "GAP3");
+    assert_eq!(result.moves[0].goal_id, "GOAL3");
     assert_eq!(result.skipped, 2);
     let reasons: Vec<&str> = result
         .skipped_details
@@ -829,10 +867,10 @@ fn distribute_skips_feature_and_claimed_gaps_and_honors_dry_run() {
         .collect();
     assert!(reasons.contains(&"feature:FEA1"));
     assert!(reasons.contains(&"claimed"));
-    let free_gap = service.show_gap_summary("GAP3").unwrap();
+    let free_goal = service.show_goal_summary("GOAL3").unwrap();
     assert_eq!(
-        free_gap
-            .gap
+        free_goal
+            .goal
             .node_id
             .unwrap_or_else(|| "default".to_string()),
         "default"

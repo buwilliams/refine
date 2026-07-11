@@ -21,9 +21,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
-use crate::model::gap::{GapIndexProjection, GapPriority};
+use crate::model::goal::{GoalIndexProjection, GoalPriority};
 use crate::model::log::ActivityEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
 };
@@ -32,7 +32,7 @@ use crate::surfaces::web_server::support::{
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
 use crate::tools::product::project_state::{
-    DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection,
+    DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection,
     PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, ProjectStateStore, ProjectionSnapshot,
     RuntimeProjection,
 };
@@ -52,14 +52,14 @@ fn web_server_serves_mcp_surface_through_daemon() {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
-            "params": {"name": "refine_list_gaps", "arguments": {}},
+            "params": {"name": "refine_list_goals", "arguments": {}},
         })),
     });
 
     assert_eq!(response.status, 200);
     assert_eq!(response.body["result"]["isError"], false);
-    let gaps = &response.body["result"]["structuredContent"]["gaps"];
-    assert!(gaps.as_array().is_some());
+    let goals = &response.body["result"]["structuredContent"]["goals"];
+    assert!(goals.as_array().is_some());
 
     // GET reports server identity so clients can discover the surface.
     let identity = server.handle(ApiRequest {
@@ -72,16 +72,16 @@ fn web_server_serves_mcp_surface_through_daemon() {
 }
 
 #[test]
-fn web_server_routes_work_gap_queries_through_projection() {
+fn web_server_routes_work_goal_queries_through_projection() {
     let mut server = server_with_projection();
-    server.projection.gaps.insert(
-        "GAP2".to_string(),
-        GapSummaryProjection {
-            gap: GapIndexProjection {
-                id: "GAP2".to_string(),
+    server.projection.goals.insert(
+        "GOAL2".to_string(),
+        GoalSummaryProjection {
+            goal: GoalIndexProjection {
+                id: "GOAL2".to_string(),
                 name: "Settings route".to_string(),
-                status: GapStatus::Done,
-                priority: GapPriority::High,
+                status: GoalStatus::Done,
+                priority: GoalPriority::High,
                 reporter: Some("Alice".to_string()),
                 assignee: Some("Alice".to_string()),
                 round_count: 3,
@@ -91,7 +91,7 @@ fn web_server_routes_work_gap_queries_through_projection() {
                 node_id: Some("node-b".to_string()),
                 feature_id: Some("FEA1".to_string()),
                 feature_order: Some(1),
-                json_path: "gaps/02/GAP2/gap.json".to_string(),
+                json_path: "goals/02/GOAL2/goal.json".to_string(),
             },
             node_display_name: Some("Node B".to_string()),
             searchable_text: "Settings route Alice".to_string(),
@@ -112,51 +112,52 @@ fn web_server_routes_work_gap_queries_through_projection() {
                 updated: "updated".to_string(),
                 json_path: "features/FE/A1/feature.json".to_string(),
             },
-            status: GapStatus::Done,
-            gap_ids: vec!["GAP2".to_string()],
+            status: GoalStatus::Done,
+            goal_ids: vec!["GOAL2".to_string()],
             rollup: FeatureRollup {
-                status: GapStatus::Done,
-                gap_count: 1,
+                status: GoalStatus::Done,
+                goal_count: 1,
                 done_count: 1,
                 active_count: 0,
                 failed_count: 0,
                 cancelled_count: 0,
                 blocked_count: 0,
-                next_gap: None,
+                next_goal: None,
             },
         },
     );
     let response = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/work/gaps".to_string(),
+        path: "/work/goals".to_string(),
         body: None,
     });
 
     assert_eq!(response.status, 200);
-    assert_eq!(response.body["gaps"].as_array().unwrap().len(), 2);
+    assert_eq!(response.body["goals"].as_array().unwrap().len(), 2);
     assert_eq!(response.body["counts"]["todo"], 1);
     assert_eq!(response.body["counts"]["done"], 1);
 
     let filtered = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?reporter=Alice&feature=FEA1&rounds_gte=2&sort=priority&dir=desc&limit=1"
+        path: "/api/goals?reporter=Alice&feature=FEA1&rounds_gte=2&sort=priority&dir=desc&limit=1"
             .to_string(),
         body: None,
     });
     assert_eq!(filtered.status, 200);
-    assert_eq!(filtered.body["gaps"][0]["id"], "GAP2");
+    assert_eq!(filtered.body["goals"][0]["id"], "GOAL2");
     assert_eq!(filtered.body["filtered_counts"]["done"], 1);
-    assert_eq!(filtered.body["matching_ids"], json!(["GAP2"]));
+    assert_eq!(filtered.body["matching_ids"], json!(["GOAL2"]));
     assert_eq!(filtered.body["page"]["total"], 1);
     assert!(filtered.body.get("facets").is_none());
 
     let status_facets = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?status=todo&reporter=Alice&feature=FEA1&rounds_gte=2&facets=1".to_string(),
+        path: "/api/goals?status=todo&reporter=Alice&feature=FEA1&rounds_gte=2&facets=1"
+            .to_string(),
         body: None,
     });
     assert_eq!(status_facets.status, 200);
-    assert_eq!(status_facets.body["gaps"].as_array().unwrap().len(), 0);
+    assert_eq!(status_facets.body["goals"].as_array().unwrap().len(), 0);
     assert_eq!(
         status_facets.body["filtered_counts"]
             .as_object()
@@ -179,7 +180,13 @@ fn web_server_routes_work_gap_queries_through_projection() {
 #[test]
 fn web_server_structures_dashboard_attention_and_runtime_banner() {
     let mut server = server_with_projection();
-    server.projection.gaps.get_mut("GAP1").unwrap().gap.status = GapStatus::Failed;
+    server
+        .projection
+        .goals
+        .get_mut("GOAL1")
+        .unwrap()
+        .goal
+        .status = GoalStatus::Failed;
     server.projection.runtime.supervisor = json!({"runner_reachable": false}).as_object().cloned();
 
     let response = server.handle(ApiRequest {
@@ -192,7 +199,7 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
     let attention = response.body["needs_attention"].as_array().unwrap();
     assert!(attention.iter().any(|item| {
         item["kind"] == "filter"
-            && item["message"] == "1 failed Gap(s) need recovery"
+            && item["message"] == "1 failed Goal(s) need recovery"
             && item["severity"] == "warn"
     }));
     assert!(attention.iter().any(|item| {
@@ -363,20 +370,20 @@ fn static_import_modal_exposes_feature_import_surface() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
     let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
-    let import_modes = fs::read_to_string(static_root.join("js/features/gaps-import.js")).unwrap();
+    let import_modes = fs::read_to_string(static_root.join("js/features/goals-import.js")).unwrap();
     let import_modal =
-        fs::read_to_string(static_root.join("js/features/gaps-import-modal.js")).unwrap();
+        fs::read_to_string(static_root.join("js/features/goals-import-modal.js")).unwrap();
     let import_prepare =
-        fs::read_to_string(static_root.join("js/features/gaps-import-prepare.js")).unwrap();
+        fs::read_to_string(static_root.join("js/features/goals-import-prepare.js")).unwrap();
 
-    assert!(index.contains(r#"data-testid="nav-import-gaps">Import</a>"#));
+    assert!(index.contains(r#"data-testid="nav-import-goals">Import</a>"#));
     assert!(commands.contains(r#"title: "Import""#));
     assert!(import_modes.contains(r#"mode: "feature""#));
     for label in [
         "Import Feature",
-        "Import Gaps",
-        "Import Gaps (.csv)",
-        "Upload Gaps (.csv)",
+        "Import Goals",
+        "Import Goals (.csv)",
+        "Upload Goals (.csv)",
     ] {
         assert!(import_modes.contains(label), "missing import label {label}");
     }
@@ -408,8 +415,8 @@ fn static_plan_chat_shows_initial_design_prompt() {
 fn static_work_item_tables_use_shared_readable_name_layout() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();
-    let gaps_css = fs::read_to_string(static_root.join("css/gaps.css")).unwrap();
-    let gaps_list = fs::read_to_string(static_root.join("js/features/gaps-list.js")).unwrap();
+    let goals_css = fs::read_to_string(static_root.join("css/goals.css")).unwrap();
+    let goals_list = fs::read_to_string(static_root.join("js/features/goals-list.js")).unwrap();
     let features = fs::read_to_string(static_root.join("js/features/features.js")).unwrap();
 
     assert!(common_css.contains(".work-items-table"));
@@ -421,13 +428,13 @@ fn static_work_item_tables_use_shared_readable_name_layout() {
     assert!(common_css.contains("word-break: normal"));
     assert!(common_css.contains("width: var(--work-item-select-width, 4%)"));
 
-    assert_eq!(gaps_css.matches("--work-item-name-width: 20%").count(), 2);
-    assert!(gaps_css.contains("--work-item-select-width: 4%"));
-    assert!(gaps_css.contains(".features-col-next {\n  width: 17%;"));
-    assert!(gaps_css.contains(".features-col-updated {\n  width: 9%;"));
-    assert!(!gaps_css.contains(".features-name-cell {\n  overflow-wrap: anywhere;"));
+    assert_eq!(goals_css.matches("--work-item-name-width: 20%").count(), 2);
+    assert!(goals_css.contains("--work-item-select-width: 4%"));
+    assert!(goals_css.contains(".features-col-next {\n  width: 17%;"));
+    assert!(goals_css.contains(".features-col-updated {\n  width: 9%;"));
+    assert!(!goals_css.contains(".features-name-cell {\n  overflow-wrap: anywhere;"));
 
-    for source in [gaps_list.as_str(), features.as_str()] {
+    for source in [goals_list.as_str(), features.as_str()] {
         assert!(source.contains("work-items-table"));
         assert!(source.contains("work-item-name-col"));
         assert!(source.contains("work-item-name-cell"));
@@ -435,32 +442,32 @@ fn static_work_item_tables_use_shared_readable_name_layout() {
 }
 
 #[test]
-fn static_gap_detail_logs_feature_blocking_notice_to_system() {
+fn static_goal_detail_logs_feature_blocking_notice_to_system() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
-    let gaps_detail = fs::read_to_string(static_root.join("js/features/gaps-detail.js")).unwrap();
+    let goals_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
 
-    assert!(gaps_detail.contains("feature_blocking_notice"));
-    assert!(gaps_detail.contains(r#"data-testid="gap-feature-blocking-banner""#));
-    assert!(gaps_detail.contains("function recordFeatureBlockingNotice"));
-    assert!(gaps_detail.contains("recordUiNotice(notice.message"));
-    assert!(gaps_detail.contains(r#"source: "workflow""#));
+    assert!(goals_detail.contains("feature_blocking_notice"));
+    assert!(goals_detail.contains(r#"data-testid="goal-feature-blocking-banner""#));
+    assert!(goals_detail.contains("function recordFeatureBlockingNotice"));
+    assert!(goals_detail.contains("recordUiNotice(notice.message"));
+    assert!(goals_detail.contains(r#"source: "workflow""#));
 }
 
 #[test]
-fn static_gap_detail_uses_shared_governance_review_state_helpers() {
+fn static_goal_detail_uses_shared_governance_review_state_helpers() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
-    let gaps_detail = fs::read_to_string(static_root.join("js/features/gaps-detail.js")).unwrap();
+    let goals_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
 
     assert!(common.contains("function governanceReviewStatus"));
     assert!(common.contains(r#""pass", "passed""#));
     assert!(common.contains("function reviewStateClass"));
-    assert!(gaps_detail.contains("governanceReviewStatus(round)"));
-    assert!(gaps_detail.contains("governanceReviewStatus(latest)"));
-    assert!(gaps_detail.contains("reviewStateClass(states.product)"));
-    assert!(gaps_detail.contains("reviewStateClass(states.constitution)"));
-    assert!(!gaps_detail.contains(r#"product_state === "pass""#));
-    assert!(!gaps_detail.contains(r#"constitution_state === "pass""#));
+    assert!(goals_detail.contains("governanceReviewStatus(round)"));
+    assert!(goals_detail.contains("governanceReviewStatus(latest)"));
+    assert!(goals_detail.contains("reviewStateClass(states.product)"));
+    assert!(goals_detail.contains("reviewStateClass(states.constitution)"));
+    assert!(!goals_detail.contains(r#"product_state === "pass""#));
+    assert!(!goals_detail.contains(r#"constitution_state === "pass""#));
 }
 
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
@@ -580,7 +587,7 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
 
     let forbidden = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
+        path: "/work/goals".to_string(),
         headers: BTreeMap::from([("origin".to_string(), "https://example.com".to_string())]),
         body: Some(br#"{"name":"Bad"}"#.to_vec()),
     });
@@ -588,7 +595,7 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
 
     let version = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
+        path: "/work/goals".to_string(),
         headers: BTreeMap::from([("x-refine-api-version".to_string(), "999".to_string())]),
         body: Some(br#"{"name":"Bad"}"#.to_vec()),
     });
@@ -596,7 +603,7 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
 
     let idempotency = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
+        path: "/work/goals".to_string(),
         headers: BTreeMap::from([("idempotency-key".to_string(), "bad key".to_string())]),
         body: Some(br#"{"name":"Bad"}"#.to_vec()),
     });
@@ -615,87 +622,82 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
         server,
         static_root: None,
     };
-    let body = br#"{"id":"GAP1","name":"Idempotent Gap"}"#.to_vec();
-    let headers = BTreeMap::from([("idempotency-key".to_string(), "create-gap-1".to_string())]);
+    let body = br#"{"id":"GOAL1","name":"Idempotent Goal"}"#.to_vec();
+    let headers = BTreeMap::from([("idempotency-key".to_string(), "create-goal-1".to_string())]);
 
     let first = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers: headers.clone(),
         body: Some(body.clone()),
     });
     assert_eq!(first.status, 201);
     let second = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers: headers.clone(),
         body: Some(body),
     });
     assert_eq!(second.status, 201);
     assert_eq!(first.body, second.body);
     assert_eq!(
-        fs::read_dir(refine_dir.join("gaps/GA/P1"))
+        fs::read_dir(refine_dir.join("goals/GO/AL1"))
             .unwrap()
             .filter_map(Result::ok)
-            .filter(|entry| entry.file_name() == "gap.json")
+            .filter(|entry| entry.file_name() == "goal.json")
             .count(),
         1
     );
     assert!(
         runtime_root
             .join(IDEMPOTENCY_DIR)
-            .join("create-gap-1.json")
+            .join("create-goal-1.json")
             .exists()
     );
     let cached_projection: ProjectionSnapshot = serde_json::from_str(
         &fs::read_to_string(runtime_root.join("cache").join(PROJECTION_SNAPSHOT_FILE)).unwrap(),
     )
     .unwrap();
-    assert!(cached_projection.gaps.contains_key("GAP1"));
+    assert!(cached_projection.goals.contains_key("GOAL1"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn web_server_creates_gap_from_new_gap_modal_payload() {
-    let temp_root = unique_temp_dir("http-gap-create-modal");
+fn web_server_creates_goal_from_new_goal_modal_payload() {
+    let temp_root = unique_temp_dir("http-goal-create-modal");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         body: Some(json!({
             "reporter": "Alice",
-            "actual": "The game does not pause when the pause key is pressed.",
-            "target": "Pressing pause should freeze the board and show a paused state.",
+            "prompt": "Pressing pause should freeze the board and show a paused state.",
             "priority": "high"
         })),
     });
 
     assert_eq!(created.status, 201);
-    let gap_id = created.body["gap"]["id"].as_str().unwrap();
+    let goal_id = created.body["goal"]["id"].as_str().unwrap();
     assert_eq!(
-        created.body["gap"]["name"],
+        created.body["goal"]["name"],
         "Pressing pause should freeze the board and show a paused state."
     );
-    assert_eq!(created.body["gap"]["priority"], "high");
-    assert_eq!(created.body["gap"]["reporter"], "Alice");
-    assert_eq!(created.body["gap"]["round_count"], 1);
+    assert_eq!(created.body["goal"]["priority"], "high");
+    assert_eq!(created.body["goal"]["reporter"], "Alice");
+    assert_eq!(created.body["goal"]["round_count"], 1);
 
     let detail = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: format!("/api/gaps/{gap_id}"),
+        path: format!("/api/goals/{goal_id}"),
         body: None,
     });
     assert_eq!(detail.status, 200);
     assert_eq!(
-        detail.body["gap"]["rounds"][0]["actual"],
-        "The game does not pause when the pause key is pressed."
-    );
-    assert_eq!(
-        detail.body["gap"]["rounds"][0]["target"],
+        detail.body["goal"]["rounds"][0]["prompt"],
         "Pressing pause should freeze the board and show a paused state."
     );
 
@@ -703,33 +705,32 @@ fn web_server_creates_gap_from_new_gap_modal_payload() {
 }
 
 #[test]
-fn web_server_handles_new_gap_duplicate_decisions() {
-    let temp_root = unique_temp_dir("http-gap-duplicate-modal");
+fn web_server_handles_new_goal_duplicate_decisions() {
+    let temp_root = unique_temp_dir("http-goal-duplicate-modal");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let body = json!({
         "reporter": "Alice",
-        "actual": "Duplicate actual state",
-        "target": "Duplicate target state",
+        "prompt": "Duplicate target state",
         "priority": "low"
     });
     let original = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         body: Some(body.clone()),
     });
     assert_eq!(original.status, 201);
-    let original_id = original.body["gap"]["id"].as_str().unwrap().to_string();
+    let original_id = original.body["goal"]["id"].as_str().unwrap().to_string();
 
     let duplicate = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         body: Some(body.clone()),
     });
     assert_eq!(duplicate.status, 409);
-    assert_eq!(duplicate.body["error"]["code"], "duplicate_gap");
+    assert_eq!(duplicate.body["error"]["code"], "duplicate_goal");
     assert_eq!(
         duplicate.body["error"]["duplicate"]["match"]["id"],
         original_id
@@ -737,11 +738,10 @@ fn web_server_handles_new_gap_duplicate_decisions() {
 
     let ignored = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         body: Some(json!({
             "reporter": "Alice",
-            "actual": "Duplicate actual state",
-            "target": "Duplicate target state",
+            "prompt": "Duplicate target state",
             "duplicate_decision": "duplicate"
         })),
     });
@@ -751,21 +751,20 @@ fn web_server_handles_new_gap_duplicate_decisions() {
 
     let imported = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         body: Some(json!({
             "reporter": "Alice",
-            "actual": "Duplicate actual state",
-            "target": "Duplicate target state",
+            "prompt": "Duplicate target state",
             "duplicate_decision": "original"
         })),
     });
     assert_eq!(imported.status, 201);
-    let imported_id = imported.body["gap"]["id"].as_str().unwrap();
+    let imported_id = imported.body["goal"]["id"].as_str().unwrap();
     assert_ne!(imported_id, original_id);
 
     let list = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?q=Duplicate%20actual%20state".to_string(),
+        path: "/api/goals?q=Duplicate%20target%20state".to_string(),
         body: None,
     });
     assert_eq!(list.status, 200);
@@ -788,21 +787,21 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     };
     let headers = BTreeMap::from([(
         "idempotency-key".to_string(),
-        "create-gap-conflict".to_string(),
+        "create-goal-conflict".to_string(),
     )]);
 
     let first = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers: headers.clone(),
-        body: Some(br#"{"id":"GAP1","name":"First"}"#.to_vec()),
+        body: Some(br#"{"id":"GOAL1","name":"First"}"#.to_vec()),
     });
     assert_eq!(first.status, 201);
     let conflict = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers,
-        body: Some(br#"{"id":"GAP2","name":"Second"}"#.to_vec()),
+        body: Some(br#"{"id":"GOAL2","name":"Second"}"#.to_vec()),
     });
     assert_eq!(conflict.status, 409);
     let body: serde_json::Value = serde_json::from_slice(&conflict.body).unwrap();
@@ -826,9 +825,9 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
 
     let create = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers: BTreeMap::new(),
-        body: Some(br#"{"id":"GAP1","name":"SSE Gap"}"#.to_vec()),
+        body: Some(br#"{"id":"GOAL1","name":"SSE Goal"}"#.to_vec()),
     });
     assert_eq!(create.status, 201);
     assert!(runtime_root.join(API_EVENTS_FILE).exists());
@@ -842,7 +841,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
     assert_eq!(sse.status, 200);
     let body = String::from_utf8(sse.body).unwrap();
     assert!(body.contains("event: api_mutation"));
-    assert!(body.contains("\"path\":\"/work/gaps\""));
+    assert!(body.contains("\"path\":\"/work/goals\""));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -859,14 +858,14 @@ fn local_http_daemon_serves_projection_routes_over_tcp() {
 
     let mut stream = TcpStream::connect(addr).unwrap();
     stream
-        .write_all(b"GET /work/gaps HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .write_all(b"GET /work/goals HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
         .unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).unwrap();
     handle.join().unwrap();
 
     assert!(response.starts_with("HTTP/1.1 200 OK"));
-    assert!(response.contains("\"id\": \"GAP1\""));
+    assert!(response.contains("\"id\": \"GOAL1\""));
     assert!(response.contains("\"counts\""));
 }
 
@@ -1174,31 +1173,31 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
 
     let create = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
+        path: "/api/goals".to_string(),
         headers: BTreeMap::new(),
-        body: Some(br#"{"id":"HOT1","name":"Hot cached Gap"}"#.to_vec()),
+        body: Some(br#"{"id":"HOT1","name":"Hot cached Goal"}"#.to_vec()),
     });
     assert_eq!(create.status, 201);
 
     let list = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?limit=50&offset=0".to_string(),
+        path: "/api/goals?limit=50&offset=0".to_string(),
         headers: BTreeMap::new(),
         body: None,
     });
     assert_eq!(list.status, 200);
     let body: serde_json::Value = serde_json::from_slice(&list.body).unwrap();
-    assert_eq!(body["gaps"][0]["id"], "HOT1");
+    assert_eq!(body["goals"][0]["id"], "HOT1");
 
     let events = wait_for_http_request_metrics(&runtime_root);
     assert!(events.iter().any(|event| {
         event.operation == "http.request"
-            && event.details.get("path").and_then(|value| value.as_str()) == Some("/work/gaps")
+            && event.details.get("path").and_then(|value| value.as_str()) == Some("/work/goals")
     }));
 
     for path in [
         "/api/dashboard?node=current",
-        "/api/gaps?limit=50&offset=0",
+        "/api/goals?limit=50&offset=0",
         "/api/features?limit=50&offset=0",
         "/api/activity?limit=50&offset=0",
         "/api/changes?limit=50&offset=0",
@@ -1228,15 +1227,15 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
 }
 
 #[test]
-fn web_server_transitions_gap_and_refine_dir() {
+fn web_server_transitions_goal_and_refine_dir() {
     let temp_root = unique_temp_dir("http-transition");
     let refine_dir = temp_root.join(".refine");
-    let gap_dir = refine_dir.join("gaps").join("01").join("GAP1");
-    fs::create_dir_all(&gap_dir).unwrap();
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
+    fs::create_dir_all(&goal_dir).unwrap();
     fs::write(
-        gap_dir.join("gap.json"),
+        goal_dir.join("goal.json"),
         r#"{
-              "id": "GAP1",
+              "id": "GOAL1",
               "name": "HTTP transition",
               "status": "backlog",
               "priority": "low",
@@ -1255,31 +1254,31 @@ fn web_server_transitions_gap_and_refine_dir() {
 
     let response = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps/GAP1/transition".to_string(),
+        path: "/work/goals/GOAL1/transition".to_string(),
         body: Some(json!({"status": "todo"})),
     });
 
     assert_eq!(response.status, 200);
-    assert_eq!(response.body["gap"]["status"], "todo");
+    assert_eq!(response.body["goal"]["status"], "todo");
     assert!(
-        fs::read_to_string(gap_dir.join("gap.json"))
+        fs::read_to_string(goal_dir.join("goal.json"))
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
 
     let patch_response = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
         body: Some(json!({"status": "backlog"})),
     });
     assert_eq!(patch_response.status, 200);
-    assert_eq!(patch_response.body["gap"]["status"], "backlog");
+    assert_eq!(patch_response.body["goal"]["status"], "backlog");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn web_server_creates_and_shows_gap() {
+fn web_server_creates_and_shows_goal() {
     let temp_root = unique_temp_dir("http-create-show");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -1287,70 +1286,74 @@ fn web_server_creates_and_shows_gap() {
 
     let create = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Created by API"})),
+        path: "/work/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Created by API"})),
     });
     assert_eq!(create.status, 201);
-    assert_eq!(create.body["gap"]["id"], "GAP1");
-    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert_eq!(create.body["goal"]["id"], "GOAL1");
+    assert!(refine_dir.join("goals/GO/AL1/goal.json").exists());
 
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: None,
     });
     assert_eq!(show.status, 200);
-    assert_eq!(show.body["gap"]["name"], "Created by API");
+    assert_eq!(show.body["goal"]["name"], "Created by API");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn web_server_gap_detail_exposes_failed_feature_blocking_notice() {
-    let temp_root = unique_temp_dir("http-gap-feature-blocking-notice");
+fn web_server_goal_detail_exposes_failed_feature_blocking_notice() {
+    let temp_root = unique_temp_dir("http-goal-feature-blocking-notice");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     let service = FileWorkItemService::new(&refine_dir);
-    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
-    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
+    service
+        .create_goal_summary("Goal A", Some("GOAL1"))
+        .unwrap();
+    service
+        .create_goal_summary("Goal B", Some("GOAL2"))
+        .unwrap();
     service
         .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
-    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
-    service.order_gap_in_feature("FEA1", "GAP1").unwrap();
-    service.order_gap_in_feature("FEA1", "GAP2").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL2").unwrap();
+    service.order_goal_in_feature("FEA1", "GOAL1").unwrap();
+    service.order_goal_in_feature("FEA1", "GOAL2").unwrap();
     service
-        .transition_gap_status("GAP1", GapStatus::Todo)
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
         .unwrap();
     service
-        .advance_automated_gap_status("GAP1", GapStatus::Failed)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
         .unwrap();
     service
-        .transition_gap_status("GAP2", GapStatus::Todo)
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
         .unwrap();
 
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: None,
     });
 
     assert_eq!(show.status, 200);
     assert_eq!(
-        show.body["gap"]["feature_blocking_notice"]["feature_id"],
+        show.body["goal"]["feature_blocking_notice"]["feature_id"],
         "FEA1"
     );
     assert_eq!(
-        show.body["gap"]["feature_blocking_notice"]["blocked_gap_ids"],
-        json!(["GAP2"])
+        show.body["goal"]["feature_blocking_notice"]["blocked_goal_ids"],
+        json!(["GOAL2"])
     );
     assert!(
-        show.body["gap"]["feature_blocking_notice"]["message"]
+        show.body["goal"]["feature_blocking_notice"]["message"]
             .as_str()
             .unwrap_or("")
             .contains("Submit a recovery round")
@@ -1360,80 +1363,80 @@ fn web_server_gap_detail_exposes_failed_feature_blocking_notice() {
 }
 
 #[test]
-fn web_server_edits_notes_and_deletes_gap() {
+fn web_server_edits_notes_and_deletes_goal() {
     let temp_root = unique_temp_dir("http-edit-note-delete");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Original"})),
+        path: "/work/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Original"})),
     });
 
     let edit = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: Some(json!({"name": "Renamed", "priority": "high"})),
     });
     assert_eq!(edit.status, 200);
-    assert_eq!(edit.body["gap"]["name"], "Renamed");
-    assert_eq!(edit.body["gap"]["priority"], "high");
+    assert_eq!(edit.body["goal"]["name"], "Renamed");
+    assert_eq!(edit.body["goal"]["priority"], "high");
 
     let note = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps/GAP1/notes".to_string(),
+        path: "/work/goals/GOAL1/notes".to_string(),
         body: Some(json!({"author": "Reviewer", "body": "Needs context"})),
     });
     assert_eq!(note.status, 200);
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"body\": \"Needs context\""));
-    let written_gap = serde_json::from_str::<serde_json::Value>(&written).unwrap();
-    let note_id = written_gap["notes"][0]["id"].as_str().unwrap();
+    let written_goal = serde_json::from_str::<serde_json::Value>(&written).unwrap();
+    let note_id = written_goal["notes"][0]["id"].as_str().unwrap();
 
     let edited_note = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: Some(json!({
             "notes": [{
                 "id": note_id,
                 "author": "Reviewer",
                 "body": "Updated context",
-                "created": written_gap["notes"][0]["created"].clone()
+                "created": written_goal["notes"][0]["created"].clone()
             }]
         })),
     });
     assert_eq!(edited_note.status, 200);
     let edited_detail = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: None,
     });
     assert_eq!(
-        edited_detail.body["gap"]["notes"][0]["body"],
+        edited_detail.body["goal"]["notes"][0]["body"],
         "Updated context"
     );
 
     let deleted_note = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: Some(json!({"notes": []})),
     });
     assert_eq!(deleted_note.status, 200);
     let deleted_detail = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: None,
     });
-    assert_eq!(deleted_detail.body["gap"]["notes"], json!([]));
+    assert_eq!(deleted_detail.body["goal"]["notes"], json!([]));
 
     let delete = server.handle(ApiRequest {
         method: "DELETE".to_string(),
-        path: "/work/gaps/GAP1".to_string(),
+        path: "/work/goals/GOAL1".to_string(),
         body: None,
     });
     assert_eq!(delete.status, 200);
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1446,39 +1449,39 @@ fn web_server_appends_and_edits_latest_round() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Round Gap"})),
+        path: "/work/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Round Goal"})),
     });
 
     let append = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps/GAP1/rounds".to_string(),
-        body: Some(json!({"reporter": "Reporter", "actual": "Actual", "target": "Target"})),
+        path: "/work/goals/GOAL1/rounds".to_string(),
+        body: Some(json!({"reporter": "Reporter", "prompt": "Target"})),
     });
     assert_eq!(append.status, 200);
-    assert_eq!(append.body["gap"]["round_count"], 1);
+    assert_eq!(append.body["goal"]["round_count"], 1);
 
     let edit = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/work/gaps/GAP1/rounds/latest".to_string(),
-        body: Some(json!({"reporter": "Reviewer", "assignee": "Reviewer", "actual": "Revised"})),
+        path: "/work/goals/GOAL1/rounds/latest".to_string(),
+        body: Some(json!({"reporter": "Reviewer", "assignee": "Reviewer", "prompt": "Revised"})),
     });
     assert_eq!(edit.status, 200);
-    assert_eq!(edit.body["gap"]["reporter"], "Reviewer");
-    let written = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
+    assert_eq!(edit.body["goal"]["reporter"], "Reviewer");
+    let written = fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
-    assert!(written.contains("\"actual\": \"Revised\""));
+    assert!(written.contains("\"prompt\": \"Revised\""));
 
     let detail = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
         body: None,
     });
     assert_eq!(detail.status, 200);
-    assert_eq!(detail.body["gap"]["round_count"], 1);
-    assert_eq!(detail.body["gap"]["rounds"][0]["reporter"], "Reviewer");
-    assert_eq!(detail.body["gap"]["rounds"][0]["assignee"], "Reviewer");
-    assert_eq!(detail.body["gap"]["rounds"][0]["actual"], "Revised");
+    assert_eq!(detail.body["goal"]["round_count"], 1);
+    assert_eq!(detail.body["goal"]["rounds"][0]["reporter"], "Reviewer");
+    assert_eq!(detail.body["goal"]["rounds"][0]["assignee"], "Reviewer");
+    assert_eq!(detail.body["goal"]["rounds"][0]["prompt"], "Revised");
 
     let reporters = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1493,8 +1496,8 @@ fn web_server_appends_and_edits_latest_round() {
 }
 
 #[test]
-fn web_server_appends_and_reads_gap_round_logs() {
-    let temp_root = unique_temp_dir("http-gap-round-logs");
+fn web_server_appends_and_reads_goal_round_logs() {
+    let temp_root = unique_temp_dir("http-goal-round-logs");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
@@ -1502,17 +1505,17 @@ fn web_server_appends_and_reads_gap_round_logs() {
     server.runtime_root = Some(runtime_root);
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Logged Gap"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Logged Goal"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/rounds".to_string(),
-        body: Some(json!({"reporter": "Reporter", "actual": "Actual", "target": "Target"})),
+        path: "/api/goals/GOAL1/rounds".to_string(),
+        body: Some(json!({"reporter": "Reporter", "prompt": "Target"})),
     });
     let activity_before_logs = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/activity?gap_id=GAP1".to_string(),
+        path: "/api/activity?goal_id=GOAL1".to_string(),
         body: None,
     });
     assert_eq!(activity_before_logs.status, 200);
@@ -1520,7 +1523,7 @@ fn web_server_appends_and_reads_gap_round_logs() {
 
     let append = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/rounds/0/logs".to_string(),
+        path: "/api/goals/GOAL1/rounds/0/logs".to_string(),
         body: Some(json!({
             "severity": "info",
             "category": "state",
@@ -1529,11 +1532,11 @@ fn web_server_appends_and_reads_gap_round_logs() {
         })),
     });
     assert_eq!(append.status, 200);
-    assert!(refine_dir.join("gaps/GA/P1/logs.jsonl").exists());
+    assert!(refine_dir.join("goals/GO/AL1/logs.jsonl").exists());
 
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps/GAP1/logs".to_string(),
+        path: "/api/goals/GOAL1/logs".to_string(),
         body: None,
     });
     assert_eq!(logs.status, 200);
@@ -1544,7 +1547,7 @@ fn web_server_appends_and_reads_gap_round_logs() {
     );
     let activity = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/activity?gap_id=GAP1".to_string(),
+        path: "/api/activity?goal_id=GOAL1".to_string(),
         body: None,
     });
     assert_eq!(activity.status, 200);
@@ -1553,11 +1556,11 @@ fn web_server_appends_and_reads_gap_round_logs() {
         activity.body["activity"][0]["message"],
         "Workflow status changed: backlog -> todo"
     );
-    assert_eq!(activity.body["activity"][0]["gap_id"], "GAP1");
+    assert_eq!(activity.body["activity"][0]["goal_id"], "GOAL1");
 
     let evaluation = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/api/gaps/GAP1/rounds/latest/evaluation".to_string(),
+        path: "/api/goals/GOAL1/rounds/latest/evaluation".to_string(),
         body: Some(json!({
             "rule_state": "failed",
             "product_state": "fail",
@@ -1575,18 +1578,18 @@ fn web_server_appends_and_reads_gap_round_logs() {
     assert_eq!(evaluation.status, 200);
     let detail = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
         body: None,
     });
     assert_eq!(detail.status, 200);
-    assert_eq!(detail.body["gap"]["rounds"][0]["rule_state"], "failed");
+    assert_eq!(detail.body["goal"]["rounds"][0]["rule_state"], "failed");
     assert_eq!(
-        detail.body["gap"]["rounds"][0]["governance_message"],
+        detail.body["goal"]["rounds"][0]["governance_message"],
         "Governance found a product concern."
     );
-    assert_eq!(detail.body["gap"]["rounds"][0]["quality_state"], "failed");
+    assert_eq!(detail.body["goal"]["rounds"][0]["quality_state"], "failed");
     assert_eq!(
-        detail.body["gap"]["rounds"][0]["quality_message"],
+        detail.body["goal"]["rounds"][0]["quality_message"],
         "Quality check failed."
     );
 
@@ -1601,8 +1604,8 @@ fn web_server_creates_features_and_updates_membership() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Gap One"})),
+        path: "/work/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Goal One"})),
     });
 
     let create_feature = server.handle(ApiRequest {
@@ -1613,13 +1616,13 @@ fn web_server_creates_features_and_updates_membership() {
     assert_eq!(create_feature.status, 201);
     assert_eq!(create_feature.body["feature"]["id"], "FEA1");
 
-    let add_gap = server.handle(ApiRequest {
+    let add_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps".to_string(),
-        body: Some(json!({"gap_id": "GAP1"})),
+        path: "/work/features/FEA1/goals".to_string(),
+        body: Some(json!({"goal_id": "GOAL1"})),
     });
-    assert_eq!(add_gap.status, 200);
-    assert_eq!(add_gap.body["gap_ids"], json!(["GAP1"]));
+    assert_eq!(add_goal.status, 200);
+    assert_eq!(add_goal.body["goal_ids"], json!(["GOAL1"]));
 
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1627,47 +1630,47 @@ fn web_server_creates_features_and_updates_membership() {
         body: None,
     });
     assert_eq!(show.status, 200);
-    assert_eq!(show.body["gap_ids"], json!(["GAP1"]));
-    assert_eq!(show.body["feature"]["gap_ids"], json!(["GAP1"]));
-    assert_eq!(show.body["feature"]["gap_count"], 1);
-    assert_eq!(show.body["feature"]["gaps"][0]["id"], "GAP1");
+    assert_eq!(show.body["goal_ids"], json!(["GOAL1"]));
+    assert_eq!(show.body["feature"]["goal_ids"], json!(["GOAL1"]));
+    assert_eq!(show.body["feature"]["goal_count"], 1);
+    assert_eq!(show.body["feature"]["goals"][0]["id"], "GOAL1");
 
-    let unorder_gap = server.handle(ApiRequest {
+    let unorder_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps/GAP1/unorder".to_string(),
+        path: "/work/features/FEA1/goals/GOAL1/unorder".to_string(),
         body: None,
     });
-    assert_eq!(unorder_gap.status, 200);
+    assert_eq!(unorder_goal.status, 200);
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/work/features/FEA1".to_string(),
         body: None,
     });
     assert_eq!(
-        show.body["feature"]["gaps"][0]["feature_order"],
+        show.body["feature"]["goals"][0]["feature_order"],
         json!(null)
     );
 
-    let order_gap = server.handle(ApiRequest {
+    let order_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps/GAP1/order".to_string(),
+        path: "/work/features/FEA1/goals/GOAL1/order".to_string(),
         body: None,
     });
-    assert_eq!(order_gap.status, 200);
+    assert_eq!(order_goal.status, 200);
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/work/features/FEA1".to_string(),
         body: None,
     });
-    assert_eq!(show.body["feature"]["gaps"][0]["feature_order"], json!(1));
+    assert_eq!(show.body["feature"]["goals"][0]["feature_order"], json!(1));
 
-    let remove_gap = server.handle(ApiRequest {
+    let remove_goal = server.handle(ApiRequest {
         method: "DELETE".to_string(),
-        path: "/work/features/FEA1/gaps/GAP1".to_string(),
+        path: "/work/features/FEA1/goals/GOAL1".to_string(),
         body: None,
     });
-    assert_eq!(remove_gap.status, 200);
-    assert_eq!(remove_gap.body["gap_ids"], json!([]));
+    assert_eq!(remove_goal.status, 200);
+    assert_eq!(remove_goal.body["goal_ids"], json!([]));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1678,10 +1681,10 @@ fn web_server_reorders_and_moves_feature_workflow() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
+    for (id, name) in [("GOAL1", "Goal One"), ("GOAL2", "Goal Two")] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/work/gaps".to_string(),
+            path: "/work/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
     }
@@ -1690,42 +1693,42 @@ fn web_server_reorders_and_moves_feature_workflow() {
         path: "/work/features".to_string(),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/work/features/FEA1/gaps".to_string(),
-            body: Some(json!({"gap_id": gap_id})),
+            path: "/work/features/FEA1/goals".to_string(),
+            body: Some(json!({"goal_id": goal_id})),
         });
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: format!("/work/features/FEA1/gaps/{gap_id}/order"),
+            path: format!("/work/features/FEA1/goals/{goal_id}/order"),
             body: None,
         });
     }
 
     let reorder = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps/GAP2/reorder".to_string(),
+        path: "/work/features/FEA1/goals/GOAL2/reorder".to_string(),
         body: Some(json!({"order": 1})),
     });
     assert_eq!(reorder.status, 200);
-    assert_eq!(reorder.body["gap_ids"], json!(["GAP2", "GAP1"]));
+    assert_eq!(reorder.body["goal_ids"], json!(["GOAL2", "GOAL1"]));
 
     let reorder_before = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps/GAP1/reorder".to_string(),
-        body: Some(json!({"before": "GAP2"})),
+        path: "/work/features/FEA1/goals/GOAL1/reorder".to_string(),
+        body: Some(json!({"before": "GOAL2"})),
     });
     assert_eq!(reorder_before.status, 200);
-    assert_eq!(reorder_before.body["gap_ids"], json!(["GAP1", "GAP2"]));
+    assert_eq!(reorder_before.body["goal_ids"], json!(["GOAL1", "GOAL2"]));
 
     let reorder_after = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/features/FEA1/gaps/GAP1/reorder".to_string(),
-        body: Some(json!({"after": "GAP2"})),
+        path: "/work/features/FEA1/goals/GOAL1/reorder".to_string(),
+        body: Some(json!({"after": "GOAL2"})),
     });
     assert_eq!(reorder_after.status, 200);
-    assert_eq!(reorder_after.body["gap_ids"], json!(["GAP2", "GAP1"]));
+    assert_eq!(reorder_after.body["goal_ids"], json!(["GOAL2", "GOAL1"]));
 
     let move_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1735,7 +1738,7 @@ fn web_server_reorders_and_moves_feature_workflow() {
     assert_eq!(move_feature.status, 200);
     assert_eq!(move_feature.body["rollup"]["status"], "todo");
     assert!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
@@ -1744,20 +1747,20 @@ fn web_server_reorders_and_moves_feature_workflow() {
 }
 
 #[test]
-fn web_server_updates_feature_metadata_and_runs_gap_actions() {
-    let temp_root = unique_temp_dir("http-feature-gap-actions");
+fn web_server_updates_feature_metadata_and_runs_goal_actions() {
+    let temp_root = unique_temp_dir("http-feature-goal-actions");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     for (id, name) in [
-        ("GAP1", "Verify Gap"),
-        ("GAP2", "Retry Quality"),
-        ("GAP3", "Retry Merge"),
-        ("GAP4", "Submit Merge"),
+        ("GOAL1", "Verify Goal"),
+        ("GOAL2", "Retry Quality"),
+        ("GOAL3", "Retry Merge"),
+        ("GOAL4", "Submit Merge"),
     ] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/api/gaps".to_string(),
+            path: "/api/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
     }
@@ -1785,82 +1788,82 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk".to_string(),
+        path: "/api/goals/bulk".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP1"],
+            "selected_ids": ["GOAL1"],
             "update": {"status": "review"}
         })),
     });
     let verified = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/verify".to_string(),
+        path: "/api/goals/GOAL1/verify".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(verified.status, 200);
     assert_eq!(verified.body["ok"], true);
-    assert_eq!(verified.body["gap"]["status"], "done");
+    assert_eq!(verified.body["goal"]["status"], "done");
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk".to_string(),
+        path: "/api/goals/bulk".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP2", "GAP3"],
+            "selected_ids": ["GOAL2", "GOAL3"],
             "update": {"status": "failed"}
         })),
     });
     let retry_quality = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP2/retry-quality".to_string(),
+        path: "/api/goals/GOAL2/retry-quality".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(retry_quality.status, 200);
-    assert_eq!(retry_quality.body["gap"]["status"], "qa");
+    assert_eq!(retry_quality.body["goal"]["status"], "qa");
 
     let started = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP4/start".to_string(),
+        path: "/api/goals/GOAL4/start".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(started.status, 200);
-    assert_eq!(started.body["gap"]["status"], "in-progress");
+    assert_eq!(started.body["goal"]["status"], "in-progress");
     let submitted = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP4/submit-merge".to_string(),
+        path: "/api/goals/GOAL4/submit-merge".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(submitted.status, 200);
-    assert_eq!(submitted.body["gap"]["status"], "ready-merge");
+    assert_eq!(submitted.body["goal"]["status"], "ready-merge");
     let submitted_again = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP4/submit-merge".to_string(),
+        path: "/api/goals/GOAL4/submit-merge".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(submitted_again.status, 200);
-    assert_eq!(submitted_again.body["gap"]["status"], "ready-merge");
+    assert_eq!(submitted_again.body["goal"]["status"], "ready-merge");
 
     let retry_merge = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP3/retry-merge".to_string(),
+        path: "/api/goals/GOAL3/retry-merge".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(retry_merge.status, 200);
-    assert_eq!(retry_merge.body["gap"]["status"], "ready-merge");
+    assert_eq!(retry_merge.body["goal"]["status"], "ready-merge");
 
     let merge = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP3/merge".to_string(),
+        path: "/api/goals/GOAL3/merge".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(merge.status, 200);
-    assert_eq!(merge.body["gap"]["status"], "done");
+    assert_eq!(merge.body["goal"]["status"], "done");
 
     let undo = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP3/undo".to_string(),
+        path: "/api/goals/GOAL3/undo".to_string(),
         body: Some(json!({})),
     });
     assert_eq!(undo.status, 200);
-    assert_eq!(undo.body["gap"]["status"], "review");
+    assert_eq!(undo.body["goal"]["status"], "review");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1873,10 +1876,10 @@ fn web_server_cancels_and_deletes_features() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
-    for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
+    for (id, name) in [("GOAL1", "Goal One"), ("GOAL2", "Goal Two")] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/work/gaps".to_string(),
+            path: "/work/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
     }
@@ -1885,31 +1888,31 @@ fn web_server_cancels_and_deletes_features() {
         path: "/work/features".to_string(),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
-    for gap_id in ["GAP1", "GAP2"] {
+    for goal_id in ["GOAL1", "GOAL2"] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/work/features/FEA1/gaps".to_string(),
-            body: Some(json!({"gap_id": gap_id})),
+            path: "/work/features/FEA1/goals".to_string(),
+            body: Some(json!({"goal_id": goal_id})),
         });
     }
 
-    let gap_cancel = server.handle(ApiRequest {
+    let goal_cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/work/gaps/GAP1/cancel".to_string(),
+        path: "/work/goals/GOAL1/cancel".to_string(),
         body: None,
     });
-    assert_eq!(gap_cancel.status, 200);
-    assert_eq!(gap_cancel.body["gap"]["status"], "cancelled");
+    assert_eq!(goal_cancel.status, 200);
+    assert_eq!(goal_cancel.body["goal"]["status"], "cancelled");
 
     let supervisor = FileProcessSupervisor::new(&runtime_root);
     let process = supervisor
         .register(ManagedProcess {
-            id: "agent-gap2".to_string(),
+            id: "agent-goal2".to_string(),
             owner: crate::process::subprocess::ProcessOwner::Agent,
             pid: None,
             state: "running".to_string(),
             label: Some("agent".to_string()),
-            details: Some("working on GAP2".to_string()),
+            details: Some("working on GOAL2".to_string()),
             stdout_path: None,
             stderr_path: None,
             stdin_path: None,
@@ -1919,7 +1922,7 @@ fn web_server_cancels_and_deletes_features() {
         })
         .unwrap();
     let operation = FileOperationRegistry::new(&runtime_root)
-        .register("feature FEA1 gap GAP2")
+        .register("feature FEA1 goal GOAL2")
         .unwrap();
 
     let feature_cancel = server.handle(ApiRequest {
@@ -1947,8 +1950,8 @@ fn web_server_cancels_and_deletes_features() {
     });
     assert_eq!(feature_delete.status, 200);
     assert!(!refine_dir.join("features/FE/A1/feature.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert!(!refine_dir.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL2/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1960,12 +1963,12 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
-    let create_gap = server.handle(ApiRequest {
+    let create_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Gap One"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Goal One"})),
     });
-    assert_eq!(create_gap.status, 201);
+    assert_eq!(create_goal.status, 201);
     let create_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features".to_string(),
@@ -1973,13 +1976,13 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     });
     assert_eq!(create_feature.status, 201);
 
-    let add_gap = server.handle(ApiRequest {
+    let add_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/features/FEA1/gaps/GAP1".to_string(),
+        path: "/api/features/FEA1/goals/GOAL1".to_string(),
         body: None,
     });
-    assert_eq!(add_gap.status, 200);
-    assert_eq!(add_gap.body["gap_ids"], json!(["GAP1"]));
+    assert_eq!(add_goal.status, 200);
+    assert_eq!(add_goal.body["goal_ids"], json!(["GOAL1"]));
 
     let workflow = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1991,11 +1994,11 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
 
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/cancel".to_string(),
+        path: "/api/goals/GOAL1/cancel".to_string(),
         body: None,
     });
     assert_eq!(cancel.status, 200);
-    assert_eq!(cancel.body["gap"]["status"], "cancelled");
+    assert_eq!(cancel.body["goal"]["status"], "cancelled");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2006,10 +2009,10 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    for (id, name) in [("GAP1", "Bulk One"), ("GAP2", "Bulk Two")] {
+    for (id, name) in [("GOAL1", "Bulk One"), ("GOAL2", "Bulk Two")] {
         let create = server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/api/gaps".to_string(),
+            path: "/api/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
         assert_eq!(create.status, 201);
@@ -2029,9 +2032,9 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
 
     let bulk_status = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk".to_string(),
+        path: "/api/goals/bulk".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP1", "GAP2"],
+            "selected_ids": ["GOAL1", "GOAL2"],
             "update": {"status": "todo"}
         })),
     });
@@ -2040,13 +2043,13 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
 
     let bulk_assign = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/features/FEA1/gaps/bulk".to_string(),
-        body: Some(json!({"selected_ids": ["GAP1", "GAP2"]})),
+        path: "/api/features/FEA1/goals/bulk".to_string(),
+        body: Some(json!({"selected_ids": ["GOAL1", "GOAL2"]})),
     });
     assert_eq!(bulk_assign.status, 200);
     assert_eq!(bulk_assign.body["updated"], 2);
     assert_eq!(
-        fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json"))
+        fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
             .contains("\"feature_id\": \"FEA1\""),
         true
@@ -2079,13 +2082,13 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
 
     let bulk_delete = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk/delete".to_string(),
-        body: Some(json!({"selected_ids": ["GAP1"]})),
+        path: "/api/goals/bulk/delete".to_string(),
+        body: Some(json!({"selected_ids": ["GOAL1"]})),
     });
     assert_eq!(bulk_delete.status, 200);
     assert_eq!(bulk_delete.body["deleted"], 1);
-    assert!(!refine_dir.join("gaps/GA/P1/gap.json").exists());
-    assert!(refine_dir.join("gaps/GA/P2/gap.json").exists());
+    assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
+    assert!(refine_dir.join("goals/GO/AL2/goal.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2128,21 +2131,21 @@ fn web_server_records_and_lists_activity_for_static_ui() {
 }
 
 #[test]
-fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
+fn web_server_parses_and_persists_imported_goals_with_feature_destination() {
     let temp_root = unique_temp_dir("http-import-persist");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let parsed = server.handle(ApiRequest {
-            method: "POST".to_string(),
-            path: "/api/import/csv/parse".to_string(),
-            body: Some(json!({
-                "text": "name,actual,target,reporter,priority\nCSV Gap,Actual state,Target state,QA,high\n"
-            })),
-        });
+        method: "POST".to_string(),
+        path: "/api/import/csv/parse".to_string(),
+        body: Some(json!({
+            "text": "name,prompt,reporter,priority\nCSV Goal,Implement target state,QA,high\n"
+        })),
+    });
     assert_eq!(parsed.status, 200);
-    assert_eq!(parsed.body["drafts"][0]["name"], "CSV Gap");
+    assert_eq!(parsed.body["drafts"][0]["name"], "CSV Goal");
     assert_eq!(parsed.body["drafts"][0]["priority"], "high");
 
     let persisted = server.handle(ApiRequest {
@@ -2151,9 +2154,8 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
         body: Some(json!({
             "new_feature_name": "Imported Feature",
             "drafts": [{
-                "name": "Imported Gap",
-                "actual": "Actual state",
-                "target": "Target state",
+                "name": "Imported Goal",
+                "prompt": "Target state",
                 "reporter": "QA",
                 "priority": "high"
             }]
@@ -2162,20 +2164,20 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     assert_eq!(persisted.status, 201);
     assert_eq!(persisted.body["count"], 1);
     assert_eq!(persisted.body["feature"]["name"], "Imported Feature");
-    let gap_id = persisted.body["gaps"][0]["id"].as_str().unwrap();
+    let goal_id = persisted.body["goals"][0]["id"].as_str().unwrap();
     let feature_id = persisted.body["feature"]["id"].as_str().unwrap();
 
-    let gap = server.handle(ApiRequest {
+    let goal = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: format!("/api/gaps/{gap_id}"),
+        path: format!("/api/goals/{goal_id}"),
         body: None,
     });
-    assert_eq!(gap.status, 200);
-    assert_eq!(gap.body["gap"]["priority"], "high");
-    assert_eq!(gap.body["gap"]["reporter"], "QA");
-    assert_eq!(gap.body["gap"]["round_count"], 1);
-    assert_eq!(gap.body["gap"]["feature_id"], feature_id);
-    assert_eq!(gap.body["gap"]["feature_order"], json!(null));
+    assert_eq!(goal.status, 200);
+    assert_eq!(goal.body["goal"]["priority"], "high");
+    assert_eq!(goal.body["goal"]["reporter"], "QA");
+    assert_eq!(goal.body["goal"]["round_count"], 1);
+    assert_eq!(goal.body["goal"]["feature_id"], feature_id);
+    assert_eq!(goal.body["goal"]["feature_order"], json!(null));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2194,7 +2196,7 @@ fn web_server_parses_import_csv_in_background() {
         path: "/api/import/csv/parse".to_string(),
         body: Some(json!({
             "background": true,
-            "text": "name,actual,target,reporter,priority\nBackground CSV,Actual state,Target state,QA,high\n"
+            "text": "name,prompt,reporter,priority\nBackground CSV,Implement target state,QA,high\n"
         })),
     });
     assert_eq!(started.status, 202);
@@ -2211,7 +2213,7 @@ fn web_server_parses_import_csv_in_background() {
 }
 
 #[test]
-fn web_server_background_feature_import_promotes_all_instant_backlog_gaps() {
+fn web_server_background_feature_import_promotes_all_instant_backlog_goals() {
     let temp_root = unique_temp_dir("http-import-feature-promote-all");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -2231,21 +2233,18 @@ fn web_server_background_feature_import_promotes_all_instant_backlog_gaps() {
             "new_feature_name": "Instant Feature",
             "drafts": [
                 {
-                    "name": "First imported Gap",
-                    "actual": "First actual",
-                    "target": "First target",
+                    "name": "First imported Goal",
+                    "prompt": "First target",
                     "priority": "high"
                 },
                 {
-                    "name": "Second imported Gap",
-                    "actual": "Second actual",
-                    "target": "Second target",
+                    "name": "Second imported Goal",
+                    "prompt": "Second target",
                     "priority": "medium"
                 },
                 {
-                    "name": "Third imported Gap",
-                    "actual": "Third actual",
-                    "target": "Third target",
+                    "name": "Third imported Goal",
+                    "prompt": "Third target",
                     "priority": "low"
                 }
             ]
@@ -2259,9 +2258,9 @@ fn web_server_background_feature_import_promotes_all_instant_backlog_gaps() {
     assert_eq!(result["http_status"], 201);
     assert_eq!(result["count"], 3);
     assert_eq!(result["promoted"], 3);
-    let gaps = result["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), 3);
-    assert!(gaps.iter().all(|gap| gap["status"] == "todo"));
+    let goals = result["goals"].as_array().unwrap();
+    assert_eq!(goals.len(), 3);
+    assert!(goals.iter().all(|goal| goal["status"] == "todo"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2279,10 +2278,9 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
         "feature": {
             "name": "Chat Context Feature",
             "description": "Feature extracted from persisted Plan chat context.",
-            "gaps": [{
+            "goals": [{
                 "name": "Use persisted chat transcript",
-                "actual": "Draft Feature only uses fallback browser text.",
-                "target": "Draft Feature extracts from the stored Plan chat transcript.",
+                "prompt": "Draft Feature extracts from the stored Plan chat transcript.",
                 "priority": "high"
             }]
         }
@@ -2311,10 +2309,9 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
     let fallback_feature = json!({
         "feature": {
             "name": "Fallback Feature",
-            "gaps": [{
-                "name": "Fallback gap",
-                "actual": "Fallback actual",
-                "target": "Fallback target"
+            "goals": [{
+                "name": "Fallback goal",
+                "prompt": "Fallback target"
             }]
         }
     })
@@ -2345,7 +2342,7 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
 }
 
 #[test]
-fn web_server_fails_background_plan_extraction_without_gap_drafts() {
+fn web_server_fails_background_plan_extraction_without_goal_drafts() {
     let temp_root = unique_temp_dir("http-import-plan-empty-background");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -2371,7 +2368,7 @@ fn web_server_fails_background_plan_extraction_without_gap_drafts() {
     assert_eq!(error["code"], "invalid_input");
     assert_eq!(
         error["message"],
-        "Plan Draft extraction did not return any Gap drafts"
+        "Plan Draft extraction did not return any Goal drafts"
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -2392,10 +2389,9 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
         &json!({
             "feature": {
                 "name": "Provider Extracted Feature",
-                "gaps": [{
-                    "name": "Provider extracted gap",
-                    "actual": "The pasted spec has no extracted drafts.",
-                    "target": "The provider extracts implementation-ready drafts.",
+                "goals": [{
+                    "name": "Provider extracted goal",
+                    "prompt": "The provider extracts implementation-ready drafts.",
                     "priority": "medium"
                 }]
             }
@@ -2431,7 +2427,7 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
     assert_eq!(extracted.body["drafts"].as_array().unwrap().len(), 1);
     assert_eq!(
         extracted.body["drafts"][0]["name"],
-        "Provider extracted gap"
+        "Provider extracted goal"
     );
 
     unsafe {
@@ -2445,7 +2441,7 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
 }
 
 #[test]
-fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
+fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
     let temp_root = unique_temp_dir("daemon-agent-automation-loop");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -2492,12 +2488,12 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Loop schedulable"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Loop schedulable"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/transition".to_string(),
+        path: "/api/goals/GOAL1/transition".to_string(),
         body: Some(json!({"status": "todo"})),
     });
 
@@ -2510,24 +2506,24 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
     loop {
         let show = server.handle(ApiRequest {
             method: "GET".to_string(),
-            path: "/api/gaps/GAP1".to_string(),
+            path: "/api/goals/GOAL1".to_string(),
             body: None,
         });
         assert_eq!(show.status, 200);
-        if show.body["gap"]["status"] == "review" {
+        if show.body["goal"]["status"] == "review" {
             break;
         }
         assert!(
             Instant::now() < deadline,
-            "automation loop did not execute GAP1 before timeout: {}",
-            show.body["gap"]["status"]
+            "automation loop did not execute GOAL1 before timeout: {}",
+            show.body["goal"]["status"]
         );
         thread::sleep(Duration::from_millis(25));
     }
     automation_loop.stop_for_test();
 
     let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
-    assert!(state.contains("\"gap_id\": \"GAP1\""));
+    assert!(state.contains("\"goal_id\": \"GOAL1\""));
     assert!(
         !fs::read_to_string(runtime_root.join(API_EVENTS_FILE))
             .unwrap_or_default()
@@ -2545,7 +2541,7 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
 }
 
 #[test]
-fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
+fn web_server_cancels_background_import_persist_and_rolls_back_created_goals() {
     let temp_root = unique_temp_dir("http-import-cancel");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -2563,8 +2559,7 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
         .map(|index| {
             json!({
                 "name": format!("{prefix}-{index:03}"),
-                "actual": format!("{prefix} actual {index:03}"),
-                "target": format!("{prefix} target {index:03}"),
+                "prompt": format!("{prefix} prompt {index:03}"),
                 "reporter": "QA",
                 "priority": "medium"
             })
@@ -2621,19 +2616,19 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
 
     let projection_deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        let gaps = server.handle(ApiRequest {
+        let goals = server.handle(ApiRequest {
             method: "GET".to_string(),
-            path: format!("/api/gaps?limit=1000&node=current&q={prefix}"),
+            path: format!("/api/goals?limit=1000&node=current&q={prefix}"),
             body: None,
         });
-        assert_eq!(gaps.status, 200);
-        let total = gaps.body["page"]["total"].as_u64().unwrap();
+        assert_eq!(goals.status, 200);
+        let total = goals.body["page"]["total"].as_u64().unwrap();
         if total == 0 {
             break;
         }
         assert!(
             Instant::now() < projection_deadline,
-            "cancelled import left {total} matching Gap records"
+            "cancelled import left {total} matching Goal records"
         );
         thread::sleep(Duration::from_millis(10));
     }
@@ -2652,8 +2647,8 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Cached Gap"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Cached Goal"})),
     });
     let rebuilt = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2661,7 +2656,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         body: Some(json!({"background": true})),
     });
     assert_eq!(rebuilt.status, 200);
-    assert_eq!(rebuilt.body["gaps"], 1);
+    assert_eq!(rebuilt.body["goals"], 1);
     assert!(
         runtime_root
             .join("cache")
@@ -2724,9 +2719,9 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     let temp_root = unique_temp_dir("http-git-changes");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    let gap_dir = refine_dir.join("gaps").join("GA").join("P1");
+    let goal_dir = refine_dir.join("goals").join("GO").join("AL1");
     fs::create_dir_all(&refine_dir).unwrap();
-    fs::create_dir_all(&gap_dir).unwrap();
+    fs::create_dir_all(&goal_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
     git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
@@ -2734,10 +2729,10 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     git(&temp_root, &["add", "app.txt"]).unwrap();
     git(&temp_root, &["commit", "-m", "initial"]).unwrap();
     fs::write(
-        gap_dir.join("gap.json"),
+        goal_dir.join("goal.json"),
         r#"{
-              "id": "GAP1",
-              "name": "Change-linked Gap",
+              "id": "GOAL1",
+              "name": "Change-linked Goal",
               "status": "todo",
               "priority": "high",
               "created": "2026-01-01T00:00:00Z",
@@ -2749,7 +2744,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     fs::write(temp_root.join("app.txt"), "unrelated\n").unwrap();
     git(&temp_root, &["commit", "-am", "maintenance update"]).unwrap();
     fs::write(temp_root.join("app.txt"), "two\n").unwrap();
-    git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
+    git(&temp_root, &["commit", "-am", "GOAL1 update app"]).unwrap();
 
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
@@ -2762,8 +2757,8 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     });
     assert_eq!(changes.status, 200);
     assert_eq!(changes.body["page"]["total"], 1);
-    assert_eq!(changes.body["changes"][0]["subject"], "GAP1 update app");
-    assert_eq!(changes.body["changes"][0]["gap_id"], "GAP1");
+    assert_eq!(changes.body["changes"][0]["subject"], "GOAL1 update app");
+    assert_eq!(changes.body["changes"][0]["goal_id"], "GOAL1");
     let commit = changes.body["changes"][0]["commit"].as_str().unwrap();
 
     let undo = server.handle(ApiRequest {
@@ -3074,7 +3069,7 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
 }
 
 #[test]
-fn web_server_manages_nodes_and_transfers_gap_ownership() {
+fn web_server_manages_nodes_and_transfers_goal_ownership() {
     let temp_root = unique_temp_dir("http-node-transfer");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -3082,13 +3077,13 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     for (id, name) in [
-        ("GAP1", "Transfer One"),
-        ("GAP2", "Transfer Two"),
-        ("GAP3", "Stay Default"),
+        ("GOAL1", "Transfer One"),
+        ("GOAL2", "Transfer Two"),
+        ("GOAL3", "Stay Default"),
     ] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/api/gaps".to_string(),
+            path: "/api/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
     }
@@ -3119,32 +3114,32 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
 
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/nodes/transfer-gaps".to_string(),
+        path: "/api/nodes/transfer-goals".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP1", "GAP2"],
+            "selected_ids": ["GOAL1", "GOAL2"],
             "target_node_id": "remote-qa"
         })),
     });
     assert_eq!(transfer.status, 200);
     assert_eq!(transfer.body["updated"], 2);
-    let current_node_gaps = server.handle(ApiRequest {
+    let current_node_goals = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?node=current".to_string(),
+        path: "/api/goals?node=current".to_string(),
         body: None,
     });
-    assert_eq!(current_node_gaps.status, 200);
-    assert_eq!(current_node_gaps.body["page"]["total"], 2);
+    assert_eq!(current_node_goals.status, 200);
+    assert_eq!(current_node_goals.body["page"]["total"], 2);
     assert_eq!(
-        current_node_gaps.body["gaps"][0]["node_display_name"],
+        current_node_goals.body["goals"][0]["node_display_name"],
         "Remote QA"
     );
-    let all_node_gaps = server.handle(ApiRequest {
+    let all_node_goals = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps?node=all".to_string(),
+        path: "/api/goals?node=all".to_string(),
         body: None,
     });
-    assert_eq!(all_node_gaps.status, 200);
-    assert_eq!(all_node_gaps.body["page"]["total"], 3);
+    assert_eq!(all_node_goals.status, 200);
+    assert_eq!(all_node_goals.body["page"]["total"], 3);
     let current_dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/dashboard".to_string(),
@@ -3162,12 +3157,12 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     assert_eq!(all_dashboard.status, 200);
     assert_eq!(all_dashboard.body["node_filter"], "all");
     assert_eq!(all_dashboard.body["counts"]["backlog"], 3);
-    let gap = server.handle(ApiRequest {
+    let goal = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
         body: None,
     });
-    assert_eq!(gap.body["gap"]["node_id"], "remote-qa");
+    assert_eq!(goal.body["goal"]["node_id"], "remote-qa");
 
     let renamed = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -3207,36 +3202,36 @@ fn web_server_transfers_feature_ownership_as_a_unit() {
         body: Some(json!({"id": "FEA1", "name": "Transfer Feature"})),
     });
     assert_eq!(create_feature.status, 201);
-    for (id, name) in [("GAP1", "Feature One"), ("GAP2", "Feature Two")] {
-        let gap = server.handle(ApiRequest {
+    for (id, name) in [("GOAL1", "Feature One"), ("GOAL2", "Feature Two")] {
+        let goal = server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/api/gaps".to_string(),
+            path: "/api/goals".to_string(),
             body: Some(json!({"id": id, "name": name})),
         });
-        assert_eq!(gap.status, 201);
+        assert_eq!(goal.status, 201);
         let assign = server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: format!("/api/features/FEA1/gaps/{id}"),
+            path: format!("/api/features/FEA1/goals/{id}"),
             body: None,
         });
         assert_eq!(assign.status, 200);
     }
 
-    let direct_gap = server.handle(ApiRequest {
+    let direct_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/nodes/transfer-gaps".to_string(),
+        path: "/api/nodes/transfer-goals".to_string(),
         body: Some(json!({
-            "item_id": "GAP1",
+            "item_id": "GOAL1",
             "target_node_id": "remote-node"
         })),
     });
-    assert_eq!(direct_gap.status, 409);
+    assert_eq!(direct_goal.status, 409);
     assert!(
-        direct_gap.body["error"]["message"]
+        direct_goal.body["error"]["message"]
             .as_str()
             .unwrap_or("")
             .contains("transfer the Feature instead"),
-        "{direct_gap:#?}"
+        "{direct_goal:#?}"
     );
 
     let bulk_transfer = server.handle(ApiRequest {
@@ -3249,7 +3244,7 @@ fn web_server_transfers_feature_ownership_as_a_unit() {
     });
     assert_eq!(bulk_transfer.status, 200);
     assert_eq!(bulk_transfer.body["updated"], 3);
-    assert_eq!(bulk_transfer.body["ids"], json!(["FEA1", "GAP1", "GAP2"]));
+    assert_eq!(bulk_transfer.body["ids"], json!(["FEA1", "GOAL1", "GOAL2"]));
 
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -3258,20 +3253,20 @@ fn web_server_transfers_feature_ownership_as_a_unit() {
     });
     assert_eq!(transfer.status, 200);
     assert_eq!(transfer.body["updated"], 3);
-    assert_eq!(transfer.body["ids"], json!(["FEA1", "GAP1", "GAP2"]));
+    assert_eq!(transfer.body["ids"], json!(["FEA1", "GOAL1", "GOAL2"]));
     let feature = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/features/FEA1".to_string(),
         body: None,
     });
     assert_eq!(feature.body["feature"]["node_id"], "remote-node");
-    for id in ["GAP1", "GAP2"] {
-        let gap = server.handle(ApiRequest {
+    for id in ["GOAL1", "GOAL2"] {
+        let goal = server.handle(ApiRequest {
             method: "GET".to_string(),
-            path: format!("/api/gaps/{id}"),
+            path: format!("/api/goals/{id}"),
             body: None,
         });
-        assert_eq!(gap.body["gap"]["node_id"], "remote-node");
+        assert_eq!(goal.body["goal"]["node_id"], "remote-node");
     }
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -3646,7 +3641,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
                 details: None,
                 actions: Vec::new(),
                 actor: None,
-                gap_id: None,
+                goal_id: None,
             },
         )
         .unwrap();
@@ -3709,7 +3704,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&refine_dir).unwrap();
     let registry = FileOperationRegistry::new(&runtime_root);
-    let operation = registry.register("bulk_update_gaps").unwrap();
+    let operation = registry.register("bulk_update_goals").unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
@@ -3768,7 +3763,7 @@ fn web_server_retries_workflow_executions() {
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&refine_dir).unwrap();
     let automation = WorkflowEngine::new(&runtime_root);
-    let claim_id = automation.claim("GAP1").unwrap();
+    let claim_id = automation.claim("GOAL1").unwrap();
     let execution_id = automation.start_claim(&claim_id).unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
@@ -3781,7 +3776,7 @@ fn web_server_retries_workflow_executions() {
     });
     assert_eq!(retry.status, 200);
     assert_eq!(retry.body["retried_from"], execution_id);
-    assert_eq!(retry.body["execution"]["gap_id"], "GAP1");
+    assert_eq!(retry.body["execution"]["goal_id"], "GOAL1");
     assert_eq!(retry.body["execution"]["status"], "running");
     assert_ne!(retry.body["execution"]["id"], execution_id);
 
@@ -3805,11 +3800,11 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let standalone_chat = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), None)
         .unwrap();
-    let gap_chat = chat
+    let goal_chat = chat
         .start_with_options(
-            ChatAttachment::Gap("GAPCHAT".to_string()),
+            ChatAttachment::Goal("GOALCHAT".to_string()),
             Some("smoke-ai"),
-            Some("gap"),
+            Some("goal"),
         )
         .unwrap();
     let stopped_chat = chat
@@ -3860,7 +3855,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Agent context".to_string()),
-            details: Some(json!({"gap_id": "GAPCTX", "round_idx": 1}).to_string()),
+            details: Some(json!({"goal_id": "GOALCTX", "round_idx": 1}).to_string()),
             stdout_path: None,
             stderr_path: None,
             stdin_path: None,
@@ -3910,7 +3905,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             pid: None,
             state: "exited".to_string(),
             label: Some("Exited agent context".to_string()),
-            details: Some(json!({"gap_id": "DONECTX", "round_idx": 1}).to_string()),
+            details: Some(json!({"goal_id": "DONECTX", "round_idx": 1}).to_string()),
             stdout_path: None,
             stderr_path: None,
             stdin_path: None,
@@ -3980,7 +3975,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .iter()
         .find(|process| process["id"] == "agent-context")
         .unwrap();
-    assert_eq!(agent_context["gap_id"], "GAPCTX");
+    assert_eq!(agent_context["goal_id"], "GOALCTX");
     assert_eq!(agent_context["round_idx"], 1);
     assert_eq!(agent_context["management_actions"], json!(["cancel_agent"]));
     let chat_context = listed_processes
@@ -3998,14 +3993,14 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(standalone_context["kind"], "chat");
     assert_eq!(standalone_context["session_id"], standalone_chat.id);
     assert_eq!(standalone_context["mode"], "standalone");
-    let gap_chat_context = listed_processes
+    let goal_chat_context = listed_processes
         .iter()
-        .find(|process| process["id"] == format!("chat-session-{}", gap_chat.id))
+        .find(|process| process["id"] == format!("chat-session-{}", goal_chat.id))
         .unwrap();
-    assert_eq!(gap_chat_context["kind"], "chat");
-    assert_eq!(gap_chat_context["session_id"], gap_chat.id);
-    assert_eq!(gap_chat_context["mode"], "gap");
-    assert_eq!(gap_chat_context["gap_id"], "GAPCHAT");
+    assert_eq!(goal_chat_context["kind"], "chat");
+    assert_eq!(goal_chat_context["session_id"], goal_chat.id);
+    assert_eq!(goal_chat_context["mode"], "goal");
+    assert_eq!(goal_chat_context["goal_id"], "GOALCHAT");
     assert!(
         !listed_processes
             .iter()
@@ -4098,7 +4093,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .runtime
             .processes
             .iter()
-            .any(|process| process["gap_id"] == "GAPCTX")
+            .any(|process| process["goal_id"] == "GOALCTX")
     );
     assert_eq!(
         cached.runtime.supervisor.unwrap()["runner_reachable"],
@@ -4172,13 +4167,13 @@ fn web_server_lists_processes_and_updates_pause_controls() {
 
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
-        .create_gap_summary("Pause workflow rollback", Some("GAP-WORKFLOW"))
+        .create_goal_summary("Pause workflow rollback", Some("GOAL-WORKFLOW"))
         .unwrap();
     work_items
-        .transition_gap_status("GAP-WORKFLOW", GapStatus::Todo)
+        .transition_goal_status("GOAL-WORKFLOW", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_gap_status("GAP-WORKFLOW", GapStatus::InProgress)
+        .advance_automated_goal_status("GOAL-WORKFLOW", GoalStatus::InProgress)
         .unwrap();
     let paused = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4200,11 +4195,11 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     );
     assert_eq!(
         work_items
-            .show_gap_summary("GAP-WORKFLOW")
+            .show_goal_summary("GOAL-WORKFLOW")
             .unwrap()
-            .gap
+            .goal
             .status,
-        GapStatus::Todo
+        GoalStatus::Todo
     );
     assert!(
         paused.body["runner_work"]
@@ -4355,14 +4350,14 @@ fn web_server_manages_quality_settings_and_checks() {
         method: "POST".to_string(),
         path: "/api/quality/checks".to_string(),
         body: Some(json!({
-            "owner_id": "GAP1",
+            "owner_id": "GOAL1",
             "command": "printf quality-ok"
         })),
     });
     assert_eq!(checks.status, 200);
     assert_eq!(checks.body["ok"], true);
-    assert_eq!(checks.body["result"]["owner_id"], "GAP1");
-    assert_eq!(checks.body["operation"]["owner"], "quality:GAP1");
+    assert_eq!(checks.body["result"]["owner_id"], "GOAL1");
+    assert_eq!(checks.body["operation"]["owner"], "quality:GOAL1");
     assert_eq!(checks.body["operation"]["status"], "complete");
     assert!(
         checks.body["result"]["diagnostics"][0]
@@ -4383,11 +4378,11 @@ fn web_server_manages_quality_settings_and_checks() {
 
     let screenshots = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/quality/screenshots?owner_id=GAP1".to_string(),
+        path: "/api/quality/screenshots?owner_id=GOAL1".to_string(),
         body: None,
     });
     assert_eq!(screenshots.status, 200);
-    assert_eq!(screenshots.body["owner_id"], "GAP1");
+    assert_eq!(screenshots.body["owner_id"], "GOAL1");
     assert_eq!(screenshots.body["screenshot_count"], 0);
     assert!(
         screenshots.body["screenshots"]
@@ -4428,11 +4423,11 @@ fn web_server_manages_refine_chat_sessions() {
     let started = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/chat/start".to_string(),
-        body: Some(json!({"gap_id": "GAP1", "provider": "smoke-ai"})),
+        body: Some(json!({"goal_id": "GOAL1", "provider": "smoke-ai"})),
     });
     assert_eq!(started.status, 201);
     let session_id = started.body["session_id"].as_str().unwrap().to_string();
-    assert_eq!(started.body["mode"], "gap");
+    assert_eq!(started.body["mode"], "goal");
     assert!(
         refine_dir
             .join(format!("chat/sessions/{session_id}.json"))
@@ -4613,7 +4608,7 @@ fn web_server_standalone_chat_start_and_stop_manage_worktree() {
 }
 
 #[test]
-fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_worktree() {
+fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-submit");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -4645,16 +4640,15 @@ fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_workt
         path: format!("/api/chat/{session_id}/submit-ready-merge"),
         body: Some(json!({
             "reporter": "QA",
-            "actual": "Standalone experiment is not merged.",
-            "target": "Standalone experiment is ready for the merge workflow.",
+            "prompt": "Standalone experiment is ready for the merge workflow.",
             "priority": "medium"
         })),
     });
     assert_eq!(submitted.status, 201, "{submitted:#?}");
-    let gap_id = submitted.body["gap"]["id"].as_str().unwrap().to_string();
-    assert_eq!(submitted.body["gap"]["status"], "ready-merge");
-    assert_eq!(submitted.body["gap"]["branch_name"], branch);
-    assert_eq!(submitted.body["gap"]["priority"], "medium");
+    let goal_id = submitted.body["goal"]["id"].as_str().unwrap().to_string();
+    assert_eq!(submitted.body["goal"]["status"], "ready-merge");
+    assert_eq!(submitted.body["goal"]["branch_name"], branch);
+    assert_eq!(submitted.body["goal"]["priority"], "medium");
     assert!(worktree_path.exists());
     assert_eq!(
         git_stdout(&worktree_path, &["rev-list", "--count", "main..HEAD"]),
@@ -4666,7 +4660,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_workt
     )
     .unwrap();
     assert_eq!(session["closed"], true);
-    assert_eq!(session["worktree"]["submitted_gap_id"], gap_id);
+    assert_eq!(session["worktree"]["submitted_goal_id"], goal_id);
 
     let stopped = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4952,10 +4946,10 @@ fn web_server_applies_runtime_settings_updates_immediately() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
 
-    for id in ["GAP1", "GAP2", "GAP3"] {
+    for id in ["GOAL1", "GOAL2", "GOAL3"] {
         let created = server.handle(ApiRequest {
             method: "POST".to_string(),
-            path: "/api/gaps".to_string(),
+            path: "/api/goals".to_string(),
             body: Some(json!({"id": id, "name": format!("Instant runtime settings {id}")})),
         });
         assert_eq!(created.status, 201);
@@ -5000,13 +4994,13 @@ fn web_server_applies_runtime_settings_updates_immediately() {
     assert_eq!(state["policy"]["per_node_limit"], 3);
     assert_eq!(state["claims"].as_array().unwrap().len(), 3);
 
-    let gap = server.handle(ApiRequest {
+    let goal = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
         body: None,
     });
-    assert_eq!(gap.status, 200);
-    assert_eq!(gap.body["gap"]["status"], "todo");
+    assert_eq!(goal.status, 200);
+    assert_eq!(goal.body["goal"]["status"], "todo");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -5030,7 +5024,7 @@ fn web_server_migrates_legacy_project_state_automatically() {
     });
     assert_eq!(migrated_attach.status, 200);
     assert_eq!(migrated_attach.body["schema"]["compatible"], true);
-    assert_eq!(migrated_attach.body["schema"]["schema_version"], 1);
+    assert_eq!(migrated_attach.body["schema"]["schema_version"], 2);
     assert!(refine_dir.join("refine.json").exists());
     assert!(refine_dir.join("backups/migrations").exists());
 
@@ -5154,11 +5148,11 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"name": "Detached attach gap", "id": "GAP1"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"name": "Detached attach goal", "id": "GOAL1"})),
     });
     assert_eq!(created.status, 201);
-    assert!(refine_dir.join("gaps/GA/P1/gap.json").exists());
+    assert!(refine_dir.join("goals/GO/AL1/goal.json").exists());
 
     let daemon = LocalHttpDaemon {
         server,
@@ -5173,7 +5167,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     assert_eq!(sse.status, 200);
     let sse_body = String::from_utf8(sse.body).unwrap();
     assert!(sse_body.contains("event: project_updated"));
-    assert!(sse_body.contains("\"gap_count\":1"));
+    assert!(sse_body.contains("\"goal_count\":1"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -5289,18 +5283,18 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Dashboard Gap"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL1", "name": "Dashboard Goal"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP2", "name": "Finished Dashboard Gap"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL2", "name": "Finished Dashboard Goal"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP3", "name": "Cancelled Dashboard Gap"})),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOAL3", "name": "Cancelled Dashboard Goal"})),
     });
     let create_node = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -5310,46 +5304,45 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(create_node.status, 200);
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP1/rounds".to_string(),
-        body: Some(json!({"reporter": "Alice", "actual": "Needs work", "target": "Works"})),
+        path: "/api/goals/GOAL1/rounds".to_string(),
+        body: Some(json!({"reporter": "Alice", "prompt": "Works"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP2/rounds".to_string(),
+        path: "/api/goals/GOAL2/rounds".to_string(),
         body: Some(json!({
             "reporter": "Alice",
             "assignee": "Carol",
-            "actual": "Needs work",
-            "target": "Works"
+            "prompt": "Works"
         })),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/GAP3/rounds".to_string(),
-        body: Some(json!({"reporter": "Bob", "actual": "Needs work", "target": "Works"})),
+        path: "/api/goals/GOAL3/rounds".to_string(),
+        body: Some(json!({"reporter": "Bob", "prompt": "Works"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk".to_string(),
+        path: "/api/goals/bulk".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP2"],
+            "selected_ids": ["GOAL2"],
             "update": {"status": "done"}
         })),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/gaps/bulk".to_string(),
+        path: "/api/goals/bulk".to_string(),
         body: Some(json!({
-            "selected_ids": ["GAP3"],
+            "selected_ids": ["GOAL3"],
             "update": {"status": "cancelled"}
         })),
     });
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/nodes/transfer-gaps".to_string(),
+        path: "/api/nodes/transfer-goals".to_string(),
         body: Some(json!({
             "target_node_id": "refine2",
-            "selected_ids": ["GAP3"],
+            "selected_ids": ["GOAL3"],
             "filter": {}
         })),
     });
@@ -5361,7 +5354,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
             severity: "info".to_string(),
             category: "state".to_string(),
             message: "Dashboard activity".to_string(),
-            gap_id: Some("GAP1".to_string()),
+            goal_id: Some("GOAL1".to_string()),
             actor: Some("system".to_string()),
             details: None,
             actions: Vec::new(),
@@ -5634,15 +5627,15 @@ fn web_server_target_app_status_is_passive_when_background_launches_are_stopped(
 }
 
 fn server_with_projection() -> InProcessWebServer {
-    let mut gaps = BTreeMap::new();
-    gaps.insert(
-        "GAP1".to_string(),
-        GapSummaryProjection {
-            gap: GapIndexProjection {
-                id: "GAP1".to_string(),
+    let mut goals = BTreeMap::new();
+    goals.insert(
+        "GOAL1".to_string(),
+        GoalSummaryProjection {
+            goal: GoalIndexProjection {
+                id: "GOAL1".to_string(),
                 name: "Projection route".to_string(),
-                status: GapStatus::Todo,
-                priority: GapPriority::Medium,
+                status: GoalStatus::Todo,
+                priority: GoalPriority::Medium,
                 reporter: Some("Buddy".to_string()),
                 assignee: Some("Buddy".to_string()),
                 round_count: 1,
@@ -5652,7 +5645,7 @@ fn server_with_projection() -> InProcessWebServer {
                 node_id: Some("default".to_string()),
                 feature_id: None,
                 feature_order: None,
-                json_path: "gaps/01/GAP1/gap.json".to_string(),
+                json_path: "goals/01/GOAL1/goal.json".to_string(),
             },
             node_display_name: None,
             searchable_text: "Projection route".to_string(),
@@ -5676,7 +5669,7 @@ fn server_with_projection() -> InProcessWebServer {
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "now".to_string(),
             source_fingerprints: BTreeMap::new(),
-            gaps,
+            goals,
             features: BTreeMap::new(),
             activity: BTreeMap::new(),
             changes: BTreeMap::new(),

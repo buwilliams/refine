@@ -1,46 +1,42 @@
-// ---- Gaps: new --------------------------------------------------------------
+// ---- Goals: new --------------------------------------------------------------
 
-async function renderGapNew() {
-  // The "New Gap" screen is a modal layered over the gaps list — render the
-  // list underneath so the URL #/gaps/new still has meaningful context, then
+async function renderGoalNew() {
+  // The "New Goal" screen is a modal layered over the goals list — render the
+  // list underneath so the URL #/goals/new still has meaningful context, then
   // open the modal on top.
-  await renderGapsList();
-  openNewGapModal();
+  await renderGoalsList();
+  openNewGoalModal();
 }
 
-let _newGapModalOpen = false;
+let _newGoalModalOpen = false;
 
-function openNewGapModal(options = {}) {
-  if (_newGapModalOpen) return;
+function openNewGoalModal(options = {}) {
+  if (_newGoalModalOpen) return;
   const reporter = state.lastReporter || "";
   if (!reporter) {
     toast("Pick a reporter in the top-right selector first", "error");
     return;
   }
-  _newGapModalOpen = true;
+  _newGoalModalOpen = true;
 
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-gap-title" data-testid="new-gap-modal" style="max-width:560px">
-      <div class="modal-title" id="new-gap-title">${options.featureId ? "New Feature Gap" : "New Gap"}</div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-goal-title" data-testid="new-goal-modal" style="max-width:560px">
+      <div class="modal-title" id="new-goal-title">${options.featureId ? "New Feature Goal" : "New Goal"}</div>
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
           Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
           — change in the top-right reporter selector.
         </div>
-        <form id="new-gap-form">
+        <form id="new-goal-form">
           <div class="form-row">
-            <label>Actual (current behavior)</label>
-            <textarea name="actual" data-testid="new-gap-actual" placeholder="What's happening today?"></textarea>
-          </div>
-          <div class="form-row">
-            <label>Target (desired behavior)</label>
-            <textarea name="target" data-testid="new-gap-target" placeholder="What should be happening?"></textarea>
+            <label>Prompt</label>
+            <textarea name="prompt" data-testid="new-goal-prompt" placeholder="Describe what the agent should accomplish."></textarea>
           </div>
           <div class="form-row">
             <label>Priority</label>
-            <select name="priority" data-testid="new-gap-priority">
+            <select name="priority" data-testid="new-goal-priority">
               <option value="low" selected>Low (default)</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -48,14 +44,14 @@ function openNewGapModal(options = {}) {
           </div>
           <p class="muted small">
             A name will be auto-generated from the text above — you can rename
-            the Gap on its detail page afterwards. High-priority Gaps run before
+            the Goal on its detail page afterwards. High-priority Goals run before
             medium, and medium before low.
           </p>
         </form>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="new-gap-cancel">Cancel</button>
-        <button data-ok data-testid="new-gap-submit">Create Gap</button>
+        <button class="secondary" data-cancel data-testid="new-goal-cancel">Cancel</button>
+        <button data-ok data-testid="new-goal-submit">Create Goal</button>
       </div>
     </div>
   `;
@@ -67,14 +63,14 @@ function openNewGapModal(options = {}) {
   function close(navigateAway) {
     if (closed) return;
     closed = true;
-    _newGapModalOpen = false;
+    _newGoalModalOpen = false;
     document.removeEventListener("keydown", onKey, true);
     root.remove();
-    // If the modal was opened via the #/gaps/new route, send the user back
-    // to the gaps list when they dismiss it (so the URL no longer points at
+    // If the modal was opened via the #/goals/new route, send the user back
+    // to the goals list when they dismiss it (so the URL no longer points at
     // a "screen" that no longer exists).
-    if (navigateAway && location.hash.startsWith("#/gaps/new")) {
-      location.hash = "#/gaps";
+    if (navigateAway && location.hash.startsWith("#/goals/new")) {
+      location.hash = "#/goals";
     }
   }
   function onKey(e) {
@@ -95,15 +91,15 @@ function openNewGapModal(options = {}) {
   root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
   root.querySelector("[data-ok]").addEventListener("click", submit);
 
-  const form = root.querySelector("#new-gap-form");
+  const form = root.querySelector("#new-goal-form");
   form.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
-  $$("#new-gap-form textarea[name='actual'], #new-gap-form textarea[name='target']", root).forEach((field) => {
+  $$("#new-goal-form textarea[name='prompt']", root).forEach((field) => {
     field.addEventListener("input", () => {
       duplicateDecision = "";
       duplicateDecisionKey = "";
-      root.querySelector("#new-gap-duplicate")?.remove();
+      root.querySelector("#new-goal-duplicate")?.remove();
       const ok = root.querySelector("[data-ok]");
-      if (ok) ok.textContent = "Create Gap";
+      if (ok) ok.textContent = "Create Goal";
     });
   });
 
@@ -111,17 +107,16 @@ function openNewGapModal(options = {}) {
     const currentReporter = state.lastReporter || "";
     if (!currentReporter) return toast("Pick a reporter in the top-right selector", "error");
     const fd = new FormData(form);
-    const actual = (fd.get("actual") || "").toString().trim();
-    const target = (fd.get("target") || "").toString().trim();
+    const prompt = (fd.get("prompt") || "").toString().trim();
     const priority = (fd.get("priority") || "low").toString();
-    if (!actual && !target) return toast("Provide actual or target", "error");
-    const duplicateKey = `${actual}\n${target}`;
+    if (!prompt) return toast("Provide a prompt", "error");
+    const duplicateKey = prompt;
     const effectiveDuplicateDecision = (
       duplicateDecision && duplicateDecisionKey === duplicateKey
     ) ? duplicateDecision : "";
     try {
-      const r = await api("POST", "/api/gaps", {
-        reporter: currentReporter, actual, target, priority,
+      const r = await api("POST", "/api/goals", {
+        reporter: currentReporter, prompt, priority,
         ...(options.featureId ? { feature_id: options.featureId } : {}),
         duplicate_decision: effectiveDuplicateDecision,
       });
@@ -129,11 +124,11 @@ function openNewGapModal(options = {}) {
         const move = r.move || {};
         if (r.duplicate_action === "move_original_to_backlog") {
           if (move.moved) {
-            toast("Original Gap moved to backlog; duplicate not created", "info");
+            toast("Original Goal moved to backlog; duplicate not created", "info");
           } else if (move.reason === "protected_status") {
-            toast(`Original Gap is ${move.from}; duplicate not created`, "info");
+            toast(`Original Goal is ${move.from}; duplicate not created`, "info");
           } else if (move.reason === "already_backlog") {
-            toast("Original Gap is already in backlog; duplicate not created", "info");
+            toast("Original Goal is already in backlog; duplicate not created", "info");
           } else {
             toast("Duplicate not created", "info");
           }
@@ -143,22 +138,22 @@ function openNewGapModal(options = {}) {
         close(true);
         return;
       }
-      toast("Gap created", "info");
+      toast("Goal created", "info");
       if (typeof options.onSaved === "function") {
         await options.onSaved(r);
       }
       // Stay on whatever screen the modal was layered over — Dashboard,
-      // Gaps list, etc. `close(true)` only re-routes if we came in via
-      // the `#/gaps/new` deep link; otherwise the underlying hash is
+      // Goals list, etc. `close(true)` only re-routes if we came in via
+      // the `#/goals/new` deep link; otherwise the underlying hash is
       // preserved so the user doesn't lose their place.
       close(true);
     } catch (err) {
-      if (err.code === "duplicate_gap" && err.error?.duplicate?.match) {
+      if (err.code === "duplicate_goal" && err.error?.duplicate?.match) {
         duplicateDecision = "";
         duplicateDecisionKey = duplicateKey;
         const ok = root.querySelector("[data-ok]");
         if (ok) ok.textContent = "Move original to backlog";
-        drawNewGapDuplicatePrompt(root, err.error.duplicate.match, {
+        drawNewGoalDuplicatePrompt(root, err.error.duplicate.match, {
           onIgnore: () => {
             duplicateDecision = "duplicate";
             duplicateDecisionKey = duplicateKey;
@@ -183,23 +178,23 @@ function openNewGapModal(options = {}) {
     }
   }
 
-  const firstField = root.querySelector("textarea[name='actual']");
+  const firstField = root.querySelector("textarea[name='prompt']");
   if (firstField) firstField.focus();
 }
 
-function drawNewGapDuplicatePrompt(root, match, {
+function drawNewGoalDuplicatePrompt(root, match, {
   onIgnore,
   onImport,
   onMoveOriginal,
 }) {
-  let prompt = root.querySelector("#new-gap-duplicate");
+  let prompt = root.querySelector("#new-goal-duplicate");
   if (!prompt) {
     prompt = document.createElement("div");
-    prompt.id = "new-gap-duplicate";
-    const form = root.querySelector("#new-gap-form");
+    prompt.id = "new-goal-duplicate";
+    const form = root.querySelector("#new-goal-form");
     form?.prepend(prompt);
   }
-  prompt.innerHTML = renderGapDuplicatePrompt(match);
+  prompt.innerHTML = renderGoalDuplicatePrompt(match);
   prompt.querySelector('[data-duplicate-decision="duplicate"]')
     ?.addEventListener("click", onIgnore);
   prompt.querySelector('[data-duplicate-decision="original"]')
@@ -216,9 +211,9 @@ function drawNewGapDuplicatePrompt(root, match, {
     ?.addEventListener("click", onMoveOriginal);
 }
 
-function renderGapDuplicatePrompt(match) {
+function renderGoalDuplicatePrompt(match) {
   return `
-    <div class="import-duplicate" data-testid="new-gap-duplicate">
+    <div class="import-duplicate" data-testid="new-goal-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
       <p class="muted small" style="margin:4px 0">
         ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.node_display_name || match.node_id || "Default")}
@@ -226,18 +221,14 @@ function renderGapDuplicatePrompt(match) {
       </p>
       <div class="import-duplicate-content">
         <div>
-          <div class="small muted">Matched actual</div>
-          <p>${htmlEscape(match.actual || "")}</p>
-        </div>
-        <div>
-          <div class="small muted">Matched target</div>
-          <p>${htmlEscape(match.target || "")}</p>
+          <div class="small muted">Matched prompt</div>
+          <p>${htmlEscape(match.prompt || "")}</p>
         </div>
       </div>
       <div class="actions import-duplicate-actions">
-        <button type="button" data-duplicate-decision="move_original_to_backlog" data-testid="new-gap-duplicate-move" class="selected">Yes, move original to backlog</button>
-        <button type="button" class="secondary" data-duplicate-decision="duplicate" data-testid="new-gap-duplicate-ignore">Yes, ignore</button>
-        <button type="button" class="secondary" data-duplicate-decision="original" data-testid="new-gap-duplicate-import">No, import</button>
+        <button type="button" data-duplicate-decision="move_original_to_backlog" data-testid="new-goal-duplicate-move" class="selected">Yes, move original to backlog</button>
+        <button type="button" class="secondary" data-duplicate-decision="duplicate" data-testid="new-goal-duplicate-ignore">Yes, ignore</button>
+        <button type="button" class="secondary" data-duplicate-decision="original" data-testid="new-goal-duplicate-import">No, import</button>
       </div>
     </div>`;
 }

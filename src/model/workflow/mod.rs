@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum GapStatus {
+pub enum GoalStatus {
     Backlog,
     Todo,
     InProgress,
@@ -15,7 +15,7 @@ pub enum GapStatus {
     Cancelled,
 }
 
-impl GapStatus {
+impl GoalStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Backlog => "backlog",
@@ -50,14 +50,14 @@ impl GapStatus {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum TerminalGapStatus {
+pub enum TerminalGoalStatus {
     Done,
     Cancelled,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum AutomatedGapStatus {
+pub enum AutomatedGoalStatus {
     InProgress,
     Qa,
     ReadyMerge,
@@ -109,8 +109,8 @@ pub enum FeatureCancelStatus {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GapOperation {
-    CreateGap,
+pub enum GoalOperation {
+    CreateGoal,
     EditMetadata,
     EditNotes,
     SubmitNewRound,
@@ -135,9 +135,9 @@ pub enum GapOperation {
 pub enum FeatureOperation {
     CreateFeature,
     EditMetadata,
-    AddGap,
-    RemoveGap,
-    ReorderGap,
+    AddGoal,
+    RemoveGoal,
+    ReorderGoal,
     MoveWorkflow,
     CancelFeature,
     DeleteFeature,
@@ -177,8 +177,8 @@ impl TransitionDecision {
     }
 }
 
-pub fn user_status_transition(from: &GapStatus, to: &GapStatus) -> TransitionDecision {
-    use GapStatus::*;
+pub fn user_status_transition(from: &GoalStatus, to: &GoalStatus) -> TransitionDecision {
+    use GoalStatus::*;
 
     if from == to {
         return TransitionDecision::no_op();
@@ -203,51 +203,54 @@ pub fn user_status_transition(from: &GapStatus, to: &GapStatus) -> TransitionDec
     }
 }
 
-pub fn is_bulk_target_allowed(status: &GapStatus) -> bool {
+pub fn is_bulk_target_allowed(status: &GoalStatus) -> bool {
     !matches!(
         status,
-        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge
+        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge
     )
 }
 
-pub fn is_automated_status(status: &GapStatus) -> bool {
+pub fn is_automated_status(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::Build
+        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge | GoalStatus::Build
     )
 }
 
-pub fn is_terminal_status(status: &GapStatus) -> bool {
-    matches!(status, GapStatus::Done | GapStatus::Cancelled)
+pub fn is_terminal_status(status: &GoalStatus) -> bool {
+    matches!(status, GoalStatus::Done | GoalStatus::Cancelled)
 }
 
-pub fn is_feature_protected_status(status: &GapStatus) -> bool {
+pub fn is_feature_protected_status(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GapStatus::Review | GapStatus::Done | GapStatus::ReadyMerge | GapStatus::Build
+        GoalStatus::Review | GoalStatus::Done | GoalStatus::ReadyMerge | GoalStatus::Build
     )
 }
 
-pub fn is_feature_cancel_status(status: &GapStatus) -> bool {
+pub fn is_feature_cancel_status(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GapStatus::Backlog
-            | GapStatus::Todo
-            | GapStatus::InProgress
-            | GapStatus::Qa
-            | GapStatus::ReadyMerge
-            | GapStatus::Build
-            | GapStatus::Review
-            | GapStatus::Failed
+        GoalStatus::Backlog
+            | GoalStatus::Todo
+            | GoalStatus::InProgress
+            | GoalStatus::Qa
+            | GoalStatus::ReadyMerge
+            | GoalStatus::Build
+            | GoalStatus::Review
+            | GoalStatus::Failed
     )
 }
 
-pub fn gap_operation_allowed(status: &GapStatus, operation: &GapOperation) -> TransitionDecision {
-    use GapOperation::*;
-    use GapStatus::*;
+pub fn goal_operation_allowed(
+    status: &GoalStatus,
+    operation: &GoalOperation,
+) -> TransitionDecision {
+    use GoalOperation::*;
+    use GoalStatus::*;
 
     let allowed = match operation {
-        CreateGap => true,
+        CreateGoal => true,
         EditMetadata | EditNotes | Delete => !matches!(status, InProgress | Qa | ReadyMerge),
         SubmitNewRound => matches!(status, Todo | Failed | Review | Backlog),
         EditLatestRound => matches!(status, Backlog | Todo | Review),
@@ -275,18 +278,20 @@ pub fn gap_operation_allowed(status: &GapStatus, operation: &GapOperation) -> Tr
 }
 
 pub fn feature_operation_allowed(
-    gap_statuses: &[GapStatus],
+    goal_statuses: &[GoalStatus],
     operation: &FeatureOperation,
 ) -> TransitionDecision {
     use FeatureOperation::*;
 
-    let has_active_automation = gap_statuses.iter().any(is_automated_status);
-    let has_protected = gap_statuses.iter().any(is_feature_protected_status);
+    let has_active_automation = goal_statuses.iter().any(is_automated_status);
+    let has_protected = goal_statuses.iter().any(is_feature_protected_status);
 
     let allowed = match operation {
         CreateFeature | EditMetadata | Import | DeleteFeature => true,
-        AddGap | RemoveGap | ReorderGap | MoveWorkflow => !has_protected && !has_active_automation,
-        CancelFeature => gap_statuses.iter().any(is_feature_cancel_status),
+        AddGoal | RemoveGoal | ReorderGoal | MoveWorkflow => {
+            !has_protected && !has_active_automation
+        }
+        CancelFeature => goal_statuses.iter().any(is_feature_cancel_status),
     };
 
     if allowed {
@@ -302,32 +307,32 @@ mod tests {
 
     #[test]
     fn manual_user_transitions_match_spec() {
-        assert!(user_status_transition(&GapStatus::Backlog, &GapStatus::Todo).allowed);
-        assert!(user_status_transition(&GapStatus::Todo, &GapStatus::Backlog).allowed);
-        assert!(user_status_transition(&GapStatus::Review, &GapStatus::Todo).allowed);
-        assert!(user_status_transition(&GapStatus::Done, &GapStatus::Review).allowed);
-        assert!(user_status_transition(&GapStatus::Failed, &GapStatus::Todo).allowed);
-        assert!(user_status_transition(&GapStatus::Cancelled, &GapStatus::Todo).allowed);
-        assert!(user_status_transition(&GapStatus::Qa, &GapStatus::Qa).no_op);
-        assert!(!user_status_transition(&GapStatus::Todo, &GapStatus::ReadyMerge).allowed);
-        assert!(!user_status_transition(&GapStatus::Backlog, &GapStatus::InProgress).allowed);
+        assert!(user_status_transition(&GoalStatus::Backlog, &GoalStatus::Todo).allowed);
+        assert!(user_status_transition(&GoalStatus::Todo, &GoalStatus::Backlog).allowed);
+        assert!(user_status_transition(&GoalStatus::Review, &GoalStatus::Todo).allowed);
+        assert!(user_status_transition(&GoalStatus::Done, &GoalStatus::Review).allowed);
+        assert!(user_status_transition(&GoalStatus::Failed, &GoalStatus::Todo).allowed);
+        assert!(user_status_transition(&GoalStatus::Cancelled, &GoalStatus::Todo).allowed);
+        assert!(user_status_transition(&GoalStatus::Qa, &GoalStatus::Qa).no_op);
+        assert!(!user_status_transition(&GoalStatus::Todo, &GoalStatus::ReadyMerge).allowed);
+        assert!(!user_status_transition(&GoalStatus::Backlog, &GoalStatus::InProgress).allowed);
     }
 
     #[test]
     fn bulk_targets_exclude_system_owned_states() {
-        assert!(!is_bulk_target_allowed(&GapStatus::InProgress));
-        assert!(!is_bulk_target_allowed(&GapStatus::Qa));
-        assert!(!is_bulk_target_allowed(&GapStatus::ReadyMerge));
-        assert!(is_bulk_target_allowed(&GapStatus::Build));
-        assert!(is_bulk_target_allowed(&GapStatus::Done));
+        assert!(!is_bulk_target_allowed(&GoalStatus::InProgress));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Qa));
+        assert!(!is_bulk_target_allowed(&GoalStatus::ReadyMerge));
+        assert!(is_bulk_target_allowed(&GoalStatus::Build));
+        assert!(is_bulk_target_allowed(&GoalStatus::Done));
     }
 
     #[test]
-    fn feature_rules_protect_specified_gap_statuses() {
-        assert!(is_feature_protected_status(&GapStatus::Review));
-        assert!(is_feature_protected_status(&GapStatus::Done));
-        assert!(is_feature_protected_status(&GapStatus::ReadyMerge));
-        assert!(is_feature_protected_status(&GapStatus::Build));
-        assert!(!is_feature_protected_status(&GapStatus::Failed));
+    fn feature_rules_protect_specified_goal_statuses() {
+        assert!(is_feature_protected_status(&GoalStatus::Review));
+        assert!(is_feature_protected_status(&GoalStatus::Done));
+        assert!(is_feature_protected_status(&GoalStatus::ReadyMerge));
+        assert!(is_feature_protected_status(&GoalStatus::Build));
+        assert!(!is_feature_protected_status(&GoalStatus::Failed));
     }
 }

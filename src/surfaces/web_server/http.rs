@@ -788,7 +788,7 @@ impl LocalHttpDaemon {
             SseEventFrame {
                 event: "project_updated",
                 data: json!({
-                    "gap_count": projection.gaps.len(),
+                    "goal_count": projection.goals.len(),
                     "feature_count": projection.features.len(),
                     "status_counts": projection.status_counts(),
                     "dashboard": projection.dashboard
@@ -1086,7 +1086,7 @@ fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> b
         "/project/status"
             | "/apps/status"
             | "/dashboard"
-            | "/work/gaps"
+            | "/work/goals"
             | "/work/features"
             | "/activity"
             | "/changes"
@@ -1102,7 +1102,7 @@ fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> b
             | "/quality"
             | "/upgrade"
             | "/target-app/status"
-    ) || normalized.starts_with("/work/gaps/")
+    ) || normalized.starts_with("/work/goals/")
         || normalized.starts_with("/work/features/")
 }
 
@@ -1346,7 +1346,7 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
             DocsNavEntry {
                 title: "Workflow Overview",
                 path: "docs/intent/03-capabilities/03-workflow/00-overview.md",
-                summary: "The lifecycle that carries Gaps from idea to done.",
+                summary: "The lifecycle that carries Goals from idea to done.",
             },
             DocsNavEntry {
                 title: "Backlog",
@@ -1476,11 +1476,11 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
             DocsNavEntry {
                 title: "Feature",
                 path: "docs/intent/04-surfaces/03-browser-desktop/07-feature.md",
-                summary: "Larger product goals composed from Gaps.",
+                summary: "Larger product goals composed from Goals.",
             },
             DocsNavEntry {
-                title: "Gap",
-                path: "docs/intent/04-surfaces/03-browser-desktop/08-gap.md",
+                title: "Goal",
+                path: "docs/intent/04-surfaces/03-browser-desktop/08-goal.md",
                 summary: "The core unit of product difference and repair.",
             },
             DocsNavEntry {
@@ -1698,7 +1698,7 @@ fn render_docs_landing_page() -> WireResponse {
         <p class="eyebrow">Product Guide</p>
         <h1 id="docs-home-title">How Refine works.</h1>
         <p>
-          Refine is a local operating layer for agentic software delivery. It turns product gaps
+          Refine is a local operating layer for agentic software delivery. It turns product goals
           into durable work, gives agents enough context to act, keeps processes observable, and
           uses Git, review, governance, and quality checks to make automation inspectable.
         </p>

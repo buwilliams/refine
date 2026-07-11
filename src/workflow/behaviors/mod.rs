@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 use std::path::Path;
 
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::FileGovernanceService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
@@ -14,7 +14,7 @@ use crate::tools::product::merging::FileMergerService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
-    GovernanceEvaluation, agent_worktree_cwd, gap_agent_prompt, implementation_branch_name,
+    GovernanceEvaluation, agent_worktree_cwd, goal_agent_prompt, implementation_branch_name,
     json_object, now_timestamp, parse_governance_provider_output,
     post_implementation_governance_prompt, setting_string,
 };
@@ -50,30 +50,30 @@ pub struct WorkflowFailed;
 pub struct WorkflowCancelled;
 
 impl WorkflowBehavior for WorkflowBacklog {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Backlog
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Backlog
     }
 
     fn advance(&self, _ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         Ok(WorkflowAdvanceOutcome::Blocked {
-            reason: "backlog Gaps wait until todo eligibility rules promote them".to_string(),
+            reason: "backlog Goals wait until todo eligibility rules promote them".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowTodo {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Todo
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Todo
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = implementation_branch_name(
-            setting_string(&ctx.settings, "branch_name_pattern", "refine/{gap_id}").as_str(),
-            &ctx.gap_id,
+            setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}").as_str(),
+            &ctx.goal_id,
             ctx.round_idx,
         );
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
-        ctx.request_transition(GapStatus::Todo, GapStatus::InProgress)?;
+        ctx.request_transition(GoalStatus::Todo, GoalStatus::InProgress)?;
         let worktree_target = ctx
             .target_root
             .parent()
@@ -100,29 +100,29 @@ impl WorkflowBehavior for WorkflowTodo {
         )?;
         if let Err(error) = ctx
             .work_items
-            .update_gap_branch_name(&ctx.gap_id, Some(&branch))
+            .update_goal_branch_name(&ctx.goal_id, Some(&branch))
         {
             return fail(ctx, "branch", error);
         }
         ctx.branch = Some(branch);
         ctx.worktree_path = Some(worktree_path);
         Ok(WorkflowAdvanceOutcome::Transition {
-            from: GapStatus::Todo,
-            to: GapStatus::InProgress,
-            reason: "Gap entered implementation".to_string(),
+            from: GoalStatus::Todo,
+            to: GoalStatus::InProgress,
+            reason: "Goal entered implementation".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowImplementation {
-    fn observes(&self) -> GapStatus {
-        GapStatus::InProgress
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::InProgress
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
         let worktree_path = ctx.require_worktree_path()?.to_string();
-        let prompt = gap_agent_prompt(&ctx.gap_id);
+        let prompt = goal_agent_prompt(&ctx.goal_id);
         let agent_cwd = match agent_worktree_cwd(
             &worktree_path,
             setting_string(&ctx.settings, "agent_subpath", "").as_str(),
@@ -144,7 +144,7 @@ impl WorkflowBehavior for WorkflowImplementation {
         };
         ctx.log(
             "agent",
-            "Gap agent completed",
+            "Goal agent completed",
             Some(json_object(json!({
                 "provider": ctx.provider,
                 "output": provider_output,
@@ -157,7 +157,7 @@ impl WorkflowBehavior for WorkflowImplementation {
             FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
         let commit = match worktree_git.commit_or_clean_noop_since(
-            &format!("Implement {} round {}", ctx.gap_id, ctx.round_idx + 1),
+            &format!("Implement {} round {}", ctx.goal_id, ctx.round_idx + 1),
             &[],
             &target_branch,
         ) {
@@ -206,18 +206,18 @@ impl WorkflowBehavior for WorkflowImplementation {
         ctx.provider_output = Some(provider_output);
         ctx.implementation_changed = commit.has_changes_since_base;
         ctx.commit = Some(commit.commit);
-        ctx.request_transition(GapStatus::InProgress, GapStatus::ReadyMerge)?;
+        ctx.request_transition(GoalStatus::InProgress, GoalStatus::ReadyMerge)?;
         Ok(WorkflowAdvanceOutcome::Transition {
-            from: GapStatus::InProgress,
-            to: GapStatus::ReadyMerge,
+            from: GoalStatus::InProgress,
+            to: GoalStatus::ReadyMerge,
             reason: "Implementation completed".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowQa {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Qa
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Qa
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
@@ -239,18 +239,18 @@ impl WorkflowBehavior for WorkflowQa {
             };
             return fail(ctx, "quality", RefineError::Conflict(detail));
         }
-        ctx.request_transition(GapStatus::Qa, GapStatus::Review)?;
+        ctx.request_transition(GoalStatus::Qa, GoalStatus::Review)?;
         Ok(WorkflowAdvanceOutcome::Transition {
-            from: GapStatus::Qa,
-            to: GapStatus::Review,
+            from: GoalStatus::Qa,
+            to: GoalStatus::Review,
             reason: "Quality checks passed".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowReadyMerge {
-    fn observes(&self) -> GapStatus {
-        GapStatus::ReadyMerge
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::ReadyMerge
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
@@ -285,18 +285,18 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             }))),
         )?;
         ctx.merge = Some(merge);
-        ctx.request_transition(GapStatus::ReadyMerge, GapStatus::Build)?;
+        ctx.request_transition(GoalStatus::ReadyMerge, GoalStatus::Build)?;
         Ok(WorkflowAdvanceOutcome::Transition {
-            from: GapStatus::ReadyMerge,
-            to: GapStatus::Build,
+            from: GoalStatus::ReadyMerge,
+            to: GoalStatus::Build,
             reason: "Implementation branch merged".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowBuild {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Build
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Build
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
@@ -322,46 +322,46 @@ impl WorkflowBehavior for WorkflowBuild {
             "Target app build passed",
             Some(json_object(json!({"target_app": &build}))),
         )?;
-        ctx.request_transition(GapStatus::Build, GapStatus::Qa)?;
+        ctx.request_transition(GoalStatus::Build, GoalStatus::Qa)?;
         Ok(WorkflowAdvanceOutcome::Transition {
-            from: GapStatus::Build,
-            to: GapStatus::Qa,
+            from: GoalStatus::Build,
+            to: GoalStatus::Qa,
             reason: "Target app build passed".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowReview {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Review
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Review
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        ctx.final_status = Some(GapStatus::Review);
+        ctx.final_status = Some(GoalStatus::Review);
         Ok(WorkflowAdvanceOutcome::Completed {
-            final_status: GapStatus::Review,
+            final_status: GoalStatus::Review,
             reason: "Workflow reached review".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowDone {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Done
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Done
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        ctx.final_status = Some(GapStatus::Done);
+        ctx.final_status = Some(GoalStatus::Done);
         Ok(WorkflowAdvanceOutcome::Completed {
-            final_status: GapStatus::Done,
+            final_status: GoalStatus::Done,
             reason: "Workflow already done".to_string(),
         })
     }
 }
 
 impl WorkflowBehavior for WorkflowFailed {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Failed
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Failed
     }
 
     fn advance(&self, _ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
@@ -372,8 +372,8 @@ impl WorkflowBehavior for WorkflowFailed {
 }
 
 impl WorkflowBehavior for WorkflowCancelled {
-    fn observes(&self) -> GapStatus {
-        GapStatus::Cancelled
+    fn observes(&self) -> GoalStatus {
+        GoalStatus::Cancelled
     }
 
     fn advance(&self, _ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
@@ -386,7 +386,7 @@ impl WorkflowBehavior for WorkflowCancelled {
 fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
     if setting_string(&ctx.settings, "quality_enabled", "0") != "1" {
         return Ok(QualityCheckResult {
-            owner_id: ctx.gap_id.clone(),
+            owner_id: ctx.goal_id.clone(),
             ok: true,
             diagnostics: vec!["Quality checks disabled.".to_string()],
         });
@@ -403,7 +403,7 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
         }
     }
     Ok(QualityCheckResult {
-        owner_id: ctx.gap_id.clone(),
+        owner_id: ctx.goal_id.clone(),
         ok: snapshot.ok,
         diagnostics,
     })
@@ -476,8 +476,8 @@ fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> Ref
     } else {
         "Quality checks failed"
     };
-    ctx.work_items.update_latest_gap_round_evaluation_summary(
-        &ctx.gap_id,
+    ctx.work_items.update_latest_goal_round_evaluation_summary(
+        &ctx.goal_id,
         &json!({
             "quality_state": if result.ok { "passed" } else { "failed" },
             "quality_message": message,
@@ -496,8 +496,8 @@ fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> Ref
 }
 
 fn record_quality_error(ctx: &WorkflowContext<'_>, error: &RefineError) -> RefineResult<()> {
-    ctx.work_items.update_latest_gap_round_evaluation_summary(
-        &ctx.gap_id,
+    ctx.work_items.update_latest_goal_round_evaluation_summary(
+        &ctx.goal_id,
         &json!({
             "quality_state": "failed",
             "quality_message": "Quality checks failed.",
@@ -537,7 +537,7 @@ fn evaluate_workflow_governance(
         &rules,
         worktree_path,
         provider_cwd,
-        &ctx.gap_id,
+        &ctx.goal_id,
         ctx.round_idx,
     );
     let provider = HostAgentProviderService::with_runtime_root(ctx.runtime_root.join("agents"));
@@ -586,8 +586,8 @@ fn record_governance(
             "No governance rules configured.".to_string()
         }
     });
-    ctx.work_items.update_latest_gap_round_evaluation_summary(
-        &ctx.gap_id,
+    ctx.work_items.update_latest_goal_round_evaluation_summary(
+        &ctx.goal_id,
         &json!({
             "rule_state": if evaluation.failed { "failed" } else { "passed" },
             "meta_rule_state": "passed",

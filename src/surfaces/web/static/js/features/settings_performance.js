@@ -120,7 +120,7 @@ function renderPerformanceEvents(perf = {}) {
       <table class="table performance-events-table mobile-card-table" data-testid="performance-events-table">
         <thead><tr>
           <th>When</th><th>Operation</th><th>Elapsed</th><th>Outcome</th>
-          <th>Gap</th><th>Provider</th><th>Mode</th><th>Resource</th><th>Rows</th>
+          <th>Goal</th><th>Provider</th><th>Mode</th><th>Resource</th><th>Rows</th>
         </tr></thead>
         <tbody>
           ${events.map((event) => `
@@ -129,7 +129,7 @@ function renderPerformanceEvents(perf = {}) {
               <td data-label="Operation" data-testid="performance-event-operation"><code>${htmlEscape(event.operation || "")}</code></td>
               <td data-label="Elapsed">${fmtPerfMs(event.elapsed_ms)}</td>
               <td data-label="Outcome" data-testid="performance-event-outcome"><span class="status-pill ${event.success ? "done" : "failed"}">${event.success ? "success" : "failed"}</span></td>
-              <td data-label="Gap">${event.gap_id ? `<a href="#/gaps/${htmlEscape(event.gap_id)}">${htmlEscape(event.gap_id.slice(0, 10))}...</a>` : ""}</td>
+              <td data-label="Goal">${event.goal_id ? `<a href="#/goals/${htmlEscape(event.goal_id)}">${htmlEscape(event.goal_id.slice(0, 10))}...</a>` : ""}</td>
               <td data-label="Provider">${htmlEscape(event.provider || "")}</td>
               <td data-label="Mode">${htmlEscape(event.query_mode || "")}</td>
               <td class="muted small" data-label="Resource">${htmlEscape(performanceResourceLabel(event))}</td>

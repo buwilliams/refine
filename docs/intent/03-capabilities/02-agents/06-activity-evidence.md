@@ -4,7 +4,7 @@
 
 - **Durable Trail**: important actions should leave inspectable activity, logs, or evidence.
 - **Operational Memory**: Refine should remember what happened well enough to support recovery and review.
-- **Evidence Links Work To Reality**: logs, processes, diffs, checks, chat output, and user actions should connect back to Gaps and Features.
+- **Evidence Links Work To Reality**: logs, processes, diffs, checks, chat output, and user actions should connect back to Goals and Features.
 - **Surface Shared**: browser System, Logs, CLI output, API responses, and agents should draw from shared activity semantics.
 - **No Silent Failure**: failures, retries, blocked work, and risky actions should be visible.
 
@@ -12,7 +12,7 @@
 
 Activity and evidence exist because agentic software work must be explainable after the fact. Without a durable trail, Refine would become a collection of chat messages and shell side effects that are hard to trust or recover.
 
-Evidence turns work from assertion into something inspectable. A Gap should not merely say it is done; Refine should preserve what changed, what ran, what failed, who or what acted, and what can be reviewed.
+Evidence turns work from assertion into something inspectable. A Goal should not merely say it is done; Refine should preserve what changed, what ran, what failed, who or what acted, and what can be reviewed.
 
 ## Expected Role
 

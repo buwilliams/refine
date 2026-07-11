@@ -15,7 +15,7 @@ It answers: what is running, what owns it, what is it attached to, and what can 
 
 ## Expected Role
 
-Processes should appear under the system/node management area and should connect process state back to product concepts like Gaps, sessions, workflow, and target-app activity.
+Processes should appear under the system/node management area and should connect process state back to product concepts like Goals, sessions, workflow, and target-app activity.
 
 Current implementation details that matter to intent:
 

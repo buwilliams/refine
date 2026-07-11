@@ -46,7 +46,7 @@ Python or `uv` for Refine itself.
 
 Refine has three surfaces over one local system. They should have complete
 feature parity. A surface may choose a different interaction style, but missing
-capabilities should be treated as implementation gaps unless explicitly
+capabilities should be treated as implementation goals unless explicitly
 documented as product decisions. This is the main reason `workflow` and
 `tools` exist: workflow semantics, state mutation, process lifecycle, provider
 execution, and storage orchestration are implemented once and exposed through
@@ -115,15 +115,15 @@ Representative model-oriented CLI groups:
 - `refine project`: attachment, registry, schema, migration, sync, and active
   app state. Actions include `status`, `attach`, `switch`, `detach`,
   `register`, `remove`, `migrate`, `sync`, and `doctor`.
-- `refine gap`: executable Gap records and Gap-owned rounds, notes, quality,
+- `refine goal`: executable Goal records and Goal-owned rounds, notes, quality,
   governance, implementation, review, merge, and deletion. Actions include
   `create`, `list`, `show`, `edit`, `note`, `round`, `start`, `cancel`,
   `retry`, `verify`, `merge`, `undo`, `delete`, `assign-feature`, and
   `remove-feature`.
-- `refine feature`: Feature metadata, ordered Gap membership, derived status,
+- `refine feature`: Feature metadata, ordered Goal membership, derived status,
   workflow movement, import-backed creation, cancellation, and deletion.
-  Actions include `create`, `list`, `show`, `edit`, `add-gap`, `remove-gap`,
-  `reorder-gap`, `move`, `cancel`, `delete`, and `import`.
+  Actions include `create`, `list`, `show`, `edit`, `add-goal`, `remove-goal`,
+  `reorder-goal`, `move`, `cancel`, `delete`, and `import`.
 - `refine workflow`: controls for the always-on workflow engine. Public
   actions include `pause` and `resume`; workflow state movement is automatic
   while the daemon is running.
@@ -213,9 +213,9 @@ Each capability should define:
   surfaces or duplicating another capability's responsibilities.
 
 Product actions compose these capabilities through the daemon. For example, a
-Gap execution workflow may use work-item, workflow claim, provider, process,
+Goal execution workflow may use work-item, workflow claim, provider, process,
 Git, storage, event, and log abstractions, but those abstractions remain
-centralized instead of being rebuilt inside the Gap execution code.
+centralized instead of being rebuilt inside the Goal execution code.
 
 ## Model
 
@@ -235,7 +235,7 @@ and which operations are allowed.
 
 Responsibilities:
 
-- Canonical product models: Project, Gap, Feature, Workflow, Cluster, Node, and
+- Canonical product models: Project, Goal, Feature, Workflow, Cluster, Node, and
   Log.
 - Workflow-state enums, transition tables, and allowed-operation rules.
 - Durable model versions and migration-facing definitions.
@@ -263,7 +263,7 @@ visible in the Python implementation:
 ```text
 src/model/
   project/
-  gap/
+  goal/
   feature/
   workflow/
   cluster/
@@ -308,23 +308,23 @@ Rules:
   behaviors belong in `tools::product::project_registry`,
   `tools::product::project_state`, and `tools::supervisor::runtime`.
 
-### Gap Model
+### Goal Model
 
-Module: `model::gap`; path: `src/model/gap/`.
+Module: `model::goal`; path: `src/model/goal/`.
 
-Owns the canonical Gap, round, note, and Gap-owned quality/governance state.
-The Python baseline stores persisted Gap state in `gap.json` and projects common
-fields into `gaps_index` as a rebuildable cache.
+Owns the canonical Goal, round, note, and Goal-owned quality/governance state.
+The Python baseline stores persisted Goal state in `goal.json` and projects common
+fields into `goals_index` as a rebuildable cache.
 
 Properties:
 
-- `Gap`: `id`, `name`, `status`, `priority`, `branch_name`, `feature_id`,
+- `Goal`: `id`, `name`, `status`, `priority`, `branch_name`, `feature_id`,
   `feature_order`, `node_id`, `created`, `updated`, `notes`, and `rounds`.
-- `GapIndexProjection`: `id`, `name`, `status`, `priority`, `reporter`,
+- `GoalIndexProjection`: `id`, `name`, `status`, `priority`, `reporter`,
   `round_count`, `created`, `updated`, `branch_name`, `node_id`,
   `feature_id`, `feature_order`, and `json_path`.
-- `GapNote`: `id`, `author`, `body`, `created`, and `updated`.
-- `GapRound`: `reporter`, `actual`, `target`, `created`, `updated`, optional
+- `GoalNote`: `id`, `author`, `body`, `created`, and `updated`.
+- `GoalRound`: `reporter`, `prompt`, `created`, `updated`, optional
   `guidance_decision`, and derived `logs` when a response hydrates sidecar
   round logs.
 - `RoundGovernance`: `rule_state`, `meta_rule_state`, `product_state`,
@@ -332,13 +332,13 @@ Properties:
   `governance_checked_at`, and `governance_rule_actions`.
 - `RoundQuality`: `quality_state`, `quality_message`, `quality_details`, and
   `quality_checked_at`.
-- `GapPriority`: `low`, `medium`, or `high`.
+- `GoalPriority`: `low`, `medium`, or `high`.
 
 Rules:
 
-- `status` must use `model::workflow::GapStatus`.
-- `feature_id` and `feature_order` associate a Gap with a Feature; the ordered
-  Feature membership is stored on the Gap.
+- `status` must use `model::workflow::GoalStatus`.
+- `feature_id` and `feature_order` associate a Goal with a Feature; the ordered
+  Feature membership is stored on the Goal.
 - Round logs are represented by `model::log` entries. Storage may keep them in
   a sidecar JSONL file, but the model shape is shared with activity logs.
 
@@ -346,7 +346,7 @@ Rules:
 
 Module: `model::feature`; path: `src/model/feature/`.
 
-Owns Feature metadata and the derived rollup produced from ordered Gaps.
+Owns Feature metadata and the derived rollup produced from ordered Goals.
 The Python baseline stores persisted Feature metadata in `feature.json` and
 projects common fields into `features_index`.
 
@@ -356,22 +356,22 @@ Properties:
   `updated`, and `json_path`.
 - `FeatureIndexProjection`: `id`, `name`, `description`, `reporter`,
   `node_id`, `created`, `updated`, and `json_path`.
-- `FeatureDetail`: `Feature` plus `gaps`, `node_display_name`, and rollup
+- `FeatureDetail`: `Feature` plus `goals`, `node_display_name`, and rollup
   fields.
-- `FeatureRollup`: `status`, `gap_count`, `done_count`, `active_count`,
-  `failed_count`, `cancelled_count`, `blocked_count`, and `next_gap`.
+- `FeatureRollup`: `status`, `goal_count`, `done_count`, `active_count`,
+  `failed_count`, `cancelled_count`, `blocked_count`, and `next_goal`.
 
 Rules:
 
-- A Feature's workflow status is derived from its ordered Gaps; it is not an
+- A Feature's workflow status is derived from its ordered Goals; it is not an
   independent persisted field in the Python baseline.
-- Feature workflow actions can move eligible Gaps to `backlog` or `todo`.
-  Protected Gap statuses are `review`, `done`, `ready-merge`, and
+- Feature workflow actions can move eligible Goals to `backlog` or `todo`.
+  Protected Goal statuses are `review`, `done`, `ready-merge`, and
   `build`.
 - Cancelling a Feature is a system-owned cascade operation. It cancels
   `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`, `build`,
-  `review`, and `failed` Gaps through the shared Gap cancel path, skips `done`
-  Gaps, and skips already `cancelled` Gaps.
+  `review`, and `failed` Goals through the shared Goal cancel path, skips `done`
+  Goals, and skips already `cancelled` Goals.
 - Feature cancel must stop or reconcile active work before recording the final
   cancellation result, so users do not see running agent, QA, merge, or rebuild
   operations continue after the Feature was cancelled.
@@ -381,19 +381,19 @@ Rules:
 Module: `model::workflow`; path: `src/model/workflow/`.
 
 Owns workflow states, transition rules, and allowed-operation decisions for
-Gap and Feature workflows.
+Goal and Feature workflows.
 
 Properties:
 
-- `GapStatus`: `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`,
+- `GoalStatus`: `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`,
   `build`, `review`, `done`, `failed`, and `cancelled`.
-- `TerminalGapStatus`: `done` and `cancelled`.
-- `AutomatedGapStatus`: `in-progress`, `qa`, `ready-merge`, and
+- `TerminalGoalStatus`: `done` and `cancelled`.
+- `AutomatedGoalStatus`: `in-progress`, `qa`, `ready-merge`, and
   `build`.
 - `UserStatusTransition`: currently `backlog -> todo`, `todo -> backlog`,
   `review -> todo`, `done -> review`, `failed -> todo`, and
   `cancelled -> todo`; same-status updates are no-ops.
-- `BulkStatusTarget`: any Gap status except `in-progress`, `qa`, and
+- `BulkStatusTarget`: any Goal status except `in-progress`, `qa`, and
   `ready-merge`, plus the special `__last_workflow_state` restore operation.
 - `FeatureWorkflowTarget`: `backlog` or `todo`.
 - `FeatureProtectedStatus`: `review`, `done`, `ready-merge`, and
@@ -405,10 +405,10 @@ Rules:
 
 - Manual status updates cannot enter system-owned states through ordinary
   metadata edits; dedicated workflow actions own those transitions.
-- The model should answer whether an operation is allowed for a given Gap or
+- The model should answer whether an operation is allowed for a given Goal or
   Feature state. `workflow/tools` performs the operation only after the model approves
   it.
-- Examples of operations the model should name: create Gap, edit Gap metadata,
+- Examples of operations the model should name: create Goal, edit Goal metadata,
   edit notes, submit new round, edit latest round, start implementation,
   cancel automation, retry agent, retry QA, retry merge, verify/review, merge,
   undo, delete, assign to Feature, remove from Feature, reorder in Feature,
@@ -443,7 +443,7 @@ Rules:
 Module: `model::node`; path: `src/model/node/`.
 
 Owns Refine node identity, node-scoped settings, and optional remote-management
-configuration. A node is the unit of ownership for Gaps and Features inside one
+configuration. A node is the unit of ownership for Goals and Features inside one
 target app; a cluster is the set of nodes and the operations Refine can perform
 over that set.
 
@@ -457,14 +457,14 @@ Properties:
 - `ActiveNodeSelection`: `active_node_id`, `refine_dir`, and `updated_at`.
 - `NodeSettings`: application, runtime, target-app config, and target-app
   runtime setting maps scoped to a node.
-- `NodeOwnership`: the `node_id` fields on Gap and Feature records.
+- `NodeOwnership`: the `node_id` fields on Goal and Feature records.
 
 Rules:
 
 - The active node cannot be archived.
 - Runtime automation owns exactly one local node for the lifetime of the
   supervisor/worker process, even if the UI browses another node.
-- Mutating a Gap or Feature requires ownership by the active local node unless
+- Mutating a Goal or Feature requires ownership by the active local node unless
   a transfer operation explicitly changes ownership first.
 
 ### Log Model
@@ -477,14 +477,14 @@ streaming, and support-bundle export belong in `tools::observability`.
 Properties:
 
 - `LogEntry`: `datetime`, `severity`, `category`, `message`, optional
-  `details`, optional `actions`, optional `actor`, and optional `gap_id`.
+  `details`, optional `actions`, optional `actor`, and optional `goal_id`.
 - `ActivityEntry`: `id`, `datetime`, `severity`, `category`, `message`,
-  optional `gap_id`, optional `actor`, optional `details`, and optional
+  optional `goal_id`, optional `actor`, optional `details`, and optional
   `actions`.
 - `RoundLogEntry`: `LogEntry` plus `round_idx` when stored in sidecar JSONL.
 - `LogAction`: action objects attached to an entry; the exact variants should
   become typed as Rust implementations replace Python's free-form dictionaries.
-- `LogQuery`: `limit`, `offset`, `gap_id`, `since_id`, `severity`,
+- `LogQuery`: `limit`, `offset`, `goal_id`, `since_id`, `severity`,
   `category`, `actor`, `q`, `sort`, and `direction`.
 
 Rules:
@@ -498,7 +498,7 @@ Rules:
 - Storage serializes and deserializes model records; it does not invent shadow
   model definitions.
 - UI, CLI, API, automation, process, provider, and quality code should all use
-  the same model types for Gap state and allowed operations.
+  the same model types for Goal state and allowed operations.
 - If a workflow rule can be expressed as data or a pure state transition, it
   belongs in `model`, not in a runner, route handler, or button callback.
 
@@ -618,8 +618,8 @@ delete, assign, reorder.
 
 Requirements:
 
-- Gap remains the executable unit of work.
-- Feature remains an optional ordered group of Gaps.
+- Goal remains the executable unit of work.
+- Feature remains an optional ordered group of Goals.
 - Imports support AI extraction, CSV paste, CSV file, and structured review.
 - UI and CLI call shared work-item operations.
 - State transitions are validated centrally.
@@ -635,7 +635,7 @@ retry, and workflow-state evaluation.
 Requirements:
 
 - Workflow is always on while the daemon is running.
-- Workflow behavior modules evaluate eligible Gaps by workflow state.
+- Workflow behavior modules evaluate eligible Goals by workflow state.
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
@@ -742,24 +742,24 @@ Requirements:
 - Target-app tests are configured with `target_app_test_commands`; the
   compatibility `target_app_test_command` value tracks the first enabled command.
   Enabled commands run as supervised Quality-owned subprocesses.
-- Results are persisted, visible, and tied to the relevant Gap, Feature, or app.
+- Results are persisted, visible, and tied to the relevant Goal, Feature, or app.
 - Users can rerun, cancel, and inspect quality operations from any surface.
 
 ### Chat And Planning
 
 Module: `tools::product::chat`; path: `src/tools/product/chat/`.
 
-Owns abstractions for: start, resume, stream, attach to Gap or Feature, persist context.
+Owns abstractions for: start, resume, stream, attach to Goal or Feature, persist context.
 
 Requirements:
 
 - Chat sessions use shared provider adapters.
-- Gap-attached chat and standalone chat have explicit storage and resumption
+- Goal-attached chat and standalone chat have explicit storage and resumption
   semantics.
 - Long-running provider priming or resume steps are observable.
-- Chat events can produce importable rounds, Gaps, or Feature plans.
+- Chat events can produce importable rounds, Goals, or Feature plans.
 - Chat records are persisted enough to survive daemon restart: Refine session id,
-  mode, provider, provider session id when known, attached Gap or Feature id,
+  mode, provider, provider session id when known, attached Goal or Feature id,
   created/updated timestamps, transcript events, importable artifacts, and
   closed/interrupted status are persisted outside in-memory process state.
 - In-flight provider processes are runtime operations, not persisted conversation
@@ -770,9 +770,9 @@ Requirements:
   supports resume. If the provider cannot resume, Refine still preserves the
   transcript and starts a fresh provider session with explicit user-visible
   status.
-- Gap-attached and Feature-attached chats rebuild their product context from
+- Goal-attached and Feature-attached chats rebuild their product context from
   persisted Refine records on resume. Persisted transcripts should not be the only
-  source of Gap, Feature, or round state.
+  source of Goal, Feature, or round state.
 
 ### Observability And Diagnostics
 
@@ -890,7 +890,7 @@ refine/
         diagnostics/
         support_bundle/
     model/
-      gap/
+      goal/
       feature/
       workflow/
       project/
@@ -941,7 +941,7 @@ tools
   tools::host::{process_supervision, target_apps, git_worktrees, ...}
       |
 model
-  model::{project, gap, feature, workflow, cluster, node, log}
+  model::{project, goal, feature, workflow, cluster, node, log}
 
 side channel for all processing layers
 observability
@@ -1062,7 +1062,7 @@ Representative API groups:
 
 - `/system`: install state, daemon status, update, doctor.
 - `/apps`: target-app registry, attach, switch, detach, commands.
-- `/work`: Gaps, Features, imports, state transitions.
+- `/work`: Goals, Features, imports, state transitions.
 - `/agents`: provider configuration, auth, diagnostics.
 - `/operations`: operation status, logs, cancel.
 - `/processes`: managed process list and controls.
@@ -1107,7 +1107,7 @@ cache files, or another cache structure. The daemon should:
 - Load the projection snapshot from the selected local runtime root's
   `<port>/cache/` directory during startup.
 - Validate the snapshot version and source-file fingerprints for persisted
-  records such as `gap.json` and `feature.json`.
+  records such as `goal.json` and `feature.json`.
 - Rescan only changed, missing, or newly discovered persisted records.
 - Build in-memory indexes from the validated projection for nearly instant UI
   counts, facets, filters, sorts, and lookups.
@@ -1119,7 +1119,7 @@ cache files, or another cache structure. The daemon should:
   incompatible, or corrupt.
 
 This projection layer is the required cache abstraction. Common UI queries
-such as "how many Gaps are done?" must be answered by the projection API, not
+such as "how many Goals are done?" must be answered by the projection API, not
 by each surface scanning persisted records or inventing its own query path.
 
 The first Rust cache choice is therefore:
@@ -1140,12 +1140,12 @@ The first Rust cache choice is therefore:
 ### Required Projection Indexes
 
 The current Python web UI has been scanned for cache needs. The Rust projection
-layer must support at least the query patterns used by the Gaps, Features,
-Dashboard, Logs, Changes, Gap Detail, and bulk-operation surfaces.
+layer must support at least the query patterns used by the Goals, Features,
+Dashboard, Logs, Changes, Goal Detail, and bulk-operation surfaces.
 
-Gap projection:
+Goal projection:
 
-- Keep `GapSummaryProjection` keyed by `gap_id` with `id`, `name`, `status`,
+- Keep `GoalSummaryProjection` keyed by `goal_id` with `id`, `name`, `status`,
   `priority`, `reporter`, `round_count`, `created`, `updated`, `branch_name`,
   `node_id`, `feature_id`, `feature_order`, persisted JSON path, and display
   fields such as `node_display_name`.
@@ -1156,11 +1156,11 @@ Gap projection:
 - Maintain sorted views for `name`, `status`, `priority`, `reporter`,
   `round_count`, `node`, `updated`, `created`, and `id`, with stable
   tie-breakers.
-- Maintain a text-search projection over Gap name, reporter, round content,
+- Maintain a text-search projection over Goal name, reporter, round content,
   and notes content.
-- Maintain activity-linked Gap membership by severity, category, and actor so
-  Gap list filters can include log/activity dimensions.
-- Return stable matching Gap id sets for bulk update, transfer, feature
+- Maintain activity-linked Goal membership by severity, category, and actor so
+  Goal list filters can include log/activity dimensions.
+- Return stable matching Goal id sets for bulk update, transfer, feature
   assignment, and bulk delete operations across pagination.
 - Return filtered status counts so workflow visualizations can reflect the
   current filter set without a second persisted scan.
@@ -1172,39 +1172,39 @@ Feature projection:
   path.
 - Index by node, reporter, derived feature status, updated, created, name, and
   id.
-- Maintain ordered Gap ids per Feature by `feature_order`, with deterministic
+- Maintain ordered Goal ids per Feature by `feature_order`, with deterministic
   fallback ordering.
-- Maintain derived rollups per Feature: `status`, `gap_count`, `done_count`,
+- Maintain derived rollups per Feature: `status`, `goal_count`, `done_count`,
   `active_count`, `failed_count`, `cancelled_count`, `blocked_count`, and
-  `next_gap`.
-- Maintain the current-node standalone Gap candidate set for assigning Gaps to
+  `next_goal`.
+- Maintain the current-node standalone Goal candidate set for assigning Goals to
   Features.
 
 Activity and log projection:
 
 - Keep activity entries keyed by activity id and indexed by datetime/id,
-  severity, category, actor, and `gap_id`.
+  severity, category, actor, and `goal_id`.
 - Maintain distinct category, actor, and severity facet values.
 - Maintain text search over activity message and details.
 - Maintain the recent activity feed used by Dashboard.
-- Maintain per-Gap and per-round log summaries: count, latest log, latest
+- Maintain per-Goal and per-round log summaries: count, latest log, latest
   error log, latest state log, latest workflow log, and paged log entries.
 - Support activity table sorting by datetime, severity, category, actor,
-  `gap_id`, message, and id.
+  `goal_id`, message, and id.
 
 Change projection:
 
 - Keep Refine merge rows keyed by commit and branch with commit sha, committed
-  time, subject, `gap_id`, branch, and joined Gap display fields.
-- Index by branch plus committed time, `gap_id`, Gap status, Gap priority, and
-  text search over Gap name, commit, status, and subject.
+  time, subject, `goal_id`, branch, and joined Goal display fields.
+- Index by branch plus committed time, `goal_id`, Goal status, Goal priority, and
+  text search over Goal name, commit, status, and subject.
 
 Dashboard projection:
 
-- Derive dashboard status counts from Gap indexes for all nodes and for the
+- Derive dashboard status counts from Goal indexes for all nodes and for the
   current node.
 - Derive reporter stats grouped by reporter and status.
-- Derive attention indicators from failed Gap counts, preflight state, runner
+- Derive attention indicators from failed Goal counts, preflight state, runner
   reachability, and relevant runtime state.
 - Reuse the recent activity projection instead of reading logs separately.
 
@@ -1276,7 +1276,7 @@ Dependency classes:
   depending on the configured adapter.
 
 Dependency checks should be capability-scoped. Missing Docker should not block
-Gap creation. Missing provider auth should block agent execution but not project
+Goal creation. Missing provider auth should block agent execution but not project
 inspection. Missing browser automation should block browser QA but not ordinary
 chat. `doctor`, first-run setup, and workflow preflight should report missing
 prerequisites clearly instead of hiding or bundling them.
@@ -1290,7 +1290,7 @@ Suggested order:
 1. Install, daemon lifecycle, status, doctor.
 2. Target-app registry: attach, switch, detach, no-app mode.
 3. Durable storage, projection snapshots, and projection rebuild.
-4. Gap list/create/update/transition.
+4. Goal list/create/update/transition.
 5. Model-oriented CLI coverage for the above.
 6. Web UI connected to Rust APIs.
 7. Desktop shell over the same APIs.

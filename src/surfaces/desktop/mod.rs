@@ -378,7 +378,7 @@ mod tests {
         bridge.open_webview("http://127.0.0.1:8123").unwrap();
         bridge.notify("Refine", "Ready").unwrap();
         bridge.tray_menu_action("show").unwrap();
-        bridge.handle_deep_link("refine://gap/GAP1").unwrap();
+        bridge.handle_deep_link("refine://goal/GOAL1").unwrap();
         let subscribed = bridge
             .apply_event_stream(
                 "event: ready\ndata: {}\n\n\
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(state.badge_count, 2);
         assert_eq!(state.last_notification_title.as_deref(), Some("Refine"));
         assert_eq!(state.last_tray_action.as_deref(), Some("show"));
-        assert_eq!(state.last_deep_link.as_deref(), Some("refine://gap/GAP1"));
+        assert_eq!(state.last_deep_link.as_deref(), Some("refine://goal/GOAL1"));
         assert!(state.last_event_stream_at.is_some());
         let events = fs::read_to_string(bridge.events_path()).unwrap();
         assert!(events.contains("daemon_bootstrap"));

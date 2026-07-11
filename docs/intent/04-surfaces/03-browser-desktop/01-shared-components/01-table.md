@@ -4,7 +4,7 @@
 
 - **Dense Inspection**: tables are the default shape for repeated operational items.
 - **Shared Behavior**: list views should reuse sort, filter, selection, mobile-card, and row-action patterns.
-- **Readable At Scale**: tables should handle many Gaps, Features, logs, changes, processes, and metrics without becoming decorative cards.
+- **Readable At Scale**: tables should handle many Goals, Features, logs, changes, processes, and metrics without becoming decorative cards.
 - **URL-Backed Controls**: filters and sorts should survive refresh and sharing.
 
 ## Purpose
@@ -15,11 +15,11 @@ Cards may be useful for summaries, but repeated work surfaces should prefer dens
 
 ## Expected Role
 
-Tables should provide consistent interaction across Gaps, Features, Logs, Changes, Processes, and Performance. Users should not need to relearn list behavior on every page.
+Tables should provide consistent interaction across Goals, Features, Logs, Changes, Processes, and Performance. Users should not need to relearn list behavior on every page.
 
 Current implementation details that matter to intent:
 
-- Gaps, Features, Changes, Logs, and Performance use shared table-like list patterns;
+- Goals, Features, Changes, Logs, and Performance use shared table-like list patterns;
 - sortable headers use consistent active/arrow behavior;
 - filters live above tables in collapsible shells where appropriate;
 - mobile-card table styling preserves readability on narrow screens;

@@ -57,16 +57,16 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
     return;
   }
   const ok = await modalConfirm(
-    `Move all current-node Gaps with status ${source} to ${dest}?`,
+    `Move all current-node Goals with status ${source} to ${dest}?`,
     {
-      title: "Bulk move Gaps",
-      okLabel: "Move Gaps",
+      title: "Bulk move Goals",
+      okLabel: "Move Goals",
       danger: true,
     },
   );
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
-    let r = await api("POST", "/api/gaps/bulk", {
+    let r = await api("POST", "/api/goals/bulk", {
       filter: currentNodeBulkFilter(source),
       update: { status: dest },
     });
@@ -74,24 +74,24 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
       r,
       "Bulk status update is running in the background",
     );
-    toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    if (state.currentRoute === "gaps") await renderGapsList();
+    toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    if (state.currentRoute === "goals") await renderGoalsList();
     if (state.currentRoute === "dashboard") await refreshDashboard();
   });
 }
 
 async function runFailedBackCommand({ button = null } = {}) {
   const ok = await modalConfirm(
-    "Move all current-node failed Gaps back to their last safe workflow state?",
+    "Move all current-node failed Goals back to their last safe workflow state?",
     {
-      title: "Bulk retry failed Gaps",
-      okLabel: "Move failed Gaps",
+      title: "Bulk retry failed Goals",
+      okLabel: "Move failed Goals",
       danger: true,
     },
   );
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
-    let r = await api("POST", "/api/gaps/bulk", {
+    let r = await api("POST", "/api/goals/bulk", {
       filter: currentNodeBulkFilter("failed"),
       update: { status: "__last_workflow_state" },
     });
@@ -99,8 +99,8 @@ async function runFailedBackCommand({ button = null } = {}) {
       r,
       "Bulk retry is running in the background",
     );
-    toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    if (state.currentRoute === "gaps") await renderGapsList();
+    toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    if (state.currentRoute === "goals") await renderGoalsList();
     if (state.currentRoute === "dashboard") await refreshDashboard();
   });
 }
@@ -215,7 +215,7 @@ function registerNavigationCommand(id, title, hash, keywords = []) {
 
 registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
 registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
-registerNavigationCommand("nav.gaps", "Gaps", "#/gaps", ["issues", "work"]);
+registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
 registerNavigationCommand("nav.logs", "Logs", "#/logs", ["activity"]);
 for (const [surfaceKey, surface] of Object.entries(SETTINGS_SURFACES || {})) {
@@ -231,22 +231,22 @@ for (const [surfaceKey, surface] of Object.entries(SETTINGS_SURFACES || {})) {
 }
 
 registerCommand({
-  id: "gap.new",
-  title: "New Gap",
+  id: "goal.new",
+  title: "New Goal",
   group: "Create",
-  aliases: ["new", "new-gap", "gap"],
+  aliases: ["new", "new-goal", "goal"],
   keywords: ["create", "submit"],
   run: () => {
     closeTopbarMenus();
-    openNewGapModal();
+    openNewGoalModal();
   },
 });
 
 registerCommand({
-  id: "gap.import",
+  id: "goal.import",
   title: "Import",
   group: "Create",
-  aliases: ["import", "import-gaps", "import-feature"],
+  aliases: ["import", "import-goals", "import-feature"],
   keywords: ["csv", "ai import", "feature"],
   run: () => {
     closeTopbarMenus();
@@ -268,7 +268,7 @@ registerCommand({
   title: "Plan: make a plan",
   group: "AI",
   aliases: ["plan", "make-plan"],
-  keywords: ["chat", "draft gaps"],
+  keywords: ["chat", "draft goals"],
   parse: (input) => {
     const prompt = commandTailFor(input, ["plan", "make-plan"]);
     return prompt ? { prompt } : {};
@@ -282,11 +282,11 @@ registerCommand({
   id: "plan.draft",
   title: "Draft Feature from plan",
   group: "AI",
-  aliases: ["draft-plan", "draft-gaps"],
+  aliases: ["draft-plan", "draft-goals"],
   visible: () => !!chatState?.tabs?.plan,
   enabled: () => planHasAgentResponse(chatState.tabs.plan),
   disabledMessage: "Wait for the agent to respond before drafting a Feature.",
-  run: () => draftGapsFromPlan(),
+  run: () => draftGoalsFromPlan(),
 });
 
 registerCommand({
@@ -332,27 +332,27 @@ registerCommand({
 });
 
 registerCommand({
-  id: "gaps.clear_filters",
-  title: "Gaps: clear filters",
-  group: "Gaps",
-  aliases: ["clear-gaps"],
+  id: "goals.clear_filters",
+  title: "Goals: clear filters",
+  group: "Goals",
+  aliases: ["clear-goals"],
   run: () => {
-    if (state.currentRoute !== "gaps") {
-      location.hash = "#/gaps";
+    if (state.currentRoute !== "goals") {
+      location.hash = "#/goals";
       return;
     }
-    history.replaceState(null, "", "#/gaps");
-    renderGapsList();
+    history.replaceState(null, "", "#/goals");
+    renderGoalsList();
   },
 });
 
 registerCommand({
-  id: "gaps.select_page",
-  title: "Gaps: select page",
-  group: "Gaps",
+  id: "goals.select_page",
+  title: "Goals: select page",
+  group: "Goals",
   aliases: ["select-page"],
-  visible: () => state.currentRoute === "gaps",
-  run: () => selectCurrentGapsPage(),
+  visible: () => state.currentRoute === "goals",
+  run: () => selectCurrentGoalsPage(),
 });
 
 registerCommand({
@@ -401,76 +401,76 @@ registerCommand({
 });
 
 registerCommand({
-  id: "gaps.bulk.status",
-  title: "Bulk: set selected Gap status",
-  group: "Gaps",
+  id: "goals.bulk.status",
+  title: "Bulk: set selected Goal status",
+  group: "Goals",
   aliases: ["bulk-status"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: ({ button } = {}) => openBulkModal("status", { button }),
 });
 
 registerCommand({
-  id: "gaps.bulk.priority",
-  title: "Bulk: set selected Gap priority",
-  group: "Gaps",
+  id: "goals.bulk.priority",
+  title: "Bulk: set selected Goal priority",
+  group: "Goals",
   aliases: ["bulk-priority"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: ({ button } = {}) => openBulkModal("priority", { button }),
 });
 
 registerCommand({
-  id: "gaps.bulk.reporter",
-  title: "Bulk: set selected Gap reporter",
-  group: "Gaps",
+  id: "goals.bulk.reporter",
+  title: "Bulk: set selected Goal reporter",
+  group: "Goals",
   aliases: ["bulk-reporter"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: ({ button } = {}) => openBulkModal("reporter", { button }),
 });
 
 registerCommand({
-  id: "gaps.bulk.assignee",
-  title: "Bulk: set selected Gap assignee",
-  group: "Gaps",
+  id: "goals.bulk.assignee",
+  title: "Bulk: set selected Goal assignee",
+  group: "Goals",
   aliases: ["bulk-assignee"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: ({ button } = {}) => openBulkModal("assignee", { button }),
 });
 
 registerCommand({
-  id: "gaps.bulk.feature",
-  title: "Bulk: assign selected Gaps to Feature",
-  group: "Gaps",
+  id: "goals.bulk.feature",
+  title: "Bulk: assign selected Goals to Feature",
+  group: "Goals",
   aliases: ["bulk-feature"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: ({ button } = {}) => openBulkAssignFeatureModal({ button }),
 });
 
 registerCommand({
-  id: "gaps.bulk.transfer_node",
-  title: "Bulk: transfer selected Gaps to node",
-  group: "Gaps",
+  id: "goals.bulk.transfer_node",
+  title: "Bulk: transfer selected Goals to node",
+  group: "Goals",
   aliases: ["bulk-node"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: () => openBulkTransferNodeModal(),
 });
 
 registerCommand({
-  id: "gaps.bulk.delete",
-  title: "Bulk: delete selected Gaps",
-  group: "Gaps",
+  id: "goals.bulk.delete",
+  title: "Bulk: delete selected Goals",
+  group: "Goals",
   aliases: ["bulk-delete"],
-  visible: () => state.currentRoute === "gaps",
+  visible: () => state.currentRoute === "goals",
   run: () => confirmBulkDelete(),
 });
 
 registerCommand({
-  id: "gaps.bulk.move",
-  title: "Bulk: move all Gaps by status",
-  group: "Gaps",
-  aliases: ["bulk_move", "bulk-move", "move-gaps"],
+  id: "goals.bulk.move",
+  title: "Bulk: move all Goals by status",
+  group: "Goals",
+  aliases: ["bulk_move", "bulk-move", "move-goals"],
   keywords: ["bulk_move source dest backlog todo"],
   parse: (input) => {
-    const tail = commandTailFor(input, ["bulk_move", "bulk-move", "move-gaps"]);
+    const tail = commandTailFor(input, ["bulk_move", "bulk-move", "move-goals"]);
     const parts = tail.split(/\s+/).filter(Boolean);
     return {
       source: parts[0] || "",
@@ -481,9 +481,9 @@ registerCommand({
 });
 
 registerCommand({
-  id: "gaps.bulk.failed_back",
+  id: "goals.bulk.failed_back",
   title: "Bulk: move failed back one workflow step",
-  group: "Gaps",
+  group: "Goals",
   aliases: ["bulk_failed_back", "failed-back"],
   keywords: ["retry failed last workflow"],
   run: runFailedBackCommand,
@@ -812,7 +812,7 @@ registerCommand({
         }
       }
       const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
-      toast(`Projection cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
+      toast(`Projection cache ${verb}; ${result.goals || 0} Goal${result.goals === 1 ? "" : "s"} indexed`, "info");
       if (["settings", "node", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
     });
   },

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use serde_json::{Value, json};
 
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
@@ -59,7 +59,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     #[cfg(not(test))]
     let cli = match cli.command {
         Commands::Project { action } => return dispatch_project_daemon(action),
-        Commands::Gap { action } => return dispatch_gap_daemon(action),
+        Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
         Commands::Workflow { action } => return dispatch_workflow_daemon(action),
         Commands::Node { action } => return dispatch_node_daemon(action),
@@ -556,7 +556,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root,
                     limit,
                     offset,
-                    gap_id,
+                    goal_id,
                     severity,
                     category,
                     actor,
@@ -568,8 +568,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     format!("offset={offset}"),
                     format!("q={}", query_component(&q)),
                 ];
-                if let Some(value) = gap_id {
-                    query.push(format!("gap_id={}", query_component(&value)));
+                if let Some(value) = goal_id {
+                    query.push(format!("goal_id={}", query_component(&value)));
                 }
                 if let Some(value) = severity {
                     query.push(format!("severity={}", query_component(&value)));
@@ -590,7 +590,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 .query(
                     limit,
                     offset,
-                    gap_id.as_deref(),
+                    goal_id.as_deref(),
                     severity.as_deref(),
                     category.as_deref(),
                     actor.as_deref(),
@@ -968,7 +968,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
-                    "gaps": snapshot.gaps.len(),
+                    "goals": snapshot.goals.len(),
                     "features": snapshot.features.len(),
                     "source_fingerprints": snapshot.source_fingerprints.len(),
                     "status_counts": snapshot.status_counts(),
@@ -988,64 +988,64 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             print_json(&response);
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Create {
+                GoalAction::Create {
                     name,
                     target_root: Some(target_root),
                     id,
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .create_gap_summary(&name, id.as_deref())?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .create_goal_summary(&name, id.as_deref())?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
-            action: GapAction::List {
+        Commands::Goal {
+            action: GoalAction::List {
                 target_root: Some(target_root),
             },
         } => {
-            let gaps: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .list_gap_summaries()?
+            let goals: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .list_goal_summaries()?
                 .into_iter()
-                .map(|gap| gap.gap)
+                .map(|goal| goal.goal)
                 .collect();
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gaps": gaps})).unwrap()
+                serde_json::to_string_pretty(&json!({"goals": goals})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Show {
+                GoalAction::Show {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .show_gap_summary(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .show_goal_summary(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Edit {
+                GoalAction::Edit {
                     id,
                     target_root: Some(target_root),
                     name,
                     priority,
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .update_gap_metadata_summary(
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .update_goal_metadata_summary(
                     &id,
                     name.as_deref(),
                     priority.as_deref(),
@@ -1054,30 +1054,30 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 )?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Note {
+                GoalAction::Note {
                     id,
                     body,
                     target_root: Some(target_root),
                     author,
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .add_gap_note_summary(&id, &author, &body)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .add_goal_note_summary(&id, &author, &body)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::NoteEdit {
+                GoalAction::NoteEdit {
                     id,
                     note_id,
                     body,
@@ -1085,52 +1085,50 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
-            let detail = service.show_gap_detail(&id)?;
-            let notes = edit_gap_note_values(gap_notes_from_detail(&detail), &note_id, &body)?;
-            let gap = service.replace_gap_notes_summary(&id, &notes)?;
+            let detail = service.show_goal_detail(&id)?;
+            let notes = edit_goal_note_values(goal_notes_from_detail(&detail), &note_id, &body)?;
+            let goal = service.replace_goal_notes_summary(&id, &notes)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::NoteDelete {
+                GoalAction::NoteDelete {
                     id,
                     note_id,
                     target_root: Some(target_root),
                 },
         } => {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
-            let detail = service.show_gap_detail(&id)?;
-            let notes = delete_gap_note_values(gap_notes_from_detail(&detail), &note_id)?;
-            let gap = service.replace_gap_notes_summary(&id, &notes)?;
+            let detail = service.show_goal_detail(&id)?;
+            let notes = delete_goal_note_values(goal_notes_from_detail(&detail), &note_id)?;
+            let goal = service.replace_goal_notes_summary(&id, &notes)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Round {
+                GoalAction::Round {
                     id,
                     target_root: Some(target_root),
                     reporter,
-                    actual,
-                    target,
+                    prompt,
                     edit_latest,
                 },
         } => {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
-            let gap = if edit_latest {
-                service.edit_latest_gap_round_summary(
+            let goal = if edit_latest {
+                service.edit_latest_goal_round_summary(
                     &id,
                     reporter.as_deref(),
                     None,
-                    actual.as_deref(),
-                    target.as_deref(),
+                    prompt.as_deref(),
                 )?
             } else {
                 let Some(reporter) = reporter.as_deref() else {
@@ -1140,85 +1138,78 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                         ),
                     );
                 };
-                let Some(actual) = actual.as_deref() else {
+                let Some(prompt) = prompt.as_deref() else {
                     return Err(
                         crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "round actual is required".to_string(),
+                            "round prompt is required".to_string(),
                         ),
                     );
                 };
-                let Some(target) = target.as_deref() else {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "round target is required".to_string(),
-                        ),
-                    );
-                };
-                service.append_gap_round_summary(&id, reporter, actual, target)?
+                service.append_goal_round_summary(&id, reporter, prompt)?
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Delete {
+                GoalAction::Delete {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
             FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .delete_gap_record(&id)?;
+                .delete_goal_record(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"deleted": true, "id": id})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Cancel {
+                GoalAction::Cancel {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .cancel_gap_summary(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .cancel_goal_summary(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Start {
+                GoalAction::Start {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .start_gap_workflow(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .start_goal_workflow(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Retry {
+                GoalAction::Retry {
                     id,
                     target_root: Some(target_root),
                     stage,
                 },
         } => {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
-            let gap = match stage.as_str() {
-                "quality" | "qa" => service.retry_gap_quality_summary(&id)?,
-                "merge" => service.retry_gap_merge_summary(&id)?,
+            let goal = match stage.as_str() {
+                "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
+                "merge" => service.retry_goal_merge_summary(&id)?,
                 _ => {
                     return Err(
                         crate::process::supervisor::errors::RefineError::InvalidInput(
@@ -1229,98 +1220,98 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Verify {
+                GoalAction::Verify {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .verify_gap_summary(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .verify_goal_summary(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Merge {
+                GoalAction::Merge {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .merge_gap_summary(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .merge_goal_summary(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::Undo {
+                GoalAction::Undo {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let gap = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .undo_gap_summary(&id)?;
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                .undo_goal_summary(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::AssignFeature {
+                GoalAction::AssignFeature {
                     id,
                     feature_id,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .assign_gap_to_feature(&feature_id, &id)?;
+                .assign_goal_to_feature(&feature_id, &id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
             );
             Ok(())
         }
-        Commands::Gap {
+        Commands::Goal {
             action:
-                GapAction::RemoveFeature {
+                GoalAction::RemoveFeature {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
-            let current = service.show_gap_summary(&id)?;
-            let Some(feature_id) = current.gap.feature_id.clone() else {
+            let current = service.show_goal_summary(&id)?;
+            let Some(feature_id) = current.goal.feature_id.clone() else {
                 return Err(
                     crate::process::supervisor::errors::RefineError::InvalidInput(format!(
-                        "Gap {id} is not assigned to a Feature"
+                        "Goal {id} is not assigned to a Feature"
                     )),
                 );
             };
-            let feature = service.remove_gap_from_feature(&feature_id, &id)?;
+            let feature = service.remove_goal_from_feature(&feature_id, &id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1349,7 +1340,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1378,7 +1369,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1398,7 +1389,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     .map(|feature| {
                         json!({
                             "feature": feature.feature,
-                            "gap_ids": feature.gap_ids,
+                            "goal_ids": feature.goal_ids,
                             "rollup": feature.rollup
                         })
                     })
@@ -1422,7 +1413,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1431,19 +1422,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
-                FeatureAction::AddGap {
+                FeatureAction::AddGoal {
                     id,
-                    gap_id,
+                    goal_id,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .assign_gap_to_feature(&id, &gap_id)?;
+                .assign_goal_to_feature(&id, &goal_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1452,19 +1443,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
-                FeatureAction::RemoveGap {
+                FeatureAction::RemoveGoal {
                     id,
-                    gap_id,
+                    goal_id,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .remove_gap_from_feature(&id, &gap_id)?;
+                .remove_goal_from_feature(&id, &goal_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1473,20 +1464,20 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
-                FeatureAction::ReorderGap {
+                FeatureAction::ReorderGoal {
                     id,
-                    gap_id,
+                    goal_id,
                     order,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .reorder_gap_in_feature(&id, &gap_id, order)?;
+                .reorder_goal_in_feature(&id, &goal_id, order)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1495,19 +1486,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
-                FeatureAction::OrderGap {
+                FeatureAction::OrderGoal {
                     id,
-                    gap_id,
+                    goal_id,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .order_gap_in_feature(&id, &gap_id)?;
+                .order_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1516,19 +1507,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Feature {
             action:
-                FeatureAction::UnorderGap {
+                FeatureAction::UnorderGoal {
                     id,
-                    gap_id,
+                    goal_id,
                     target_root: Some(target_root),
                 },
         } => {
             let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .unorder_gap_in_feature(&id, &gap_id)?;
+                .unorder_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1543,7 +1534,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let Some(target) = GapStatus::parse_wire(&target) else {
+            let Some(target) = GoalStatus::parse_wire(&target) else {
                 return Err(
                     crate::process::supervisor::errors::RefineError::InvalidInput(
                         "target must be backlog or todo".to_string(),
@@ -1556,7 +1547,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1589,7 +1580,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "{}",
                 serde_json::to_string_pretty(&json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }))
                 .unwrap()
@@ -1676,7 +1667,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::Gap { action } => dispatch_gap_daemon(action),
+        Commands::Goal { action } => dispatch_goal_daemon(action),
         Commands::Feature { action } => dispatch_feature_daemon(action),
         Commands::Workflow { action } => dispatch_workflow_daemon(action),
         Commands::Node { action } => dispatch_node_daemon(action),
@@ -2026,85 +2017,86 @@ fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()> {
     Ok(())
 }
 
-fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
+fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
     let response = match action {
-        GapAction::Create {
+        GoalAction::Create {
             name,
             target_root: None,
             id,
         } => daemon_json(
             "POST",
-            "/work/gaps",
+            "/work/goals",
             Some(json!({
                 "name": name,
                 "id": id
             })),
         )?,
-        GapAction::List { target_root: None } => daemon_json("GET", "/work/gaps?limit=1000", None)?,
-        GapAction::Show {
+        GoalAction::List { target_root: None } => {
+            daemon_json("GET", "/work/goals?limit=1000", None)?
+        }
+        GoalAction::Show {
             id,
             target_root: None,
-        } => daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?,
-        GapAction::Edit {
+        } => daemon_json("GET", &format!("/work/goals/{}", path_segment(&id)), None)?,
+        GoalAction::Edit {
             id,
             target_root: None,
             name,
             priority,
         } => daemon_json(
             "PATCH",
-            &format!("/work/gaps/{}", path_segment(&id)),
+            &format!("/work/goals/{}", path_segment(&id)),
             Some(json!({
                 "name": name,
                 "priority": priority
             })),
         )?,
-        GapAction::Note {
+        GoalAction::Note {
             id,
             body,
             target_root: None,
             author,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/notes", path_segment(&id)),
+            &format!("/work/goals/{}/notes", path_segment(&id)),
             Some(json!({
                 "body": body,
                 "author": author
             })),
         )?,
-        GapAction::NoteEdit {
+        GoalAction::NoteEdit {
             id,
             note_id,
             body,
             target_root: None,
         } => {
-            let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
+            let detail = daemon_json("GET", &format!("/work/goals/{}", path_segment(&id)), None)?;
             let notes =
-                edit_gap_note_values(gap_notes_from_detail(&detail["gap"]), &note_id, &body)?;
+                edit_goal_note_values(goal_notes_from_detail(&detail["goal"]), &note_id, &body)?;
             daemon_json(
                 "PATCH",
-                &format!("/work/gaps/{}", path_segment(&id)),
+                &format!("/work/goals/{}", path_segment(&id)),
                 Some(json!({ "notes": notes })),
             )?
         }
-        GapAction::NoteDelete {
+        GoalAction::NoteDelete {
             id,
             note_id,
             target_root: None,
         } => {
-            let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
-            let notes = delete_gap_note_values(gap_notes_from_detail(&detail["gap"]), &note_id)?;
+            let detail = daemon_json("GET", &format!("/work/goals/{}", path_segment(&id)), None)?;
+            let notes = delete_goal_note_values(goal_notes_from_detail(&detail["goal"]), &note_id)?;
             daemon_json(
                 "PATCH",
-                &format!("/work/gaps/{}", path_segment(&id)),
+                &format!("/work/goals/{}", path_segment(&id)),
                 Some(json!({ "notes": notes })),
             )?
         }
-        GapAction::Round {
+        GoalAction::Round {
             id,
             target_root: None,
             reporter,
-            actual,
-            target,
+            prompt,
             edit_latest,
         } => {
             let method = if edit_latest { "PATCH" } else { "POST" };
@@ -2115,31 +2107,30 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
             };
             daemon_json(
                 method,
-                &format!("/work/gaps/{}{}", path_segment(&id), suffix),
+                &format!("/work/goals/{}{}", path_segment(&id), suffix),
                 Some(json!({
                     "reporter": reporter,
-                    "actual": actual,
-                    "target": target
+                    "prompt": prompt
                 })),
             )?
         }
-        GapAction::Start {
+        GoalAction::Start {
             id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/start", path_segment(&id)),
+            &format!("/work/goals/{}/start", path_segment(&id)),
             None,
         )?,
-        GapAction::Cancel {
+        GoalAction::Cancel {
             id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/cancel", path_segment(&id)),
+            &format!("/work/goals/{}/cancel", path_segment(&id)),
             None,
         )?,
-        GapAction::Retry {
+        GoalAction::Retry {
             id,
             target_root: None,
             stage,
@@ -2151,67 +2142,71 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
             };
             daemon_json(
                 "POST",
-                &format!("/work/gaps/{}/{}", path_segment(&id), action),
+                &format!("/work/goals/{}/{}", path_segment(&id), action),
                 None,
             )?
         }
-        GapAction::Verify {
+        GoalAction::Verify {
             id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/verify", path_segment(&id)),
+            &format!("/work/goals/{}/verify", path_segment(&id)),
             None,
         )?,
-        GapAction::Merge {
+        GoalAction::Merge {
             id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/merge", path_segment(&id)),
+            &format!("/work/goals/{}/merge", path_segment(&id)),
             None,
         )?,
-        GapAction::Undo {
+        GoalAction::Undo {
             id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/work/gaps/{}/undo", path_segment(&id)),
+            &format!("/work/goals/{}/undo", path_segment(&id)),
             None,
         )?,
-        GapAction::Delete {
+        GoalAction::Delete {
             id,
             target_root: None,
-        } => daemon_json("DELETE", &format!("/work/gaps/{}", path_segment(&id)), None)?,
-        GapAction::AssignFeature {
+        } => daemon_json(
+            "DELETE",
+            &format!("/work/goals/{}", path_segment(&id)),
+            None,
+        )?,
+        GoalAction::AssignFeature {
             id,
             feature_id,
             target_root: None,
         } => daemon_json(
             "POST",
             &format!(
-                "/work/features/{}/gaps/{}",
+                "/work/features/{}/goals/{}",
                 path_segment(&feature_id),
                 path_segment(&id)
             ),
             None,
         )?,
-        GapAction::RemoveFeature {
+        GoalAction::RemoveFeature {
             id,
             target_root: None,
         } => {
-            let current = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
+            let current = daemon_json("GET", &format!("/work/goals/{}", path_segment(&id)), None)?;
             let feature_id = current
-                .get("gap")
-                .and_then(|gap| gap.get("feature_id"))
+                .get("goal")
+                .and_then(|goal| goal.get("feature_id"))
                 .and_then(|value| value.as_str())
                 .ok_or_else(|| {
-                    RefineError::Conflict(format!("Gap {id} is not assigned to a Feature"))
+                    RefineError::Conflict(format!("Goal {id} is not assigned to a Feature"))
                 })?;
             daemon_json(
                 "DELETE",
                 &format!(
-                    "/work/features/{}/gaps/{}",
+                    "/work/features/{}/goals/{}",
                     path_segment(feature_id),
                     path_segment(&id)
                 ),
@@ -2220,7 +2215,7 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
         }
         other => {
             return Err(RefineError::InvalidInput(format!(
-                "Gap command cannot be routed to the daemon in this mode: {other:?}"
+                "Goal command cannot be routed to the daemon in this mode: {other:?}"
             )));
         }
     };
@@ -2272,69 +2267,69 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
                 "reporter": reporter
             })),
         )?,
-        FeatureAction::AddGap {
+        FeatureAction::AddGoal {
             id,
-            gap_id,
+            goal_id,
             target_root: None,
         } => daemon_json(
             "POST",
             &format!(
-                "/work/features/{}/gaps/{}",
+                "/work/features/{}/goals/{}",
                 path_segment(&id),
-                path_segment(&gap_id)
+                path_segment(&goal_id)
             ),
             None,
         )?,
-        FeatureAction::RemoveGap {
+        FeatureAction::RemoveGoal {
             id,
-            gap_id,
+            goal_id,
             target_root: None,
         } => daemon_json(
             "DELETE",
             &format!(
-                "/work/features/{}/gaps/{}",
+                "/work/features/{}/goals/{}",
                 path_segment(&id),
-                path_segment(&gap_id)
+                path_segment(&goal_id)
             ),
             None,
         )?,
-        FeatureAction::ReorderGap {
+        FeatureAction::ReorderGoal {
             id,
-            gap_id,
+            goal_id,
             order,
             target_root: None,
         } => daemon_json(
             "POST",
             &format!(
-                "/work/features/{}/gaps/{}/reorder",
+                "/work/features/{}/goals/{}/reorder",
                 path_segment(&id),
-                path_segment(&gap_id)
+                path_segment(&goal_id)
             ),
             Some(json!({ "order": order })),
         )?,
-        FeatureAction::OrderGap {
+        FeatureAction::OrderGoal {
             id,
-            gap_id,
+            goal_id,
             target_root: None,
         } => daemon_json(
             "POST",
             &format!(
-                "/work/features/{}/gaps/{}/order",
+                "/work/features/{}/goals/{}/order",
                 path_segment(&id),
-                path_segment(&gap_id)
+                path_segment(&goal_id)
             ),
             None,
         )?,
-        FeatureAction::UnorderGap {
+        FeatureAction::UnorderGoal {
             id,
-            gap_id,
+            goal_id,
             target_root: None,
         } => daemon_json(
             "POST",
             &format!(
-                "/work/features/{}/gaps/{}/unorder",
+                "/work/features/{}/goals/{}/unorder",
                 path_segment(&id),
-                path_segment(&gap_id)
+                path_segment(&goal_id)
             ),
             None,
         )?,
@@ -2487,7 +2482,7 @@ fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
             target_root,
             limit,
             offset,
-            gap_id,
+            goal_id,
             severity,
             category,
             actor,
@@ -2497,8 +2492,8 @@ fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
                 format!("offset={offset}"),
                 format!("q={}", query_component(&q)),
             ];
-            if let Some(value) = gap_id {
-                query.push(format!("gap_id={}", query_component(&value)));
+            if let Some(value) = goal_id {
+                query.push(format!("goal_id={}", query_component(&value)));
             }
             if let Some(value) = severity {
                 query.push(format!("severity={}", query_component(&value)));
@@ -2692,7 +2687,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
             target_root: None,
         } => daemon_json(
             "POST",
-            "/nodes/transfer-gaps",
+            "/nodes/transfer-goals",
             Some(json!({
                 "target_node_id": id,
                 "item_id": item_id,
@@ -2988,7 +2983,7 @@ fn query_component(value: &str) -> String {
     path_segment(value)
 }
 
-fn gap_notes_from_detail(detail: &Value) -> Vec<Value> {
+fn goal_notes_from_detail(detail: &Value) -> Vec<Value> {
     detail
         .get("notes")
         .and_then(Value::as_array)
@@ -2996,7 +2991,7 @@ fn gap_notes_from_detail(detail: &Value) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-fn edit_gap_note_values(
+fn edit_goal_note_values(
     mut notes: Vec<Value>,
     note_id: &str,
     body: &str,
@@ -3026,7 +3021,7 @@ fn edit_gap_note_values(
     Ok(notes)
 }
 
-fn delete_gap_note_values(notes: Vec<Value>, note_id: &str) -> RefineResult<Vec<Value>> {
+fn delete_goal_note_values(notes: Vec<Value>, note_id: &str) -> RefineResult<Vec<Value>> {
     let original_len = notes.len();
     let next = notes
         .into_iter()
@@ -3062,35 +3057,35 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Sync { target_root, .. }
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
         },
-        Commands::Gap { action } => match action {
-            GapAction::Create { target_root, .. }
-            | GapAction::List { target_root }
-            | GapAction::Show { target_root, .. }
-            | GapAction::Edit { target_root, .. }
-            | GapAction::Note { target_root, .. }
-            | GapAction::NoteEdit { target_root, .. }
-            | GapAction::NoteDelete { target_root, .. }
-            | GapAction::Round { target_root, .. }
-            | GapAction::Start { target_root, .. }
-            | GapAction::Cancel { target_root, .. }
-            | GapAction::Retry { target_root, .. }
-            | GapAction::Verify { target_root, .. }
-            | GapAction::Merge { target_root, .. }
-            | GapAction::Undo { target_root, .. }
-            | GapAction::Delete { target_root, .. }
-            | GapAction::AssignFeature { target_root, .. }
-            | GapAction::RemoveFeature { target_root, .. } => target_root.as_ref(),
+        Commands::Goal { action } => match action {
+            GoalAction::Create { target_root, .. }
+            | GoalAction::List { target_root }
+            | GoalAction::Show { target_root, .. }
+            | GoalAction::Edit { target_root, .. }
+            | GoalAction::Note { target_root, .. }
+            | GoalAction::NoteEdit { target_root, .. }
+            | GoalAction::NoteDelete { target_root, .. }
+            | GoalAction::Round { target_root, .. }
+            | GoalAction::Start { target_root, .. }
+            | GoalAction::Cancel { target_root, .. }
+            | GoalAction::Retry { target_root, .. }
+            | GoalAction::Verify { target_root, .. }
+            | GoalAction::Merge { target_root, .. }
+            | GoalAction::Undo { target_root, .. }
+            | GoalAction::Delete { target_root, .. }
+            | GoalAction::AssignFeature { target_root, .. }
+            | GoalAction::RemoveFeature { target_root, .. } => target_root.as_ref(),
         },
         Commands::Feature { action } => match action {
             FeatureAction::Create { target_root, .. }
             | FeatureAction::List { target_root }
             | FeatureAction::Show { target_root, .. }
             | FeatureAction::Edit { target_root, .. }
-            | FeatureAction::AddGap { target_root, .. }
-            | FeatureAction::RemoveGap { target_root, .. }
-            | FeatureAction::ReorderGap { target_root, .. }
-            | FeatureAction::OrderGap { target_root, .. }
-            | FeatureAction::UnorderGap { target_root, .. }
+            | FeatureAction::AddGoal { target_root, .. }
+            | FeatureAction::RemoveGoal { target_root, .. }
+            | FeatureAction::ReorderGoal { target_root, .. }
+            | FeatureAction::OrderGoal { target_root, .. }
+            | FeatureAction::UnorderGoal { target_root, .. }
             | FeatureAction::Move { target_root, .. }
             | FeatureAction::Transfer { target_root, .. }
             | FeatureAction::Cancel { target_root, .. }

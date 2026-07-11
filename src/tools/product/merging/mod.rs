@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
-use crate::model::feature::compare_feature_gap_order;
+use crate::model::feature::compare_feature_goal_order;
 use crate::model::log::LogEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -19,17 +19,17 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::git_worktrees::{
     FileGitWorktreeService, GitWorktreeService, MergeResult, MergedBranchCleanup,
 };
-use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
+use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MergerTickResult {
-    pub processed: Option<MergerGapResult>,
+    pub processed: Option<MergerGoalResult>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MergerGapResult {
-    pub gap_id: String,
+pub struct MergerGoalResult {
+    pub goal_id: String,
     pub branch_name: String,
     pub target_branch: String,
     pub operation_id: String,
@@ -65,32 +65,32 @@ impl FileMergerService {
         if self.active_merger_operation()? {
             return Ok(MergerTickResult { processed: None });
         }
-        let Some(gap) = self.next_ready_merge_gap()? else {
+        let Some(goal) = self.next_ready_merge_goal()? else {
             return Ok(MergerTickResult { processed: None });
         };
-        let gap_id = gap.gap.id.clone();
+        let goal_id = goal.goal.id.clone();
         let settings =
             FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
-        let branch_name = gap
-            .gap
+        let branch_name = goal
+            .goal
             .branch_name
             .clone()
-            .unwrap_or_else(|| branch_name_for_gap(&settings, &gap_id));
+            .unwrap_or_else(|| branch_name_for_goal(&settings, &goal_id));
         let target_branch = setting_string(&settings, "merge_target_branch", "main");
         let operation = self
             .operation_registry
-            .register(&format!("merger:{gap_id}"))?;
+            .register(&format!("merger:{goal_id}"))?;
         self.append_operation_log(
             &operation.id,
-            &gap_id,
+            &goal_id,
             "info",
-            "Merging Gap branch",
+            "Merging Goal branch",
             Some(json_object(json!({
                 "branch_name": branch_name,
                 "target_branch": target_branch
             }))),
         )?;
-        let result = self.merge_gap_branch(&gap_id, &branch_name, &target_branch, &operation.id);
+        let result = self.merge_goal_branch(&goal_id, &branch_name, &target_branch, &operation.id);
         match result {
             Ok(merge_result) => Ok(MergerTickResult {
                 processed: Some(merge_result),
@@ -99,7 +99,7 @@ impl FileMergerService {
                 let _ = self.operation_registry.fail_with_error(
                     &operation.id,
                     json!({
-                        "gap_id": gap_id,
+                        "goal_id": goal_id,
                         "branch_name": branch_name,
                         "target_branch": target_branch,
                         "error": error.to_string()
@@ -130,29 +130,29 @@ impl FileMergerService {
         Ok(result)
     }
 
-    fn merge_gap_branch(
+    fn merge_goal_branch(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         branch_name: &str,
         target_branch: &str,
         operation_id: &str,
-    ) -> RefineResult<MergerGapResult> {
+    ) -> RefineResult<MergerGoalResult> {
         let target_root = target_root(&self.refine_dir)?;
         let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
         git.switch(target_branch)?;
         let merge = git.merge_no_ff(branch_name)?;
         if !merge.ok {
             let recover = git.recover()?;
-            self.fail_gap_merge(
-                gap_id,
+            self.fail_goal_merge(
+                goal_id,
                 operation_id,
                 branch_name,
                 target_branch,
                 &merge,
                 &recover,
             )?;
-            return Ok(MergerGapResult {
-                gap_id: gap_id.to_string(),
+            return Ok(MergerGoalResult {
+                goal_id: goal_id.to_string(),
                 branch_name: branch_name.to_string(),
                 target_branch: target_branch.to_string(),
                 operation_id: operation_id.to_string(),
@@ -168,23 +168,23 @@ impl FileMergerService {
         );
         self.append_operation_log(
             operation_id,
-            gap_id,
+            goal_id,
             "info",
-            "Cleaned up merged Gap branch worktree",
+            "Cleaned up merged Goal branch worktree",
             Some(json_object(json!({"cleanup": &cleanup}))),
         )?;
-        work_items.advance_automated_gap_status(gap_id, GapStatus::Build)?;
+        work_items.advance_automated_goal_status(goal_id, GoalStatus::Build)?;
         self.append_operation_log(
             operation_id,
-            gap_id,
+            goal_id,
             "info",
             "Workflow status changed: ready-merge -> build",
             Some(json_object(json!({"merge": &merge}))),
         )?;
-        work_items.advance_automated_gap_status(gap_id, GapStatus::Qa)?;
+        work_items.advance_automated_goal_status(goal_id, GoalStatus::Qa)?;
         self.append_operation_log(
             operation_id,
-            gap_id,
+            goal_id,
             "info",
             "Workflow status changed: build -> qa",
             None,
@@ -193,7 +193,7 @@ impl FileMergerService {
             operation_id,
             OperationState::Succeeded,
             json!({
-                "gap_id": gap_id,
+                "goal_id": goal_id,
                 "branch_name": branch_name,
                 "target_branch": target_branch,
                 "merge": merge,
@@ -201,8 +201,8 @@ impl FileMergerService {
                 "final_status": "qa"
             }),
         )?;
-        Ok(MergerGapResult {
-            gap_id: gap_id.to_string(),
+        Ok(MergerGoalResult {
+            goal_id: goal_id.to_string(),
             branch_name: branch_name.to_string(),
             target_branch: target_branch.to_string(),
             operation_id: operation_id.to_string(),
@@ -212,9 +212,9 @@ impl FileMergerService {
         })
     }
 
-    fn fail_gap_merge(
+    fn fail_goal_merge(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         operation_id: &str,
         branch_name: &str,
         target_branch: &str,
@@ -225,12 +225,12 @@ impl FileMergerService {
             &self.refine_dir,
             self.runtime_root.join("cache"),
         );
-        work_items.advance_automated_gap_status(gap_id, GapStatus::Failed)?;
+        work_items.advance_automated_goal_status(goal_id, GoalStatus::Failed)?;
         self.append_operation_log(
             operation_id,
-            gap_id,
+            goal_id,
             "error",
-            "Gap branch merge failed",
+            "Goal branch merge failed",
             Some(json_object(json!({
                 "branch_name": branch_name,
                 "target_branch": target_branch,
@@ -241,7 +241,7 @@ impl FileMergerService {
         self.operation_registry.fail_with_error(
             operation_id,
             json!({
-                "gap_id": gap_id,
+                "goal_id": goal_id,
                 "branch_name": branch_name,
                 "target_branch": target_branch,
                 "conflicts": merge.conflicts,
@@ -251,20 +251,20 @@ impl FileMergerService {
         Ok(())
     }
 
-    fn next_ready_merge_gap(&self) -> RefineResult<Option<GapSummaryProjection>> {
+    fn next_ready_merge_goal(&self) -> RefineResult<Option<GoalSummaryProjection>> {
         let snapshot =
             FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root)
                 .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         let mut candidates = snapshot
-            .gaps
+            .goals
             .values()
-            .filter(|gap| gap.gap.status == GapStatus::ReadyMerge)
+            .filter(|goal| goal.goal.status == GoalStatus::ReadyMerge)
             .cloned()
             .collect::<Vec<_>>();
         candidates.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.updated.cmp(&b.gap.updated))
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.updated.cmp(&b.goal.updated))
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
         Ok(candidates.into_iter().next())
     }
@@ -288,7 +288,7 @@ impl FileMergerService {
     fn append_operation_log(
         &self,
         operation_id: &str,
-        gap_id: &str,
+        goal_id: &str,
         severity: &str,
         message: &str,
         details: Option<JsonObject>,
@@ -303,15 +303,16 @@ impl FileMergerService {
                 details,
                 actions: Vec::new(),
                 actor: Some("refine".to_string()),
-                gap_id: Some(gap_id.to_string()),
+                goal_id: Some(goal_id.to_string()),
             },
         )?;
         Ok(())
     }
 }
 
-pub fn branch_name_for_gap(settings: &JsonObject, gap_id: &str) -> String {
-    setting_string(settings, "branch_name_pattern", "refine/{gap_id}").replace("{gap_id}", gap_id)
+pub fn branch_name_for_goal(settings: &JsonObject, goal_id: &str) -> String {
+    setting_string(settings, "branch_name_pattern", "refine/{goal_id}")
+        .replace("{goal_id}", goal_id)
 }
 
 pub fn target_root(refine_dir: &Path) -> RefineResult<PathBuf> {
@@ -359,7 +360,7 @@ mod tests {
     use crate::tools::product::work_items::FileWorkItemService;
 
     #[test]
-    fn file_merger_merges_one_ready_gap_per_tick_with_no_ff_commit() {
+    fn file_merger_merges_one_ready_goal_per_tick_with_no_ff_commit() {
         let temp_root = unique_temp_dir("merger-success");
         let repo = temp_root.join("repo");
         let refine_dir = repo.join(".refine");
@@ -369,19 +370,19 @@ mod tests {
         commit_file(&repo, "app.txt", "base\n", "initial");
 
         let work_items = FileWorkItemService::new(&refine_dir);
-        for id in ["GAP1", "GAP2"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+        for id in ["GOAL1", "GOAL2"] {
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
             work_items
-                .advance_automated_gap_status(id, GapStatus::InProgress)
+                .advance_automated_goal_status(id, GoalStatus::InProgress)
                 .unwrap();
             work_items
-                .advance_automated_gap_status(id, GapStatus::ReadyMerge)
+                .advance_automated_goal_status(id, GoalStatus::ReadyMerge)
                 .unwrap();
             work_items
-                .set_gap_branch_name(id, &format!("refine/{id}"))
+                .set_goal_branch_name(id, &format!("refine/{id}"))
                 .unwrap();
             git(&repo, &["switch", "-c", &format!("refine/{id}")]).unwrap();
             commit_file(&repo, &format!("{id}.txt"), "change\n", id);
@@ -390,17 +391,17 @@ mod tests {
 
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let first = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(first.gap_id, "GAP1");
-        assert_eq!(first.cleanup.as_ref().unwrap().branch, "refine/GAP1");
+        assert_eq!(first.goal_id, "GOAL1");
+        assert_eq!(first.cleanup.as_ref().unwrap().branch, "refine/GOAL1");
         assert!(!first.cleanup.as_ref().unwrap().worktree_removed);
         assert!(first.cleanup.as_ref().unwrap().branch_deleted);
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Qa
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Qa
         );
         assert_eq!(
-            work_items.show_gap_summary("GAP2").unwrap().gap.status,
-            GapStatus::ReadyMerge
+            work_items.show_goal_summary("GOAL2").unwrap().goal.status,
+            GoalStatus::ReadyMerge
         );
         assert_eq!(
             git_stdout(&repo, &["rev-parse", "--abbrev-ref", "HEAD"]),
@@ -414,27 +415,27 @@ mod tests {
         );
 
         let second = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(second.gap_id, "GAP2");
+        assert_eq!(second.goal_id, "GOAL2");
         assert_eq!(
-            work_items.show_gap_summary("GAP2").unwrap().gap.status,
-            GapStatus::Qa
+            work_items.show_goal_summary("GOAL2").unwrap().goal.status,
+            GoalStatus::Qa
         );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_merger_cleans_gap_worktree_and_branch_after_successful_tick() {
+    fn file_merger_cleans_goal_worktree_and_branch_after_successful_tick() {
         let temp_root = unique_temp_dir("merger-cleanup");
         let repo = temp_root.join("repo");
         let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        let worktree_path = temp_root.join("repo-refine-GOAL1-round-1");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
 
-        let branch = "refine/GAP1/round-1";
+        let branch = "refine/GOAL1/round-1";
         git(
             &repo,
             &[
@@ -446,25 +447,27 @@ mod tests {
             ],
         )
         .unwrap();
-        commit_file(&worktree_path, "feature.txt", "change\n", "GAP1");
+        commit_file(&worktree_path, "feature.txt", "change\n", "GOAL1");
 
         let work_items = FileWorkItemService::new(&refine_dir);
-        work_items.create_gap_summary("GAP1", Some("GAP1")).unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .create_goal_summary("GOAL1", Some("GOAL1"))
             .unwrap();
         work_items
-            .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         work_items
-            .advance_automated_gap_status("GAP1", GapStatus::ReadyMerge)
+            .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
             .unwrap();
-        work_items.set_gap_branch_name("GAP1", branch).unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+            .unwrap();
+        work_items.set_goal_branch_name("GOAL1", branch).unwrap();
 
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let merged = merger.tick().unwrap().processed.unwrap();
         let cleanup = merged.cleanup.unwrap();
-        assert_eq!(merged.gap_id, "GAP1");
+        assert_eq!(merged.goal_id, "GOAL1");
         assert_eq!(merged.status, "qa");
         assert_eq!(cleanup.branch, branch);
         assert_eq!(
@@ -488,17 +491,17 @@ mod tests {
     }
 
     #[test]
-    fn workflow_merge_cleans_gap_worktree_and_branch() {
+    fn workflow_merge_cleans_goal_worktree_and_branch() {
         let temp_root = unique_temp_dir("workflow-merge-cleanup");
         let repo = temp_root.join("repo");
         let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
-        let worktree_path = temp_root.join("repo-refine-GAP1-round-1");
+        let worktree_path = temp_root.join("repo-refine-GOAL1-round-1");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
 
-        let branch = "refine/GAP1/round-1";
+        let branch = "refine/GOAL1/round-1";
         git(
             &repo,
             &[
@@ -510,7 +513,7 @@ mod tests {
             ],
         )
         .unwrap();
-        commit_file(&worktree_path, "workflow.txt", "change\n", "GAP1");
+        commit_file(&worktree_path, "workflow.txt", "change\n", "GOAL1");
 
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let merge = merger.merge_branch_for_workflow(branch).unwrap();
@@ -530,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn file_merger_marks_only_conflicted_gap_failed_and_recovers_target() {
+    fn file_merger_marks_only_conflicted_goal_failed_and_recovers_target() {
         let temp_root = unique_temp_dir("merger-conflict");
         let repo = temp_root.join("repo");
         let refine_dir = repo.join(".refine");
@@ -541,18 +544,18 @@ mod tests {
 
         let work_items = FileWorkItemService::new(&refine_dir);
         for id in ["AAA", "ZZZ"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
             work_items
-                .advance_automated_gap_status(id, GapStatus::InProgress)
+                .advance_automated_goal_status(id, GoalStatus::InProgress)
                 .unwrap();
             work_items
-                .advance_automated_gap_status(id, GapStatus::ReadyMerge)
+                .advance_automated_goal_status(id, GoalStatus::ReadyMerge)
                 .unwrap();
             work_items
-                .set_gap_branch_name(id, &format!("refine/{id}"))
+                .set_goal_branch_name(id, &format!("refine/{id}"))
                 .unwrap();
         }
 
@@ -569,16 +572,16 @@ mod tests {
         assert_eq!(conflicted.status, "failed");
         assert_eq!(conflicted.conflicts, vec!["app.txt"]);
         assert_eq!(
-            work_items.show_gap_summary("AAA").unwrap().gap.status,
-            GapStatus::Failed
+            work_items.show_goal_summary("AAA").unwrap().goal.status,
+            GoalStatus::Failed
         );
         assert_eq!(fs::read_to_string(repo.join("app.txt")).unwrap(), "main\n");
 
         let clean = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(clean.gap_id, "ZZZ");
+        assert_eq!(clean.goal_id, "ZZZ");
         assert_eq!(
-            work_items.show_gap_summary("ZZZ").unwrap().gap.status,
-            GapStatus::Qa
+            work_items.show_goal_summary("ZZZ").unwrap().goal.status,
+            GoalStatus::Qa
         );
 
         fs::remove_dir_all(temp_root).unwrap();

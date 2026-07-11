@@ -421,10 +421,10 @@ fn operation_log_entry(
         details: Some(details),
         actions: Vec::new(),
         actor: Some("refine".to_string()),
-        gap_id: operation
+        goal_id: operation
             .owner
-            .strip_prefix("gap:")
-            .map(|gap_id| gap_id.to_string()),
+            .strip_prefix("goal:")
+            .map(|goal_id| goal_id.to_string()),
     }
 }
 
@@ -440,11 +440,11 @@ mod tests {
     fn file_operation_registry_registers_recovers_and_cancels_operations() {
         let temp_root = unique_temp_dir("operations");
         let registry = FileOperationRegistry::new(temp_root.join("run/8080"));
-        let operation = registry.register("bulk_update_gaps").unwrap();
+        let operation = registry.register("bulk_update_goals").unwrap();
         assert_eq!(operation.state, OperationState::Running);
         assert_eq!(
             registry.status(&operation.id).unwrap().owner,
-            "bulk_update_gaps"
+            "bulk_update_goals"
         );
         assert_eq!(registry.recover().unwrap().len(), 1);
 

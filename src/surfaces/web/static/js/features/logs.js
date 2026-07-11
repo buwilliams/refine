@@ -4,7 +4,7 @@ const LOGS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const LOGS_DEFAULT_LIMIT = 50;
 const LOGS_DEFAULT_DIR = {
   datetime: "desc", severity: "asc", category: "asc",
-  actor: "asc", gap_id: "asc", message: "asc", id: "desc",
+  actor: "asc", goal_id: "asc", message: "asc", id: "desc",
 };
 
 function logsFiltersFromHash() {
@@ -17,7 +17,7 @@ function logsFiltersFromHash() {
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
     actor: hashQs.get("actor") || "",
-    gap_id: hashQs.get("gap_id") || "",
+    goal_id: hashQs.get("goal_id") || "",
     q: hashQs.get("q") || "",
     period: ["day", "week", "month"].includes(hashQs.get("period")) ? hashQs.get("period") : "day",
     limit: parseInt(hashQs.get("limit") || String(LOGS_DEFAULT_LIMIT), 10)
@@ -33,7 +33,7 @@ function logsHashFromFilters(f) {
   if (f.severity) next.set("severity", f.severity);
   if (f.category) next.set("category", f.category);
   if (f.actor) next.set("actor", f.actor);
-  if (f.gap_id) next.set("gap_id", f.gap_id);
+  if (f.goal_id) next.set("goal_id", f.goal_id);
   if (f.q) next.set("q", f.q);
   if (f.period && f.period !== "day") next.set("period", f.period);
   if (f.limit && f.limit !== LOGS_DEFAULT_LIMIT) {
@@ -79,11 +79,11 @@ async function renderLogs() {
                data-testid="logs-search"
                placeholder="Search message or details…"
                value="${htmlEscape(f.q)}">
-        <input type="text" id="logs-gap-id"
-               class="filter-gap-id"
-               data-testid="logs-gap-filter"
-               placeholder="Gap ID"
-               value="${htmlEscape(f.gap_id)}">
+        <input type="text" id="logs-goal-id"
+               class="filter-goal-id"
+               data-testid="logs-goal-filter"
+               placeholder="Goal ID"
+               value="${htmlEscape(f.goal_id)}">
       </div>
       <div class="filter-row filter-row-filters">
         <select id="logs-severity" data-testid="logs-severity-filter">
@@ -116,8 +116,8 @@ async function renderLogs() {
     updateLogsFilter({ category: e.target.value, page: 1 }));
   $("#logs-actor").addEventListener("change", (e) =>
     updateLogsFilter({ actor: e.target.value, page: 1 }));
-  $("#logs-gap-id").addEventListener("input", debounce(() => {
-    updateLogsFilter({ gap_id: $("#logs-gap-id").value.trim(), page: 1 });
+  $("#logs-goal-id").addEventListener("input", debounce(() => {
+    updateLogsFilter({ goal_id: $("#logs-goal-id").value.trim(), page: 1 });
   }, 300));
   $("#logs-limit").addEventListener("change", (e) =>
     updateLogsFilter({
@@ -141,7 +141,7 @@ function updateLogsFilter(patch) {
     severity: "severity" in patch ? patch.severity : current.severity,
     category: "category" in patch ? patch.category : current.category,
     actor: "actor" in patch ? patch.actor : current.actor,
-    gap_id: "gap_id" in patch ? patch.gap_id : current.gap_id,
+    goal_id: "goal_id" in patch ? patch.goal_id : current.goal_id,
     q: "q" in patch ? patch.q : current.q,
     period: "period" in patch ? patch.period : current.period,
     limit: "limit" in patch ? patch.limit : current.limit,
@@ -165,7 +165,7 @@ async function loadLogs() {
   if (f.severity) params.set("severity", f.severity);
   if (f.category) params.set("category", f.category);
   if (f.actor) params.set("actor", f.actor);
-  if (f.gap_id) params.set("gap_id", f.gap_id);
+  if (f.goal_id) params.set("goal_id", f.goal_id);
   if (f.q) params.set("q", f.q);
   params.set("limit", String(f.limit));
   params.set("offset", String((f.page - 1) * f.limit));
@@ -222,7 +222,7 @@ function drawLogsList(data, f) {
     { key: "severity", label: "Severity" },
     { key: "category", label: "Category" },
     { key: "actor", label: "Actor" },
-    { key: "gap_id", label: "Gap" },
+    { key: "goal_id", label: "Goal" },
   ];
   const sortHeads = columns.map((c) => {
     const isActive = c.key === f.effectiveSort;
@@ -260,9 +260,9 @@ function drawLogsList(data, f) {
                   <span class="logs-entry-meta-value muted small">${htmlEscape(e.actor || "")}</span>
                 </div>
                 <div class="logs-entry-meta-item">
-                  <span class="logs-entry-meta-label">Gap</span>
-                  <span class="logs-entry-meta-value muted small">${e.gap_id
-                    ? `<a href="#/gaps/${htmlEscape(e.gap_id)}">Gap ${htmlEscape(e.gap_id.slice(0, 8))}...</a>`
+                  <span class="logs-entry-meta-label">Goal</span>
+                  <span class="logs-entry-meta-value muted small">${e.goal_id
+                    ? `<a href="#/goals/${htmlEscape(e.goal_id)}">Goal ${htmlEscape(e.goal_id.slice(0, 8))}...</a>`
                     : "-"}</span>
                 </div>
               </div>
@@ -372,11 +372,11 @@ function drawLogsVisualization(entries, period = "day") {
     </section>`;
 }
 
-// Mirror of applyGapsFilterIndicator for the Logs screen.
+// Mirror of applyGoalsFilterIndicator for the Logs screen.
 function applyLogsFilterIndicator(f) {
   const active = {
     "logs-q": !!f.q,
-    "logs-gap-id": !!f.gap_id,
+    "logs-goal-id": !!f.goal_id,
     "logs-severity": !!f.severity,
     "logs-category": !!f.category,
     "logs-actor": !!f.actor,

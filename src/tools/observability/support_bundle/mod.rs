@@ -205,7 +205,7 @@ mod tests {
                 severity: "error".to_string(),
                 category: "provider".to_string(),
                 message: "Provider failed".to_string(),
-                gap_id: None,
+                goal_id: None,
                 actor: Some("test".to_string()),
                 details: Some(
                     serde_json::json!({

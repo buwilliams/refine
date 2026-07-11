@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_INSTRUCTIONS: &str = concat!(
-    "Execute the target-app tests for this Gap, if none exist, then write them. ",
-    "Write tests that check how the Gap is supposed to work, not based on how ",
+    "Execute the target-app tests for this Goal, if none exist, then write them. ",
+    "Write tests that check how the Goal is supposed to work, not based on how ",
     "it is implemented. Failing tests are good when they show true failures. ",
-    "Run the minimal number of tests needed to cover the Gap."
+    "Run the minimal number of tests needed to cover the Goal."
 );
 pub const PRE_MERGE: &str = "pre_merge";
 pub const POST_BUILD: &str = "post_build";

@@ -11,7 +11,7 @@
 
 Pagination exists to keep operational surfaces fast and understandable as work grows. Refine should work for small projects and for large work queues without changing interaction models.
 
-It also protects agent and browser performance. Large Gaps, Features, logs, changes, and metrics should be navigable without exhausting the UI.
+It also protects agent and browser performance. Large Goals, Features, logs, changes, and metrics should be navigable without exhausting the UI.
 
 ## Expected Role
 
@@ -20,7 +20,7 @@ Pagination should be shared wherever a list can expose page metadata. It should 
 Current implementation details that matter to intent:
 
 - shared primitives include `renderPaginationControls` and `bindPaginationControls`;
-- Gaps, Features, Logs, Changes, Performance, and Feature modal Gap lists use pagination patterns;
+- Goals, Features, Logs, Changes, Performance, and Feature modal Goal lists use pagination patterns;
 - boundary controls are used when the backend provides enough metadata;
 - list filters reset page to 1 when the filter context changes.
 

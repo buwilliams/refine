@@ -195,7 +195,7 @@
   justify-content: flex-end;
   flex-wrap: wrap;
 }
-.feature-modal-gap-heading {
+.feature-modal-goal-heading {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -203,14 +203,14 @@
   margin-top: 16px;
   margin-bottom: 8px;
 }
-.feature-modal-gap-heading .modal-title {
+.feature-modal-goal-heading .modal-title {
   margin-bottom: 0;
 }
-.feature-gap-heading-actions {
+.feature-goal-heading-actions {
   margin-left: auto;
   justify-content: flex-end;
 }
-.feature-gap-add-btn {
+.feature-goal-add-btn {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -372,15 +372,15 @@
 .diff-show-details { font-size: 12px; color: var(--muted); cursor: pointer; }
 .collapsed { display: none; }
 
-/* --- Gap detail modal -------------------------------------------------- */
+/* --- Goal detail modal -------------------------------------------------- */
 /* Leave the Toolbar peeking out at the bottom — the dock publishes its
    height via `--toolbar-dock-height`, so the modal's backdrop stops above it
    instead of covering it. The user can keep chatting while the modal sits
    on top of the underlying screen. */
-.gap-detail-backdrop {
+.goal-detail-backdrop {
   bottom: var(--toolbar-dock-height, 0);
 }
-.gap-detail-modal {
+.goal-detail-modal {
   position: relative;
   max-width: 960px;
   width: calc(100% - 40px);
@@ -390,11 +390,11 @@
   max-height: calc(100vh - var(--toolbar-dock-height, 0px) - 60px);
   overflow: hidden;
 }
-.gap-detail-modal-body {
+.goal-detail-modal-body {
   overflow: auto;
   padding: 22px 24px 24px;
 }
-.gap-detail-modal-body .gap-detail h2 { margin-top: 0; }
+.goal-detail-modal-body .goal-detail h2 { margin-top: 0; }
 
 @media (max-width: 760px) {
   .feature-detail-modal {

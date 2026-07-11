@@ -80,131 +80,130 @@ Run project-level diagnostics against the attached target app and report problem
 - `--runtime-root` — Runtime directory where Refine keeps daemon and registry state
 - `--repo-root` — Path to the Refine checkout used for repository diagnostics
 
-## `refine gap`
+## `refine goal`
 
-Create and drive Gaps — units of work capturing the difference between actual and desired app behavior. Covers the full lifecycle: create, round, start, retry, verify, merge, undo
+Create and drive Goals — prompt-driven units of work for the active app. Covers the full lifecycle: create, round, start, retry, verify, merge, undo
 
-### `refine gap create`
+### `refine goal create`
 
-Create a new Gap — a unit of work describing the difference between actual and desired behavior. It starts in the backlog; add a round to describe the behavior, then `gap start` to begin work
+Create a new prompt-driven Goal. It starts in the backlog; add a round to describe the behavior, then `goal start` to begin work
 
-- `<NAME>` (required) — Human-readable Gap name
-- `--id` — Explicit Gap id (generated when omitted)
+- `<NAME>` (required) — Human-readable Goal name
+- `--id` — Explicit Goal id (generated when omitted)
 
-### `refine gap list`
+### `refine goal list`
 
-List all Gaps with their status and ownership
+List all Goals with their status and ownership
 
-### `refine gap show`
+### `refine goal show`
 
-Show full detail for one Gap: status, rounds, notes, and ownership
+Show full detail for one Goal: status, rounds, notes, and ownership
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap edit`
+### `refine goal edit`
 
-Edit a Gap's metadata (name and/or priority). Only valid while the Gap's status allows editing
+Edit a Goal's metadata (name and/or priority). Only valid while the Goal's status allows editing
 
-- `<ID>` (required) — Gap id
-- `--name` — New Gap name
+- `<ID>` (required) — Goal id
+- `--name` — New Goal name
 - `--priority` — New priority value
 
-### `refine gap note`
+### `refine goal note`
 
-Append a free-form note to a Gap for context that agents and humans should see
+Append a free-form note to a Goal for context that agents and humans should see
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 - `<BODY>` (required) — Note text
 - `--author` — Author label recorded on the note
 
-### `refine gap note-edit`
+### `refine goal note-edit`
 
-Replace the body of an existing note on a Gap
+Replace the body of an existing note on a Goal
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 - `<NOTE_ID>` (required) — Id of the note to edit
 - `<BODY>` (required) — Replacement note text
 
-### `refine gap note-delete`
+### `refine goal note-delete`
 
-Delete a note from a Gap
+Delete a note from a Goal
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 - `<NOTE_ID>` (required) — Id of the note to delete
 
-### `refine gap round`
+### `refine goal round`
 
-Record a round on a Gap: a reporter's statement of actual vs target behavior. Requires --reporter, --actual, and --target unless --edit-latest amends the newest round
+Record an actionable prompt as a round on a Goal. Requires --reporter and --prompt unless --edit-latest amends the newest round
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 - `--reporter` — Who is reporting this round
-- `--actual` — The actual (current) behavior observed
-- `--target` — The target (desired) behavior
+- `--prompt` — The work prompt for the agent
 - `--edit-latest` — Edit the most recent round instead of appending a new one
 
-### `refine gap start`
+### `refine goal start`
 
-Start work on a Gap: moves it from backlog/todo to in-progress so the agent workflow picks it up
+Start work on a Goal: moves it from backlog/todo to in-progress so the agent workflow picks it up
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap cancel`
+### `refine goal cancel`
 
-Cancel a Gap: any not-yet-done Gap becomes cancelled. Done Gaps cannot be cancelled (use undo first)
+Cancel a Goal: any not-yet-done Goal becomes cancelled. Done Goals cannot be cancelled (use undo first)
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap retry`
+### `refine goal retry`
 
-Retry a failed stage for a Gap: --stage quality returns it to QA, --stage merge to ready-merge
+Retry a failed stage for a Goal: --stage quality returns it to QA, --stage merge to ready-merge
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 - `--stage` — Stage to retry: "quality" (back to QA) or "merge" (back to ready-merge)
 
-### `refine gap verify`
+### `refine goal verify`
 
-Approve a Gap that is in review: marks it done after the change has been verified
+Approve a Goal that is in review: marks it done after the change has been verified
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap merge`
+### `refine goal merge`
 
-Merge a ready-merge Gap and mark it done. Requires the Gap to be in the ready-merge status
+Merge a ready-merge Goal and mark it done. Requires the Goal to be in the ready-merge status
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap undo`
+### `refine goal undo`
 
-Walk a Gap's status backwards: done goes to review; review or cancelled goes to todo
+Walk a Goal's status backwards: done goes to review; review or cancelled goes to todo
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap delete`
+### `refine goal delete`
 
-Permanently delete a Gap record from project state. Irreversible; prefer cancel to keep history
+Permanently delete a Goal record from project state. Irreversible; prefer cancel to keep history
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
-### `refine gap assign-feature`
+### `refine goal assign-feature`
 
-Assign a Gap to a Feature so it is grouped and ordered with related work
+Assign a Goal to a Feature so it is grouped and ordered with related work
 
-- `<ID>` (required) — Gap id
-- `<FEATURE_ID>` (required) — Feature id to assign the Gap to
+- `<ID>` (required) — Goal id
+- `<FEATURE_ID>` (required) — Feature id to assign the Goal to
 
-### `refine gap remove-feature`
+### `refine goal remove-feature`
 
-Remove a Gap from its Feature. The Gap itself is kept
+Remove a Goal from its Feature. The Goal itself is kept
 
-- `<ID>` (required) — Gap id
+- `<ID>` (required) — Goal id
 
 ## `refine feature`
 
-Manage Features — named groups of ordered Gaps delivered together. Group, order, move, transfer, and bulk-import Gaps under a Feature
+Manage Features — named groups of ordered Goals delivered together. Group, order, move, transfer, and bulk-import Goals under a Feature
 
 ### `refine feature create`
 
-Create a Feature — a named group of ordered Gaps delivered together
+Create a Feature — a named group of ordered Goals delivered together
 
 - `<NAME>` (required) — Human-readable Feature name
 - `--id` — Explicit Feature id (generated when omitted)
@@ -217,7 +216,7 @@ List all Features with their rollup status
 
 ### `refine feature show`
 
-Show one Feature with its Gaps and rollup status
+Show one Feature with its Goals and rollup status
 
 - `<ID>` (required) — Feature id
 
@@ -230,91 +229,91 @@ Edit a Feature's metadata: name, description, or reporter
 - `--description` — New Feature description
 - `--reporter` — New reporter value
 
-### `refine feature add-gap`
+### `refine feature add-goal`
 
-Add an existing Gap to a Feature
-
-- `<ID>` (required) — Feature id
-- `<GAP_ID>` (required) — Gap id to add to the Feature
-
-### `refine feature remove-gap`
-
-Remove a Gap from a Feature. The Gap itself is kept
+Add an existing Goal to a Feature
 
 - `<ID>` (required) — Feature id
-- `<GAP_ID>` (required) — Gap id to remove from the Feature
+- `<GOAL_ID>` (required) — Goal id to add to the Feature
 
-### `refine feature reorder-gap`
+### `refine feature remove-goal`
 
-Set a Gap's position within the Feature's ordered delivery sequence
-
-- `<ID>` (required) — Feature id
-- `<GAP_ID>` (required) — Gap id to reposition
-- `<ORDER>` (required) — New position in the Feature's ordered Gap sequence
-
-### `refine feature order-gap`
-
-Add a Gap to the Feature's ordered delivery sequence
+Remove a Goal from a Feature. The Goal itself is kept
 
 - `<ID>` (required) — Feature id
-- `<GAP_ID>` (required) — Gap id to add to the ordered sequence
+- `<GOAL_ID>` (required) — Goal id to remove from the Feature
 
-### `refine feature unorder-gap`
+### `refine feature reorder-goal`
 
-Remove a Gap from the Feature's ordered delivery sequence while keeping it in the Feature
+Set a Goal's position within the Feature's ordered delivery sequence
 
 - `<ID>` (required) — Feature id
-- `<GAP_ID>` (required) — Gap id to remove from the ordered sequence
+- `<GOAL_ID>` (required) — Goal id to reposition
+- `<ORDER>` (required) — New position in the Feature's ordered Goal sequence
+
+### `refine feature order-goal`
+
+Add a Goal to the Feature's ordered delivery sequence
+
+- `<ID>` (required) — Feature id
+- `<GOAL_ID>` (required) — Goal id to add to the ordered sequence
+
+### `refine feature unorder-goal`
+
+Remove a Goal from the Feature's ordered delivery sequence while keeping it in the Feature
+
+- `<ID>` (required) — Feature id
+- `<GOAL_ID>` (required) — Goal id to remove from the ordered sequence
 
 ### `refine feature move`
 
-Move all of a Feature's eligible Gaps to a workflow stage (backlog or todo)
+Move all of a Feature's eligible Goals to a workflow stage (backlog or todo)
 
 - `<ID>` (required) — Feature id
-- `<TARGET>` (required) — Target status for the Feature's Gaps: "backlog" or "todo"
+- `<TARGET>` (required) — Target status for the Feature's Goals: "backlog" or "todo"
 
 ### `refine feature transfer`
 
-Transfer ownership of a Feature and its Gaps to another node in the fleet
+Transfer ownership of a Feature and its Goals to another node in the fleet
 
 - `<ID>` (required) — Feature id
 - `<NODE_ID>` (required) — Destination node id
 
 ### `refine feature cancel`
 
-Cancel a Feature: its cancellable Gaps are cancelled as well
+Cancel a Feature: its cancellable Goals are cancelled as well
 
 - `<ID>` (required) — Feature id
 
 ### `refine feature delete`
 
-Permanently delete a Feature and its Gaps. Irreversible; prefer cancel to keep history
+Permanently delete a Feature and its Goals. Irreversible; prefer cancel to keep history
 
 - `<ID>` (required) — Feature id
 
 ### `refine feature import`
 
-Bulk-import Gap drafts from text, structured JSON, or CSV, optionally attaching them to a Feature
+Bulk-import Goal drafts from text, structured JSON, or CSV, optionally attaching them to a Feature
 
 - `--text` — Inline import source text (alternative to --file)
 - `--file` — File to read the import source from (alternative to --text)
 - `--csv` — Parse the input as CSV instead of structured or free text
-- `--reporter` — Reporter recorded on the imported Gaps
-- `--feature-id` — Feature id to attach the imported Gaps to
+- `--reporter` — Reporter recorded on the imported Goals
+- `--feature-id` — Feature id to attach the imported Goals to
 
 ## `refine workflow`
 
-Control the agent automation engine that advances Gaps through their workflow (pause/resume)
+Control the agent automation engine that advances Goals through their workflow (pause/resume)
 
 ### `refine workflow pause`
 
-Pause the agent automation engine: no new Gap work is claimed until resumed
+Pause the agent automation engine: no new Goal work is claimed until resumed
 
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 
 ### `refine workflow resume`
 
-Resume the agent automation engine after a pause so agents claim Gap work again
+Resume the agent automation engine after a pause so agents claim Goal work again
 
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 
@@ -376,14 +375,14 @@ Print a node's settings object
 
 ### `refine node transfer`
 
-Transfer ownership of a Gap or Feature (by item id) to the given node
+Transfer ownership of a Goal or Feature (by item id) to the given node
 
 - `<ID>` (required) — Destination node id
-- `<ITEM_ID>` (required) — Gap or Feature id to transfer
+- `<ITEM_ID>` (required) — Goal or Feature id to transfer
 
 ## `refine cluster`
 
-Operate the cluster (the fleet of nodes): register and bootstrap nodes, distribute unclaimed Gap ownership, and run remote commands
+Operate the cluster (the fleet of nodes): register and bootstrap nodes, distribute unclaimed Goal ownership, and run remote commands
 
 ### `refine cluster list`
 
@@ -443,10 +442,10 @@ SSH-bootstrap a manually configured node by git-pulling its Refine checkout. Req
 
 ### `refine cluster distribute`
 
-Reassign eligible unclaimed Gap ownership across the fleet. Spreads across enabled healthy nodes by default, fills one node with --to, or converges reviewable Gaps home with --converge --to <node>
+Reassign eligible unclaimed Goal ownership across the fleet. Spreads across enabled healthy nodes by default, fills one node with --to, or converges reviewable Goals home with --converge --to <node>
 
 - `--to` — Send all moves to this node instead of spreading across the fleet
-- `--converge` — Converge reviewable Gaps back to the node given by --to
+- `--converge` — Converge reviewable Goals back to the node given by --to
 - `--dry-run` — Plan the moves without applying them
 
 ### `refine cluster sync`
@@ -462,10 +461,10 @@ Run an authorized command on a node over SSH and print the result
 
 ### `refine cluster transfer`
 
-Transfer ownership of a Gap or Feature (by item id) to the given node, updating cluster records
+Transfer ownership of a Goal or Feature (by item id) to the given node, updating cluster records
 
 - `<ID>` (required) — Destination node id
-- `<ITEM_ID>` (required) — Gap or Feature id to transfer
+- `<ITEM_ID>` (required) — Goal or Feature id to transfer
 
 ### `refine cluster maintenance`
 
@@ -500,7 +499,7 @@ Search the activity log with a text query and optional filters, with pagination
 - `<Q>` (required) — Text to search for
 - `--limit` — Maximum number of entries to return
 - `--offset` — Number of matching entries to skip (for pagination)
-- `--gap-id` — Only return entries for this Gap id
+- `--goal-id` — Only return entries for this Goal id
 - `--severity` — Only return entries with this severity
 - `--category` — Only return entries in this category
 - `--actor` — Only return entries recorded by this actor

@@ -4,7 +4,7 @@ use std::process::Command;
 #[test]
 fn production_cli_rejects_target_root_argument() {
     let output = Command::new(env!("CARGO_BIN_EXE_refine"))
-        .args(["gap", "create", "--target-root", ".refine", "direct write"])
+        .args(["goal", "create", "--target-root", ".refine", "direct write"])
         .output()
         .expect("failed to run refine binary");
 
@@ -23,7 +23,7 @@ fn production_cli_product_commands_require_daemon() {
         .to_string();
     drop(listener);
     let output = Command::new(env!("CARGO_BIN_EXE_refine"))
-        .args(["gap", "list"])
+        .args(["goal", "list"])
         .env("REFINE_DAEMON_PORT", port)
         .output()
         .expect("failed to run refine binary");

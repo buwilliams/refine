@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/common.css">
   <link rel="stylesheet" href="/static/css/modals.css">
-  <link rel="stylesheet" href="/static/css/gaps.css">
+  <link rel="stylesheet" href="/static/css/goals.css">
   <link rel="stylesheet" href="/static/css/guide.css">
   <link rel="stylesheet" href="/static/css/toolbar.css">
   <link rel="stylesheet" href="/static/vendor/xterm/xterm.css">
@@ -23,7 +23,7 @@
     <nav class="nav" data-testid="primary-nav">
       <a href="#/" data-route="dashboard" data-testid="nav-dashboard">Dashboard</a>
       <a href="#/features" data-route="features" data-testid="nav-features">Features</a>
-      <a href="#/gaps" data-route="gaps" data-testid="nav-gaps">Gaps</a>
+      <a href="#/goals" data-route="goals" data-testid="nav-goals">Goals</a>
       <a href="#/changes" data-route="changes" data-testid="nav-changes">Changes</a>
       <a href="#/logs" data-route="logs" data-testid="nav-logs">Logs</a>
     </nav>
@@ -96,13 +96,13 @@
         <span class="nav-bug-icon" aria-hidden="true"></span>
       </button>
       <div class="nav-create-group">
-        <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap" data-testid="nav-new-gap">+ New Gap</a>
+        <a class="btn nav-action nav-create-primary" href="#/goals/new" id="btn-new-goal" data-testid="nav-new-goal">+ New Goal</a>
         <details class="nav-menu nav-create-menu" id="nav-create-menu">
           <summary class="btn nav-action nav-create-more" aria-label="More create actions" data-testid="create-menu-toggle"></summary>
           <div class="nav-menu-panel nav-create-panel">
             <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
-            <a class="nav-menu-item" href="#/gaps/plan" id="btn-plan" data-testid="nav-plan-mode">Plan Mode</a>
-            <a class="nav-menu-item" href="#/gaps/import" id="btn-import" data-testid="nav-import-gaps">Import</a>
+            <a class="nav-menu-item" href="#/goals/plan" id="btn-plan" data-testid="nav-plan-mode">Plan Mode</a>
+            <a class="nav-menu-item" href="#/goals/import" id="btn-import" data-testid="nav-import-goals">Import</a>
             <a class="nav-menu-item" href="https://github.com/buwilliams/refine/issues/new"
                id="btn-refine-issue-menu" data-testid="nav-refine-issue-menu">Request refine feature/bugfix</a>
           </div>
@@ -131,17 +131,17 @@
   <script src="/static/js/workflow-visualization.js"></script>
   <script src="/static/js/features/dashboard.js"></script>
   <script src="/static/js/features/features.js"></script>
-  <script src="/static/js/features/gaps-list.js"></script>
-  <script src="/static/js/features/gaps-bulk.js"></script>
-  <script src="/static/js/features/gaps-detail.js"></script>
-  <script src="/static/js/features/gaps-new.js"></script>
-  <script src="/static/js/features/gaps-import.js"></script>
-  <script src="/static/js/features/gaps-import-modal.js"></script>
-  <script src="/static/js/features/gaps-import-prepare.js"></script>
-  <script src="/static/js/features/gaps-import-drafts.js"></script>
-  <script src="/static/js/features/gaps-import-save.js"></script>
-  <script src="/static/js/features/gaps-import-draft-state.js"></script>
-  <script src="/static/js/features/gaps-import-draft-table.js"></script>
+  <script src="/static/js/features/goals-list.js"></script>
+  <script src="/static/js/features/goals-bulk.js"></script>
+  <script src="/static/js/features/goals-detail.js"></script>
+  <script src="/static/js/features/goals-new.js"></script>
+  <script src="/static/js/features/goals-import.js"></script>
+  <script src="/static/js/features/goals-import-modal.js"></script>
+  <script src="/static/js/features/goals-import-prepare.js"></script>
+  <script src="/static/js/features/goals-import-drafts.js"></script>
+  <script src="/static/js/features/goals-import-save.js"></script>
+  <script src="/static/js/features/goals-import-draft-state.js"></script>
+  <script src="/static/js/features/goals-import-draft-table.js"></script>
   <script src="/static/js/features/changes.js"></script>
   <script src="/static/js/features/toolbar.js"></script>
   <script src="/static/js/features/guide.js"></script>

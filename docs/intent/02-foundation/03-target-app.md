@@ -11,7 +11,7 @@
 
 ## Purpose
 
-Target App exists because software work only becomes meaningful when it is attached to the system being changed. A Gap, Feature, chat, process, quality run, import, or merge action needs to know which repository, runtime, guidance, commands, state, and Git context it belongs to.
+Target App exists because software work only becomes meaningful when it is attached to the system being changed. A Goal, Feature, chat, process, quality run, import, or merge action needs to know which repository, runtime, guidance, commands, state, and Git context it belongs to.
 
 This foundation concept also explains state and storage. Refine should know what app it is acting on, what it knows about that app, where that knowledge lives, and which runtime context is currently active.
 
@@ -34,7 +34,7 @@ The current implementation details that matter to intent are:
 
 - durable product state lives under the target app;
 - runtime state is separated from durable product state so processes and daemons can recover cleanly;
-- flat JSON-like records keep Gaps, Features, settings, guidance, governance, and logs inspectable;
+- flat JSON-like records keep Goals, Features, settings, guidance, governance, and logs inspectable;
 - projections and caches exist for speed but should be rebuildable from durable state;
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.

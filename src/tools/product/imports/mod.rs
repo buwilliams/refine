@@ -11,8 +11,7 @@ use crate::tools::product::work_items::FileWorkItemService;
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImportDraft {
     pub name: String,
-    pub actual: String,
-    pub target: String,
+    pub prompt: String,
     pub reporter: String,
     #[serde(default)]
     pub assignee: Option<String>,
@@ -26,7 +25,7 @@ pub struct ImportDraft {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ImportPersistResult {
     pub created: usize,
-    pub gap_ids: Vec<String>,
+    pub goal_ids: Vec<String>,
     pub feature_id: Option<String>,
 }
 
@@ -59,21 +58,17 @@ impl FileImportService {
             .lines()
             .map(str::trim)
             .filter(|line| !line.is_empty())
-            .map(|line| {
-                let (actual, target) = split_import_line(line);
-                ImportDraft {
-                    name: import_name("", actual, target),
-                    actual: actual.to_string(),
-                    target: target.to_string(),
-                    reporter: reporter.unwrap_or("").trim().to_string(),
-                    assignee: reporter
-                        .map(str::trim)
-                        .filter(|reporter| !reporter.is_empty())
-                        .map(str::to_string),
-                    priority: "low".to_string(),
-                    duplicate_decision: String::new(),
-                    dependency_names: Vec::new(),
-                }
+            .map(|line| ImportDraft {
+                name: import_name("", line),
+                prompt: line.to_string(),
+                reporter: reporter.unwrap_or("").trim().to_string(),
+                assignee: reporter
+                    .map(str::trim)
+                    .filter(|reporter| !reporter.is_empty())
+                    .map(str::to_string),
+                priority: "low".to_string(),
+                duplicate_decision: String::new(),
+                dependency_names: Vec::new(),
             })
             .collect::<Vec<_>>();
         Ok(drafts)
@@ -102,9 +97,8 @@ impl FileImportService {
                     .unwrap_or("")
                     .trim()
             };
-            let actual = value("actual");
-            let target = value("target");
-            if actual.is_empty() && target.is_empty() {
+            let prompt = value("prompt");
+            if prompt.is_empty() {
                 continue;
             }
             let priority = normalized_priority(value("priority")).map_err(|_| {
@@ -114,9 +108,8 @@ impl FileImportService {
                 ))
             })?;
             drafts.push(ImportDraft {
-                name: import_name(value("name"), actual, target),
-                actual: actual.to_string(),
-                target: target.to_string(),
+                name: import_name(value("name"), prompt),
+                prompt: prompt.to_string(),
                 reporter: nonempty_or(value("reporter"), reporter.unwrap_or("")).to_string(),
                 assignee: Some(
                     nonempty_or(
@@ -185,55 +178,46 @@ impl FileImportService {
         feature_id: Option<&str>,
     ) -> RefineResult<ImportPersistResult> {
         let work_items = FileWorkItemService::new(&self.refine_dir);
-        let mut gap_ids = Vec::new();
+        let mut goal_ids = Vec::new();
         let mut created_drafts = Vec::new();
         if let Some(feature_id) = feature_id {
             work_items.show_feature_summary(feature_id)?;
         }
         for draft in drafts {
-            let gap = work_items.create_gap_summary(&draft.name, None)?;
-            if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
-                work_items.append_gap_round_summary_with_assignee(
-                    &gap.gap.id,
+            let goal = work_items.create_goal_summary(&draft.name, None)?;
+            if !draft.prompt.trim().is_empty() {
+                work_items.append_goal_round_summary_with_assignee(
+                    &goal.goal.id,
                     nonempty_or(&draft.reporter, "Imported"),
                     draft.assignee.as_deref(),
-                    &draft.actual,
-                    &draft.target,
+                    &draft.prompt,
                 )?;
             }
-            if gap.gap.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
-                work_items.update_gap_metadata_summary(
-                    &gap.gap.id,
+            if goal.goal.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
+                work_items.update_goal_metadata_summary(
+                    &goal.goal.id,
                     None,
-                    (gap.gap.priority.as_str() != draft.priority)
+                    (goal.goal.priority.as_str() != draft.priority)
                         .then_some(draft.priority.as_str()),
                     nonempty_option(&draft.reporter),
                     None,
                 )?;
             }
             if let Some(feature_id) = feature_id {
-                work_items.assign_gap_to_feature(feature_id, &gap.gap.id)?;
+                work_items.assign_goal_to_feature(feature_id, &goal.goal.id)?;
             }
-            gap_ids.push(gap.gap.id.clone());
-            created_drafts.push((draft, gap.gap.id));
+            goal_ids.push(goal.goal.id.clone());
+            created_drafts.push((draft, goal.goal.id));
         }
         if let Some(feature_id) = feature_id {
             order_feature_dependency_drafts(&work_items, feature_id, &created_drafts)?;
         }
         Ok(ImportPersistResult {
-            created: gap_ids.len(),
-            gap_ids,
+            created: goal_ids.len(),
+            goal_ids,
             feature_id: feature_id.map(str::to_string),
         })
     }
-}
-
-fn split_import_line(line: &str) -> (&str, &str) {
-    line.split_once("=>")
-        .or_else(|| line.split_once("->"))
-        .or_else(|| line.split_once('|'))
-        .map(|(actual, target)| (actual.trim(), target.trim()))
-        .unwrap_or((line.trim(), ""))
 }
 
 pub fn import_drafts_from_value(
@@ -273,36 +257,7 @@ fn import_draft_from_value(
         )));
     };
     let field = |key: &str| -> &str { string_field(object, &[key]) };
-    let actual = string_field(
-        object,
-        &[
-            "actual",
-            "current",
-            "current_state",
-            "current_behavior",
-            "existing",
-            "existing_state",
-            "problem",
-            "issue",
-            "as_is",
-        ],
-    )
-    .to_string();
-    let target = string_field(
-        object,
-        &[
-            "target",
-            "desired",
-            "desired_state",
-            "desired_behavior",
-            "expected",
-            "expected_state",
-            "outcome",
-            "goal",
-            "to_be",
-        ],
-    )
-    .to_string();
+    let prompt = field("prompt").to_string();
     let priority = normalized_priority(field("priority")).map_err(|_| {
         RefineError::InvalidInput(format!(
             "draft {index} priority must be one of low, medium, or high"
@@ -311,13 +266,8 @@ fn import_draft_from_value(
     let reporter = nonempty_or(field("reporter"), default_reporter).to_string();
     let assignee = nonempty_or(field("assignee"), &reporter).to_string();
     Ok(ImportDraft {
-        name: import_name(
-            string_field(object, &["name", "title", "summary"]),
-            &actual,
-            &target,
-        ),
-        actual,
-        target,
+        name: import_name(string_field(object, &["name", "title", "summary"]), &prompt),
+        prompt,
         reporter,
         assignee: (!assignee.is_empty()).then_some(assignee),
         priority,
@@ -340,43 +290,43 @@ pub fn order_feature_dependency_drafts(
     feature_id: &str,
     created_drafts: &[(ImportDraft, String)],
 ) -> RefineResult<()> {
-    let ordered_gap_ids = dependency_ordered_gap_ids(created_drafts);
-    if !ordered_gap_ids.is_empty() {
-        work_items.order_gaps_in_feature(feature_id, &ordered_gap_ids)?;
+    let ordered_goal_ids = dependency_ordered_goal_ids(created_drafts);
+    if !ordered_goal_ids.is_empty() {
+        work_items.order_goals_in_feature(feature_id, &ordered_goal_ids)?;
     }
     Ok(())
 }
 
-fn dependency_ordered_gap_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<String> {
-    let mut name_to_gap_id = BTreeMap::new();
-    let mut position_by_gap_id = BTreeMap::new();
-    for (index, (draft, gap_id)) in created_drafts.iter().enumerate() {
-        position_by_gap_id.insert(gap_id.clone(), index);
-        for key in [&draft.name, &gap_id] {
+fn dependency_ordered_goal_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<String> {
+    let mut name_to_goal_id = BTreeMap::new();
+    let mut position_by_goal_id = BTreeMap::new();
+    for (index, (draft, goal_id)) in created_drafts.iter().enumerate() {
+        position_by_goal_id.insert(goal_id.clone(), index);
+        for key in [&draft.name, &goal_id] {
             let key = normalize_dependency_key(key);
             if !key.is_empty() {
-                name_to_gap_id.insert(key, gap_id.clone());
+                name_to_goal_id.insert(key, goal_id.clone());
             }
         }
     }
 
     let mut edges: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut involved = BTreeSet::new();
-    for (draft, gap_id) in created_drafts {
+    for (draft, goal_id) in created_drafts {
         for dependency in &draft.dependency_names {
             let dependency_key = normalize_dependency_key(dependency);
-            let Some(prerequisite_id) = name_to_gap_id.get(&dependency_key) else {
+            let Some(prerequisite_id) = name_to_goal_id.get(&dependency_key) else {
                 continue;
             };
-            if prerequisite_id == gap_id {
+            if prerequisite_id == goal_id {
                 continue;
             }
             edges
                 .entry(prerequisite_id.clone())
                 .or_default()
-                .insert(gap_id.clone());
+                .insert(goal_id.clone());
             involved.insert(prerequisite_id.clone());
-            involved.insert(gap_id.clone());
+            involved.insert(goal_id.clone());
         }
     }
     if involved.is_empty() {
@@ -385,7 +335,7 @@ fn dependency_ordered_gap_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<S
 
     let mut incoming: BTreeMap<String, usize> = involved
         .iter()
-        .map(|gap_id| (gap_id.clone(), 0usize))
+        .map(|goal_id| (goal_id.clone(), 0usize))
         .collect();
     for dependents in edges.values() {
         for dependent in dependents {
@@ -400,13 +350,13 @@ fn dependency_ordered_gap_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<S
         let Some(next_id) = incoming
             .iter()
             .filter(|(_, count)| **count == 0)
-            .min_by_key(|(gap_id, _)| {
-                position_by_gap_id
-                    .get(*gap_id)
+            .min_by_key(|(goal_id, _)| {
+                position_by_goal_id
+                    .get(*goal_id)
                     .copied()
                     .unwrap_or(usize::MAX)
             })
-            .map(|(gap_id, _)| gap_id.clone())
+            .map(|(goal_id, _)| goal_id.clone())
         else {
             break;
         };
@@ -423,9 +373,9 @@ fn dependency_ordered_gap_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<S
 
     if !incoming.is_empty() {
         let mut fallback = involved.into_iter().collect::<Vec<_>>();
-        fallback.sort_by_key(|gap_id| {
-            position_by_gap_id
-                .get(gap_id)
+        fallback.sort_by_key(|goal_id| {
+            position_by_goal_id
+                .get(goal_id)
                 .copied()
                 .unwrap_or(usize::MAX)
         });
@@ -472,14 +422,14 @@ fn parse_csv_rows(text: &str) -> RefineResult<Vec<Vec<String>>> {
     Ok(rows)
 }
 
-fn import_name(name: &str, actual: &str, target: &str) -> String {
-    let raw = [name.trim(), target.trim(), actual.trim()]
+fn import_name(name: &str, prompt: &str) -> String {
+    let raw = [name.trim(), prompt.trim()]
         .into_iter()
         .find(|value| !value.is_empty())
-        .unwrap_or("Imported Gap");
+        .unwrap_or("Imported Goal");
     let mut result: String = raw.chars().take(80).collect();
     if result.trim().is_empty() {
-        result = "Imported Gap".to_string();
+        result = "Imported Goal".to_string();
     }
     result
 }
@@ -512,33 +462,33 @@ fn nonempty_option(value: &str) -> Option<&str> {
 pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
     let instruction = match purpose {
         "plan" | "feature import" | "feature_spec" | "feature-spec" | "spec" => {
-            "Extract one product Feature and its Gaps from this Plan or feature-spec source. Return only \
+            "Extract one product Feature and its Goals from this Plan or feature-spec source. Return only \
              one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
-            \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
-             \"priority\":\"low\",\"depends_on\":[]}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
-             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\",\"depends_on\":[]}]}. The feature name and \
+            \"drafts\":[{\"name\":\"...\",\"prompt\":\"...\",\"reporter\":\"\",\
+             \"priority\":\"low\",\"depends_on\":[]}],\"implementation_goals\":[{\"name\":\"...\",\"prompt\":\"...\",\
+             \"reporter\":\"\",\"priority\":\"medium\",\"depends_on\":[]}]}. The feature name and \
              description must describe the user's \
              product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
-             extraction, or how the plan was created. Draft every concrete implementation gap \
+             extraction, or how the plan was created. Draft every concrete implementation goal \
              needed to build the feature, not only user-visible product behavior. Use architecture \
              lenses such as durable state, logic and code organization, surfaces, integrations, \
              performance, recovery, and verification only when they clarify the work; do not force \
              categories that do not fit the domain. Preserve the plan's natural build order. Each \
-             Gap must be independently actionable with actual and target states. Leave depends_on \
-             empty by default. Add depends_on only for real prerequisites where one Gap cannot be \
+             Goal must be independently actionable from its prompt. Leave depends_on \
+             empty by default. Add depends_on only for real prerequisites where one Goal cannot be \
              implemented safely before another, such as sorting or adding items to a list before \
              the list exists."
         }
         "round" => {
-            "Draft Round data from this Gap chat transcript. Return only one actual => target line."
+            "Draft Round data from this Goal chat transcript. Return only one actionable prompt."
         }
-        "standalone_gap" => {
-            "Draft one standalone Gap from this Standalone chat transcript. Return only one \
-             JSON object with name, actual, target, reporter, and priority, or one actual => target line."
+        "standalone_goal" => {
+            "Draft one standalone Goal from this Standalone chat transcript. Return only one \
+             JSON object with name, prompt, reporter, and priority, or one actionable prompt."
         }
         _ => {
-            "Import these notes into Refine Gap drafts. Return only draft data, one draft per line, \
-             using actual => target text or JSON objects with name, actual, target, reporter, and priority."
+            "Import these notes into Refine Goal drafts. Return only draft data, one draft per line, \
+             using prompt text or JSON objects with name, prompt, reporter, and priority."
         }
     };
     format!("{instruction}\n\n{text}")
@@ -645,37 +595,37 @@ fn import_extraction_from_json_value(
 
 fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
     let mut drafts = Vec::new();
-    append_plan_gap_arrays(object, &mut drafts);
+    append_plan_goal_arrays(object, &mut drafts);
     if let Some(feature) = object.get("feature").and_then(Value::as_object) {
-        append_plan_gap_arrays(feature, &mut drafts);
+        append_plan_goal_arrays(feature, &mut drafts);
     }
     if !drafts.is_empty() {
         object.insert("drafts".to_string(), Value::Array(drafts));
     }
 }
 
-fn append_plan_gap_arrays(object: &Map<String, Value>, drafts: &mut Vec<Value>) {
-    for key in GAP_ARRAY_KEYS {
+fn append_plan_goal_arrays(object: &Map<String, Value>, drafts: &mut Vec<Value>) {
+    for key in GOAL_ARRAY_KEYS {
         if let Some(items) = object.get(*key).and_then(Value::as_array) {
             drafts.extend(items.iter().cloned());
         }
     }
 }
 
-fn collect_import_draft_values(value: &Value, drafts: &mut Vec<Value>, in_gap_array: bool) {
+fn collect_import_draft_values(value: &Value, drafts: &mut Vec<Value>, in_goal_array: bool) {
     match value {
         Value::Array(items) => {
             for item in items {
-                collect_import_draft_values(item, drafts, in_gap_array);
+                collect_import_draft_values(item, drafts, in_goal_array);
             }
         }
         Value::Object(object) => {
-            if in_gap_array || is_import_draft_object(object) {
+            if in_goal_array || is_import_draft_object(object) {
                 drafts.push(Value::Object(object.clone()));
                 return;
             }
             for (key, child) in object {
-                if GAP_ARRAY_KEYS.contains(&key.as_str()) {
+                if GOAL_ARRAY_KEYS.contains(&key.as_str()) {
                     if let Value::Array(items) = child {
                         for item in items {
                             collect_import_draft_values(item, drafts, true);
@@ -692,17 +642,17 @@ fn collect_import_draft_values(value: &Value, drafts: &mut Vec<Value>, in_gap_ar
     }
 }
 
-const GAP_ARRAY_KEYS: &[&str] = &[
+const GOAL_ARRAY_KEYS: &[&str] = &[
     "drafts",
-    "gaps",
+    "goals",
     "items",
-    "implementation_gaps",
-    "technical_gaps",
-    "engineering_gaps",
-    "backend_gaps",
-    "frontend_gaps",
-    "testing_gaps",
-    "work_gaps",
+    "implementation_goals",
+    "technical_goals",
+    "engineering_goals",
+    "backend_goals",
+    "frontend_goals",
+    "testing_goals",
+    "work_goals",
 ];
 
 fn should_descend_import_container(key: &str, value: &Value) -> bool {
@@ -732,44 +682,26 @@ fn should_descend_import_container(key: &str, value: &Value) -> bool {
 }
 
 fn is_import_draft_object(object: &Map<String, Value>) -> bool {
-    if has_nested_gap_arrays(object) {
+    if has_nested_goal_arrays(object) {
         return false;
     }
-    object_has_any(
-        object,
-        &[
-            "actual",
-            "target",
-            "current",
-            "current_state",
-            "current_behavior",
-            "desired",
-            "desired_state",
-            "desired_behavior",
-            "problem",
-            "issue",
-            "expected",
-            "outcome",
-            "goal",
-            "as_is",
-            "to_be",
-        ],
-    ) || object_has_any(object, &["name", "title", "summary"])
-        && object_has_any(
-            object,
-            &[
-                "priority",
-                "reporter",
-                "assignee",
-                "duplicate_decision",
-                "kind",
-                "type",
-            ],
-        )
+    object_has_any(object, &["prompt"])
+        || object_has_any(object, &["name", "title", "summary"])
+            && object_has_any(
+                object,
+                &[
+                    "priority",
+                    "reporter",
+                    "assignee",
+                    "duplicate_decision",
+                    "kind",
+                    "type",
+                ],
+            )
 }
 
-fn has_nested_gap_arrays(object: &Map<String, Value>) -> bool {
-    GAP_ARRAY_KEYS
+fn has_nested_goal_arrays(object: &Map<String, Value>) -> bool {
+    GOAL_ARRAY_KEYS
         .iter()
         .any(|key| object.get(*key).and_then(Value::as_array).is_some())
         || object.get("features").and_then(Value::as_array).is_some()
@@ -933,18 +865,18 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.created, 1);
-        let gap = FileWorkItemService::new(&refine_dir)
-            .show_gap_summary(&result.gap_ids[0])
+        let goal = FileWorkItemService::new(&refine_dir)
+            .show_goal_summary(&result.goal_ids[0])
             .unwrap();
-        assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
-        assert_eq!(gap.gap.feature_order, None);
-        assert_eq!(gap.gap.reporter.as_deref(), Some("Reporter"));
+        assert_eq!(goal.goal.feature_id.as_deref(), Some("FEA1"));
+        assert_eq!(goal.goal.feature_order, None);
+        assert_eq!(goal.goal.reporter.as_deref(), Some("Reporter"));
 
         std::fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_import_service_orders_only_dependency_connected_feature_gaps() {
+    fn file_import_service_orders_only_dependency_connected_feature_goals() {
         let temp_root = unique_temp_dir("import-dependencies");
         let refine_dir = temp_root.join(".refine");
         let work_items = FileWorkItemService::new(&refine_dir);
@@ -958,21 +890,18 @@ mod tests {
                     "drafts": [
                         {
                             "name": "Create saved list",
-                            "actual": "There is no saved list.",
-                            "target": "A saved list exists.",
+                            "prompt": "Create a saved list.",
                             "priority": "medium"
                         },
                         {
                             "name": "Sort saved list",
-                            "actual": "The saved list is unsorted.",
-                            "target": "Users can sort the saved list.",
+                            "prompt": "Let users sort the saved list.",
                             "priority": "medium",
                             "depends_on": ["Create saved list"]
                         },
                         {
                             "name": "Tune empty state",
-                            "actual": "The empty state is generic.",
-                            "target": "The empty state is product-specific.",
+                            "prompt": "Make the empty state product-specific.",
                             "priority": "low"
                         }
                     ]
@@ -985,20 +914,20 @@ mod tests {
             .unwrap();
 
         let work_items = FileWorkItemService::new(&refine_dir);
-        let gaps = result
-            .gap_ids
+        let goals = result
+            .goal_ids
             .iter()
-            .map(|id| work_items.show_gap_summary(id).unwrap().gap)
+            .map(|id| work_items.show_goal_summary(id).unwrap().goal)
             .collect::<Vec<_>>();
-        assert_eq!(gaps[0].feature_order, Some(1));
-        assert_eq!(gaps[1].feature_order, Some(2));
-        assert_eq!(gaps[2].feature_order, None);
+        assert_eq!(goals[0].feature_order, Some(1));
+        assert_eq!(goals[1].feature_order, Some(2));
+        assert_eq!(goals[2].feature_order, None);
 
         std::fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn provider_import_result_flattens_nested_project_features_into_gaps() {
+    fn provider_import_result_flattens_nested_project_features_into_goals() {
         let output = json!({
             "project": {
                 "name": "Personal Budget App — Product Spec",
@@ -1006,22 +935,20 @@ mod tests {
                 "features": [
                     {
                         "name": "Transaction Tracking",
-                        "gaps": [
+                        "goals": [
                             {
                                 "title": "Categorize transactions",
-                                "current_state": "Imported transactions are uncategorized.",
-                                "desired_state": "Users can assign each transaction to a category.",
+                                "prompt": "Let users assign each imported transaction to a category.",
                                 "priority": "medium"
                             }
                         ]
                     },
                     {
                         "name": "Budget Alerts",
-                        "implementation_gaps": [
+                        "implementation_goals": [
                             {
                                 "name": "Persist alert preferences",
-                                "actual": "Alert thresholds are not stored.",
-                                "target": "Alert thresholds are persisted per category.",
+                                "prompt": "Persist alert thresholds per category.",
                                 "priority": "high"
                             }
                         ]
@@ -1036,12 +963,8 @@ mod tests {
         assert_eq!(result.drafts.len(), 2);
         assert_eq!(result.drafts[0].name, "Categorize transactions");
         assert_eq!(
-            result.drafts[0].actual,
-            "Imported transactions are uncategorized."
-        );
-        assert_eq!(
-            result.drafts[0].target,
-            "Users can assign each transaction to a category."
+            result.drafts[0].prompt,
+            "Let users assign each imported transaction to a category."
         );
         assert_eq!(result.drafts[0].reporter, "Product");
         assert_eq!(result.drafts[1].name, "Persist alert preferences");
@@ -1060,11 +983,10 @@ mod tests {
                 {
                     "name": "User Profiles",
                     "description": "Manage profile details.",
-                    "gaps": [
+                    "goals": [
                         {
                             "name": "Profile editor",
-                            "actual": "Users cannot edit profile details.",
-                            "target": "Users can update profile details.",
+                            "prompt": "Let users update profile details.",
                             "priority": "low"
                         }
                     ]

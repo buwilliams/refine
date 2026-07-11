@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::process::supervisor::errors::RefineResult;
-use crate::tools::product::work_items::{BulkGapUpdate, FileWorkItemService};
+use crate::tools::product::work_items::{BulkGoalUpdate, FileWorkItemService};
 
 use super::super::*;
 
@@ -60,7 +60,7 @@ pub(in crate::surfaces::web_server) fn feature_import_response(
     json!({
         "id": feature.feature.id,
         "name": feature.feature.name,
-        "gap_ids": feature.gap_ids,
+        "goal_ids": feature.goal_ids,
         "rollup": feature.rollup
     })
 }
@@ -80,28 +80,28 @@ pub(in crate::surfaces::web_server) fn normalized_dedup_text(values: &[&str]) ->
         .join(" ")
 }
 
-pub(in crate::surfaces::web_server) fn gap_id_required() -> ApiResponse {
+pub(in crate::surfaces::web_server) fn goal_id_required() -> ApiResponse {
     ApiResponse::json(
         404,
         json!({
             "error": {
                 "code": "not_found",
-                "message": "Gap route requires a Gap id"
+                "message": "Goal route requires a Goal id"
             }
         }),
     )
 }
 
-pub(in crate::surfaces::web_server) fn gap_id_and_action(path: &str) -> Option<(&str, &str)> {
-    let rest = path.strip_prefix("/work/gaps/")?;
-    let (gap_id, action) = rest.rsplit_once('/')?;
-    if gap_id.is_empty() || gap_id.contains('/') || action.is_empty() {
+pub(in crate::surfaces::web_server) fn goal_id_and_action(path: &str) -> Option<(&str, &str)> {
+    let rest = path.strip_prefix("/work/goals/")?;
+    let (goal_id, action) = rest.rsplit_once('/')?;
+    if goal_id.is_empty() || goal_id.contains('/') || action.is_empty() {
         return None;
     }
-    Some((gap_id, action))
+    Some((goal_id, action))
 }
 
-pub(in crate::surfaces::web_server) fn gap_action_message(action: &str) -> &'static str {
+pub(in crate::surfaces::web_server) fn goal_action_message(action: &str) -> &'static str {
     match action {
         "start" => "Started",
         "verify" => "Verified",
@@ -109,7 +109,7 @@ pub(in crate::surfaces::web_server) fn gap_action_message(action: &str) -> &'sta
         "retry-merge" => "Queued for merge",
         "merge" => "Merged",
         "undo" => "Undone",
-        _ => "Gap action completed",
+        _ => "Goal action completed",
     }
 }
 
@@ -131,7 +131,7 @@ pub(in crate::surfaces::web_server) fn invalid_round_body() -> ApiResponse {
         json!({
             "error": {
                 "code": "invalid_round",
-                "message": "round reporter, actual, and target are required"
+                "message": "round reporter and prompt are required"
             }
         }),
     )
@@ -149,9 +149,9 @@ pub(in crate::surfaces::web_server) fn invalid_bulk_body() -> ApiResponse {
     )
 }
 
-pub(in crate::surfaces::web_server) fn parse_bulk_gap_update(
+pub(in crate::surfaces::web_server) fn parse_bulk_goal_update(
     body: &serde_json::Value,
-) -> Option<BulkGapUpdate> {
+) -> Option<BulkGoalUpdate> {
     let update = body.get("update")?.as_object()?;
     let mut entries = update.iter().filter(|(key, _)| {
         matches!(
@@ -165,10 +165,10 @@ pub(in crate::surfaces::web_server) fn parse_bulk_gap_update(
     }
     let value = value.as_str()?.to_string();
     match field.as_str() {
-        "priority" => Some(BulkGapUpdate::Priority(value)),
-        "status" => Some(BulkGapUpdate::Status(value)),
-        "reporter" => Some(BulkGapUpdate::Reporter(value)),
-        "assignee" => Some(BulkGapUpdate::Assignee(value)),
+        "priority" => Some(BulkGoalUpdate::Priority(value)),
+        "status" => Some(BulkGoalUpdate::Status(value)),
+        "reporter" => Some(BulkGoalUpdate::Reporter(value)),
+        "assignee" => Some(BulkGoalUpdate::Assignee(value)),
         _ => None,
     }
 }

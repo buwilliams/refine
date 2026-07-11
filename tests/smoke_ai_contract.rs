@@ -67,10 +67,10 @@ fn smoke_ai_contract() {
             "smoke-ai chat response",
         ),
         (
-            "Run the gap agent for a ready Gap.",
-            "smoke-ai gap-agent response",
+            "Run the goal agent for a ready Goal.",
+            "smoke-ai goal-agent response",
         ),
-        ("Import these CSV rows into gaps.", "\"kind\": \"import\""),
+        ("Import these CSV rows into goals.", "\"kind\": \"import\""),
         (
             "Check the target app and report health.",
             "\"kind\": \"target-app\"",
@@ -113,8 +113,8 @@ fn smoke_ai_contract() {
         .collect::<Vec<_>>();
     assert_eq!(kinds, vec!["import", "import"]);
 
-    let normal = run_smoke_ai(&["Run the gap agent."], None, false);
-    let debug = run_smoke_ai(&["Run the gap agent."], None, true);
+    let normal = run_smoke_ai(&["Run the goal agent."], None, false);
+    let debug = run_smoke_ai(&["Run the goal agent."], None, true);
     assert_eq!(stdout(&normal), stdout(&debug));
     assert!(!stderr(&debug).is_empty());
     if let Ok(path) = std::env::var("REFINE_SMOKE_AI_STDERR_ARTIFACT") {

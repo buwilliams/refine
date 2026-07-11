@@ -4,7 +4,7 @@
 
 - **Integration Check**: build verifies that the target app can still be assembled or prepared.
 - **Target-App Specific**: build behavior should use target-app lifecycle instructions and settings.
-- **Evidence Producing**: build output should become part of the Gap's evidence.
+- **Evidence Producing**: build output should become part of the Goal's evidence.
 
 ## Purpose
 
@@ -18,13 +18,13 @@ Build should not be hardcoded to one ecosystem. Different target apps may need d
 
 ## What Happens
 
-When a Gap is in build:
+When a Goal is in build:
 
 - Refine uses target-app configuration to determine whether build instructions or equivalent preparation guidance exists.
 - If build instructions exist, Refine asks the configured agent to perform the build work through the shared lifecycle capability.
 - Agent output, check context, output paths, status, and timing become evidence.
-- A successful build moves the Gap toward QA or review.
-- A failed build should preserve actionable output and route the Gap to failed, retry, or a new implementation round.
+- A successful build moves the Goal toward QA or review.
+- A failed build should preserve actionable output and route the Goal to failed, retry, or a new implementation round.
 - If no build step applies, workflow should make that explicit rather than inventing one.
 
 ## Future Direction

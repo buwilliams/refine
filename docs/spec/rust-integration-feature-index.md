@@ -6,63 +6,63 @@ Nav & Content: Dashboard
 	Workflow Visualization
 		Status cards: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
 		"AI" badge on agent-managed statuses (todo, in-progress, qa, ready-merge, build)
-		Gap count per status
-		Click a status opens Gaps screen filtered to that status
+		Goal count per status
+		Click a status opens Goals screen filtered to that status
 	Awaiting your review
 		Expand/Collapse (state persists), count pill, "Needs attention" pill + action links
-		Review gaps table: checkbox, gap name (link), updated, actions
+		Review goals table: checkbox, goal name (link), updated, actions
 		Per row: Verify, Add round
 		Select all (indeterminate state), Verify selected (count, disabled if none)
-		Add round modal: actual + target textareas, Submit new round, Cancel
+		Add round modal: prompt textarea, Submit new round, Cancel
 		Empty state: "You're clear. No review items..."
 	Reporter throughput
 		Expand/Collapse (state persists), count pill
 		Table: reporter, active, done, reported, completion rate %
-		Click row opens Gaps filtered by reporter
+		Click row opens Goals filtered by reporter
 		Empty state: "No reporter activity yet."
 Nav & Content: Features
 	URL Query string filters
 	Filter card Expand/Collapse, "Filtered" pill when active
 	Filters: Search, Status, Reporters, Nodes, # of entries, Clear filters button
 	Features table
-		Columns: name, status, progress, current / next gap, reporter, node, updated
+		Columns: name, status, progress, current / next goal, reporter, node, updated
 		Sortable, sort direction arrows
 		Click row to open Feature modal
 		Pagination: # of # entries, first, prev, Page #, next, last
-Nav & Content: Gaps
-	Workflow Visualization scoped to Gap filters (click status updates filters)
+Nav & Content: Goals
+	Workflow Visualization scoped to Goal filters (click status updates filters)
 	URL Query string filters (q, status, reporter, feature, rounds, node, severity, category, actor, limit, page, sort, dir)
 	Filter & bulk actions card Expand/Collapse, "Filtered" pill when active
 	Filters: Search, Status, Reporter, Nodes, Feature ID (or standalone), Round >=, Round <=, Severities, Categories, Actors, Entries (50/100/250/500/1000), Clear filters button
 	Bulk actions: Select page, Status, Priority, Reporter, Assign Feature, Transfer node, Delete
 		Filter-scoped selection (select-all-matching across pages vs per-page), excluded IDs, indeterminate header checkbox
 		Each opens its own Bulk Action modal (see Modals)
-	Gaps table
+	Goals table
 		Selection checkboxes (shown when filter card expanded), select-all header
 		Columns: name, status, priority, reporter, feature (link + order #), node, updated
 		Column Sorting (all but feature), default updated desc
-		Click row to open Gap Modal
+		Click row to open Goal Modal
 		Pagination: # of # entries, first, prev, Page #, next, last
 Nav & Content: Changes
-	Git Visualization scoped to Change filters (gaps merged by day, week, month, year)
+	Git Visualization scoped to Change filters (goals merged by day, week, month, year)
 	URL Query string filters (q, status, priority, limit, page)
 	Filter card Expand/Collapse, "Filtered" pill when active
-	Filters: search (gap/commit/status), status, priority, entries, clear filters button
+	Filters: search (goal/commit/status), status, priority, entries, clear filters button
 	Branch info (merge target branch; empty state if unresolved)
 	Changes table
-		Columns: when, gap (link or "Unlinked Gap"), status, priority, merge commit (abbrev hash), actions
+		Columns: when, goal (link or "Unlinked Goal"), status, priority, merge commit (abbrev hash), actions
 		Column Sorting
 		Undo button per row (disabled if cancelled)
-			Confirmation modal: git revert -m 1, push upstream, move Gap to cancelled
-		Click row to open Gap Modal
+			Confirmation modal: git revert -m 1, push upstream, move Goal to cancelled
+		Click row to open Goal Modal
 		Pagination: # of # entries, first, prev, Page #, next, last
 Nav & Content: Logs
 	Log Visualization scoped to Log filters (by day, week, month by severity: info, warn, error)
-	URL Query string filters (severity, category, actor, gap_id, q, limit, page, sort, dir)
+	URL Query string filters (severity, category, actor, goal_id, q, limit, page, sort, dir)
 	Filter card Expand/Collapse, "Filtered" pill when active
-	Filters: search, gap id, severity, category, actor, entries, clear filter button
+	Filters: search, goal id, severity, category, actor, entries, clear filter button
 	Logs table
-		Columns: when, severity (badge), category, actor, gap (link)
+		Columns: when, severity (badge), category, actor, goal (link)
 		Column Sorting, default datetime desc
 		Rows show message; "Show details" expand/collapse for extra detail
 		Pagination: # of # entries, first, prev, Page #, next, last
@@ -94,9 +94,9 @@ Nav & Guide: Manage Drop-down
 				Target application: select known app, status indicator, app path
 				Add app (file path / Git clone URL / new directory), Switch to selected (migration check), Remove selected (danger), Copy from node, Generate with AI
 				Disabled unless supervisor/registry enabled
-				Nodes section: table (name + active pill, ID, gap counts, optional host/port/status), Activate, Rename, Connection, Bootstrap (over SSH), Enable/Disable, Archive (danger), Create node
+				Nodes section: table (name + active pill, ID, goal counts, optional host/port/status), Activate, Rename, Connection, Bootstrap (over SSH), Enable/Disable, Archive (danger), Create node
 			Reporters
-				List with counts; Rename (cascades rounds), Merge (move gaps to destination), Remove (danger, keeps history), Add reporter
+				List with counts; Rename (cascades rounds), Merge (move goals to destination), Remove (danger, keeps history), Add reporter
 			Processes
 				Process management table: name (supervisor parent/child expand), status, PID, CPU priority, max memory, details
 					Actions by kind: Pause/Unpause agents, Stop/Start background, Hard reset worktree, Cancel (agent), Stop (chat), target app Start/Stop/Build/Sync/Check
@@ -105,7 +105,7 @@ Nav & Guide: Manage Drop-down
 				Projection cache rebuild progress
 			Performance
 				Summary: operation, count, failures, avg/p95/max latency, last seen
-				Recent events: when, operation, elapsed, outcome, gap, provider, mode, resource, rows; pagination
+				Recent events: when, operation, elapsed, outcome, goal, provider, mode, resource, rows; pagination
 				Filters (operation, outcome, limit, clear), "Filtered" pill
 				Refresh, Prune old metrics, Clear metrics (danger)
 			Target App Config
@@ -115,7 +115,7 @@ Nav & Guide: Manage Drop-down
 				Optional checks: HTTP URL, TCP host + port, process check command
 			Refine Runtime Config
 				Scope label, Copy from node
-				Runtime: parallel-run cap, branch name pattern ({gap_id}), agent idle/hard timeouts, worker/UI memory limits, worker CPU priority, resource isolation mode, rate/token-limit pause, standalone chat idle timeout, auto-promote backlog→todo, target repo update pulse, file browser ignore patterns
+				Runtime: parallel-run cap, branch name pattern ({goal_id}), agent idle/hard timeouts, worker/UI memory limits, worker CPU priority, resource isolation mode, rate/token-limit pause, standalone chat idle timeout, auto-promote backlog→todo, target repo update pulse, file browser ignore patterns
 				AI Provider: provider selector (Claude Code / Codex / Gemini / Copilot / Smoke AI), auth help, Re-check auth (pre-flight)
 				Runtime upgrade banner (current + latest versions, copy upgrade command)
 		Governance (#/project)
@@ -141,11 +141,11 @@ Nav: Command Palette
 	Modal: input (fuzzy search, "Type a command or parameters..."), results list (up to 12; title, description, group, disabled/parse-error states)
 	Navigation: Arrow up/down, Enter execute, Escape close; empty state "No commands found."
 	Commands
-		Nav: Dashboard, Gaps, Changes, Logs, node/settings surfaces & tabs
-		Create: New Gap, Import
-		AI: Plan (make a plan), Draft Gaps from plan, Generate target-app config with AI
+		Nav: Dashboard, Goals, Changes, Logs, node/settings surfaces & tabs
+		Create: New Goal, Import
+		AI: Plan (make a plan), Draft Goals from plan, Generate target-app config with AI
 		Toolbar: Toggle Toolbar, Maximize Toolbar, Files open, Files search
-		Gaps: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
+		Goals: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
 		Changes: clear filters
 		Logs: clear filters
 		System: Pause/unpause agents, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
@@ -156,12 +156,12 @@ Nav: Command Palette
 		Support: Request refine feature/bugfix
 Nav: Report Bug
 	Click opens Request refine feature/bugfix Modal
-Nav: New Gap
-	Click opens New Gap Modal
-Nav: New Gap Drop-down
+Nav: New Goal
+	Click opens New Goal Modal
+Nav: New Goal Drop-down
 	New Feature Modal
 	Plan Mode
-	Import Gaps
+	Import Goals
 	Request refine feature/bugfix (GitHub issue link)
 Nav: Toolbar (bottom dock)
 	Dock chrome
@@ -169,7 +169,7 @@ Nav: Toolbar (bottom dock)
 		Toggle full-screen (fills viewport below topbar, implies open)
 		Resize (drag handle, 120px–85vh), persists height
 		Persists tabs/active tab/open/height/fullscreen across reload & project switch reset
-	Persistent Tabs (order: System, Files, Standalone) + dynamic Gap/Plan tabs
+	Persistent Tabs (order: System, Files, Standalone) + dynamic Goal/Plan tabs
 		System
 			Recent system operations log (time, message, color by status)
 			Filters: All, Info, Started, Queued, Completed, Errors (persisted)
@@ -181,34 +181,34 @@ Nav: Toolbar (bottom dock)
 			Content panel: status line, Copy contents
 				Image preview (lightbox); text preview with line numbers + syntax highlighting; non-previewable message
 				Scroll-to-load more (128KB chunks)
-		Standalone chat (default, no Gap)
+		Standalone chat (default, no Goal)
 			Session: Start/Stop standalone, status line (no session / active / ended — reason)
 			Output (Markdown, auto-scroll), Activity panel (Expand/Collapse activity, last lines, busy dots)
 			Input (Enter send, Shift+Enter newline; placeholder reflects state), Send
 			Queued messages: list, edit textarea, Save, Remove (local + server-side)
 			Clear history (confirmation: Clear / Keep history)
-		Gap chat (opened via Open Chat on a Gap)
-			Tab labeled "Gap {id}…", link to gap, Close tab
-			Gap status tracked; same chat input/output/queue/activity as standalone
+		Goal chat (opened via Open Chat on a Goal)
+			Tab labeled "Goal {id}…", link to goal, Close tab
+			Goal status tracked; same chat input/output/queue/activity as standalone
 			Draft Round (extract): enabled when agent responded, status valid, not busy
-				Extract round modal: review draft, Actual + Target (editable), reporter, Add round / Cancel, Escape close
+				Extract round modal: review prompt (editable), reporter, Add round / Cancel, Escape close
 		Plan chat / Plan Mode (toolbar tab, mode "plan")
 			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
 			Same chat input/output/queue/activity
 			Draft Feature: enabled when agent responded → opens Plan draft modal, minimizes toolbar
 		Tab management: active-session dot, activity pulse, close (non-standard tabs), reorder
 Modals
-	Gap Modal (#/gaps/:id)
+	Goal Modal (#/goals/:id)
 		Header: name, status pill, priority pill, workflow back/forward buttons, Open Chat
-		Metadata: gap ID, created, updated, node owner, branch
+		Metadata: goal ID, created, updated, node owner, branch
 		Feature association: Feature link + order, or "Standalone"
 		Banners: failure (error from logs), governance (warn/error)
 		Governance summary: rules/product/constitution/meta pills, message, details, rule actions
 		Quality summary: status pill, checked time, message, details
-		More Gap actions: View Logs, Reporter, Rename, Change Priority, Move to / Assign Feature, Remove from Feature, Cancel, Delete (confirmations)
-		Rounds: count, per-round collapsible (round #, latest pill, governance/quality pills, reporter, created, actual, target)
-		Edit latest round (backlog/todo): actual, target, reporter, Save changes (draft + cursor preserved)
-		Submit follow-up / recovery round (review/failed): actual, target, Submit new round
+		More Goal actions: View Logs, Reporter, Rename, Change Priority, Move to / Assign Feature, Remove from Feature, Cancel, Delete (confirmations)
+		Rounds: count, per-round collapsible (round #, latest pill, governance/quality pills, reporter, created, prompt)
+		Edit latest round (backlog/todo): prompt, reporter, Save changes (draft + cursor preserved)
+		Submit follow-up / recovery round (review/failed): prompt, Submit new round
 		Notes (collapsible, count): per note preview/author/time, Edit, Delete; Add note composer, Save note
 		Workflow transitions per status (system-owned states have no buttons)
 		Close, Escape / click-outside
@@ -216,36 +216,36 @@ Modals
 		Header: title, status pill, progress (X/Y done), metadata (ID, created, updated, node owner)
 		Actions: ← Backlog, Todo →, Cancel Feature, Delete Feature (confirmations)
 		Fields: Name, Description (autosaved, name required)
-		Ordered Gaps: list (drag handle + order #, name link, status, priority, reporter, updated)
-			Reorder via drag-and-drop or move up/down; Delete gap; New Gap (feature pre-filled); pagination (25/page)
+		Ordered Goals: list (drag handle + order #, name link, status, priority, reporter, updated)
+			Reorder via drag-and-drop or move up/down; Delete goal; New Goal (feature pre-filled); pagination (25/page)
 		Create flow (new): Name (required), Description, Create
 		Close, Escape / click-outside
-	New Gap Modal (#/gaps/new)
+	New Goal Modal (#/goals/new)
 		Reporter ("Submitting as …")
-		Fields: Actual (current behavior), Target (desired behavior), Priority (low/medium/high); auto-named
-		Create Gap, Cancel; validation (actual or target, reporter)
-		Duplicate handling: matched gap info + actual/target; decisions (move original to backlog / create anyway / import original)
+		Fields: Prompt, Priority (low/medium/high); auto-named
+		Create Goal, Cancel; validation (prompt, reporter)
+		Duplicate handling: matched Goal info + prompt; decisions (move original to backlog / create anyway / import original)
 		Escape / click-outside, focus first field
 	New Feature Modal (#/features/new)
-	Plan Mode (#/gaps/plan)
-		Plan text input; AI extracts gap drafts; per-gap edit (actual/target/priority/reporter)
+	Plan Mode (#/goals/plan)
+		Plan text input; AI extracts Goal drafts; per-Goal edit (prompt/priority/reporter)
 		Feature destination: standalone / new (name + description) / existing (dropdown); bulk save; duplicate detection
-	Import Modal (#/gaps/import)
-		Tabs/sources: Import Feature (paste long spec), Import Gaps (paste text), Import Gaps (.csv) (paste CSV), Upload Gaps (.csv) (Choose CSV file)
+	Import Modal (#/goals/import)
+		Tabs/sources: Import Feature (paste long spec), Import Goals (paste text), Import Goals (.csv) (paste CSV), Upload Goals (.csv) (Choose CSV file)
 			Distribute across nodes checkbox; Extract Feature / Extract drafts / Parse CSV / Parse upload queue background preparation, close the modal, then reopen review when drafts are ready
 		Review (drafts, 25/page)
-			Per draft: checkbox, order, name (+ error), reporter, priority, node, actual, target; possible-duplicate info
+			Per draft: checkbox, order, name (+ error), reporter, priority, node, prompt; possible-duplicate info
 			Duplicate decision per row: move original to backlog / ignore / import
 			Bulk: select page/all/duplicates, dismiss duplicates, import selected, move originals to backlog, update originals (field), needs-resolution filter
 			Feature destination: standalone / new / existing; summary
-			Save (N) gaps [to Feature]; unresolved drafts must be resolved
+			Save (N) goals [to Feature]; unresolved drafts must be resolved
 		Saving: progress, Cancel (rollback), Hide (background); session persisted + recovered
 		Result: created/duplicates toast; partial-failure drafts re-shown for retry
-	Bulk Action Modals (from Gaps bulk actions)
+	Bulk Action Modals (from Goals bulk actions)
 		Set Status / Priority / Reporter: value control, filter + selection context, help text, result toast
-		Assign Feature: feature dropdown (name/status/progress), skips already-assigned / other-node gaps
+		Assign Feature: feature dropdown (name/status/progress), skips already-assigned / other-node goals
 		Transfer node: active-node dropdown, skips in-progress/qa/ready-merge/build
-		Delete: danger confirmation (cancels subprocesses, removes worktrees/branches, erases gap.json), partial-failure handling
+		Delete: danger confirmation (cancels subprocesses, removes worktrees/branches, erases goal.json), partial-failure handling
 		Background operation support (progress/result)
 	Request refine feature/bugfix Modal (Report Bug)
 		Title (Short summary), Description (What should change?)
@@ -256,38 +256,38 @@ Implementation Internals (for e2e testing)
 	Purpose: contract details a test needs to drive the UI, wait correctly, and assert outcomes. Frontend is a hash-routed SPA served from one index.html; all data via JSON over /api; live updates via SSE.
 	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
-			[crud] deterministic, assert directly: create/edit gaps·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Verify, done↔review); reporter/node/cluster mgmt; settings edits; Undo (git revert)
-				[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/gap/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
+			[crud] deterministic, assert directly: create/edit goals·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Verify, done↔review); reporter/node/cluster mgmt; settings edits; Undo (git revert)
+				[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
 		Preconditions — gated features; build the state first
-			Verify / Verify selected: a review gap assigned to the currently selected reporter
-			←QA / ←Merge buttons: only on failed gaps in quality-retry / merge-retry context
-			Bulk transfer/assign: skip in-progress·qa·ready-merge·build and other-node gaps
+			Verify / Verify selected: a review goal assigned to the currently selected reporter
+			←QA / ←Merge buttons: only on failed goals in quality-retry / merge-retry context
+			Bulk transfer/assign: skip in-progress·qa·ready-merge·build and other-node goals
 			Generate rules: product + constitution both filled; QA: target-app test command configured
 			Node / Governance surfaces: an attached project; Application controls: supervisor/registry enabled
 		Oracles — non-obvious success states to assert
-			Verify → status becomes done; Cancel Feature keeps done gaps, cancels non-terminal ones
-			Duplicate detection (New Gap / Import) matches on actual/target; decisions → action keys move_original_to_backlog / create-anyway / import-original
-			Undo → revert commit pushed (if upstream) and gap moved to cancelled
+			Verify → status becomes done; Cancel Feature keeps done goals, cancels non-terminal ones
+			Duplicate detection (New Goal / Import) matches on prompt; decisions → action keys move_original_to_backlog / create-anyway / import-original
+			Undo → revert commit pushed (if upstream) and goal moved to cancelled
 			Reporter throughput: completion_rate % is server-computed (shown beside Done/Reported) — assert the value from /api/dashboard, not a recomputed formula
 		Selectors — no data-testid exists anywhere; the #ids below are the contract
-			Prefer ARIA role/label/text for controls without an id; address dynamic rows (gaps, drafts, rounds) by row text or the gap/feature link href — there is no per-row id or stable index
+			Prefer ARIA role/label/text for controls without an id; address dynamic rows (goals, drafts, rounds) by row text or the goal/feature link href — there is no per-row id or stable index
 		Timing — SSE-driven; wait on the resulting DOM change, never a fixed sleep
 			[agent] transitions with smoke-ai resolve within a few seconds; cap waits at ~30s and fail loudly rather than poll forever
 	Routing (hash-based, location.hash)
 		Parser strips ?query before path parsing; views read query off location.hash directly
 		#/ → dashboard (#/?node=all = all-node scope)
 		#/features, #/features/new, #/features/:id (detail modal over list)
-		#/gaps, #/gaps/new, #/gaps/plan, #/gaps/import, #/gaps/:id (detail modal over list)
+		#/goals, #/goals/new, #/goals/plan, #/goals/import, #/goals/:id (detail modal over list)
 		#/changes, #/logs
 		#/node[/:tab] (tabs: application, reporters, processes, performance, target-app, runtime); legacy #/system and #/settings → node/processes; #/project/application → node/application
 		#/project[/:tab] (tabs: governance, quality, guidance); legacy #/governance → project/governance
-		#/chat[?gap=] → legacy redirect: opens toolbar dock, bounces to #/
+		#/chat[?goal=] → legacy redirect: opens toolbar dock, bounces to #/
 		Unknown → dashboard
 		Detail routes render a modal over the underlay screen; underlayHash preserved so closing restores list + scroll
 		Settings/node/project route changes within same surface swap tab content without full re-render
 	Live updates (SSE, EventSource "/api/sse")
 		Event "activity_added": invalidates screen-data cache; feeds System ops log (recordSystemOperation); refreshes dashboard / logs / changes / agent-status if on that route (silent refresh*, not render* — no "Loading…" blink)
-		Event "status_change": invalidates cache; refreshes agent status, target-app toggle, dashboard, gaps table (table only, not filters — preserves in-flight search keystroke), logs, current settings surface
+		Event "status_change": invalidates cache; refreshes agent status, target-app toggle, dashboard, goals table (table only, not filters — preserves in-flight search keystroke), logs, current settings surface
 		Tests should wait on resulting DOM change, not a fixed delay; SSE de-dupes repeat events (sseEventChanged)
 	Data fetching & caching
 		api(method, path, body, options) — fetch wrapper; GET responses cached per-path
@@ -308,45 +308,45 @@ Implementation Internals (for e2e testing)
 		refine_import_session_v — import wizard session (mode/phase/source/drafts/destination/operationId), for recovery
 		refine_checkout / refine_port — runtime/desktop wiring
 	Constants & limits (assert truncation/pagination against these)
-		Default list limit 50; entries options 50/100/250/500/1000 (gaps, changes, logs, features, performance)
-		Import draft page size 25 (IMPORT_DRAFT_PAGE_SIZE); Feature-modal gaps page size 25
+		Default list limit 50; entries options 50/100/250/500/1000 (goals, changes, logs, features, performance)
+		Import draft page size 25 (IMPORT_DRAFT_PAGE_SIZE); Feature-modal goals page size 25
 		System operation log limit 250 (SYSTEM_OPERATION_LOG_LIMIT), 5s dedupe window
 		Files: tree max depth 3, max 200 entries/dir, search max 20 results, search debounce 250ms, text chunk 128000 bytes (scroll-to-load)
 		Chat activity pulse 1800ms; chat output persisted last 50000 chars, progress last 20000 chars
 		List search debounce ~120ms (status_change keeps keystroke alive via table-only refresh)
 		Guide panel width clamp 280–560px (GUIDE_MAX_WIDTH 560)
 		Toolbar dock height clamp 120px–85vh (default 20vh)
-	Gap workflow state machine (GAP_WORKFLOW; user buttons only where listed)
+	Goal workflow state machine (GOAL_WORKFLOW; user buttons only where listed)
 		backlog → Todo → (forward: todo)
 		todo → ← Backlog (back: backlog) — agent then drives todo → in-progress → qa → ready-merge → build → review automatically
 			in-progress: Workflow Engine-owned, no user buttons
 		qa: Quality-owned, no user buttons
 		ready-merge: merger-owned, no user buttons
 		build: target-app-build-owned, no user buttons
-		review → ← Todo (back: todo) | Verify → (forward: done, POST /api/gaps/:id/verify)
+		review → ← Todo (back: todo) | Verify → (forward: done, POST /api/goals/:id/verify)
 		done → ← Review (back: review)
-		failed → ← Todo (back: todo); if QA-retry context: ← QA (POST /api/gaps/:id/retry-quality); if merge-retry context: ← Merge (POST /api/gaps/:id/retry-merge)
+		failed → ← Todo (back: todo); if QA-retry context: ← QA (POST /api/goals/:id/retry-quality); if merge-retry context: ← Merge (POST /api/goals/:id/retry-merge)
 		cancelled → ← Todo (back: todo)
 		Status enum: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
 		Priority enum: low, medium, high
 	Chat sessions
-		POST /api/chat/start with body { purpose:"plan" } (Plan tab) | { gap_id } (Gap chat) | {} (Standalone)
+		POST /api/chat/start with body { purpose:"plan" } (Plan tab) | { goal_id } (Goal chat) | {} (Standalone)
 		Send POST /api/chat/:id/input; read GET /api/chat/:id/read (lines, progress_lines, queued_messages, in_flight, alive, closed_reason); stop POST /api/chat/:id/stop; queue edit/delete PATCH/DELETE /api/chat/:id/queue/:msgId
 		in_flight authoritative for "agent busy"; alive=false closes session and sets closed_reason
 	Key element IDs / selectors
-		Topbar: brand[data-route=dashboard], nav a[data-route=dashboard|features|gaps|changes|logs], #nav-context-menu, #global-reporter, #target-app-indicator, #agent-status-indicator, #btn-command-palette, #btn-refine-issue, #btn-new-gap, #nav-create-menu, #btn-new-feature, #btn-plan, #btn-import; #active-node-label
+		Topbar: brand[data-route=dashboard], nav a[data-route=dashboard|features|goals|changes|logs], #nav-context-menu, #global-reporter, #target-app-indicator, #agent-status-indicator, #btn-command-palette, #btn-refine-issue, #btn-new-goal, #nav-create-menu, #btn-new-feature, #btn-plan, #btn-import; #active-node-label
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab]
-		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-gap-link, #btn-plan-draft, #btn-gap-round-extract, #gap-round-extract-form/-body/-title, #btn-add-extracted-round
-		Gap modal: #btn-state-back, #btn-state-forward, #gap-action-menu, #gap-feature-blocking-banner, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-gap-feature-assign, #btn-gap-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #gap-notes-status
-		Gaps list: #gap-select-page, #gap-select-all (+ row checkboxes), table header sort controls
+		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
+		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
+		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)
 	API surface (grouped; :id = path param)
 		Project/app: /api/project/status|attach|path|directories|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions
-		Nodes/cluster: /api/nodes(/activate|/copy-settings|/transfer-gaps), /api/cluster, /api/cluster/nodes, /api/reporters, /api/reporters/:id/merge
-		Gaps: /api/gaps, /api/gaps/:id, /api/gaps/:id/rounds(/latest), /api/gaps/:id/verify|cancel|retry-quality|retry-merge, /api/gaps/bulk, /api/gaps/bulk/delete
-		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/gaps/:id(/reorder), /api/features/:id/gaps/bulk
+		Nodes/cluster: /api/nodes(/activate|/copy-settings|/transfer-goals), /api/cluster, /api/cluster/nodes, /api/reporters, /api/reporters/:id/merge
+		Goals: /api/goals, /api/goals/:id, /api/goals/:id/rounds(/latest), /api/goals/:id/verify|cancel|retry-quality|retry-merge, /api/goals/bulk, /api/goals/bulk/delete
+		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/goals/:id(/reorder), /api/features/:id/goals/bulk
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
 		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/checks|/screenshots), /api/guidance
 		Import/operations: /api/import/extract|csv/parse|dedup|persist, /api/operations/:id(/cancel)

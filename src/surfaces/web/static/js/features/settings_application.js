@@ -87,7 +87,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         id: "s-merge-target",
         label: "Merge target branch",
         guideItemId: "application-merge-target",
-        description: "branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
+        description: "branch all Goal worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
         valueLabel: s.merge_target_branch || "",
         control: `<input type="text" id="s-merge-target"
                          placeholder="e.g. main"
@@ -457,7 +457,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         if (result.attached === false) {
           enterNoProjectMode(result, { openGuidePanel: true });
           refreshProjectApplicationsSectionOnly(result);
-          if (["dashboard", "gaps", "changes", "logs"].includes(state.currentRoute || "")) {
+          if (["dashboard", "goals", "changes", "logs"].includes(state.currentRoute || "")) {
             navigate();
           }
           return;

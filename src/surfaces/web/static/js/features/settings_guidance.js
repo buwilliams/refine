@@ -178,7 +178,7 @@ function renderSettingsGuidanceTab(guidanceItems) {
       <h3>${renderSettingsGuideLabel("Guidance", "guidance-items")}</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
-        Guidance is classified against each Gap before work starts. Accepted
+        Guidance is classified against each Goal before work starts. Accepted
         guidance instructions are prepended to the agent's work prompt.
       </p>
       <div id="guidance-list" data-testid="guidance-list">

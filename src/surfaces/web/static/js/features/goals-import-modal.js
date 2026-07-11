@@ -23,11 +23,11 @@ function openImportModal() {
         <div class="card settings-tab-card import-tab-card">
           <section class="settings-pane import-panel active" data-import-panel="feature">
             <p class="muted small">Paste a long product spec or planning note. refine extracts one Feature
-            and its implementation-ready Gaps for review before saving.</p>
+            and its implementation-ready Goals for review before saving.</p>
             <div class="muted small" style="margin-bottom:8px">
               Default reporter:
               <strong class="js-reporter-name">${htmlEscape(reporter || "none selected")}</strong>.
-              Each drafted Gap can be edited before saving.
+              Each drafted Goal can be edited before saving.
             </div>
             <div class="form-row">
               <label>Feature spec</label>
@@ -52,7 +52,7 @@ function openImportModal() {
               <label>CSV text
                 <span class="muted small">— required fields: ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}</span>
               </label>
-              <textarea id="import-csv-text" data-testid="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
+              <textarea id="import-csv-text" data-testid="import-csv-text" rows="8" placeholder="prompt,reporter,priority&#10;Add pause support to the game,Alice,medium"></textarea>
             </div>
             <label class="checkbox-row">
               <input type="checkbox" id="import-csv-distribute" data-testid="import-csv-distribute">
@@ -106,8 +106,8 @@ function openImportModal() {
     _importModalOpen = false;
     document.removeEventListener("keydown", onKey, true);
     root.remove();
-    if (navigateAway && location.hash.startsWith("#/gaps/import")) {
-      location.hash = "#/gaps";
+    if (navigateAway && location.hash.startsWith("#/goals/import")) {
+      location.hash = "#/goals";
     }
   }
   function onKey(e) {
@@ -129,7 +129,7 @@ function openImportModal() {
     return mode === "feature"
       ? "Feature extraction is running in the background."
       : mode === "ai"
-        ? "Gap extraction is running in the background."
+        ? "Goal extraction is running in the background."
         : "CSV import preparation is running in the background.";
   }
   function queueImportPreparation(operation, mode, onComplete) {
@@ -161,8 +161,8 @@ function openImportModal() {
           details: { operation_id: operationId },
         });
         if (!_importModalOpen) {
-          if (!location.hash.startsWith("#/gaps/import")) {
-            location.hash = "#/gaps/import";
+          if (!location.hash.startsWith("#/goals/import")) {
+            location.hash = "#/goals/import";
           }
           openImportModal();
         }
@@ -227,7 +227,7 @@ function openImportModal() {
     const dirty = importSessionIsDirty(session);
     if (dirty) {
       const ok = await modalConfirm(
-        "Cancel this import and discard the recoverable import state? Any running save operation will be asked to stop and roll back Gaps it created.",
+        "Cancel this import and discard the recoverable import state? Any running save operation will be asked to stop and roll back Goals it created.",
         { title: "Cancel import", okLabel: "Cancel import", danger: true },
       );
       if (!ok) return;

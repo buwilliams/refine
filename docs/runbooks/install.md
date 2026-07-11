@@ -1,6 +1,6 @@
 # Install Refine
 
-Refine is an agentic software delivery system that runs locally against a user's application repository. It coordinates agents and humans through Gaps, workflow state, provider CLIs, local processes, and a browser UI so software changes can move from request to implementation to human review.
+Refine is an agentic software delivery system that runs locally against a user's application repository. It coordinates agents and humans through Goals, workflow state, provider CLIs, local processes, and a browser UI so software changes can move from request to implementation to human review.
 
 Use this document when an agent is responsible for installing Refine. Follow the steps in order, ask the user only the questions needed for the chosen install path, confirm where Refine should be installed when you cannot infer it, and do not claim installation succeeded until the CLI reports a healthy running system or you have reported the exact blocker.
 
@@ -149,12 +149,12 @@ Target app commands:
 ./r project sync
 ```
 
-Workflow and Gap commands:
+Workflow and Goal commands:
 
 ```bash
-./r gap create "Describe the product gap"
-./r gap list
-./r gap show <gap-id>
+./r goal create "Describe the product goal"
+./r goal list
+./r goal show <goal-id>
 ./r workflow pause
 ./r workflow resume
 ```

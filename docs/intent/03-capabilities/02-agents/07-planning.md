@@ -5,7 +5,7 @@
 - **Purpose Before Shape**: planning should start with what the user is trying to make and why it matters.
 - **Architecture As Lenses**: persistence, logic, surfaces, and integrations are ways to think, not required sections.
 - **Natural Work Order**: drafted work should follow the order implied by the plan, dependencies, and domain.
-- **Reviewable Decomposition**: plans should become Features and Gaps only after users can inspect and adjust them.
+- **Reviewable Decomposition**: plans should become Features and Goals only after users can inspect and adjust them.
 - **Loose Fundamentals**: good architecture gives agents a starting point without becoming a rule system.
 
 ## Purpose
@@ -28,12 +28,12 @@ Planning should sit before durable work creation. It should help users and agent
 
 These are lenses, not mandatory headings. If a concern is irrelevant, temporary, collapsed into another concern, or premature, a good plan may omit it or mention the tradeoff briefly.
 
-Draft Feature should convert the selected plan into ordinary Refine work. It should produce one Feature plus implementation-ready Gaps in the plan's natural build order. When dependency order is clear, the drafts should reflect it. When the work is exploratory, visual, research-heavy, or prototype-oriented, the drafts should be the smallest useful implementation slices rather than forced architecture categories.
+Draft Feature should convert the selected plan into ordinary Refine work. It should produce one Feature plus implementation-ready Goals in the plan's natural build order. When dependency order is clear, the drafts should reflect it. When the work is exploratory, visual, research-heavy, or prototype-oriented, the drafts should be the smallest useful implementation slices rather than forced architecture categories.
 
 Current implementation details that matter to intent:
 
 - Plan Mode is a chat mode that drafts product and implementation intent;
-- Draft Feature extracts a Feature and Gaps from a Plan transcript through shared import extraction;
+- Draft Feature extracts a Feature and Goals from a Plan transcript through shared import extraction;
 - Plan and spec-like extraction should use architecture-aware drafting;
 - simple CSV, issue-list, and direct import flows should remain direct and not become planning exercises;
 - review-before-persist should remain the boundary before creating durable work.

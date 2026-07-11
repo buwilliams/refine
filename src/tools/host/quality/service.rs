@@ -452,10 +452,10 @@ pub(super) fn quality_operation_log(
         details: details.and_then(|value| value.as_object().cloned()),
         actions: Vec::new(),
         actor: Some("refine".to_string()),
-        gap_id: owner_id
-            .strip_prefix("GAP")
+        goal_id: owner_id
+            .strip_prefix("GOAL")
             .map(|_| owner_id.to_string())
-            .or_else(|| owner_id.strip_prefix("gap:").map(ToString::to_string)),
+            .or_else(|| owner_id.strip_prefix("goal:").map(ToString::to_string)),
     }
 }
 

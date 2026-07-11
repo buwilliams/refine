@@ -1,15 +1,15 @@
-// ---- Gaps: list -------------------------------------------------------------
+// ---- Goals: list -------------------------------------------------------------
 
-const GAPS_DEFAULT_DIR = {
+const GOALS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
   reporter: "asc", assignee: "asc", rounds: "asc", node: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
-const GAPS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
-const GAPS_DEFAULT_LIMIT = 50;
+const GOALS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const GOALS_DEFAULT_LIMIT = 50;
 
-function gapsHash(parts) {
+function goalsHash(parts) {
   const next = new URLSearchParams();
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
@@ -26,67 +26,67 @@ function gapsHash(parts) {
   if (parts.severity) next.set("severity", parts.severity);
   if (parts.category) next.set("category", parts.category);
   if (parts.actor)    next.set("actor", parts.actor);
-  if (parts.limit && parts.limit !== GAPS_DEFAULT_LIMIT) next.set("limit", String(parts.limit));
+  if (parts.limit && parts.limit !== GOALS_DEFAULT_LIMIT) next.set("limit", String(parts.limit));
   if (parts.page && parts.page > 1) next.set("page", String(parts.page));
   if (parts.sort)     next.set("sort", parts.sort);
   if (parts.dir)      next.set("dir", parts.dir);
-  return "#/gaps" + (next.toString() ? "?" + next : "");
+  return "#/goals" + (next.toString() ? "?" + next : "");
 }
 
-async function renderGapsList() {
-  if (renderNoProjectIfDetached("Gaps")) return;
+async function renderGoalsList() {
+  if (renderNoProjectIfDetached("Goals")) return;
   renderBanners([]);
-  await ensureGapsNodeOptions();
-  const f = gapsFilterFromHash();
+  await ensureGoalsNodeOptions();
+  const f = goalsFilterFromHash();
   // Preserve the filter shell's open/closed state across full re-renders
   // (Clear filters, bulk-op completion, etc.). First-ever render defaults
   // closed, with the summary strip visible as the open control.
-  const filterShell = document.getElementById("gaps-filter-shell");
+  const filterShell = document.getElementById("goals-filter-shell");
   const filterShellOpen = filterShell ? filterShell.open : false;
 
   $("#main").innerHTML = `
-    <h2>Gaps</h2>
-    <div id="gaps-workflow" class="gaps-workflow" data-testid="gaps-workflow">
+    <h2>Goals</h2>
+    <div id="goals-workflow" class="goals-workflow" data-testid="goals-workflow">
       ${renderWorkflowVisualization({
         counts: {},
-        hrefForStatus: (status) => gapsWorkflowStatusHash(status, f),
-        className: "gaps-workflow-grid",
+        hrefForStatus: (status) => goalsWorkflowStatusHash(status, f),
+        className: "goals-workflow-grid",
       })}
     </div>
-    <details class="filter-shell" id="gaps-filter-shell" data-testid="gaps-filter-shell"${filterShellOpen ? " open" : ""}>
-      <summary data-testid="gaps-filter-summary">
+    <details class="filter-shell" id="goals-filter-shell" data-testid="goals-filter-shell"${filterShellOpen ? " open" : ""}>
+      <summary data-testid="goals-filter-summary">
         <span class="filter-shell-title">Filters &amp; bulk actions</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="gaps-count" data-testid="gaps-count"></span></span>
-        <span id="gaps-filtered" class="filter-pill" data-testid="gaps-filtered-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="goals-count" data-testid="goals-count"></span></span>
+        <span id="goals-filtered" class="filter-pill" data-testid="goals-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="search" class="filter-grow"
-               data-testid="gaps-search"
-               placeholder="Search gaps…" value="${htmlEscape(f.q)}">
+               data-testid="goals-search"
+               placeholder="Search goals…" value="${htmlEscape(f.q)}">
       </div>
       <div class="filter-row filter-row-activity">
-        <select id="filter-status" data-testid="gaps-status-filter">
+        <select id="filter-status" data-testid="goals-status-filter">
           ${STATUS_FILTER_OPTIONS
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
         </select>
-        <select id="filter-reporter" data-testid="gaps-reporter-filter">
+        <select id="filter-reporter" data-testid="goals-reporter-filter">
           <option value="" ${f.reporter === "" ? "selected" : ""}>all reporters</option>
           ${(state.reporters || []).map((r) =>
             `<option value="${htmlEscape(r.name)}" ${r.name === f.reporter ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
-        <select id="filter-assignee" data-testid="gaps-assignee-filter">
+        <select id="filter-assignee" data-testid="goals-assignee-filter">
           <option value="" ${f.assignee === "" ? "selected" : ""}>all assignees</option>
           ${(state.reporters || []).map((r) =>
             `<option value="${htmlEscape(r.name)}" ${r.name === f.assignee ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
           ${f.assignee && !(state.reporters || []).some((r) => r.name === f.assignee)
             ? `<option value="${htmlEscape(f.assignee)}" selected>${htmlEscape(f.assignee)}</option>` : ""}
         </select>
-        <select id="filter-node" data-testid="gaps-node-filter">
+        <select id="filter-node" data-testid="goals-node-filter">
           <option value="all" ${f.node === "" || f.node === "all" ? "selected" : ""}>all nodes</option>
           <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
           ${(state.project?.nodes || []).map((inst) =>
@@ -95,108 +95,108 @@ async function renderGapsList() {
             ? `<option value="${htmlEscape(f.node)}" selected>${htmlEscape(f.node)}</option>` : ""}
         </select>
         <input type="text" id="filter-feature" class="filter-feature"
-               data-testid="gaps-feature-filter"
+               data-testid="goals-feature-filter"
                placeholder="Feature ID or standalone" value="${htmlEscape(f.feature)}">
         <input type="number" id="filter-rounds-gte" class="filter-number"
-               data-testid="gaps-rounds-gte-filter"
+               data-testid="goals-rounds-gte-filter"
                min="0" step="1" inputmode="numeric"
                placeholder="Rounds ≥" value="${htmlEscape(f.rounds_gte)}">
         <input type="number" id="filter-rounds-lte" class="filter-number"
-               data-testid="gaps-rounds-lte-filter"
+               data-testid="goals-rounds-lte-filter"
                min="0" step="1" inputmode="numeric"
                placeholder="Rounds ≤" value="${htmlEscape(f.rounds_lte)}">
-        <select id="gaps-severity" data-testid="gaps-severity-filter">
+        <select id="goals-severity" data-testid="goals-severity-filter">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
           <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
           <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
         </select>
-        <select id="gaps-category" data-testid="gaps-category-filter"><option value="">all categories</option></select>
-        <select id="gaps-actor" data-testid="gaps-actor-filter"><option value="">all actors</option></select>
-        <select id="gaps-limit" data-testid="gaps-limit-filter">
-          ${GAPS_LIMIT_OPTIONS.map((n) =>
+        <select id="goals-category" data-testid="goals-category-filter"><option value="">all categories</option></select>
+        <select id="goals-actor" data-testid="goals-actor-filter"><option value="">all actors</option></select>
+        <select id="goals-limit" data-testid="goals-limit-filter">
+          ${GOALS_LIMIT_OPTIONS.map((n) =>
             `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
         </select>
         <span class="spacer"></span>
-        <button class="secondary" id="gaps-clear" data-testid="gaps-clear-filters">Clear filters</button>
+        <button class="secondary" id="goals-clear" data-testid="goals-clear-filters">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
         <span class="muted small">Bulk update selected:</span>
-        <button class="secondary small" id="gap-select-page" data-testid="gaps-select-page">Select page</button>
-        <button class="secondary small" id="bulk-set-status" data-testid="gaps-bulk-status">Status…</button>
-        <button class="secondary small" id="bulk-set-priority" data-testid="gaps-bulk-priority">Priority…</button>
-        <button class="secondary small" id="bulk-set-reporter" data-testid="gaps-bulk-reporter">Reporter…</button>
-        <button class="secondary small" id="bulk-set-assignee" data-testid="gaps-bulk-assignee">Assignee…</button>
-        <button class="secondary small" id="bulk-assign-feature" data-testid="gaps-bulk-feature">Feature…</button>
-        <button class="secondary small" id="bulk-transfer-node" data-testid="gaps-bulk-transfer-node">Node…</button>
-        <button class="secondary small" id="bulk-delete" data-testid="gaps-bulk-delete">Delete…</button>
+        <button class="secondary small" id="goal-select-page" data-testid="goals-select-page">Select page</button>
+        <button class="secondary small" id="bulk-set-status" data-testid="goals-bulk-status">Status…</button>
+        <button class="secondary small" id="bulk-set-priority" data-testid="goals-bulk-priority">Priority…</button>
+        <button class="secondary small" id="bulk-set-reporter" data-testid="goals-bulk-reporter">Reporter…</button>
+        <button class="secondary small" id="bulk-set-assignee" data-testid="goals-bulk-assignee">Assignee…</button>
+        <button class="secondary small" id="bulk-assign-feature" data-testid="goals-bulk-feature">Feature…</button>
+        <button class="secondary small" id="bulk-transfer-node" data-testid="goals-bulk-transfer-node">Node…</button>
+        <button class="secondary small" id="bulk-delete" data-testid="goals-bulk-delete">Delete…</button>
       </div>
     </div>
       </div>
     </details>
-    <div id="gaps-table" data-testid="gaps-table"><p class="muted">Loading…</p></div>
+    <div id="goals-table" data-testid="goals-table"><p class="muted">Loading…</p></div>
   `;
   // In-view filter changes update the URL via replaceState (which does NOT
   // fire `hashchange`) and refresh only the table. Going through
-  // `location.hash =` would trigger renderGapsList again, which rebuilds
+  // `location.hash =` would trigger renderGoalsList again, which rebuilds
   // `#main` from scratch — that destroys the focused search input mid-
   // keystroke. Sort-header clicks go through the same path
-  // (`refreshGapsTable`); see drawGapsTable.
+  // (`refreshGoalsTable`); see drawGoalsTable.
   $("#search").addEventListener("input", debounce(() => {
-    updateGapsFilter({ q: $("#search").value, page: 1 });
+    updateGoalsFilter({ q: $("#search").value, page: 1 });
   }, 250));
   $("#filter-status").addEventListener("change", (e) =>
-    updateGapsFilter({ status: e.target.value, page: 1 }));
+    updateGoalsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
-    updateGapsFilter({ reporter: e.target.value, page: 1 }));
+    updateGoalsFilter({ reporter: e.target.value, page: 1 }));
   $("#filter-assignee").addEventListener("change", (e) =>
-    updateGapsFilter({ assignee: e.target.value, page: 1 }));
+    updateGoalsFilter({ assignee: e.target.value, page: 1 }));
   $("#filter-feature").addEventListener("input", debounce((e) =>
-    updateGapsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
+    updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
   $("#filter-node").addEventListener("change", (e) =>
-    updateGapsFilter({ node: e.target.value, page: 1 }));
+    updateGoalsFilter({ node: e.target.value, page: 1 }));
   $("#filter-rounds-gte").addEventListener("input", debounce((e) =>
-    updateGapsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
+    updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
   $("#filter-rounds-lte").addEventListener("input", debounce((e) =>
-    updateGapsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
-  $("#gaps-severity").addEventListener("change", (e) =>
-    updateGapsFilter({ severity: e.target.value, page: 1 }));
-  $("#gaps-category").addEventListener("change", (e) =>
-    updateGapsFilter({ category: e.target.value, page: 1 }));
-  $("#gaps-actor").addEventListener("change", (e) =>
-    updateGapsFilter({ actor: e.target.value, page: 1 }));
-  $("#gaps-limit").addEventListener("change", (e) =>
-    updateGapsFilter({
-      limit: parseInt(e.target.value, 10) || GAPS_DEFAULT_LIMIT,
+    updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
+  $("#goals-severity").addEventListener("change", (e) =>
+    updateGoalsFilter({ severity: e.target.value, page: 1 }));
+  $("#goals-category").addEventListener("change", (e) =>
+    updateGoalsFilter({ category: e.target.value, page: 1 }));
+  $("#goals-actor").addEventListener("change", (e) =>
+    updateGoalsFilter({ actor: e.target.value, page: 1 }));
+  $("#goals-limit").addEventListener("change", (e) =>
+    updateGoalsFilter({
+      limit: parseInt(e.target.value, 10) || GOALS_DEFAULT_LIMIT,
       page: 1,
     }));
-  $("#gaps-clear").addEventListener("click", () => {
-    history.replaceState(null, "", "#/gaps");
-    renderGapsList();
+  $("#goals-clear").addEventListener("click", () => {
+    history.replaceState(null, "", "#/goals");
+    renderGoalsList();
   });
   // The bulk-action buttons read the current filter from the hash at click
   // time, so they always reflect what the user can see.
-  bindCommand("#bulk-set-priority", "gaps.bulk.priority");
-  bindCommand("#bulk-set-status", "gaps.bulk.status");
-  bindCommand("#bulk-set-reporter", "gaps.bulk.reporter");
-  bindCommand("#bulk-set-assignee", "gaps.bulk.assignee");
-  bindCommand("#bulk-assign-feature", "gaps.bulk.feature");
-  bindCommand("#bulk-transfer-node", "gaps.bulk.transfer_node");
-  bindCommand("#bulk-delete", "gaps.bulk.delete");
-  bindCommand("#gap-select-page", "gaps.select_page");
+  bindCommand("#bulk-set-priority", "goals.bulk.priority");
+  bindCommand("#bulk-set-status", "goals.bulk.status");
+  bindCommand("#bulk-set-reporter", "goals.bulk.reporter");
+  bindCommand("#bulk-set-assignee", "goals.bulk.assignee");
+  bindCommand("#bulk-assign-feature", "goals.bulk.feature");
+  bindCommand("#bulk-transfer-node", "goals.bulk.transfer_node");
+  bindCommand("#bulk-delete", "goals.bulk.delete");
+  bindCommand("#goal-select-page", "goals.select_page");
 
   // Expanding / collapsing the filter shell shows / hides the per-row
   // checkbox column. Redraw from the cached results so we don't re-fetch.
-  $("#gaps-filter-shell").addEventListener("toggle", () => {
-    if (_lastGapsRender) {
-      drawGapsTable(_lastGapsRender.gaps, _lastGapsRender.state);
+  $("#goals-filter-shell").addEventListener("toggle", () => {
+    if (_lastGoalsRender) {
+      drawGoalsTable(_lastGoalsRender.goals, _lastGoalsRender.state);
     }
   });
 
-  await refreshGapsTable();
+  await refreshGoalsTable();
 }
 
-async function ensureGapsNodeOptions() {
+async function ensureGoalsNodeOptions() {
   try {
     const data = await api("GET", "/api/nodes");
     if (!Array.isArray(data?.nodes)) return;
@@ -211,13 +211,13 @@ async function ensureGapsNodeOptions() {
   }
 }
 
-// Snapshot the current Gaps filter from the URL hash.
-function gapsFilterFromHash() {
+// Snapshot the current Goals filter from the URL hash.
+function goalsFilterFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
   const sort = (hashQs.get("sort") || "").toLowerCase();
   const dir = (hashQs.get("dir") || "").toLowerCase();
   const effectiveSort = sort || "updated";
-  const effectiveDir = dir || (GAPS_DEFAULT_DIR[effectiveSort] || "desc");
+  const effectiveDir = dir || (GOALS_DEFAULT_DIR[effectiveSort] || "desc");
   return {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
@@ -230,8 +230,8 @@ function gapsFilterFromHash() {
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
     actor: hashQs.get("actor") || "",
-    limit: parseInt(hashQs.get("limit") || String(GAPS_DEFAULT_LIMIT), 10)
-           || GAPS_DEFAULT_LIMIT,
+    limit: parseInt(hashQs.get("limit") || String(GOALS_DEFAULT_LIMIT), 10)
+           || GOALS_DEFAULT_LIMIT,
     page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
     sort, dir,
     effectiveSort, effectiveDir,
@@ -241,8 +241,8 @@ function gapsFilterFromHash() {
 // Patch one or more filter fields and refresh the table without
 // triggering a full view re-render. The URL stays in sync via
 // `history.replaceState` so reload / share / back behave correctly.
-function updateGapsFilter(patch) {
-  const current = gapsFilterFromHash();
+function updateGoalsFilter(patch) {
+  const current = goalsFilterFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
@@ -260,12 +260,12 @@ function updateGapsFilter(patch) {
     sort: "sort" in patch ? patch.sort : current.sort,
     dir: "dir" in patch ? patch.dir : current.dir,
   };
-  history.replaceState(null, "", gapsHash(next));
-  refreshGapsTable();
+  history.replaceState(null, "", goalsHash(next));
+  refreshGoalsTable();
 }
 
-function gapsWorkflowStatusHash(status, filter = gapsFilterFromHash()) {
-  return gapsHash({
+function goalsWorkflowStatusHash(status, filter = goalsFilterFromHash()) {
+  return goalsHash({
     q: filter.q,
     status,
     reporter: filter.reporter,
@@ -284,20 +284,20 @@ function gapsWorkflowStatusHash(status, filter = gapsFilterFromHash()) {
   });
 }
 
-function drawGapsWorkflowVisualization(filter, counts) {
-  const root = document.getElementById("gaps-workflow");
+function drawGoalsWorkflowVisualization(filter, counts) {
+  const root = document.getElementById("goals-workflow");
   if (!root) return;
   root.innerHTML = renderWorkflowVisualization({
     counts,
-    hrefForStatus: (status) => gapsWorkflowStatusHash(status, filter),
-    className: "gaps-workflow-grid",
+    hrefForStatus: (status) => goalsWorkflowStatusHash(status, filter),
+    className: "goals-workflow-grid",
   });
 }
 
-async function refreshGapsTable() {
-  if (state.currentRoute !== "gaps") return;
-  if (renderNoProjectIfDetached("Gaps")) return;
-  const f = gapsFilterFromHash();
+async function refreshGoalsTable() {
+  if (state.currentRoute !== "goals") return;
+  if (renderNoProjectIfDetached("Goals")) return;
+  const f = goalsFilterFromHash();
   const params = new URLSearchParams();
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
@@ -316,30 +316,30 @@ async function refreshGapsTable() {
   if (f.dir) params.set("dir", f.dir);
   params.set("facets", "1");
   try {
-    const data = await api("GET", "/api/gaps?" + params);
-    if (renderNoProjectIfApiDetached(data, "Gaps")) return;
-    const gaps = data.gaps || [];
+    const data = await api("GET", "/api/goals?" + params);
+    if (renderNoProjectIfApiDetached(data, "Goals")) return;
+    const goals = data.goals || [];
     const facets = data.facets || {};
-    drawGapsWorkflowVisualization(f, facets.status_counts || {});
+    drawGoalsWorkflowVisualization(f, facets.status_counts || {});
     // Refresh the category / actor dropdowns from the server-side
     // distinct values — same pattern as the Logs screen.
-    const catSel = $("#gaps-category");
+    const catSel = $("#goals-category");
     if (catSel) {
       const cats = facets.categories || [];
       catSel.innerHTML = `<option value="">all categories</option>` +
         cats.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join("");
     }
-    const actSel = $("#gaps-actor");
+    const actSel = $("#goals-actor");
     if (actSel) {
       const acts = facets.actors || [];
       actSel.innerHTML = `<option value="">all actors</option>` +
         acts.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join("");
     }
-    const countEl = $("#gaps-count");
+    const countEl = $("#goals-count");
     if (countEl) {
-      countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
+      countEl.textContent = `${goals.length} goal${goals.length === 1 ? "" : "s"}`;
     }
-    applyGapsFilterIndicator(f);
+    applyGoalsFilterIndicator(f);
     const renderState = {
       q: f.q, status: f.status, feature: f.feature,
       assignee: f.assignee,
@@ -351,73 +351,73 @@ async function refreshGapsTable() {
         has_more: false,
       },
     };
-    _lastGapsRender = { gaps, state: renderState };
-    drawGapsTable(gaps, renderState);
+    _lastGoalsRender = { goals, state: renderState };
+    drawGoalsTable(goals, renderState);
   } catch (e) {
-    const tbl = $("#gaps-table");
+    const tbl = $("#goals-table");
     if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
 // Bulk selection is filter-scoped. By default, bulk actions target every
-// matching Gap across pagination, with checked row changes stored as explicit
+// matching Goal across pagination, with checked row changes stored as explicit
 // include/exclude exceptions. State survives filter tweaks and re-expanding
-// the filter shell but resets on a hard navigation away from the Gaps screen.
-let gapsSelectAllMatching = true;
-const gapsExcludedIds = new Set();
-const gapsIncludedIds = new Set();
+// the filter shell but resets on a hard navigation away from the Goals screen.
+let goalsSelectAllMatching = true;
+const goalsExcludedIds = new Set();
+const goalsIncludedIds = new Set();
 
 // Cached snapshot of the last refresh, so toggling the filter shell open
 // or closed can redraw the table without re-fetching.
-let _lastGapsRender = null;
+let _lastGoalsRender = null;
 
-function resetGapsSelection() {
-  gapsSelectAllMatching = true;
-  gapsExcludedIds.clear();
-  gapsIncludedIds.clear();
+function resetGoalsSelection() {
+  goalsSelectAllMatching = true;
+  goalsExcludedIds.clear();
+  goalsIncludedIds.clear();
 }
 
-function selectCurrentGapsPage() {
-  const gaps = _lastGapsRender?.gaps || [];
-  if (!gaps.length) {
-    toast("No Gaps on this page.", "warn");
+function selectCurrentGoalsPage() {
+  const goals = _lastGoalsRender?.goals || [];
+  if (!goals.length) {
+    toast("No Goals on this page.", "warn");
     return;
   }
-  gapsSelectAllMatching = false;
-  gapsExcludedIds.clear();
-  gapsIncludedIds.clear();
-  for (const gap of gaps) gapsIncludedIds.add(gap.id);
-  drawGapsTable(gaps, _lastGapsRender.state);
+  goalsSelectAllMatching = false;
+  goalsExcludedIds.clear();
+  goalsIncludedIds.clear();
+  for (const goal of goals) goalsIncludedIds.add(goal.id);
+  drawGoalsTable(goals, _lastGoalsRender.state);
 }
 
-function _isGapSelected(id) {
-  return gapsSelectAllMatching
-    ? !gapsExcludedIds.has(id)
-    : gapsIncludedIds.has(id);
+function _isGoalSelected(id) {
+  return goalsSelectAllMatching
+    ? !goalsExcludedIds.has(id)
+    : goalsIncludedIds.has(id);
 }
 
-function renderGapFeatureCell(gap) {
-  if (!gap.feature_id) return "—";
-  const featureId = String(gap.feature_id);
+function renderGoalFeatureCell(goal) {
+  if (!goal.feature_id) return "—";
+  const featureId = String(goal.feature_id);
   const featureLabel = featureId.length > 12 ? `${featureId.slice(0, 10)}…` : featureId;
-  const order = gap.feature_order ? ` #${gap.feature_order}` : "";
+  const order = goal.feature_order ? ` #${goal.feature_order}` : "";
   return `<a href="#/features/${encodeURIComponent(featureId)}" title="${htmlEscape(featureId)}">${htmlEscape(featureLabel)}${htmlEscape(order)}</a>`;
 }
 
-function drawGapsTable(gaps, state) {
-  const root = $("#gaps-table");
+function drawGoalsTable(goals, state) {
+  const root = $("#goals-table");
   // Selection UI follows the filter shell — only show checkboxes when the
   // shell is expanded (i.e. the user has indicated they want to interact
   // with bulk actions). Collapsed = focus on results.
-  const shell = document.getElementById("gaps-filter-shell");
+  const shell = document.getElementById("goals-filter-shell");
   const showSelection = !!(shell && shell.open);
 
-  if (!gaps.length) {
+  if (!goals.length) {
     root.innerHTML = `
-      <p class="muted">No gaps match the current filters.</p>
-      ${renderPaginationControls("gaps", state.page, 0, "gap")}`;
-    bindPaginationControls(root, "gaps", (page) =>
-      updateGapsFilter({ page }));
+      <p class="muted">No goals match the current filters.</p>
+      ${renderPaginationControls("goals", state.page, 0, "goal")}`;
+    bindPaginationControls(root, "goals", (page) =>
+      updateGoalsFilter({ page }));
     return;
   }
   const columns = [
@@ -440,52 +440,52 @@ function drawGapsTable(gaps, state) {
       : `<span class="sort-arrow-placeholder">↕</span>`;
     return `<th class="sortable ${isActive ? "active" : ""}"
                 data-sort-key="${c.key}"
-                data-testid="gaps-sort-${c.key}">
+                data-testid="goals-sort-${c.key}">
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
   const selectionHead = showSelection
-    ? `<th class="gap-select-col">
-         <input type="checkbox" id="gap-select-all"
-                data-testid="gaps-select-all"
-                aria-label="Select all matching Gaps">
+    ? `<th class="goal-select-col">
+         <input type="checkbox" id="goal-select-all"
+                data-testid="goals-select-all"
+                aria-label="Select all matching Goals">
        </th>`
     : "";
   root.innerHTML = `
     <div class="table-scroll">
-      <table class="table work-items-table gaps-table mobile-card-table">
+      <table class="table work-items-table goals-table mobile-card-table">
         <colgroup>
-          ${showSelection ? '<col class="gaps-col-select">' : ""}
-          <col class="work-item-name-col gaps-col-name">
-          <col class="gaps-col-status">
-          <col class="gaps-col-priority">
-          <col class="gaps-col-reporter">
-          <col class="gaps-col-assignee">
-          <col class="gaps-col-feature">
-          <col class="gaps-col-node">
-          <col class="gaps-col-updated">
+          ${showSelection ? '<col class="goals-col-select">' : ""}
+          <col class="work-item-name-col goals-col-name">
+          <col class="goals-col-status">
+          <col class="goals-col-priority">
+          <col class="goals-col-reporter">
+          <col class="goals-col-assignee">
+          <col class="goals-col-feature">
+          <col class="goals-col-node">
+          <col class="goals-col-updated">
         </colgroup>
         <thead><tr>${selectionHead}${sortHeads}</tr></thead>
         <tbody>
-          ${gaps.map((g) => {
-            const selected = _isGapSelected(g.id);
+          ${goals.map((g) => {
+            const selected = _isGoalSelected(g.id);
             const cell = showSelection
-              ? `<td class="gap-select-col" data-label="Select">
-                   <input type="checkbox" class="gap-select"
-                          data-testid="gaps-row-select"
+              ? `<td class="goal-select-col" data-label="Select">
+                   <input type="checkbox" class="goal-select"
+                          data-testid="goals-row-select"
                           data-id="${g.id}"
                           ${selected ? "checked" : ""}
-                          aria-label="Select gap ${htmlEscape(g.name)}">
+                          aria-label="Select goal ${htmlEscape(g.name)}">
                  </td>`
               : "";
-            return `<tr data-id="${g.id}" data-testid="gaps-row">
+            return `<tr data-id="${g.id}" data-testid="goals-row">
               ${cell}
-              <td class="work-item-name-cell gaps-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
-              <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
+              <td class="work-item-name-cell goals-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
+              <td class="goals-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
               <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
               <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
               <td class="muted small" data-label="Assignee">${g.assignee ? htmlEscape(g.assignee) : "—"}</td>
-              <td class="muted small" data-label="Feature">${renderGapFeatureCell(g)}</td>
+              <td class="muted small" data-label="Feature">${renderGoalFeatureCell(g)}</td>
               <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
               <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
             </tr>`;
@@ -493,45 +493,45 @@ function drawGapsTable(gaps, state) {
         </tbody>
       </table>
     </div>
-    ${renderPaginationControls("gaps", state.page, gaps.length, "gap")}
+    ${renderPaginationControls("goals", state.page, goals.length, "goal")}
 		  `;
-  bindPaginationControls(root, "gaps", (page) =>
-    updateGapsFilter({ page }));
-  // Row click navigates to gap detail — but a click on the checkbox (or
+  bindPaginationControls(root, "goals", (page) =>
+    updateGoalsFilter({ page }));
+  // Row click navigates to goal detail — but a click on the checkbox (or
   // its surrounding td) should toggle selection, not navigate.
   $$(".table tbody tr", root).forEach((row) => {
     row.addEventListener("click", (e) => {
-      if (e.target.closest(".gap-select-col")) return;
+      if (e.target.closest(".goal-select-col")) return;
       if (e.target.closest("a, button, input, select, textarea")) return;
-      location.hash = "#/gaps/" + row.dataset.id;
+      location.hash = "#/goals/" + row.dataset.id;
     });
   });
-  $$(".gap-select", root).forEach((cb) => {
+  $$(".goal-select", root).forEach((cb) => {
     cb.addEventListener("click", (e) => e.stopPropagation());
     cb.addEventListener("change", (e) => {
       const id = e.target.dataset.id;
-      if (gapsSelectAllMatching) {
-        if (e.target.checked) gapsExcludedIds.delete(id);
-        else gapsExcludedIds.add(id);
+      if (goalsSelectAllMatching) {
+        if (e.target.checked) goalsExcludedIds.delete(id);
+        else goalsExcludedIds.add(id);
       } else if (e.target.checked) {
-        gapsIncludedIds.add(id);
+        goalsIncludedIds.add(id);
       } else {
-        gapsIncludedIds.delete(id);
+        goalsIncludedIds.delete(id);
       }
-      _updateSelectAllState(gaps);
+      _updateSelectAllState(goals);
     });
   });
-  const selectAll = root.querySelector("#gap-select-all");
+  const selectAll = root.querySelector("#goal-select-all");
   if (selectAll) {
-    _updateSelectAllState(gaps);
+    _updateSelectAllState(goals);
     selectAll.addEventListener("click", (e) => {
       e.stopPropagation();
       const shouldCheck = selectAll.checked;
-      gapsSelectAllMatching = shouldCheck;
-      gapsExcludedIds.clear();
-      gapsIncludedIds.clear();
+      goalsSelectAllMatching = shouldCheck;
+      goalsExcludedIds.clear();
+      goalsIncludedIds.clear();
       // Re-sync the current page checkboxes without a full redraw.
-      $$(".gap-select", root).forEach((cb) => {
+      $$(".goal-select", root).forEach((cb) => {
         cb.checked = shouldCheck;
       });
       selectAll.indeterminate = false;
@@ -546,9 +546,9 @@ function drawGapsTable(gaps, state) {
         nextDir = state.dir === "asc" ? "desc" : "asc";
       } else {
         // New column — use its natural default direction.
-        nextDir = GAPS_DEFAULT_DIR[key] || "desc";
+        nextDir = GOALS_DEFAULT_DIR[key] || "desc";
       }
-      updateGapsFilter({ sort: key, dir: nextDir, page: 1 });
+      updateGoalsFilter({ sort: key, dir: nextDir, page: 1 });
     });
   });
 }
@@ -556,16 +556,16 @@ function drawGapsTable(gaps, state) {
 // Sync the header checkbox to the global filter-scoped selection:
 // all matching selected -> checked, none selected -> unchecked, per-row
 // exceptions -> indeterminate.
-function _updateSelectAllState(gaps) {
-  const master = document.getElementById("gap-select-all");
+function _updateSelectAllState(goals) {
+  const master = document.getElementById("goal-select-all");
   if (!master) return;
-  if (!gaps.length && !gapsIncludedIds.size) {
+  if (!goals.length && !goalsIncludedIds.size) {
     master.checked = false;
     master.indeterminate = false;
-  } else if (gapsSelectAllMatching && gapsExcludedIds.size === 0) {
+  } else if (goalsSelectAllMatching && goalsExcludedIds.size === 0) {
     master.checked = true;
     master.indeterminate = false;
-  } else if (!gapsSelectAllMatching && gapsIncludedIds.size === 0) {
+  } else if (!goalsSelectAllMatching && goalsIncludedIds.size === 0) {
     master.checked = false;
     master.indeterminate = false;
   } else {

@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::operations::{
@@ -26,21 +26,22 @@ use crate::tools::product::imports::{
     parse_structured_import_result,
 };
 use crate::tools::product::project_state::{
-    ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
+    ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GoalProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::tools::product::work_items::{
-    BulkFeatureSelection, BulkFeatureUpdate, BulkGapSelection, FileWorkItemService,
+    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FileWorkItemService,
 };
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
 
-fn derive_gap_name(actual: &str, target: &str) -> Option<String> {
-    let source = [target.trim(), actual.trim()]
-        .into_iter()
-        .find(|value| !value.is_empty())?;
+fn derive_goal_name(prompt: &str) -> Option<String> {
+    let source = prompt.trim();
+    if source.is_empty() {
+        return None;
+    }
     let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut name = collapsed.chars().take(80).collect::<String>();
     if collapsed.chars().count() > 80 {
@@ -53,17 +54,16 @@ fn derive_gap_name(actual: &str, target: &str) -> Option<String> {
 
 fn latest_round_duplicate_match(
     service: &FileWorkItemService,
-    actual: &str,
-    target: &str,
+    prompt: &str,
 ) -> Result<Option<Value>, RefineError> {
-    if actual.is_empty() || target.is_empty() {
+    if prompt.is_empty() {
         return Ok(None);
     }
-    for gap in service.list_gap_summaries()? {
-        if gap.gap.round_count == 0 {
+    for goal in service.list_goal_summaries()? {
+        if goal.goal.round_count == 0 {
             continue;
         }
-        let detail = service.show_gap_detail(&gap.gap.id)?;
+        let detail = service.show_goal_detail(&goal.goal.id)?;
         let Some(round) = detail
             .get("rounds")
             .and_then(Value::as_array)
@@ -71,25 +71,19 @@ fn latest_round_duplicate_match(
         else {
             continue;
         };
-        let round_actual = round
-            .get("actual")
+        let round_prompt = round
+            .get("prompt")
             .and_then(Value::as_str)
             .unwrap_or("")
             .trim();
-        let round_target = round
-            .get("target")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-        if round_actual == actual && round_target == target {
+        if round_prompt == prompt {
             return Ok(Some(json!({
-                "id": gap.gap.id,
-                "name": gap.gap.name,
-                "status": gap.gap.status,
-                "node_id": gap.gap.node_id,
-                "node_display_name": gap.node_display_name,
-                "actual": round_actual,
-                "target": round_target
+                "id": goal.goal.id,
+                "name": goal.goal.name,
+                "status": goal.goal.status,
+                "node_id": goal.goal.node_id,
+                "node_display_name": goal.node_display_name,
+                "prompt": round_prompt
             })));
         }
     }
@@ -143,22 +137,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_gaps() {
+    fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals() {
         let output = json!({
             "feature": {
                 "name": "Personal Budget App — Product Spec",
                 "description": "created by Plan Mode",
-                "gaps": [
+                "goals": [
                     {
                         "name": "Track spending by category",
-                        "actual": "Users cannot categorize transactions.",
-                        "target": "Users can assign each transaction to a budget category.",
+                        "prompt": "Let users assign each transaction to a budget category.",
                         "priority": "medium"
                     },
                     {
                         "name": "Monthly budget overview",
-                        "actual": "Users cannot see monthly budget progress.",
-                        "target": "Users can compare month-to-date spending against budget limits.",
+                        "prompt": "Let users compare month-to-date spending against budget limits.",
                         "priority": "high"
                     }
                 ]
@@ -173,8 +165,8 @@ mod tests {
         assert_eq!(result.drafts.len(), 2);
         assert_eq!(result.drafts[0].name, "Track spending by category");
         assert_eq!(
-            result.drafts[0].target,
-            "Users can assign each transaction to a budget category."
+            result.drafts[0].prompt,
+            "Let users assign each transaction to a budget category."
         );
         assert_eq!(result.drafts[0].reporter, "Product");
         assert_eq!(result.drafts[1].priority, "high");
@@ -187,11 +179,10 @@ mod tests {
   "feature": {
     "name": "Smoke AI Plan Feature",
     "description": "A deterministic product capability planned by the Smoke AI fixture.",
-    "gaps": [
+    "goals": [
       {
-        "name": "Smoke AI plan gap one",
-        "actual": "smoke-ai plan actual behavior one",
-        "target": "smoke-ai plan target behavior one",
+        "name": "Smoke AI plan goal one",
+        "prompt": "smoke-ai plan prompt one",
         "priority": "low"
       }
     ]
@@ -203,36 +194,33 @@ Provider notes after JSON."#;
         let feature = result.feature_destination.unwrap();
         assert_eq!(feature.name, "Smoke AI Plan Feature");
         assert_eq!(result.drafts.len(), 1);
-        assert_eq!(result.drafts[0].actual, "smoke-ai plan actual behavior one");
+        assert_eq!(result.drafts[0].prompt, "smoke-ai plan prompt one");
     }
 
     #[test]
-    fn plan_import_result_merges_feature_behavior_and_implementation_gap_arrays() {
+    fn plan_import_result_merges_feature_behavior_and_implementation_goal_arrays() {
         let output = json!({
             "feature": {
                 "name": "Budget Alerts",
                 "description": "Alert users when spending nears limits.",
-                "gaps": [
+                "goals": [
                     {
                         "name": "Budget threshold alert",
-                        "actual": "Users do not receive budget threshold alerts.",
-                        "target": "Users receive an alert before a category exceeds its monthly budget.",
+                        "prompt": "Alert users before a category exceeds its monthly budget.",
                         "priority": "high"
                     }
                 ],
-                "implementation_gaps": [
+                "implementation_goals": [
                     {
                         "name": "Persist alert preferences",
-                        "actual": "There is no refine model for per-category alert thresholds.",
-                        "target": "The backend persists threshold preferences and exposes them through the budget settings API.",
+                        "prompt": "Add a refine model that persists threshold preferences and exposes them through the budget settings API.",
                         "priority": "medium"
                     }
                 ],
-                "technical_gaps": [
+                "technical_goals": [
                     {
                         "name": "Verify alert trigger coverage",
-                        "actual": "No test covers threshold crossing behavior.",
-                        "target": "Automated tests cover below-threshold, threshold-crossing, and disabled-alert cases.",
+                        "prompt": "Add automated tests for below-threshold, threshold-crossing, and disabled-alert cases.",
                         "priority": "medium"
                     }
                 ]
@@ -245,16 +233,16 @@ Provider notes after JSON."#;
         assert_eq!(result.drafts[0].name, "Budget threshold alert");
         assert_eq!(result.drafts[1].name, "Persist alert preferences");
         assert_eq!(result.drafts[2].name, "Verify alert trigger coverage");
-        assert!(result.drafts[1].actual.contains("refine model"));
-        assert!(result.drafts[2].target.contains("Automated tests"));
+        assert!(result.drafts[1].prompt.contains("refine model"));
+        assert!(result.drafts[2].prompt.contains("automated tests"));
     }
 
     #[test]
     fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
         let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
         assert!(prompt.contains("feature"));
-        assert!(prompt.contains("implementation_gaps"));
-        assert!(prompt.contains("Draft every concrete implementation gap"));
+        assert!(prompt.contains("implementation_goals"));
+        assert!(prompt.contains("Draft every concrete implementation goal"));
         assert!(prompt.contains("architecture"));
         assert!(prompt.contains("durable state"));
         assert!(prompt.contains("logic and code organization"));
@@ -280,14 +268,12 @@ fn persist_import_draft_with_duplicate_decision(
     draft: &ImportDraft,
     feature_id: Option<&str>,
     actions: &mut ImportDuplicateActions,
-    created_gap_ids: &mut Vec<String>,
+    created_goal_ids: &mut Vec<String>,
     created_drafts: &mut Vec<(ImportDraft, String)>,
 ) -> Result<Option<String>, RefineError> {
     let decision = draft.duplicate_decision.trim();
     if !decision.is_empty() && decision != "original" {
-        if let Some(duplicate) =
-            latest_round_duplicate_match(service, draft.actual.trim(), draft.target.trim())?
-        {
+        if let Some(duplicate) = latest_round_duplicate_match(service, draft.prompt.trim())? {
             let duplicate_id = duplicate
                 .get("id")
                 .and_then(Value::as_str)
@@ -303,7 +289,7 @@ fn persist_import_draft_with_duplicate_decision(
                     if from == "backlog" || duplicate_id.is_empty() {
                         actions.move_noop += 1;
                     } else if service
-                        .transition_gap_status(&duplicate_id, GapStatus::Backlog)
+                        .transition_goal_status(&duplicate_id, GoalStatus::Backlog)
                         .is_ok()
                     {
                         actions.moved_to_backlog += 1;
@@ -312,13 +298,12 @@ fn persist_import_draft_with_duplicate_decision(
                     }
                     return Ok(None);
                 }
-                "update_original_actual"
-                | "update_original_target"
+                "update_original_prompt"
                 | "update_original_reporter"
                 | "update_original_priority" => {
                     if !duplicate_id.is_empty() {
                         if decision == "update_original_priority" {
-                            service.update_gap_metadata_summary(
+                            service.update_goal_metadata_summary(
                                 &duplicate_id,
                                 None,
                                 Some(&draft.priority),
@@ -326,23 +311,20 @@ fn persist_import_draft_with_duplicate_decision(
                                 None,
                             )?;
                         } else {
-                            let actual = (decision == "update_original_actual")
-                                .then_some(draft.actual.as_str());
-                            let target = (decision == "update_original_target")
-                                .then_some(draft.target.as_str());
+                            let prompt = (decision == "update_original_prompt")
+                                .then_some(draft.prompt.as_str());
                             let reporter = (decision == "update_original_reporter")
                                 .then(|| nonempty_import_option(&draft.reporter))
                                 .flatten();
                             if let Some(reporter) = reporter {
-                                service.update_gap_reporter_summary(&duplicate_id, reporter)?;
+                                service.update_goal_reporter_summary(&duplicate_id, reporter)?;
                             }
-                            if actual.is_some() || target.is_some() {
-                                service.edit_latest_gap_round_summary(
+                            if prompt.is_some() {
+                                service.edit_latest_goal_round_summary(
                                     &duplicate_id,
                                     None,
                                     None,
-                                    actual,
-                                    target,
+                                    prompt,
                                 )?;
                             }
                         }
@@ -359,31 +341,30 @@ fn persist_import_draft_with_duplicate_decision(
         }
     }
 
-    let gap = service.create_gap_summary(&draft.name, None)?;
-    created_gap_ids.push(gap.gap.id.clone());
-    if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
-        service.append_gap_round_summary_with_assignee(
-            &gap.gap.id,
+    let goal = service.create_goal_summary(&draft.name, None)?;
+    created_goal_ids.push(goal.goal.id.clone());
+    if !draft.prompt.trim().is_empty() {
+        service.append_goal_round_summary_with_assignee(
+            &goal.goal.id,
             nonempty_or_import_value(&draft.reporter, "Imported"),
             draft.assignee.as_deref(),
-            &draft.actual,
-            &draft.target,
+            &draft.prompt,
         )?;
     }
-    if gap.gap.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
-        service.update_gap_metadata_summary(
-            &gap.gap.id,
+    if goal.goal.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
+        service.update_goal_metadata_summary(
+            &goal.goal.id,
             None,
-            (gap.gap.priority.as_str() != draft.priority).then_some(draft.priority.as_str()),
+            (goal.goal.priority.as_str() != draft.priority).then_some(draft.priority.as_str()),
             nonempty_import_option(&draft.reporter),
             None,
         )?;
     }
     if let Some(feature_id) = feature_id {
-        service.assign_gap_to_feature(feature_id, &gap.gap.id)?;
+        service.assign_goal_to_feature(feature_id, &goal.goal.id)?;
     }
-    created_drafts.push((draft.clone(), gap.gap.id.clone()));
-    Ok(Some(gap.gap.id))
+    created_drafts.push((draft.clone(), goal.goal.id.clone()));
+    Ok(Some(goal.goal.id))
 }
 
 fn nonempty_import_option(value: &str) -> Option<&str> {
@@ -462,20 +443,20 @@ fn validate_import_extraction_result(
 ) -> Result<ImportExtractionResult, RefineError> {
     if purpose == "plan" && result.drafts.is_empty() {
         return Err(RefineError::InvalidInput(
-            "Plan Draft extraction did not return any Gap drafts".to_string(),
+            "Plan Draft extraction did not return any Goal drafts".to_string(),
         ));
     }
     Ok(result)
 }
 
-fn feature_detail_response_from_gaps(
+fn feature_detail_response_from_goals(
     feature: &crate::tools::product::project_state::FeatureSummaryProjection,
-    gaps: Vec<crate::model::gap::GapIndexProjection>,
+    goals: Vec<crate::model::goal::GoalIndexProjection>,
 ) -> Value {
     let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
         object.insert("status".to_string(), json!(feature.rollup.status));
-        object.insert("gap_count".to_string(), json!(feature.rollup.gap_count));
+        object.insert("goal_count".to_string(), json!(feature.rollup.goal_count));
         object.insert("done_count".to_string(), json!(feature.rollup.done_count));
         object.insert(
             "active_count".to_string(),
@@ -493,9 +474,9 @@ fn feature_detail_response_from_gaps(
             "blocked_count".to_string(),
             json!(feature.rollup.blocked_count),
         );
-        object.insert("next_gap".to_string(), json!(feature.rollup.next_gap));
-        object.insert("gap_ids".to_string(), json!(feature.gap_ids));
-        object.insert("gaps".to_string(), json!(gaps));
+        object.insert("next_goal".to_string(), json!(feature.rollup.next_goal));
+        object.insert("goal_ids".to_string(), json!(feature.goal_ids));
+        object.insert("goals".to_string(), json!(goals));
         object.insert("rollup".to_string(), json!(feature.rollup));
     }
     value
@@ -505,7 +486,7 @@ fn feature_reorder_order_from_body(
     body: Option<&Value>,
     projection: &crate::tools::product::project_state::ProjectionSnapshot,
     feature_id: &str,
-    gap_id: &str,
+    goal_id: &str,
 ) -> Result<i64, ApiResponse> {
     let Some(body) = body else {
         return Err(ApiResponse::json(
@@ -550,40 +531,40 @@ fn feature_reorder_order_from_body(
             }),
         ));
     };
-    let mut ordered_gap_ids = feature
-        .gap_ids
+    let mut ordered_goal_ids = feature
+        .goal_ids
         .iter()
         .filter(|id| {
             projection
-                .gaps
+                .goals
                 .get(*id)
-                .and_then(|gap| gap.gap.feature_order)
+                .and_then(|goal| goal.goal.feature_order)
                 .is_some()
         })
         .cloned()
         .collect::<Vec<_>>();
-    let Some(source_index) = ordered_gap_ids.iter().position(|id| id == gap_id) else {
+    let Some(source_index) = ordered_goal_ids.iter().position(|id| id == goal_id) else {
         return Err(ApiResponse::json(
             404,
             json!({
                 "error": {
                     "code": "not_found",
-                    "message": format!("Gap {gap_id} was not found in Feature {feature_id}")
+                    "message": format!("Goal {goal_id} was not found in Feature {feature_id}")
                 }
             }),
         ));
     };
-    if target_id == gap_id {
+    if target_id == goal_id {
         return Ok(source_index as i64 + 1);
     }
-    ordered_gap_ids.remove(source_index);
-    let Some(target_index) = ordered_gap_ids.iter().position(|id| id == target_id) else {
+    ordered_goal_ids.remove(source_index);
+    let Some(target_index) = ordered_goal_ids.iter().position(|id| id == target_id) else {
         return Err(ApiResponse::json(
             400,
             json!({
                 "error": {
                     "code": "invalid_order",
-                    "message": format!("target Gap {target_id} is not assigned to Feature {feature_id}")
+                    "message": format!("target Goal {target_id} is not assigned to Feature {feature_id}")
                 }
             }),
         ));
@@ -608,9 +589,9 @@ fn import_operation_cancelled(registry: &FileOperationRegistry, operation_id: &s
         .unwrap_or(false)
 }
 
-fn rollback_import_gaps(service: &FileWorkItemService, gap_ids: &[String]) {
-    for gap_id in gap_ids.iter().rev() {
-        let _ = service.delete_gap_record(gap_id);
+fn rollback_import_goals(service: &FileWorkItemService, goal_ids: &[String]) {
+    for goal_id in goal_ids.iter().rev() {
+        let _ = service.delete_goal_record(goal_id);
     }
 }
 
@@ -653,20 +634,20 @@ impl InProcessWebServer {
             .collect()
     }
 
-    pub(super) fn handle_gap_transition(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_transition(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "mutate work items");
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/transition"))
-            .filter(|gap_id| !gap_id.is_empty())
+            .filter(|goal_id| !goal_id.is_empty())
         else {
             return ApiResponse::json(
                 404,
                 json!({
                     "error": {
                         "code": "not_found",
-                        "message": "Gap transition route requires a Gap id"
+                        "message": "Goal transition route requires a Goal id"
                     }
                 }),
             );
@@ -676,14 +657,14 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("status"))
             .and_then(|status| status.as_str())
-            .and_then(GapStatus::parse_wire)
+            .and_then(GoalStatus::parse_wire)
         else {
             return ApiResponse::json(
                 400,
                 json!({
                     "error": {
                         "code": "invalid_status",
-                        "message": "body.status must be a valid Gap status"
+                        "message": "body.status must be a valid Goal status"
                     }
                 }),
             );
@@ -691,63 +672,58 @@ impl InProcessWebServer {
 
         match self
             .work_item_service(refine_dir)
-            .transition_gap_status(gap_id, status)
+            .transition_goal_status(goal_id, status)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_action(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_action(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "mutate work items");
-        let Some((gap_id, action)) = gap_id_and_action(&request.path) else {
-            return gap_id_required();
+        let Some((goal_id, action)) = goal_id_and_action(&request.path) else {
+            return goal_id_required();
         };
         let service = self.work_item_service(refine_dir);
         let result = match action {
-            "start" => service.start_gap_workflow(gap_id),
-            "verify" => service.verify_gap_summary(gap_id),
-            "retry-quality" => service.retry_gap_quality_summary(gap_id),
-            "retry-merge" => service.retry_gap_merge_summary(gap_id),
-            "submit-merge" => service.submit_gap_for_merge_summary(gap_id),
-            "merge" => service.merge_gap_summary(gap_id),
-            "undo" => service.undo_gap_summary(gap_id),
+            "start" => service.start_goal_workflow(goal_id),
+            "verify" => service.verify_goal_summary(goal_id),
+            "retry-quality" => service.retry_goal_quality_summary(goal_id),
+            "retry-merge" => service.retry_goal_merge_summary(goal_id),
+            "submit-merge" => service.submit_goal_for_merge_summary(goal_id),
+            "merge" => service.merge_goal_summary(goal_id),
+            "undo" => service.undo_goal_summary(goal_id),
             _ => {
                 return ApiResponse::json(
                     404,
                     json!({
                         "error": {
                             "code": "not_found",
-                            "message": "unknown Gap action"
+                            "message": "unknown Goal action"
                         }
                     }),
                 );
             }
         };
         match result {
-            Ok(gap) => ApiResponse::json(
+            Ok(goal) => ApiResponse::json(
                 200,
                 json!({
                     "ok": true,
-                    "message": gap_action_message(action),
-                    "gap": gap.gap
+                    "message": goal_action_message(action),
+                    "goal": goal.goal
                 }),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_create(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_create(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "create work items");
         let body = request.body.as_ref();
-        let actual = body
-            .and_then(|body| body.get("actual"))
-            .and_then(|actual| actual.as_str())
-            .unwrap_or("")
-            .trim();
-        let target = body
-            .and_then(|body| body.get("target"))
-            .and_then(|target| target.as_str())
+        let prompt = body
+            .and_then(|body| body.get("prompt"))
+            .and_then(|prompt| prompt.as_str())
             .unwrap_or("")
             .trim();
         let Some(name) = body
@@ -756,14 +732,14 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|name| !name.is_empty())
             .map(str::to_string)
-            .or_else(|| derive_gap_name(actual, target))
+            .or_else(|| derive_goal_name(prompt))
         else {
             return ApiResponse::json(
                 400,
                 json!({
                     "error": {
                         "code": "invalid_name",
-                        "message": "body.name, body.actual, or body.target is required"
+                        "message": "body.name or body.prompt is required"
                     }
                 }),
             );
@@ -805,7 +781,7 @@ impl InProcessWebServer {
 
         let service = self.work_item_service(refine_dir);
         let duplicate = if id.is_none() {
-            match latest_round_duplicate_match(&service, actual, target) {
+            match latest_round_duplicate_match(&service, prompt) {
                 Ok(duplicate) => duplicate,
                 Err(error) => return error_response(error),
             }
@@ -824,8 +800,8 @@ impl InProcessWebServer {
                         409,
                         json!({
                             "error": {
-                                "code": "duplicate_gap",
-                                "message": "Possible duplicate Gap",
+                                "code": "duplicate_goal",
+                                "message": "Possible duplicate Goal",
                                 "duplicate": {
                                     "match": duplicate
                                 }
@@ -858,7 +834,7 @@ impl InProcessWebServer {
                         "reason": "already_backlog"
                     });
                     if from != "backlog" && !duplicate_id.is_empty() {
-                        match service.transition_gap_status(&duplicate_id, GapStatus::Backlog) {
+                        match service.transition_goal_status(&duplicate_id, GoalStatus::Backlog) {
                             Ok(_) => {
                                 move_result = json!({
                                     "moved": true,
@@ -896,83 +872,82 @@ impl InProcessWebServer {
                 }
             }
         }
-        let mut gap = match service.create_gap_summary(&name, id) {
-            Ok(gap) => gap,
+        let mut goal = match service.create_goal_summary(&name, id) {
+            Ok(goal) => goal,
             Err(error) => return error_response(error),
         };
         if priority != "low" || !reporter.is_empty() {
-            match service.update_gap_metadata_summary(
-                &gap.gap.id,
+            match service.update_goal_metadata_summary(
+                &goal.goal.id,
                 None,
                 (priority != "low").then_some(priority),
                 (!reporter.is_empty()).then_some(reporter),
                 None,
             ) {
-                Ok(updated) => gap = updated,
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
-        if !reporter.is_empty() && !actual.is_empty() && !target.is_empty() {
-            match service.append_gap_round_summary_with_assignee(
-                &gap.gap.id,
+        if !reporter.is_empty() && !prompt.is_empty() {
+            match service.append_goal_round_summary_with_assignee(
+                &goal.goal.id,
                 reporter,
                 (!assignee.is_empty()).then_some(assignee),
-                actual,
-                target,
+                prompt,
             ) {
-                Ok(updated) => gap = updated,
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
         if let Some(feature_id) = feature_id {
-            if let Err(error) = service.assign_gap_to_feature(feature_id, &gap.gap.id) {
+            if let Err(error) = service.assign_goal_to_feature(feature_id, &goal.goal.id) {
                 return error_response(error);
             }
-            match service.show_gap_summary(&gap.gap.id) {
-                Ok(updated) => gap = updated,
+            match service.show_goal_summary(&goal.goal.id) {
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
 
         match self.refresh_projection_cache_after_mutation() {
-            Ok(()) => ApiResponse::json(201, json!({"gap": gap.gap})),
+            Ok(()) => ApiResponse::json(201, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_bulk_update(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_bulk_update(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "bulk update work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
-        let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
+        let selection = match serde_json::from_value::<BulkGoalSelection>(body.clone()) {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
-        let Some(update) = parse_bulk_gap_update(body) else {
+        let Some(update) = parse_bulk_goal_update(body) else {
             return invalid_bulk_body();
         };
         match self
             .work_item_service(refine_dir)
-            .bulk_update_gaps(selection, update)
+            .bulk_update_goals(selection, update)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_bulk_delete(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_bulk_delete(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "bulk delete work items");
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
-        let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
+        let selection = match serde_json::from_value::<BulkGoalSelection>(body.clone()) {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
         match self
             .work_item_service(refine_dir)
-            .bulk_delete_gaps(selection)
+            .bulk_delete_goals(selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
@@ -1026,7 +1001,7 @@ impl InProcessWebServer {
         ) {
             Ok(feature) => ApiResponse::json(
                 201,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
@@ -1055,7 +1030,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 }),
             ),
@@ -1157,12 +1132,12 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_feature_bulk_assign_gaps(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "bulk assign Gaps to Features");
+    pub(super) fn handle_feature_bulk_assign_goals(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "bulk assign Goals to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
-            .and_then(|path| path.strip_suffix("/gaps/bulk"))
+            .and_then(|path| path.strip_suffix("/goals/bulk"))
             .filter(|feature_id| !feature_id.is_empty() && !feature_id.contains('/'))
         else {
             return feature_id_required();
@@ -1170,27 +1145,27 @@ impl InProcessWebServer {
         let Some(body) = request.body.as_ref() else {
             return invalid_bulk_body();
         };
-        let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
+        let selection = match serde_json::from_value::<BulkGoalSelection>(body.clone()) {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
         match self
             .work_item_service(refine_dir)
-            .bulk_assign_gaps_to_feature(feature_id, selection)
+            .bulk_assign_goals_to_feature(feature_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_update(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_update(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "update work items");
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
-            .filter(|gap_id| !gap_id.is_empty() && !gap_id.contains('/'))
+            .strip_prefix("/work/goals/")
+            .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         let name = request
             .body
@@ -1233,7 +1208,7 @@ impl InProcessWebServer {
             .and_then(|body| body.get("status"))
             .and_then(|status| status.as_str())
         {
-            Some(status) => match GapStatus::parse_wire(status) {
+            Some(status) => match GoalStatus::parse_wire(status) {
                 Some(status) => Some(status),
                 None => {
                     return ApiResponse::json(
@@ -1241,7 +1216,7 @@ impl InProcessWebServer {
                         json!({
                             "error": {
                                 "code": "invalid_status",
-                                "message": "body.status must be a valid Gap status"
+                                "message": "body.status must be a valid Goal status"
                             }
                         }),
                     );
@@ -1250,46 +1225,46 @@ impl InProcessWebServer {
             None => None,
         };
         let service = self.work_item_service(refine_dir);
-        let mut gap = match status {
-            Some(status) => match service.transition_gap_status(gap_id, status) {
-                Ok(gap) => gap,
+        let mut goal = match status {
+            Some(status) => match service.transition_goal_status(goal_id, status) {
+                Ok(goal) => goal,
                 Err(error) => return error_response(error),
             },
-            None => match service.show_gap_summary(gap_id) {
-                Ok(gap) => gap,
+            None => match service.show_goal_summary(goal_id) {
+                Ok(goal) => goal,
                 Err(error) => return error_response(error),
             },
         };
         if name.is_some() || priority.is_some() || reporter.is_some() {
-            match service.update_gap_metadata_summary(gap_id, name, priority, reporter, None) {
-                Ok(updated) => gap = updated,
+            match service.update_goal_metadata_summary(goal_id, name, priority, reporter, None) {
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
         if let Some(assignee) = assignee {
-            match service.update_gap_assignee_summary(gap_id, assignee) {
-                Ok(updated) => gap = updated,
+            match service.update_goal_assignee_summary(goal_id, assignee) {
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
         if let Some(notes) = notes {
-            match service.replace_gap_notes_summary(gap_id, &notes) {
-                Ok(updated) => gap = updated,
+            match service.replace_goal_notes_summary(goal_id, &notes) {
+                Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
         }
-        ApiResponse::json(200, json!({"gap": gap.gap}))
+        ApiResponse::json(200, json!({"goal": goal.goal}))
     }
 
-    pub(super) fn handle_gap_note(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_note(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "edit work items");
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/notes"))
-            .filter(|gap_id| !gap_id.is_empty())
+            .filter(|goal_id| !goal_id.is_empty())
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         let Some(body) = request
             .body
@@ -1315,22 +1290,22 @@ impl InProcessWebServer {
             .unwrap_or("");
         match self
             .work_item_service(refine_dir)
-            .add_gap_note_summary(gap_id, author, body)
+            .add_goal_note_summary(goal_id, author, body)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_round_append(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "append Gap rounds");
-        let Some(gap_id) = request
+    pub(super) fn handle_goal_round_append(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "append Goal rounds");
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/rounds"))
-            .filter(|gap_id| !gap_id.is_empty())
+            .filter(|goal_id| !goal_id.is_empty())
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         let Some(reporter) = request
             .body
@@ -1340,18 +1315,10 @@ impl InProcessWebServer {
         else {
             return invalid_round_body();
         };
-        let Some(actual) = request
+        let Some(prompt) = request
             .body
             .as_ref()
-            .and_then(|body| body.get("actual"))
-            .and_then(|value| value.as_str())
-        else {
-            return invalid_round_body();
-        };
-        let Some(target) = request
-            .body
-            .as_ref()
-            .and_then(|body| body.get("target"))
+            .and_then(|body| body.get("prompt"))
             .and_then(|value| value.as_str())
         else {
             return invalid_round_body();
@@ -1363,79 +1330,74 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str());
         match self
             .work_item_service(refine_dir)
-            .append_gap_round_summary_with_assignee(gap_id, reporter, assignee, actual, target)
+            .append_goal_round_summary_with_assignee(goal_id, reporter, assignee, prompt)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_round_edit_latest(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "edit latest Gap round");
-        let Some(gap_id) = request
+    pub(super) fn handle_goal_round_edit_latest(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "edit latest Goal round");
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/rounds/latest"))
-            .filter(|gap_id| !gap_id.is_empty())
+            .filter(|goal_id| !goal_id.is_empty())
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         let reporter = request
             .body
             .as_ref()
             .and_then(|body| body.get("reporter"))
             .and_then(|value| value.as_str());
-        let actual = request
+        let prompt = request
             .body
             .as_ref()
-            .and_then(|body| body.get("actual"))
+            .and_then(|body| body.get("prompt"))
             .and_then(|value| value.as_str());
         let assignee = request
             .body
             .as_ref()
             .and_then(|body| body.get("assignee"))
             .and_then(|value| value.as_str());
-        let target = request
-            .body
-            .as_ref()
-            .and_then(|body| body.get("target"))
-            .and_then(|value| value.as_str());
         match self
             .work_item_service(refine_dir)
-            .edit_latest_gap_round_summary(gap_id, reporter, assignee, actual, target)
+            .edit_latest_goal_round_summary(goal_id, reporter, assignee, prompt)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_round_evaluation_update(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "update latest Gap round evaluation");
-        let Some(gap_id) = request
+    pub(super) fn handle_goal_round_evaluation_update(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "update latest Goal round evaluation");
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/rounds/latest/evaluation"))
-            .filter(|gap_id| !gap_id.is_empty())
+            .filter(|goal_id| !goal_id.is_empty())
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         match self
             .work_item_service(refine_dir)
-            .update_latest_gap_round_evaluation_summary(gap_id, &body)
+            .update_latest_goal_round_evaluation_summary(goal_id, &body)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_round_log_append(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "append Gap round logs");
-        let Some(rest) = request.path.strip_prefix("/work/gaps/") else {
-            return gap_id_required();
+    pub(super) fn handle_goal_round_log_append(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "append Goal round logs");
+        let Some(rest) = request.path.strip_prefix("/work/goals/") else {
+            return goal_id_required();
         };
-        let Some((gap_id, round_part)) = rest.split_once("/rounds/") else {
-            return gap_id_required();
+        let Some((goal_id, round_part)) = rest.split_once("/rounds/") else {
+            return goal_id_required();
         };
         let Some(round_idx) = round_part
             .strip_suffix("/logs")
@@ -1446,11 +1408,14 @@ impl InProcessWebServer {
                 json!({"error": {"code": "invalid_round", "message": "round index is required"}}),
             );
         };
-        let gap = match self.work_item_service(&refine_dir).show_gap_summary(gap_id) {
-            Ok(gap) => gap,
+        let goal = match self
+            .work_item_service(&refine_dir)
+            .show_goal_summary(goal_id)
+        {
+            Ok(goal) => goal,
             Err(error) => return error_response(error),
         };
-        if round_idx >= gap.gap.round_count {
+        if round_idx >= goal.goal.round_count {
             return ApiResponse::json(
                 404,
                 json!({"error": {"code": "not_found", "message": "Round not found"}}),
@@ -1494,43 +1459,46 @@ impl InProcessWebServer {
                 .get("actor")
                 .and_then(|actor| actor.as_str())
                 .map(str::to_string),
-            gap_id: Some(gap_id.to_string()),
+            goal_id: Some(goal_id.to_string()),
         };
-        match FileLogService::new(refine_dir).append_round_log(gap_id, round_idx, entry) {
+        match FileLogService::new(refine_dir).append_round_log(goal_id, round_idx, entry) {
             Ok(log) => ApiResponse::json(
                 200,
-                json!({"log": log, "gap_id": gap_id, "round_idx": round_idx}),
+                json!({"log": log, "goal_id": goal_id, "round_idx": round_idx}),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_logs(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "read Gap round logs");
-        let Some(gap_id) = request
+    pub(super) fn handle_goal_logs(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "read Goal round logs");
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/logs"))
-            .filter(|gap_id| !gap_id.is_empty() && !gap_id.contains('/'))
+            .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
-        let gap = match self.work_item_service(&refine_dir).show_gap_summary(gap_id) {
-            Ok(gap) => gap,
+        let goal = match self
+            .work_item_service(&refine_dir)
+            .show_goal_summary(goal_id)
+        {
+            Ok(goal) => goal,
             Err(error) => return error_response(error),
         };
-        if gap.gap.round_count == 0 {
+        if goal.goal.round_count == 0 {
             return ApiResponse::json(
                 404,
                 json!({"error": {"code": "not_found", "message": "Round not found"}}),
             );
         }
         let round_idx = 0;
-        match FileLogService::new(refine_dir).page_round_logs(gap_id, round_idx, 50, 0) {
+        match FileLogService::new(refine_dir).page_round_logs(goal_id, round_idx, 50, 0) {
             Ok((logs, has_more, total)) => ApiResponse::json(
                 200,
                 json!({
-                    "gap_id": gap_id,
+                    "goal_id": goal_id,
                     "round_idx": round_idx,
                     "logs": logs,
                     "pagination": {
@@ -1547,39 +1515,42 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_gap_delete(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_delete(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "delete work items");
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
-            .filter(|gap_id| !gap_id.is_empty() && !gap_id.contains('/'))
+            .strip_prefix("/work/goals/")
+            .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
-        match self.work_item_service(refine_dir).delete_gap_record(gap_id) {
+        match self
+            .work_item_service(refine_dir)
+            .delete_goal_record(goal_id)
+        {
             Ok(()) => match self.refresh_projection_cache_after_mutation() {
-                Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": gap_id})),
+                Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": goal_id})),
                 Err(error) => error_response(error),
             },
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gap_cancel(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_goal_cancel(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "cancel work items");
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
+            .strip_prefix("/work/goals/")
             .and_then(|path| path.strip_suffix("/cancel"))
-            .filter(|gap_id| !gap_id.is_empty() && !gap_id.contains('/'))
+            .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
         else {
-            return gap_id_required();
+            return goal_id_required();
         };
         match self
             .work_item_service(refine_dir)
-            .cancel_gap_summary(gap_id)
+            .cancel_goal_summary(goal_id)
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),
         }
     }
@@ -1596,17 +1567,22 @@ impl InProcessWebServer {
         let service = FileWorkItemService::new(refine_dir);
         match service.show_feature_summary(feature_id) {
             Ok(feature) => {
-                let gaps = feature
-                    .gap_ids
+                let goals = feature
+                    .goal_ids
                     .iter()
-                    .filter_map(|gap_id| service.show_gap_summary(gap_id).ok().map(|gap| gap.gap))
+                    .filter_map(|goal_id| {
+                        service
+                            .show_goal_summary(goal_id)
+                            .ok()
+                            .map(|goal| goal.goal)
+                    })
                     .collect::<Vec<_>>();
-                let feature_detail = feature_detail_response_from_gaps(&feature, gaps);
+                let feature_detail = feature_detail_response_from_goals(&feature, goals);
                 ApiResponse::json(
                     200,
                     json!({
                         "feature": feature_detail,
-                        "gap_ids": feature.gap_ids,
+                        "goal_ids": feature.goal_ids,
                         "rollup": feature.rollup
                     }),
                 )
@@ -1615,40 +1591,40 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_feature_add_gap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "assign Gaps to Features");
+    pub(super) fn handle_feature_add_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "assign Goals to Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
-            .and_then(|path| path.strip_suffix("/gaps"))
+            .and_then(|path| path.strip_suffix("/goals"))
             .filter(|feature_id| !feature_id.is_empty())
         else {
             return feature_id_required();
         };
-        let Some(gap_id) = request
+        let Some(goal_id) = request
             .body
             .as_ref()
-            .and_then(|body| body.get("gap_id"))
-            .and_then(|gap_id| gap_id.as_str())
+            .and_then(|body| body.get("goal_id"))
+            .and_then(|goal_id| goal_id.as_str())
         else {
             return ApiResponse::json(
                 400,
                 json!({
                     "error": {
-                        "code": "invalid_gap_id",
-                        "message": "body.gap_id is required"
+                        "code": "invalid_goal_id",
+                        "message": "body.goal_id is required"
                     }
                 }),
             );
         };
         match self
             .work_item_service(refine_dir)
-            .assign_gap_to_feature(feature_id, gap_id)
+            .assign_goal_to_feature(feature_id, goal_id)
         {
             Ok(feature) => match self.refresh_projection_cache_after_mutation() {
                 Ok(()) => ApiResponse::json(
                     200,
-                    json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                    json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
                 ),
                 Err(error) => error_response(error),
             },
@@ -1656,116 +1632,116 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_feature_add_gap_path(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "assign Gaps to Features");
+    pub(super) fn handle_feature_add_goal_path(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "assign Goals to Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
-        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+        let Some((feature_id, goal_part)) = rest.split_once("/goals/") else {
             return feature_id_required();
         };
-        let gap_id = gap_part;
-        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+        let goal_id = goal_part;
+        if feature_id.is_empty() || goal_id.is_empty() || goal_id.contains('/') {
             return feature_id_required();
         }
         match self
             .work_item_service(refine_dir)
-            .assign_gap_to_feature(feature_id, gap_id)
+            .assign_goal_to_feature(feature_id, goal_id)
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_feature_remove_gap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "remove Gaps from Features");
+    pub(super) fn handle_feature_remove_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "remove Goals from Features");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
-        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+        let Some((feature_id, goal_part)) = rest.split_once("/goals/") else {
             return feature_id_required();
         };
-        let gap_id = gap_part;
-        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+        let goal_id = goal_part;
+        if feature_id.is_empty() || goal_id.is_empty() || goal_id.contains('/') {
             return feature_id_required();
         }
         match self
             .work_item_service(refine_dir)
-            .remove_gap_from_feature(feature_id, gap_id)
+            .remove_goal_from_feature(feature_id, goal_id)
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_feature_order_gap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "order Feature Gaps");
+    pub(super) fn handle_feature_order_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "order Feature Goals");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
-        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+        let Some((feature_id, goal_part)) = rest.split_once("/goals/") else {
             return feature_id_required();
         };
-        let Some(gap_id) = gap_part.strip_suffix("/order") else {
-            return gap_id_required();
+        let Some(goal_id) = goal_part.strip_suffix("/order") else {
+            return goal_id_required();
         };
-        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+        if feature_id.is_empty() || goal_id.is_empty() || goal_id.contains('/') {
             return feature_id_required();
         }
         match self
             .work_item_service(refine_dir)
-            .order_gap_in_feature(feature_id, gap_id)
+            .order_goal_in_feature(feature_id, goal_id)
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_feature_unorder_gap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "unorder Feature Gaps");
+    pub(super) fn handle_feature_unorder_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "unorder Feature Goals");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
-        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+        let Some((feature_id, goal_part)) = rest.split_once("/goals/") else {
             return feature_id_required();
         };
-        let Some(gap_id) = gap_part.strip_suffix("/unorder") else {
-            return gap_id_required();
+        let Some(goal_id) = goal_part.strip_suffix("/unorder") else {
+            return goal_id_required();
         };
-        if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
+        if feature_id.is_empty() || goal_id.is_empty() || goal_id.contains('/') {
             return feature_id_required();
         }
         match self
             .work_item_service(refine_dir)
-            .unorder_gap_in_feature(feature_id, gap_id)
+            .unorder_goal_in_feature(feature_id, goal_id)
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_feature_reorder_gap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "reorder Feature Gaps");
+    pub(super) fn handle_feature_reorder_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "reorder Feature Goals");
         let Some(rest) = request.path.strip_prefix("/work/features/") else {
             return feature_id_required();
         };
-        let Some((feature_id, gap_part)) = rest.split_once("/gaps/") else {
+        let Some((feature_id, goal_part)) = rest.split_once("/goals/") else {
             return feature_id_required();
         };
-        let Some(gap_id) = gap_part.strip_suffix("/reorder") else {
-            return gap_id_required();
+        let Some(goal_id) = goal_part.strip_suffix("/reorder") else {
+            return goal_id_required();
         };
         let order = match self
             .current_projection()
@@ -1775,7 +1751,7 @@ impl InProcessWebServer {
                     request.body.as_ref(),
                     &projection,
                     feature_id,
-                    gap_id,
+                    goal_id,
                 )
             }) {
             Ok(order) => order,
@@ -1783,11 +1759,11 @@ impl InProcessWebServer {
         };
         match self
             .work_item_service(refine_dir)
-            .reorder_gap_in_feature(feature_id, gap_id, order)
+            .reorder_goal_in_feature(feature_id, goal_id, order)
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
@@ -1808,7 +1784,7 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("status"))
             .and_then(|status| status.as_str())
-            .and_then(GapStatus::parse_wire)
+            .and_then(GoalStatus::parse_wire)
         else {
             return ApiResponse::json(
                 400,
@@ -1826,7 +1802,7 @@ impl InProcessWebServer {
         {
             Ok(feature) => ApiResponse::json(
                 200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                json!({"feature": feature.feature, "goal_ids": feature.goal_ids, "rollup": feature.rollup}),
             ),
             Err(error) => error_response(error),
         }
@@ -1879,15 +1855,15 @@ impl InProcessWebServer {
         else {
             return feature_id_required();
         };
-        let gap_ids = match self.current_projection() {
+        let goal_ids = match self.current_projection() {
             Ok(projection) => projection
                 .features
                 .get(feature_id)
-                .map(|feature| feature.gap_ids.clone())
+                .map(|feature| feature.goal_ids.clone())
                 .unwrap_or_default(),
             Err(error) => return error_response(error),
         };
-        let runtime_reconciled = match self.reconcile_feature_runtime_work(feature_id, &gap_ids) {
+        let runtime_reconciled = match self.reconcile_feature_runtime_work(feature_id, &goal_ids) {
             Ok(summary) => summary,
             Err(error) => return error_response(error),
         };
@@ -1899,7 +1875,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup,
                     "runtime_reconciled": {
                         "processes": runtime_reconciled.processes,
@@ -1932,30 +1908,30 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_gap_show(&self, request: ApiRequest) -> ApiResponse {
-        let Some(gap_id) = request
+    pub(super) fn handle_goal_show(&self, request: ApiRequest) -> ApiResponse {
+        let Some(goal_id) = request
             .path
-            .strip_prefix("/work/gaps/")
-            .filter(|gap_id| !gap_id.is_empty())
+            .strip_prefix("/work/goals/")
+            .filter(|goal_id| !goal_id.is_empty())
         else {
             return ApiResponse::json(
                 404,
                 json!({
                     "error": {
                         "code": "not_found",
-                        "message": "Gap route requires a Gap id"
+                        "message": "Goal route requires a Goal id"
                     }
                 }),
             );
         };
-        let refine_dir = require_refine_dir!(self, "read Gap detail");
-        match self.work_item_service(refine_dir).show_gap_detail(gap_id) {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap})),
+        let refine_dir = require_refine_dir!(self, "read Goal detail");
+        match self.work_item_service(refine_dir).show_goal_detail(goal_id) {
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal})),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_gaps_list(&self, raw_path: &str) -> ApiResponse {
+    pub(super) fn handle_goals_list(&self, raw_path: &str) -> ApiResponse {
         let projection = match self.current_projection() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
@@ -1966,7 +1942,7 @@ impl InProcessWebServer {
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or_else(|| (page - 1).saturating_mul(limit));
         let current_node_id = self.active_node_id_for_routes();
-        let query = GapProjectionQuery {
+        let query = GoalProjectionQuery {
             page: PageRequest {
                 limit,
                 offset,
@@ -1974,7 +1950,8 @@ impl InProcessWebServer {
                 dir: query_param(raw_path, "dir").unwrap_or_else(|| "desc".to_string()),
             },
             q: query_param(raw_path, "q"),
-            status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
+            status: query_param(raw_path, "status")
+                .and_then(|value| GoalStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
             assignee: query_param(raw_path, "assignee"),
             node: query_param(raw_path, "node"),
@@ -1994,24 +1971,24 @@ impl InProcessWebServer {
         facet_query.page.offset = 0;
         facet_query.page.limit = 0;
         let facet_status_counts =
-            include_facets.then(|| projection.list_gaps(facet_query).filtered_status_counts);
+            include_facets.then(|| projection.list_goals(facet_query).filtered_status_counts);
         let activity_facets = include_facets.then(|| {
             projection
                 .list_activity(ActivityProjectionQuery::default())
                 .facets
         });
-        let result = projection.list_gaps(query);
+        let result = projection.list_goals(query);
         let node_names = self.node_display_names_for_routes();
-        let gaps = result
-            .gaps
+        let goals = result
+            .goals
             .into_iter()
-            .map(|gap| {
-                let node_display_name = gap
+            .map(|goal| {
+                let node_display_name = goal
                     .node_id
                     .as_deref()
                     .and_then(|node_id| node_names.get(node_id))
                     .cloned();
-                let mut value = json!(gap);
+                let mut value = json!(goal);
                 if let Some(display_name) = node_display_name
                     && let Some(object) = value.as_object_mut()
                 {
@@ -2021,7 +1998,7 @@ impl InProcessWebServer {
             })
             .collect::<Vec<_>>();
         let mut body = json!({
-            "gaps": gaps,
+            "goals": goals,
             "counts": projection.status_counts(),
             "filtered_counts": result.filtered_status_counts,
             "matching_ids": result.matching_ids,
@@ -2073,7 +2050,8 @@ impl InProcessWebServer {
                 dir: query_param(raw_path, "dir").unwrap_or_else(|| "desc".to_string()),
             },
             q: query_param(raw_path, "q"),
-            status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
+            status: query_param(raw_path, "status")
+                .and_then(|value| GoalStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
             assignee: query_param(raw_path, "assignee"),
             node: query_param(raw_path, "node"),
@@ -2086,7 +2064,7 @@ impl InProcessWebServer {
             .map(|feature| {
                 json!({
                     "feature": feature.feature,
-                    "gap_ids": feature.gap_ids,
+                    "goal_ids": feature.goal_ids,
                     "rollup": feature.rollup
                 })
             })
@@ -2128,7 +2106,7 @@ impl InProcessWebServer {
                 sort: query_param(raw_path, "sort").unwrap_or_else(|| "datetime".to_string()),
                 dir: query_param(raw_path, "dir").unwrap_or_else(|| "desc".to_string()),
             },
-            gap_id: query_param(raw_path, "gap_id"),
+            goal_id: query_param(raw_path, "goal_id"),
             severity: query_param(raw_path, "severity"),
             category: query_param(raw_path, "category"),
             actor: query_param(raw_path, "actor"),
@@ -2167,8 +2145,8 @@ impl InProcessWebServer {
             },
             "error",
             "ui",
-            body.get("gap_id")
-                .and_then(|gap_id| gap_id.as_str())
+            body.get("goal_id")
+                .and_then(|goal_id| goal_id.as_str())
                 .map(str::to_string),
             Some("browser".to_string()),
         );
@@ -2224,9 +2202,9 @@ impl InProcessWebServer {
                 dir: query_param(raw_path, "dir").unwrap_or_else(|| "desc".to_string()),
             },
             q: query_param(raw_path, "q"),
-            gap_id: query_param(raw_path, "gap_id"),
+            goal_id: query_param(raw_path, "goal_id"),
             status: query_param(raw_path, "status")
-                .and_then(|status| GapStatus::parse_wire(&status)),
+                .and_then(|status| GoalStatus::parse_wire(&status)),
             priority: query_param(raw_path, "priority"),
             branch: query_param(raw_path, "branch"),
         });
@@ -2248,11 +2226,11 @@ impl InProcessWebServer {
             .map(|change| {
                 json!({
                     "commit": change.commit,
-                    "gap_id": change.gap_id,
-                    "name": change.gap_name,
-                    "status": change.gap_status,
-                    "priority": change.gap_priority,
-                    "assignee": change.gap_assignee,
+                    "goal_id": change.goal_id,
+                    "name": change.goal_name,
+                    "status": change.goal_status,
+                    "priority": change.goal_priority,
+                    "assignee": change.goal_assignee,
                     "committed": change.committed_time,
                     "subject": change.subject,
                     "branch": change.branch
@@ -2302,24 +2280,24 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("undo Git changes");
         };
-        let linked_gap_id = self.current_projection().ok().and_then(|projection| {
+        let linked_goal_id = self.current_projection().ok().and_then(|projection| {
             projection
                 .changes
                 .values()
                 .find(|change| change.commit == commit)
-                .and_then(|change| change.gap_id.clone())
+                .and_then(|change| change.goal_id.clone())
         });
         match FileGitWorktreeService::with_runtime_root(target_root, runtime_root)
             .revert_commit(commit)
         {
             Ok(result) => {
-                let cancelled_gap = if result.ok {
-                    match linked_gap_id.as_deref() {
-                        Some(gap_id) => match self
+                let cancelled_goal = if result.ok {
+                    match linked_goal_id.as_deref() {
+                        Some(goal_id) => match self
                             .work_item_service(refine_dir)
-                            .cancel_gap_summary(gap_id)
+                            .cancel_goal_summary(goal_id)
                         {
-                            Ok(gap) => Some(gap.gap.id),
+                            Ok(goal) => Some(goal.goal.id),
                             Err(error) => return error_response(error),
                         },
                         None => None,
@@ -2336,8 +2314,8 @@ impl InProcessWebServer {
                         "commit": commit,
                         "conflicts": result.conflicts,
                         "message": result.message.unwrap_or_default(),
-                        "gap_id": linked_gap_id,
-                        "cancelled_gap": cancelled_gap
+                        "goal_id": linked_goal_id,
+                        "cancelled_goal": cancelled_goal
                     }),
                 )
             }
@@ -2359,7 +2337,7 @@ impl InProcessWebServer {
             json!({
                 "ok": true,
                 "mode": "rebuilt",
-                "gaps": projection.gaps.len(),
+                "goals": projection.goals.len(),
                 "features": projection.features.len(),
                 "projection_version": projection.version,
                 "cache": cache_dir.join(PROJECTION_SNAPSHOT_FILE).display().to_string()
@@ -2604,7 +2582,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "extract imported Gaps");
+        let refine_dir = require_refine_dir!(self, "extract imported Goals");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")
@@ -2612,7 +2590,7 @@ impl InProcessWebServer {
             .unwrap_or(false)
         {
             let Some(runtime_root) = &self.runtime_root else {
-                return runtime_root_unavailable("extract imported Gaps in the background");
+                return runtime_root_unavailable("extract imported Goals in the background");
             };
             let purpose = body
                 .get("purpose")
@@ -2633,7 +2611,7 @@ impl InProcessWebServer {
                 &operation.id,
                 json!({
                     "message": if purpose == "plan" {
-                        "Extracting Plan Feature and Gaps"
+                        "Extracting Plan Feature and Goals"
                     } else {
                         "Extracting import drafts"
                     },
@@ -2678,7 +2656,7 @@ impl InProcessWebServer {
                     &operation_id,
                     json!({
                         "message": if plan_purpose {
-                            "Plan Feature and Gap drafts extracted"
+                            "Plan Feature and Goal drafts extracted"
                         } else {
                             "Import drafts extracted"
                         },
@@ -2851,25 +2829,17 @@ impl InProcessWebServer {
         for (index, draft) in drafts.iter().enumerate() {
             let mut needles = vec![normalized_dedup_text(&[
                 draft.name.as_str(),
-                draft.actual.as_str(),
-                draft.target.as_str(),
+                draft.prompt.as_str(),
             ])];
-            if !draft.actual.trim().is_empty() && !draft.target.trim().is_empty() {
-                let behavior =
-                    normalized_dedup_text(&[draft.actual.as_str(), draft.target.as_str()]);
-                if !needles.iter().any(|needle| needle == &behavior) {
-                    needles.push(behavior);
-                }
-            }
             needles.retain(|needle| !needle.is_empty());
             if needles.is_empty() {
                 continue;
             }
-            if let Some(existing) = projection.gaps.values().find(|gap| {
+            if let Some(existing) = projection.goals.values().find(|goal| {
                 let haystack = normalized_dedup_text(&[
-                    gap.gap.name.as_str(),
-                    gap.searchable_text.as_str(),
-                    gap.gap.id.as_str(),
+                    goal.goal.name.as_str(),
+                    goal.searchable_text.as_str(),
+                    goal.goal.id.as_str(),
                 ]);
                 needles.iter().any(|needle| {
                     haystack == *needle || (!haystack.is_empty() && haystack.contains(needle))
@@ -2879,11 +2849,11 @@ impl InProcessWebServer {
                     "index": index + 1,
                     "score": 1.0,
                     "match": {
-                        "id": existing.gap.id,
-                        "name": existing.gap.name,
-                        "status": existing.gap.status,
-                        "priority": existing.gap.priority,
-                        "reporter": existing.gap.reporter
+                        "id": existing.goal.id,
+                        "name": existing.goal.name,
+                        "status": existing.goal.status,
+                        "priority": existing.goal.priority,
+                        "reporter": existing.goal.reporter
                     }
                 }));
             }
@@ -2899,7 +2869,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_persist(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "persist imported Gaps");
+        let refine_dir = require_refine_dir!(self, "persist imported Goals");
         let body = request.body.unwrap_or_else(|| json!({}));
         if body
             .get("background")
@@ -2907,7 +2877,7 @@ impl InProcessWebServer {
             .unwrap_or(false)
         {
             let Some(runtime_root) = &self.runtime_root else {
-                return runtime_root_unavailable("persist imported Gaps in the background");
+                return runtime_root_unavailable("persist imported Goals in the background");
             };
             let registry = FileOperationRegistry::new(runtime_root);
             let operation = match registry.register("import:persist") {
@@ -3018,7 +2988,7 @@ impl InProcessWebServer {
                 None
             }
         };
-        let mut created_gap_ids = Vec::new();
+        let mut created_goal_ids = Vec::new();
         let mut duplicate_actions = ImportDuplicateActions::default();
         if failures.is_empty() {
             match self.persist_import_drafts_incrementally(
@@ -3027,12 +2997,12 @@ impl InProcessWebServer {
                 feature_id.as_deref(),
                 registry,
                 operation_id,
-                &mut created_gap_ids,
+                &mut created_goal_ids,
                 &mut duplicate_actions,
             ) {
                 Ok(()) => {}
                 Err(ImportPersistWorkerError::Cancelled) => {
-                    rollback_import_gaps(&service, &created_gap_ids);
+                    rollback_import_goals(&service, &created_goal_ids);
                     if let Err(error) = self.refresh_projection_cache_after_mutation() {
                         let _ = registry.fail_with_error(
                             operation_id,
@@ -3073,9 +3043,9 @@ impl InProcessWebServer {
                 })),
             }
         }
-        let created = created_gap_ids
+        let created = created_goal_ids
             .iter()
-            .filter_map(|gap_id| service.show_gap_summary(gap_id).ok())
+            .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
             .collect::<Vec<_>>();
         if let Some(feature_id) = feature_id.as_deref() {
             if let Ok(feature) = service.show_feature_summary(feature_id) {
@@ -3089,7 +3059,7 @@ impl InProcessWebServer {
                 "ok": failures.is_empty(),
                 "count": created.len(),
                 "created": created,
-                "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
+                "goals": created.iter().map(|goal| &goal.goal).collect::<Vec<_>>(),
                 "promoted": promoted,
                 "failures": failures,
                 "duplicate_actions": duplicate_actions.to_json(),
@@ -3105,7 +3075,7 @@ impl InProcessWebServer {
         feature_id: Option<&str>,
         registry: &FileOperationRegistry,
         operation_id: &str,
-        created_gap_ids: &mut Vec<String>,
+        created_goal_ids: &mut Vec<String>,
         duplicate_actions: &mut ImportDuplicateActions,
     ) -> Result<(), ImportPersistWorkerError> {
         if let Some(feature_id) = feature_id {
@@ -3119,23 +3089,23 @@ impl InProcessWebServer {
             if import_operation_cancelled(registry, operation_id) {
                 return Err(ImportPersistWorkerError::Cancelled);
             }
-            if let Some(gap_id) = persist_import_draft_with_duplicate_decision(
+            if let Some(goal_id) = persist_import_draft_with_duplicate_decision(
                 service,
                 &draft,
                 feature_id,
                 duplicate_actions,
-                created_gap_ids,
+                created_goal_ids,
                 &mut created_drafts,
             )
             .map_err(ImportPersistWorkerError::Failed)?
             {
-                let _ = gap_id;
+                let _ = goal_id;
             }
             let _ = registry.update_progress(
                 operation_id,
                 json!({
                     "message": "Saving import",
-                    "completed": created_gap_ids.len(),
+                    "completed": created_goal_ids.len(),
                     "total": total
                 }),
             );
@@ -3187,7 +3157,7 @@ impl InProcessWebServer {
             }
         };
         let import_result = if failures.is_empty() {
-            let mut gap_ids = Vec::new();
+            let mut goal_ids = Vec::new();
             let mut created_drafts = Vec::new();
             let mut duplicate_actions = ImportDuplicateActions::default();
             let result: Result<crate::tools::product::imports::ImportPersistResult, RefineError> =
@@ -3196,23 +3166,23 @@ impl InProcessWebServer {
                         service.show_feature_summary(feature_id)?;
                     }
                     for draft in drafts {
-                        if let Some(gap_id) = persist_import_draft_with_duplicate_decision(
+                        if let Some(goal_id) = persist_import_draft_with_duplicate_decision(
                             &service,
                             &draft,
                             feature_id.as_deref(),
                             &mut duplicate_actions,
-                            &mut gap_ids,
+                            &mut goal_ids,
                             &mut created_drafts,
                         )? {
-                            let _ = gap_id;
+                            let _ = goal_id;
                         }
                     }
                     if let Some(feature_id) = feature_id.as_deref() {
                         order_feature_dependency_drafts(&service, feature_id, &created_drafts)?;
                     }
                     Ok(crate::tools::product::imports::ImportPersistResult {
-                        created: gap_ids.len(),
-                        gap_ids,
+                        created: goal_ids.len(),
+                        goal_ids,
                         feature_id: feature_id.clone(),
                     })
                 })();
@@ -3245,9 +3215,9 @@ impl InProcessWebServer {
             .as_ref()
             .map(|(result, _)| {
                 result
-                    .gap_ids
+                    .goal_ids
                     .iter()
-                    .filter_map(|gap_id| service.show_gap_summary(gap_id).ok())
+                    .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -3263,7 +3233,7 @@ impl InProcessWebServer {
                 "ok": failures.is_empty(),
                 "count": created.len(),
                 "created": created,
-                "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
+                "goals": created.iter().map(|goal| &goal.goal).collect::<Vec<_>>(),
                 "promoted": promoted,
                 "failures": failures,
                 "duplicate_actions": import_result

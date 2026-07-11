@@ -18,15 +18,15 @@ Refine should not assume agents are only chatbots. They are workers, reviewers, 
 
 ## Expected Role
 
-Agents should use the same product concepts as people through the CLI and shared capability surfaces: Gap, Feature, workflow state, guidance, governance, logs, changes, and processes. Their outputs should become durable work evidence, not disappear into provider transcripts.
+Agents should use the same product concepts as people through the CLI and shared capability surfaces: Goal, Feature, workflow state, guidance, governance, logs, changes, and processes. Their outputs should become durable work evidence, not disappear into provider transcripts.
 
 Current implementation details that matter to intent:
 
 - provider configuration is treated as settings and diagnostics, not hardcoded behavior.
 - workflow invokes agents as part of shared state advancement.
-- chat sessions can attach to Gaps or run standalone.
-- standalone sessions can work in Git worktrees and submit ready-merge Gaps.
-- Plan Mode and spec-like import can turn selected intent into reviewable Feature and Gap drafts.
+- chat sessions can attach to Goals or run standalone.
+- standalone sessions can work in Git worktrees and submit ready-merge Goals.
+- Plan Mode and spec-like import can turn selected intent into reviewable Feature and Goal drafts.
 - guidance, governance, quality, and target-app settings provide context for agent work.
 
 Agents should be powerful enough to get real work done and observable enough that people and other agents can understand what happened.

@@ -1,4 +1,4 @@
-// ---- Gaps: bulk-update modal ------------------------------------------------
+// ---- Goals: bulk-update modal ------------------------------------------------
 //
 // Each bulk action prompts for a new value and confirms the change against
 // the current filter-scoped selection. Exactly one field is changed per call
@@ -16,8 +16,8 @@ const BULK_STATUS_OPTIONS = [
   { value: "cancelled", label: "cancelled" },
 ];
 
-function gapsBulkFilterFromHash() {
-  const f = gapsFilterFromHash();
+function goalsBulkFilterFromHash() {
+  const f = goalsFilterFromHash();
   const filter = {};
   for (const key of ["status", "q", "reporter", "assignee", "feature", "node"]) {
     if (f[key]) filter[key] = f[key];
@@ -29,13 +29,13 @@ function gapsBulkFilterFromHash() {
 
 async function openBulkModal(field) {
   // Snapshot the current filter for display context; the mutation itself
-  // targets all matching Gaps unless the user has switched to an explicit
+  // targets all matching Goals unless the user has switched to an explicit
   // picked-ID selection by clearing the header checkbox.
-  const filter = gapsBulkFilterFromHash();
-  const filterDesc = describeGapsFilter(filter);
+  const filter = goalsBulkFilterFromHash();
+  const filterDesc = describeGoalsFilter(filter);
   const selectionFields = _selectionRequestFields();
-  if (!_hasAnyGapSelection()) {
-    toast("No Gaps selected.", "warn");
+  if (!_hasAnyGoalSelection()) {
+    toast("No Goals selected.", "warn");
     return;
   }
   const countText = _selectionCountText("selected");
@@ -54,7 +54,7 @@ async function openBulkModal(field) {
       </select>
       <p class="muted small" style="margin-top:6px">
         Last workflow state sends failed QA attempts back to qa, failed merge
-        attempts back to ready-merge, other failed or reviewable Gaps back to todo, and leaves active
+        attempts back to ready-merge, other failed or reviewable Goals back to todo, and leaves active
         automation alone.
       </p>`;
   } else if (field === "reporter") {
@@ -67,7 +67,7 @@ async function openBulkModal(field) {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Updates each Gap's original <strong>reporter</strong>.
+        Updates each Goal's original <strong>reporter</strong>.
         Round history keeps its original reporters.
       </p>`;
   } else if (field === "assignee") {
@@ -80,7 +80,7 @@ async function openBulkModal(field) {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Updates the latest round's <strong>assignee</strong>, which is each Gap's current owner.
+        Updates the latest round's <strong>assignee</strong>, which is each Goal's current owner.
       </p>`;
   }
 
@@ -104,53 +104,53 @@ async function openBulkModal(field) {
   if (next === null) return;
   if (!next) return;          // user opened the picker but didn't choose
   try {
-    let r = await api("POST", "/api/gaps/bulk", {
+    let r = await api("POST", "/api/goals/bulk", {
       filter, ...selectionFields, update: { [field]: next },
     });
     r = await resolveBackgroundOperationResponse(
       r,
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );
-    toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    await refreshGapsListIfCurrent();
+    toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    await refreshGoalsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk update failed");
   }
 }
 
 function _selectionRequestFields() {
-  if (gapsSelectAllMatching) {
-    return { exclude_ids: Array.from(gapsExcludedIds) };
+  if (goalsSelectAllMatching) {
+    return { exclude_ids: Array.from(goalsExcludedIds) };
   }
-  return { selected_ids: Array.from(gapsIncludedIds) };
+  return { selected_ids: Array.from(goalsIncludedIds) };
 }
 
-function _hasAnyGapSelection() {
-  return gapsSelectAllMatching || gapsIncludedIds.size > 0;
+function _hasAnyGoalSelection() {
+  return goalsSelectAllMatching || goalsIncludedIds.size > 0;
 }
 
 function _selectionCountText(noun = "selected") {
-  if (gapsSelectAllMatching) {
-    if (gapsExcludedIds.size) {
-      return `all matching Gaps except ${gapsExcludedIds.size} excluded`;
+  if (goalsSelectAllMatching) {
+    if (goalsExcludedIds.size) {
+      return `all matching Goals except ${goalsExcludedIds.size} excluded`;
     }
-    return "all matching Gaps selected";
+    return "all matching Goals selected";
   }
-  const selectedCount = gapsIncludedIds.size;
-  const visibleIds = (_lastGapsRender?.gaps || []).map((g) => g.id);
+  const selectedCount = goalsIncludedIds.size;
+  const visibleIds = (_lastGoalsRender?.goals || []).map((g) => g.id);
   const currentPageOnly = visibleIds.length > 0
     && visibleIds.length === selectedCount
-    && visibleIds.every((id) => gapsIncludedIds.has(id));
+    && visibleIds.every((id) => goalsIncludedIds.has(id));
   if (currentPageOnly) {
-    return `${selectedCount} Gaps on this page ${noun}`;
+    return `${selectedCount} Goals on this page ${noun}`;
   }
   return `${selectedCount} explicitly ${noun}`;
 }
 
-// Highlight each non-default Gaps filter control with the accent
+// Highlight each non-default Goals filter control with the accent
 // border + show the "Filtered" pill next to the count when any filter
 // is active. Called after every table refresh.
-function applyGapsFilterIndicator(f) {
+function applyGoalsFilterIndicator(f) {
   const active = {
     "search": !!f.q,
     "filter-status": !!f.status,
@@ -160,10 +160,10 @@ function applyGapsFilterIndicator(f) {
     "filter-rounds-gte": !!f.rounds_gte,
     "filter-rounds-lte": !!f.rounds_lte,
     "filter-node": !!f.node && f.node !== "all",
-    "gaps-severity": !!f.severity,
-    "gaps-category": !!f.category,
-    "gaps-actor": !!f.actor,
-    "gaps-limit": f.limit !== GAPS_DEFAULT_LIMIT,
+    "goals-severity": !!f.severity,
+    "goals-category": !!f.category,
+    "goals-actor": !!f.actor,
+    "goals-limit": f.limit !== GOALS_DEFAULT_LIMIT,
   };
   let anyActive = false;
   for (const [id, on] of Object.entries(active)) {
@@ -172,18 +172,18 @@ function applyGapsFilterIndicator(f) {
     el.classList.toggle("filter-active", on);
     if (on) anyActive = true;
   }
-  const pill = $("#gaps-filtered");
+  const pill = $("#goals-filtered");
   if (pill) pill.hidden = !anyActive;
-  const tbl = $("#gaps-table");
+  const tbl = $("#goals-table");
   if (tbl) tbl.classList.toggle("results-filtered", anyActive);
 }
 
 async function openBulkTransferNodeModal() {
-  const filter = gapsBulkFilterFromHash();
-  const filterDesc = describeGapsFilter(filter);
+  const filter = goalsBulkFilterFromHash();
+  const filterDesc = describeGoalsFilter(filter);
   const selectionFields = _selectionRequestFields();
-  if (!_hasAnyGapSelection()) {
-    toast("No Gaps selected.", "warn");
+  if (!_hasAnyGoalSelection()) {
+    toast("No Goals selected.", "warn");
     return;
   }
   const countText = _selectionCountText("selected");
@@ -222,7 +222,7 @@ async function openBulkTransferNodeModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        In-progress, qa, ready-merge, and build Gaps are skipped.
+        In-progress, qa, ready-merge, and build Goals are skipped.
       </p>
     </div>
     <div class="modal-actions">
@@ -234,22 +234,22 @@ async function openBulkTransferNodeModal() {
   );
   if (target === null) return;
   try {
-    const r = await api("POST", "/api/nodes/transfer-gaps", {
+    const r = await api("POST", "/api/nodes/transfer-goals", {
       filter, ...selectionFields, target_node_id: target,
     });
     toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
-    await refreshGapsListIfCurrent();
+    await refreshGoalsListIfCurrent();
   } catch (e) {
     toast(`Transfer failed: ${e.message}`, "error");
   }
 }
 
 async function openBulkAssignFeatureModal({ button = null } = {}) {
-  const filter = gapsBulkFilterFromHash();
-  const filterDesc = describeGapsFilter(filter);
+  const filter = goalsBulkFilterFromHash();
+  const filterDesc = describeGoalsFilter(filter);
   const selectionFields = _selectionRequestFields();
-  if (!_hasAnyGapSelection()) {
-    toast("No Gaps selected.", "warn");
+  if (!_hasAnyGoalSelection()) {
+    toast("No Goals selected.", "warn");
     return;
   }
   const countText = _selectionCountText("selected");
@@ -283,7 +283,7 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
     <option value="${htmlEscape(feature.id)}">
       ${htmlEscape(feature.name || feature.id)}
       · ${htmlEscape(feature.status || "backlog")}
-      · ${feature.done_count || 0}/${feature.gap_count || 0} done
+      · ${feature.done_count || 0}/${feature.goal_count || 0} done
     </option>`).join("");
   const body = () => `
     <div class="modal-title">Assign to Feature</div>
@@ -297,7 +297,7 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Selected Gaps already in this Feature or owned by another node are skipped.
+        Selected Goals already in this Feature or owned by another node are skipped.
       </p>
     </div>
     <div class="modal-actions">
@@ -309,29 +309,29 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
   );
   if (featureId === null) return;
   await withButtonBusy(button, "Assigning...", async () => {
-    const r = await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/bulk`, {
+    const r = await api("POST", `/api/features/${encodeURIComponent(featureId)}/goals/bulk`, {
       filter, ...selectionFields,
     });
     toast(`Assigned ${r.updated}; skipped ${r.skipped}.`, "info");
-    await refreshGapsListIfCurrent();
+    await refreshGoalsListIfCurrent();
   });
 }
 
 async function confirmBulkDelete() {
-  const filter = gapsBulkFilterFromHash();
-  const filterDesc = describeGapsFilter(filter);
+  const filter = goalsBulkFilterFromHash();
+  const filterDesc = describeGoalsFilter(filter);
   const selectionFields = _selectionRequestFields();
-  if (!_hasAnyGapSelection()) {
-    toast("No Gaps selected.", "warn");
+  if (!_hasAnyGoalSelection()) {
+    toast("No Goals selected.", "warn");
     return;
   }
-  const countText = _selectionCountText("selected gaps");
+  const countText = _selectionCountText("selected goals");
   const ok = await modalConfirm(
     `Permanently delete ${countText} (${filterDesc})? This cancels any ` +
     "running subprocesses, removes worktrees and branches for non-done " +
-    "Gaps, and erases their gap.json files. This cannot be undone.",
+    "Goals, and erases their goal.json files. This cannot be undone.",
     {
-      title: "Delete Gaps",
+      title: "Delete Goals",
       okLabel: `Delete ${countText}`,
       cancelLabel: "Keep them",
       danger: true,
@@ -339,27 +339,27 @@ async function confirmBulkDelete() {
   );
   if (!ok) return;
   try {
-    const r = await api("POST", "/api/gaps/bulk/delete", {
+    const r = await api("POST", "/api/goals/bulk/delete", {
       filter, ...selectionFields,
     });
     const failedN = (r.failures || []).length;
     if (failedN) {
-      toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}, ` +
+      toast(`Deleted ${r.deleted} goal${r.deleted === 1 ? "" : "s"}, ` +
             `${failedN} failed.`, "warn");
     } else {
-      toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
+      toast(`Deleted ${r.deleted} goal${r.deleted === 1 ? "" : "s"}.`, "info");
     }
-    await refreshGapsListIfCurrent();
+    await refreshGoalsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk delete failed");
   }
 }
 
-async function refreshGapsListIfCurrent() {
-  if (state.currentRoute === "gaps") await renderGapsList();
+async function refreshGoalsListIfCurrent() {
+  if (state.currentRoute === "goals") await renderGoalsList();
 }
 
-function describeGapsFilter(filter) {
+function describeGoalsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
   if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
@@ -372,7 +372,7 @@ function describeGapsFilter(filter) {
   if (filter.severity) parts.push(`severity=${filter.severity}`);
   if (filter.category) parts.push(`category=${filter.category}`);
   if (filter.actor)    parts.push(`actor=${filter.actor}`);
-  return parts.length ? parts.join(", ") : "all gaps";
+  return parts.length ? parts.join(", ") : "all goals";
 }
 
 function debounce(fn, ms) {

@@ -24,7 +24,7 @@ pub struct WorkerInitOptions {
 
 /// Turns this machine into a working fleet node: clone/refresh the target
 /// repo, attach it, take on the node identity so this daemon can claim the
-/// Gaps distribute assigns to it, select the agent provider, and verify the
+/// Goals distribute assigns to it, select the agent provider, and verify the
 /// provider binary is present. Idempotent — safe to run on every boot.
 pub fn initialize_worker(options: WorkerInitOptions) -> RefineResult<serde_json::Value> {
     let node_id = resolve(options.node_id, "REFINE_NODE_ID").unwrap_or_else(|| "default".into());

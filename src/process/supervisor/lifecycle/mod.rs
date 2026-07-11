@@ -569,7 +569,7 @@ mod tests {
             .unwrap();
         let operation_registry = FileOperationRegistry::new(runtime_root.port_root(4555));
         let operation = operation_registry
-            .register("gap GAP1 implementation")
+            .register("goal GOAL1 implementation")
             .unwrap();
         let service = FileDaemonLifecycleService::new(runtime_root);
 

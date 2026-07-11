@@ -359,7 +359,7 @@ impl InProcessWebServer {
     pub(super) fn reconcile_feature_runtime_work(
         &self,
         feature_id: &str,
-        gap_ids: &[String],
+        goal_ids: &[String],
     ) -> RefineResult<RuntimeReconcileSummary> {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeReconcileSummary::default());
@@ -367,7 +367,8 @@ impl InProcessWebServer {
         let supervisor = FileProcessSupervisor::new(runtime_root);
         let mut processes = 0;
         for process in supervisor.list()? {
-            if process.state == "running" && runtime_record_matches(&process, feature_id, gap_ids) {
+            if process.state == "running" && runtime_record_matches(&process, feature_id, goal_ids)
+            {
                 supervisor.signal(&process.id, "terminate")?;
                 processes += 1;
             }
@@ -379,7 +380,7 @@ impl InProcessWebServer {
             if matches!(
                 operation.state,
                 OperationState::Pending | OperationState::Running | OperationState::Cancelling
-            ) && operation_owner_matches(&operation.owner, feature_id, gap_ids)
+            ) && operation_owner_matches(&operation.owner, feature_id, goal_ids)
             {
                 registry.cancel(&operation.id)?;
                 operations += 1;

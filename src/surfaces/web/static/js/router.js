@@ -1,16 +1,16 @@
 // ---- Router -----------------------------------------------------------------
 
-// `gaps_detail` and `features_detail` are handled directly in `navigate()`
+// `goals_detail` and `features_detail` are handled directly in `navigate()`
 // because they open modals on top of the current screen rather than replacing
 // `#main`.
 const routes = {
   dashboard: renderDashboard,
   features: renderFeaturesList,
   features_new: renderFeatureNew,
-  gaps: renderGapsList,
-  gaps_new: renderGapNew,
-  gaps_import: renderGapImport,
-  gaps_plan: renderGapPlan,
+  goals: renderGoalsList,
+  goals_new: renderGoalNew,
+  goals_import: renderGoalImport,
+  goals_plan: renderGoalPlan,
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
@@ -20,18 +20,18 @@ const routes = {
 
 function parseHash() {
   const raw = location.hash.slice(1) || "/";
-  // "/" → dashboard, "/gaps" → list, "/gaps/<id>" → detail
+  // "/" → dashboard, "/goals" → list, "/goals/<id>" → detail
   // Strip the query string (e.g. "?status=review") before path parsing;
   // views that care about query params read them off location.hash directly.
   const path = raw.split("?", 1)[0];
   const parts = path.split("/").filter(Boolean);
   if (parts.length === 0) return { route: "dashboard" };
-  if (parts[0] === "gaps") {
-    if (parts.length === 1) return { route: "gaps" };
-    if (parts[1] === "new") return { route: "gaps_new" };
-    if (parts[1] === "plan") return { route: "gaps_plan" };
-    if (parts[1] === "import") return { route: "gaps_import" };
-    return { route: "gaps_detail", id: parts[1] };
+  if (parts[0] === "goals") {
+    if (parts.length === 1) return { route: "goals" };
+    if (parts[1] === "new") return { route: "goals_new" };
+    if (parts[1] === "plan") return { route: "goals_plan" };
+    if (parts[1] === "import") return { route: "goals_import" };
+    return { route: "goals_detail", id: parts[1] };
   }
   if (parts[0] === "features") {
     if (parts.length === 1) return { route: "features" };
@@ -60,43 +60,43 @@ function parseHash() {
 function navigate() {
   const r = parseHash();
   if (r.route === "chat_redirect") {
-    // Legacy `#/chat[?gap=...]` deep links now open the dock and bounce to
+    // Legacy `#/chat[?goal=...]` deep links now open the dock and bounce to
     // the dashboard so the URL no longer points at a removed screen.
     const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
-    const gapId = hashQs.get("gap") || null;
-    openChatDock(gapId ? { gapId } : {});
+    const goalId = hashQs.get("goal") || null;
+    openChatDock(goalId ? { goalId } : {});
     location.hash = "#/";
     return;
   }
-  // Leaving the Gaps list forgets in-memory bulk-selection exceptions on
-  // purpose — a fresh visit starts with all matching Gaps selected again.
+  // Leaving the Goals list forgets in-memory bulk-selection exceptions on
+  // purpose — a fresh visit starts with all matching Goals selected again.
   const prevRoute = state.currentRoute;
-  if (prevRoute === "gaps" && r.route !== "gaps") {
-    resetGapsSelection();
+  if (prevRoute === "goals" && r.route !== "goals") {
+    resetGoalsSelection();
   }
   if (prevRoute === "features" && r.route !== "features") {
     resetFeaturesSelection();
   }
-  if (r.route === "gaps_detail") {
-    // Gap detail is now a modal layered on top of the current screen, so
-    // the user keeps their underlying context (Dashboard, Gaps list, etc.)
+  if (r.route === "goals_detail") {
+    // Goal detail is now a modal layered on top of the current screen, so
+    // the user keeps their underlying context (Dashboard, Goals list, etc.)
     // and dismissing returns them to where they were. We don't touch
     // `#main` — whatever's there stays. If `#main` is empty (cold-load
     // deep link), open the dashboard underneath as the natural landing.
     //
     // Refresh the underlay hash from the URL we navigated AWAY from on
-    // this hashchange — but only if it wasn't another gap-detail URL
+    // this hashchange — but only if it wasn't another goal-detail URL
     // (modal-to-modal swaps shouldn't clobber the true underlay).
     try {
       const prevHash = new URL(_prevHashURL).hash || "#/";
-      if (!/^#\/gaps\/[^/]+/.test(prevHash) || /^#\/gaps\/(new|plan|import)/.test(prevHash)) {
+      if (!/^#\/goals\/[^/]+/.test(prevHash) || /^#\/goals\/(new|plan|import)/.test(prevHash)) {
         state.underlayHash = prevHash;
       }
     } catch { /* keep prior state.underlayHash */ }
-    state.currentRoute = "gaps_detail";
-    state.currentGap = r.id;
-    highlightNav("gaps");
-    openGapDetailModal(r.id);
+    state.currentRoute = "goals_detail";
+    state.currentGoal = r.id;
+    highlightNav("goals");
+    openGoalDetailModal(r.id);
     return;
   }
 
@@ -104,23 +104,23 @@ function navigate() {
     try {
       const prevHash = new URL(_prevHashURL).hash || "#/features";
       const fromFeatureDetail = /^#\/features\/[^/]+/.test(prevHash) && !/^#\/features\/new/.test(prevHash);
-      const fromGapDetail = /^#\/gaps\/[^/]+/.test(prevHash) && !/^#\/gaps\/(new|plan|import)/.test(prevHash);
-      if (!fromFeatureDetail && !fromGapDetail) {
+      const fromGoalDetail = /^#\/goals\/[^/]+/.test(prevHash) && !/^#\/goals\/(new|plan|import)/.test(prevHash);
+      if (!fromFeatureDetail && !fromGoalDetail) {
         state.underlayHash = prevHash;
       }
     } catch { /* keep prior state.underlayHash */ }
     state.currentRoute = "features_detail";
-    state.currentGap = null;
+    state.currentGoal = null;
     highlightNav("features");
-    if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
+    if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
     if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
     openFeatureDetailModal(r.id);
     return;
   }
 
-  // Leaving a Gap detail modal — close it (without rewriting the hash,
+  // Leaving a Goal detail modal — close it (without rewriting the hash,
   // since we're already moving to a different one).
-  if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
+  if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
   if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
 
   if (
@@ -128,7 +128,7 @@ function navigate() {
     (r.route === "settings" || r.route === "node" || r.route === "project")
   ) {
     state.currentRoute = r.route;
-    state.currentGap = null;
+    state.currentGoal = null;
     state.underlayHash = location.hash || "#/";
     highlightNav(r.route);
     if (
@@ -145,7 +145,7 @@ function navigate() {
   }
 
   state.currentRoute = r.route;
-  state.currentGap = r.id || null;
+  state.currentGoal = r.id || null;
   state.underlayHash = location.hash || "#/";
   highlightNav(r.route);
   const fn = routes[r.route];
@@ -158,16 +158,16 @@ function highlightNav(route) {
     const r = a.dataset.route;
     a.classList.toggle("active",
       r === route ||
-      (r === "gaps" && route.startsWith("gaps")) ||
+      (r === "goals" && route.startsWith("goals")) ||
       (r === "features" && route.startsWith("features")));
   }
 }
 
-// Capture the URL we navigated FROM so the gap-detail modal can return
+// Capture the URL we navigated FROM so the goal-detail modal can return
 // the user to their actual prior view — including any filter params the
-// Gaps list applied via `history.replaceState` (which doesn't fire
+// Goals list applied via `history.replaceState` (which doesn't fire
 // `hashchange`). `navigate()` reads this only when transitioning into
-// the `gaps_detail` route.
+// the `goals_detail` route.
 let _prevHashURL = location.href;
 window.addEventListener("hashchange", (e) => {
   try { _prevHashURL = e.oldURL || location.href; }

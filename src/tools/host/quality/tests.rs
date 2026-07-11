@@ -41,7 +41,7 @@ fn quality_service_runs_commands_compares_artifacts_and_gates() {
 
     let command_result = service
         .run_checks(QualityCheckRequest {
-            owner_id: "GAP1".to_string(),
+            owner_id: "GOAL1".to_string(),
             command: "printf command-ok".to_string(),
             process_metadata: Default::default(),
         })
@@ -55,10 +55,10 @@ fn quality_service_runs_commands_compares_artifacts_and_gates() {
             ..QualitySettingsPatch::default()
         })
         .unwrap();
-    let gate = service.gate("GAP1").unwrap();
+    let gate = service.gate("GOAL1").unwrap();
     assert!(gate.ok);
     assert!(gate.diagnostics[0].contains("target-app test command"));
-    assert!(service.screenshots("GAP1").unwrap().is_empty());
+    assert!(service.screenshots("GOAL1").unwrap().is_empty());
 
     let baseline = temp_root.join("baseline.txt");
     let candidate = temp_root.join("candidate.txt");
@@ -92,7 +92,7 @@ fn quality_service_enforces_allowed_commands_for_direct_checks() {
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
 
     let denied = service.run_checks(QualityCheckRequest {
-        owner_id: "GAP1".to_string(),
+        owner_id: "GOAL1".to_string(),
         command: "rm -rf target".to_string(),
         process_metadata: Default::default(),
     });

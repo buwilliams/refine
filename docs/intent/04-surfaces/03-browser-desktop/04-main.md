@@ -9,7 +9,7 @@
 
 ## Purpose
 
-The main area exists to show the selected product surface: Dashboard, Features, Gaps, Changes, Logs, Settings, Node, Project, import, Plan, and related modal flows.
+The main area exists to show the selected product surface: Dashboard, Features, Goals, Changes, Logs, Settings, Node, Project, import, Plan, and related modal flows.
 
 It should give the user enough room to inspect and act without losing the global shell, toolbar, Guide, or operating context.
 
@@ -20,7 +20,7 @@ The main surface should support dense, repeatable operational work. Lists should
 Current implementation details that matter to intent:
 
 - hash routing determines the active main view;
-- Gap and Feature details open as modal overlays over the current context;
+- Goal and Feature details open as modal overlays over the current context;
 - list filters use URL-backed state so views can be refreshed or shared;
 - leaving list routes clears selection state where stale bulk selection would be dangerous;
 - detached/no-app state is a first-class UI mode.

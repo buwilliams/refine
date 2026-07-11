@@ -5,7 +5,7 @@
 - **Git As Safety Substrate**: history, diffs, rollback, isolation, and merge discipline should come from Git where possible.
 - **Review As Boundary**: review is a meaningful workflow state, not a decorative approval label.
 - **Worktree Isolation**: agent and standalone work should be isolated when that makes changes safer and easier to inspect.
-- **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Gap intent.
+- **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Goal intent.
 - **Recoverable Handoff**: work should move from implementation to review to merge without losing context.
 
 ## Purpose
@@ -21,7 +21,7 @@ This capability should connect workflow with the user's source repository:
 - implementation work can happen in an isolated branch or worktree;
 - ready-merge state should mean there is a reviewable change with enough evidence;
 - review should preserve human or agent judgment before final integration;
-- merge actions should connect back to Gap and Feature intent;
+- merge actions should connect back to Goal and Feature intent;
 - failed or conflicted merges should create recoverable evidence;
 - standalone worktree output should be able to become structured ready-merge work.
 

@@ -4,9 +4,9 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::model::gap::GapPriority;
+use crate::model::goal::GoalPriority;
 use crate::model::log::ActivityEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 use super::types::*;
@@ -20,8 +20,8 @@ pub(super) fn activity_searchable_text(entry: &ActivityEntry) -> String {
     if let Some(actor) = &entry.actor {
         parts.push(actor.clone());
     }
-    if let Some(gap_id) = &entry.gap_id {
-        parts.push(gap_id.clone());
+    if let Some(goal_id) = &entry.goal_id {
+        parts.push(goal_id.clone());
     }
     if let Some(details) = &entry.details
         && let Ok(encoded) = serde_json::to_string(details)
@@ -36,11 +36,11 @@ pub(super) fn change_searchable_text(change: &ChangeSummaryProjection) -> String
         Some(change.commit.as_str()),
         Some(change.subject.as_str()),
         change.branch.as_deref(),
-        change.gap_id.as_deref(),
-        change.gap_name.as_deref(),
-        change.gap_priority.as_deref(),
-        change.gap_assignee.as_deref(),
-        change.gap_status.as_ref().map(GapStatus::as_str),
+        change.goal_id.as_deref(),
+        change.goal_name.as_deref(),
+        change.goal_priority.as_deref(),
+        change.goal_assignee.as_deref(),
+        change.goal_status.as_ref().map(GoalStatus::as_str),
     ]
     .into_iter()
     .flatten()
@@ -56,13 +56,14 @@ pub(super) fn change_projection_key(change: &ChangeSummaryProjection) -> String 
     )
 }
 
-pub(super) fn matching_change_gap<'a>(
-    gaps: &'a BTreeMap<String, GapSummaryProjection>,
+pub(super) fn matching_change_goal<'a>(
+    goals: &'a BTreeMap<String, GoalSummaryProjection>,
     branch: Option<&str>,
     subject: &str,
-) -> Option<&'a GapSummaryProjection> {
-    gaps.values().find(|gap| {
-        subject.contains(&gap.gap.id) || branch.is_some_and(|branch| branch.contains(&gap.gap.id))
+) -> Option<&'a GoalSummaryProjection> {
+    goals.values().find(|goal| {
+        subject.contains(&goal.goal.id)
+            || branch.is_some_and(|branch| branch.contains(&goal.goal.id))
     })
 }
 
@@ -109,32 +110,32 @@ pub(super) fn nullable_i64(value: Option<&Value>) -> Option<i64> {
     }
 }
 
-pub(super) fn gap_status(value: Option<&Value>) -> GapStatus {
+pub(super) fn goal_status(value: Option<&Value>) -> GoalStatus {
     match nullable_text(value).as_deref() {
-        Some("todo") => GapStatus::Todo,
-        Some("in-progress") => GapStatus::InProgress,
-        Some("qa") => GapStatus::Qa,
-        Some("ready-merge") => GapStatus::ReadyMerge,
-        Some("build") => GapStatus::Build,
-        Some("review") => GapStatus::Review,
-        Some("done") => GapStatus::Done,
-        Some("failed") => GapStatus::Failed,
-        Some("cancelled") => GapStatus::Cancelled,
-        _ => GapStatus::Backlog,
+        Some("todo") => GoalStatus::Todo,
+        Some("in-progress") => GoalStatus::InProgress,
+        Some("qa") => GoalStatus::Qa,
+        Some("ready-merge") => GoalStatus::ReadyMerge,
+        Some("build") => GoalStatus::Build,
+        Some("review") => GoalStatus::Review,
+        Some("done") => GoalStatus::Done,
+        Some("failed") => GoalStatus::Failed,
+        Some("cancelled") => GoalStatus::Cancelled,
+        _ => GoalStatus::Backlog,
     }
 }
 
-pub(super) fn gap_priority(value: Option<&Value>) -> GapPriority {
+pub(super) fn goal_priority(value: Option<&Value>) -> GoalPriority {
     match nullable_text(value).as_deref() {
-        Some("medium") => GapPriority::Medium,
-        Some("high") => GapPriority::High,
-        _ => GapPriority::Low,
+        Some("medium") => GoalPriority::Medium,
+        Some("high") => GoalPriority::High,
+        _ => GoalPriority::Low,
     }
 }
 
-pub(super) fn gap_status_counts<'a>(
-    statuses: impl Iterator<Item = &'a GapStatus>,
-) -> BTreeMap<GapStatus, usize> {
+pub(super) fn goal_status_counts<'a>(
+    statuses: impl Iterator<Item = &'a GoalStatus>,
+) -> BTreeMap<GoalStatus, usize> {
     let mut counts = BTreeMap::new();
     for status in statuses {
         *counts.entry(status.clone()).or_default() += 1;

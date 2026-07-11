@@ -2,7 +2,7 @@
 
 const FEATURES_DEFAULT_LIMIT = 50;
 const FEATURES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
-const FEATURE_MODAL_GAP_PAGE_SIZE = 25;
+const FEATURE_MODAL_GOAL_PAGE_SIZE = 25;
 const FEATURES_DEFAULT_DIR = {
   name: "asc", status: "asc", reporter: "asc", assignee: "asc", node: "asc", updated: "desc",
 };
@@ -220,8 +220,8 @@ function drawFeaturesTable(features, stateForRender) {
       ${cell}
       <td class="work-item-name-cell features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
       <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
-      <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
-      <td data-label="Next">${feature.next_gap ? htmlEscape(feature.next_gap.name || feature.next_gap.id) : '<span class="muted small">-</span>'}</td>
+      <td data-label="Progress">${feature.done_count || 0} / ${feature.goal_count || 0} done</td>
+      <td data-label="Next">${feature.next_goal ? htmlEscape(feature.next_goal.name || feature.next_goal.id) : '<span class="muted small">-</span>'}</td>
       <td class="muted small" data-label="Reporter">${htmlEscape(feature.reporter || "-")}</td>
       <td class="muted small" data-label="Assignee">${htmlEscape(feature.assignee || "-")}</td>
       <td class="muted small" data-label="Node">${htmlEscape(feature.node_display_name || feature.node_id || "-")}</td>
@@ -255,7 +255,7 @@ function drawFeaturesTable(features, stateForRender) {
           ${featureSortHeader("name", "Name", stateForRender)}
           ${featureSortHeader("status", "Status", stateForRender)}
           <th>Progress</th>
-          <th>Current / next Gap</th>
+          <th>Current / next Goal</th>
           ${featureSortHeader("reporter", "Reporter", stateForRender)}
           ${featureSortHeader("assignee", "Assignee", stateForRender)}
           ${featureSortHeader("node", "Node", stateForRender)}
@@ -319,14 +319,14 @@ function normalizeFeatureEntry(entry) {
   const feature = { ...(entry?.feature || entry || {}) };
   const rollup = entry?.rollup || feature.rollup || {};
   feature.status = feature.status || rollup.status || "backlog";
-  feature.gap_count = feature.gap_count ?? rollup.gap_count ?? (entry?.gap_ids || feature.gap_ids || []).length;
+  feature.goal_count = feature.goal_count ?? rollup.goal_count ?? (entry?.goal_ids || feature.goal_ids || []).length;
   feature.done_count = feature.done_count ?? rollup.done_count ?? 0;
   feature.active_count = feature.active_count ?? rollup.active_count ?? 0;
   feature.failed_count = feature.failed_count ?? rollup.failed_count ?? 0;
   feature.cancelled_count = feature.cancelled_count ?? rollup.cancelled_count ?? 0;
   feature.blocked_count = feature.blocked_count ?? rollup.blocked_count ?? 0;
-  feature.next_gap = feature.next_gap || rollup.next_gap || null;
-  feature.gap_ids = feature.gap_ids || entry?.gap_ids || [];
+  feature.next_goal = feature.next_goal || rollup.next_goal || null;
+  feature.goal_ids = feature.goal_ids || entry?.goal_ids || [];
   feature.rollup = feature.rollup || rollup;
   return feature;
 }
@@ -508,7 +508,7 @@ async function openFeatureBulkTransferNodeModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        A Feature moves with its Gaps. Features with active Gaps are skipped.
+        A Feature moves with its Goals. Features with active Goals are skipped.
       </p>
     </div>
     <div class="modal-actions">
@@ -538,7 +538,7 @@ async function confirmFeatureBulkDelete() {
   }
   const countText = _featureSelectionCountText("selected features");
   const ok = await modalConfirm(
-    `Permanently delete ${countText} (${filterDesc})? This also deletes their assigned Gaps and cannot be undone.`,
+    `Permanently delete ${countText} (${filterDesc})? This also deletes their assigned Goals and cannot be undone.`,
     {
       title: "Delete Features",
       okLabel: `Delete ${countText}`,
@@ -578,30 +578,30 @@ async function renderFeatureDetail(route) {
   openFeatureDetailModal(route.id);
 }
 
-function renderFeatureGapTable(gaps, options = {}) {
+function renderFeatureGoalTable(goals, options = {}) {
   const actions = !!options.actions;
   const pageSize = Math.max(0, parseInt(options.pageSize || "0", 10) || 0);
   const pageNo = Math.max(1, parseInt(options.page || "1", 10) || 1);
   const start = pageSize ? (pageNo - 1) * pageSize : 0;
-  const visible = pageSize ? gaps.slice(start, start + pageSize) : gaps;
+  const visible = pageSize ? goals.slice(start, start + pageSize) : goals;
   const pageMeta = pageSize ? {
     limit: pageSize,
     offset: start,
-    has_more: start + visible.length < gaps.length,
-    total: gaps.length,
+    has_more: start + visible.length < goals.length,
+    total: goals.length,
   } : null;
-  const rows = visible.length ? visible.map((gap, idx) => {
+  const rows = visible.length ? visible.map((goal, idx) => {
     const globalIdx = start + idx;
-    const ordered = gap.feature_order !== null && gap.feature_order !== undefined;
-    const previousOrdered = ordered ? findOrderedFeatureGap(gaps, globalIdx, -1) : null;
-    const nextOrdered = ordered ? findOrderedFeatureGap(gaps, globalIdx, 1) : null;
+    const ordered = goal.feature_order !== null && goal.feature_order !== undefined;
+    const previousOrdered = ordered ? findOrderedFeatureGoal(goals, globalIdx, -1) : null;
+    const nextOrdered = ordered ? findOrderedFeatureGoal(goals, globalIdx, 1) : null;
     return `
-    <tr data-feature-gap-row="${htmlEscape(gap.id)}" data-feature-gap-ordered="${ordered ? "1" : "0"}" data-testid="feature-gap-row">
-      ${actions ? `<td class="feature-gap-drag-cell" data-label="Move">
-        <button type="button" class="feature-gap-drag-handle" draggable="true"
-                data-feature-drag-gap="${htmlEscape(gap.id)}"
-                data-testid="feature-gap-drag"
-                aria-label="Drag to reorder ${htmlEscape(gap.name || gap.id)}"
+    <tr data-feature-goal-row="${htmlEscape(goal.id)}" data-feature-goal-ordered="${ordered ? "1" : "0"}" data-testid="feature-goal-row">
+      ${actions ? `<td class="feature-goal-drag-cell" data-label="Move">
+        <button type="button" class="feature-goal-drag-handle" draggable="true"
+                data-feature-drag-goal="${htmlEscape(goal.id)}"
+                data-testid="feature-goal-drag"
+                aria-label="Drag to reorder ${htmlEscape(goal.name || goal.id)}"
                 title="Drag to reorder">
           <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
             <circle cx="9" cy="5" r="1.5"></circle>
@@ -613,62 +613,62 @@ function renderFeatureGapTable(gaps, options = {}) {
           </svg>
         </button>
       </td>` : ""}
-      <td data-label="Order" data-testid="feature-gap-order">${ordered ? htmlEscape(gap.feature_order) : '<span class="muted">Unordered</span>'}</td>
-      <td data-label="Gap"><a href="#/gaps/${encodeURIComponent(gap.id)}" data-testid="feature-gap-link">${htmlEscape(gap.name || gap.id)}</a></td>
-      <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}" data-testid="feature-gap-status">${workflowStatusLabel(gap.status || "backlog")}</span></td>
-      <td data-label="Priority" data-testid="feature-gap-priority">${htmlEscape(gap.priority || "low")}</td>
-      <td data-label="Reporter" data-testid="feature-gap-reporter">${htmlEscape(gap.reporter || "-")}</td>
-      <td data-label="Assignee" data-testid="feature-gap-assignee">${htmlEscape(gap.assignee || "-")}</td>
-      <td data-label="Updated" data-testid="feature-gap-updated">${fmtTime(gap.updated)}</td>
+      <td data-label="Order" data-testid="feature-goal-order">${ordered ? htmlEscape(goal.feature_order) : '<span class="muted">Unordered</span>'}</td>
+      <td data-label="Goal"><a href="#/goals/${encodeURIComponent(goal.id)}" data-testid="feature-goal-link">${htmlEscape(goal.name || goal.id)}</a></td>
+      <td data-label="Status"><span class="status-pill ${htmlEscape(goal.status || "backlog")}" data-testid="feature-goal-status">${workflowStatusLabel(goal.status || "backlog")}</span></td>
+      <td data-label="Priority" data-testid="feature-goal-priority">${htmlEscape(goal.priority || "low")}</td>
+      <td data-label="Reporter" data-testid="feature-goal-reporter">${htmlEscape(goal.reporter || "-")}</td>
+      <td data-label="Assignee" data-testid="feature-goal-assignee">${htmlEscape(goal.assignee || "-")}</td>
+      <td data-label="Updated" data-testid="feature-goal-updated">${fmtTime(goal.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
-          <button class="secondary small feature-gap-icon-btn" data-feature-order-toggle="${ordered ? "unorder" : "order"}"
-                  data-gap-id="${htmlEscape(gap.id)}"
-                  data-testid="feature-gap-order-toggle"
-                  aria-label="${ordered ? "Remove" : "Add"} ${htmlEscape(gap.name || gap.id)} ${ordered ? "from" : "to"} Feature order"
-                  title="${ordered ? "Remove from order" : "Add to order"}">${featureGapActionIcon(ordered ? "list-minus" : "list-plus")}</button>
-          <button class="secondary small feature-gap-icon-btn" data-feature-move="up"
-                  data-gap-id="${htmlEscape(gap.id)}"
+          <button class="secondary small feature-goal-icon-btn" data-feature-order-toggle="${ordered ? "unorder" : "order"}"
+                  data-goal-id="${htmlEscape(goal.id)}"
+                  data-testid="feature-goal-order-toggle"
+                  aria-label="${ordered ? "Remove" : "Add"} ${htmlEscape(goal.name || goal.id)} ${ordered ? "from" : "to"} Feature order"
+                  title="${ordered ? "Remove from order" : "Add to order"}">${featureGoalActionIcon(ordered ? "list-minus" : "list-plus")}</button>
+          <button class="secondary small feature-goal-icon-btn" data-feature-move="up"
+                  data-goal-id="${htmlEscape(goal.id)}"
                   data-neighbor-id="${htmlEscape(previousOrdered?.id || "")}"
-                  data-testid="feature-gap-move-up"
-                  aria-label="Move ${htmlEscape(gap.name || gap.id)} up"
+                  data-testid="feature-goal-move-up"
+                  aria-label="Move ${htmlEscape(goal.name || goal.id)} up"
                   title="Move up"
-                  ${!previousOrdered ? "disabled" : ""}>${featureGapActionIcon("chevron-up")}</button>
-          <button class="secondary small feature-gap-icon-btn" data-feature-move="down"
-                  data-gap-id="${htmlEscape(gap.id)}"
+                  ${!previousOrdered ? "disabled" : ""}>${featureGoalActionIcon("chevron-up")}</button>
+          <button class="secondary small feature-goal-icon-btn" data-feature-move="down"
+                  data-goal-id="${htmlEscape(goal.id)}"
                   data-neighbor-id="${htmlEscape(nextOrdered?.id || "")}"
-                  data-testid="feature-gap-move-down"
-                  aria-label="Move ${htmlEscape(gap.name || gap.id)} down"
+                  data-testid="feature-goal-move-down"
+                  aria-label="Move ${htmlEscape(goal.name || goal.id)} down"
                   title="Move down"
-                  ${!nextOrdered ? "disabled" : ""}>${featureGapActionIcon("chevron-down")}</button>
-          <button class="secondary small feature-gap-icon-btn" data-feature-delete-gap="${htmlEscape(gap.id)}"
-                  data-testid="feature-gap-delete"
-                  aria-label="Delete ${htmlEscape(gap.name || gap.id)}"
-                  title="Delete Gap">${featureGapActionIcon("trash")}</button>
+                  ${!nextOrdered ? "disabled" : ""}>${featureGoalActionIcon("chevron-down")}</button>
+          <button class="secondary small feature-goal-icon-btn" data-feature-delete-goal="${htmlEscape(goal.id)}"
+                  data-testid="feature-goal-delete"
+                  aria-label="Delete ${htmlEscape(goal.name || goal.id)}"
+                  title="Delete Goal">${featureGoalActionIcon("trash")}</button>
         </div>
       </td>` : ""}
     </tr>`;
   }).join("") : `
-    <tr><td colspan="${actions ? 9 : 7}" class="muted">No Gaps are assigned to this Feature.</td></tr>`;
+    <tr><td colspan="${actions ? 9 : 7}" class="muted">No Goals are assigned to this Feature.</td></tr>`;
   return `
     <div class="table-scroll">
-      <table class="table feature-gaps-table mobile-card-table">
-        <thead><tr>${actions ? '<th class="feature-gap-drag-col"></th>' : ""}<th>Order</th><th>Gap</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
+      <table class="table feature-goals-table mobile-card-table">
+        <thead><tr>${actions ? '<th class="feature-goal-drag-col"></th>' : ""}<th>Order</th><th>Goal</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    ${pageMeta ? renderPaginationControls("feature-modal-gaps", pageMeta, visible.length, "gap") : ""}`;
+    ${pageMeta ? renderPaginationControls("feature-modal-goals", pageMeta, visible.length, "goal") : ""}`;
 }
 
-function findOrderedFeatureGap(gaps, fromIndex, direction) {
-  for (let i = fromIndex + direction; i >= 0 && i < gaps.length; i += direction) {
-    const candidate = gaps[i];
+function findOrderedFeatureGoal(goals, fromIndex, direction) {
+  for (let i = fromIndex + direction; i >= 0 && i < goals.length; i += direction) {
+    const candidate = goals[i];
     if (candidate?.feature_order !== null && candidate?.feature_order !== undefined) return candidate;
   }
   return null;
 }
 
-function featureGapActionIcon(name) {
+function featureGoalActionIcon(name) {
   const icons = {
     "chevron-up": '<path d="M6 15l6-6 6 6"></path>',
     "chevron-down": '<path d="M6 9l6 6 6-6"></path>',
@@ -680,8 +680,8 @@ function featureGapActionIcon(name) {
 }
 
 function featureWorkflowEligibleCount(feature, targetStatus) {
-  return (feature?.gaps || []).filter((gap) => {
-    const status = gap.status || "";
+  return (feature?.goals || []).filter((goal) => {
+    const status = goal.status || "";
     return status !== targetStatus && !FEATURE_WORKFLOW_PROTECTED_STATUSES.has(status);
   }).length;
 }
@@ -699,8 +699,8 @@ function ensureFeatureModalUnderlay() {
 
 async function openFeatureDetailModal(featureId) {
   ensureFeatureModalUnderlay();
-  if (typeof closeGapDetailModal === "function") {
-    closeGapDetailModal({ navigateAway: false });
+  if (typeof closeGoalDetailModal === "function") {
+    closeGoalDetailModal({ navigateAway: false });
   }
   closeFeatureModal({ navigateAway: false });
   try {
@@ -745,8 +745,8 @@ function openFeatureModal(feature = null, options = {}) {
   closeFeatureModal({ navigateAway: false });
   const root = document.createElement("div");
   root.className = "modal-backdrop";
-  const gaps = feature?.gaps || [];
-  const gapPage = Math.max(1, parseInt(options.gapPage || "1", 10) || 1);
+  const goals = feature?.goals || [];
+  const goalPage = Math.max(1, parseInt(options.goalPage || "1", 10) || 1);
   const navigateAway = !!options.navigateAway;
   const nodeDisplayName = feature
     ? (feature.node_display_name || feature.node_id || "Unknown")
@@ -776,7 +776,7 @@ function openFeatureModal(feature = null, options = {}) {
           <div class="feature-modal-title-row">
             <div class="modal-title" id="feature-modal-title">Feature</div>
             <span class="status-pill ${htmlEscape(feature.status || "backlog")}" data-testid="feature-status-pill">${workflowStatusLabel(feature.status || "backlog")}</span>
-            <span class="muted small" data-testid="feature-progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</span>
+            <span class="muted small" data-testid="feature-progress">${feature.done_count || 0} / ${feature.goal_count || 0} done</span>
           </div>
           <div class="feature-modal-meta muted small" data-testid="feature-metadata">
             ID <code>${htmlEscape(feature.id)}</code> · created ${fmtTime(feature.created)} · updated ${fmtTime(feature.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
@@ -815,17 +815,17 @@ function openFeatureModal(feature = null, options = {}) {
           ${missingFeatureAssignee}
           ${reporterOptions}
         </select>
-        ${feature ? `<div class="feature-modal-gap-heading">
-          <div class="modal-title compact">Feature Gaps</div>
-          <div class="actions feature-gap-heading-actions">
-            <button type="button" class="secondary small feature-gap-add-btn"
-                    data-feature-new-gap data-testid="feature-new-gap" aria-label="New Gap" title="New Gap">+</button>
+        ${feature ? `<div class="feature-modal-goal-heading">
+          <div class="modal-title compact">Feature Goals</div>
+          <div class="actions feature-goal-heading-actions">
+            <button type="button" class="secondary small feature-goal-add-btn"
+                    data-feature-new-goal data-testid="feature-new-goal" aria-label="New Goal" title="New Goal">+</button>
           </div>
         </div>
-        ${renderFeatureGapTable(gaps, {
+        ${renderFeatureGoalTable(goals, {
           actions: true,
-          page: gapPage,
-          pageSize: FEATURE_MODAL_GAP_PAGE_SIZE,
+          page: goalPage,
+          pageSize: FEATURE_MODAL_GOAL_PAGE_SIZE,
         })}` : ""}
       </div>
       ${feature ? "" : `<div class="modal-actions">
@@ -881,19 +881,19 @@ function openFeatureModal(feature = null, options = {}) {
     if (assigneeSelect) assigneeSelect.value = feature.assignee || "";
     const reloadModal = async () => {
       const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
-      openFeatureModal(data.feature, { gapPage, navigateAway });
+      openFeatureModal(data.feature, { goalPage, navigateAway });
     };
-    root.querySelector("[data-feature-new-gap]")?.addEventListener("click", () => {
+    root.querySelector("[data-feature-new-goal]")?.addEventListener("click", () => {
       close();
-      openFeatureNewGapFlow(feature.id, async () => {
+      openFeatureNewGoalFlow(feature.id, async () => {
         const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
         openFeatureModal(data.feature, { navigateAway });
       });
     });
-    bindFeatureGapActions(root, feature.id, reloadModal);
-    bindFeatureGapDragReorder(root, feature.id, reloadModal);
-    bindPaginationControls(root, "feature-modal-gaps", (pageNo) => {
-      openFeatureModal(feature, { gapPage: pageNo, navigateAway });
+    bindFeatureGoalActions(root, feature.id, reloadModal);
+    bindFeatureGoalDragReorder(root, feature.id, reloadModal);
+    bindPaginationControls(root, "feature-modal-goals", (pageNo) => {
+      openFeatureModal(feature, { goalPage: pageNo, navigateAway });
     });
     root.querySelector("[data-feature-cancel]")?.addEventListener("click", () =>
       cancelFeatureFromUi(feature.id));
@@ -995,35 +995,35 @@ function bindFeatureAutosave(root, feature) {
   });
 }
 
-function bindFeatureGapDragReorder(root, featureId, onChanged) {
-  let draggedGapId = "";
-  root.querySelectorAll("[data-feature-drag-gap]").forEach((handle) => {
+function bindFeatureGoalDragReorder(root, featureId, onChanged) {
+  let draggedGoalId = "";
+  root.querySelectorAll("[data-feature-drag-goal]").forEach((handle) => {
     handle.addEventListener("click", (e) => e.preventDefault());
     handle.addEventListener("dragstart", (e) => {
-      draggedGapId = handle.dataset.featureDragGap || "";
-      if (!draggedGapId || handle.closest("[data-feature-gap-row]")?.dataset.featureGapOrdered !== "1") {
+      draggedGoalId = handle.dataset.featureDragGoal || "";
+      if (!draggedGoalId || handle.closest("[data-feature-goal-row]")?.dataset.featureGoalOrdered !== "1") {
         e.preventDefault();
         return;
       }
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", draggedGapId);
-      handle.closest("[data-feature-gap-row]")?.classList.add("dragging");
+      e.dataTransfer.setData("text/plain", draggedGoalId);
+      handle.closest("[data-feature-goal-row]")?.classList.add("dragging");
     });
     handle.addEventListener("dragend", () => {
-      draggedGapId = "";
-      clearFeatureGapDragState(root);
+      draggedGoalId = "";
+      clearFeatureGoalDragState(root);
     });
   });
-  root.querySelectorAll("[data-feature-gap-row]").forEach((row) => {
+  root.querySelectorAll("[data-feature-goal-row]").forEach((row) => {
     row.addEventListener("dragover", (e) => {
-      if (!draggedGapId) return;
-      const targetGapId = row.dataset.featureGapRow || "";
-      if (!targetGapId || targetGapId === draggedGapId || row.dataset.featureGapOrdered !== "1") return;
+      if (!draggedGoalId) return;
+      const targetGoalId = row.dataset.featureGoalRow || "";
+      if (!targetGoalId || targetGoalId === draggedGoalId || row.dataset.featureGoalOrdered !== "1") return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       const rect = row.getBoundingClientRect();
       const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
-      root.querySelectorAll("[data-feature-gap-row]").forEach((candidate) => {
+      root.querySelectorAll("[data-feature-goal-row]").forEach((candidate) => {
         candidate.classList.remove("drop-before", "drop-after");
       });
       row.classList.add(position === "before" ? "drop-before" : "drop-after");
@@ -1034,15 +1034,15 @@ function bindFeatureGapDragReorder(root, featureId, onChanged) {
       delete row.dataset.featureDropPosition;
     });
     row.addEventListener("drop", async (e) => {
-      const sourceGapId = e.dataTransfer.getData("text/plain") || draggedGapId;
-      const targetGapId = row.dataset.featureGapRow || "";
+      const sourceGoalId = e.dataTransfer.getData("text/plain") || draggedGoalId;
+      const targetGoalId = row.dataset.featureGoalRow || "";
       const position = row.dataset.featureDropPosition || "after";
-      clearFeatureGapDragState(root);
-      if (!sourceGapId || !targetGapId || sourceGapId === targetGapId) return;
+      clearFeatureGoalDragState(root);
+      if (!sourceGoalId || !targetGoalId || sourceGoalId === targetGoalId) return;
       e.preventDefault();
       try {
-        await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(sourceGapId)}/reorder`, {
-          [position]: targetGapId,
+        await api("POST", `/api/features/${encodeURIComponent(featureId)}/goals/${encodeURIComponent(sourceGoalId)}/reorder`, {
+          [position]: targetGoalId,
         });
         toast("Feature order updated", "info");
         await onChanged?.();
@@ -1053,24 +1053,24 @@ function bindFeatureGapDragReorder(root, featureId, onChanged) {
   });
 }
 
-function clearFeatureGapDragState(root) {
-  root.querySelectorAll("[data-feature-gap-row]").forEach((row) => {
+function clearFeatureGoalDragState(root) {
+  root.querySelectorAll("[data-feature-goal-row]").forEach((row) => {
     row.classList.remove("dragging", "drop-before", "drop-after");
     delete row.dataset.featureDropPosition;
   });
 }
 
-function bindFeatureGapActions(root, featureId, onChanged) {
+function bindFeatureGoalActions(root, featureId, onChanged) {
   root.querySelectorAll("[data-feature-move]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const gapId = btn.dataset.gapId;
+      const goalId = btn.dataset.goalId;
       const siblingId = btn.dataset.neighborId;
-      if (!gapId || !siblingId) return;
+      if (!goalId || !siblingId) return;
       const body = btn.dataset.featureMove === "up"
         ? { before: siblingId }
         : { after: siblingId };
       try {
-        await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/reorder`, body);
+        await api("POST", `/api/features/${encodeURIComponent(featureId)}/goals/${encodeURIComponent(goalId)}/reorder`, body);
         toast("Feature order updated", "info");
         await onChanged?.();
       } catch (e) {
@@ -1080,30 +1080,30 @@ function bindFeatureGapActions(root, featureId, onChanged) {
   });
   root.querySelectorAll("[data-feature-order-toggle]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const gapId = btn.dataset.gapId;
+      const goalId = btn.dataset.goalId;
       const action = btn.dataset.featureOrderToggle;
-      if (!gapId || !["order", "unorder"].includes(action)) return;
+      if (!goalId || !["order", "unorder"].includes(action)) return;
       try {
-        await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/${action}`);
-        toast(action === "order" ? "Gap added to Feature order" : "Gap removed from Feature order", "info");
+        await api("POST", `/api/features/${encodeURIComponent(featureId)}/goals/${encodeURIComponent(goalId)}/${action}`);
+        toast(action === "order" ? "Goal added to Feature order" : "Goal removed from Feature order", "info");
         await onChanged?.();
       } catch (e) {
         showActionError(e, "Feature order update failed");
       }
     });
   });
-  root.querySelectorAll("[data-feature-delete-gap]").forEach((btn) => {
+  root.querySelectorAll("[data-feature-delete-goal]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const gapId = btn.dataset.featureDeleteGap;
-      if (!gapId) return;
+      const goalId = btn.dataset.featureDeleteGoal;
+      if (!goalId) return;
       const ok = await modalConfirm(
-        "Delete this Gap from the Feature? This cannot be undone.",
-        { title: "Delete Gap", okLabel: "Delete Gap", cancelLabel: "Keep it", danger: true },
+        "Delete this Goal from the Feature? This cannot be undone.",
+        { title: "Delete Goal", okLabel: "Delete Goal", cancelLabel: "Keep it", danger: true },
       );
       if (!ok) return;
       try {
-        await api("DELETE", `/api/gaps/${encodeURIComponent(gapId)}`);
-        toast("Gap deleted", "info");
+        await api("DELETE", `/api/goals/${encodeURIComponent(goalId)}`);
+        toast("Goal deleted", "info");
         await onChanged?.();
       } catch (e) {
         showActionError(e, "Delete failed");
@@ -1112,8 +1112,8 @@ function bindFeatureGapActions(root, featureId, onChanged) {
   });
 }
 
-function openFeatureNewGapFlow(featureId, onSaved) {
-  openNewGapModal({
+function openFeatureNewGoalFlow(featureId, onSaved) {
+  openNewGoalModal({
     featureId,
     onSaved: async () => {
       await onSaved?.();
@@ -1123,7 +1123,7 @@ function openFeatureNewGapFlow(featureId, onSaved) {
 
 async function cancelFeatureFromUi(featureId) {
   const ok = await modalConfirm(
-    "Cancel this Feature? Completed Gaps stay done and every non-terminal Gap in the Feature will be cancelled.",
+    "Cancel this Feature? Completed Goals stay done and every non-terminal Goal in the Feature will be cancelled.",
     { title: "Cancel Feature", okLabel: "Cancel Feature", cancelLabel: "Keep working", danger: true },
   );
   if (!ok) return;
@@ -1154,7 +1154,7 @@ async function moveFeatureWorkflowFromUi(featureId, targetStatus, { button = nul
       const skipped = result.skipped || 0;
       const stopped = result.stopped || 0;
       const stopText = stopped ? `; stopped ${stopped}` : "";
-      toast(`Moved ${updated} Gap${updated === 1 ? "" : "s"} to ${label}${stopText}${skipped ? `; skipped ${skipped}` : ""}`, "info");
+      toast(`Moved ${updated} Goal${updated === 1 ? "" : "s"} to ${label}${stopText}${skipped ? `; skipped ${skipped}` : ""}`, "info");
       if (typeof reload === "function") {
         await reload();
       } else if (state.currentRoute === "features_detail") {
@@ -1170,7 +1170,7 @@ async function moveFeatureWorkflowFromUi(featureId, targetStatus, { button = nul
 
 async function deleteFeatureFromUi(featureId) {
   const ok = await modalConfirm(
-    "Delete this Feature and all Gaps in it? This cannot be undone.",
+    "Delete this Feature and all Goals in it? This cannot be undone.",
     { title: "Delete Feature", okLabel: "Delete Feature", cancelLabel: "Keep it", danger: true },
   );
   if (!ok) return;

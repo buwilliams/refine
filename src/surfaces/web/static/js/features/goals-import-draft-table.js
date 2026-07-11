@@ -45,8 +45,8 @@ function renderImportDraftActionBar({
             <button type="button" class="secondary small" data-import-dismiss-duplicates data-testid="import-dismiss-duplicates" ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
             <button type="button" class="secondary small" data-import-originals data-testid="import-import-selected">Import selected</button>
             <button type="button" class="secondary small" data-import-backlog-originals data-testid="import-move-originals">Move originals to backlog</button>
-            <select data-import-update-field data-testid="import-update-field" aria-label="Original Gap field">
-              ${["actual", "target", "reporter", "priority"].map((field) => `
+            <select data-import-update-field data-testid="import-update-field" aria-label="Original Goal field">
+              ${["prompt", "reporter", "priority"].map((field) => `
                 <option value="${field}" ${field === updateField ? "selected" : ""}>${field}</option>`).join("")}
             </select>
             <button type="button" class="secondary small" data-import-update-originals data-testid="import-update-originals">Update originals</button>
@@ -66,8 +66,7 @@ function renderImportDraftRange(start, end, visibleCount, totalCount, filtered) 
 function importDraftPayload(draft) {
   return {
     name: draft.name.trim(),
-    actual: draft.actual.trim(),
-    target: draft.target.trim(),
+    prompt: draft.prompt.trim(),
     reporter: draft.reporter.trim(),
     priority: draft.priority,
     node_id: (draft.node_id || "").trim(),
@@ -96,12 +95,11 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected,
         <col class="import-col-reporter">
         <col class="import-col-priority">
         <col class="import-col-node">
-        <col class="import-col-actual">
-        <col class="import-col-target">
+        <col class="import-col-prompt">
       </colgroup>
       <thead>
         <tr>
-          <th class="gap-select-col">
+          <th class="goal-select-col">
             <input type="checkbox" data-import-toggle-page-checkbox
                    aria-label="Select page"
                    ${pageAllSelected ? "checked" : ""}
@@ -112,8 +110,7 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected,
           <th>Reporter</th>
           <th>Priority</th>
           <th>Node</th>
-          <th>Actual</th>
-          <th>Target</th>
+          <th>Prompt</th>
         </tr>
       </thead>
       <tbody>
@@ -127,7 +124,7 @@ function renderImportDraftRow(d, index, draftCount) {
     <tr class="draft ${importDraftNeedsResolution(d) ? "needs-resolution" : ""}"
         data-testid="import-draft-row"
         data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
-      <td class="gap-select-col">
+      <td class="goal-select-col">
         <input type="checkbox" data-import-draft-select data-testid="import-draft-select" ${d.selected ? "checked" : ""}
                aria-label="Select draft ${index + 1}">
       </td>
@@ -151,12 +148,8 @@ function renderImportDraftRow(d, index, draftCount) {
       </td>
       <td><input type="text" class="d-node" data-testid="import-draft-node" value="${htmlEscape(d.node_id || "")}" placeholder="current"></td>
       <td>
-        <textarea class="d-actual" data-testid="import-draft-actual" rows="3">${htmlEscape(d.actual)}</textarea>
-        ${d.duplicate ? renderImportDuplicateActual(d.duplicate) : ""}
-      </td>
-      <td>
-        <textarea class="d-target" data-testid="import-draft-target" rows="3">${htmlEscape(d.target)}</textarea>
-        ${d.duplicate ? renderImportDuplicateTarget(d.duplicate) : ""}
+        <textarea class="d-prompt" data-testid="import-draft-prompt" rows="3">${htmlEscape(d.prompt)}</textarea>
+        ${d.duplicate ? renderImportDuplicatePrompt(d.duplicate) : ""}
       </td>
     </tr>`;
 }
@@ -171,7 +164,7 @@ function importDuplicateDecisionLabel(decision) {
   return "Needs duplicate resolution";
 }
 
-function renderImportDuplicateActual(match) {
+function renderImportDuplicatePrompt(match) {
   return `
     <div class="import-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
@@ -179,16 +172,8 @@ function renderImportDuplicateActual(match) {
         ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.node_display_name || match.node_id || "Default")}
         · ${htmlEscape(match.status || "")}
       </p>
-      <div class="small muted">Matched actual</div>
-      <p>${htmlEscape(match.actual || "")}</p>
-    </div>`;
-}
-
-function renderImportDuplicateTarget(match) {
-  return `
-    <div class="import-duplicate">
-      <div class="small muted">Matched target</div>
-      <p>${htmlEscape(match.target || "")}</p>
+      <div class="small muted">Matched prompt</div>
+      <p>${htmlEscape(match.prompt || "")}</p>
     </div>`;
 }
 
@@ -234,7 +219,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
         });
       });
     });
-    $$(".d-name, .d-reporter, .d-priority, .d-actual, .d-target", row).forEach((field) => {
+    $$(".d-name, .d-reporter, .d-priority, .d-prompt", row).forEach((field) => {
       const syncAndClearError = () => {
         syncImportDraftRow(row, draftState);
         draft.error = "";
@@ -244,7 +229,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
       field.addEventListener("input", syncAndClearError);
       field.addEventListener("change", syncAndClearError);
     });
-    $$(".d-actual, .d-target", row).forEach((field) => {
+    $$(".d-prompt", row).forEach((field) => {
       field.addEventListener("input", () => {
         if (!row.querySelector(".import-duplicate")) return;
         row.dataset.duplicateDecision = "";
@@ -270,8 +255,7 @@ function syncImportDraftRow(row, draftState) {
   if (!draft) return;
   draft.selected = !!row.querySelector("[data-import-draft-select]")?.checked;
   draft.name = row.querySelector(".d-name")?.value || "";
-  draft.actual = row.querySelector(".d-actual")?.value || "";
-  draft.target = row.querySelector(".d-target")?.value || "";
+  draft.prompt = row.querySelector(".d-prompt")?.value || "";
   draft.reporter = row.querySelector(".d-reporter")?.value || "";
   draft.priority = row.querySelector(".d-priority")?.value || "low";
   draft.node_id = row.querySelector(".d-node")?.value || "";

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -20,13 +20,13 @@ use crate::tools::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
+use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChatAttachment {
-    Gap(String),
+    Goal(String),
     Feature(String),
     Standalone,
 }
@@ -62,7 +62,7 @@ pub struct ChatSessionWorktree {
     pub branch: String,
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub submitted_gap_id: Option<String>,
+    pub submitted_goal_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -91,14 +91,13 @@ pub struct ChatReadResult {
 pub struct StandaloneReadyMergeRequest {
     pub name: Option<String>,
     pub reporter: String,
-    pub actual: String,
-    pub target: String,
+    pub prompt: String,
     pub priority: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StandaloneReadyMergeResult {
-    pub gap: GapSummaryProjection,
+    pub goal: GoalSummaryProjection,
     pub worktree: ChatSessionWorktree,
 }
 
@@ -159,7 +158,7 @@ impl FileChatService {
     ) -> RefineResult<ChatSessionRecord> {
         let now = now_timestamp();
         let attachment_mode = match &attachment {
-            ChatAttachment::Gap(_) => "gap",
+            ChatAttachment::Goal(_) => "goal",
             ChatAttachment::Feature(_) => "feature",
             ChatAttachment::Standalone => "standalone",
         };
@@ -226,7 +225,7 @@ impl FileChatService {
     pub fn mark_worktree_submitted(
         &self,
         session_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<ChatSessionRecord> {
         let mut record = self.load_record(session_id)?;
         let Some(worktree) = record.worktree.as_mut() else {
@@ -234,7 +233,7 @@ impl FileChatService {
                 "Chat session {session_id} has no standalone worktree"
             )));
         };
-        worktree.submitted_gap_id = Some(gap_id.to_string());
+        worktree.submitted_goal_id = Some(goal_id.to_string());
         record.updated_at = now_timestamp();
         self.write_record(&record)?;
         Ok(record)
@@ -275,7 +274,7 @@ impl FileChatService {
             && existing
                 .worktree
                 .as_ref()
-                .and_then(|worktree| worktree.submitted_gap_id.as_deref())
+                .and_then(|worktree| worktree.submitted_goal_id.as_deref())
                 .is_none()
             && let Some(worktree) = existing.worktree.as_ref()
         {
@@ -316,14 +315,13 @@ impl FileChatService {
                 "Chat session {session_id} has no standalone worktree"
             )));
         };
-        if worktree.submitted_gap_id.is_some() {
+        if worktree.submitted_goal_id.is_some() {
             return Err(RefineError::Conflict(format!(
                 "Chat session {session_id} was already submitted"
             )));
         }
 
-        let actual = request.actual.trim();
-        let target = request.target.trim();
+        let prompt = request.prompt.trim();
         let reporter = request.reporter.trim();
         let priority = request.priority.trim();
         let name = request
@@ -332,15 +330,13 @@ impl FileChatService {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_string)
-            .or_else(|| derive_standalone_gap_name(actual, target))
+            .or_else(|| derive_standalone_goal_name(prompt))
             .ok_or_else(|| {
-                RefineError::InvalidInput(
-                    "body.name, body.actual, or body.target is required".to_string(),
-                )
+                RefineError::InvalidInput("body.name or body.prompt is required".to_string())
             })?;
-        if reporter.is_empty() || actual.is_empty() || target.is_empty() {
+        if reporter.is_empty() || prompt.is_empty() {
             return Err(RefineError::InvalidInput(
-                "reporter, actual, and target are required".to_string(),
+                "reporter and prompt are required".to_string(),
             ));
         }
         if !matches!(priority, "low" | "medium" | "high") {
@@ -363,20 +359,20 @@ impl FileChatService {
             &self.refine_dir,
             self.runtime_root.join("cache"),
         );
-        let gap = work_items.create_gap_summary(&name, None)?;
-        let gap_id = gap.gap.id.clone();
-        let submit_result = (|| -> RefineResult<GapSummaryProjection> {
-            work_items.append_gap_round_summary(&gap_id, reporter, actual, target)?;
+        let goal = work_items.create_goal_summary(&name, None)?;
+        let goal_id = goal.goal.id.clone();
+        let submit_result = (|| -> RefineResult<GoalSummaryProjection> {
+            work_items.append_goal_round_summary(&goal_id, reporter, prompt)?;
             if priority != "low" {
-                work_items.update_gap_metadata_summary(
-                    &gap_id,
+                work_items.update_goal_metadata_summary(
+                    &goal_id,
                     None,
                     Some(priority),
                     None,
                     None,
                 )?;
             }
-            match worktree_git.commit(&format!("Submit {gap_id} from standalone chat"), &[]) {
+            match worktree_git.commit(&format!("Submit {goal_id} from standalone chat"), &[]) {
                 Ok(_) => {}
                 Err(error) => {
                     if !worktree_git.has_commits_since(target_branch)? {
@@ -384,18 +380,19 @@ impl FileChatService {
                     }
                 }
             }
-            work_items.set_gap_branch_name(&gap_id, &worktree.branch)?;
-            work_items.transition_gap_status(&gap_id, GapStatus::Todo)?;
-            work_items.advance_automated_gap_status(&gap_id, GapStatus::InProgress)?;
-            let gap = work_items.advance_automated_gap_status(&gap_id, GapStatus::ReadyMerge)?;
-            self.mark_worktree_submitted(session_id, &gap_id)?;
+            work_items.set_goal_branch_name(&goal_id, &worktree.branch)?;
+            work_items.transition_goal_status(&goal_id, GoalStatus::Todo)?;
+            work_items.advance_automated_goal_status(&goal_id, GoalStatus::InProgress)?;
+            let goal =
+                work_items.advance_automated_goal_status(&goal_id, GoalStatus::ReadyMerge)?;
+            self.mark_worktree_submitted(session_id, &goal_id)?;
             self.interrupt(session_id, "submitted for ready-merge")?;
-            Ok(gap)
+            Ok(goal)
         })();
         match submit_result {
-            Ok(gap) => Ok(StandaloneReadyMergeResult { gap, worktree }),
+            Ok(goal) => Ok(StandaloneReadyMergeResult { goal, worktree }),
             Err(error) => {
-                let _ = work_items.delete_gap_record(&gap_id);
+                let _ = work_items.delete_goal_record(&goal_id);
                 Err(error)
             }
         }
@@ -528,7 +525,7 @@ impl FileChatService {
         Ok(ChatSessionWorktree {
             branch,
             path,
-            submitted_gap_id: None,
+            submitted_goal_id: None,
         })
     }
 
@@ -1108,7 +1105,7 @@ impl FileChatService {
 
     fn chat_prompt(&self, record: &ChatSessionRecord, message: &str) -> String {
         let attachment = match &record.attachment {
-            ChatAttachment::Gap(id) => format!("Gap {id}"),
+            ChatAttachment::Goal(id) => format!("Goal {id}"),
             ChatAttachment::Feature(id) => format!("Feature {id}"),
             ChatAttachment::Standalone => "standalone chat".to_string(),
         };
@@ -1128,21 +1125,21 @@ impl FileChatService {
         let store = FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root);
         let snapshot = store.load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         match &record.attachment {
-            ChatAttachment::Gap(id) => {
-                let Some(gap) = snapshot.gaps.get(id) else {
-                    return Err(RefineError::NotFound(format!("Gap {id} was not found")));
+            ChatAttachment::Goal(id) => {
+                let Some(goal) = snapshot.goals.get(id) else {
+                    return Err(RefineError::NotFound(format!("Goal {id} was not found")));
                 };
                 serde_json::to_string_pretty(&json!({
-                    "type": "gap",
-                    "id": &gap.gap.id,
-                    "name": &gap.gap.name,
-                    "status": &gap.gap.status,
-                    "priority": &gap.gap.priority,
-                    "reporter": &gap.gap.reporter,
-                    "round_count": gap.gap.round_count,
-                    "feature_id": &gap.gap.feature_id,
-                    "node_id": &gap.gap.node_id,
-                    "updated": &gap.gap.updated
+                    "type": "goal",
+                    "id": &goal.goal.id,
+                    "name": &goal.goal.name,
+                    "status": &goal.goal.status,
+                    "priority": &goal.goal.priority,
+                    "reporter": &goal.goal.reporter,
+                    "round_count": goal.goal.round_count,
+                    "feature_id": &goal.goal.feature_id,
+                    "node_id": &goal.goal.node_id,
+                    "updated": &goal.goal.updated
                 }))
             }
             ChatAttachment::Feature(id) => {
@@ -1154,7 +1151,7 @@ impl FileChatService {
                     "id": &feature.feature.id,
                     "name": &feature.feature.name,
                     "status": &feature.status,
-                    "gap_ids": &feature.gap_ids,
+                    "goal_ids": &feature.goal_ids,
                     "rollup": &feature.rollup,
                     "updated": &feature.feature.updated
                 }))
@@ -1186,19 +1183,19 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
                 force a fixed checklist or categories that do not fit the domain. Include enough \
                 concrete behavior, implementation tradeoffs, natural build order, and test or \
                 verification work that the Draft Feature action can later extract \
-                implementation-ready Features and Gaps from the transcript. Do not reduce the \
+                implementation-ready Features and Goals from the transcript. Do not reduce the \
                 answer to generic strategy, prioritization advice, or a single suggested next \
                 action.";
     }
     match &record.attachment {
-        ChatAttachment::Gap(_) => {
-            "Discuss the attached Gap and focus on concrete changes, evidence, and next steps for that Gap."
+        ChatAttachment::Goal(_) => {
+            "Discuss the attached Goal and focus on concrete changes, evidence, and next steps for that Goal."
         }
         ChatAttachment::Feature(_) => {
-            "Discuss the attached Feature and focus on its included Gaps, workflow state, and delivery plan."
+            "Discuss the attached Feature and focus on its included Goals, workflow state, and delivery plan."
         }
         ChatAttachment::Standalone => {
-            "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Gap-ready behavior."
+            "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Goal-ready behavior."
         }
     }
 }
@@ -1245,10 +1242,11 @@ fn event_bool(event: &JsonObject, key: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn derive_standalone_gap_name(actual: &str, target: &str) -> Option<String> {
-    let source = [target.trim(), actual.trim()]
-        .into_iter()
-        .find(|value| !value.is_empty())?;
+fn derive_standalone_goal_name(prompt: &str) -> Option<String> {
+    let source = prompt.trim();
+    if source.is_empty() {
+        return None;
+    }
     let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut name = collapsed.chars().take(80).collect::<String>();
     if collapsed.chars().count() > 80 {
@@ -1301,7 +1299,7 @@ fn collect_importable_artifacts(value: &Value, artifacts: &mut Vec<JsonObject>) 
             }
             for (key, artifact_type) in [
                 ("round", "round"),
-                ("gap", "gap"),
+                ("goal", "goal"),
                 ("feature_plan", "feature_plan"),
             ] {
                 if let Some(Value::Object(payload)) = object.get(key) {
@@ -1311,10 +1309,10 @@ fn collect_importable_artifacts(value: &Value, artifacts: &mut Vec<JsonObject>) 
                     artifacts.push(artifact);
                 }
             }
-            if let Some(Value::Array(gaps)) = object.get("gaps") {
+            if let Some(Value::Array(goals)) = object.get("goals") {
                 let mut artifact = JsonObject::new();
-                artifact.insert("type".to_string(), Value::String("gaps".to_string()));
-                artifact.insert("gaps".to_string(), Value::Array(gaps.clone()));
+                artifact.insert("type".to_string(), Value::String("goals".to_string()));
+                artifact.insert("goals".to_string(), Value::Array(goals.clone()));
                 artifacts.push(artifact);
             }
         }
@@ -1325,7 +1323,7 @@ fn collect_importable_artifacts(value: &Value, artifacts: &mut Vec<JsonObject>) 
 fn recognized_artifact(object: &JsonObject) -> bool {
     matches!(
         object.get("type").and_then(|value| value.as_str()),
-        Some("round" | "gap" | "gaps" | "feature_plan")
+        Some("round" | "goal" | "goals" | "feature_plan")
     )
 }
 
@@ -1433,7 +1431,7 @@ fn chat_operation_log(severity: &str, message: &str, details: Option<JsonObject>
         details,
         actions: Vec::new(),
         actor: Some("refine".to_string()),
-        gap_id: None,
+        goal_id: None,
     }
 }
 
@@ -1454,12 +1452,12 @@ mod tests {
 
         let session = service
             .start_with_options(
-                ChatAttachment::Gap("GAP1".to_string()),
+                ChatAttachment::Goal("GOAL1".to_string()),
                 Some("smoke-ai"),
-                Some("gap"),
+                Some("goal"),
             )
             .unwrap();
-        assert_eq!(session.mode, "gap");
+        assert_eq!(session.mode, "goal");
         assert_eq!(session.provider, "smoke-ai");
 
         service
@@ -1541,24 +1539,24 @@ mod tests {
     }
 
     #[test]
-    fn file_chat_service_rebuilds_attached_gap_context_from_refine_records() {
-        let temp_root = unique_temp_dir("chat-gap-context");
+    fn file_chat_service_rebuilds_attached_goal_context_from_refine_records() {
+        let temp_root = unique_temp_dir("chat-goal-context");
         let refine_dir = temp_root.join(".refine");
         FileWorkItemService::new(&refine_dir)
-            .create_gap_summary("Checkout fails", Some("GAP1"))
+            .create_goal_summary("Checkout fails", Some("GOAL1"))
             .unwrap();
         let service = FileChatService::new(&refine_dir);
         let session = service
             .start_with_options(
-                ChatAttachment::Gap("GAP1".to_string()),
+                ChatAttachment::Goal("GOAL1".to_string()),
                 Some("smoke-ai"),
-                Some("gap"),
+                Some("goal"),
             )
             .unwrap();
 
         let prompt = service.chat_prompt(&session, "What changed?");
         assert!(prompt.contains("Current refine context"));
-        assert!(prompt.contains("\"id\": \"GAP1\""));
+        assert!(prompt.contains("\"id\": \"GOAL1\""));
         assert!(prompt.contains("\"name\": \"Checkout fails\""));
         assert!(prompt.contains("What changed?"));
 
@@ -1590,7 +1588,7 @@ mod tests {
         assert!(prompt.contains("do not force a fixed checklist"));
         assert!(prompt.contains("natural build order"));
         assert!(prompt.contains("test or verification work"));
-        assert!(prompt.contains("implementation-ready Features and Gaps"));
+        assert!(prompt.contains("implementation-ready Features and Goals"));
         assert!(prompt.contains("Do not reduce the answer to generic strategy"));
         assert!(!prompt.contains("highest-leverage"));
         assert!(prompt.contains("Plan authentication cleanup."));
@@ -1635,7 +1633,7 @@ mod tests {
             &refine_dir,
             "smoke-ai",
             0,
-            r#"{"importable_artifacts":[{"type":"round","round":{"reporter":"QA","actual":"Broken","target":"Fixed"}},{"type":"gap","gap":{"name":"Imported gap","actual":"A","target":"B"}}]}"#,
+            r#"{"importable_artifacts":[{"type":"round","round":{"reporter":"QA","prompt": "Fixed"}},{"type":"goal","goal":{"name":"Imported goal","prompt": "B"}}]}"#,
         );
         let service = FileChatService::new(&refine_dir);
         let session = service
@@ -1650,7 +1648,7 @@ mod tests {
         });
         assert_eq!(resumed.importable_artifacts.len(), 2);
         assert_eq!(resumed.importable_artifacts[0]["type"], "round");
-        assert_eq!(resumed.importable_artifacts[1]["type"], "gap");
+        assert_eq!(resumed.importable_artifacts[1]["type"], "goal");
         assert!(resumed.transcript_events.iter().any(|event| {
             event
                 .get("text")

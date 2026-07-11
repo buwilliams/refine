@@ -135,28 +135,28 @@ pub fn tool_catalog() -> Vec<McpTool> {
             },
         },
         McpTool {
-            name: "refine_list_gaps",
-            description: "List Gaps (units of product feedback and work) for the active app.",
+            name: "refine_list_goals",
+            description: "List Goals (units of product feedback and work) for the active app.",
             input_schema: empty_schema,
             binding: ToolBinding::Api {
                 method: "GET",
-                path: "/work/gaps",
+                path: "/work/goals",
                 path_params: &[],
             },
         },
         McpTool {
-            name: "refine_show_gap",
-            description: "Show a single Gap by id, including its current workflow state.",
-            input_schema: gap_id_schema,
+            name: "refine_show_goal",
+            description: "Show a single Goal by id, including its current workflow state.",
+            input_schema: goal_id_schema,
             binding: ToolBinding::Api {
                 method: "GET",
-                path: "/work/gaps/{gap_id}",
-                path_params: &["gap_id"],
+                path: "/work/goals/{goal_id}",
+                path_params: &["goal_id"],
             },
         },
         McpTool {
             name: "refine_list_features",
-            description: "List Features (grouped Gaps) for the active app.",
+            description: "List Features (grouped Goals) for the active app.",
             input_schema: empty_schema,
             binding: ToolBinding::Api {
                 method: "GET",
@@ -176,7 +176,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
         },
         McpTool {
             name: "refine_request",
-            description: "Escape hatch: call any local daemon API route directly. Provide 'method' (default GET), 'path' (e.g. /work/gaps), and an optional JSON 'body'. Discover routes with the refine_api_groups tool.",
+            description: "Escape hatch: call any local daemon API route directly. Provide 'method' (default GET), 'path' (e.g. /work/goals), and an optional JSON 'body'. Discover routes with the refine_api_groups tool.",
             input_schema: request_schema,
             binding: ToolBinding::Passthrough,
         },
@@ -191,16 +191,16 @@ fn empty_schema() -> Value {
     })
 }
 
-fn gap_id_schema() -> Value {
+fn goal_id_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "gap_id": {
+            "goal_id": {
                 "type": "string",
-                "description": "Gap identifier, e.g. GAP1",
+                "description": "Goal identifier, e.g. GOAL1",
             },
         },
-        "required": ["gap_id"],
+        "required": ["goal_id"],
         "additionalProperties": false,
     })
 }
@@ -215,7 +215,7 @@ fn request_schema() -> Value {
             },
             "path": {
                 "type": "string",
-                "description": "Daemon API path, e.g. /work/gaps",
+                "description": "Daemon API path, e.g. /work/goals",
             },
             "body": {
                 "description": "Optional JSON request body for writes",

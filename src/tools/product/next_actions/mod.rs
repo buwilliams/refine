@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
@@ -50,27 +50,27 @@ impl FileNextActionsService {
         let active_node_id = nodes_service
             .active_node_id()
             .unwrap_or_else(|_| "default".to_string());
-        let gaps = FileWorkItemService::new(&self.refine_dir).list_gap_summaries()?;
+        let goals = FileWorkItemService::new(&self.refine_dir).list_goal_summaries()?;
         let claimed = self.active_claim_count();
 
         let mut status_counts: BTreeMap<&'static str, usize> = BTreeMap::new();
         let mut open_by_node: BTreeMap<String, usize> = BTreeMap::new();
         let mut stranded_review = Vec::new();
-        for gap in &gaps {
+        for goal in &goals {
             status_counts
-                .entry(gap.gap.status.as_str())
+                .entry(goal.goal.status.as_str())
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
-            let owner = gap
-                .gap
+            let owner = goal
+                .goal
                 .node_id
                 .clone()
                 .unwrap_or_else(|| "default".to_string());
-            if matches!(gap.gap.status, GapStatus::Backlog | GapStatus::Todo) {
+            if matches!(goal.goal.status, GoalStatus::Backlog | GoalStatus::Todo) {
                 *open_by_node.entry(owner.clone()).or_insert(0) += 1;
             }
-            if gap.gap.status == GapStatus::Review && owner != active_node_id {
-                stranded_review.push(gap.gap.id.clone());
+            if goal.goal.status == GoalStatus::Review && owner != active_node_id {
+                stranded_review.push(goal.goal.id.clone());
             }
         }
 
@@ -99,12 +99,12 @@ impl FileNextActionsService {
             .count();
 
         let mut suggestions = Vec::new();
-        if gaps.is_empty() {
+        if goals.is_empty() {
             suggest(
                 &mut suggestions,
-                "capture-first-gap",
-                "No work is tracked yet. Capture the first gap between what the app does and what it should do.",
-                "refine gap create \"<what should change>\"",
+                "capture-first-goal",
+                "No work is tracked yet. Capture the first goal between what the app does and what it should do.",
+                "refine goal create \"<what should change>\"",
             );
         }
         for node_id in &failed {
@@ -122,7 +122,7 @@ impl FileNextActionsService {
                 &mut suggestions,
                 "converge-reviewables",
                 &format!(
-                    "{} reviewable gap(s) sit on other nodes; converge them to this node for review.",
+                    "{} reviewable goal(s) sit on other nodes; converge them to this node for review.",
                     stranded_review.len()
                 ),
                 &format!("refine cluster distribute --converge --to {active_node_id}"),
@@ -134,7 +134,7 @@ impl FileNextActionsService {
                 &mut suggestions,
                 "distribute-work",
                 &format!(
-                    "{open_total} open gap(s) all sit on one node while {healthy_node_count} nodes are available."
+                    "{open_total} open goal(s) all sit on one node while {healthy_node_count} nodes are available."
                 ),
                 "refine cluster distribute --dry-run",
             );
@@ -145,8 +145,8 @@ impl FileNextActionsService {
             suggest(
                 &mut suggestions,
                 "review-work",
-                &format!("{review_count} gap(s) are waiting on human review."),
-                "refine gap list",
+                &format!("{review_count} goal(s) are waiting on human review."),
+                "refine goal list",
             );
         }
         if suggestions.is_empty() {
@@ -162,8 +162,8 @@ impl FileNextActionsService {
             "ok": true,
             "active_node_id": active_node_id,
             "state": {
-                "gaps_by_status": status_counts,
-                "open_gaps_by_node": open_by_node,
+                "goals_by_status": status_counts,
+                "open_goals_by_node": open_by_node,
                 "nodes_enabled": enabled_nodes.len(),
                 "nodes_healthy": healthy_node_count,
                 "active_claims": claimed,
@@ -220,14 +220,14 @@ mod tests {
     }
 
     #[test]
-    fn next_suggests_first_gap_when_nothing_is_tracked() {
+    fn next_suggests_first_goal_when_nothing_is_tracked() {
         let temp_root = unique_temp_dir("guidance-empty");
         let refine_dir = temp_root.join(".refine");
         fs::create_dir_all(&refine_dir).unwrap();
         let response = FileNextActionsService::new(&refine_dir)
             .next_response()
             .unwrap();
-        assert_eq!(response["suggestions"][0]["id"], "capture-first-gap");
+        assert_eq!(response["suggestions"][0]["id"], "capture-first-goal");
         fs::remove_dir_all(temp_root).unwrap();
     }
 
@@ -240,16 +240,16 @@ mod tests {
             .upsert_node("fly-worker-1", NodeRemoteUpdate::default())
             .unwrap();
         let work = FileWorkItemService::new(&refine_dir);
-        work.create_gap_summary("Gap A", Some("GAP1")).unwrap();
-        work.create_gap_summary("Gap B", Some("GAP2")).unwrap();
-        // a reviewable gap stranded on the worker
-        work.create_gap_summary("Gap C", Some("GAP3")).unwrap();
-        work.transfer_gap_to_node("fly-worker-1", "GAP3").unwrap();
-        let gap_path = refine_dir.join("gaps/GA/P3/gap.json");
-        let review = fs::read_to_string(&gap_path)
+        work.create_goal_summary("Goal A", Some("GOAL1")).unwrap();
+        work.create_goal_summary("Goal B", Some("GOAL2")).unwrap();
+        // a reviewable goal stranded on the worker
+        work.create_goal_summary("Goal C", Some("GOAL3")).unwrap();
+        work.transfer_goal_to_node("fly-worker-1", "GOAL3").unwrap();
+        let goal_path = refine_dir.join("goals/GO/AL3/goal.json");
+        let review = fs::read_to_string(&goal_path)
             .unwrap()
             .replace("\"backlog\"", "\"review\"");
-        fs::write(&gap_path, review).unwrap();
+        fs::write(&goal_path, review).unwrap();
 
         let response = FileNextActionsService::new(&refine_dir)
             .next_response()
@@ -277,12 +277,13 @@ mod tests {
         let temp_root = unique_temp_dir("guidance-quiet");
         let refine_dir = temp_root.join(".refine");
         let work = FileWorkItemService::new(&refine_dir);
-        work.create_gap_summary("Done gap", Some("GAP1")).unwrap();
-        let gap_path = refine_dir.join("gaps/GA/P1/gap.json");
-        let done = fs::read_to_string(&gap_path)
+        work.create_goal_summary("Done goal", Some("GOAL1"))
+            .unwrap();
+        let goal_path = refine_dir.join("goals/GO/AL1/goal.json");
+        let done = fs::read_to_string(&goal_path)
             .unwrap()
             .replace("\"backlog\"", "\"done\"");
-        fs::write(&gap_path, done).unwrap();
+        fs::write(&goal_path, done).unwrap();
         let response = FileNextActionsService::new(&refine_dir)
             .next_response()
             .unwrap();

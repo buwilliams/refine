@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
-use crate::model::gap::GapIndexProjection;
+use crate::model::goal::GoalIndexProjection;
 use crate::model::log::ActivityEntry;
-use crate::model::workflow::GapStatus;
+use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
 pub const PROJECTION_SNAPSHOT_VERSION: u64 = 1;
@@ -16,7 +16,7 @@ pub struct ProjectionSnapshot {
     pub version: u64,
     pub generated_at: Timestamp,
     pub source_fingerprints: BTreeMap<String, SourceFingerprint>,
-    pub gaps: BTreeMap<String, GapSummaryProjection>,
+    pub goals: BTreeMap<String, GoalSummaryProjection>,
     pub features: BTreeMap<String, FeatureSummaryProjection>,
     pub activity: BTreeMap<String, ActivitySummaryProjection>,
     pub changes: BTreeMap<String, ChangeSummaryProjection>,
@@ -30,7 +30,7 @@ impl Default for ProjectionSnapshot {
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "detached".to_string(),
             source_fingerprints: BTreeMap::new(),
-            gaps: BTreeMap::new(),
+            goals: BTreeMap::new(),
             features: BTreeMap::new(),
             activity: BTreeMap::new(),
             changes: BTreeMap::new(),
@@ -49,9 +49,9 @@ pub struct SourceFingerprint {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GapSummaryProjection {
+pub struct GoalSummaryProjection {
     #[serde(flatten)]
-    pub gap: GapIndexProjection,
+    pub goal: GoalIndexProjection,
     pub node_display_name: Option<String>,
     pub searchable_text: String,
     pub activity_ids: Vec<String>,
@@ -61,8 +61,8 @@ pub struct GapSummaryProjection {
 pub struct FeatureSummaryProjection {
     #[serde(flatten)]
     pub feature: FeatureIndexProjection,
-    pub status: GapStatus,
-    pub gap_ids: Vec<String>,
+    pub status: GoalStatus,
+    pub goal_ids: Vec<String>,
     pub rollup: FeatureRollup,
 }
 
@@ -78,13 +78,13 @@ pub struct ChangeSummaryProjection {
     pub commit: String,
     pub committed_time: Timestamp,
     pub subject: String,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
     pub branch: Option<String>,
-    pub gap_name: Option<String>,
-    pub gap_status: Option<GapStatus>,
-    pub gap_priority: Option<String>,
+    pub goal_name: Option<String>,
+    pub goal_status: Option<GoalStatus>,
+    pub goal_priority: Option<String>,
     #[serde(default)]
-    pub gap_assignee: Option<String>,
+    pub goal_assignee: Option<String>,
     pub searchable_text: String,
     #[serde(default)]
     pub order: usize,
@@ -92,11 +92,11 @@ pub struct ChangeSummaryProjection {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct DashboardProjection {
-    pub all_node_status_counts: BTreeMap<GapStatus, usize>,
-    pub current_node_status_counts: BTreeMap<GapStatus, usize>,
-    pub reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    pub all_node_status_counts: BTreeMap<GoalStatus, usize>,
+    pub current_node_status_counts: BTreeMap<GoalStatus, usize>,
+    pub reporter_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>>,
     #[serde(default)]
-    pub assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    pub assignee_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>>,
     pub attention_indicators: Vec<String>,
     pub recent_activity_ids: Vec<String>,
 }
@@ -111,10 +111,10 @@ pub struct DashboardProjectionQuery {
 pub struct DashboardProjectionSummary {
     pub node_filter: String,
     pub current_node_id: String,
-    pub counts: BTreeMap<GapStatus, usize>,
-    pub all_node_counts: BTreeMap<GapStatus, usize>,
-    pub reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
-    pub assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    pub counts: BTreeMap<GoalStatus, usize>,
+    pub all_node_counts: BTreeMap<GoalStatus, usize>,
+    pub reporter_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>>,
+    pub assignee_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>>,
     pub attention_indicators: Vec<String>,
     pub recent_activity_ids: Vec<String>,
 }
@@ -131,12 +131,12 @@ pub struct RuntimeProjection {
 
 #[derive(Clone, Debug, Default)]
 pub struct ProjectionIndex {
-    pub gaps_by_status: BTreeMap<GapStatus, BTreeSet<String>>,
-    pub gaps_by_node: BTreeMap<String, BTreeSet<String>>,
-    pub gaps_by_feature: BTreeMap<String, BTreeSet<String>>,
-    pub standalone_gap_ids: BTreeSet<String>,
-    pub features_by_status: BTreeMap<GapStatus, BTreeSet<String>>,
-    pub activity_by_gap: BTreeMap<String, BTreeSet<String>>,
+    pub goals_by_status: BTreeMap<GoalStatus, BTreeSet<String>>,
+    pub goals_by_node: BTreeMap<String, BTreeSet<String>>,
+    pub goals_by_feature: BTreeMap<String, BTreeSet<String>>,
+    pub standalone_goal_ids: BTreeSet<String>,
+    pub features_by_status: BTreeMap<GoalStatus, BTreeSet<String>>,
+    pub activity_by_goal: BTreeMap<String, BTreeSet<String>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -159,10 +159,10 @@ impl Default for PageRequest {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct GapProjectionQuery {
+pub struct GoalProjectionQuery {
     pub page: PageRequest,
     pub q: Option<String>,
-    pub status: Option<GapStatus>,
+    pub status: Option<GoalStatus>,
     pub reporter: Option<String>,
     pub assignee: Option<String>,
     pub node: Option<String>,
@@ -179,7 +179,7 @@ pub struct GapProjectionQuery {
 pub struct FeatureProjectionQuery {
     pub page: PageRequest,
     pub q: Option<String>,
-    pub status: Option<GapStatus>,
+    pub status: Option<GoalStatus>,
     pub reporter: Option<String>,
     pub assignee: Option<String>,
     pub node: Option<String>,
@@ -190,7 +190,7 @@ pub struct FeatureProjectionQuery {
 pub struct ActivityProjectionQuery {
     pub page: PageRequest,
     pub q: Option<String>,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
     pub severity: Option<String>,
     pub category: Option<String>,
     pub actor: Option<String>,
@@ -200,17 +200,17 @@ pub struct ActivityProjectionQuery {
 pub struct ChangeProjectionQuery {
     pub page: PageRequest,
     pub q: Option<String>,
-    pub gap_id: Option<String>,
-    pub status: Option<GapStatus>,
+    pub goal_id: Option<String>,
+    pub status: Option<GoalStatus>,
     pub priority: Option<String>,
     pub branch: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct GapProjectionList {
-    pub gaps: Vec<GapIndexProjection>,
+pub struct GoalProjectionList {
+    pub goals: Vec<GoalIndexProjection>,
     pub total: usize,
-    pub filtered_status_counts: BTreeMap<GapStatus, usize>,
+    pub filtered_status_counts: BTreeMap<GoalStatus, usize>,
     pub matching_ids: Vec<String>,
 }
 
@@ -247,35 +247,35 @@ impl ProjectionIndex {
     pub fn build(snapshot: &ProjectionSnapshot) -> Self {
         let mut index = Self::default();
 
-        for (gap_id, projection) in &snapshot.gaps {
+        for (goal_id, projection) in &snapshot.goals {
             index
-                .gaps_by_status
-                .entry(projection.gap.status.clone())
+                .goals_by_status
+                .entry(projection.goal.status.clone())
                 .or_default()
-                .insert(gap_id.clone());
+                .insert(goal_id.clone());
 
-            if let Some(node_id) = &projection.gap.node_id {
+            if let Some(node_id) = &projection.goal.node_id {
                 index
-                    .gaps_by_node
+                    .goals_by_node
                     .entry(node_id.clone())
                     .or_default()
-                    .insert(gap_id.clone());
+                    .insert(goal_id.clone());
             }
 
-            if let Some(feature_id) = &projection.gap.feature_id {
+            if let Some(feature_id) = &projection.goal.feature_id {
                 index
-                    .gaps_by_feature
+                    .goals_by_feature
                     .entry(feature_id.clone())
                     .or_default()
-                    .insert(gap_id.clone());
+                    .insert(goal_id.clone());
             } else {
-                index.standalone_gap_ids.insert(gap_id.clone());
+                index.standalone_goal_ids.insert(goal_id.clone());
             }
 
             for activity_id in &projection.activity_ids {
                 index
-                    .activity_by_gap
-                    .entry(gap_id.clone())
+                    .activity_by_goal
+                    .entry(goal_id.clone())
                     .or_default()
                     .insert(activity_id.clone());
             }

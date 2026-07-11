@@ -39,7 +39,7 @@ function renderWorkflowVisualization({
             <div class="workflow-status-label">${displayLabel}</div>
           </div>
           <div class="workflow-status-count">${fmtCount(count)}</div>`;
-        const attrs = `class="card workflow-status-card ${s}${agentManaged ? " workflow-status-card-agent" : ""}" data-testid="workflow-status-${htmlEscape(s)}" title="${count} ${label} gap${count === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}"`;
+        const attrs = `class="card workflow-status-card ${s}${agentManaged ? " workflow-status-card-agent" : ""}" data-testid="workflow-status-${htmlEscape(s)}" title="${count} ${label} goal${count === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}"`;
         const href = hrefForStatus ? hrefForStatus(s) : "";
         return href
           ? `<a ${attrs} href="${htmlEscape(href)}" style="text-decoration:none;color:inherit">${body}</a>`

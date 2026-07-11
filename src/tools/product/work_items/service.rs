@@ -8,12 +8,12 @@ use chrono::Utc;
 use serde_json::{Map, Value};
 
 use crate::model::feature::{
-    Feature, FeatureDetail, compare_feature_gap_order, failed_gap_feature_blocking_notice,
-    is_ordered_feature_gap,
+    Feature, FeatureDetail, compare_feature_goal_order, failed_goal_feature_blocking_notice,
+    is_ordered_feature_goal,
 };
-use crate::model::gap::{Gap, GapPriority};
+use crate::model::goal::{Goal, GoalPriority};
 use crate::model::workflow::{
-    FeatureOperation, GapOperation, GapStatus, feature_operation_allowed, gap_operation_allowed,
+    FeatureOperation, GoalOperation, GoalStatus, feature_operation_allowed, goal_operation_allowed,
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
     is_feature_protected_status, is_terminal_status, user_status_transition,
 };
@@ -21,25 +21,25 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
-    FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
+    FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection, ProjectStateStore,
 };
 
 use super::types::*;
 
 pub trait WorkItemService {
-    fn create_gap(&self, gap: Gap) -> RefineResult<Gap>;
-    fn list_gaps(&self) -> RefineResult<Vec<Gap>>;
-    fn update_gap(&self, gap: Gap) -> RefineResult<Gap>;
-    fn transition_gap(&self, gap_id: &str, target: GapStatus) -> RefineResult<Gap>;
-    fn cancel_gap(&self, gap_id: &str) -> RefineResult<Gap>;
-    fn delete_gap(&self, gap_id: &str) -> RefineResult<()>;
+    fn create_goal(&self, goal: Goal) -> RefineResult<Goal>;
+    fn list_goals(&self) -> RefineResult<Vec<Goal>>;
+    fn update_goal(&self, goal: Goal) -> RefineResult<Goal>;
+    fn transition_goal(&self, goal_id: &str, target: GoalStatus) -> RefineResult<Goal>;
+    fn cancel_goal(&self, goal_id: &str) -> RefineResult<Goal>;
+    fn delete_goal(&self, goal_id: &str) -> RefineResult<()>;
     fn create_feature(&self, feature: Feature) -> RefineResult<Feature>;
     fn feature_detail(&self, feature_id: &str) -> RefineResult<FeatureDetail>;
-    fn assign_gap(&self, gap_id: &str, feature_id: &str, order: i64) -> RefineResult<Gap>;
-    fn reorder_gap(&self, gap_id: &str, order: i64) -> RefineResult<Gap>;
+    fn assign_goal(&self, goal_id: &str, feature_id: &str, order: i64) -> RefineResult<Goal>;
+    fn reorder_goal(&self, goal_id: &str, order: i64) -> RefineResult<Goal>;
 }
 
-pub fn validate_manual_gap_transition(from: &GapStatus, to: &GapStatus) -> RefineResult<()> {
+pub fn validate_manual_goal_transition(from: &GoalStatus, to: &GoalStatus) -> RefineResult<()> {
     let decision = user_status_transition(from, to);
     if decision.allowed {
         Ok(())
@@ -54,18 +54,18 @@ pub fn validate_manual_gap_transition(from: &GapStatus, to: &GapStatus) -> Refin
     }
 }
 
-fn validate_automated_gap_transition(from: &GapStatus, to: &GapStatus) -> RefineResult<()> {
+fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> RefineResult<()> {
     let allowed = matches!(
         (from, to),
-        (GapStatus::Todo, GapStatus::InProgress)
-            | (GapStatus::InProgress, GapStatus::ReadyMerge)
-            | (GapStatus::ReadyMerge, GapStatus::Build)
-            | (GapStatus::Build, GapStatus::Qa)
-            | (GapStatus::Qa, GapStatus::Review)
-            | (GapStatus::InProgress, GapStatus::Failed)
-            | (GapStatus::Qa, GapStatus::Failed)
-            | (GapStatus::ReadyMerge, GapStatus::Failed)
-            | (GapStatus::Build, GapStatus::Failed)
+        (GoalStatus::Todo, GoalStatus::InProgress)
+            | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
+            | (GoalStatus::ReadyMerge, GoalStatus::Build)
+            | (GoalStatus::Build, GoalStatus::Qa)
+            | (GoalStatus::Qa, GoalStatus::Review)
+            | (GoalStatus::InProgress, GoalStatus::Failed)
+            | (GoalStatus::Qa, GoalStatus::Failed)
+            | (GoalStatus::ReadyMerge, GoalStatus::Failed)
+            | (GoalStatus::Build, GoalStatus::Failed)
     );
     if allowed {
         Ok(())
@@ -137,9 +137,9 @@ impl FileWorkItemService {
         }
     }
 
-    fn ensure_gap_owned(&self, gap: &GapSummaryProjection) -> RefineResult<()> {
-        let owner = gap
-            .gap
+    fn ensure_goal_owned(&self, goal: &GoalSummaryProjection) -> RefineResult<()> {
+        let owner = goal
+            .goal
             .node_id
             .as_deref()
             .filter(|node_id| !node_id.is_empty())
@@ -149,8 +149,8 @@ impl FileWorkItemService {
             Ok(())
         } else {
             Err(RefineError::Conflict(format!(
-                "Gap {} is owned by node {owner}, not active node {active}",
-                gap.gap.id
+                "Goal {} is owned by node {owner}, not active node {active}",
+                goal.goal.id
             )))
         }
     }
@@ -173,37 +173,37 @@ impl FileWorkItemService {
         }
     }
 
-    pub fn create_gap_summary(
+    pub fn create_goal_summary(
         &self,
         name: &str,
         id: Option<&str>,
-    ) -> RefineResult<GapSummaryProjection> {
+    ) -> RefineResult<GoalSummaryProjection> {
         let name = name.trim();
         if name.is_empty() {
             return Err(RefineError::InvalidInput(
-                "Gap name is required".to_string(),
+                "Goal name is required".to_string(),
             ));
         }
-        let gap_id = id
+        let goal_id = id
             .map(|id| id.trim().to_uppercase())
             .filter(|id| !id.is_empty())
             .unwrap_or_else(new_ulid_like);
-        if gap_id.len() < 3 {
+        if goal_id.len() < 3 {
             return Err(RefineError::InvalidInput(
-                "Gap id must be at least three characters".to_string(),
+                "Goal id must be at least three characters".to_string(),
             ));
         }
 
-        let gap_path = gap_json_path(&self.refine_dir, &gap_id);
-        if gap_path.exists() {
+        let goal_path = goal_json_path(&self.refine_dir, &goal_id);
+        if goal_path.exists() {
             return Err(RefineError::Conflict(format!(
-                "Gap {gap_id} already exists"
+                "Goal {goal_id} already exists"
             )));
         }
         let node_id = self.active_node_id()?;
         let now = now_timestamp();
         let mut object = Map::new();
-        object.insert("id".to_string(), Value::String(gap_id.clone()));
+        object.insert("id".to_string(), Value::String(goal_id.clone()));
         object.insert("name".to_string(), Value::String(name.to_string()));
         object.insert("status".to_string(), Value::String("backlog".to_string()));
         object.insert("priority".to_string(), Value::String("low".to_string()));
@@ -216,30 +216,30 @@ impl FileWorkItemService {
         object.insert("updated".to_string(), Value::String(now));
         object.insert("notes".to_string(), Value::Array(Vec::new()));
         object.insert("rounds".to_string(), Value::Array(Vec::new()));
-        write_json_atomically(&gap_path, &Value::Object(object))?;
-        self.show_gap_summary(&gap_id)
+        write_json_atomically(&goal_path, &Value::Object(object))?;
+        self.show_goal_summary(&goal_id)
     }
 
-    pub fn show_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
+    pub fn show_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let snapshot = self.projection_snapshot()?;
-        snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
+        snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })
     }
 
-    pub fn show_gap_detail(&self, gap_id: &str) -> RefineResult<Value> {
+    pub fn show_goal_detail(&self, goal_id: &str) -> RefineResult<Value> {
         let snapshot = self.projection_snapshot()?;
-        let current = snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
+        let current = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })?;
-        let (_, mut value) = self.read_gap_value_unchecked(&current)?;
+        let (_, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {gap_id} is not a JSON object"))
+            RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
         })?;
         object.insert(
             "reporter".to_string(),
             current
-                .gap
+                .goal
                 .reporter
                 .clone()
                 .map(Value::String)
@@ -247,12 +247,12 @@ impl FileWorkItemService {
         );
         object.insert(
             "round_count".to_string(),
-            Value::from(current.gap.round_count),
+            Value::from(current.goal.round_count),
         );
         object.insert(
             "assignee".to_string(),
             current
-                .gap
+                .goal
                 .assignee
                 .clone()
                 .map(Value::String)
@@ -260,22 +260,23 @@ impl FileWorkItemService {
         );
         if let Some(display_name) = current
             .node_display_name
-            .or_else(|| self.node_display_name(current.gap.node_id.as_deref()))
+            .or_else(|| self.node_display_name(current.goal.node_id.as_deref()))
         {
             object.insert("node_display_name".to_string(), Value::String(display_name));
         }
-        if let Some(feature_id) = current.gap.feature_id.as_deref() {
-            let mut feature_gaps = snapshot
-                .gaps
+        if let Some(feature_id) = current.goal.feature_id.as_deref() {
+            let mut feature_goals = snapshot
+                .goals
                 .values()
-                .filter(|projection| projection.gap.feature_id.as_deref() == Some(feature_id))
-                .map(|projection| projection.gap.clone())
+                .filter(|projection| projection.goal.feature_id.as_deref() == Some(feature_id))
+                .map(|projection| projection.goal.clone())
                 .collect::<Vec<_>>();
-            feature_gaps.sort_by(|a, b| {
-                compare_feature_gap_order(a.feature_order, b.feature_order)
+            feature_goals.sort_by(|a, b| {
+                compare_feature_goal_order(a.feature_order, b.feature_order)
                     .then_with(|| a.id.cmp(&b.id))
             });
-            if let Some(notice) = failed_gap_feature_blocking_notice(&current.gap, &feature_gaps) {
+            if let Some(notice) = failed_goal_feature_blocking_notice(&current.goal, &feature_goals)
+            {
                 let notice = serde_json::to_value(notice).map_err(|error| {
                     RefineError::Serialization(format!(
                         "failed to encode Feature blocking notice: {error}"
@@ -284,13 +285,13 @@ impl FileWorkItemService {
                 object.insert("feature_blocking_notice".to_string(), notice);
             }
         }
-        self.attach_round_logs(gap_id, object)?;
+        self.attach_round_logs(goal_id, object)?;
         Ok(value)
     }
 
-    pub fn list_gap_summaries(&self) -> RefineResult<Vec<GapSummaryProjection>> {
+    pub fn list_goal_summaries(&self) -> RefineResult<Vec<GoalSummaryProjection>> {
         let snapshot = self.projection_snapshot()?;
-        Ok(snapshot.gaps.into_values().collect())
+        Ok(snapshot.goals.into_values().collect())
     }
 
     fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
@@ -307,20 +308,24 @@ impl FileWorkItemService {
             })
     }
 
-    fn attach_round_logs(&self, gap_id: &str, object: &mut Map<String, Value>) -> RefineResult<()> {
+    fn attach_round_logs(
+        &self,
+        goal_id: &str,
+        object: &mut Map<String, Value>,
+    ) -> RefineResult<()> {
         let Some(rounds) = object.get_mut("rounds").and_then(Value::as_array_mut) else {
             return Ok(());
         };
         let log_service = FileLogService::new(&self.refine_dir);
         let round_count = rounds.len();
         for (idx, round) in rounds.iter_mut().enumerate() {
-            let logs = log_service.round_logs(gap_id, idx)?;
+            let logs = log_service.round_logs(goal_id, idx)?;
             let Some(round_object) = round.as_object_mut() else {
                 continue;
             };
             if !logs.is_empty() {
                 let value = serde_json::to_value(&logs).map_err(|error| {
-                    RefineError::Serialization(format!("failed to encode Gap logs: {error}"))
+                    RefineError::Serialization(format!("failed to encode Goal logs: {error}"))
                 })?;
                 round_object.insert("logs".to_string(), value);
             }
@@ -470,18 +475,18 @@ impl FileWorkItemService {
         Ok(snapshot.features.into_values().collect())
     }
 
-    pub fn assign_gap_to_feature(
+    pub fn assign_goal_to_feature(
         &self,
         feature_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let current_gap = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current_gap)?;
-        validate_gap_operation(&current_gap.gap.status, &GapOperation::AssignToFeature)?;
-        let old_feature_id = current_gap.gap.feature_id.clone();
-        self.set_gap_feature_membership(gap_id, Some(feature_id), None)?;
+        let current_goal = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current_goal)?;
+        validate_goal_operation(&current_goal.goal.status, &GoalOperation::AssignToFeature)?;
+        let old_feature_id = current_goal.goal.feature_id.clone();
+        self.set_goal_feature_membership(goal_id, Some(feature_id), None)?;
         if let Some(old_feature_id) = old_feature_id
             && old_feature_id != feature_id
         {
@@ -490,76 +495,76 @@ impl FileWorkItemService {
         self.show_feature_summary(feature_id)
     }
 
-    pub fn remove_gap_from_feature(
+    pub fn remove_goal_from_feature(
         &self,
         feature_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let current_gap = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current_gap)?;
-        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+        let current_goal = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current_goal)?;
+        if current_goal.goal.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
-                "Gap {gap_id} is not assigned to Feature {feature_id}"
+                "Goal {goal_id} is not assigned to Feature {feature_id}"
             )));
         }
-        validate_gap_operation(&current_gap.gap.status, &GapOperation::RemoveFromFeature)?;
-        self.set_gap_feature_membership(gap_id, None, None)?;
+        validate_goal_operation(&current_goal.goal.status, &GoalOperation::RemoveFromFeature)?;
+        self.set_goal_feature_membership(goal_id, None, None)?;
         self.compact_feature_orders(feature_id)?;
         self.show_feature_summary(feature_id)
     }
 
-    pub fn order_gap_in_feature(
+    pub fn order_goal_in_feature(
         &self,
         feature_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let current_gap = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current_gap)?;
-        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+        let current_goal = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current_goal)?;
+        if current_goal.goal.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
-                "Gap {gap_id} is not assigned to Feature {feature_id}"
+                "Goal {goal_id} is not assigned to Feature {feature_id}"
             )));
         }
-        validate_gap_operation(&current_gap.gap.status, &GapOperation::ReorderInFeature)?;
-        if is_ordered_feature_gap(current_gap.gap.feature_order) {
+        validate_goal_operation(&current_goal.goal.status, &GoalOperation::ReorderInFeature)?;
+        if is_ordered_feature_goal(current_goal.goal.feature_order) {
             return self.show_feature_summary(feature_id);
         }
         let next_order = self.next_feature_order(feature_id)?;
-        self.set_gap_feature_membership(gap_id, Some(feature_id), Some(next_order))?;
+        self.set_goal_feature_membership(goal_id, Some(feature_id), Some(next_order))?;
         self.show_feature_summary(feature_id)
     }
 
-    pub fn unorder_gap_in_feature(
+    pub fn unorder_goal_in_feature(
         &self,
         feature_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let current_gap = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current_gap)?;
-        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+        let current_goal = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current_goal)?;
+        if current_goal.goal.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
-                "Gap {gap_id} is not assigned to Feature {feature_id}"
+                "Goal {goal_id} is not assigned to Feature {feature_id}"
             )));
         }
-        validate_gap_operation(&current_gap.gap.status, &GapOperation::ReorderInFeature)?;
-        if !is_ordered_feature_gap(current_gap.gap.feature_order) {
+        validate_goal_operation(&current_goal.goal.status, &GoalOperation::ReorderInFeature)?;
+        if !is_ordered_feature_goal(current_goal.goal.feature_order) {
             return self.show_feature_summary(feature_id);
         }
-        self.set_gap_feature_membership(gap_id, Some(feature_id), None)?;
+        self.set_goal_feature_membership(goal_id, Some(feature_id), None)?;
         self.compact_feature_orders(feature_id)?;
         self.show_feature_summary(feature_id)
     }
 
-    pub fn reorder_gap_in_feature(
+    pub fn reorder_goal_in_feature(
         &self,
         feature_id: &str,
-        gap_id: &str,
+        goal_id: &str,
         order: i64,
     ) -> RefineResult<FeatureSummaryProjection> {
         if order < 1 {
@@ -569,47 +574,51 @@ impl FileWorkItemService {
         }
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let current_gap = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current_gap)?;
-        if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
+        let current_goal = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current_goal)?;
+        if current_goal.goal.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
-                "Gap {gap_id} is not assigned to Feature {feature_id}"
+                "Goal {goal_id} is not assigned to Feature {feature_id}"
             )));
         }
-        validate_gap_operation(&current_gap.gap.status, &GapOperation::ReorderInFeature)?;
-        let mut gaps: Vec<_> = self
-            .list_gap_summaries()?
+        validate_goal_operation(&current_goal.goal.status, &GoalOperation::ReorderInFeature)?;
+        let mut goals: Vec<_> = self
+            .list_goal_summaries()?
             .into_iter()
-            .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
-            .filter(|gap| is_ordered_feature_gap(gap.gap.feature_order))
+            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature_id))
+            .filter(|goal| is_ordered_feature_goal(goal.goal.feature_order))
             .collect();
-        gaps.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        goals.sort_by(|a, b| {
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
-        let Some(current_index) = gaps.iter().position(|gap| gap.gap.id == gap_id) else {
+        let Some(current_index) = goals.iter().position(|goal| goal.goal.id == goal_id) else {
             return Err(RefineError::NotFound(format!(
-                "Gap {gap_id} was not found in Feature {feature_id}"
+                "Goal {goal_id} was not found in Feature {feature_id}"
             )));
         };
-        let gap = gaps.remove(current_index);
-        let insert_index = usize::min(order as usize - 1, gaps.len());
-        gaps.insert(insert_index, gap);
-        for (idx, gap) in gaps.iter().enumerate() {
-            self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), Some(idx as i64 + 1))?;
+        let goal = goals.remove(current_index);
+        let insert_index = usize::min(order as usize - 1, goals.len());
+        goals.insert(insert_index, goal);
+        for (idx, goal) in goals.iter().enumerate() {
+            self.set_goal_feature_membership(
+                &goal.goal.id,
+                Some(feature_id),
+                Some(idx as i64 + 1),
+            )?;
         }
         self.show_feature_summary(feature_id)
     }
 
-    pub fn order_gaps_in_feature(
+    pub fn order_goals_in_feature(
         &self,
         feature_id: &str,
-        gap_ids: &[String],
+        goal_ids: &[String],
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        for gap_id in gap_ids {
-            self.order_gap_in_feature(feature_id, gap_id)?;
+        for goal_id in goal_ids {
+            self.order_goal_in_feature(feature_id, goal_id)?;
         }
         self.show_feature_summary(feature_id)
     }
@@ -617,29 +626,29 @@ impl FileWorkItemService {
     pub fn move_feature_workflow(
         &self,
         feature_id: &str,
-        target: GapStatus,
+        target: GoalStatus,
     ) -> RefineResult<FeatureSummaryProjection> {
-        if !matches!(target, GapStatus::Backlog | GapStatus::Todo) {
+        if !matches!(target, GoalStatus::Backlog | GoalStatus::Todo) {
             return Err(RefineError::InvalidInput(
                 "Feature workflow target must be backlog or todo".to_string(),
             ));
         }
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let mut gaps: Vec<_> = self
-            .list_gap_summaries()?
+        let mut goals: Vec<_> = self
+            .list_goal_summaries()?
             .into_iter()
-            .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
+            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature_id))
             .collect();
-        gaps.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        goals.sort_by(|a, b| {
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
-        for gap in gaps {
-            if is_feature_protected_status(&gap.gap.status) {
+        for goal in goals {
+            if is_feature_protected_status(&goal.goal.status) {
                 continue;
             }
-            self.set_gap_status_unchecked(&gap.gap.id, &target)?;
+            self.set_goal_status_unchecked(&goal.goal.id, &target)?;
         }
         self.show_feature_summary(feature_id)
     }
@@ -650,17 +659,17 @@ impl FileWorkItemService {
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let gaps = self.feature_gap_summaries(feature_id)?;
+        let goals = self.feature_goal_summaries(feature_id)?;
         validate_feature_operation(
-            &gaps
+            &goals
                 .iter()
-                .map(|gap| gap.gap.status.clone())
+                .map(|goal| goal.goal.status.clone())
                 .collect::<Vec<_>>(),
             &FeatureOperation::CancelFeature,
         )?;
-        for gap in gaps {
-            if is_feature_cancel_status(&gap.gap.status) {
-                self.cancel_gap_summary(&gap.gap.id)?;
+        for goal in goals {
+            if is_feature_cancel_status(&goal.goal.status) {
+                self.cancel_goal_summary(&goal.goal.id)?;
             }
         }
         self.show_feature_summary(feature_id)
@@ -669,16 +678,16 @@ impl FileWorkItemService {
     pub fn delete_feature_record(&self, feature_id: &str) -> RefineResult<()> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let gaps = self.feature_gap_summaries(feature_id)?;
+        let goals = self.feature_goal_summaries(feature_id)?;
         validate_feature_operation(
-            &gaps
+            &goals
                 .iter()
-                .map(|gap| gap.gap.status.clone())
+                .map(|goal| goal.goal.status.clone())
                 .collect::<Vec<_>>(),
             &FeatureOperation::DeleteFeature,
         )?;
-        for gap in gaps {
-            self.delete_gap_record(&gap.gap.id)?;
+        for goal in goals {
+            self.delete_goal_record(&goal.goal.id)?;
         }
         let feature_path = feature_json_path(&self.refine_dir, feature_id);
         fs::remove_file(&feature_path).map_err(|error| {
@@ -693,24 +702,24 @@ impl FileWorkItemService {
         Ok(())
     }
 
-    pub fn bulk_update_gaps(
+    pub fn bulk_update_goals(
         &self,
-        selection: BulkGapSelection,
-        update: BulkGapUpdate,
+        selection: BulkGoalSelection,
+        update: BulkGoalUpdate,
     ) -> RefineResult<BulkUpdateResult> {
         let (field, raw_value) = match update {
-            BulkGapUpdate::Priority(value) => ("priority".to_string(), value.trim().to_string()),
-            BulkGapUpdate::Status(value) => ("status".to_string(), value.trim().to_lowercase()),
-            BulkGapUpdate::Reporter(value) => ("reporter".to_string(), value.trim().to_string()),
-            BulkGapUpdate::Assignee(value) => ("assignee".to_string(), value.trim().to_string()),
+            BulkGoalUpdate::Priority(value) => ("priority".to_string(), value.trim().to_string()),
+            BulkGoalUpdate::Status(value) => ("status".to_string(), value.trim().to_lowercase()),
+            BulkGoalUpdate::Reporter(value) => ("reporter".to_string(), value.trim().to_string()),
+            BulkGoalUpdate::Assignee(value) => ("assignee".to_string(), value.trim().to_string()),
         };
-        if field == "priority" && GapPriority::parse_wire(&raw_value).is_none() {
+        if field == "priority" && GoalPriority::parse_wire(&raw_value).is_none() {
             return Err(RefineError::InvalidInput(
                 "priority must be one of low, medium, or high".to_string(),
             ));
         }
         if field == "status" && raw_value != "__last_workflow_state" {
-            let Some(status) = GapStatus::parse_wire(&raw_value) else {
+            let Some(status) = GoalStatus::parse_wire(&raw_value) else {
                 return Err(RefineError::InvalidInput("invalid status".to_string()));
             };
             if !is_bulk_target_allowed(&status) {
@@ -731,28 +740,29 @@ impl FileWorkItemService {
         }
 
         let skip_automated = field == "status" && raw_value != "__last_workflow_state";
-        let (gaps, skipped_details) = self.select_bulk_gap_summaries(&selection, skip_automated)?;
+        let (goals, skipped_details) =
+            self.select_bulk_goal_summaries(&selection, skip_automated)?;
         let mut ids = Vec::new();
-        for gap in gaps {
-            self.ensure_gap_owned(&gap)?;
+        for goal in goals {
+            self.ensure_goal_owned(&goal)?;
             match field.as_str() {
-                "priority" => self.set_gap_priority_unchecked(&gap.gap.id, &raw_value)?,
+                "priority" => self.set_goal_priority_unchecked(&goal.goal.id, &raw_value)?,
                 "status" if raw_value == "__last_workflow_state" => {
-                    let restored = restore_last_workflow_status(&gap.gap.status);
-                    if restored != gap.gap.status {
-                        self.set_gap_status_unchecked(&gap.gap.id, &restored)?;
+                    let restored = restore_last_workflow_status(&goal.goal.status);
+                    if restored != goal.goal.status {
+                        self.set_goal_status_unchecked(&goal.goal.id, &restored)?;
                     }
                 }
                 "status" => {
-                    let status = GapStatus::parse_wire(&raw_value)
+                    let status = GoalStatus::parse_wire(&raw_value)
                         .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?;
-                    self.set_gap_status_unchecked(&gap.gap.id, &status)?;
+                    self.set_goal_status_unchecked(&goal.goal.id, &status)?;
                 }
-                "reporter" => self.set_gap_reporter_unchecked(&gap.gap.id, &raw_value)?,
-                "assignee" => self.set_latest_round_assignee(&gap.gap.id, &raw_value)?,
+                "reporter" => self.set_goal_reporter_unchecked(&goal.goal.id, &raw_value)?,
+                "assignee" => self.set_latest_round_assignee(&goal.goal.id, &raw_value)?,
                 _ => unreachable!(),
             }
-            ids.push(gap.gap.id);
+            ids.push(goal.goal.id);
         }
         Ok(BulkUpdateResult {
             updated: ids.len(),
@@ -766,17 +776,20 @@ impl FileWorkItemService {
         })
     }
 
-    pub fn bulk_delete_gaps(&self, selection: BulkGapSelection) -> RefineResult<BulkDeleteResult> {
-        let (gaps, _) = self.select_bulk_gap_summaries(&selection, false)?;
+    pub fn bulk_delete_goals(
+        &self,
+        selection: BulkGoalSelection,
+    ) -> RefineResult<BulkDeleteResult> {
+        let (goals, _) = self.select_bulk_goal_summaries(&selection, false)?;
         let mut ids = Vec::new();
         let mut feature_ids = BTreeSet::new();
-        for gap in gaps {
-            self.ensure_gap_owned(&gap)?;
-            if let Some(feature_id) = &gap.gap.feature_id {
+        for goal in goals {
+            self.ensure_goal_owned(&goal)?;
+            if let Some(feature_id) = &goal.goal.feature_id {
                 feature_ids.insert(feature_id.clone());
             }
-            self.delete_gap_record(&gap.gap.id)?;
-            ids.push(gap.gap.id);
+            self.delete_goal_record(&goal.goal.id)?;
+            ids.push(goal.goal.id);
         }
         for feature_id in feature_ids {
             let _ = self.compact_feature_orders(&feature_id);
@@ -869,31 +882,31 @@ impl FileWorkItemService {
         })
     }
 
-    pub fn bulk_assign_gaps_to_feature(
+    pub fn bulk_assign_goals_to_feature(
         &self,
         feature_id: &str,
-        selection: BulkGapSelection,
+        selection: BulkGoalSelection,
     ) -> RefineResult<BulkAssignFeatureResult> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let (gaps, mut skipped_details) = self.select_bulk_gap_summaries(&selection, false)?;
+        let (goals, mut skipped_details) = self.select_bulk_goal_summaries(&selection, false)?;
         let mut old_feature_ids = BTreeSet::new();
         let mut ids = Vec::new();
-        for gap in gaps {
-            self.ensure_gap_owned(&gap)?;
-            if gap.gap.feature_id.as_deref() == Some(feature_id) {
+        for goal in goals {
+            self.ensure_goal_owned(&goal)?;
+            if goal.goal.feature_id.as_deref() == Some(feature_id) {
                 skipped_details.push(BulkSkippedDetail {
-                    id: gap.gap.id,
+                    id: goal.goal.id,
                     reason: "already-assigned".to_string(),
                 });
                 continue;
             }
-            validate_gap_operation(&gap.gap.status, &GapOperation::AssignToFeature)?;
-            if let Some(old_feature_id) = &gap.gap.feature_id {
+            validate_goal_operation(&goal.goal.status, &GoalOperation::AssignToFeature)?;
+            if let Some(old_feature_id) = &goal.goal.feature_id {
                 old_feature_ids.insert(old_feature_id.clone());
             }
-            self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), None)?;
-            ids.push(gap.gap.id);
+            self.set_goal_feature_membership(&goal.goal.id, Some(feature_id), None)?;
+            ids.push(goal.goal.id);
         }
         for old_feature_id in old_feature_ids {
             let _ = self.compact_feature_orders(&old_feature_id);
@@ -907,24 +920,24 @@ impl FileWorkItemService {
         })
     }
 
-    pub fn bulk_transfer_gaps_to_node(
+    pub fn bulk_transfer_goals_to_node(
         &self,
         target_node_id: &str,
-        selection: BulkGapSelection,
+        selection: BulkGoalSelection,
     ) -> RefineResult<BulkTransferNodeResult> {
         let target_node_id = self.validate_transfer_target_node(target_node_id)?;
-        let (gaps, mut skipped_details) = self.select_bulk_gap_summaries(&selection, false)?;
+        let (goals, mut skipped_details) = self.select_bulk_goal_summaries(&selection, false)?;
         let mut ids = Vec::new();
-        for gap in gaps {
-            if let Some(reason) = gap_transfer_skip_reason(&gap) {
+        for goal in goals {
+            if let Some(reason) = goal_transfer_skip_reason(&goal) {
                 skipped_details.push(BulkSkippedDetail {
-                    id: gap.gap.id,
+                    id: goal.goal.id,
                     reason,
                 });
                 continue;
             }
-            self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
-            ids.push(gap.gap.id);
+            self.set_goal_node_unchecked(&goal.goal.id, &target_node_id)?;
+            ids.push(goal.goal.id);
         }
         Ok(BulkTransferNodeResult {
             target_node_id,
@@ -935,19 +948,19 @@ impl FileWorkItemService {
         })
     }
 
-    pub fn transfer_gap_to_node(
+    pub fn transfer_goal_to_node(
         &self,
         target_node_id: &str,
-        gap_id: &str,
+        goal_id: &str,
     ) -> RefineResult<BulkTransferNodeResult> {
         let target_node_id = self.validate_transfer_target_node(target_node_id)?;
-        let gap = self.show_gap_summary(gap_id)?;
-        validate_gap_transfer_to_node(&gap)?;
-        self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
+        let goal = self.show_goal_summary(goal_id)?;
+        validate_goal_transfer_to_node(&goal)?;
+        self.set_goal_node_unchecked(&goal.goal.id, &target_node_id)?;
         Ok(BulkTransferNodeResult {
             target_node_id,
             updated: 1,
-            ids: vec![gap.gap.id],
+            ids: vec![goal.goal.id],
             skipped: 0,
             skipped_details: Vec::new(),
         })
@@ -960,22 +973,22 @@ impl FileWorkItemService {
     ) -> RefineResult<BulkTransferNodeResult> {
         let target_node_id = self.validate_transfer_target_node(target_node_id)?;
         let feature = self.show_feature_summary(feature_id)?;
-        let mut gaps = Vec::new();
-        for gap_id in &feature.gap_ids {
-            let gap = self.show_gap_summary(gap_id)?;
-            if let Some(reason) = gap_status_transfer_skip_reason(&gap) {
+        let mut goals = Vec::new();
+        for goal_id in &feature.goal_ids {
+            let goal = self.show_goal_summary(goal_id)?;
+            if let Some(reason) = goal_status_transfer_skip_reason(&goal) {
                 return Err(RefineError::Conflict(format!(
-                    "Feature {} cannot transfer while Gap {} is not transferable ({reason})",
-                    feature.feature.id, gap.gap.id
+                    "Feature {} cannot transfer while Goal {} is not transferable ({reason})",
+                    feature.feature.id, goal.goal.id
                 )));
             }
-            gaps.push(gap);
+            goals.push(goal);
         }
         self.set_feature_node_unchecked(&feature.feature.id, &target_node_id)?;
         let mut ids = vec![feature.feature.id];
-        for gap in gaps {
-            self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
-            ids.push(gap.gap.id);
+        for goal in goals {
+            self.set_goal_node_unchecked(&goal.goal.id, &target_node_id)?;
+            ids.push(goal.goal.id);
         }
         Ok(BulkTransferNodeResult {
             target_node_id,
@@ -997,15 +1010,15 @@ impl FileWorkItemService {
         let mut skipped_details = Vec::new();
         for feature in features {
             self.ensure_feature_owned(&feature)?;
-            let mut gaps = Vec::new();
+            let mut goals = Vec::new();
             let mut skip_reason = None;
-            for gap_id in &feature.gap_ids {
-                let gap = self.show_gap_summary(gap_id)?;
-                if let Some(reason) = gap_status_transfer_skip_reason(&gap) {
-                    skip_reason = Some(format!("gap:{}:{reason}", gap.gap.id));
+            for goal_id in &feature.goal_ids {
+                let goal = self.show_goal_summary(goal_id)?;
+                if let Some(reason) = goal_status_transfer_skip_reason(&goal) {
+                    skip_reason = Some(format!("goal:{}:{reason}", goal.goal.id));
                     break;
                 }
-                gaps.push(gap);
+                goals.push(goal);
             }
             if let Some(reason) = skip_reason {
                 skipped_details.push(BulkSkippedDetail {
@@ -1016,9 +1029,9 @@ impl FileWorkItemService {
             }
             self.set_feature_node_unchecked(&feature.feature.id, &target_node_id)?;
             ids.push(feature.feature.id);
-            for gap in gaps {
-                self.set_gap_node_unchecked(&gap.gap.id, &target_node_id)?;
-                ids.push(gap.gap.id);
+            for goal in goals {
+                self.set_goal_node_unchecked(&goal.goal.id, &target_node_id)?;
+                ids.push(goal.goal.id);
             }
         }
         Ok(BulkTransferNodeResult {
@@ -1030,19 +1043,19 @@ impl FileWorkItemService {
         })
     }
 
-    /// Reassigns node ownership of eligible Gaps across the given nodes.
+    /// Reassigns node ownership of eligible Goals across the given nodes.
     /// Distribute is the one sanctioned exception to node ownership
     /// enforcement: unclaimed work may move regardless of which node owns it,
     /// because reassignment is the transfer. Eligible means captured or
     /// actionable (backlog/todo) with no active claim; converge instead moves
-    /// reviewable Gaps home to a single review node. Feature-bound gaps are
+    /// reviewable Goals home to a single review node. Feature-bound goals are
     /// skipped so Feature ordering stays intact — transfer the Feature to move
     /// them as a unit.
-    pub fn distribute_gaps_across_nodes(
+    pub fn distribute_goals_across_nodes(
         &self,
         target_node_ids: &[String],
         converge: bool,
-        claimed_gap_ids: &BTreeSet<String>,
+        claimed_goal_ids: &BTreeSet<String>,
         dry_run: bool,
     ) -> RefineResult<DistributeResult> {
         if target_node_ids.is_empty() {
@@ -1059,41 +1072,41 @@ impl FileWorkItemService {
         }
         if converge && node_ids.len() != 1 {
             return Err(RefineError::InvalidInput(
-                "converge moves reviewable gaps to exactly one review node".to_string(),
+                "converge moves reviewable goals to exactly one review node".to_string(),
             ));
         }
-        let mut summaries = self.list_gap_summaries()?;
+        let mut summaries = self.list_goal_summaries()?;
         summaries.sort_by(|a, b| {
-            a.gap
+            a.goal
                 .created
-                .cmp(&b.gap.created)
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+                .cmp(&b.goal.created)
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
         let mut eligible = Vec::new();
         let mut skipped_details = Vec::new();
         let mut load: Vec<usize> = vec![0; node_ids.len()];
-        for gap in &summaries {
-            let owner = gap
-                .gap
+        for goal in &summaries {
+            let owner = goal
+                .goal
                 .node_id
                 .clone()
                 .unwrap_or_else(|| "default".to_string());
             let matches = if converge {
-                gap.gap.status == GapStatus::Review
+                goal.goal.status == GoalStatus::Review
             } else {
-                matches!(gap.gap.status, GapStatus::Backlog | GapStatus::Todo)
+                matches!(goal.goal.status, GoalStatus::Backlog | GoalStatus::Todo)
             };
             if !matches {
-                if !is_terminal_status(&gap.gap.status) {
+                if !is_terminal_status(&goal.goal.status) {
                     if let Some(index) = node_ids.iter().position(|id| *id == owner) {
                         load[index] += 1;
                     }
                 }
                 continue;
             }
-            if let Some(feature_id) = gap.gap.feature_id.as_deref() {
+            if let Some(feature_id) = goal.goal.feature_id.as_deref() {
                 skipped_details.push(BulkSkippedDetail {
-                    id: gap.gap.id.clone(),
+                    id: goal.goal.id.clone(),
                     reason: format!("feature:{feature_id}"),
                 });
                 if let Some(index) = node_ids.iter().position(|id| *id == owner) {
@@ -1101,9 +1114,9 @@ impl FileWorkItemService {
                 }
                 continue;
             }
-            if claimed_gap_ids.contains(&gap.gap.id) {
+            if claimed_goal_ids.contains(&goal.goal.id) {
                 skipped_details.push(BulkSkippedDetail {
-                    id: gap.gap.id.clone(),
+                    id: goal.goal.id.clone(),
                     reason: "claimed".to_string(),
                 });
                 if let Some(index) = node_ids.iter().position(|id| *id == owner) {
@@ -1111,10 +1124,10 @@ impl FileWorkItemService {
                 }
                 continue;
             }
-            eligible.push((gap.gap.id.clone(), owner));
+            eligible.push((goal.goal.id.clone(), owner));
         }
         let mut moves = Vec::new();
-        for (gap_id, owner) in &eligible {
+        for (goal_id, owner) in &eligible {
             let target_index = load
                 .iter()
                 .enumerate()
@@ -1125,7 +1138,7 @@ impl FileWorkItemService {
             load[target_index] += 1;
             if to_node_id != *owner {
                 moves.push(DistributeMove {
-                    gap_id: gap_id.clone(),
+                    goal_id: goal_id.clone(),
                     from_node_id: owner.clone(),
                     to_node_id,
                 });
@@ -1133,7 +1146,7 @@ impl FileWorkItemService {
         }
         if !dry_run {
             for entry in &moves {
-                self.set_gap_node_unchecked(&entry.gap_id, &entry.to_node_id)?;
+                self.set_goal_node_unchecked(&entry.goal_id, &entry.to_node_id)?;
             }
         }
         Ok(DistributeResult {
@@ -1165,187 +1178,190 @@ impl FileWorkItemService {
         }
         match self.show_feature_summary(item_id) {
             Ok(_) => self.transfer_feature_to_node(target_node_id, item_id),
-            Err(feature_error) => match self.transfer_gap_to_node(target_node_id, item_id) {
+            Err(feature_error) => match self.transfer_goal_to_node(target_node_id, item_id) {
                 Ok(result) => Ok(result),
-                Err(gap_error)
+                Err(goal_error)
                     if matches!(
                         feature_error.category(),
                         crate::process::supervisor::errors::ErrorCategory::NotFound
                     ) && matches!(
-                        gap_error.category(),
+                        goal_error.category(),
                         crate::process::supervisor::errors::ErrorCategory::NotFound
                     ) =>
                 {
                     Err(RefineError::NotFound(format!(
-                        "Gap or Feature {item_id} was not found in refine state"
+                        "Goal or Feature {item_id} was not found in refine state"
                     )))
                 }
-                Err(gap_error) => Err(gap_error),
+                Err(goal_error) => Err(goal_error),
             },
         }
     }
 
-    pub fn verify_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::VerifyReview)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::Done)?;
-        self.show_gap_summary(gap_id)
+    pub fn verify_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::VerifyReview)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::Done)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn retry_gap_quality_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::RetryQa)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::Qa)?;
-        self.show_gap_summary(gap_id)
+    pub fn retry_goal_quality_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::RetryQa)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::Qa)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn retry_gap_merge_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::RetryMerge)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::ReadyMerge)?;
-        self.show_gap_summary(gap_id)
+    pub fn retry_goal_merge_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::RetryMerge)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::ReadyMerge)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn submit_gap_for_merge_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        if current.gap.status == GapStatus::ReadyMerge {
+    pub fn submit_goal_for_merge_summary(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        if current.goal.status == GoalStatus::ReadyMerge {
             return Ok(current);
         }
-        validate_gap_operation(&current.gap.status, &GapOperation::SubmitMerge)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::ReadyMerge)?;
-        self.show_gap_summary(gap_id)
+        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitMerge)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::ReadyMerge)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn merge_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::Merge)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::Done)?;
-        self.show_gap_summary(gap_id)
+    pub fn merge_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::Merge)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::Done)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn undo_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::Undo)?;
-        let target = match current.gap.status {
-            GapStatus::Done => GapStatus::Review,
-            GapStatus::Review | GapStatus::Cancelled => GapStatus::Todo,
+    pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::Undo)?;
+        let target = match current.goal.status {
+            GoalStatus::Done => GoalStatus::Review,
+            GoalStatus::Review | GoalStatus::Cancelled => GoalStatus::Todo,
             _ => {
                 return Err(RefineError::InvalidInput(
-                    "Gap undo is only available from done, review, or cancelled".to_string(),
+                    "Goal undo is only available from done, review, or cancelled".to_string(),
                 ));
             }
         };
-        self.set_gap_status_unchecked(gap_id, &target)?;
-        self.show_gap_summary(gap_id)
+        self.set_goal_status_unchecked(goal_id, &target)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn start_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::StartImplementation)?;
-        self.set_gap_status_unchecked(gap_id, &GapStatus::InProgress)?;
-        self.show_gap_summary(gap_id)
+    pub fn start_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::StartImplementation)?;
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::InProgress)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn start_gap_workflow(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        if current.gap.status == GapStatus::Backlog {
-            self.transition_gap_status(gap_id, GapStatus::Todo)?;
+    pub fn start_goal_workflow(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        if current.goal.status == GoalStatus::Backlog {
+            self.transition_goal_status(goal_id, GoalStatus::Todo)?;
         }
-        self.start_gap_summary(gap_id)
+        self.start_goal_summary(goal_id)
     }
 
-    pub fn advance_automated_gap_status(
+    pub fn advance_automated_goal_status(
         &self,
-        gap_id: &str,
-        target: GapStatus,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_automated_gap_transition(&current.gap.status, &target)?;
-        self.set_gap_status_unchecked(gap_id, &target)?;
-        self.show_gap_summary(gap_id)
+        goal_id: &str,
+        target: GoalStatus,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_automated_goal_transition(&current.goal.status, &target)?;
+        self.set_goal_status_unchecked(goal_id, &target)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn rollback_in_progress_gap_to_todo(
+    pub fn rollback_in_progress_goal_to_todo(
         &self,
-        gap_id: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current)?;
-        if current.gap.status != GapStatus::InProgress {
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        if current.goal.status != GoalStatus::InProgress {
             return Err(RefineError::InvalidInput(format!(
-                "Gap {gap_id} is not in-progress"
+                "Goal {goal_id} is not in-progress"
             )));
         }
-        self.set_gap_status_unchecked(gap_id, &GapStatus::Todo)?;
-        self.show_gap_summary(gap_id)
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::Todo)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn set_gap_branch_name(
+    pub fn set_goal_branch_name(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         branch_name: &str,
-    ) -> RefineResult<GapSummaryProjection> {
+    ) -> RefineResult<GoalSummaryProjection> {
         let branch_name = branch_name.trim();
         if branch_name.is_empty() {
             return Err(RefineError::InvalidInput(
                 "branch name is required".to_string(),
             ));
         }
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "branch_name".to_string(),
             Value::String(branch_name.to_string()),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
     pub fn workflow_enforcement_summary(&self) -> RefineResult<WorkflowEnforcementSummary> {
         let snapshot = self.projection_snapshot()?;
         let automated = snapshot
-            .gaps
+            .goals
             .values()
-            .filter(|gap| is_automated_status(&gap.gap.status))
-            .map(|gap| gap.gap.id.clone())
+            .filter(|goal| is_automated_status(&goal.goal.status))
+            .map(|goal| goal.goal.id.clone())
             .collect();
         Ok(WorkflowEnforcementSummary {
             ok: true,
-            checked: snapshot.gaps.len(),
+            checked: snapshot.goals.len(),
             automated,
         })
     }
 
-    pub fn transition_gap_status(
+    pub fn transition_goal_status(
         &self,
-        gap_id: &str,
-        target: GapStatus,
-    ) -> RefineResult<GapSummaryProjection> {
+        goal_id: &str,
+        target: GoalStatus,
+    ) -> RefineResult<GoalSummaryProjection> {
         let snapshot = self.projection_snapshot()?;
-        let current = snapshot.gaps.get(gap_id).ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
+        let current = snapshot.goals.get(goal_id).ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })?;
-        self.ensure_gap_owned(current)?;
-        validate_manual_gap_transition(&current.gap.status, &target)?;
+        self.ensure_goal_owned(current)?;
+        validate_manual_goal_transition(&current.goal.status, &target)?;
 
-        let gap_path = self.refine_dir.join(&current.gap.json_path);
-        let bytes = fs::read(&gap_path).map_err(|error| {
+        let goal_path = self.refine_dir.join(&current.goal.json_path);
+        let bytes = fs::read(&goal_path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to read Gap {}: {error}",
-                gap_path.display()
+                "failed to read Goal {}: {error}",
+                goal_path.display()
             ))
         })?;
         let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
-                "failed to parse Gap {}: {error}",
-                gap_path.display()
+                "failed to parse Goal {}: {error}",
+                goal_path.display()
             ))
         })?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "status".to_string(),
@@ -1353,54 +1369,54 @@ impl FileWorkItemService {
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
 
-        write_json_atomically(&gap_path, &value)?;
+        write_json_atomically(&goal_path, &value)?;
 
         let refreshed = self.projection_snapshot()?;
-        refreshed.gaps.get(gap_id).cloned().ok_or_else(|| {
-            RefineError::NotFound(format!("Gap {gap_id} disappeared after transition"))
+        refreshed.goals.get(goal_id).cloned().ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} disappeared after transition"))
         })
     }
 
-    pub fn cancel_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        if current.gap.status == GapStatus::Cancelled {
+    pub fn cancel_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        if current.goal.status == GoalStatus::Cancelled {
             return Ok(current);
         }
-        if current.gap.status == GapStatus::Done {
+        if current.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(
-                "done Gaps cannot be cancelled".to_string(),
+                "done Goals cannot be cancelled".to_string(),
             ));
         }
-        self.set_gap_status_unchecked(gap_id, &GapStatus::Cancelled)?;
-        self.show_gap_summary(gap_id)
+        self.set_goal_status_unchecked(goal_id, &GoalStatus::Cancelled)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn update_gap_metadata_summary(
+    pub fn update_goal_metadata_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         name: Option<&str>,
         priority: Option<&str>,
         reporter: Option<&str>,
         assignee: Option<&str>,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditMetadata)?;
 
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         if let Some(name) = name {
             let name = name.trim();
             if name.is_empty() {
                 return Err(RefineError::InvalidInput(
-                    "Gap name cannot be empty".to_string(),
+                    "Goal name cannot be empty".to_string(),
                 ));
             }
             object.insert("name".to_string(), Value::String(name.to_string()));
         }
         if let Some(priority) = priority {
-            let Some(priority) = GapPriority::parse_wire(priority) else {
+            let Some(priority) = GoalPriority::parse_wire(priority) else {
                 return Err(RefineError::InvalidInput(
                     "priority must be one of low, medium, or high".to_string(),
                 ));
@@ -1427,14 +1443,14 @@ impl FileWorkItemService {
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)?;
+        write_json_atomically(&goal_path, &value)?;
         if let Some(assignee) = assignee {
-            self.set_latest_round_assignee(gap_id, assignee)?;
+            self.set_latest_round_assignee(goal_id, assignee)?;
         }
-        self.show_gap_summary(gap_id)
+        self.show_goal_summary(goal_id)
     }
 
-    fn validate_gap_assignee(assignee: &str) -> RefineResult<&str> {
+    fn validate_goal_assignee(assignee: &str) -> RefineResult<&str> {
         let assignee = assignee.trim();
         if !assignee.is_empty() && !valid_reporter_name(assignee) {
             return Err(RefineError::InvalidInput(
@@ -1444,7 +1460,7 @@ impl FileWorkItemService {
         Ok(assignee)
     }
 
-    fn validate_gap_reporter(reporter: &str) -> RefineResult<&str> {
+    fn validate_goal_reporter(reporter: &str) -> RefineResult<&str> {
         let reporter = reporter.trim();
         if !reporter.is_empty() && !valid_reporter_name(reporter) {
             return Err(RefineError::InvalidInput(
@@ -1454,36 +1470,36 @@ impl FileWorkItemService {
         Ok(reporter)
     }
 
-    pub fn update_gap_assignee_summary(
+    pub fn update_goal_assignee_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         assignee: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
-        self.set_latest_round_assignee(gap_id, assignee)?;
-        self.show_gap_summary(gap_id)
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditMetadata)?;
+        self.set_latest_round_assignee(goal_id, assignee)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn update_gap_reporter_summary(
+    pub fn update_goal_reporter_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         reporter: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
-        self.set_gap_reporter_unchecked(gap_id, reporter)?;
-        self.show_gap_summary(gap_id)
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditMetadata)?;
+        self.set_goal_reporter_unchecked(goal_id, reporter)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn add_gap_note_summary(
+    pub fn add_goal_note_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         author: &str,
         body: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditNotes)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditNotes)?;
         let body = body.trim();
         if body.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -1491,9 +1507,9 @@ impl FileWorkItemService {
             ));
         }
 
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         let now = now_timestamp();
         let mut note = Map::new();
@@ -1512,17 +1528,17 @@ impl FileWorkItemService {
             }
         }
         object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn replace_gap_notes_summary(
+    pub fn replace_goal_notes_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         notes: &[Value],
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditNotes)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditNotes)?;
 
         let now = now_timestamp();
         let mut next_notes = Vec::new();
@@ -1579,109 +1595,105 @@ impl FileWorkItemService {
             next_notes.push(Value::Object(cleaned));
         }
 
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert("notes".to_string(), Value::Array(next_notes));
         object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn append_gap_round_summary(
+    pub fn append_goal_round_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         reporter: &str,
-        actual: &str,
-        target: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        self.append_gap_round_summary_with_assignee(gap_id, reporter, None, actual, target)
+        prompt: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        self.append_goal_round_summary_with_assignee(goal_id, reporter, None, prompt)
     }
 
-    pub fn append_gap_round_summary_with_assignee(
+    pub fn append_goal_round_summary_with_assignee(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         reporter: &str,
         assignee: Option<&str>,
-        actual: &str,
-        target: &str,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::SubmitNewRound)?;
-        let reporter = Self::validate_gap_reporter(reporter)?;
+        prompt: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
+        let reporter = Self::validate_goal_reporter(reporter)?;
         let assignee = assignee
-            .map(Self::validate_gap_assignee)
+            .map(Self::validate_goal_assignee)
             .transpose()?
             .filter(|value| !value.is_empty())
             .unwrap_or(reporter);
-        let actual = actual.trim();
-        let target = target.trim();
-        if reporter.is_empty() || actual.is_empty() || target.is_empty() {
+        let prompt = prompt.trim();
+        if reporter.is_empty() || prompt.is_empty() {
             return Err(RefineError::InvalidInput(
-                "round reporter, actual, and target are required".to_string(),
+                "round reporter and prompt are required".to_string(),
             ));
         }
 
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
-        let round = new_round_value(reporter, assignee, actual, target);
+        let round = new_round_value(reporter, assignee, prompt);
         match object.get_mut("rounds") {
             Some(Value::Array(rounds)) => rounds.push(round),
             _ => {
                 object.insert("rounds".to_string(), Value::Array(vec![round]));
             }
         }
-        if current.gap.status == GapStatus::Review {
+        if current.goal.status == GoalStatus::Review {
             object.insert(
                 "status".to_string(),
-                Value::String(GapStatus::Todo.as_str().to_string()),
+                Value::String(GoalStatus::Todo.as_str().to_string()),
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn edit_latest_gap_round_summary(
+    pub fn edit_latest_goal_round_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         reporter: Option<&str>,
         assignee: Option<&str>,
-        actual: Option<&str>,
-        target: Option<&str>,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::EditLatestRound)?;
+        prompt: Option<&str>,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::EditLatestRound)?;
 
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         let rounds = object
             .get_mut("rounds")
             .and_then(Value::as_array_mut)
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = rounds
             .iter_mut()
             .rev()
             .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = latest.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
-                "latest round for Gap {gap_id} is not a JSON object"
+                "latest round for Goal {goal_id} is not a JSON object"
             ))
         })?;
         if let Some(reporter) = reporter {
             latest.insert(
                 "reporter".to_string(),
-                Value::String(Self::validate_gap_reporter(reporter)?.to_string()),
+                Value::String(Self::validate_goal_reporter(reporter)?.to_string()),
             );
         }
         if let Some(assignee) = assignee {
-            let assignee = Self::validate_gap_assignee(assignee)?;
+            let assignee = Self::validate_goal_assignee(assignee)?;
             latest.insert(
                 "assignee".to_string(),
                 if assignee.is_empty() {
@@ -1691,35 +1703,29 @@ impl FileWorkItemService {
                 },
             );
         }
-        if let Some(actual) = actual {
+        if let Some(prompt) = prompt {
             latest.insert(
-                "actual".to_string(),
-                Value::String(actual.trim().to_string()),
-            );
-        }
-        if let Some(target) = target {
-            latest.insert(
-                "target".to_string(),
-                Value::String(target.trim().to_string()),
+                "prompt".to_string(),
+                Value::String(prompt.trim().to_string()),
             );
         }
         let now = now_timestamp();
         latest.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn update_gap_branch_name(
+    pub fn update_goal_branch_name(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         branch_name: Option<&str>,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current)?;
-        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         match branch_name.map(str::trim).filter(|value| !value.is_empty()) {
             Some(branch) => {
@@ -1730,37 +1736,37 @@ impl FileWorkItemService {
             }
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn update_latest_gap_round_evaluation_summary(
+    pub fn update_latest_goal_round_evaluation_summary(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         evaluation: &Value,
-    ) -> RefineResult<GapSummaryProjection> {
-        let current = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
         let fields = evaluation.as_object().ok_or_else(|| {
             RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
         })?;
 
-        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         let rounds = object
             .get_mut("rounds")
             .and_then(Value::as_array_mut)
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = rounds
             .iter_mut()
             .rev()
             .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = latest.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
-                "latest round for Gap {gap_id} is not a JSON object"
+                "latest round for Goal {goal_id} is not a JSON object"
             ))
         })?;
         for key in [
@@ -1784,62 +1790,62 @@ impl FileWorkItemService {
         let now = now_timestamp();
         latest.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&gap_path, &value)?;
-        self.show_gap_summary(gap_id)
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
     }
 
-    pub fn delete_gap_record(&self, gap_id: &str) -> RefineResult<()> {
-        let current = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current)?;
-        validate_gap_operation(&current.gap.status, &GapOperation::Delete)?;
-        let gap_path = self.refine_dir.join(&current.gap.json_path);
-        fs::remove_file(&gap_path).map_err(|error| {
+    pub fn delete_goal_record(&self, goal_id: &str) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::Delete)?;
+        let goal_path = self.refine_dir.join(&current.goal.json_path);
+        fs::remove_file(&goal_path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to delete Gap {}: {error}",
-                gap_path.display()
+                "failed to delete Goal {}: {error}",
+                goal_path.display()
             ))
         })?;
-        if let Some(parent) = gap_path.parent() {
+        if let Some(parent) = goal_path.parent() {
             let _ = fs::remove_dir(parent);
         }
         Ok(())
     }
 
-    fn read_gap_value(&self, gap_id: &str) -> RefineResult<(PathBuf, Value)> {
-        let current = self.show_gap_summary(gap_id)?;
-        self.ensure_gap_owned(&current)?;
-        self.read_gap_value_unchecked(&current)
+    fn read_goal_value(&self, goal_id: &str) -> RefineResult<(PathBuf, Value)> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        self.read_goal_value_unchecked(&current)
     }
 
-    fn read_gap_value_unchecked(
+    fn read_goal_value_unchecked(
         &self,
-        current: &GapSummaryProjection,
+        current: &GoalSummaryProjection,
     ) -> RefineResult<(PathBuf, Value)> {
-        let gap_path = self.refine_dir.join(&current.gap.json_path);
-        let bytes = fs::read(&gap_path).map_err(|error| {
+        let goal_path = self.refine_dir.join(&current.goal.json_path);
+        let bytes = fs::read(&goal_path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to read Gap {}: {error}",
-                gap_path.display()
+                "failed to read Goal {}: {error}",
+                goal_path.display()
             ))
         })?;
         let value: Value = serde_json::from_slice(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
-                "failed to parse Gap {}: {error}",
-                gap_path.display()
+                "failed to parse Goal {}: {error}",
+                goal_path.display()
             ))
         })?;
-        Ok((gap_path, value))
+        Ok((goal_path, value))
     }
 
-    fn set_gap_feature_membership(
+    fn set_goal_feature_membership(
         &self,
-        gap_id: &str,
+        goal_id: &str,
         feature_id: Option<&str>,
         feature_order: Option<i64>,
     ) -> RefineResult<()> {
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "feature_id".to_string(),
@@ -1854,41 +1860,41 @@ impl FileWorkItemService {
                 .unwrap_or(Value::Null),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
-    pub(super) fn set_gap_status_unchecked(
+    pub(super) fn set_goal_status_unchecked(
         &self,
-        gap_id: &str,
-        status: &GapStatus,
+        goal_id: &str,
+        status: &GoalStatus,
     ) -> RefineResult<()> {
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "status".to_string(),
             Value::String(status.as_str().to_string()),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
-    fn set_gap_priority_unchecked(&self, gap_id: &str, priority: &str) -> RefineResult<()> {
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+    fn set_goal_priority_unchecked(&self, goal_id: &str, priority: &str) -> RefineResult<()> {
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert("priority".to_string(), Value::String(priority.to_string()));
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
-    fn set_gap_reporter_unchecked(&self, gap_id: &str, reporter: &str) -> RefineResult<()> {
-        let reporter = Self::validate_gap_reporter(reporter)?;
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+    fn set_goal_reporter_unchecked(&self, goal_id: &str, reporter: &str) -> RefineResult<()> {
+        let reporter = Self::validate_goal_reporter(reporter)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "reporter".to_string(),
@@ -1899,18 +1905,18 @@ impl FileWorkItemService {
             },
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
-    fn set_gap_node_unchecked(&self, gap_id: &str, node_id: &str) -> RefineResult<()> {
-        let current = self.show_gap_summary(gap_id)?;
-        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
+    fn set_goal_node_unchecked(&self, goal_id: &str, node_id: &str) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert("node_id".to_string(), Value::String(node_id.to_string()));
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
     fn set_feature_node_unchecked(&self, feature_id: &str, node_id: &str) -> RefineResult<()> {
@@ -1950,24 +1956,24 @@ impl FileWorkItemService {
         Ok(target_node_id.to_string())
     }
 
-    fn set_latest_round_assignee(&self, gap_id: &str, assignee: &str) -> RefineResult<()> {
-        let assignee = Self::validate_gap_assignee(assignee)?;
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+    fn set_latest_round_assignee(&self, goal_id: &str, assignee: &str) -> RefineResult<()> {
+        let assignee = Self::validate_goal_assignee(assignee)?;
+        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         let rounds = object
             .get_mut("rounds")
             .and_then(Value::as_array_mut)
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = rounds
             .iter_mut()
             .rev()
             .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         let latest = latest.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
-                "latest round for Gap {gap_id} is not a JSON object"
+                "latest round for Goal {goal_id} is not a JSON object"
             ))
         })?;
         let now = now_timestamp();
@@ -1981,98 +1987,102 @@ impl FileWorkItemService {
         );
         latest.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&gap_path, &value)
+        write_json_atomically(&goal_path, &value)
     }
 
     fn next_feature_order(&self, feature_id: &str) -> RefineResult<i64> {
         let max_order = self
-            .list_gap_summaries()?
+            .list_goal_summaries()?
             .into_iter()
-            .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
-            .filter_map(|gap| gap.gap.feature_order)
+            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature_id))
+            .filter_map(|goal| goal.goal.feature_order)
             .max()
             .unwrap_or(0);
         Ok(max_order + 1)
     }
 
     fn compact_feature_orders(&self, feature_id: &str) -> RefineResult<()> {
-        let mut gaps: Vec<_> = self
-            .list_gap_summaries()?
+        let mut goals: Vec<_> = self
+            .list_goal_summaries()?
             .into_iter()
-            .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
-            .filter(|gap| is_ordered_feature_gap(gap.gap.feature_order))
+            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature_id))
+            .filter(|goal| is_ordered_feature_goal(goal.goal.feature_order))
             .collect();
-        gaps.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        goals.sort_by(|a, b| {
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
-        for (idx, gap) in gaps.iter().enumerate() {
-            self.set_gap_feature_membership(&gap.gap.id, Some(feature_id), Some(idx as i64 + 1))?;
+        for (idx, goal) in goals.iter().enumerate() {
+            self.set_goal_feature_membership(
+                &goal.goal.id,
+                Some(feature_id),
+                Some(idx as i64 + 1),
+            )?;
         }
         Ok(())
     }
 
-    fn feature_gap_summaries(&self, feature_id: &str) -> RefineResult<Vec<GapSummaryProjection>> {
-        let mut gaps: Vec<_> = self
-            .list_gap_summaries()?
+    fn feature_goal_summaries(&self, feature_id: &str) -> RefineResult<Vec<GoalSummaryProjection>> {
+        let mut goals: Vec<_> = self
+            .list_goal_summaries()?
             .into_iter()
-            .filter(|gap| gap.gap.feature_id.as_deref() == Some(feature_id))
+            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature_id))
             .collect();
-        gaps.sort_by(|a, b| {
-            compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order)
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        goals.sort_by(|a, b| {
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
-        Ok(gaps)
+        Ok(goals)
     }
 
-    fn select_bulk_gap_summaries(
+    fn select_bulk_goal_summaries(
         &self,
-        selection: &BulkGapSelection,
+        selection: &BulkGoalSelection,
         skip_automated: bool,
-    ) -> RefineResult<(Vec<GapSummaryProjection>, Vec<BulkSkippedDetail>)> {
+    ) -> RefineResult<(Vec<GoalSummaryProjection>, Vec<BulkSkippedDetail>)> {
         let excluded: BTreeSet<_> = selection
             .exclude_ids
             .iter()
             .map(|id| id.trim().to_uppercase())
             .filter(|id| !id.is_empty())
             .collect();
-        let mut gaps = if let Some(selected_ids) = &selection.selected_ids {
+        let mut goals = if let Some(selected_ids) = &selection.selected_ids {
             let mut selected = Vec::new();
             for id in selected_ids {
                 let id = id.trim().to_uppercase();
                 if id.is_empty() || excluded.contains(&id) {
                     continue;
                 }
-                selected.push(self.show_gap_summary(&id)?);
+                selected.push(self.show_goal_summary(&id)?);
             }
             selected
         } else {
-            self.list_gap_summaries()?
+            self.list_goal_summaries()?
                 .into_iter()
-                .filter(|gap| !excluded.contains(&gap.gap.id))
-                .filter(|gap| bulk_gap_matches_filter(gap, &selection.filter))
+                .filter(|goal| !excluded.contains(&goal.goal.id))
+                .filter(|goal| bulk_goal_matches_filter(goal, &selection.filter))
                 .collect()
         };
-        gaps.sort_by(|a, b| a.gap.id.cmp(&b.gap.id));
+        goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));
         let mut skipped_details = Vec::new();
         if skip_automated {
             let mut retained = Vec::new();
-            for gap in gaps {
+            for goal in goals {
                 if matches!(
-                    gap.gap.status,
-                    GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge
+                    goal.goal.status,
+                    GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge
                 ) {
                     skipped_details.push(BulkSkippedDetail {
-                        id: gap.gap.id,
-                        reason: format!("status:{}", gap.gap.status.as_str()),
+                        id: goal.goal.id,
+                        reason: format!("status:{}", goal.goal.status.as_str()),
                     });
                 } else {
-                    retained.push(gap);
+                    retained.push(goal);
                 }
             }
-            gaps = retained;
+            goals = retained;
         }
-        Ok((gaps, skipped_details))
+        Ok((goals, skipped_details))
     }
 
     fn select_bulk_feature_summaries(
@@ -2114,14 +2124,14 @@ fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -> bool {
+fn bulk_goal_matches_filter(goal: &GoalSummaryProjection, filter: &BulkGoalFilter) -> bool {
     if let Some(status) = filter
         .status
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        if gap.gap.status.as_str() != status {
+        if goal.goal.status.as_str() != status {
             return false;
         }
     }
@@ -2131,7 +2141,7 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        if gap.gap.reporter.as_deref() != Some(reporter) {
+        if goal.goal.reporter.as_deref() != Some(reporter) {
             return false;
         }
     }
@@ -2141,7 +2151,7 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        if gap.gap.assignee.as_deref() != Some(assignee) {
+        if goal.goal.assignee.as_deref() != Some(assignee) {
             return false;
         }
     }
@@ -2152,20 +2162,20 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         .filter(|s| !s.is_empty())
     {
         if feature == "standalone" {
-            if gap.gap.feature_id.is_some() {
+            if goal.goal.feature_id.is_some() {
                 return false;
             }
-        } else if feature != "all" && gap.gap.feature_id.as_deref() != Some(feature) {
+        } else if feature != "all" && goal.goal.feature_id.as_deref() != Some(feature) {
             return false;
         }
     }
     if let Some(min_rounds) = filter.rounds_gte {
-        if gap.gap.round_count < min_rounds {
+        if goal.goal.round_count < min_rounds {
             return false;
         }
     }
     if let Some(max_rounds) = filter.rounds_lte {
-        if gap.gap.round_count > max_rounds {
+        if goal.goal.round_count > max_rounds {
             return false;
         }
     }
@@ -2177,18 +2187,18 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
     {
         if node != "all"
             && node != "current"
-            && gap.gap.node_id.as_deref().unwrap_or("default") != node
+            && goal.goal.node_id.as_deref().unwrap_or("default") != node
         {
             return false;
         }
     }
     if let Some(query) = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let query = query.to_lowercase();
-        let haystack = gap.searchable_text.to_lowercase();
-        let reporter = gap.gap.reporter.as_deref().unwrap_or("").to_lowercase();
-        let assignee = gap.gap.assignee.as_deref().unwrap_or("").to_lowercase();
+        let haystack = goal.searchable_text.to_lowercase();
+        let reporter = goal.goal.reporter.as_deref().unwrap_or("").to_lowercase();
+        let assignee = goal.goal.assignee.as_deref().unwrap_or("").to_lowercase();
         if !haystack.contains(&query)
-            && !gap.gap.id.to_lowercase().contains(&query)
+            && !goal.goal.id.to_lowercase().contains(&query)
             && !reporter.contains(&query)
             && !assignee.contains(&query)
         {
@@ -2198,38 +2208,38 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
     true
 }
 
-fn gap_transfer_skip_reason(gap: &GapSummaryProjection) -> Option<String> {
-    if let Some(reason) = gap_status_transfer_skip_reason(gap) {
+fn goal_transfer_skip_reason(goal: &GoalSummaryProjection) -> Option<String> {
+    if let Some(reason) = goal_status_transfer_skip_reason(goal) {
         return Some(reason);
     }
-    gap.gap
+    goal.goal
         .feature_id
         .as_ref()
         .map(|feature_id| format!("feature:{feature_id}"))
 }
 
-fn gap_status_transfer_skip_reason(gap: &GapSummaryProjection) -> Option<String> {
+fn goal_status_transfer_skip_reason(goal: &GoalSummaryProjection) -> Option<String> {
     if matches!(
-        gap.gap.status,
-        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::Build
+        goal.goal.status,
+        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge | GoalStatus::Build
     ) {
-        Some(format!("status:{}", gap.gap.status.as_str()))
+        Some(format!("status:{}", goal.goal.status.as_str()))
     } else {
         None
     }
 }
 
-fn validate_gap_transfer_to_node(gap: &GapSummaryProjection) -> RefineResult<()> {
-    if let Some(feature_id) = gap.gap.feature_id.as_deref() {
+fn validate_goal_transfer_to_node(goal: &GoalSummaryProjection) -> RefineResult<()> {
+    if let Some(feature_id) = goal.goal.feature_id.as_deref() {
         return Err(RefineError::Conflict(format!(
-            "Gap {} is assigned to Feature {feature_id}; transfer the Feature instead",
-            gap.gap.id
+            "Goal {} is assigned to Feature {feature_id}; transfer the Feature instead",
+            goal.goal.id
         )));
     }
-    if let Some(reason) = gap_transfer_skip_reason(gap) {
+    if let Some(reason) = goal_transfer_skip_reason(goal) {
         return Err(RefineError::Conflict(format!(
-            "Gap {} is not transferable ({reason})",
-            gap.gap.id
+            "Goal {} is not transferable ({reason})",
+            goal.goal.id
         )));
     }
     Ok(())
@@ -2326,9 +2336,9 @@ fn valid_reporter_name(value: &str) -> bool {
     !value.is_empty() && value.len() <= 80 && !value.chars().any(|ch| ch.is_control())
 }
 
-fn restore_last_workflow_status(status: &GapStatus) -> GapStatus {
+fn restore_last_workflow_status(status: &GoalStatus) -> GoalStatus {
     match status {
-        GapStatus::Failed | GapStatus::Review | GapStatus::Cancelled => GapStatus::Todo,
+        GoalStatus::Failed | GoalStatus::Review | GoalStatus::Cancelled => GoalStatus::Todo,
         other => other.clone(),
     }
 }
@@ -2355,7 +2365,7 @@ fn attach_latest_log_fields(
     ] {
         if let Some(log) = value {
             let value = serde_json::to_value(log).map_err(|error| {
-                RefineError::Serialization(format!("failed to encode latest Gap log: {error}"))
+                RefineError::Serialization(format!("failed to encode latest Goal log: {error}"))
             })?;
             round.insert(key.to_string(), value);
         }
@@ -2363,13 +2373,12 @@ fn attach_latest_log_fields(
     Ok(())
 }
 
-fn new_round_value(reporter: &str, assignee: &str, actual: &str, target: &str) -> Value {
+fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     let now = now_timestamp();
     let mut round = Map::new();
     round.insert("reporter".to_string(), Value::String(reporter.to_string()));
     round.insert("assignee".to_string(), Value::String(assignee.to_string()));
-    round.insert("actual".to_string(), Value::String(actual.to_string()));
-    round.insert("target".to_string(), Value::String(target.to_string()));
+    round.insert("prompt".to_string(), Value::String(prompt.to_string()));
     round.insert("created".to_string(), Value::String(now.clone()));
     round.insert("updated".to_string(), Value::String(now));
     round.insert("logs".to_string(), Value::Array(Vec::new()));
@@ -2418,8 +2427,8 @@ fn new_round_value(reporter: &str, assignee: &str, actual: &str, target: &str) -
     Value::Object(round)
 }
 
-fn validate_gap_operation(status: &GapStatus, operation: &GapOperation) -> RefineResult<()> {
-    let decision = gap_operation_allowed(status, operation);
+fn validate_goal_operation(status: &GoalStatus, operation: &GoalOperation) -> RefineResult<()> {
+    let decision = goal_operation_allowed(status, operation);
     if decision.allowed {
         Ok(())
     } else {
@@ -2432,7 +2441,7 @@ fn validate_gap_operation(status: &GapStatus, operation: &GapOperation) -> Refin
 }
 
 fn validate_feature_operation(
-    statuses: &[GapStatus],
+    statuses: &[GoalStatus],
     operation: &FeatureOperation,
 ) -> RefineResult<()> {
     let decision = feature_operation_allowed(statuses, operation);
@@ -2445,13 +2454,13 @@ fn validate_feature_operation(
     }
 }
 
-fn gap_json_path(refine_dir: &std::path::Path, gap_id: &str) -> PathBuf {
-    let gap_id = gap_id.to_uppercase();
+fn goal_json_path(refine_dir: &std::path::Path, goal_id: &str) -> PathBuf {
+    let goal_id = goal_id.to_uppercase();
     refine_dir
-        .join("gaps")
-        .join(&gap_id[..2])
-        .join(&gap_id[2..])
-        .join("gap.json")
+        .join("goals")
+        .join(&goal_id[..2])
+        .join(&goal_id[2..])
+        .join("goal.json")
 }
 
 fn feature_json_path(refine_dir: &std::path::Path, feature_id: &str) -> PathBuf {
@@ -2467,7 +2476,7 @@ fn write_json_atomically(path: &std::path::Path, value: &Value) -> RefineResult<
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create Gap directory {}: {error}",
+                "failed to create Goal directory {}: {error}",
                 parent.display()
             ))
         })?;

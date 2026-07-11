@@ -92,13 +92,13 @@ async function refreshDashboard() {
     const [d, reviews] = await Promise.all([
       dashboardApi("GET", `/api/dashboard?node=${nodeParam}`),
       reporter
-        ? dashboardApi("GET", "/api/gaps?status=review&assignee=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
-        : Promise.resolve({ gaps: [] }),
+        ? dashboardApi("GET", "/api/goals?status=review&assignee=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
+        : Promise.resolve({ goals: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
     state.dashboard = d;
-    state.dashboardReviewSnapshot = { reviewsForReporter: reviews.gaps || [], reporter };
+    state.dashboardReviewSnapshot = { reviewsForReporter: reviews.goals || [], reporter };
     drawDashboard(d, state.dashboardReviewSnapshot);
   } catch (e) {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
@@ -184,7 +184,7 @@ function drawDashboard(d, opts = {}) {
     ${renderWorkflowVisualization({
       counts,
       statuses: orderedStatuses,
-      hrefForStatus: (s) => gapsHash({ status: s, node: scope }),
+      hrefForStatus: (s) => goalsHash({ status: s, node: scope }),
       className: "dashboard-status-grid",
     })}
 
@@ -200,7 +200,7 @@ function drawDashboard(d, opts = {}) {
         ${needsAttention.length ? `
           <div class="actions dashboard-panel-actions">
             ${needsAttention.map((x) => `
-              <a href="${gapsHash({
+              <a href="${goalsHash({
                 status: x.filter?.status || "",
                 node: x.filter?.node || scope,
               })}" class="btn">
@@ -220,21 +220,21 @@ function drawDashboard(d, opts = {}) {
            </div>`
         : `<table class="table">
             <thead><tr>
-              <th class="gap-select-col">
+              <th class="goal-select-col">
                 <input type="checkbox" id="rev-select-all"
                        data-testid="dashboard-review-select-all"
                        aria-label="Select all reviews">
               </th>
-              <th>Gap</th>
+              <th>Goal</th>
               <th>Updated</th>
               <th class="actions-col" style="white-space:nowrap"></th>
             </tr></thead>
             <tbody>
               ${reviewsForReporter.map((g) => `
                 <tr data-rev-row="${g.id}" data-testid="dashboard-review-row">
-                  <td class="gap-select-col"><input type="checkbox" class="rev-row-check" data-testid="dashboard-review-check" data-rev-id="${g.id}"></td>
+                  <td class="goal-select-col"><input type="checkbox" class="rev-row-check" data-testid="dashboard-review-check" data-rev-id="${g.id}"></td>
                   <td>
-                    <a href="#/gaps/${g.id}" title="${htmlEscape(g.id)}">
+                    <a href="#/goals/${g.id}" title="${htmlEscape(g.id)}">
                       ${htmlEscape(g.name)}
                     </a>
                   </td>
@@ -275,7 +275,7 @@ function drawDashboard(d, opts = {}) {
                   <tr class="assignee-stats-row"
                       data-testid="dashboard-assignee-stats-row"
                       data-assignee="${htmlEscape(assignee)}"
-                      title="See Gaps assigned to ${htmlEscape(assignee)}">
+                      title="See Goals assigned to ${htmlEscape(assignee)}">
                     <td>${htmlEscape(assignee)}</td>
                     <td>${fmtCount(s.active)}</td>
                     <td>${fmtCount(s.done)}</td>
@@ -290,12 +290,12 @@ function drawDashboard(d, opts = {}) {
     </details>
 
   `;
-  // Click any assignee row -> deep-link into the Gaps list filtered by
+  // Click any assignee row -> deep-link into the Goals list filtered by
   // that assignee. We use data-assignee + a delegated listener so the
   // name can contain spaces/quotes without HTML-escaping hazards.
   $$(".assignee-stats-row").forEach((row) => {
     row.addEventListener("click", () => {
-      location.hash = gapsHash({ assignee: row.dataset.assignee, node: scope });
+      location.hash = goalsHash({ assignee: row.dataset.assignee, node: scope });
     });
   });
 
@@ -367,7 +367,7 @@ function wireReviewsForReporter(reviews) {
       const id = btn.dataset.revVerify;
       await withButtonBusy(btn, "Verifying…", async () => {
         try {
-          const r = await api("POST", `/api/gaps/${id}/verify`);
+          const r = await api("POST", `/api/goals/${id}/verify`);
           if (r.ok) toast(r.message || "Verified", "info");
           else toast(r.message || "Verify did not complete", "error");
           if (r.ok) dashboardReviewSelectedIds.delete(id);
@@ -380,8 +380,8 @@ function wireReviewsForReporter(reviews) {
   $$("[data-rev-add-round]", card).forEach((btn) => {
     btn.addEventListener("click", () => {
       openAddRoundModal({
-        gapId: btn.dataset.revAddRound,
-        gapName: btn.dataset.revName || "",
+        goalId: btn.dataset.revAddRound,
+        goalName: btn.dataset.revName || "",
       });
     });
   });
@@ -390,7 +390,7 @@ function wireReviewsForReporter(reviews) {
     const ids = selected();
     if (!ids.length) return;
     const ok = await modalConfirm(
-      `Verify ${ids.length} gap${ids.length === 1 ? "" : "s"}?`,
+      `Verify ${ids.length} goal${ids.length === 1 ? "" : "s"}?`,
       { title: "Bulk verify", okLabel: "Verify all" },
     );
     if (!ok) return;
@@ -401,7 +401,7 @@ function wireReviewsForReporter(reviews) {
       for (const id of ids) {
         btn.textContent = `Verifying ${done + 1}/${ids.length}…`;
         try {
-          const r = await api("POST", `/api/gaps/${id}/verify`);
+          const r = await api("POST", `/api/goals/${id}/verify`);
           if (!r.ok) failed++;
           else dashboardReviewSelectedIds.delete(id);
         } catch (e) {
@@ -413,7 +413,7 @@ function wireReviewsForReporter(reviews) {
       if (ownershipError) await showActionError(ownershipError);
       const msg = failed
         ? `Verified ${done - failed} of ${ids.length} — ${failed} did not complete`
-        : `Verified ${done} gap${done === 1 ? "" : "s"}`;
+        : `Verified ${done} goal${done === 1 ? "" : "s"}`;
       toast(msg, failed ? "error" : "info");
       await refreshDashboard();
     });
@@ -422,7 +422,7 @@ function wireReviewsForReporter(reviews) {
   syncBulkButton();
 }
 
-function openAddRoundModal({ gapId, gapName }) {
+function openAddRoundModal({ goalId, goalName }) {
   const reporter = state.lastReporter || "";
   if (!reporter) {
     toast("Pick a reporter in the top-right selector first", "error");
@@ -435,7 +435,7 @@ function openAddRoundModal({ gapId, gapName }) {
          data-testid="dashboard-add-round-modal"
          aria-labelledby="add-round-title" style="max-width:560px">
       <div class="modal-title" id="add-round-title">
-        Add round — ${htmlEscape(gapName || gapId)}
+        Add round — ${htmlEscape(goalName || goalId)}
       </div>
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
@@ -444,12 +444,8 @@ function openAddRoundModal({ gapId, gapName }) {
         </div>
         <form id="add-round-form">
           <div class="form-row">
-            <label>Actual (current behavior)</label>
-            <textarea name="actual" data-testid="dashboard-add-round-actual" placeholder="What's still happening?"></textarea>
-          </div>
-          <div class="form-row">
-            <label>Target (desired behavior)</label>
-            <textarea name="target" data-testid="dashboard-add-round-target" placeholder="What should be happening?"></textarea>
+            <label>Prompt</label>
+            <textarea name="prompt" data-testid="dashboard-add-round-prompt" placeholder="Describe what the agent should accomplish."></textarea>
           </div>
         </form>
       </div>
@@ -473,14 +469,13 @@ function openAddRoundModal({ gapId, gapName }) {
   const submit = async () => {
     const form = root.querySelector("#add-round-form");
     const fd = new FormData(form);
-    const actual = (fd.get("actual") || "").toString().trim();
-    const target = (fd.get("target") || "").toString().trim();
-    if (!actual && !target) return toast("Provide actual or target", "error");
+    const prompt = (fd.get("prompt") || "").toString().trim();
+    if (!prompt) return toast("Provide a prompt", "error");
     const okBtn = root.querySelector("[data-ok]");
     await withButtonBusy(okBtn, "Submitting…", async () => {
       try {
-        await api("POST", `/api/gaps/${gapId}/rounds`,
-                  { reporter, actual, target });
+        await api("POST", `/api/goals/${goalId}/rounds`,
+                  { reporter, prompt });
         toast("New round submitted", "info");
         close();
         await refreshDashboard();
@@ -491,7 +486,7 @@ function openAddRoundModal({ gapId, gapName }) {
   root.querySelector("#add-round-form").addEventListener("submit", (e) => {
     e.preventDefault(); submit();
   });
-  root.querySelector("textarea[name='actual']")?.focus();
+  root.querySelector("textarea[name='prompt']")?.focus();
 }
 
 function renderActivityList(entries) {
@@ -502,7 +497,7 @@ function renderActivityList(entries) {
       <div class="meta">
         ${fmtTime(e.datetime)} · ${htmlEscape(e.category || '')}
         ${e.actor ? ' · ' + htmlEscape(e.actor) : ''}
-        ${e.gap_id ? ` · <a href="#/gaps/${e.gap_id}">Gap ${e.gap_id.slice(0,8)}…</a>` : ''}
+        ${e.goal_id ? ` · <a href="#/goals/${e.goal_id}">Goal ${e.goal_id.slice(0,8)}…</a>` : ''}
       </div>
       ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ''}
     </div>`).join("");

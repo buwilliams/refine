@@ -398,7 +398,7 @@ impl FileReporterService {
         let value = read_json_or_default(self.refine_dir.join(REPORTERS_FILE), json!([]))?;
         let reporters = normalize_reporters(&value);
         if reporters.is_empty() {
-            let seeded = self.seed_reporters_from_gap_rounds()?;
+            let seeded = self.seed_reporters_from_goal_rounds()?;
             if !seeded.is_empty() {
                 self.save_reporters(&seeded)?;
                 return Ok(seeded);
@@ -414,9 +414,9 @@ impl FileReporterService {
         )
     }
 
-    fn seed_reporters_from_gap_rounds(&self) -> RefineResult<Vec<Value>> {
+    fn seed_reporters_from_goal_rounds(&self) -> RefineResult<Vec<Value>> {
         let mut names = BTreeSet::new();
-        collect_reporter_names(&self.refine_dir.join("gaps"), "gap.json", &mut names)?;
+        collect_reporter_names(&self.refine_dir.join("goals"), "goal.json", &mut names)?;
         collect_reporter_names(
             &self.refine_dir.join("features"),
             "feature.json",
@@ -438,7 +438,7 @@ fn default_settings() -> JsonObject {
         ("parallel_per_node_cap", "2"),
         ("parallel_per_provider_cap", "2"),
         ("parallel_per_target_app_cap", "2"),
-        ("branch_name_pattern", "refine/{gap_id}"),
+        ("branch_name_pattern", "refine/{goal_id}"),
         ("agent_idle_timeout_seconds", "900"),
         ("agent_hard_cap_seconds", "7200"),
         ("agent_limit_pause_seconds", "60"),
@@ -972,7 +972,7 @@ fn collect_reporter_names(
     })? {
         let entry = entry.map_err(|error| {
             RefineError::Io(format!(
-                "failed to read Gap directory entry {}: {error}",
+                "failed to read Goal directory entry {}: {error}",
                 path.display()
             ))
         })?;
@@ -1013,7 +1013,7 @@ fn rewrite_reporter_references(refine_dir: &Path, old: &str, new: &str) -> Refin
     if old.trim().is_empty() || old == new {
         return Ok(());
     }
-    rewrite_reporter_references_in_tree(&refine_dir.join("gaps"), "gap.json", old, new)?;
+    rewrite_reporter_references_in_tree(&refine_dir.join("goals"), "goal.json", old, new)?;
     rewrite_reporter_references_in_tree(&refine_dir.join("features"), "feature.json", old, new)
 }
 
@@ -1268,17 +1268,17 @@ mod tests {
             .unwrap();
         assert_eq!(guidance_payload["guidance"].as_array().unwrap().len(), 1);
 
-        let gap_dir = refine_dir.join("gaps/GA/P1");
+        let goal_dir = refine_dir.join("goals/GO/AL1");
         let feature_dir = refine_dir.join("features/FE/A1");
-        fs::create_dir_all(&gap_dir).unwrap();
+        fs::create_dir_all(&goal_dir).unwrap();
         fs::create_dir_all(&feature_dir).unwrap();
         fs::write(
-            gap_dir.join("gap.json"),
+            goal_dir.join("goal.json"),
             serde_json::to_string_pretty(&json!({
-                "id": "GAP1",
+                "id": "GOAL1",
                 "reporter": "Buddy",
                 "rounds": [
-                    {"reporter": "Alex", "assignee": "Buddy", "actual": "A", "target": "B"}
+                    {"reporter": "Alex", "assignee": "Buddy", "prompt": "B"}
                 ]
             }))
             .unwrap(),
@@ -1312,11 +1312,11 @@ mod tests {
                 .len(),
             1
         );
-        let gap: Value =
-            serde_json::from_str(&fs::read_to_string(gap_dir.join("gap.json")).unwrap()).unwrap();
-        assert_eq!(gap["reporter"], "Alex");
-        assert_eq!(gap["rounds"][0]["reporter"], "Alex");
-        assert_eq!(gap["rounds"][0]["assignee"], "Alex");
+        let goal: Value =
+            serde_json::from_str(&fs::read_to_string(goal_dir.join("goal.json")).unwrap()).unwrap();
+        assert_eq!(goal["reporter"], "Alex");
+        assert_eq!(goal["rounds"][0]["reporter"], "Alex");
+        assert_eq!(goal["rounds"][0]["assignee"], "Alex");
         let feature: Value =
             serde_json::from_str(&fs::read_to_string(feature_dir.join("feature.json")).unwrap())
                 .unwrap();

@@ -28,6 +28,6 @@ The palette should not become an unrelated shortcut list. It should mirror real 
 
 ## Future Direction
 
-Future command palettes should become more agent-aware and intent-aware. A user may type an outcome, and Refine may route that to a Gap, Feature, search, setting, tool, or agent conversation.
+Future command palettes should become more agent-aware and intent-aware. A user may type an outcome, and Refine may route that to a Goal, Feature, search, setting, tool, or agent conversation.
 
 The long-term direction is a command surface that can be used by humans and AI systems as a compact index of Refine capabilities.

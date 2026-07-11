@@ -101,7 +101,7 @@ function renderSettingsGovernanceTab(gov) {
       </p>
       ${gov.configured ? "" : `
         <p class="muted small" style="color:var(--warn)">
-          Governance is incomplete. Gap execution continues until Product and Constitution are both filled in.
+          Governance is incomplete. Goal execution continues until Product and Constitution are both filled in.
         </p>`}
       ${renderGovernanceRules(gov.rules || [])}
       <div class="actions" style="margin-top:10px">

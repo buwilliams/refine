@@ -323,21 +323,21 @@ mod tests {
     #[test]
     fn sync_commits_pushes_and_pulls_refine_state() {
         let fixture = SyncFixture::new("round-trip");
-        write_gap(&fixture.a, "GAPA");
+        write_goal(&fixture.a, "GOALA");
 
         let pushed = fixture.service(&fixture.a).sync().unwrap();
         assert!(pushed.ok && pushed.committed && pushed.pushed, "{pushed:?}");
 
         let pulled = fixture.service(&fixture.b).sync().unwrap();
         assert!(pulled.ok && pulled.pulled && pulled.pushed, "{pulled:?}");
-        assert!(fixture.b.join(".refine/gaps/GAPA/gap.json").exists());
+        assert!(fixture.b.join(".refine/goals/GOALA/goal.json").exists());
     }
 
     #[test]
     fn sync_rebases_disjoint_state_when_nodes_race() {
         let fixture = SyncFixture::new("race");
-        write_gap(&fixture.a, "GAPA");
-        write_gap(&fixture.b, "GAPB");
+        write_goal(&fixture.a, "GOALA");
+        write_goal(&fixture.b, "GOALB");
 
         fixture.service(&fixture.a).sync().unwrap();
         let second = fixture.service(&fixture.b).sync().unwrap();
@@ -347,20 +347,20 @@ mod tests {
         );
 
         fixture.service(&fixture.a).sync().unwrap();
-        assert!(fixture.a.join(".refine/gaps/GAPA/gap.json").exists());
-        assert!(fixture.a.join(".refine/gaps/GAPB/gap.json").exists());
+        assert!(fixture.a.join(".refine/goals/GOALA/goal.json").exists());
+        assert!(fixture.a.join(".refine/goals/GOALB/goal.json").exists());
     }
 
     #[test]
     fn sync_does_not_touch_uncommitted_target_app_changes() {
         let fixture = SyncFixture::new("dirty");
         fs::write(fixture.a.join("app.txt"), "dirty\n").unwrap();
-        write_gap(&fixture.a, "GAPA");
+        write_goal(&fixture.a, "GOALA");
 
         let result = fixture.service(&fixture.a).sync().unwrap();
         assert!(!result.attempted && !result.committed && !result.pushed);
         assert!(result.detail.unwrap().contains("app.txt"));
-        assert!(fixture.a.join(".refine/gaps/GAPA/gap.json").exists());
+        assert!(fixture.a.join(".refine/goals/GOALA/goal.json").exists());
         assert_eq!(
             fs::read_to_string(fixture.a.join("app.txt")).unwrap(),
             "dirty\n"
@@ -417,10 +417,10 @@ mod tests {
         }
     }
 
-    fn write_gap(root: &Path, id: &str) {
-        let dir = root.join(".refine/gaps").join(id);
+    fn write_goal(root: &Path, id: &str) {
+        let dir = root.join(".refine/goals").join(id);
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("gap.json"), format!("{{\"id\":\"{id}\"}}\n")).unwrap();
+        fs::write(dir.join("goal.json"), format!("{{\"id\":\"{id}\"}}\n")).unwrap();
     }
 
     fn configure(root: &Path) {

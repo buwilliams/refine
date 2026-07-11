@@ -6,12 +6,12 @@ use std::time::Duration;
 
 const CHAT: &str = "smoke-ai chat response\n\nI can discuss the requested Refine workflow deterministically for integration tests.\n";
 const FALLBACK: &str = "smoke-ai fallback response\n\nThis deterministic fallback is used when no smoke-ai matcher applies.\n";
-const GAP_AGENT: &str = "smoke-ai gap-agent response\n\nThe disposable refine-smoke Gap has been reviewed and no source changes are required.\n";
+const GOAL_AGENT: &str = "smoke-ai goal-agent response\n\nThe disposable refine-smoke Goal has been reviewed and no source changes are required.\n";
 const GOVERNANCE: &str = "smoke-ai governance response\n\nUse clear ownership, reversible changes, and explicit cleanup for refine-smoke artifacts.\n";
-const IMPORT: &str = "{\"kind\": \"import\", \"name\": \"refine-smoke imported gap one\", \"priority\": \"low\"}\n{\"kind\": \"import\", \"name\": \"refine-smoke imported gap two\", \"priority\": \"low\"}\n";
-const PLAN: &str = "{\n  \"feature\": {\n    \"name\": \"Smoke AI Plan Feature\",\n    \"description\": \"A deterministic product capability planned by the Smoke AI fixture.\",\n    \"gaps\": [\n      {\n        \"name\": \"Smoke AI plan gap one\",\n        \"actual\": \"smoke-ai plan actual behavior one\",\n        \"target\": \"smoke-ai plan target behavior one\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      },\n      {\n        \"name\": \"Smoke AI plan gap two\",\n        \"actual\": \"smoke-ai plan actual behavior two\",\n        \"target\": \"smoke-ai plan target behavior two\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      }\n    ]\n  }\n}\n";
+const IMPORT: &str = "{\"kind\": \"import\", \"name\": \"refine-smoke imported goal one\", \"priority\": \"low\"}\n{\"kind\": \"import\", \"name\": \"refine-smoke imported goal two\", \"priority\": \"low\"}\n";
+const PLAN: &str = "{\n  \"feature\": {\n    \"name\": \"Smoke AI Plan Feature\",\n    \"description\": \"A deterministic product capability planned by the Smoke AI fixture.\",\n    \"goals\": [\n      {\n        \"name\": \"Smoke AI plan goal one\",\n        \"actual\": \"smoke-ai plan actual behavior one\",\n        \"target\": \"smoke-ai plan target behavior one\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      },\n      {\n        \"name\": \"Smoke AI plan goal two\",\n        \"actual\": \"smoke-ai plan actual behavior two\",\n        \"target\": \"smoke-ai plan target behavior two\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      }\n    ]\n  }\n}\n";
 const ROUND: &str = "smoke-ai round actual behavior => smoke-ai round target behavior\n";
-const STANDALONE_GAP: &str =
+const STANDALONE_GOAL: &str =
     "smoke-ai standalone actual behavior => smoke-ai standalone target behavior\n";
 const PREFLIGHT: &str = "hello\n";
 const TARGET_APP: &str = "{\n  \"kind\": \"target-app\",\n  \"ok\": true,\n  \"message\": \"refine-smoke target app check passed\",\n  \"start_instructions\": \"Start the smoke target app and report smoke-ai-target-start when complete.\",\n  \"stop_instructions\": \"Stop the smoke target app and report smoke-ai-target-stop when complete.\",\n  \"build_instructions\": \"Build the smoke target app and report smoke-ai-target-build when complete.\",\n  \"test_command\": \"printf smoke-ai-target-test\",\n  \"status_command\": \"printf smoke-ai-target-status\",\n  \"cwd\": \".\",\n  \"env\": {\"REFINE_SMOKE_TARGET\": \"1\"},\n  \"start_timeout_seconds\": 11,\n  \"stop_timeout_seconds\": 12,\n  \"build_timeout_seconds\": 13,\n  \"test_timeout_seconds\": 15,\n  \"status_timeout_seconds\": 14,\n  \"log_path\": \"target/refine-smoke-target.log\",\n  \"http_check_url\": \"http://127.0.0.1:3456/health\",\n  \"tcp_check_host\": \"127.0.0.1\",\n  \"tcp_check_port\": \"3456\",\n  \"process_check_command\": \"printf smoke-ai-target-process\",\n  \"notes\": \"smoke-ai target-app generated config\"\n}\n";
@@ -29,10 +29,10 @@ const MATCHERS: &[(&str, &[&str], &str, &str)] = &[
         PREFLIGHT,
     ),
     (
-        "gap-agent",
-        &["gap agent", "ready gap", "work on gap"],
-        "gap-agent.md",
-        GAP_AGENT,
+        "goal-agent",
+        &["goal agent", "ready goal", "work on goal"],
+        "goal-agent.md",
+        GOAL_AGENT,
     ),
     (
         "plan",
@@ -41,14 +41,14 @@ const MATCHERS: &[(&str, &[&str], &str, &str)] = &[
         PLAN,
     ),
     (
-        "standalone-gap",
-        &["standalone gap", "draft one standalone gap"],
-        "standalone-gap.txt",
-        STANDALONE_GAP,
+        "standalone-goal",
+        &["standalone goal", "draft one standalone goal"],
+        "standalone-goal.txt",
+        STANDALONE_GOAL,
     ),
     (
         "round",
-        &["extract round", "draft round", "gap round"],
+        &["extract round", "draft round", "goal round"],
         "round.txt",
         ROUND,
     ),
@@ -102,9 +102,9 @@ fn main() {
             "smoke-ai matcher={selected_name} template={selected_template}"
         );
     }
-    if selected_name == "gap-agent" && env::var("SMOKE_AI_EDIT_APP").as_deref() == Ok("1") {
+    if selected_name == "goal-agent" && env::var("SMOKE_AI_EDIT_APP").as_deref() == Ok("1") {
         if let Ok(mut file) = OpenOptions::new().append(true).open("app.py") {
-            let _ = writeln!(file, "\n# edited by smoke-ai gap-agent");
+            let _ = writeln!(file, "\n# edited by smoke-ai goal-agent");
         }
     }
     if haystack.contains("smoke-ai queue delay") {

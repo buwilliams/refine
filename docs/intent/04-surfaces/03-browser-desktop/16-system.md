@@ -22,7 +22,7 @@ Current implementation details that matter to intent:
 - `recordUiNotice` and `recordUiError` bridge UI events into System behavior;
 - pending System operations queue before toolbar initialization;
 - System filters distinguish info, started, queued, completed, and errors;
-- failed blocking Gap notices and other important UI messages should be visible here.
+- failed blocking Goal notices and other important UI messages should be visible here.
 
 System should not be only a toast sink. It should make local operations inspectable and reduce surprise.
 

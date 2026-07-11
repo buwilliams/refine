@@ -12,7 +12,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   );
   let page = 1;
   let showNeedsResolutionOnly = false;
-  let originalUpdateField = "actual";
+  let originalUpdateField = "prompt";
   const currentSessionPhase = () => (
     options.retry && draftState.some((draft) => draft.error)
       ? "failed"
@@ -156,15 +156,15 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.selected = false;
       });
       if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
-      toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for backlog`, "info");
+      toast(`Marked ${targets.length} original Goal${targets.length === 1 ? "" : "s"} for backlog`, "info");
       renderPage();
     });
     $("[data-import-update-field]", drafts_root)?.addEventListener("change", (e) => {
-      originalUpdateField = e.target.value || "actual";
+      originalUpdateField = e.target.value || "prompt";
     });
     $("[data-import-update-originals]", drafts_root)?.addEventListener("click", () => {
       persistReviewState();
-      const field = $("[data-import-update-field]", drafts_root)?.value || "actual";
+      const field = $("[data-import-update-field]", drafts_root)?.value || "prompt";
       const targets = draftState.filter((draft) => draft.selected && draft.duplicate);
       if (!targets.length) {
         toast("Select duplicate drafts to update originals.", "warn");
@@ -175,7 +175,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.selected = false;
       });
       if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
-      toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for ${field} update`, "info");
+      toast(`Marked ${targets.length} original Goal${targets.length === 1 ? "" : "s"} for ${field} update`, "info");
       renderPage();
     });
     $$("[data-import-draft-move]", drafts_root).forEach((btn) => {
@@ -200,7 +200,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   }
 
   renderPage();
-  // Swap the primary action from "Extract drafts" to "Save N gap(s)".
+  // Swap the primary action from "Extract drafts" to "Save N goal(s)".
   const actions = root.querySelector(".modal-actions");
   actions.innerHTML = `
     <button class="secondary" data-cancel data-testid="import-cancel">Cancel</button>
@@ -237,7 +237,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       .filter((draft) => draft.duplicateDecision !== "duplicate")
       .map(importDraftPayload);
     if (!payload.length) {
-      toast(`Skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}; no new gaps created`, "info");
+      toast(`Skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}; no new goals created`, "info");
       if (clearSessionOnClose) clearImportSession();
       close(true, { force: true });
       return;

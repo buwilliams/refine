@@ -178,22 +178,22 @@ fn append_chat_session_processes(
 
 fn is_process_visible_chat_session(session: &ChatSessionRecord) -> bool {
     !session.closed
-        && matches!(session.mode.as_str(), "standalone" | "gap")
+        && matches!(session.mode.as_str(), "standalone" | "goal")
         && matches!(
             session.attachment,
-            ChatAttachment::Standalone | ChatAttachment::Gap(_)
+            ChatAttachment::Standalone | ChatAttachment::Goal(_)
         )
 }
 
 fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
-    let gap_id = match &session.attachment {
-        ChatAttachment::Gap(gap_id) => Some(gap_id.as_str()),
+    let goal_id = match &session.attachment {
+        ChatAttachment::Goal(goal_id) => Some(goal_id.as_str()),
         _ => None,
     };
     let details = [
         Some(session.provider.as_str()),
         Some(session.mode.as_str()),
-        gap_id,
+        goal_id,
     ]
     .into_iter()
     .flatten()
@@ -202,14 +202,14 @@ fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
     json!({
         "id": format!("chat-session-{}", session.id),
         "kind": "chat",
-        "label": if session.mode == "gap" { "Gap chat" } else { "Standalone chat" },
+        "label": if session.mode == "goal" { "Goal chat" } else { "Standalone chat" },
         "status": if session.in_flight || session.queue_dispatching { "running" } else { "idle" },
         "pid": null,
         "details": details,
         "session_id": &session.id,
         "mode": &session.mode,
         "provider": &session.provider,
-        "gap_id": gap_id,
+        "goal_id": goal_id,
         "started_at": &session.created_at,
         "updated_at": &session.updated_at,
         "output_available": false,
@@ -248,7 +248,7 @@ fn process_management_actions(value: &Value, pause_state: &ProcessPauseState) ->
         "workflow_automation" | "agent_automation" | "background_processes" => {
             vec![workflow_toggle, "hard_reset_worktree"]
         }
-        "agent" if process.get("gap_id").and_then(Value::as_str).is_some() => {
+        "agent" if process.get("goal_id").and_then(Value::as_str).is_some() => {
             vec!["cancel_agent"]
         }
         "chat" if process.get("session_id").and_then(Value::as_str).is_some() => {
@@ -320,7 +320,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
             .map(|operation| operation.state.as_api_status().to_string())
             .unwrap_or_else(|| "idle".to_string())
     };
-    let merger_gap_id = merger_operation
+    let merger_goal_id = merger_operation
         .and_then(|operation| operation.owner.strip_prefix("merger:"))
         .map(ToString::to_string);
     let plan_extract_status = if background_stopped {
@@ -334,7 +334,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
         .and_then(|operation| operation.progress.get("message").and_then(Value::as_str))
         .unwrap_or("Plan Draft extraction is ready for Draft Feature requests");
     let mut rows = [
-        ("merger", "serial Gap branch merger"),
+        ("merger", "serial Goal branch merger"),
         (
             "plan_draft_extractor",
             "Plan Draft extraction is ready for Draft Feature requests",
@@ -366,7 +366,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
                 "queued": 0,
                 "details": details,
                 "operation_id": merger_operation.map(|operation| operation.id.clone()),
-                "gap_id": merger_gap_id
+                "goal_id": merger_goal_id
             })
         } else if kind == "plan_draft_extractor" {
             json!({

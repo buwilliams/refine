@@ -1278,7 +1278,7 @@ ensure_provider_cli() {
 
   warn_issue \
     "$provider CLI install" \
-    "Refine uses the selected agent CLI to implement, review, and repair Gaps." \
+    "Refine uses the selected agent CLI to implement, review, and repair Goals." \
     "Run $install_cmd, complete provider auth if required, then re-run install.sh." \
     "Provider CLI still missing. Run this later, then re-run install.sh: $install_cmd"
   return 1

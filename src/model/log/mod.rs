@@ -12,7 +12,7 @@ pub struct LogEntry {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<LogAction>,
     pub actor: Option<String>,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -22,7 +22,7 @@ pub struct ActivityEntry {
     pub severity: String,
     pub category: String,
     pub message: String,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
     pub actor: Option<String>,
     pub details: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -48,7 +48,7 @@ pub enum LogAction {
 pub struct LogQuery {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
-    pub gap_id: Option<String>,
+    pub goal_id: Option<String>,
     pub since_id: Option<String>,
     pub severity: Option<String>,
     pub category: Option<String>,

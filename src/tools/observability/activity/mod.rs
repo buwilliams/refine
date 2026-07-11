@@ -14,7 +14,7 @@ pub const ACTIVITY_LOG_FILE: &str = "logs/activity.jsonl";
 pub trait ActivityService {
     fn append(&self, entry: ActivityEntry) -> RefineResult<()>;
     fn recent(&self, limit: usize) -> RefineResult<Vec<ActivityEntry>>;
-    fn by_gap(&self, gap_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>>;
+    fn by_goal(&self, goal_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -46,7 +46,7 @@ impl FileActivityService {
         message: impl Into<String>,
         severity: impl Into<String>,
         category: impl Into<String>,
-        gap_id: Option<String>,
+        goal_id: Option<String>,
         actor: Option<String>,
     ) -> ActivityEntry {
         ActivityEntry {
@@ -55,7 +55,7 @@ impl FileActivityService {
             severity: severity.into(),
             category: category.into(),
             message: message.into(),
-            gap_id,
+            goal_id,
             actor,
             details: None,
             actions: Vec::new(),
@@ -66,7 +66,7 @@ impl FileActivityService {
         &self,
         limit: usize,
         offset: usize,
-        gap_id: Option<&str>,
+        goal_id: Option<&str>,
         severity: Option<&str>,
         category: Option<&str>,
         actor: Option<&str>,
@@ -74,8 +74,8 @@ impl FileActivityService {
     ) -> RefineResult<Vec<ActivityEntry>> {
         let mut entries = self.read_all()?;
         entries.retain(|entry| {
-            if let Some(gap_id) = gap_id {
-                if entry.gap_id.as_deref() != Some(gap_id) {
+            if let Some(goal_id) = goal_id {
+                if entry.goal_id.as_deref() != Some(goal_id) {
                     return false;
                 }
             }
@@ -301,8 +301,8 @@ impl ActivityService for FileActivityService {
         self.query(limit, 0, None, None, None, None, None)
     }
 
-    fn by_gap(&self, gap_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>> {
-        self.query(limit, 0, Some(gap_id), None, None, None, None)
+    fn by_goal(&self, goal_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>> {
+        self.query(limit, 0, Some(goal_id), None, None, None, None)
     }
 }
 
@@ -332,14 +332,14 @@ mod tests {
             "Something happened",
             "error",
             "ui",
-            Some("GAP1".to_string()),
+            Some("GOAL1".to_string()),
             Some("browser".to_string()),
         );
         service.append(entry).unwrap();
 
         assert!(service.path().exists());
         assert_eq!(service.recent(10).unwrap().len(), 1);
-        assert_eq!(service.by_gap("GAP1", 10).unwrap()[0].category, "ui");
+        assert_eq!(service.by_goal("GOAL1", 10).unwrap()[0].category, "ui");
         assert_eq!(
             service
                 .query(10, 0, None, Some("error"), None, None, None)

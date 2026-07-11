@@ -13,9 +13,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::model::JsonObject;
-use crate::model::feature::{compare_feature_gap_order, is_ordered_feature_gap};
-use crate::model::gap::GapPriority;
-use crate::model::workflow::GapStatus;
+use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal};
+use crate::model::goal::GoalPriority;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -23,7 +23,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
-    FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
+    FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
 };
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
@@ -58,7 +58,7 @@ pub enum WorkflowClaimState {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowClaim {
     pub claim_id: String,
-    pub gap_id: String,
+    pub goal_id: String,
     #[serde(default = "default_node_id")]
     pub node_id: String,
     #[serde(default = "default_provider")]
@@ -116,7 +116,7 @@ pub struct WorkflowPassResult {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowStepResult {
     pub claim_id: String,
-    pub gap_id: String,
+    pub goal_id: String,
     pub execution_id: String,
     pub provider: String,
     pub branch: String,
@@ -128,7 +128,7 @@ pub struct WorkflowStepResult {
 
 pub trait WorkflowAutomation {
     fn promote(&self) -> RefineResult<usize>;
-    fn claim(&self, gap_id: &str) -> RefineResult<String>;
+    fn claim(&self, goal_id: &str) -> RefineResult<String>;
     fn start_claim(&self, claim_id: &str) -> RefineResult<String>;
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()>;
     fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()>;
@@ -244,7 +244,7 @@ impl WorkflowEngine {
         let state = if paused {
             supervisor.set_agents_paused(true)?;
             let state = supervisor.set_background_processes_stopped(true)?;
-            self.rollback_in_progress_gaps_to_todo()?;
+            self.rollback_in_progress_goals_to_todo()?;
             self.pause(WorkflowPauseControl::AllAutomation)?;
             state
         } else {
@@ -262,30 +262,30 @@ impl WorkflowEngine {
         self.set_workflow_paused(paused)
     }
 
-    pub fn rollback_in_progress_gaps_to_todo(&self) -> RefineResult<usize> {
+    pub fn rollback_in_progress_goals_to_todo(&self) -> RefineResult<usize> {
         let Some(refine_dir) = self.refine_dir() else {
             return Ok(0);
         };
         let snapshot = self.projection_snapshot(&refine_dir)?;
         let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
-        let gap_ids = snapshot
-            .gaps
+        let goal_ids = snapshot
+            .goals
             .values()
-            .filter(|projection| projection.gap.status == GapStatus::InProgress)
+            .filter(|projection| projection.goal.status == GoalStatus::InProgress)
             .filter(|projection| {
-                projection.gap.node_id.as_deref().unwrap_or("default") == active_node_id
+                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
             })
-            .map(|projection| projection.gap.id.clone())
+            .map(|projection| projection.goal.id.clone())
             .collect::<Vec<_>>();
-        if gap_ids.is_empty() {
+        if goal_ids.is_empty() {
             return Ok(0);
         }
         let work_items = FileWorkItemService::new(refine_dir);
-        for gap_id in &gap_ids {
-            work_items.rollback_in_progress_gap_to_todo(gap_id)?;
+        for goal_id in &goal_ids {
+            work_items.rollback_in_progress_goal_to_todo(goal_id)?;
         }
-        self.interrupt_active_claims(&gap_ids)?;
-        Ok(gap_ids.len())
+        self.interrupt_active_claims(&goal_ids)?;
+        Ok(goal_ids.len())
     }
 
     fn signal_workflow_subprocesses(&self, execution_id: &str, signal: &str) -> RefineResult<()> {
@@ -329,10 +329,10 @@ impl WorkflowEngine {
 
     fn active_claim<'a>(
         state: &'a WorkflowAutomationState,
-        gap_id: &str,
+        goal_id: &str,
     ) -> Option<&'a WorkflowClaim> {
         state.claims.iter().find(|claim| {
-            claim.gap_id == gap_id
+            claim.goal_id == goal_id
                 && matches!(
                     claim.state,
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
@@ -408,18 +408,18 @@ impl WorkflowEngine {
 
     fn claim_metadata(
         &self,
-        gap: Option<&GapSummaryProjection>,
+        goal: Option<&GoalSummaryProjection>,
         policy: &WorkflowPolicy,
     ) -> RefineResult<ClaimMetadata> {
-        let node_id = gap
-            .and_then(|gap| gap.gap.node_id.clone())
+        let node_id = goal
+            .and_then(|goal| goal.goal.node_id.clone())
             .unwrap_or_else(|| default_node_id());
         if node_id != policy.active_node_id {
-            let gap_id = gap
-                .map(|gap| gap.gap.id.as_str())
-                .unwrap_or("requested Gap");
+            let goal_id = goal
+                .map(|goal| goal.goal.id.as_str())
+                .unwrap_or("requested Goal");
             return Err(RefineError::Conflict(format!(
-                "{gap_id} is owned by node {node_id}, not active node {}",
+                "{goal_id} is owned by node {node_id}, not active node {}",
                 policy.active_node_id
             )));
         }
@@ -435,48 +435,51 @@ impl WorkflowEngine {
             .load_or_refresh_projection(&self.runtime_root.join("cache"))
     }
 
-    fn feature_claim_eligible(snapshot: &ProjectionSnapshot, gap: &GapSummaryProjection) -> bool {
-        let Some(feature_id) = gap.gap.feature_id.as_deref() else {
+    fn feature_claim_eligible(snapshot: &ProjectionSnapshot, goal: &GoalSummaryProjection) -> bool {
+        let Some(feature_id) = goal.goal.feature_id.as_deref() else {
             return true;
         };
-        let Some(feature_order) = gap.gap.feature_order else {
+        let Some(feature_order) = goal.goal.feature_order else {
             return true;
         };
-        let node_id = gap.gap.node_id.as_deref().unwrap_or("default");
-        !snapshot.gaps.values().any(|other| {
-            other.gap.feature_id.as_deref() == Some(feature_id)
-                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
+        let node_id = goal.goal.node_id.as_deref().unwrap_or("default");
+        !snapshot.goals.values().any(|other| {
+            other.goal.feature_id.as_deref() == Some(feature_id)
+                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
                 && other
-                    .gap
+                    .goal
                     .feature_order
                     .is_some_and(|order| order < feature_order)
                 && !matches!(
-                    other.gap.status,
-                    GapStatus::Review | GapStatus::Done | GapStatus::Cancelled
+                    other.goal.status,
+                    GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled
                 )
-        }) && !snapshot.gaps.values().any(|other| {
-            other.gap.id != gap.gap.id
-                && other.gap.feature_id.as_deref() == Some(feature_id)
-                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
-                && is_ordered_feature_gap(gap.gap.feature_order)
-                && is_ordered_feature_gap(other.gap.feature_order)
+        }) && !snapshot.goals.values().any(|other| {
+            other.goal.id != goal.goal.id
+                && other.goal.feature_id.as_deref() == Some(feature_id)
+                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
+                && is_ordered_feature_goal(goal.goal.feature_order)
+                && is_ordered_feature_goal(other.goal.feature_order)
                 && matches!(
-                    other.gap.status,
-                    GapStatus::InProgress
-                        | GapStatus::ReadyMerge
-                        | GapStatus::Build
-                        | GapStatus::Qa
+                    other.goal.status,
+                    GoalStatus::InProgress
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Qa
                 )
         })
     }
 
-    fn priority_claim_eligible(snapshot: &ProjectionSnapshot, gap: &GapSummaryProjection) -> bool {
-        let node_id = gap.gap.node_id.as_deref().unwrap_or("default");
-        !snapshot.gaps.values().any(|other| {
-            other.gap.id != gap.gap.id
-                && other.gap.status == GapStatus::Todo
-                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
-                && priority_rank(&other.gap.priority) > priority_rank(&gap.gap.priority)
+    fn priority_claim_eligible(
+        snapshot: &ProjectionSnapshot,
+        goal: &GoalSummaryProjection,
+    ) -> bool {
+        let node_id = goal.goal.node_id.as_deref().unwrap_or("default");
+        !snapshot.goals.values().any(|other| {
+            other.goal.id != goal.goal.id
+                && other.goal.status == GoalStatus::Todo
+                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
+                && priority_rank(&other.goal.priority) > priority_rank(&goal.goal.priority)
                 && Self::feature_claim_eligible(snapshot, other)
         })
     }
@@ -538,7 +541,7 @@ impl WorkflowEngine {
             &refine_dir,
             self.runtime_root.join("cache"),
         );
-        let round_idx = ensure_workflow_round(&work_items, &claim.gap_id)?;
+        let round_idx = ensure_workflow_round(&work_items, &claim.goal_id)?;
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let mut ctx = WorkflowContext::new(
@@ -554,30 +557,30 @@ impl WorkflowEngine {
         let branch = ctx
             .branch
             .clone()
-            .ok_or_else(|| missing_workflow_artifact("branch", &ctx.gap_id))?;
+            .ok_or_else(|| missing_workflow_artifact("branch", &ctx.goal_id))?;
         let commit = ctx
             .commit
             .clone()
-            .ok_or_else(|| missing_workflow_artifact("commit", &ctx.gap_id))?;
+            .ok_or_else(|| missing_workflow_artifact("commit", &ctx.goal_id))?;
         let merge = ctx
             .merge
             .clone()
-            .ok_or_else(|| missing_workflow_artifact("merge", &ctx.gap_id))?;
+            .ok_or_else(|| missing_workflow_artifact("merge", &ctx.goal_id))?;
         let provider_output = ctx
             .provider_output
             .clone()
-            .ok_or_else(|| missing_workflow_artifact("provider output", &ctx.gap_id))?;
+            .ok_or_else(|| missing_workflow_artifact("provider output", &ctx.goal_id))?;
         let final_status = ctx
             .final_status
             .clone()
-            .unwrap_or(GapStatus::Review)
+            .unwrap_or(GoalStatus::Review)
             .as_str()
             .to_string();
 
         self.mark_claim_state(&ctx.claim_id, WorkflowClaimState::Completed)?;
         Ok(WorkflowStepResult {
             claim_id: ctx.claim_id,
-            gap_id: ctx.gap_id,
+            goal_id: ctx.goal_id,
             execution_id: execution_id.to_string(),
             provider: ctx.provider,
             branch,
@@ -597,7 +600,7 @@ impl WorkflowEngine {
         let review = WorkflowReview;
         let behaviors: [&dyn WorkflowBehavior; 6] =
             [&todo, &implementation, &ready_merge, &build, &qa, &review];
-        let mut current = GapStatus::Todo;
+        let mut current = GoalStatus::Todo;
         loop {
             let Some(behavior) = behaviors
                 .iter()
@@ -651,13 +654,13 @@ impl WorkflowEngine {
         self.save_state(&mut state)
     }
 
-    fn interrupt_active_claims(&self, gap_ids: &[String]) -> RefineResult<()> {
-        let gap_ids = gap_ids.iter().collect::<BTreeSet<_>>();
+    fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
+        let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
         let now = now_timestamp();
         for claim in &mut state.claims {
-            if gap_ids.contains(&claim.gap_id)
+            if goal_ids.contains(&claim.goal_id)
                 && matches!(
                     claim.state,
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
@@ -725,27 +728,29 @@ impl WorkflowAutomation for WorkflowEngine {
         self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?;
         let snapshot = self.projection_snapshot(&refine_dir)?;
         let mut eligible = snapshot
-            .gaps
+            .goals
             .values()
-            .filter(|projection| projection.gap.status == GapStatus::Todo)
+            .filter(|projection| projection.goal.status == GoalStatus::Todo)
             .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
             .filter(|projection| Self::priority_claim_eligible(&snapshot, projection))
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
-            priority_rank(&b.gap.priority)
-                .cmp(&priority_rank(&a.gap.priority))
-                .then_with(|| compare_feature_gap_order(a.gap.feature_order, b.gap.feature_order))
-                .then_with(|| a.gap.created.cmp(&b.gap.created))
-                .then_with(|| a.gap.id.cmp(&b.gap.id))
+            priority_rank(&b.goal.priority)
+                .cmp(&priority_rank(&a.goal.priority))
+                .then_with(|| {
+                    compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                })
+                .then_with(|| a.goal.created.cmp(&b.goal.created))
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
         });
 
         let mut promoted = 0;
-        for gap in eligible {
-            if Self::active_claim(&state, &gap.gap.id).is_some() {
+        for goal in eligible {
+            if Self::active_claim(&state, &goal.goal.id).is_some() {
                 continue;
             }
-            let metadata = match self.claim_metadata(Some(&gap), &policy) {
+            let metadata = match self.claim_metadata(Some(&goal), &policy) {
                 Ok(metadata) => metadata,
                 Err(RefineError::Conflict(_)) => continue,
                 Err(error) => return Err(error),
@@ -762,7 +767,7 @@ impl WorkflowAutomation for WorkflowEngine {
             let now = now_timestamp();
             state.claims.push(WorkflowClaim {
                 claim_id: new_claim_id(),
-                gap_id: gap.gap.id,
+                goal_id: goal.goal.id,
                 node_id: metadata.node_id,
                 provider: metadata.provider,
                 target_app_id: metadata.target_app_id,
@@ -779,38 +784,38 @@ impl WorkflowAutomation for WorkflowEngine {
         Ok(promoted)
     }
 
-    fn claim(&self, gap_id: &str) -> RefineResult<String> {
-        let gap_id = gap_id.trim();
-        if gap_id.is_empty() {
-            return Err(RefineError::InvalidInput("Gap id is required".to_string()));
+    fn claim(&self, goal_id: &str) -> RefineResult<String> {
+        let goal_id = goal_id.trim();
+        if goal_id.is_empty() {
+            return Err(RefineError::InvalidInput("Goal id is required".to_string()));
         }
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
         self.ensure_automation_running(&state)?;
-        if let Some(existing) = Self::active_claim(&state, gap_id) {
+        if let Some(existing) = Self::active_claim(&state, goal_id) {
             return Ok(existing.claim_id.clone());
         }
-        let gap = if let Some(refine_dir) = self.refine_dir() {
+        let goal = if let Some(refine_dir) = self.refine_dir() {
             let snapshot = self.projection_snapshot(&refine_dir)?;
-            let gap = snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
-                RefineError::NotFound(format!("Gap {gap_id} was not found in target state"))
+            let goal = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
+                RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
             })?;
-            if !Self::feature_claim_eligible(&snapshot, &gap) {
+            if !Self::feature_claim_eligible(&snapshot, &goal) {
                 return Err(RefineError::Conflict(format!(
-                    "Gap {gap_id} is blocked by Feature order"
+                    "Goal {goal_id} is blocked by Feature order"
                 )));
             }
-            if !Self::priority_claim_eligible(&snapshot, &gap) {
+            if !Self::priority_claim_eligible(&snapshot, &goal) {
                 return Err(RefineError::Conflict(format!(
-                    "Gap {gap_id} is blocked by higher priority work"
+                    "Goal {goal_id} is blocked by higher priority work"
                 )));
             }
-            Some(gap)
+            Some(goal)
         } else {
             None
         };
-        let metadata = self.claim_metadata(gap.as_ref(), &policy)?;
+        let metadata = self.claim_metadata(goal.as_ref(), &policy)?;
         if !Self::capacity_available(
             &state,
             &policy,
@@ -825,7 +830,7 @@ impl WorkflowAutomation for WorkflowEngine {
         let now = now_timestamp();
         let claim = WorkflowClaim {
             claim_id: new_claim_id(),
-            gap_id: gap_id.to_string(),
+            goal_id: goal_id.to_string(),
             node_id: metadata.node_id,
             provider: metadata.provider,
             target_app_id: metadata.target_app_id,
@@ -861,23 +866,23 @@ impl WorkflowAutomation for WorkflowEngine {
         if let Some(refine_dir) = self.refine_dir() {
             let policy = self.policy()?;
             let snapshot = self.projection_snapshot(&refine_dir)?;
-            let gap = snapshot.gaps.get(&claim.gap_id).ok_or_else(|| {
+            let goal = snapshot.goals.get(&claim.goal_id).ok_or_else(|| {
                 RefineError::NotFound(format!(
-                    "Gap {} was not found in target state",
-                    claim.gap_id
+                    "Goal {} was not found in target state",
+                    claim.goal_id
                 ))
             })?;
-            self.claim_metadata(Some(gap), &policy)?;
-            if !Self::feature_claim_eligible(&snapshot, gap) {
+            self.claim_metadata(Some(goal), &policy)?;
+            if !Self::feature_claim_eligible(&snapshot, goal) {
                 return Err(RefineError::Conflict(format!(
-                    "Gap {} is blocked by Feature order",
-                    claim.gap_id
+                    "Goal {} is blocked by Feature order",
+                    claim.goal_id
                 )));
             }
-            if !Self::priority_claim_eligible(&snapshot, gap) {
+            if !Self::priority_claim_eligible(&snapshot, goal) {
                 return Err(RefineError::Conflict(format!(
-                    "Gap {} is blocked by higher priority work",
-                    claim.gap_id
+                    "Goal {} is blocked by higher priority work",
+                    claim.goal_id
                 )));
             }
         }
@@ -1036,34 +1041,33 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .unwrap_or_else(|| fallback.to_string())
 }
 
-fn ensure_workflow_round(work_items: &FileWorkItemService, gap_id: &str) -> RefineResult<usize> {
-    let gap = work_items.show_gap_summary(gap_id)?;
-    if let Some(idx) = gap.gap.round_count.checked_sub(1) {
+fn ensure_workflow_round(work_items: &FileWorkItemService, goal_id: &str) -> RefineResult<usize> {
+    let goal = work_items.show_goal_summary(goal_id)?;
+    if let Some(idx) = goal.goal.round_count.checked_sub(1) {
         return Ok(idx);
     }
-    let gap = work_items.append_gap_round_summary(
-        gap_id,
+    let goal = work_items.append_goal_round_summary(
+        goal_id,
         "Refine",
-        "Automated workflow requested",
-        "Implement and verify this Gap",
+        "Implement and verify this Goal.",
     )?;
-    gap.gap
+    goal.goal
         .round_count
         .checked_sub(1)
-        .ok_or_else(|| RefineError::InvalidInput(format!("Gap {gap_id} has no rounds")))
+        .ok_or_else(|| RefineError::InvalidInput(format!("Goal {goal_id} has no rounds")))
 }
 
-fn implementation_branch_name(pattern: &str, gap_id: &str, round_idx: usize) -> String {
+fn implementation_branch_name(pattern: &str, goal_id: &str, round_idx: usize) -> String {
     let pattern = pattern.trim();
     let base = if pattern.is_empty() {
-        "refine/{gap_id}"
+        "refine/{goal_id}"
     } else {
         pattern
     };
     let round = (round_idx + 1).to_string();
     let branch = base
-        .replace("{gap_id}", gap_id)
-        .replace("{gap}", gap_id)
+        .replace("{goal_id}", goal_id)
+        .replace("{goal}", goal_id)
         .replace("{round}", &round);
     if branch.contains(&format!("round-{round}")) || branch.contains(&format!("round/{round}")) {
         branch
@@ -1096,7 +1100,7 @@ fn post_implementation_governance_prompt(
     rules: &[Value],
     worktree_path: &str,
     provider_cwd: &Path,
-    gap_id: &str,
+    goal_id: &str,
     round_idx: usize,
 ) -> String {
     let product = governance
@@ -1109,7 +1113,7 @@ fn post_implementation_governance_prompt(
         .unwrap_or("");
     let rules_json = serde_json::to_string_pretty(rules).unwrap_or_else(|_| "[]".to_string());
     format!(
-        "Post-implementation governance review for Gap {gap_id}, round {}.\n\
+        "Post-implementation governance review for Goal {goal_id}, round {}.\n\
          Inspect the current implementation worktree and determine whether the completed \
          implementation violates any Governance rule. The implementation has already been \
          committed on the current branch; inspect the repository and compare the branch changes \
@@ -1292,9 +1296,9 @@ fn governance_violation_message(message: &str) -> String {
     }
 }
 
-fn gap_agent_prompt(gap_id: &str) -> String {
+fn goal_agent_prompt(goal_id: &str) -> String {
     format!(
-        "Run the gap agent for ready Gap {gap_id}. Work on Gap {gap_id}, report deterministic command outcomes, and leave the Gap ready for review."
+        "Run the goal agent for ready Goal {goal_id}. Work on Goal {goal_id}, report deterministic command outcomes, and leave the Goal ready for review."
     )
 }
 
@@ -1314,11 +1318,11 @@ fn default_target_app_id() -> String {
     "default".to_string()
 }
 
-fn priority_rank(priority: &GapPriority) -> u8 {
+fn priority_rank(priority: &GoalPriority) -> u8 {
     match priority {
-        GapPriority::Low => 0,
-        GapPriority::Medium => 1,
-        GapPriority::High => 2,
+        GoalPriority::Low => 0,
+        GoalPriority::Medium => 1,
+        GoalPriority::High => 2,
     }
 }
 
@@ -1330,9 +1334,9 @@ fn new_execution_id() -> String {
     format!("exec-{}", Uuid::new_v4())
 }
 
-fn missing_workflow_artifact(name: &str, gap_id: &str) -> RefineError {
+fn missing_workflow_artifact(name: &str, goal_id: &str) -> RefineError {
     RefineError::Conflict(format!(
-        "workflow artifact {name} is missing for Gap {gap_id}"
+        "workflow artifact {name} is missing for Goal {goal_id}"
     ))
 }
 
@@ -1346,25 +1350,25 @@ mod tests {
     use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
     use crate::tools::product::nodes::FileNodeRegistryService;
-    use crate::tools::product::work_items::{BulkGapSelection, FileWorkItemService};
+    use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn file_automation_promotes_todo_gaps_and_starts_executions() {
+    fn file_automation_promotes_todo_goals_and_starts_executions() {
         let temp_root = unique_temp_dir("automation");
         let target_root = temp_root.join("target");
         let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Queued", Some("GAP1"))
+            .create_goal_summary("Queued", Some("GOAL1"))
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         work_items
-            .create_gap_summary("Backlog", Some("GAP2"))
+            .create_goal_summary("Backlog", Some("GOAL2"))
             .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
@@ -1372,7 +1376,7 @@ mod tests {
         assert_eq!(automation.promote().unwrap(), 0);
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims.len(), 1);
-        assert_eq!(state.claims[0].gap_id, "GAP1");
+        assert_eq!(state.claims[0].goal_id, "GOAL1");
 
         let execution_id = automation.start_claim(&state.claims[0].claim_id).unwrap();
         assert!(execution_id.starts_with("exec-"));
@@ -1387,17 +1391,17 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_auto_promotes_backlog_gaps_when_configured() {
+    fn file_automation_auto_promotes_backlog_goals_when_configured() {
         let temp_root = unique_temp_dir("automation-backlog-promote");
         let target_root = temp_root.join("target");
         let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Instant Backlog", Some("GAP1"))
+            .create_goal_summary("Instant Backlog", Some("GOAL1"))
             .unwrap();
         work_items
-            .create_gap_summary("Never Backlog", Some("GAP2"))
+            .create_goal_summary("Never Backlog", Some("GOAL2"))
             .unwrap();
         let settings = FileSettingsService::new(&refine_dir);
         settings
@@ -1407,8 +1411,8 @@ mod tests {
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote().unwrap(), 0);
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Backlog
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Backlog
         );
 
         settings
@@ -1416,28 +1420,28 @@ mod tests {
             .unwrap();
         assert_eq!(automation.promote().unwrap(), 2);
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Todo
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Todo
         );
         assert_eq!(
-            work_items.show_gap_summary("GAP2").unwrap().gap.status,
-            GapStatus::Todo
+            work_items.show_goal_summary("GOAL2").unwrap().goal.status,
+            GoalStatus::Todo
         );
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims.len(), 2);
-        let mut claimed_gap_ids = state
+        let mut claimed_goal_ids = state
             .claims
             .iter()
-            .map(|claim| claim.gap_id.as_str())
+            .map(|claim| claim.goal_id.as_str())
             .collect::<Vec<_>>();
-        claimed_gap_ids.sort_unstable();
-        assert_eq!(claimed_gap_ids, vec!["GAP1", "GAP2"]);
+        claimed_goal_ids.sort_unstable();
+        assert_eq!(claimed_goal_ids, vec!["GOAL1", "GOAL2"]);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_automation_promotes_all_ordered_feature_backlog_gaps() {
+    fn file_automation_promotes_all_ordered_feature_backlog_goals() {
         let temp_root = unique_temp_dir("automation-feature-backlog-promote");
         let target_root = temp_root.join("target");
         let refine_dir = target_root.join(".refine");
@@ -1446,10 +1450,10 @@ mod tests {
         work_items
             .create_feature_summary("Imported Feature", Some("FEA1"), None, None, None)
             .unwrap();
-        for id in ["GAP1", "GAP2", "GAP3"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
-            work_items.assign_gap_to_feature("FEA1", id).unwrap();
-            work_items.order_gap_in_feature("FEA1", id).unwrap();
+        for id in ["GOAL1", "GOAL2", "GOAL3"] {
+            work_items.create_goal_summary(id, Some(id)).unwrap();
+            work_items.assign_goal_to_feature("FEA1", id).unwrap();
+            work_items.order_goal_in_feature("FEA1", id).unwrap();
         }
         FileSettingsService::new(&refine_dir)
             .update(&json!({"backlog_promote_after_seconds": "0"}))
@@ -1457,10 +1461,10 @@ mod tests {
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.promote_backlog_to_todo().unwrap(), 3);
-        for id in ["GAP1", "GAP2", "GAP3"] {
+        for id in ["GOAL1", "GOAL2", "GOAL3"] {
             assert_eq!(
-                work_items.show_gap_summary(id).unwrap().gap.status,
-                GapStatus::Todo
+                work_items.show_goal_summary(id).unwrap().goal.status,
+                GoalStatus::Todo
             );
         }
 
@@ -1477,13 +1481,13 @@ mod tests {
             .update(&json!({"parallel_run_cap": 3}))
             .unwrap();
         let work_items = FileWorkItemService::new(&refine_dir);
-        for id in ["GAP1", "GAP2", "GAP3", "GAP4"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+        for id in ["GOAL1", "GOAL2", "GOAL3", "GOAL4"] {
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some("high"), None, None)
+                .update_goal_metadata_summary(id, None, Some("high"), None, None)
                 .unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
         }
 
@@ -1499,16 +1503,16 @@ mod tests {
             state
                 .claims
                 .iter()
-                .map(|claim| claim.gap_id.as_str())
+                .map(|claim| claim.goal_id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["GAP1", "GAP2", "GAP3"]
+            vec!["GOAL1", "GOAL2", "GOAL3"]
         );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_automation_blocks_lower_priority_work_behind_higher_priority_gaps() {
+    fn file_automation_blocks_lower_priority_work_behind_higher_priority_goals() {
         let temp_root = unique_temp_dir("automation-priority-band");
         let target_root = temp_root.join("target");
         let refine_dir = target_root.join(".refine");
@@ -1518,12 +1522,12 @@ mod tests {
             .unwrap();
         let work_items = FileWorkItemService::new(&refine_dir);
         for (id, priority) in [("LOW", "low"), ("MEDIUM", "medium"), ("HIGH", "high")] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some(priority), None, None)
+                .update_goal_metadata_summary(id, None, Some(priority), None, None)
                 .unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
         }
 
@@ -1533,7 +1537,7 @@ mod tests {
         assert_eq!(automation.promote().unwrap(), 1);
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims.len(), 1);
-        assert_eq!(state.claims[0].gap_id, "HIGH");
+        assert_eq!(state.claims[0].goal_id, "HIGH");
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1546,7 +1550,7 @@ mod tests {
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Instant Backlog", Some("GAP1"))
+            .create_goal_summary("Instant Backlog", Some("GOAL1"))
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -1564,10 +1568,10 @@ mod tests {
         assert_eq!(state.policy.per_node_limit, 7);
         assert_eq!(state.policy.provider, "smoke-ai");
         assert_eq!(state.claims.len(), 1);
-        assert_eq!(state.claims[0].gap_id, "GAP1");
+        assert_eq!(state.claims[0].goal_id, "GOAL1");
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Todo
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Todo
         );
 
         fs::remove_dir_all(temp_root).unwrap();
@@ -1587,15 +1591,15 @@ mod tests {
             .unwrap();
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Local backlog", Some("LOCAL"))
+            .create_goal_summary("Local backlog", Some("LOCAL"))
             .unwrap();
         work_items
-            .create_gap_summary("Remote backlog", Some("REMOTE"))
+            .create_goal_summary("Remote backlog", Some("REMOTE"))
             .unwrap();
         work_items
-            .bulk_transfer_gaps_to_node(
+            .bulk_transfer_goals_to_node(
                 "remote-node",
-                BulkGapSelection {
+                BulkGoalSelection {
                     selected_ids: Some(vec!["REMOTE".to_string()]),
                     ..Default::default()
                 },
@@ -1605,16 +1609,16 @@ mod tests {
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(automation.apply_runtime_settings().unwrap(), 1);
         assert_eq!(
-            work_items.show_gap_summary("LOCAL").unwrap().gap.status,
-            GapStatus::Todo
+            work_items.show_goal_summary("LOCAL").unwrap().goal.status,
+            GoalStatus::Todo
         );
         assert_eq!(
-            work_items.show_gap_summary("REMOTE").unwrap().gap.status,
-            GapStatus::Backlog
+            work_items.show_goal_summary("REMOTE").unwrap().goal.status,
+            GoalStatus::Backlog
         );
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims.len(), 1);
-        assert_eq!(state.claims[0].gap_id, "LOCAL");
+        assert_eq!(state.claims[0].goal_id, "LOCAL");
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1635,10 +1639,10 @@ mod tests {
             }))
             .unwrap();
         let work_items = FileWorkItemService::new(&refine_dir);
-        for id in ["GAP1", "GAP2", "GAP3"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+        for id in ["GOAL1", "GOAL2", "GOAL3"] {
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
         }
 
@@ -1663,24 +1667,24 @@ mod tests {
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Local", Some("LOCAL"))
+            .create_goal_summary("Local", Some("LOCAL"))
             .unwrap();
         work_items
-            .transition_gap_status("LOCAL", GapStatus::Todo)
+            .transition_goal_status("LOCAL", GoalStatus::Todo)
             .unwrap();
         work_items
-            .create_gap_summary("Remote", Some("REMOTE"))
+            .create_goal_summary("Remote", Some("REMOTE"))
             .unwrap();
         work_items
-            .transition_gap_status("REMOTE", GapStatus::Todo)
+            .transition_goal_status("REMOTE", GoalStatus::Todo)
             .unwrap();
         FileNodeRegistryService::new(&refine_dir)
             .create("remote-node")
             .unwrap();
         work_items
-            .bulk_transfer_gaps_to_node(
+            .bulk_transfer_goals_to_node(
                 "remote-node",
-                BulkGapSelection {
+                BulkGoalSelection {
                     selected_ids: Some(vec!["REMOTE".to_string()]),
                     ..Default::default()
                 },
@@ -1725,34 +1729,34 @@ mod tests {
             .create_feature_summary("Feature", Some("FEAT1"), None, None, None)
             .unwrap();
         for id in ["FIRST", "SECOND", "UNORDERED"] {
-            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items.create_goal_summary(id, Some(id)).unwrap();
             work_items
-                .transition_gap_status(id, GapStatus::Todo)
+                .transition_goal_status(id, GoalStatus::Todo)
                 .unwrap();
-            work_items.assign_gap_to_feature("FEAT1", id).unwrap();
+            work_items.assign_goal_to_feature("FEAT1", id).unwrap();
         }
         for id in ["FIRST", "SECOND"] {
-            work_items.order_gap_in_feature("FEAT1", id).unwrap();
+            work_items.order_goal_in_feature("FEAT1", id).unwrap();
         }
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert!(automation.claim("SECOND").is_err());
         assert_eq!(automation.promote().unwrap(), 2);
         let state = automation.load_state().unwrap();
-        let claimed_gap_ids = state
+        let claimed_goal_ids = state
             .claims
             .iter()
-            .map(|claim| claim.gap_id.as_str())
+            .map(|claim| claim.goal_id.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(claimed_gap_ids, vec!["FIRST", "UNORDERED"]);
+        assert_eq!(claimed_goal_ids, vec!["FIRST", "UNORDERED"]);
 
         work_items
-            .bulk_update_gaps(
-                BulkGapSelection {
+            .bulk_update_goals(
+                BulkGoalSelection {
                     selected_ids: Some(vec!["FIRST".to_string()]),
                     ..Default::default()
                 },
-                crate::tools::product::work_items::BulkGapUpdate::Status("review".to_string()),
+                crate::tools::product::work_items::BulkGoalUpdate::Status("review".to_string()),
             )
             .unwrap();
         let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
@@ -1761,16 +1765,16 @@ mod tests {
         let second_claim = state
             .claims
             .iter()
-            .find(|claim| claim.gap_id == "SECOND")
+            .find(|claim| claim.goal_id == "SECOND")
             .map(|claim| claim.claim_id.clone())
             .unwrap();
         work_items
-            .bulk_update_gaps(
-                BulkGapSelection {
+            .bulk_update_goals(
+                BulkGoalSelection {
                     selected_ids: Some(vec!["FIRST".to_string()]),
                     ..Default::default()
                 },
-                crate::tools::product::work_items::BulkGapUpdate::Status("todo".to_string()),
+                crate::tools::product::work_items::BulkGoalUpdate::Status("todo".to_string()),
             )
             .unwrap();
         assert!(claim_automation.start_claim(&second_claim).is_err());
@@ -1779,7 +1783,7 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_fails_in_progress_gap_on_post_implementation_governance_violation() {
+    fn file_automation_fails_in_progress_goal_on_post_implementation_governance_violation() {
         let temp_root = unique_temp_dir("automation-governance");
         let target_root = temp_root.clone();
         let refine_dir = target_root.join(".refine");
@@ -1805,7 +1809,7 @@ mod tests {
                ;;\n\
              *)\n\
                printf '\\n# automated by smoke-ai governance violation\\n' >> app.py\n\
-               printf '%s\\n' 'smoke-ai gap-agent response'\n\
+               printf '%s\\n' 'smoke-ai goal-agent response'\n\
                ;;\n\
              esac\n",
         )
@@ -1826,13 +1830,13 @@ mod tests {
         }
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Governed implementation", Some("GAP1"))
+            .create_goal_summary("Governed implementation", Some("GOAL1"))
             .unwrap();
         work_items
-            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({"agent_cli": "smoke-ai"}))
@@ -1848,9 +1852,9 @@ mod tests {
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let error = automation.evaluate_workflow().unwrap_err();
         assert!(error.to_string().contains("Do not append smoke markers."));
-        let gap = work_items.show_gap_detail("GAP1").unwrap();
-        assert_eq!(gap["status"], "failed");
-        let latest = &gap["rounds"][0];
+        let goal = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(goal["status"], "failed");
+        let latest = &goal["rounds"][0];
         assert_eq!(latest["rule_state"], "failed");
         assert_eq!(latest["quality_state"], "unclassified");
         assert!(
@@ -1915,13 +1919,13 @@ mod tests {
         }
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Precommitted implementation", Some("GAP1"))
+            .create_goal_summary("Precommitted implementation", Some("GOAL1"))
             .unwrap();
         work_items
-            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -1935,8 +1939,8 @@ mod tests {
         assert_eq!(result.steps.len(), 1);
         assert_eq!(result.steps[0].commit.len(), 40);
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Review
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Review
         );
         assert_eq!(
             fs::read_to_string(target_root.join("agent.txt")).unwrap(),
@@ -1964,7 +1968,7 @@ mod tests {
         }
 
         fs::remove_dir_all(temp_root.parent().unwrap().join(format!(
-            "{}-refine-GAP1-round-1",
+            "{}-refine-GOAL1-round-1",
             temp_root.file_name().unwrap().to_string_lossy()
         )))
         .ok();
@@ -2012,13 +2016,13 @@ mod tests {
         }
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("No-op implementation", Some("GAP1"))
+            .create_goal_summary("No-op implementation", Some("GOAL1"))
             .unwrap();
         work_items
-            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -2032,8 +2036,8 @@ mod tests {
         assert_eq!(result.steps.len(), 1);
         assert_eq!(result.steps[0].commit, initial_head.trim());
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Review
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Review
         );
         assert_eq!(
             git_stdout(&target_root, &["rev-parse", "HEAD"])
@@ -2041,8 +2045,8 @@ mod tests {
                 .trim(),
             initial_head.trim()
         );
-        let gap = work_items.show_gap_detail("GAP1").unwrap();
-        let round_logs = gap["rounds"][0]["logs"].as_array().unwrap();
+        let goal = work_items.show_goal_detail("GOAL1").unwrap();
+        let round_logs = goal["rounds"][0]["logs"].as_array().unwrap();
         assert!(
             round_logs.iter().any(|log| {
                 log["message"].as_str() == Some("No implementation changes to commit")
@@ -2064,7 +2068,7 @@ mod tests {
         }
 
         fs::remove_dir_all(temp_root.parent().unwrap().join(format!(
-            "{}-refine-GAP1-round-1",
+            "{}-refine-GOAL1-round-1",
             temp_root.file_name().unwrap().to_string_lossy()
         )))
         .ok();
@@ -2090,7 +2094,7 @@ mod tests {
         git(&temp_root, &["add", "app.py"]).unwrap();
         git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
 
-        let branch = "refine/GAP1/round-1";
+        let branch = "refine/GOAL1/round-1";
         let worktree_path = temp_root.parent().unwrap().join(format!(
             "{}-{}",
             temp_root.file_name().unwrap().to_string_lossy(),
@@ -2137,16 +2141,16 @@ mod tests {
         }
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Retry existing worktree", Some("GAP1"))
+            .create_goal_summary("Retry existing worktree", Some("GOAL1"))
             .unwrap();
         work_items
-            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
             .unwrap();
         work_items
-            .update_gap_branch_name("GAP1", Some(branch))
+            .update_goal_branch_name("GOAL1", Some(branch))
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -2160,8 +2164,8 @@ mod tests {
         assert_eq!(result.steps.len(), 1);
         assert_eq!(result.steps[0].commit, precommitted.trim());
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Review
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Review
         );
         assert_eq!(
             fs::read_to_string(target_root.join("agent.txt")).unwrap(),
@@ -2181,7 +2185,7 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_fails_gap_reverts_merge_and_recreates_worktree_on_qa_failure() {
+    fn file_automation_fails_goal_reverts_merge_and_recreates_worktree_on_qa_failure() {
         let temp_root = unique_temp_dir("automation-qa-revert");
         let target_root = temp_root.clone();
         let refine_dir = target_root.join(".refine");
@@ -2202,7 +2206,7 @@ mod tests {
             &smoke_ai,
             "#!/bin/sh\n\
              printf 'qa should fail\\n' > fail-qa\n\
-             printf '%s\\n' 'smoke-ai gap-agent response'\n",
+             printf '%s\\n' 'smoke-ai goal-agent response'\n",
         )
         .unwrap();
         {
@@ -2212,7 +2216,7 @@ mod tests {
             fs::set_permissions(&smoke_ai, permissions).unwrap();
         }
 
-        let branch = "refine/GAP1/round-1";
+        let branch = "refine/GOAL1/round-1";
         let worktree_path = temp_root.parent().unwrap().join(format!(
             "{}-{}",
             temp_root.file_name().unwrap().to_string_lossy(),
@@ -2229,13 +2233,13 @@ mod tests {
         }
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Implementation with failing QA", Some("GAP1"))
+            .create_goal_summary("Implementation with failing QA", Some("GOAL1"))
             .unwrap();
         work_items
-            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -2251,8 +2255,8 @@ mod tests {
         let error = automation.evaluate_workflow().unwrap_err();
         assert!(error.to_string().contains("quality checks failed"));
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Failed
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Failed
         );
         assert!(!target_root.join("fail-qa").exists());
         assert!(worktree_path.exists());
@@ -2281,20 +2285,20 @@ mod tests {
         automation
             .pause(WorkflowPauseControl::AllAutomation)
             .unwrap();
-        assert!(automation.claim("GAP1").is_err());
+        assert!(automation.claim("GOAL1").is_err());
         automation
             .resume(WorkflowPauseControl::AllAutomation)
             .unwrap();
         FileProcessSupervisor::new(temp_root.join("run/8080"))
             .set_agents_paused(true)
             .unwrap();
-        assert!(automation.claim("GAP1").is_err());
+        assert!(automation.claim("GOAL1").is_err());
         FileProcessSupervisor::new(temp_root.join("run/8080"))
             .set_agents_paused(false)
             .unwrap();
 
-        let claim_id = automation.claim("GAP1").unwrap();
-        assert_eq!(automation.claim("GAP1").unwrap(), claim_id);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        assert_eq!(automation.claim("GOAL1").unwrap(), claim_id);
         let execution_id = automation.start_claim(&claim_id).unwrap();
         automation.cancel(&execution_id).unwrap();
         let state = automation.load_state().unwrap();
@@ -2314,24 +2318,24 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_pause_moves_in_progress_gaps_back_to_todo() {
+    fn file_automation_pause_moves_in_progress_goals_back_to_todo() {
         let temp_root = unique_temp_dir("automation-pause-rollback");
         let target_root = temp_root.join("target");
         let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
-            .create_gap_summary("Running work", Some("GAP1"))
+            .create_goal_summary("Running work", Some("GOAL1"))
             .unwrap();
         work_items
-            .transition_gap_status("GAP1", GapStatus::Todo)
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-        let claim_id = automation.claim("GAP1").unwrap();
+        let claim_id = automation.claim("GOAL1").unwrap();
         automation.start_claim(&claim_id).unwrap();
         work_items
-            .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+            .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
             .unwrap();
 
         let pause_state = automation.set_agent_workflow_paused(true).unwrap();
@@ -2345,8 +2349,8 @@ mod tests {
                 .contains(&WorkflowPauseControl::AllAutomation)
         );
         assert_eq!(
-            work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Todo
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Todo
         );
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims[0].state, WorkflowClaimState::Interrupted);

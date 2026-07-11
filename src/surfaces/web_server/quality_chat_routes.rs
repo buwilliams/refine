@@ -177,7 +177,7 @@ impl InProcessWebServer {
         let body = request.body.unwrap_or_else(|| json!({}));
         let owner_id = body
             .get("owner_id")
-            .or_else(|| body.get("gap_id"))
+            .or_else(|| body.get("goal_id"))
             .or_else(|| body.get("feature_id"))
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
@@ -239,8 +239,9 @@ impl InProcessWebServer {
     pub(super) fn handle_chat_start(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "start chat sessions");
         let body = request.body.unwrap_or_else(|| json!({}));
-        let attachment = if let Some(gap_id) = body.get("gap_id").and_then(|value| value.as_str()) {
-            ChatAttachment::Gap(gap_id.to_string())
+        let attachment = if let Some(goal_id) = body.get("goal_id").and_then(|value| value.as_str())
+        {
+            ChatAttachment::Goal(goal_id.to_string())
         } else if let Some(feature_id) = body.get("feature_id").and_then(|value| value.as_str()) {
             ChatAttachment::Feature(feature_id.to_string())
         } else {
@@ -448,13 +449,8 @@ impl InProcessWebServer {
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string(),
-                actual: body
-                    .get("actual")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                target: body
-                    .get("target")
+                prompt: body
+                    .get("prompt")
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string(),
@@ -471,7 +467,7 @@ impl InProcessWebServer {
                     201,
                     json!({
                         "ok": true,
-                        "gap": result.gap.gap,
+                        "goal": result.goal.goal,
                         "session_id": session_id,
                         "worktree": result.worktree
                     }),

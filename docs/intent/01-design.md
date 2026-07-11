@@ -4,7 +4,7 @@
 
 - **AI Agent First**: separate surfaces from the shared model and capabilities to make Refine agent first. Prefer installed AI agents through CLIs over direct provider APIs.
 - **Decentralized**: use flat files + Git + system caching instead of leveraging databases.
-- **Simple Nomenclature**: anyone can describe "a gap", what something does today and what it should do next. AIs do well when they are given outcomes with enough environmental considerations (context).
+- **Simple Nomenclature**: anyone can describe "a goal", what something does today and what it should do next. AIs do well when they are given outcomes with enough environmental considerations (context).
 - **Performant**: use low-level programming language (Rust) for maximum performance.
 - **Bounded Concerns**: do not implement authorization, authentication, or features AIs are likely to quickly subsume. Push those concerns upstream (authn/authx) or downstream (frontier models).
 - **Open To Everyone**: everyone, regardless of skill, can use Refine.
@@ -48,7 +48,7 @@ Refine should be understood through three system levels:
 - Capabilities: the active powers that run processes, let agents act, and move work through workflow.
 - Surfaces: the ways people and agents interact with those capabilities.
 
-The foundation should remain small. It defines the concepts future agents must preserve: node, Gap, Feature, target app, target-app state, logs, settings, and runtime state. These concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
+The foundation should remain small. It defines the concepts future agents must preserve: node, Goal, Feature, target app, target-app state, logs, settings, and runtime state. These concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
 
 The capabilities should be shared. Process, Agents, and Workflow should not belong to one UI, command, or integration. They are the system's durable powers. Agents contains the supporting capabilities that let agents act well: tools, guidance, import, quality, governance, merge, review, Git worktrees, activity, and evidence. Every surface should call into these capabilities rather than reimplementing them.
 
@@ -56,11 +56,11 @@ The surfaces should be replaceable. Browser, desktop, CLI, API, voice, and agent
 
 ## Intended Outcome
 
-Refine should become the local operating layer for agentic software work. It should let people and AI systems describe gaps between actual and desired software behavior, organize those gaps into larger features, preserve the context needed to act on them, and move the work through implementation, quality, review, and merge.
+Refine should become the local operating layer for agentic software work. It should let people and AI systems express work as direct Goal prompts, organize those Goals into larger Features, preserve the context needed to act on them, and move the work through implementation, quality, review, and merge.
 
 The long-term direction is software composition at scale: workflow, persistence, and orchestration for fleets of agents. If future AI systems find better internal designs, they should still preserve the product intent:
 
-- work is represented as understandable gaps and features,
+- work is represented as understandable goals and features,
 - agents receive enough context and guidance to act well,
 - state is durable, inspectable, and owned by the user,
 - surfaces are conveniences over shared capability,

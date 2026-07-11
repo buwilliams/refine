@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Direction Over Permission**: governance should guide work, risk, and review without turning Refine into an authorization system.
-- **Project Intent**: governance captures what the project cares about beyond a single Gap.
+- **Project Intent**: governance captures what the project cares about beyond a single Goal.
 - **Agent Context**: agents should receive governance concerns before they act, not after they cause avoidable damage.
 - **Review Pressure**: governance should shape which changes need evidence, escalation, or human judgment.
 - **Durable And Editable**: governance should be stored as target-app context that people and agents can inspect.
@@ -16,7 +16,7 @@ Refine should make those concerns explicit. Governance helps agents choose bette
 
 ## Expected Role
 
-Governance should act as a durable layer of project judgment. It should inform import extraction, Gap creation, planning, implementation, quality, review, merge readiness, and future automation.
+Governance should act as a durable layer of project judgment. It should inform import extraction, Goal creation, planning, implementation, quality, review, merge readiness, and future automation.
 
 Governance should not become broad capability denial. Refine's design favors mitigation greater than prevention: powerful tools remain available, but governance should increase visibility, evidence, and review pressure where the project says risk matters.
 

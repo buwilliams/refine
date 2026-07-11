@@ -2,8 +2,8 @@
 //
 // Lists refine merge commits on the configured merge target branch (or the
 // host's current branch if no target is set). Each row links the commit
-// to its Gap and offers an Undo button — Undo runs `git revert -m 1` on
-// the merge commit, pushes if there's an upstream, and moves the Gap to
+// to its Goal and offers an Undo button — Undo runs `git revert -m 1` on
+// the merge commit, pushes if there's an upstream, and moves the Goal to
 // `cancelled` with a log entry.
 
 const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
@@ -78,7 +78,7 @@ async function renderChanges() {
             <input type="text" id="changes-q"
                    class="filter-grow"
                    data-testid="changes-search"
-                   placeholder="Search gap, commit, or status..."
+                   placeholder="Search goal, commit, or status..."
                    value="${htmlEscape(f.q)}">
           </div>
           <div class="filter-row filter-row-filters">
@@ -201,7 +201,7 @@ function drawChanges(data, f) {
       <p class="muted" data-testid="changes-empty-state">
         ${f.q || f.status || f.priority
           ? `No changes match the current filters on <code>${htmlEscape(branch)}</code>.`
-          : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When the Merge agent lands a Gap, its merge commit shows up here.`}
+          : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When the Merge agent lands a Goal, its merge commit shows up here.`}
       </p>
       ${renderPaginationControls("changes", pageMeta, 0, "change")}`;
     bindPaginationControls(root, "changes", (page) =>
@@ -210,7 +210,7 @@ function drawChanges(data, f) {
   }
   const columns = [
     { key: "committed", label: "When" },
-    { key: "gap", label: "Gap" },
+    { key: "goal", label: "Goal" },
     { key: "status", label: "Status" },
     { key: "priority", label: "Priority" },
     { key: "assignee", label: "Assignee" },
@@ -230,16 +230,16 @@ function drawChanges(data, f) {
   root.innerHTML = `
     <p class="muted small" style="margin-bottom:10px" data-testid="changes-branch-info">
       Merges on <code>${htmlEscape(branch)}</code> (newest first).
-      Each row maps to a Gap via the <code>Refine Gap:</code> trailer in
+      Each row maps to a Goal via the <code>Refine Goal:</code> trailer in
       the commit message.
     </p>
     <table class="table changes-table mobile-card-table" data-testid="changes-table">
       <thead><tr>${sortHeads}<th></th></tr></thead>
       <tbody>
         ${changes.map((c) => `
-          <tr data-commit="${htmlEscape(c.commit)}" data-gap-id="${htmlEscape(c.gap_id)}" data-testid="changes-row">
+          <tr data-commit="${htmlEscape(c.commit)}" data-goal-id="${htmlEscape(c.goal_id)}" data-testid="changes-row">
             <td class="muted small" data-label="When">${fmtTime(c.committed)}</td>
-            <td data-label="Gap" data-testid="changes-gap-cell">${renderChangeGapCell(c)}</td>
+            <td data-label="Goal" data-testid="changes-goal-cell">${renderChangeGoalCell(c)}</td>
             <td data-label="Status" data-testid="changes-status-cell">${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
             <td data-label="Priority" data-testid="changes-priority-cell">${c.priority
               ? `<span class="priority-pill priority-${c.priority}">${c.priority}</span>`
@@ -266,13 +266,13 @@ function drawChanges(data, f) {
       e.stopPropagation();
       const commit = btn.dataset.undoCommit;
       const row = btn.closest("tr");
-      const gapName = row?.querySelector("td:nth-child(2)")?.textContent?.trim() || "this Gap";
+      const goalName = row?.querySelector("td:nth-child(2)")?.textContent?.trim() || "this Goal";
       const ok = await modalConfirm(
-        `Revert the merge commit ${commit.slice(0, 10)}... for ${gapName}? ` +
+        `Revert the merge commit ${commit.slice(0, 10)}... for ${goalName}? ` +
         "Refine will run `git revert -m 1`, push to the upstream if one " +
-        "exists, and move the Gap to `cancelled`. The original commits " +
+        "exists, and move the Goal to `cancelled`. The original commits " +
         "stay in history; the revert is a new commit on top.",
-        { title: "Undo Gap", okLabel: "Undo", cancelLabel: "Keep merge",
+        { title: "Undo Goal", okLabel: "Undo", cancelLabel: "Keep merge",
           danger: true },
       );
       if (!ok) return;
@@ -336,7 +336,7 @@ function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
     }
     const bucket = buckets.get(label);
     bucket.total += 1;
-    if (change.gap_id) bucket.linked += 1;
+    if (change.goal_id) bucket.linked += 1;
   });
   const rows = Array.from(buckets.values()).sort((a, b) => b.label.localeCompare(a.label));
   if (!rows.length) {
@@ -355,18 +355,18 @@ function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
             <div class="logs-visualization-bar changes-visualization-bar" aria-hidden="true">
               <span class="info" style="width:${width}%"></span>
             </div>
-            <span class="logs-visualization-counts changes-bucket-linked" data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Gap" : "Gaps"}</span>
+            <span class="logs-visualization-counts changes-bucket-linked" data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Goal" : "Goals"}</span>
           </div>`;
       }).join("")}
     </section>`;
 }
 
-function renderChangeGapCell(change = {}) {
-  const gapId = String(change.gap_id || "").trim();
+function renderChangeGoalCell(change = {}) {
+  const goalId = String(change.goal_id || "").trim();
   const name = String(change.name || "").trim();
-  const label = name || (gapId ? `Gap ${gapId}` : "Unlinked Gap");
-  if (!gapId) return `<span class="muted">${htmlEscape(label)}</span>`;
-  return `<a href="#/gaps/${htmlEscape(gapId)}" ${name ? "" : `class="muted"`}>${htmlEscape(label)}</a>`;
+  const label = name || (goalId ? `Goal ${goalId}` : "Unlinked Goal");
+  if (!goalId) return `<span class="muted">${htmlEscape(label)}</span>`;
+  return `<a href="#/goals/${htmlEscape(goalId)}" ${name ? "" : `class="muted"`}>${htmlEscape(label)}</a>`;
 }
 
 function applyChangesFilterIndicator(f) {

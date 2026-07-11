@@ -9,7 +9,7 @@ use support::integration::IntegrationFixture;
 
 #[test]
 #[ignore]
-fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
+fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     let provider = deterministic_provider_script();
     let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
@@ -24,7 +24,7 @@ fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
             "agent_cli": "smoke-ai",
             "quality_enabled": "1",
             "target_app_test_command": "printf target-tests-ok",
-            "branch_name_pattern": "refine/{gap_id}"
+            "branch_name_pattern": "refine/{goal_id}"
         }),
     );
     fixture.api_json(
@@ -37,10 +37,10 @@ fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
         }),
     );
 
-    let gap_id = fixture.create_gap("full workflow git-backed gap");
-    let transition = fixture.run_refine(&["workflow", "transition", &gap_id, "todo"]);
-    fixture.assert_success("transition gap to todo", &transition);
-    wait_for_gap_status(&fixture, &gap_id, "review");
+    let goal_id = fixture.create_goal("full workflow git-backed goal");
+    let transition = fixture.run_refine(&["workflow", "transition", &goal_id, "todo"]);
+    fixture.assert_success("transition goal to todo", &transition);
+    wait_for_goal_status(&fixture, &goal_id, "review");
 
     let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
     assert!(
@@ -49,37 +49,35 @@ fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
     );
     let log = git(&fixture.app_root, &["log", "--oneline", "--decorate", "-5"]);
     assert!(
-        log.contains(&format!("Implement {gap_id} round 1")),
+        log.contains(&format!("Implement {goal_id} round 1")),
         "missing implementation commit in target app log:\n{log}"
     );
 
-    let shown = fixture.run_refine(&["gap", "show", &gap_id]);
-    fixture.assert_success("gap show after workflow", &shown);
-    let gap = fixture.json_stdout(&shown);
-    let latest = &gap["gap"]["rounds"][0];
-    assert_eq!(gap["gap"]["status"], "review", "{gap:#}");
+    let shown = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after workflow", &shown);
+    let goal = fixture.json_stdout(&shown);
+    let latest = &goal["goal"]["rounds"][0];
+    assert_eq!(goal["goal"]["status"], "review", "{goal:#}");
     assert_eq!(
-        gap["gap"]["branch_name"],
-        format!("refine/{gap_id}/round-1")
+        goal["goal"]["branch_name"],
+        format!("refine/{goal_id}/round-1")
     );
-    assert_eq!(latest["quality_state"], "passed", "{gap:#}");
-    assert_eq!(latest["rule_state"], "passed", "{gap:#}");
+    assert_eq!(latest["quality_state"], "passed", "{goal:#}");
+    assert_eq!(latest["rule_state"], "passed", "{goal:#}");
 
     let round = fixture.run_refine(&[
-        "gap",
+        "goal",
         "round",
-        &gap_id,
+        &goal_id,
         "--reporter",
         "QA",
-        "--actual",
-        "First round needs another deterministic pass",
-        "--target",
-        "Second round is queued through todo",
+        "--prompt",
+        "Queue a second deterministic pass through todo",
     ]);
     fixture.assert_success("submit second round from review", &round);
     let round_payload = fixture.json_stdout(&round);
-    assert_eq!(round_payload["gap"]["status"], "todo", "{round_payload:#}");
-    assert_eq!(round_payload["gap"]["round_count"], 2, "{round_payload:#}");
+    assert_eq!(round_payload["goal"]["status"], "todo", "{round_payload:#}");
+    assert_eq!(round_payload["goal"]["round_count"], 2, "{round_payload:#}");
 
     unsafe {
         if let Some(previous) = previous_provider {
@@ -90,16 +88,16 @@ fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
     }
 }
 
-fn wait_for_gap_status(fixture: &IntegrationFixture, gap_id: &str, expected: &str) {
+fn wait_for_goal_status(fixture: &IntegrationFixture, goal_id: &str, expected: &str) {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        let status = fixture.gap_field(gap_id, "status");
+        let status = fixture.goal_field(goal_id, "status");
         if status.as_str() == Some(expected) {
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "Gap {gap_id} did not reach {expected}; latest status was {status}"
+            "Goal {goal_id} did not reach {expected}; latest status was {status}"
         );
         thread::sleep(Duration::from_millis(100));
     }

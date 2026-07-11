@@ -16,7 +16,7 @@ The purpose of a surface is to make shared capability usable in a context, not t
 
 ## Expected Role
 
-Every surface should preserve the same underlying model and workflow semantics. If a Gap cannot transition in the browser, it should not be secretly allowed by the CLI. If a Feature order matters in workflow, the UI should explain it rather than hide it.
+Every surface should preserve the same underlying model and workflow semantics. If a Goal cannot transition in the browser, it should not be secretly allowed by the CLI. If a Feature order matters in workflow, the UI should explain it rather than hide it.
 
 Surfaces should:
 

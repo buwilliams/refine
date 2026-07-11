@@ -128,7 +128,7 @@ impl ManagedProcess {
                 .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
                 .and_then(|details| details.as_object().cloned())
         {
-            for key in ["gap_id", "session_id", "mode", "round_idx"] {
+            for key in ["goal_id", "session_id", "mode", "round_idx"] {
                 if let Some(field) = details.get(key) {
                     object.insert(key.to_string(), field.clone());
                 }
@@ -148,7 +148,7 @@ impl ManagedProcess {
 
 pub fn workflow_subprocess_metadata(
     execution_id: &str,
-    gap_id: &str,
+    goal_id: &str,
     workflow_state: &str,
     behavior: &str,
     round_idx: Option<usize>,
@@ -156,7 +156,7 @@ pub fn workflow_subprocess_metadata(
     let mut metadata = Map::new();
     metadata.insert("kind".to_string(), json!("workflow"));
     metadata.insert("execution_id".to_string(), json!(execution_id));
-    metadata.insert("gap_id".to_string(), json!(gap_id));
+    metadata.insert("goal_id".to_string(), json!(goal_id));
     metadata.insert("workflow_state".to_string(), json!(workflow_state));
     metadata.insert("behavior".to_string(), json!(behavior));
     if let Some(round_idx) = round_idx {

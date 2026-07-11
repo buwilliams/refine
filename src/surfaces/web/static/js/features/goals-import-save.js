@@ -23,7 +23,7 @@ function drawImportSaving(root, session, close, saveSession = null) {
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
     const ok = await modalConfirm(
-      "Cancel this import? Refine will stop the save operation and roll back Gaps created by this import.",
+      "Cancel this import? Refine will stop the save operation and roll back Goals created by this import.",
       { title: "Cancel import", okLabel: "Cancel import", danger: true },
     );
     if (!ok) return;
@@ -110,21 +110,21 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
   if (failures.length) {
     const failedDrafts = failures.map((failure) => {
       const original = payload[(failure.index || 1) - 1] || {};
-      const duplicate = failure.code === "duplicate_gap"
+      const duplicate = failure.code === "duplicate_goal"
         ? failure.duplicate?.match
         : null;
       return {
         ...original,
         ...(failure.draft || {}),
         duplicate,
-        error: failure.error || failure.message || "Could not save this Gap.",
+        error: failure.error || failure.message || "Could not save this Goal.",
       };
     });
     if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, operationId: "", result: r });
     toast(
       root.isConnected
-        ? `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`
-        : `Import created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} draft${failures.length === 1 ? "" : "s"} need fixes. Reopen Import to continue.`,
+        ? `Created ${createdCount} goal${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`
+        : `Import created ${createdCount} goal${createdCount === 1 ? "" : "s"}; ${failures.length} draft${failures.length === 1 ? "" : "s"} need fixes. Reopen Import to continue.`,
       "error",
     );
     if (root.isConnected) {
@@ -138,7 +138,7 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
     const duplicateText = handledDuplicates
       ? `; handled ${handledDuplicates} duplicate${handledDuplicates === 1 ? "" : "s"}`
       : "";
-    toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
+    toast(`Created ${createdCount} goal(s)${duplicateText}`, "info");
     if (options.clearSession !== false) clearImportSession();
     if (root.isConnected) close(true, { force: true });
   }
