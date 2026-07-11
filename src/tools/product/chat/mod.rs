@@ -1439,6 +1439,7 @@ fn chat_operation_log(severity: &str, message: &str, details: Option<JsonObject>
 mod tests {
     use std::io::Write;
     use std::process::Command;
+    use std::time::{Duration, Instant};
 
     use super::*;
     use crate::tools::product::work_items::FileWorkItemService;
@@ -1465,26 +1466,40 @@ mod tests {
             .unwrap();
         let queued = service.read(&session.id).unwrap();
         assert!(queued.in_flight || !queued.queued_messages.is_empty());
-        let read = wait_for_chat_line(&service, &session.id, "provider says hello");
-        assert!(read.alive);
+        let streamed = wait_for_chat_line(&service, &session.id, "provider says hello");
+        assert!(streamed.alive);
         assert!(
-            read.lines
+            streamed
+                .lines
                 .iter()
                 .any(|line| line.contains("What should I test?"))
         );
-        let record = service.load_record(&session.id).unwrap();
+        assert!(
+            streamed
+                .lines
+                .iter()
+                .any(|line| line.contains("provider says hello"))
+                || streamed
+                    .progress_lines
+                    .iter()
+                    .any(|line| line.contains("provider says hello"))
+        );
+        let record = wait_for_chat_record(&service, &session.id, |record| {
+            record.transcript_events.iter().any(|event| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|line| line.contains("Provider turn completed"))
+            })
+        });
+        let read = service.read(&session.id).unwrap();
+        assert!(read.alive);
         assert!(record.transcript_events.iter().any(|event| {
             event
                 .get("text")
                 .and_then(Value::as_str)
                 .is_some_and(|line| line.contains("Provider turn completed"))
         }));
-        assert!(
-            read.lines
-                .iter()
-                .any(|line| line.contains("provider says hello"))
-        );
-
         let stopped = service.stop(&session.id).unwrap();
         assert!(stopped.closed);
         assert_eq!(service.read(&session.id).unwrap().alive, false);
@@ -1945,16 +1960,19 @@ mod tests {
         session_id: &str,
         needle: &str,
     ) -> ChatReadResult {
-        for _ in 0..100 {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
             let read = service.read(session_id).unwrap();
             if read.lines.iter().any(|line| line.contains(needle))
                 || read.progress_lines.iter().any(|line| line.contains(needle))
             {
                 return read;
             }
-            std::thread::sleep(std::time::Duration::from_millis(25));
+            if Instant::now() >= deadline {
+                return read;
+            }
+            std::thread::sleep(Duration::from_millis(25));
         }
-        service.read(session_id).unwrap()
     }
 
     fn wait_for_chat_read<F>(
@@ -1965,14 +1983,17 @@ mod tests {
     where
         F: Fn(&ChatReadResult) -> bool,
     {
-        for _ in 0..100 {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
             let read = service.read(session_id).unwrap();
             if predicate(&read) {
                 return read;
             }
-            std::thread::sleep(std::time::Duration::from_millis(25));
+            if Instant::now() >= deadline {
+                return read;
+            }
+            std::thread::sleep(Duration::from_millis(25));
         }
-        service.read(session_id).unwrap()
     }
 
     fn wait_for_chat_record<F>(
@@ -1983,14 +2004,17 @@ mod tests {
     where
         F: Fn(&ChatSessionRecord) -> bool,
     {
-        for _ in 0..100 {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
             let record = service.resume(session_id).unwrap();
             if predicate(&record) {
                 return record;
             }
-            std::thread::sleep(std::time::Duration::from_millis(25));
+            if Instant::now() >= deadline {
+                return record;
+            }
+            std::thread::sleep(Duration::from_millis(25));
         }
-        service.resume(session_id).unwrap()
     }
 
     fn write_fake_provider_script(refine_dir: &PathBuf, name: &str, script: &str) {

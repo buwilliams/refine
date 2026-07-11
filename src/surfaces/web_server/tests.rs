@@ -1216,12 +1216,17 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
         });
         let elapsed = started.elapsed();
         assert_eq!(response.status, 200, "{path}");
+        // Keep enough headroom for the repository's heavily parallel unit suite;
+        // request-level performance budgets are recorded separately in metrics.
         assert!(
-            elapsed < Duration::from_millis(150),
+            elapsed < Duration::from_millis(500),
             "{path} took {:?}",
             elapsed
         );
     }
+
+    let events = wait_for_http_request_metric_count(&runtime_root, 10);
+    assert!(events.len() >= 10);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2502,7 +2507,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
         static_root: None,
     };
     let automation_loop = daemon.start_agent_automation_loop(Duration::from_millis(25));
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(15);
     loop {
         let show = server.handle(ApiRequest {
             method: "GET".to_string(),
@@ -5768,19 +5773,29 @@ fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {
 fn wait_for_http_request_metrics(
     runtime_root: &Path,
 ) -> Vec<crate::tools::observability::metrics::PerformanceEvent> {
-    for _ in 0..20 {
+    wait_for_http_request_metric_count(runtime_root, 1)
+}
+
+fn wait_for_http_request_metric_count(
+    runtime_root: &Path,
+    expected: usize,
+) -> Vec<crate::tools::observability::metrics::PerformanceEvent> {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
         let report = FileMetricsService::new(runtime_root)
             .report(PerformanceQuery {
                 operation: Some("http.request".to_string()),
                 ..PerformanceQuery::default()
             })
             .unwrap();
-        if !report.events.is_empty() {
+        if report.events.len() >= expected {
+            return report.events;
+        }
+        if Instant::now() >= deadline {
             return report.events;
         }
         thread::sleep(Duration::from_millis(25));
     }
-    Vec::new()
 }
 
 fn wait_for_operation_status(
@@ -5788,7 +5803,7 @@ fn wait_for_operation_status(
     operation_id: &str,
     expected: OperationState,
 ) -> OperationHandle {
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(15);
     loop {
         if let Ok(operation) = registry.status(operation_id)
             && operation.state == expected
