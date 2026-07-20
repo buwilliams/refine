@@ -1232,13 +1232,6 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub fn merge_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
-        let current = self.show_goal_summary(goal_id)?;
-        validate_goal_operation(&current.goal.status, &GoalOperation::Merge)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::Done)?;
-        self.show_goal_summary(goal_id)
-    }
-
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::Undo)?;
@@ -1255,19 +1248,15 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub fn start_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
-        let current = self.show_goal_summary(goal_id)?;
-        validate_goal_operation(&current.goal.status, &GoalOperation::StartImplementation)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::InProgress)?;
-        self.show_goal_summary(goal_id)
-    }
-
     pub fn start_goal_workflow(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
-        if current.goal.status == GoalStatus::Backlog {
-            self.transition_goal_status(goal_id, GoalStatus::Todo)?;
+        match current.goal.status {
+            GoalStatus::Backlog => self.transition_goal_status(goal_id, GoalStatus::Todo),
+            GoalStatus::Todo => Ok(current),
+            _ => Err(RefineError::InvalidInput(format!(
+                "Goal {goal_id} can only be queued from backlog or todo"
+            ))),
         }
-        self.start_goal_summary(goal_id)
     }
 
     pub fn advance_automated_goal_status(

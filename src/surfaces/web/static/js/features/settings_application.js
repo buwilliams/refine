@@ -85,9 +85,9 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
       })}
       ${renderSettingsEditableField({
         id: "s-merge-target",
-        label: "Merge target branch",
+        label: "Integration branch",
         guideItemId: "application-merge-target",
-        description: "branch all Goal worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
+        description: "branch all Goal worktrees are based on and approved implementations land on. Leave blank to follow the attached project's current branch.",
         valueLabel: s.merge_target_branch || "",
         control: `<input type="text" id="s-merge-target"
                          placeholder="e.g. main"
@@ -161,12 +161,12 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         id: "s-target-auto-build",
         label: "Automatic application build",
         guideItemId: "application-auto-build",
-        description: "controls when Refine builds merged work before it becomes ready for review.",
+        description: "controls when Refine builds isolated candidate work before review.",
         valueLabel: targetAppAutoBuildLabel(autoBuildMode),
         control: `<select id="s-target-auto-build">
           ${[
             ["never", "Never"],
-            ["on_worktree_merge", "On worktree merge"],
+            ["on_worktree_merge", "When candidate is ready"],
             ["hourly", "Hourly"],
             ["daily", "Daily (time)"],
           ].map(([v, lbl]) => `<option value="${v}" ${autoBuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}

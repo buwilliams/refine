@@ -15,6 +15,7 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::logs::FileLogService;
@@ -25,6 +26,7 @@ use crate::tools::product::imports::{
     import_extraction_prompt, order_feature_dependency_drafts, parse_provider_import_result,
     parse_structured_import_result,
 };
+use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GoalProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
@@ -687,11 +689,34 @@ impl InProcessWebServer {
         let service = self.work_item_service(refine_dir);
         let result = match action {
             "start" => service.start_goal_workflow(goal_id),
-            "verify" => service.verify_goal_summary(goal_id),
+            "approve" => {
+                let Some(runtime_root) = &self.runtime_root else {
+                    return runtime_root_unavailable("approve reviewed Goals");
+                };
+                FileMergerService::new(runtime_root, &service.refine_dir)
+                    .approve_reviewed_goal(goal_id)
+            }
+            "verify" => match service.show_goal_summary(goal_id) {
+                Ok(goal) if goal.goal.status == GoalStatus::Review => {
+                    let Some(runtime_root) = &self.runtime_root else {
+                        return runtime_root_unavailable("approve reviewed Goals");
+                    };
+                    FileMergerService::new(runtime_root, &service.refine_dir)
+                        .approve_reviewed_goal(goal_id)
+                }
+                Ok(_) => service.verify_goal_summary(goal_id),
+                Err(error) => Err(error),
+            },
+            "merge" => {
+                let Some(runtime_root) = &self.runtime_root else {
+                    return runtime_root_unavailable("approve reviewed Goals");
+                };
+                FileMergerService::new(runtime_root, &service.refine_dir)
+                    .approve_reviewed_goal(goal_id)
+            }
             "retry-quality" => service.retry_goal_quality_summary(goal_id),
             "retry-merge" => service.retry_goal_merge_summary(goal_id),
             "submit-merge" => service.submit_goal_for_merge_summary(goal_id),
-            "merge" => service.merge_goal_summary(goal_id),
             "undo" => service.undo_goal_summary(goal_id),
             _ => {
                 return ApiResponse::json(
@@ -2287,9 +2312,10 @@ impl InProcessWebServer {
                 .find(|change| change.commit == commit)
                 .and_then(|change| change.goal_id.clone())
         });
-        match FileGitWorktreeService::with_runtime_root(target_root, runtime_root)
-            .revert_commit(commit)
-        {
+        match with_repository_git_lock(&target_root, || {
+            FileGitWorktreeService::with_runtime_root(&target_root, runtime_root)
+                .revert_commit(commit)
+        }) {
             Ok(result) => {
                 let cancelled_goal = if result.ok {
                     match linked_goal_id.as_deref() {
@@ -2568,7 +2594,9 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("hard-reset Git worktree");
         };
-        match FileGitWorktreeService::with_runtime_root(target_root, runtime_root).hard_reset() {
+        match with_repository_git_lock(&target_root, || {
+            FileGitWorktreeService::with_runtime_root(&target_root, runtime_root).hard_reset()
+        }) {
             Ok(result) => ApiResponse::json(
                 200,
                 json!({

@@ -40,7 +40,6 @@ async function init() {
       }
       initTargetAppToggle();
       initSSE();
-      if (typeof scheduleStartupProjectSync === "function") scheduleStartupProjectSync();
       if (typeof scheduleMainScreenPrefetch === "function") scheduleMainScreenPrefetch();
     }, 250);
   }

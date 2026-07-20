@@ -126,6 +126,8 @@ static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry
 
 const AGENT_WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_GIT_SYNC_INTERVAL: Duration = Duration::from_secs(300);
+const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
@@ -277,14 +279,47 @@ impl LocalHttpDaemon {
         let thread_stop = Arc::clone(&stop);
         let server = self.server.clone();
         let handle = thread::spawn(move || {
+            let mut active_root = None;
+            let mut last_reconciled_fingerprint = None;
+            let mut next_remote_sync = Instant::now();
+            let mut next_attempt = Instant::now();
             while !thread_stop.load(Ordering::Relaxed) {
-                let (enabled, interval) =
-                    git_sync_configuration(&server).unwrap_or((true, DEFAULT_GIT_SYNC_INTERVAL));
-                if enabled {
-                    let _ = server.try_sync_current_project_git();
-                    let _ = server.refresh_projection_cache_after_mutation();
+                let now = Instant::now();
+                if now >= next_attempt
+                    && let Ok(Some(service)) = server.current_git_sync_service()
+                {
+                    let root = service
+                        .target_root
+                        .canonicalize()
+                        .unwrap_or_else(|_| service.target_root.clone());
+                    if active_root.as_ref() != Some(&root) {
+                        active_root = Some(root);
+                        last_reconciled_fingerprint = None;
+                        next_remote_sync = now;
+                    }
+                    if let Ok(fingerprint) = service.durable_state_fingerprint() {
+                        let local_change = last_reconciled_fingerprint != Some(fingerprint);
+                        if local_change || now >= next_remote_sync {
+                            match service.try_sync() {
+                                Ok(result) if !result.deferred => {
+                                    last_reconciled_fingerprint = service
+                                        .durable_state_fingerprint()
+                                        .ok()
+                                        .or(Some(fingerprint));
+                                    next_remote_sync = now
+                                        + git_sync_configuration(&server)
+                                            .unwrap_or(DEFAULT_GIT_SYNC_INTERVAL);
+                                    next_attempt = now;
+                                    let _ = server.refresh_projection_cache_after_mutation();
+                                }
+                                Ok(_) | Err(_) => {
+                                    next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
+                                }
+                            }
+                        }
+                    }
                 }
-                sleep_until_stopped(&thread_stop, interval);
+                sleep_until_stopped(&thread_stop, GIT_RECONCILE_POLL_INTERVAL);
             }
         });
         GitSyncLoop {
@@ -881,35 +916,34 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     };
     let automation = WorkflowEngine::with_target_root(runtime_root, target_root);
     let result = automation.evaluate_workflow();
-    let _ = server.sync_current_project_git();
     let refresh_result = server.refresh_projection_cache_after_mutation();
     result?;
     refresh_result?;
     Ok(())
 }
 
-fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<(bool, Duration)> {
+fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<Duration> {
     let Some(runtime_root) = &server.runtime_root else {
-        return Ok((false, DEFAULT_GIT_SYNC_INTERVAL));
+        return Ok(DEFAULT_GIT_SYNC_INTERVAL);
     };
     let Some(refine_dir) = server.current_refine_dir()? else {
-        return Ok((false, DEFAULT_GIT_SYNC_INTERVAL));
+        return Ok(DEFAULT_GIT_SYNC_INTERVAL);
     };
     let settings = FileSettingsService::with_active_root(refine_dir, runtime_root).load()?;
-    Ok(git_sync_schedule(
+    Ok(git_sync_interval(
         settings.get("project_update_pulse_interval_seconds"),
     ))
 }
 
-fn git_sync_schedule(value: Option<&Value>) -> (bool, Duration) {
+fn git_sync_interval(value: Option<&Value>) -> Duration {
     let seconds = value
         .and_then(Value::as_str)
         .and_then(|value| value.trim().parse::<i64>().ok())
         .unwrap_or(DEFAULT_GIT_SYNC_INTERVAL.as_secs() as i64);
     if seconds <= 0 {
-        return (false, DEFAULT_GIT_SYNC_INTERVAL);
+        return DEFAULT_GIT_SYNC_INTERVAL;
     }
-    (true, Duration::from_secs(seconds as u64))
+    Duration::from_secs(seconds as u64)
 }
 
 #[cfg(test)]
@@ -918,14 +952,14 @@ mod git_sync_schedule_tests {
 
     #[test]
     fn project_update_pulse_controls_git_sync_cadence() {
-        assert_eq!(git_sync_schedule(None), (true, Duration::from_secs(300)));
+        assert_eq!(git_sync_interval(None), Duration::from_secs(300));
         assert_eq!(
-            git_sync_schedule(Some(&Value::String("30".to_string()))),
-            (true, Duration::from_secs(30))
+            git_sync_interval(Some(&Value::String("30".to_string()))),
+            Duration::from_secs(30)
         );
         assert_eq!(
-            git_sync_schedule(Some(&Value::String("-1".to_string()))),
-            (false, Duration::from_secs(300))
+            git_sync_interval(Some(&Value::String("-1".to_string()))),
+            Duration::from_secs(300)
         );
     }
 }

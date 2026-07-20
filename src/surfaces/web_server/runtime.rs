@@ -11,7 +11,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
+use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -49,26 +49,15 @@ static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectio
     OnceLock::new();
 
 impl InProcessWebServer {
-    pub(super) fn sync_current_project_git(&self) -> RefineResult<GitSyncResult> {
-        self.sync_current_project_git_with(|service| service.sync())
-    }
-
-    pub(super) fn try_sync_current_project_git(&self) -> RefineResult<GitSyncResult> {
-        self.sync_current_project_git_with(|service| service.try_sync())
-    }
-
-    fn sync_current_project_git_with(
-        &self,
-        sync: impl FnOnce(FileGitSyncService) -> RefineResult<GitSyncResult>,
-    ) -> RefineResult<GitSyncResult> {
+    pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
         let Some(target_root) = self.current_target_root()? else {
-            return Ok(GitSyncResult::default());
+            return Ok(None);
         };
         let runtime_root = self
             .runtime_root
             .clone()
             .unwrap_or_else(|| target_root.join(".refine/runtime"));
-        sync(FileGitSyncService::new(target_root, runtime_root))
+        Ok(Some(FileGitSyncService::new(target_root, runtime_root)))
     }
 
     pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {

@@ -1,10 +1,8 @@
 // ---- Changes ----------------------------------------------------------------
 //
-// Lists refine merge commits on the configured merge target branch (or the
-// host's current branch if no target is set). Each row links the commit
-// to its Goal and offers an Undo button — Undo runs `git revert -m 1` on
-// the merge commit, pushes if there's an upstream, and moves the Goal to
-// `cancelled` with a log entry.
+// Lists approved implementation commits on the configured integration branch.
+// Each implementation links to its Goal and offers an Undo button; Refine owns
+// the repository operation and moves the linked Goal to cancelled.
 
 const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const CHANGES_DEFAULT_LIMIT = 50;
@@ -190,7 +188,7 @@ function drawChanges(data, f) {
   if (!branch || branch === "(unknown)") {
     root.innerHTML = `
       <p class="muted" data-testid="changes-branch-unresolved">
-        No merge target branch resolved. Set <code>merge_target_branch</code>
+        No integration branch resolved. Set <code>merge_target_branch</code>
         in <a href="#/node/target-app">Node → Target App Config</a>, or check that the host
         repo has a branch checked out.
       </p>`;
@@ -201,7 +199,7 @@ function drawChanges(data, f) {
       <p class="muted" data-testid="changes-empty-state">
         ${f.q || f.status || f.priority
           ? `No changes match the current filters on <code>${htmlEscape(branch)}</code>.`
-          : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When the Merge agent lands a Goal, its merge commit shows up here.`}
+          : `No approved implementations on <code>${htmlEscape(branch)}</code> yet. When a reviewed Goal is approved, its integration commit shows up here.`}
       </p>
       ${renderPaginationControls("changes", pageMeta, 0, "change")}`;
     bindPaginationControls(root, "changes", (page) =>
@@ -268,10 +266,9 @@ function drawChanges(data, f) {
       const row = btn.closest("tr");
       const goalName = row?.querySelector("td:nth-child(2)")?.textContent?.trim() || "this Goal";
       const ok = await modalConfirm(
-        `Revert the merge commit ${commit.slice(0, 10)}... for ${goalName}? ` +
-        "Refine will run `git revert -m 1`, push to the upstream if one " +
-        "exists, and move the Goal to `cancelled`. The original commits " +
-        "stay in history; the revert is a new commit on top.",
+        `Undo implementation ${commit.slice(0, 10)}... for ${goalName}? ` +
+        "Refine will reverse the approved implementation, reconcile the project, " +
+        "and move the linked Goal to cancelled.",
         { title: "Undo Goal", okLabel: "Undo", cancelLabel: "Keep merge",
           danger: true },
       );

@@ -126,6 +126,33 @@ impl FileGitWorktreeService {
             .collect::<Vec<_>>())
     }
 
+    pub fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
+        if remote.trim().is_empty() {
+            return Ok(false);
+        }
+        Ok(self.git_raw(&["remote", "get-url", remote])?.success)
+    }
+
+    pub fn ensure_branch_from_remote(&self, remote: &str, branch: &str) -> RefineResult<()> {
+        validate_branch_name(branch)?;
+        if self.branch_exists(branch)? {
+            return Ok(());
+        }
+        if !self.remote_exists(remote)? {
+            return Err(RefineError::NotFound(format!(
+                "Git remote {remote} was not found"
+            )));
+        }
+        self.git_output(&["fetch", remote, branch])?;
+        let remote_branch = format!("{remote}/{branch}");
+        self.git_output(&["branch", branch, &remote_branch])?;
+        self.audit(
+            "branch_fetch",
+            "ok",
+            json!({"remote": remote, "branch": branch}),
+        )
+    }
+
     pub fn head_ref(&self) -> RefineResult<GitHeadRef> {
         let branch_output = self.git_raw(&["branch", "--show-current"])?;
         let branch = if branch_output.success {

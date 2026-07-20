@@ -121,7 +121,8 @@ pub struct WorkflowStepResult {
     pub provider: String,
     pub branch: String,
     pub commit: String,
-    pub merge: MergeResult,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<MergeResult>,
     pub final_status: String,
     pub provider_output: String,
 }
@@ -562,10 +563,7 @@ impl WorkflowEngine {
             .commit
             .clone()
             .ok_or_else(|| missing_workflow_artifact("commit", &ctx.goal_id))?;
-        let merge = ctx
-            .merge
-            .clone()
-            .ok_or_else(|| missing_workflow_artifact("merge", &ctx.goal_id))?;
+        let merge = ctx.merge.clone();
         let provider_output = ctx
             .provider_output
             .clone()
@@ -1936,6 +1934,10 @@ mod tests {
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let result = automation.evaluate_workflow().unwrap();
+        let worktree_path = temp_root.parent().unwrap().join(format!(
+            "{}-refine-GOAL1-round-1",
+            temp_root.file_name().unwrap().to_string_lossy()
+        ));
         assert_eq!(result.steps.len(), 1);
         assert_eq!(result.steps[0].commit.len(), 40);
         assert_eq!(
@@ -1943,17 +1945,18 @@ mod tests {
             GoalStatus::Review
         );
         assert_eq!(
-            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "agent precommitted implementation\n"
         );
+        assert!(!target_root.join("agent.txt").exists());
         assert_eq!(
-            git_stdout(&target_root, &["rev-parse", "HEAD"])
+            git_stdout(&worktree_path, &["rev-parse", "HEAD"])
                 .unwrap()
                 .trim(),
             result.steps[0].commit
         );
         assert_eq!(
-            git_stdout(&target_root, &["log", "--pretty=%s", "-1"])
+            git_stdout(&worktree_path, &["log", "--pretty=%s", "-1"])
                 .unwrap()
                 .trim(),
             "agent precommit"
@@ -1967,11 +1970,7 @@ mod tests {
             }
         }
 
-        fs::remove_dir_all(temp_root.parent().unwrap().join(format!(
-            "{}-refine-GOAL1-round-1",
-            temp_root.file_name().unwrap().to_string_lossy()
-        )))
-        .ok();
+        fs::remove_dir_all(worktree_path).ok();
         fs::remove_dir_all(temp_root).unwrap();
     }
 
@@ -2168,9 +2167,10 @@ mod tests {
             GoalStatus::Review
         );
         assert_eq!(
-            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "existing retry implementation\n"
         );
+        assert!(!target_root.join("agent.txt").exists());
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {
@@ -2185,8 +2185,8 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_fails_goal_reverts_merge_and_recreates_worktree_on_qa_failure() {
-        let temp_root = unique_temp_dir("automation-qa-revert");
+    fn file_automation_fails_goal_and_preserves_candidate_on_qa_failure() {
+        let temp_root = unique_temp_dir("automation-qa-candidate");
         let target_root = temp_root.clone();
         let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
@@ -2222,7 +2222,7 @@ mod tests {
             temp_root.file_name().unwrap().to_string_lossy(),
             branch.replace('/', "-")
         ));
-        let build_command = format!("rm -rf {} && printf build-ok", shell_word(&worktree_path));
+        let initial_head = git_stdout(&target_root, &["rev-parse", "HEAD"]).unwrap();
 
         let _smoke_ai_env_guard = smoke_ai_env_lock()
             .lock()
@@ -2245,9 +2245,9 @@ mod tests {
             .update(&json!({
                 "agent_cli": "smoke-ai",
                 "quality_enabled": "1",
-                "target_app_build_command": build_command,
+                "target_app_build_command": "printf build-ok",
                 "target_app_test_command": "test ! -f fail-qa",
-                "allowed_commands": "rm, printf, test"
+                "allowed_commands": "printf, test"
             }))
             .unwrap();
 
@@ -2260,8 +2260,13 @@ mod tests {
         );
         assert!(!target_root.join("fail-qa").exists());
         assert!(worktree_path.exists());
-        let subject = git_stdout(&target_root, &["log", "--pretty=%s", "-1"]).unwrap();
-        assert!(subject.trim().starts_with("Revert "));
+        assert!(worktree_path.join("fail-qa").exists());
+        assert_eq!(
+            git_stdout(&target_root, &["rev-parse", "HEAD"])
+                .unwrap()
+                .trim(),
+            initial_head.trim()
+        );
         let worktrees = git_stdout(&target_root, &["worktree", "list", "--porcelain"]).unwrap();
         assert!(worktrees.contains(&format!("branch refs/heads/{branch}")));
 
@@ -2398,9 +2403,5 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         )))
-    }
-
-    fn shell_word(path: &Path) -> String {
-        format!("'{}'", path.display().to_string().replace('\'', "'\\''"))
     }
 }

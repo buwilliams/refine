@@ -105,25 +105,25 @@ async function loadGoalDetail(goalId) {
 // User-driven workflow transitions for a Goal. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
 // `in-progress` (Workflow Engine owns), `qa` (Quality owns), `ready-merge`
-// (merger owns), and `build` (target-app build owns) have no user buttons
+// (candidate preparation owns), and `build` (target-app build owns) have no user buttons
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → qa → ready-merge → build → review).
-// Forward from `review` goes through the dedicated /verify endpoint for
+// automatically (todo → in-progress → ready-merge → build → qa → review).
+// Forward from `review` goes through the dedicated /approve endpoint for
 // approval. No user action moves a Goal into `review`; successful build does.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
-// from done). Failed Goals normally go back to todo and rerun; merge-stage
-// failures use the latest workflow transition to requeue the existing branch.
+// from done). Failed Goals normally go back to todo and rerun; candidate-stage
+// failures use the latest workflow transition to requeue the isolated branch.
 const GOAL_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
   // in-progress: no user buttons — Workflow Engine owns.
   // qa: no user buttons — Quality owns.
-  // ready-merge: no user buttons — merger owns.
+  // ready-merge: no user buttons — candidate preparation owns.
   // build: no user buttons — target-app build owns.
   review:       { back:    { label: "← Todo",     next: "todo"   },
-                  forward: { label: "Verify →",   next: "done", verify: true } },
+                  forward: { label: "Approve →",  next: "done", approve: true } },
   done:         { back:    { label: "← Review",   next: "review" } },
   failed:       { back:    { label: "← Todo",     next: "todo"   } },
   cancelled:    { back:    { label: "← Todo",     next: "todo"   } },
@@ -134,7 +134,7 @@ function workflowForGoal(goal, latest) {
     return { back: { label: "← QA", next: "qa", retryQuality: true } };
   }
   if (goal.status === "failed" && isMergeRetryGoal(latest)) {
-    return { back: { label: "← Merge", next: "ready-merge", retryMerge: true } };
+    return { back: { label: "← Candidate", next: "ready-merge", retryMerge: true } };
   }
   return GOAL_WORKFLOW[goal.status] || {};
 }
@@ -277,8 +277,8 @@ function drawGoalDetail(goal) {
 
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
-  // skips system-owned statuses. Forward from review goes through the existing
-  // `verify` endpoint for approval; everything else is a bookkeeping status
+  // skips system-owned statuses. Forward from review goes through the
+  // `approve` endpoint; everything else is a bookkeeping status
   // update via PATCH /api/goals/<id>.
   const workflow = workflowForGoal(goal, latest);
   const backBtn = workflow.back ? `
@@ -406,31 +406,31 @@ function drawGoalDetail(goal) {
   });
 
   // Workflow back / forward buttons. Forward from `review` calls the
-  // existing /verify endpoint for approval; every other arrow is a plain
+  // dedicated /approve endpoint; every other arrow is a plain
   // status PATCH.
   const wireWorkflow = (btnId, target) => {
     if (!target) return;
     $(btnId)?.addEventListener("click", async () => {
       const btn = $(btnId);
-      const busyLabel = target.verify
-        ? "Verifying…"
+      const busyLabel = target.approve
+        ? "Approving…"
         : target.retryMerge
-          ? "Queueing merge…"
+          ? "Queueing candidate…"
           : `Moving to ${target.next}…`;
       await withButtonBusy(btn, busyLabel, async () => {
         try {
-          if (target.verify) {
-            const r = await api("POST", `/api/goals/${goal.id}/verify`);
-            if (r.ok) toast(r.message || "Verified", "info");
-            else toast(r.message || "Verify did not complete", "error");
+          if (target.approve) {
+            const r = await api("POST", `/api/goals/${goal.id}/approve`);
+            if (r.ok) toast(r.message || "Approved", "info");
+            else toast(r.message || "Approval did not complete", "error");
           } else if (target.retryQuality) {
             const r = await api("POST", `/api/goals/${goal.id}/retry-quality`);
             if (r.ok) toast(r.message || "Queued for QA", "info");
             else toast(r.message || "QA retry did not queue", "error");
           } else if (target.retryMerge) {
             const r = await api("POST", `/api/goals/${goal.id}/retry-merge`);
-            if (r.ok) toast(r.message || "Queued for merge", "info");
-            else toast(r.message || "Merge retry did not queue", "error");
+            if (r.ok) toast(r.message || "Queued candidate", "info");
+            else toast(r.message || "Candidate retry did not queue", "error");
           } else {
             await api("PATCH", `/api/goals/${goal.id}`, { status: target.next });
             toast(`Moved to ${target.next}`, "info");
@@ -991,6 +991,6 @@ function recordFeatureBlockingNotice(goal, notice) {
 }
 
 function bindFailureBannerActions(_goal) {
-  // No banner-level actions: Verify / Open Chat / Reopen / Rename / Cancel /
+  // No banner-level actions: Approve / Open Chat / Reopen / Rename / Cancel /
   // Delete all live in the unified action menu at the top of the page.
 }

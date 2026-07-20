@@ -25,7 +25,7 @@ Attach an existing local repository as the current target app. The path is regis
 
 ### `refine project switch`
 
-Switch the current target app to another registered project by name. Migrates the project's Refine state if it uses an older schema
+Switch the current target app to another registered project by name. Older semantic schemas remain detached until a migration agent handles them
 
 - `<NAME>` (required) — Registered project name to make current
 - `--runtime-root` — Runtime directory where Refine keeps daemon and registry state
@@ -63,13 +63,13 @@ Remove a project from the registry by name. Files on disk are not deleted
 
 ### `refine project migrate`
 
-Migrate the current project's on-disk Refine state to the latest schema and report what changed
+Report schema migration requirements. Semantic migrations are agent-operated
 
 - `--runtime-root` — Runtime directory where Refine keeps daemon and registry state
 
 ### `refine project sync`
 
-Commit durable Refine state, pull/rebase and push the current branch, then rebuild projections. Uncommitted target-app files are left untouched; optionally persists the projection snapshot
+Internal repair command; normal project synchronization is automatic
 
 - `--cache-dir` — Cache directory to persist the rebuilt projection snapshot into
 
@@ -82,7 +82,7 @@ Run project-level diagnostics against the attached target app and report problem
 
 ## `refine goal`
 
-Create and drive Goals — prompt-driven units of work for the active app. Covers the full lifecycle: create, round, start, retry, verify, merge, undo
+Create and drive Goals — prompt-driven units of work for the active app. Covers the full lifecycle: create, round, start, retry, approve, and undo
 
 ### `refine goal create`
 
@@ -143,7 +143,7 @@ Record an actionable prompt as a round on a Goal. Requires --reporter and --prom
 
 ### `refine goal start`
 
-Start work on a Goal: moves it from backlog/todo to in-progress so the agent workflow picks it up
+Queue a Goal for the agent workflow: moves backlog work to todo so automation can claim it
 
 - `<ID>` (required) — Goal id
 
@@ -160,15 +160,21 @@ Retry a failed stage for a Goal: --stage quality returns it to QA, --stage merge
 - `<ID>` (required) — Goal id
 - `--stage` — Stage to retry: "quality" (back to QA) or "merge" (back to ready-merge)
 
+### `refine goal approve`
+
+Approve a reviewed Goal and mark it done
+
+- `<ID>` (required) — Goal id
+
 ### `refine goal verify`
 
-Approve a Goal that is in review: marks it done after the change has been verified
+Internal verification alias retained for QA and compatibility
 
 - `<ID>` (required) — Goal id
 
 ### `refine goal merge`
 
-Merge a ready-merge Goal and mark it done. Requires the Goal to be in the ready-merge status
+Deprecated alias for approving a reviewed Goal
 
 - `<ID>` (required) — Goal id
 
@@ -450,7 +456,7 @@ Reassign eligible unclaimed Goal ownership across the fleet. Spreads across enab
 
 ### `refine cluster sync`
 
-Commit durable Refine state, pull/rebase upstream changes, and push the current branch
+Internal repair command; normal fleet synchronization is automatic
 
 ### `refine cluster run`
 

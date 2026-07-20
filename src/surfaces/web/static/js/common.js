@@ -409,10 +409,7 @@ async function api(method, path, body, options = {}) {
     }
     if (method !== "GET") {
       invalidateScreenDataCache();
-      if (
-        path !== "/api/project/sync" &&
-        /^\/api\/(project|apps|goals|features|activity|changes|nodes|settings|cache)\b/.test(path)
-      ) {
+      if (/^\/api\/(project|apps|goals|features|activity|changes|nodes|settings|cache)\b/.test(path)) {
         scheduleMainScreenPrefetch({ force: true, delayMs: 250 });
       }
     }
@@ -849,42 +846,6 @@ async function refreshProjectStatus() {
   return snap;
 }
 
-async function syncProjectUpdates({ silent = false } = {}) {
-  try {
-    const result = await api("POST", "/api/project/sync", {});
-    await refreshProjectStatus();
-    if (!silent) toast(result.message || "Project updates synced", "info");
-    return result;
-  } catch (e) {
-    if (!silent) {
-      await showActionError(e, "Could not sync latest project updates");
-    } else {
-      const message = e.details || e.message || "Could not sync latest project updates";
-      toast(message, "warn");
-    }
-    if (!silent) throw e;
-    return null;
-  }
-}
-
-function scheduleStartupProjectSync() {
-  if (state._startupProjectSyncScheduled || !hasAttachedProject()) return;
-  state._startupProjectSyncScheduled = true;
-  setTimeout(() => {
-    scheduleBrowserIdle(async () => {
-      await syncProjectUpdates({ silent: true });
-      invalidateScreenDataCache();
-      if (state.currentRoute === "dashboard") refreshDashboard();
-      if (state.currentRoute === "goals") refreshGoalsTable();
-      if (state.currentRoute === "logs") loadLogs();
-      if (state.currentRoute === "changes") loadChanges();
-      if (["settings", "node", "project"].includes(state.currentRoute || "")) {
-        refreshCurrentSettingsSurface();
-      }
-    });
-  }, 1500);
-}
-
 function openProjectAttachModal({
   message = "",
   title = "Choose project",
@@ -1150,7 +1111,6 @@ async function applyProjectAttachResult(result, options = {}) {
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
-  await syncProjectUpdates({ silent: true });
   await refreshNodeScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
   if (location.hash !== "#/node/application") {
@@ -1750,7 +1710,7 @@ function initSSE() {
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
-    // Changes screen: the Merge agent can land a new merge commit;
+    // Changes screen: an approved implementation can land asynchronously;
     // a cancellation flips an existing row's Undo button state.
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "goals_detail" && state.currentGoal) {

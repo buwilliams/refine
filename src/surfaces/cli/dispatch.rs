@@ -31,6 +31,7 @@ use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosti
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::imports::FileImportService;
+use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
@@ -1226,13 +1227,14 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Goal {
             action:
-                GoalAction::Verify {
+                GoalAction::Approve {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .verify_goal_summary(&id)?;
+            let refine_dir = refine_dir_for_target_root(&target_root);
+            let goal = FileMergerService::new(refine_dir.join("runtime"), &refine_dir)
+                .approve_reviewed_goal(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -1246,8 +1248,9 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
-                .merge_goal_summary(&id)?;
+            let refine_dir = refine_dir_for_target_root(&target_root);
+            let goal = FileMergerService::new(refine_dir.join("runtime"), &refine_dir)
+                .approve_reviewed_goal(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -2152,6 +2155,14 @@ fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
         } => daemon_json(
             "POST",
             &format!("/work/goals/{}/verify", path_segment(&id)),
+            None,
+        )?,
+        GoalAction::Approve {
+            id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/goals/{}/approve", path_segment(&id)),
             None,
         )?,
         GoalAction::Merge {
@@ -3069,6 +3080,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::Start { target_root, .. }
             | GoalAction::Cancel { target_root, .. }
             | GoalAction::Retry { target_root, .. }
+            | GoalAction::Approve { target_root, .. }
             | GoalAction::Verify { target_root, .. }
             | GoalAction::Merge { target_root, .. }
             | GoalAction::Undo { target_root, .. }

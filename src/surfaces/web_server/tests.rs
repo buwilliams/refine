@@ -1791,14 +1791,20 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         "Updated description"
     );
 
-    server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/bulk".to_string(),
-        body: Some(json!({
-            "selected_ids": ["GOAL1"],
-            "update": {"status": "review"}
-        })),
-    });
+    let goal_actions = FileWorkItemService::new(&refine_dir);
+    goal_actions
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    for status in [
+        GoalStatus::InProgress,
+        GoalStatus::ReadyMerge,
+        GoalStatus::Build,
+        GoalStatus::Qa,
+    ] {
+        goal_actions
+            .advance_automated_goal_status("GOAL1", status)
+            .unwrap();
+    }
     let verified = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals/GOAL1/verify".to_string(),
@@ -1830,7 +1836,10 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         body: Some(json!({})),
     });
     assert_eq!(started.status, 200);
-    assert_eq!(started.body["goal"]["status"], "in-progress");
+    assert_eq!(started.body["goal"]["status"], "todo");
+    FileWorkItemService::new(&refine_dir)
+        .advance_automated_goal_status("GOAL4", GoalStatus::InProgress)
+        .unwrap();
     let submitted = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals/GOAL4/submit-merge".to_string(),
@@ -1859,16 +1868,15 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         path: "/api/goals/GOAL3/merge".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(merge.status, 200);
-    assert_eq!(merge.body["goal"]["status"], "done");
-
-    let undo = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/GOAL3/undo".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!(undo.status, 200);
-    assert_eq!(undo.body["goal"]["status"], "review");
+    assert_eq!(merge.status, 503);
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary("GOAL3")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::ReadyMerge
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -5011,7 +5019,7 @@ fn web_server_applies_runtime_settings_updates_immediately() {
 }
 
 #[test]
-fn web_server_migrates_legacy_project_state_automatically() {
+fn web_server_requires_an_agent_for_legacy_project_state() {
     let temp_root = unique_temp_dir("http-project-migration");
     let runtime_root = temp_root.join("run/8080");
     let app_root = temp_root.join("legacy-app");
@@ -5022,34 +5030,20 @@ fn web_server_migrates_legacy_project_state_automatically() {
     let mut server = server_with_projection();
     server.runtime_root = Some(runtime_root.clone());
 
-    let migrated_attach = server.handle(ApiRequest {
+    let blocked_attach = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/attach".to_string(),
         body: Some(json!({"path": app_root.display().to_string()})),
     });
-    assert_eq!(migrated_attach.status, 200);
-    assert_eq!(migrated_attach.body["schema"]["compatible"], true);
-    assert_eq!(migrated_attach.body["schema"]["schema_version"], 2);
-    assert!(refine_dir.join("refine.json").exists());
-    assert!(refine_dir.join("backups/migrations").exists());
-
-    let migrate_again = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/project/migrate".to_string(),
-        body: None,
-    });
-    assert_eq!(migrate_again.status, 200);
-    assert_eq!(migrate_again.body["ok"], true);
-    assert_eq!(migrate_again.body["migrated"], false);
-    assert_eq!(migrate_again.body["schema"]["compatible"], true);
-
-    let status = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/project/status".to_string(),
-        body: None,
-    });
-    assert_eq!(status.status, 200);
-    assert_eq!(status.body["schema"]["migration_required"], false);
+    assert_eq!(blocked_attach.status, 409);
+    assert!(
+        blocked_attach.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("migration agent")
+    );
+    assert!(refine_dir.join("gaps/GA/gap.json").exists());
+    assert!(!refine_dir.join("refine.json").exists());
 
     let second_app = temp_root.join("second-legacy-app");
     let second_refine_dir = second_app.join(".refine");
@@ -5064,17 +5058,19 @@ fn web_server_migrates_legacy_project_state_automatically() {
     });
     assert_eq!(registered.status, 201);
 
-    let migrated_switch = server.handle(ApiRequest {
+    let blocked_switch = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/switch".to_string(),
         body: Some(json!({"name": "second"})),
     });
-    assert_eq!(migrated_switch.status, 200);
-    assert_eq!(
-        migrated_switch.body["target_root"],
-        second_app.display().to_string()
+    assert_eq!(blocked_switch.status, 409);
+    assert!(
+        blocked_switch.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("migration agent")
     );
-    assert!(second_refine_dir.join("refine.json").exists());
+    assert!(!second_refine_dir.join("refine.json").exists());
 
     let newer_app = temp_root.join("newer-app");
     let newer_refine_dir = newer_app.join(".refine");

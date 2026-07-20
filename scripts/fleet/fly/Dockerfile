@@ -2,7 +2,7 @@
 #
 # The worker builds Refine from a Git ref chosen at provision time, so the
 # control node's released binary can deploy workers running a newer Refine
-# (REFINE_REF=main) or a pinned release (REFINE_REF=3.1.6). REFINE_REF accepts
+# (REFINE_REF=main) or a pinned release (REFINE_REF=4.0.0). REFINE_REF accepts
 # a branch, tag, or commit SHA.
 
 FROM rust:1-bookworm AS builder

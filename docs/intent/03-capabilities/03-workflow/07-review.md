@@ -22,7 +22,7 @@ When a Goal is in review:
 
 - Refine presents the work's intent, changed files, diffs, logs, quality output, governance concerns, and agent notes for judgment.
 - A user, agent, or future review policy evaluates whether the work satisfies the Goal.
-- Review can approve the work, request another round, create follow-up work, mark the Goal failed, cancel it, or move it toward done.
+- Review can approve the work, which asks Refine to integrate the isolated candidate and mark it done; it can also request another round, create follow-up work, mark the Goal failed, or cancel it.
 - Ordered Feature work may be allowed to proceed once review represents enough completion for the next Goal to start.
 - Review decisions should be preserved as evidence, not treated as transient UI state.
 

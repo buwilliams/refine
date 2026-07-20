@@ -8,7 +8,7 @@ use crate::tools::host::installation::InstallTarget;
 
 /// Refine: agent fleet software delivery — track Goals, run agent workflows, and operate a fleet of nodes.
 #[derive(Debug, Parser)]
-#[command(name = "refine")]
+#[command(name = "refine", version)]
 #[command(about = "Refine - Your team's agentic software delivery system.")]
 pub struct Cli {
     #[command(subcommand)]
@@ -24,7 +24,7 @@ pub enum Commands {
         action: ProjectAction,
     },
     /// Create and drive Goals — prompt-driven units of work for the active app.
-    /// Covers the full lifecycle: create, round, start, retry, verify, merge, undo.
+    /// Covers the full lifecycle: create, round, start, retry, approve, and undo.
     Goal {
         #[command(subcommand)]
         action: GoalAction,
@@ -117,7 +117,7 @@ pub enum ProjectAction {
         target_root: Option<PathBuf>,
     },
     /// Switch the current target app to another registered project by name.
-    /// Migrates the project's Refine state if it uses an older schema.
+    /// Older semantic schemas remain detached until a migration agent handles them.
     Switch {
         /// Registered project name to make current.
         name: String,
@@ -182,7 +182,7 @@ pub enum ProjectAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Migrate the current project's on-disk Refine state to the latest schema and report what changed.
+    /// Report schema migration requirements. Semantic migrations are agent-operated.
     Migrate {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -191,8 +191,8 @@ pub enum ProjectAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Commit durable Refine state, pull/rebase and push the current branch, then rebuild projections.
-    /// Uncommitted target-app files are left untouched; optionally persists the projection snapshot.
+    /// Internal repair command; normal project synchronization is automatic.
+    #[command(hide = true)]
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -310,7 +310,7 @@ pub enum GoalAction {
         #[arg(long)]
         edit_latest: bool,
     },
-    /// Start work on a Goal: moves it from backlog/todo to in-progress so the agent workflow picks it up.
+    /// Queue a Goal for the agent workflow: moves backlog work to todo so automation can claim it.
     Start {
         /// Goal id.
         id: String,
@@ -337,7 +337,16 @@ pub enum GoalAction {
         #[arg(long, default_value = "quality")]
         stage: String,
     },
-    /// Approve a Goal that is in review: marks it done after the change has been verified.
+    /// Approve a reviewed Goal and mark it done.
+    Approve {
+        /// Goal id.
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Internal verification alias retained for QA and compatibility.
+    #[command(hide = true)]
     Verify {
         /// Goal id.
         id: String,
@@ -345,7 +354,8 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Merge a ready-merge Goal and mark it done. Requires the Goal to be in the ready-merge status.
+    /// Deprecated alias for approving a reviewed Goal.
+    #[command(hide = true)]
     Merge {
         /// Goal id.
         id: String,
@@ -801,7 +811,8 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Commit durable Refine state, pull/rebase upstream changes, and push the current branch.
+    /// Internal repair command; normal fleet synchronization is automatic.
+    #[command(hide = true)]
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

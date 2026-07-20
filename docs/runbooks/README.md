@@ -23,6 +23,8 @@ Runbooks:
   provider tools while Refine owns node identity and work.
 - [Distribute and converge work](distribute-and-converge.md) — move Goals to
   workers and bring reviewable work home.
+- [Migrate Gap state to Goals](migrate-gap-state.md) — preserve intent through
+  the agent-operated schema migration.
 
 Conventions: commands are shown as `refine …`; inside a source checkout use
 `./r …`, which is the same surface. All cluster/fleet commands accept

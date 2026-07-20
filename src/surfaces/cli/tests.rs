@@ -443,7 +443,7 @@ fn project_and_system_doctor_and_migrate_use_observability_services() {
 }
 
 #[test]
-fn project_attach_runs_legacy_refine_migration() {
+fn project_attach_requires_an_agent_for_legacy_refine_migration() {
     let temp_root = unique_temp_dir("cli-project-migration");
     let runtime_root = temp_root.join("run");
     let app_root = temp_root.join("legacy-app");
@@ -452,7 +452,7 @@ fn project_attach_runs_legacy_refine_migration() {
     fs::create_dir_all(refine_dir.join("gaps/GA")).unwrap();
     fs::write(refine_dir.join("gaps/GA/gap.json"), "{}").unwrap();
 
-    dispatch(
+    let attach_error = dispatch(
         Cli::try_parse_from([
             "refine",
             "project",
@@ -463,12 +463,13 @@ fn project_attach_runs_legacy_refine_migration() {
         ])
         .unwrap(),
     )
-    .unwrap();
-    let config: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(refine_dir.join("refine.json")).unwrap()).unwrap();
-    assert_eq!(config["schema_version"], 2);
+    .unwrap_err()
+    .to_string();
+    assert!(attach_error.contains("migration agent"));
+    assert!(!refine_dir.join("refine.json").exists());
+    assert!(refine_dir.join("gaps/GA/gap.json").exists());
 
-    dispatch(
+    let migrate_error = dispatch(
         Cli::try_parse_from([
             "refine",
             "project",
@@ -480,7 +481,9 @@ fn project_attach_runs_legacy_refine_migration() {
         ])
         .unwrap(),
     )
-    .unwrap();
+    .unwrap_err()
+    .to_string();
+    assert!(migrate_error.contains("migration agent"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -897,10 +900,17 @@ fn goal_round_append_and_edit_use_shared_file_work_item_service() {
 }
 
 #[test]
-fn goal_merge_and_undo_use_shared_file_work_item_service() {
+fn goal_approve_and_undo_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-goal-merge-undo");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
+    fs::create_dir_all(&target_root).unwrap();
+    run_git(&target_root, &["init", "-b", "main"]);
+    run_git(&target_root, &["config", "user.email", "test@example.com"]);
+    run_git(&target_root, &["config", "user.name", "Test User"]);
+    fs::write(target_root.join("app.txt"), "base\n").unwrap();
+    run_git(&target_root, &["add", "app.txt"]);
+    run_git(&target_root, &["commit", "-m", "initial"]);
     dispatch(
         Cli::try_parse_from([
             "refine",
@@ -915,17 +925,31 @@ fn goal_merge_and_undo_use_shared_file_work_item_service() {
         .unwrap(),
     )
     .unwrap();
+    let branch = "refine/GOAL1/round-1";
+    let worktree = temp_root.parent().unwrap().join(format!(
+        "{}-{}",
+        temp_root.file_name().unwrap().to_string_lossy(),
+        branch.replace('/', "-")
+    ));
+    run_git(
+        &target_root,
+        &["worktree", "add", "-b", branch, worktree.to_str().unwrap()],
+    );
+    fs::write(worktree.join("approved.txt"), "approved\n").unwrap();
+    run_git(&worktree, &["add", "approved.txt"]);
+    run_git(&worktree, &["commit", "-m", "candidate"]);
     let goal_path = refine_dir.join("goals/GO/AL1/goal.json");
     let mut value: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
-    value["status"] = serde_json::Value::String("ready-merge".to_string());
+    value["status"] = serde_json::Value::String("review".to_string());
+    value["branch_name"] = serde_json::Value::String(branch.to_string());
     fs::write(&goal_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
 
     dispatch(
         Cli::try_parse_from([
             "refine",
             "goal",
-            "merge",
+            "approve",
             "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
@@ -935,6 +959,10 @@ fn goal_merge_and_undo_use_shared_file_work_item_service() {
     .unwrap();
     let written = fs::read_to_string(&goal_path).unwrap();
     assert!(written.contains("\"status\": \"done\""));
+    assert_eq!(
+        fs::read_to_string(target_root.join("approved.txt")).unwrap(),
+        "approved\n"
+    );
 
     dispatch(
         Cli::try_parse_from([
@@ -952,6 +980,21 @@ fn goal_merge_and_undo_use_shared_file_work_item_service() {
     assert!(written.contains("\"status\": \"review\""));
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+fn run_git(root: &std::path::Path, args: &[&str]) {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
@@ -1188,7 +1231,7 @@ fn cli_goal_lifecycle_membership_and_feature_edit_use_tool_services() {
     assert!(
         fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
-            .contains("\"status\": \"in-progress\"")
+            .contains("\"status\": \"todo\"")
     );
 
     fs::remove_dir_all(temp_root).unwrap();

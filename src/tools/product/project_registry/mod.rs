@@ -332,6 +332,9 @@ impl FileProjectRegistryService {
             FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
         if schema.compatible && !schema.migration_required {
+            if schema.schema_version.is_none() {
+                service.initialize_current_schema()?;
+            }
             return Ok(());
         }
         if schema.migration_required {

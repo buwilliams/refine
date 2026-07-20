@@ -21,12 +21,11 @@ and the daemon before distributing work.
 
 ## Register the node
 
-Choose a stable lowercase node id and synchronize it before creating the
-machine:
+Choose a stable lowercase node id before creating the machine. The daemon
+publishes this durable state automatically:
 
 ```bash
 refine cluster add-node worker-1
-refine cluster sync
 ```
 
 ## Fly.io recipe
@@ -95,16 +94,14 @@ fly status --app "$APP_NAME"
 fly ssh console --app "$APP_NAME" --command "refine system status --port 8080"
 fly ssh console --app "$APP_NAME" --command "refine node list"
 fly ssh console --app "$APP_NAME" --command "refine agent detect"
-fly ssh console --app "$APP_NAME" --command "refine project sync"
 ```
 
 Confirm that the active node is `worker-1`, the target project is attached, and
-Git sync reports a configured upstream. Only then distribute work:
+the registered fleet state appears on the worker. Only then distribute work:
 
 ```bash
 refine cluster distribute --dry-run
 refine cluster distribute
-refine cluster sync
 ```
 
 ## Undo
@@ -115,7 +112,6 @@ Move reviewable or open work away from the worker before destroying it:
 refine cluster distribute --to default --dry-run
 refine cluster distribute --to default
 refine cluster disable-node "$NODE_ID"
-refine cluster sync
 fly apps destroy "$APP_NAME" --yes
 ```
 
@@ -127,7 +123,6 @@ fly apps destroy "$APP_NAME" --yes
   and rerun `refine node init` inside the worker.
 - The agent CLI exists but cannot execute: install or inject the selected
   provider's authentication without changing the node identity secrets.
-- Sync reports uncommitted target-app files: commit or remove those user-owned
-  changes. Refine never stages them as part of its state synchronization.
-- Push is rejected repeatedly: inspect the reported rebase conflict. Do not
-  force-push shared state.
+- Fleet state does not appear: inspect `refine system status` and the System
+  process diagnostics. Reconciliation retries automatically; users should not
+  edit, stash, commit, or force-push application files to repair Refine state.

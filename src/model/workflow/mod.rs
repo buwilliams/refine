@@ -122,7 +122,6 @@ pub enum GoalOperation {
     RetryMerge,
     SubmitMerge,
     VerifyReview,
-    Merge,
     Undo,
     Delete,
     AssignToFeature,
@@ -261,7 +260,6 @@ pub fn goal_operation_allowed(
         RetryMerge => matches!(status, ReadyMerge | Failed),
         SubmitMerge => matches!(status, InProgress | Qa | ReadyMerge | Failed),
         VerifyReview => matches!(status, Review | Qa),
-        Merge => matches!(status, ReadyMerge),
         Undo => matches!(status, Done | Review | Cancelled),
         AssignToFeature | RemoveFromFeature | ReorderInFeature => {
             !matches!(status, InProgress | Qa | ReadyMerge)

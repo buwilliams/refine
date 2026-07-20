@@ -19,6 +19,7 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
@@ -355,6 +356,12 @@ impl FileChatService {
             .unwrap_or("main");
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree.path, &self.runtime_root);
+        let target_root = self.refine_dir.parent().ok_or_else(|| {
+            RefineError::InvalidInput(format!(
+                "refine dir {} has no target root",
+                self.refine_dir.display()
+            ))
+        })?;
         let work_items = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
             self.runtime_root.join("cache"),
@@ -372,14 +379,17 @@ impl FileChatService {
                     None,
                 )?;
             }
-            match worktree_git.commit(&format!("Submit {goal_id} from standalone chat"), &[]) {
-                Ok(_) => {}
-                Err(error) => {
-                    if !worktree_git.has_commits_since(target_branch)? {
-                        return Err(error);
+            with_repository_git_lock(target_root, || {
+                match worktree_git.commit(&format!("Submit {goal_id} from standalone chat"), &[]) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        if !worktree_git.has_commits_since(target_branch)? {
+                            return Err(error);
+                        }
                     }
                 }
-            }
+                Ok(())
+            })?;
             work_items.set_goal_branch_name(&goal_id, &worktree.branch)?;
             work_items.transition_goal_status(&goal_id, GoalStatus::Todo)?;
             work_items.advance_automated_goal_status(&goal_id, GoalStatus::InProgress)?;
@@ -521,7 +531,7 @@ impl FileChatService {
                 ))
             })?;
         }
-        let path = git.ensure_worktree(&branch, &target)?;
+        let path = with_repository_git_lock(target_root, || git.ensure_worktree(&branch, &target))?;
         Ok(ChatSessionWorktree {
             branch,
             path,
@@ -538,11 +548,13 @@ impl FileChatService {
         })?;
         let git = FileGitWorktreeService::new(target_root);
         let path = PathBuf::from(&worktree.path);
-        if path.exists() {
-            git.remove_worktree(&path, true)?;
-        }
-        let _ = git.delete_branch(&worktree.branch, true);
-        Ok(())
+        with_repository_git_lock(target_root, || {
+            if path.exists() {
+                git.remove_worktree(&path, true)?;
+            }
+            let _ = git.delete_branch(&worktree.branch, true);
+            Ok(())
+        })
     }
 
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {

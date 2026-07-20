@@ -19,7 +19,7 @@ The Changes screen should combine visualization, filtering, table inspection, an
 
 Current implementation details that matter to intent:
 
-- Changes list refine merge commits on the configured merge target branch;
+- Changes list approved implementation commits on the configured integration branch;
 - rows link commits to Goals through Goal trailers or projection data;
 - Undo runs a revert-style operation and moves the Goal to cancelled when appropriate;
 - visualization buckets changes by selected period;

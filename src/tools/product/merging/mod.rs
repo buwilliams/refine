@@ -1,312 +1,78 @@
 use std::path::{Path, PathBuf};
-use std::thread;
-use std::time::Duration;
 
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::model::JsonObject;
-use crate::model::feature::compare_feature_goal_order;
-use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{
-    FileOperationRegistry, OperationRegistry, OperationState,
-};
-use crate::tools::host::git_worktrees::{
-    FileGitWorktreeService, GitWorktreeService, MergeResult, MergedBranchCleanup,
-};
-use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
+use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::product::project_state::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MergerTickResult {
-    pub processed: Option<MergerGoalResult>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MergerGoalResult {
-    pub goal_id: String,
-    pub branch_name: String,
-    pub target_branch: String,
-    pub operation_id: String,
-    pub status: String,
-    pub conflicts: Vec<String>,
-    pub cleanup: Option<MergedBranchCleanup>,
-}
 
 #[derive(Clone, Debug)]
 pub struct FileMergerService {
     pub runtime_root: PathBuf,
     pub refine_dir: PathBuf,
-    pub operation_registry: FileOperationRegistry,
 }
 
 impl FileMergerService {
     pub fn new(runtime_root: impl Into<PathBuf>, refine_dir: impl Into<PathBuf>) -> Self {
-        let runtime_root = runtime_root.into();
         Self {
-            operation_registry: FileOperationRegistry::new(&runtime_root),
-            runtime_root,
+            runtime_root: runtime_root.into(),
             refine_dir: refine_dir.into(),
         }
     }
 
-    pub fn tick(&self) -> RefineResult<MergerTickResult> {
-        if FileProcessSupervisor::new(&self.runtime_root)
-            .pause_state()?
-            .background_processes_stopped
-        {
-            return Ok(MergerTickResult { processed: None });
+    /// Approve a reviewed Goal by integrating its isolated candidate exactly
+    /// once. Surfaces expose approval; this capability owns the Git mechanics.
+    pub fn approve_reviewed_goal(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let work_items = FileWorkItemService::with_projection_cache(
+            &self.refine_dir,
+            self.runtime_root.join("cache"),
+        );
+        let goal = work_items.show_goal_summary(goal_id)?;
+        if goal.goal.status != GoalStatus::Review {
+            return Err(RefineError::InvalidInput(format!(
+                "Goal {goal_id} can only be approved from review"
+            )));
         }
-        if self.active_merger_operation()? {
-            return Ok(MergerTickResult { processed: None });
-        }
-        let Some(goal) = self.next_ready_merge_goal()? else {
-            return Ok(MergerTickResult { processed: None });
-        };
-        let goal_id = goal.goal.id.clone();
         let settings =
             FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
         let branch_name = goal
             .goal
             .branch_name
-            .clone()
-            .unwrap_or_else(|| branch_name_for_goal(&settings, &goal_id));
+            .as_deref()
+            .filter(|branch| !branch.trim().is_empty())
+            .ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} does not have an implementation candidate"
+                ))
+            })?
+            .to_string();
         let target_branch = setting_string(&settings, "merge_target_branch", "main");
-        let operation = self
-            .operation_registry
-            .register(&format!("merger:{goal_id}"))?;
-        self.append_operation_log(
-            &operation.id,
-            &goal_id,
-            "info",
-            "Merging Goal branch",
-            Some(json_object(json!({
-                "branch_name": branch_name,
-                "target_branch": target_branch
-            }))),
-        )?;
-        let result = self.merge_goal_branch(&goal_id, &branch_name, &target_branch, &operation.id);
-        match result {
-            Ok(merge_result) => Ok(MergerTickResult {
-                processed: Some(merge_result),
-            }),
-            Err(error) => {
-                let _ = self.operation_registry.fail_with_error(
-                    &operation.id,
-                    json!({
-                        "goal_id": goal_id,
-                        "branch_name": branch_name,
-                        "target_branch": target_branch,
-                        "error": error.to_string()
-                    }),
-                );
-                Err(error)
-            }
-        }
-    }
-
-    pub fn merge_branch_for_workflow(&self, branch_name: &str) -> RefineResult<MergeResult> {
+        let remote = setting_string(&settings, "git_remote", "origin");
         let target_root = target_root(&self.refine_dir)?;
-        let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
-        let mut result = git.merge(branch_name)?;
-        for _ in 0..5 {
-            if result.ok || !merge_message_has_index_lock(&result) {
-                if result.ok {
-                    git.cleanup_merged_branch(branch_name)?;
-                }
-                return Ok(result);
+
+        with_repository_git_lock(&target_root, || {
+            let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
+            if git.remote_exists(&remote)? {
+                git.ensure_branch_from_remote(&remote, &branch_name)?;
             }
-            thread::sleep(Duration::from_millis(50));
-            result = git.merge(branch_name)?;
-        }
-        if result.ok {
-            git.cleanup_merged_branch(branch_name)?;
-        }
-        Ok(result)
-    }
+            git.switch(&target_branch)?;
+            let merge = git.merge_no_ff(&branch_name)?;
+            if !merge.ok {
+                let _ = git.recover();
+                return Err(RefineError::Conflict(merge.message.unwrap_or_else(|| {
+                    "implementation integration failed".to_string()
+                })));
+            }
+            git.cleanup_merged_branch(&branch_name)?;
+            Ok(())
+        })?;
 
-    fn merge_goal_branch(
-        &self,
-        goal_id: &str,
-        branch_name: &str,
-        target_branch: &str,
-        operation_id: &str,
-    ) -> RefineResult<MergerGoalResult> {
-        let target_root = target_root(&self.refine_dir)?;
-        let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
-        git.switch(target_branch)?;
-        let merge = git.merge_no_ff(branch_name)?;
-        if !merge.ok {
-            let recover = git.recover()?;
-            self.fail_goal_merge(
-                goal_id,
-                operation_id,
-                branch_name,
-                target_branch,
-                &merge,
-                &recover,
-            )?;
-            return Ok(MergerGoalResult {
-                goal_id: goal_id.to_string(),
-                branch_name: branch_name.to_string(),
-                target_branch: target_branch.to_string(),
-                operation_id: operation_id.to_string(),
-                status: "failed".to_string(),
-                conflicts: merge.conflicts,
-                cleanup: None,
-            });
-        }
-        let cleanup = git.cleanup_merged_branch(branch_name)?;
-        let work_items = FileWorkItemService::with_projection_cache(
-            &self.refine_dir,
-            self.runtime_root.join("cache"),
-        );
-        self.append_operation_log(
-            operation_id,
-            goal_id,
-            "info",
-            "Cleaned up merged Goal branch worktree",
-            Some(json_object(json!({"cleanup": &cleanup}))),
-        )?;
-        work_items.advance_automated_goal_status(goal_id, GoalStatus::Build)?;
-        self.append_operation_log(
-            operation_id,
-            goal_id,
-            "info",
-            "Workflow status changed: ready-merge -> build",
-            Some(json_object(json!({"merge": &merge}))),
-        )?;
-        work_items.advance_automated_goal_status(goal_id, GoalStatus::Qa)?;
-        self.append_operation_log(
-            operation_id,
-            goal_id,
-            "info",
-            "Workflow status changed: build -> qa",
-            None,
-        )?;
-        self.operation_registry.finish_with_result(
-            operation_id,
-            OperationState::Succeeded,
-            json!({
-                "goal_id": goal_id,
-                "branch_name": branch_name,
-                "target_branch": target_branch,
-                "merge": merge,
-                "cleanup": &cleanup,
-                "final_status": "qa"
-            }),
-        )?;
-        Ok(MergerGoalResult {
-            goal_id: goal_id.to_string(),
-            branch_name: branch_name.to_string(),
-            target_branch: target_branch.to_string(),
-            operation_id: operation_id.to_string(),
-            status: "qa".to_string(),
-            conflicts: Vec::new(),
-            cleanup: Some(cleanup),
-        })
-    }
-
-    fn fail_goal_merge(
-        &self,
-        goal_id: &str,
-        operation_id: &str,
-        branch_name: &str,
-        target_branch: &str,
-        merge: &MergeResult,
-        recover: &MergeResult,
-    ) -> RefineResult<()> {
-        let work_items = FileWorkItemService::with_projection_cache(
-            &self.refine_dir,
-            self.runtime_root.join("cache"),
-        );
-        work_items.advance_automated_goal_status(goal_id, GoalStatus::Failed)?;
-        self.append_operation_log(
-            operation_id,
-            goal_id,
-            "error",
-            "Goal branch merge failed",
-            Some(json_object(json!({
-                "branch_name": branch_name,
-                "target_branch": target_branch,
-                "merge": merge,
-                "recover": recover
-            }))),
-        )?;
-        self.operation_registry.fail_with_error(
-            operation_id,
-            json!({
-                "goal_id": goal_id,
-                "branch_name": branch_name,
-                "target_branch": target_branch,
-                "conflicts": merge.conflicts,
-                "message": merge.message
-            }),
-        )?;
-        Ok(())
-    }
-
-    fn next_ready_merge_goal(&self) -> RefineResult<Option<GoalSummaryProjection>> {
-        let snapshot =
-            FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root)
-                .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
-        let mut candidates = snapshot
-            .goals
-            .values()
-            .filter(|goal| goal.goal.status == GoalStatus::ReadyMerge)
-            .cloned()
-            .collect::<Vec<_>>();
-        candidates.sort_by(|a, b| {
-            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
-                .then_with(|| a.goal.updated.cmp(&b.goal.updated))
-                .then_with(|| a.goal.id.cmp(&b.goal.id))
-        });
-        Ok(candidates.into_iter().next())
-    }
-
-    fn active_merger_operation(&self) -> RefineResult<bool> {
-        Ok(self
-            .operation_registry
-            .recover()?
-            .into_iter()
-            .any(|operation| {
-                operation.owner.starts_with("merger:")
-                    && matches!(
-                        operation.state,
-                        OperationState::Pending
-                            | OperationState::Running
-                            | OperationState::Cancelling
-                    )
-            }))
-    }
-
-    fn append_operation_log(
-        &self,
-        operation_id: &str,
-        goal_id: &str,
-        severity: &str,
-        message: &str,
-        details: Option<JsonObject>,
-    ) -> RefineResult<()> {
-        self.operation_registry.append_log(
-            operation_id,
-            LogEntry {
-                datetime: now_timestamp(),
-                severity: severity.to_string(),
-                category: "merger".to_string(),
-                message: message.to_string(),
-                details,
-                actions: Vec::new(),
-                actor: Some("refine".to_string()),
-                goal_id: Some(goal_id.to_string()),
-            },
-        )?;
-        Ok(())
+        work_items.verify_goal_summary(goal_id)
     }
 }
 
@@ -334,21 +100,6 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .unwrap_or_else(|| fallback.to_string())
 }
 
-fn json_object(value: serde_json::Value) -> JsonObject {
-    value.as_object().cloned().unwrap_or_default()
-}
-
-fn merge_message_has_index_lock(result: &MergeResult) -> bool {
-    result
-        .message
-        .as_deref()
-        .is_some_and(|message| message.contains("index.lock"))
-}
-
-fn now_timestamp() -> String {
-    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -360,73 +111,8 @@ mod tests {
     use crate::tools::product::work_items::FileWorkItemService;
 
     #[test]
-    fn file_merger_merges_one_ready_goal_per_tick_with_no_ff_commit() {
-        let temp_root = unique_temp_dir("merger-success");
-        let repo = temp_root.join("repo");
-        let refine_dir = repo.join(".refine");
-        let runtime_root = temp_root.join("run/8080");
-        fs::create_dir_all(&refine_dir).unwrap();
-        init_repo(&repo);
-        commit_file(&repo, "app.txt", "base\n", "initial");
-
-        let work_items = FileWorkItemService::new(&refine_dir);
-        for id in ["GOAL1", "GOAL2"] {
-            work_items.create_goal_summary(id, Some(id)).unwrap();
-            work_items
-                .transition_goal_status(id, GoalStatus::Todo)
-                .unwrap();
-            work_items
-                .advance_automated_goal_status(id, GoalStatus::InProgress)
-                .unwrap();
-            work_items
-                .advance_automated_goal_status(id, GoalStatus::ReadyMerge)
-                .unwrap();
-            work_items
-                .set_goal_branch_name(id, &format!("refine/{id}"))
-                .unwrap();
-            git(&repo, &["switch", "-c", &format!("refine/{id}")]).unwrap();
-            commit_file(&repo, &format!("{id}.txt"), "change\n", id);
-            git(&repo, &["switch", "main"]).unwrap();
-        }
-
-        let merger = FileMergerService::new(&runtime_root, &refine_dir);
-        let first = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(first.goal_id, "GOAL1");
-        assert_eq!(first.cleanup.as_ref().unwrap().branch, "refine/GOAL1");
-        assert!(!first.cleanup.as_ref().unwrap().worktree_removed);
-        assert!(first.cleanup.as_ref().unwrap().branch_deleted);
-        assert_eq!(
-            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-            GoalStatus::Qa
-        );
-        assert_eq!(
-            work_items.show_goal_summary("GOAL2").unwrap().goal.status,
-            GoalStatus::ReadyMerge
-        );
-        assert_eq!(
-            git_stdout(&repo, &["rev-parse", "--abbrev-ref", "HEAD"]),
-            "main"
-        );
-        assert_eq!(
-            git_stdout(&repo, &["rev-list", "--parents", "-n", "1", "HEAD"])
-                .split_whitespace()
-                .count(),
-            3
-        );
-
-        let second = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(second.goal_id, "GOAL2");
-        assert_eq!(
-            work_items.show_goal_summary("GOAL2").unwrap().goal.status,
-            GoalStatus::Qa
-        );
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn file_merger_cleans_goal_worktree_and_branch_after_successful_tick() {
-        let temp_root = unique_temp_dir("merger-cleanup");
+    fn reviewed_goal_approval_integrates_and_cleans_candidate() {
+        let temp_root = unique_temp_dir("review-approval-cleanup");
         let repo = temp_root.join("repo");
         let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
@@ -462,20 +148,20 @@ mod tests {
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
             .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Build)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Qa)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Review)
+            .unwrap();
         work_items.set_goal_branch_name("GOAL1", branch).unwrap();
 
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
-        let merged = merger.tick().unwrap().processed.unwrap();
-        let cleanup = merged.cleanup.unwrap();
-        assert_eq!(merged.goal_id, "GOAL1");
-        assert_eq!(merged.status, "qa");
-        assert_eq!(cleanup.branch, branch);
-        assert_eq!(
-            cleanup.worktree_path.as_deref(),
-            Some(worktree_path.to_str().unwrap())
-        );
-        assert!(cleanup.worktree_removed);
-        assert!(cleanup.branch_deleted);
+        let approved = merger.approve_reviewed_goal("GOAL1").unwrap();
+        assert_eq!(approved.goal.status, GoalStatus::Done);
         assert!(!worktree_path.exists());
         assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains(branch));
         assert!(!git_succeeds(
@@ -485,103 +171,6 @@ mod tests {
         assert_eq!(
             fs::read_to_string(repo.join("feature.txt")).unwrap(),
             "change\n"
-        );
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn workflow_merge_cleans_goal_worktree_and_branch() {
-        let temp_root = unique_temp_dir("workflow-merge-cleanup");
-        let repo = temp_root.join("repo");
-        let refine_dir = repo.join(".refine");
-        let runtime_root = temp_root.join("run/8080");
-        let worktree_path = temp_root.join("repo-refine-GOAL1-round-1");
-        fs::create_dir_all(&refine_dir).unwrap();
-        init_repo(&repo);
-        commit_file(&repo, "app.txt", "base\n", "initial");
-
-        let branch = "refine/GOAL1/round-1";
-        git(
-            &repo,
-            &[
-                "worktree",
-                "add",
-                "-b",
-                branch,
-                worktree_path.to_str().unwrap(),
-            ],
-        )
-        .unwrap();
-        commit_file(&worktree_path, "workflow.txt", "change\n", "GOAL1");
-
-        let merger = FileMergerService::new(&runtime_root, &refine_dir);
-        let merge = merger.merge_branch_for_workflow(branch).unwrap();
-        assert!(merge.ok);
-        assert!(!worktree_path.exists());
-        assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains(branch));
-        assert!(!git_succeeds(
-            &repo,
-            &["rev-parse", "--verify", &format!("refs/heads/{branch}")]
-        ));
-        assert_eq!(
-            fs::read_to_string(repo.join("workflow.txt")).unwrap(),
-            "change\n"
-        );
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn file_merger_marks_only_conflicted_goal_failed_and_recovers_target() {
-        let temp_root = unique_temp_dir("merger-conflict");
-        let repo = temp_root.join("repo");
-        let refine_dir = repo.join(".refine");
-        let runtime_root = temp_root.join("run/8080");
-        fs::create_dir_all(&refine_dir).unwrap();
-        init_repo(&repo);
-        commit_file(&repo, "app.txt", "base\n", "initial");
-
-        let work_items = FileWorkItemService::new(&refine_dir);
-        for id in ["AAA", "ZZZ"] {
-            work_items.create_goal_summary(id, Some(id)).unwrap();
-            work_items
-                .transition_goal_status(id, GoalStatus::Todo)
-                .unwrap();
-            work_items
-                .advance_automated_goal_status(id, GoalStatus::InProgress)
-                .unwrap();
-            work_items
-                .advance_automated_goal_status(id, GoalStatus::ReadyMerge)
-                .unwrap();
-            work_items
-                .set_goal_branch_name(id, &format!("refine/{id}"))
-                .unwrap();
-        }
-
-        git(&repo, &["switch", "-c", "refine/AAA"]).unwrap();
-        commit_file(&repo, "app.txt", "branch\n", "branch side");
-        git(&repo, &["switch", "main"]).unwrap();
-        commit_file(&repo, "app.txt", "main\n", "main side");
-        git(&repo, &["switch", "-c", "refine/ZZZ"]).unwrap();
-        commit_file(&repo, "clean.txt", "clean\n", "clean side");
-        git(&repo, &["switch", "main"]).unwrap();
-
-        let merger = FileMergerService::new(&runtime_root, &refine_dir);
-        let conflicted = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(conflicted.status, "failed");
-        assert_eq!(conflicted.conflicts, vec!["app.txt"]);
-        assert_eq!(
-            work_items.show_goal_summary("AAA").unwrap().goal.status,
-            GoalStatus::Failed
-        );
-        assert_eq!(fs::read_to_string(repo.join("app.txt")).unwrap(), "main\n");
-
-        let clean = merger.tick().unwrap().processed.unwrap();
-        assert_eq!(clean.goal_id, "ZZZ");
-        assert_eq!(
-            work_items.show_goal_summary("ZZZ").unwrap().goal.status,
-            GoalStatus::Qa
         );
 
         fs::remove_dir_all(temp_root).unwrap();

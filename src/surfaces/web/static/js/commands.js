@@ -578,20 +578,6 @@ for (const action of ["start", "stop", "build"]) {
 }
 
 registerCommand({
-  id: "target_app.sync",
-  title: "Target app: sync project",
-  group: "Application",
-  aliases: ["sync-project"],
-  run: async ({ button } = {}) => {
-    await withButtonBusy(button, "Syncing...", async () => {
-      await syncProjectUpdates();
-      await refreshReporters({ selectFallback: true });
-      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
-    });
-  },
-});
-
-registerCommand({
   id: "target_app.health",
   title: "Target app: check status",
   group: "Application",

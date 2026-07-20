@@ -23,9 +23,9 @@ refine cluster distribute --to worker-1  # or: fill one specific node
 
 Distribution reassigns node ownership of unclaimed work — that is the entire
 mechanism. There is no background scheduler; work moved because this command
-was invoked. State reaches other nodes when `.refine/` changes are committed
-and pushed to the shared remote (`POST /api/project/sync` or the Project Sync
-button pulls on the other side).
+was invoked. Refine's daemon observes the durable state change and reconciles
+it through the shared remote. Other nodes do the same, so no Git or sync action
+is part of the user's workflow.
 
 ## Converge for review
 
@@ -38,8 +38,9 @@ refine cluster distribute --converge --to default
 refine goal list        # reviewable goals now owned by the review node
 ```
 
-Convergence is the same distribute operation pointed home — review and merge
-happen once, where the human judgment lives.
+Convergence is the same distribute operation pointed home. Review happens once,
+where the human judgment lives; approving a reviewed Goal asks Refine to
+integrate its isolated candidate.
 
 ## Verify
 

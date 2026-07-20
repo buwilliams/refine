@@ -146,7 +146,6 @@ Target app commands:
 ./r project detach
 ./r project register <name> /path/to/app
 ./r project clone <remote-url> /path/to/app
-./r project sync
 ```
 
 Workflow and Goal commands:
@@ -166,9 +165,12 @@ Distributed/node commands:
 ./r node settings
 ./r cluster list
 ./r cluster maintenance
-./r cluster sync
 ./r cluster distribute [--to <node-id>] [--converge] [--dry-run]
 ```
+
+Repository reconciliation is daemon-owned and automatic. The hidden
+`project sync` and `cluster sync` aliases are repair interfaces for Refine's
+own agents and diagnostics, not normal operating steps.
 
 Cloud worker creation is provider-operated rather than part of the Refine
 binary. Follow `docs/runbooks/provision.md` when a fleet needs another worker.

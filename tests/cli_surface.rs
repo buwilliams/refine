@@ -367,11 +367,8 @@ fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixt
     let started_id = fixture.create_goal("goal action start");
     let started = fixture.run_refine(&["goal", "start", &started_id]);
     fixture.assert_success("goal start", &started);
-    assert_eq!(
-        fixture.json_stdout(&started)["goal"]["status"],
-        "in-progress"
-    );
-    assert_eq!(fixture.goal_field(&started_id, "status"), "in-progress");
+    assert_eq!(fixture.json_stdout(&started)["goal"]["status"], "todo");
+    assert_eq!(fixture.goal_field(&started_id, "status"), "todo");
     fixture.assert_success(
         "goal cancel started",
         &fixture.run_refine(&["goal", "cancel", &started_id]),
@@ -425,13 +422,13 @@ fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixt
         "ready-merge"
     );
     let merged = fixture.run_refine(&["goal", "merge", &merge_id]);
-    fixture.assert_success("goal merge", &merged);
-    assert_eq!(fixture.json_stdout(&merged)["goal"]["status"], "done");
-    let merge_undone = fixture.run_refine(&["goal", "undo", &merge_id]);
-    fixture.assert_success("goal undo merged", &merge_undone);
-    assert_eq!(
-        fixture.json_stdout(&merge_undone)["goal"]["status"],
-        "review"
+    assert!(
+        !merged.status.success(),
+        "goal merge without a reviewed candidate unexpectedly succeeded"
+    );
+    fixture.assert_success(
+        "goal cancel merge retry",
+        &fixture.run_refine(&["goal", "cancel", &merge_id]),
     );
     fixture.assert_success(
         "goal delete merge retry",
@@ -840,7 +837,10 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
     let sync_payload = fixture.json_stdout(&sync);
     assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
     assert!(sync_payload["goal_count"].is_number(), "{sync_payload:#}");
-    assert!(sync_payload["feature_count"].is_number(), "{sync_payload:#}");
+    assert!(
+        sync_payload["feature_count"].is_number(),
+        "{sync_payload:#}"
+    );
     let maintenance = fixture.run_refine(&["cluster", "maintenance"]);
     fixture.assert_success("cluster maintenance", &maintenance);
     let maintenance_payload = fixture.json_stdout(&maintenance);

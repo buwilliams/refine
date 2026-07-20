@@ -104,10 +104,11 @@ pub(in crate::surfaces::web_server) fn goal_id_and_action(path: &str) -> Option<
 pub(in crate::surfaces::web_server) fn goal_action_message(action: &str) -> &'static str {
     match action {
         "start" => "Started",
+        "approve" => "Approved",
         "verify" => "Verified",
         "retry-quality" => "Queued for QA",
-        "retry-merge" => "Queued for merge",
-        "merge" => "Merged",
+        "retry-merge" => "Queued candidate preparation",
+        "merge" => "Approved",
         "undo" => "Undone",
         _ => "Goal action completed",
     }

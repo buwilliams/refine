@@ -344,19 +344,19 @@ fn file_work_item_service_cancels_and_deletes_features_through_goal_paths() {
 }
 
 #[test]
-fn file_work_item_service_merges_and_undoes_goal_workflow() {
-    let temp_root = unique_temp_dir("work-item-merge-undo");
+fn file_work_item_service_verifies_and_undoes_goal_workflow() {
+    let temp_root = unique_temp_dir("work-item-verify-undo");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
     service
         .create_goal_summary("Merge Goal", Some("GOAL1"))
         .unwrap();
     service
-        .set_goal_status_unchecked("GOAL1", &GoalStatus::ReadyMerge)
+        .set_goal_status_unchecked("GOAL1", &GoalStatus::Review)
         .unwrap();
 
-    let merged = service.merge_goal_summary("GOAL1").unwrap();
-    assert_eq!(merged.goal.status, GoalStatus::Done);
+    let verified = service.verify_goal_summary("GOAL1").unwrap();
+    assert_eq!(verified.goal.status, GoalStatus::Done);
 
     let undone = service.undo_goal_summary("GOAL1").unwrap();
     assert_eq!(undone.goal.status, GoalStatus::Review);

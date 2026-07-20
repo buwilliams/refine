@@ -41,23 +41,13 @@ fn two_daemons_sync_refine_state_through_shared_git_remote() {
     let first_label = format!("multi-instance first {}", now_millis());
     let first_goal = instance_a.create_goal(&first_label);
     assert!(!first_goal.is_empty());
-
-    let sync_b = instance_b.api_json("POST", "/api/project/sync", json!({}));
-    assert_eq!(sync_b["ok"], true, "{sync_b:#}");
-    assert_eq!(sync_b["git_sync"]["attempted"], true, "{sync_b:#}");
-    assert_eq!(sync_b["goal_count"], 1, "{sync_b:#}");
-    instance_b.assert_goal_visible(&first_label);
+    instance_b.wait_for_goal(&first_label);
 
     let second_label = format!("multi-instance second {}", now_millis());
     let second_goal = instance_b.create_goal(&second_label);
     assert!(!second_goal.is_empty());
-
-    let sync_a = instance_a.api_json("POST", "/api/project/sync", json!({}));
-    assert_eq!(sync_a["ok"], true, "{sync_a:#}");
-    assert_eq!(sync_a["git_sync"]["attempted"], true, "{sync_a:#}");
-    assert_eq!(sync_a["goal_count"], 2, "{sync_a:#}");
-    instance_a.assert_goal_visible(&first_label);
-    instance_a.assert_goal_visible(&second_label);
+    instance_a.wait_for_goal(&first_label);
+    instance_a.wait_for_goal(&second_label);
 
     instance_b.stop();
     instance_a.stop();
@@ -113,6 +103,15 @@ impl RefineInstance {
         };
         let attach = instance.run_refine(&["project", "attach", app_root.to_str().unwrap()]);
         assert_success("project attach", &attach);
+        let settings = instance.api_json(
+            "PATCH",
+            "/api/settings",
+            json!({"project_update_pulse_interval_seconds": "1"}),
+        );
+        assert_eq!(
+            settings["settings"]["project_update_pulse_interval_seconds"], "1",
+            "{settings:#}"
+        );
         instance
     }
 
@@ -141,15 +140,24 @@ impl RefineInstance {
         id
     }
 
-    fn assert_goal_visible(&self, label: &str) {
+    fn wait_for_goal(&self, label: &str) {
         let path = format!("/api/goals?q={}&node=all&limit=50", query_component(label));
-        let payload = self.api_json("GET", &path, json!({}));
-        let goals = payload["goals"].as_array().cloned().unwrap_or_default();
-        assert!(
-            goals
-                .iter()
-                .any(|goal| goal["name"].as_str().unwrap_or_default().contains(label)),
-            "{label} was not visible in instance on port {}\n{payload:#}",
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let mut last_payload = Value::Null;
+        while Instant::now() < deadline {
+            last_payload = self.api_json("GET", &path, json!({}));
+            let visible = last_payload["goals"].as_array().is_some_and(|goals| {
+                goals
+                    .iter()
+                    .any(|goal| goal["name"].as_str().unwrap_or_default().contains(label))
+            });
+            if visible {
+                return;
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
+        panic!(
+            "{label} was not reconciled automatically on port {}\n{last_payload:#}",
             self.port
         );
     }

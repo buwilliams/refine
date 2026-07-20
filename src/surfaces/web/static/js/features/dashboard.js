@@ -209,7 +209,7 @@ function drawDashboard(d, opts = {}) {
           </div>` : ""}
         ${reviewsForReporter.length === 0 ? "" : `
           <div class="actions dashboard-panel-actions">
-            <button id="rev-bulk-verify" data-testid="dashboard-review-bulk-verify" disabled>Verify selected</button>
+            <button id="rev-bulk-verify" data-testid="dashboard-review-bulk-verify" disabled>Approve selected</button>
           </div>`}
       ${!reviewReporter
         ? ""
@@ -240,7 +240,7 @@ function drawDashboard(d, opts = {}) {
                   </td>
                   <td class="muted small">${fmtTime(g.updated)}</td>
                   <td class="actions" style="white-space:nowrap">
-                    <button data-rev-verify="${g.id}" data-testid="dashboard-review-verify">Verify →</button>
+                    <button data-rev-verify="${g.id}" data-testid="dashboard-review-verify">Approve →</button>
                     <button class="secondary" data-rev-add-round="${g.id}"
                             data-testid="dashboard-review-add-round"
                             data-rev-name="${htmlEscape(g.name)}">Add round</button>
@@ -338,7 +338,7 @@ function wireReviewsForReporter(reviews) {
     if (!btn) return;
     const n = selected().length;
     btn.disabled = n === 0;
-    btn.textContent = n === 0 ? "Verify selected" : `Verify selected (${n})`;
+    btn.textContent = n === 0 ? "Approve selected" : `Approve selected (${n})`;
     if (selectAll) {
       selectAll.checked = n > 0 && n === checks().length;
       selectAll.indeterminate = n > 0 && n < checks().length;
@@ -365,11 +365,11 @@ function wireReviewsForReporter(reviews) {
   $$("[data-rev-verify]", card).forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.revVerify;
-      await withButtonBusy(btn, "Verifying…", async () => {
+      await withButtonBusy(btn, "Approving…", async () => {
         try {
-          const r = await api("POST", `/api/goals/${id}/verify`);
-          if (r.ok) toast(r.message || "Verified", "info");
-          else toast(r.message || "Verify did not complete", "error");
+          const r = await api("POST", `/api/goals/${id}/approve`);
+          if (r.ok) toast(r.message || "Approved", "info");
+          else toast(r.message || "Approval did not complete", "error");
           if (r.ok) dashboardReviewSelectedIds.delete(id);
         } catch (e) { await showActionError(e); }
         await refreshDashboard();
@@ -390,18 +390,18 @@ function wireReviewsForReporter(reviews) {
     const ids = selected();
     if (!ids.length) return;
     const ok = await modalConfirm(
-      `Verify ${ids.length} goal${ids.length === 1 ? "" : "s"}?`,
-      { title: "Bulk verify", okLabel: "Verify all" },
+      `Approve ${ids.length} goal${ids.length === 1 ? "" : "s"}?`,
+      { title: "Bulk approve", okLabel: "Approve all" },
     );
     if (!ok) return;
     const btn = $("#rev-bulk-verify", card);
-    await withButtonBusy(btn, `Verifying 0/${ids.length}…`, async () => {
+    await withButtonBusy(btn, `Approving 0/${ids.length}…`, async () => {
       let done = 0, failed = 0;
       let ownershipError = null;
       for (const id of ids) {
-        btn.textContent = `Verifying ${done + 1}/${ids.length}…`;
+        btn.textContent = `Approving ${done + 1}/${ids.length}…`;
         try {
-          const r = await api("POST", `/api/goals/${id}/verify`);
+          const r = await api("POST", `/api/goals/${id}/approve`);
           if (!r.ok) failed++;
           else dashboardReviewSelectedIds.delete(id);
         } catch (e) {
@@ -412,8 +412,8 @@ function wireReviewsForReporter(reviews) {
       }
       if (ownershipError) await showActionError(ownershipError);
       const msg = failed
-        ? `Verified ${done - failed} of ${ids.length} — ${failed} did not complete`
-        : `Verified ${done} goal${done === 1 ? "" : "s"}`;
+        ? `Approved ${done - failed} of ${ids.length} — ${failed} did not complete`
+        : `Approved ${done} goal${done === 1 ? "" : "s"}`;
       toast(msg, failed ? "error" : "info");
       await refreshDashboard();
     });

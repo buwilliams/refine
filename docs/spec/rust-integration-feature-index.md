@@ -53,7 +53,7 @@ Nav & Content: Changes
 		Columns: when, goal (link or "Unlinked Goal"), status, priority, merge commit (abbrev hash), actions
 		Column Sorting
 		Undo button per row (disabled if cancelled)
-			Confirmation modal: git revert -m 1, push upstream, move Goal to cancelled
+			Confirmation modal: undo the approved implementation, reconcile automatically, move Goal to cancelled
 		Click row to open Goal Modal
 		Pagination: # of # entries, first, prev, Page #, next, last
 Nav & Content: Logs
@@ -256,7 +256,7 @@ Implementation Internals (for e2e testing)
 	Purpose: contract details a test needs to drive the UI, wait correctly, and assert outcomes. Frontend is a hash-routed SPA served from one index.html; all data via JSON over /api; live updates via SSE.
 	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
-			[crud] deterministic, assert directly: create/edit goals·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Verify, done↔review); reporter/node/cluster mgmt; settings edits; Undo (git revert)
+			[crud] deterministic, assert directly: create/edit goals·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Approve, done↔review); reporter/node/cluster mgmt; settings edits; Undo
 				[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
 		Preconditions — gated features; build the state first
 			Verify / Verify selected: a review goal assigned to the currently selected reporter
@@ -265,7 +265,7 @@ Implementation Internals (for e2e testing)
 			Generate rules: product + constitution both filled; QA: target-app test command configured
 			Node / Governance surfaces: an attached project; Application controls: supervisor/registry enabled
 		Oracles — non-obvious success states to assert
-			Verify → status becomes done; Cancel Feature keeps done goals, cancels non-terminal ones
+			Approve → reviewed candidate integrates and status becomes done; Cancel Feature keeps done goals, cancels non-terminal ones
 			Duplicate detection (New Goal / Import) matches on prompt; decisions → action keys move_original_to_backlog / create-anyway / import-original
 			Undo → revert commit pushed (if upstream) and goal moved to cancelled
 			Reporter throughput: completion_rate % is server-computed (shown beside Done/Reported) — assert the value from /api/dashboard, not a recomputed formula
@@ -323,7 +323,7 @@ Implementation Internals (for e2e testing)
 		qa: Quality-owned, no user buttons
 		ready-merge: merger-owned, no user buttons
 		build: target-app-build-owned, no user buttons
-		review → ← Todo (back: todo) | Verify → (forward: done, POST /api/goals/:id/verify)
+		review → ← Todo (back: todo) | Approve → (forward: done, POST /api/goals/:id/approve)
 		done → ← Review (back: review)
 		failed → ← Todo (back: todo); if QA-retry context: ← QA (POST /api/goals/:id/retry-quality); if merge-retry context: ← Merge (POST /api/goals/:id/retry-merge)
 		cancelled → ← Todo (back: todo)
@@ -345,7 +345,7 @@ Implementation Internals (for e2e testing)
 	API surface (grouped; :id = path param)
 		Project/app: /api/project/status|attach|path|directories|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions
 		Nodes/cluster: /api/nodes(/activate|/copy-settings|/transfer-goals), /api/cluster, /api/cluster/nodes, /api/reporters, /api/reporters/:id/merge
-		Goals: /api/goals, /api/goals/:id, /api/goals/:id/rounds(/latest), /api/goals/:id/verify|cancel|retry-quality|retry-merge, /api/goals/bulk, /api/goals/bulk/delete
+		Goals: /api/goals, /api/goals/:id, /api/goals/:id/rounds(/latest), /api/goals/:id/approve|cancel|retry-quality|retry-merge, /api/goals/bulk, /api/goals/bulk/delete
 		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/goals/:id(/reorder), /api/features/:id/goals/bulk
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
 		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/checks|/screenshots), /api/guidance

@@ -86,7 +86,7 @@ surfaces:
 - `project status`, `attach`, `switch`, `detach`, `register`, `clone`,
   `remove`, `migrate`, and `sync`.
 - Goal lifecycle commands: create, list, show, edit, note, round, workflow
-  movement, retry, verify, merge, undo, and delete.
+  movement, retry, review approval, undo, and delete.
 - Feature lifecycle and membership commands.
 - Node registry and cluster-operation commands.
 - Activity log list, tail, query, show, export, and support bundle commands.

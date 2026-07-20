@@ -122,8 +122,8 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
     runner_reachable: runnerReachable,
     pid: null,
     details: workflowPaused
-      ? "Workflow automation is paused; Goal agents, QA, builds, and merges wait."
-      : "Workflow automation can run Goal agents, QA, builds, and merges.",
+      ? "Workflow automation is paused; Goal agents, QA, and builds wait."
+      : "Workflow automation can run Goal agents, QA, and builds.",
     agents_paused: agentsPaused,
     background_processes_stopped: backgroundStopped,
     actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
@@ -520,7 +520,6 @@ function renderProcessActions(proc) {
         <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !hasStopAction ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
       <button class="secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""}>Build</button>
-      <button class="secondary" id="s-target-sync-now" data-testid="process-target-app-sync">Sync</button>
       <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
   }
   return `<span class="muted small">-</span>`;
@@ -972,7 +971,6 @@ function bindSettingsProcessesTab(s) {
   bindCommand("#s-target-run-start", "target_app.start");
   bindCommand("#s-target-run-stop", "target_app.stop");
   bindCommand("#s-target-run-build", "target_app.build");
-  bindCommand("#s-target-sync-now", "target_app.sync");
   bindCommand("#s-target-health-now", "target_app.health");
   // Kick off the initial status load (and let SSE refresh later).
   refreshTargetAppStatus();

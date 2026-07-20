@@ -10,7 +10,6 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::QualityCheckResult;
 use crate::tools::host::target_apps::FileTargetAppService;
-use crate::tools::product::merging::FileMergerService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
@@ -202,6 +201,22 @@ impl WorkflowBehavior for WorkflowImplementation {
             return fail(ctx, "governance", error);
         }
 
+        let remote = setting_string(&ctx.settings, "git_remote", "origin");
+        if worktree_git.remote_exists(&remote)? {
+            if let Err(error) = worktree_git.push(&remote, &branch) {
+                return fail(ctx, "git", error);
+            }
+            ctx.log(
+                "git",
+                &format!("Published implementation candidate {branch}"),
+                Some(json_object(json!({
+                    "branch": branch,
+                    "remote": remote,
+                    "commit": commit.commit
+                }))),
+            )?;
+        }
+
         ctx.agent_cwd = Some(agent_cwd);
         ctx.provider_output = Some(provider_output);
         ctx.implementation_changed = commit.has_changes_since_base;
@@ -230,14 +245,14 @@ impl WorkflowBehavior for WorkflowQa {
         };
         record_quality(ctx, &quality)?;
         if !quality.ok {
-            let cleanup = revert_merged_commit_after_quality_failure(ctx);
-            let detail = match cleanup {
-                Ok(()) => "quality checks failed".to_string(),
-                Err(error) => {
-                    format!("quality checks failed; failed to restore merged work: {error}")
-                }
-            };
-            return fail(ctx, "quality", RefineError::Conflict(detail));
+            return fail(
+                ctx,
+                "quality",
+                RefineError::Conflict(
+                    "quality checks failed; the isolated candidate was preserved for recovery"
+                        .to_string(),
+                ),
+            );
         }
         ctx.request_transition(GoalStatus::Qa, GoalStatus::Review)?;
         Ok(WorkflowAdvanceOutcome::Transition {
@@ -255,41 +270,16 @@ impl WorkflowBehavior for WorkflowReadyMerge {
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
-        let commit = ctx.require_commit()?.to_string();
-        let merger = FileMergerService::new(ctx.runtime_root, ctx.refine_dir());
-        let merge = match merger.merge_branch_for_workflow(&branch) {
-            Ok(result) if result.ok => result,
-            Ok(result) => {
-                let error = RefineError::Conflict(
-                    result
-                        .message
-                        .clone()
-                        .unwrap_or_else(|| "implementation merge failed".to_string()),
-                );
-                ctx.log(
-                    "merge",
-                    "Implementation merge failed",
-                    Some(json_object(json!({"branch": branch, "merge": &result}))),
-                )?;
-                return fail(ctx, "merge", error);
-            }
-            Err(error) => return fail(ctx, "merge", error),
-        };
         ctx.log(
-            "merge",
-            &format!("Merged implementation branch {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "commit": commit,
-                "merge": &merge
-            }))),
+            "review",
+            &format!("Prepared implementation candidate {branch} for validation"),
+            Some(json_object(json!({"branch": branch}))),
         )?;
-        ctx.merge = Some(merge);
         ctx.request_transition(GoalStatus::ReadyMerge, GoalStatus::Build)?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::ReadyMerge,
             to: GoalStatus::Build,
-            reason: "Implementation branch merged".to_string(),
+            reason: "Implementation candidate is ready for validation".to_string(),
         })
     }
 }
@@ -300,8 +290,9 @@ impl WorkflowBehavior for WorkflowBuild {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        let candidate_root = Path::new(ctx.require_worktree_path()?);
         let target_app =
-            FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
+            FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, candidate_root);
         let build = match target_app
             .build_with_metadata(ctx.workflow_process_metadata("build", "WorkflowBuild"))
         {
@@ -391,7 +382,8 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
             diagnostics: vec!["Quality checks disabled.".to_string()],
         });
     }
-    let service = FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
+    let candidate_root = Path::new(ctx.require_worktree_path()?);
+    let service = FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, candidate_root);
     let snapshot = service.test_with_metadata(ctx.workflow_process_metadata("qa", "WorkflowQa"))?;
     let mut diagnostics = vec![snapshot.message.clone()];
     if let Some(operation) = snapshot.last_operation {
@@ -407,67 +399,6 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
         ok: snapshot.ok,
         diagnostics,
     })
-}
-
-fn revert_merged_commit_after_quality_failure(ctx: &WorkflowContext<'_>) -> RefineResult<()> {
-    let branch = ctx.require_branch()?.to_string();
-    let commit = ctx.require_commit()?.to_string();
-    let worktree_path = ctx.require_worktree_path()?.to_string();
-    if !ctx.implementation_changed {
-        ctx.log(
-            "quality",
-            "No implementation commit to revert after quality failure",
-            Some(json_object(json!({
-                "branch": branch,
-                "commit": commit,
-                "worktree": worktree_path
-            }))),
-        )?;
-        return Ok(());
-    }
-    let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
-    let target_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
-    target_git.switch(&target_branch)?;
-    let revert = target_git.revert_commit(&commit)?;
-    if !revert.ok {
-        let recover = target_git.recover()?;
-        ctx.log(
-            "quality",
-            "Failed to revert implementation commit after QA failure",
-            Some(json_object(json!({
-                "commit": commit,
-                "target_branch": target_branch,
-                "revert": revert,
-                "recover": recover
-            }))),
-        )?;
-        return Err(RefineError::Conflict(
-            "reverting implementation commit failed".to_string(),
-        ));
-    }
-    ctx.log(
-        "quality",
-        "Reverted implementation commit after QA failure",
-        Some(json_object(json!({
-            "commit": commit,
-            "target_branch": target_branch,
-            "revert": revert
-        }))),
-    )?;
-    let path = Path::new(&worktree_path);
-    if !path.exists() {
-        let _ = target_git.remove_worktree(path, true);
-        let recreated = target_git.ensure_worktree(&branch, path)?;
-        ctx.log(
-            "quality",
-            "Recreated implementation worktree after QA failure",
-            Some(json_object(json!({
-                "branch": branch,
-                "worktree": recreated
-            }))),
-        )?;
-    }
-    Ok(())
 }
 
 fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> RefineResult<()> {

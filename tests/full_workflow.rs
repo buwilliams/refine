@@ -38,19 +38,25 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     );
 
     let goal_id = fixture.create_goal("full workflow git-backed goal");
-    let transition = fixture.run_refine(&["workflow", "transition", &goal_id, "todo"]);
-    fixture.assert_success("transition goal to todo", &transition);
+    let start = fixture.run_refine(&["goal", "start", &goal_id]);
+    fixture.assert_success("start goal workflow", &start);
     wait_for_goal_status(&fixture, &goal_id, "review");
 
+    let branch = format!("refine/{goal_id}/round-1");
+    let worktree = fixture.app_root.parent().unwrap().join(format!(
+        "{}-{}",
+        fixture.app_root.file_name().unwrap().to_string_lossy(),
+        branch.replace('/', "-")
+    ));
     let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
     assert!(
-        app_py.contains("full workflow provider edit"),
-        "merged app.py did not contain provider edit:\n{app_py}"
+        !app_py.contains("full workflow provider edit"),
+        "review modified the target branch before approval:\n{app_py}"
     );
-    let log = git(&fixture.app_root, &["log", "--oneline", "--decorate", "-5"]);
+    let candidate_py = fs::read_to_string(worktree.join("app.py")).unwrap();
     assert!(
-        log.contains(&format!("Implement {goal_id} round 1")),
-        "missing implementation commit in target app log:\n{log}"
+        candidate_py.contains("full workflow provider edit"),
+        "review candidate did not contain provider edit:\n{candidate_py}"
     );
 
     let shown = fixture.run_refine(&["goal", "show", &goal_id]);
@@ -58,26 +64,23 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     let goal = fixture.json_stdout(&shown);
     let latest = &goal["goal"]["rounds"][0];
     assert_eq!(goal["goal"]["status"], "review", "{goal:#}");
-    assert_eq!(
-        goal["goal"]["branch_name"],
-        format!("refine/{goal_id}/round-1")
-    );
+    assert_eq!(goal["goal"]["branch_name"], branch);
     assert_eq!(latest["quality_state"], "passed", "{goal:#}");
     assert_eq!(latest["rule_state"], "passed", "{goal:#}");
 
-    let round = fixture.run_refine(&[
-        "goal",
-        "round",
-        &goal_id,
-        "--reporter",
-        "QA",
-        "--prompt",
-        "Queue a second deterministic pass through todo",
-    ]);
-    fixture.assert_success("submit second round from review", &round);
-    let round_payload = fixture.json_stdout(&round);
-    assert_eq!(round_payload["goal"]["status"], "todo", "{round_payload:#}");
-    assert_eq!(round_payload["goal"]["round_count"], 2, "{round_payload:#}");
+    let approve = fixture.run_refine(&["goal", "approve", &goal_id]);
+    fixture.assert_success("approve reviewed goal", &approve);
+    wait_for_goal_status(&fixture, &goal_id, "done");
+    let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
+    assert!(
+        app_py.contains("full workflow provider edit"),
+        "approved app.py did not contain provider edit:\n{app_py}"
+    );
+    let log = git(&fixture.app_root, &["log", "--oneline", "--decorate", "-5"]);
+    assert!(
+        log.contains(&format!("Implement {goal_id} round 1")),
+        "missing approved implementation commit in target app log:\n{log}"
+    );
 
     unsafe {
         if let Some(previous) = previous_provider {

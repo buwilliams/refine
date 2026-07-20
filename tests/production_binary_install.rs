@@ -153,51 +153,19 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
 }
 
 #[test]
-fn install_dry_run_builds_and_installs_release_binary_before_start_commands() {
+fn install_runbook_builds_and_installs_release_binary_before_start_commands() {
     let repo = env!("CARGO_MANIFEST_DIR");
-    let temp_root = unique_temp_dir("install-dry-run");
-    let checkout = temp_root.join("refine");
-    let log = temp_root.join("install.log");
-    fs::create_dir_all(&temp_root).unwrap();
+    let runbook = fs::read_to_string(format!("{repo}/docs/runbooks/install.md")).unwrap();
 
-    let output = Command::new("bash")
-        .arg(format!("{repo}/scripts/install.sh"))
-        .arg("--yes")
-        .current_dir(&temp_root)
-        .env("REFINE_INSTALL_DRY_RUN", "1")
-        .env("REFINE_INSTALL_ASSUME_DEFAULTS", "1")
-        .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
-        .env("REFINE_INSTALL_LOG", &log)
-        .env("REFINE_INSTALL_ALLOW_TEST_PROVIDERS", "1")
-        .env("REFINE_INSTALL_PROVIDER", "smoke-ai")
-        .env("REFINE_INSTALL_TARGET_APP", "")
-        .env("REFINE_REPO_URL", "https://example.invalid/refine.git")
-        .env("REFINE_INSTALL_DRY_RUN_RELEASE_TAG", "9.8.7")
-        .output()
-        .unwrap();
+    assert!(runbook.contains("Do not use `scripts/install.sh`"));
+    assert!(runbook.contains("cargo build --release --locked"));
+    assert!(runbook.contains("install -m 755 target/release/refine bin/refine"));
     assert!(
-        output.status.success(),
-        "installer failed: stdout={}\nstderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+        runbook.contains("printf 'mode=deployed\\nrelease_bin=bin/refine\\n' > .refine-deployed")
     );
-
-    let log = fs::read_to_string(&log).unwrap();
-    assert!(log.contains("cargo build --release --locked"));
-    assert!(log.contains(&format!(
-        "install -m 755 {}/target/release/refine {}/bin/refine",
-        checkout.display(),
-        checkout.display()
-    )));
-    assert!(log.contains(&format!(
-        "write deployed marker {}/.refine-deployed",
-        checkout.display()
-    )));
-    assert!(
-        log.contains("./r system install --target linux-cli-web --port 8080 --runtime-root run")
-    );
-
-    fs::remove_dir_all(temp_root).unwrap();
+    assert!(runbook.contains("./r system start --port <port>"));
+    assert!(runbook.contains("Default: `8082`"));
+    assert!(runbook.contains("Do not offer `smoke-ai` during installation"));
 }
 
 #[test]
