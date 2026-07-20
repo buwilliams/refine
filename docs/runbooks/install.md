@@ -168,9 +168,10 @@ Distributed/node commands:
 ./r cluster distribute [--to <node-id>] [--converge] [--dry-run]
 ```
 
-Repository reconciliation is daemon-owned and automatic. The hidden
-`project sync` and `cluster sync` aliases are repair interfaces for Refine's
-own agents and diagnostics, not normal operating steps.
+Refine publishes durable state automatically on the dedicated `refine/state`
+branch without touching application branches. Use `project sync` or the Node
+screen's **Sync state now** action when a state handoff must happen immediately;
+`cluster sync` invokes the same shared capability for the current node.
 
 Cloud worker creation is provider-operated rather than part of the Refine
 binary. Follow `docs/runbooks/provision.md` when a fleet needs another worker.

@@ -815,7 +815,7 @@ Requirements:
 
 - Local daemon identity is explicit.
 - Work ownership is enforced before workflow claims or mutation.
-- Project-state sync is a shared workflow/tools operation.
+- Project-state sync is a shared workflow/tools operation over the dedicated `refine/state` branch. It uses an isolated worktree, batches demand-driven mutations, fetches only the state branch for those mutations, fetches all remote branches on the configurable project update pulse, and never moves an application branch.
 - Remote execution and cluster maintenance have bounded, visible operations.
 - The Rust architecture should preserve the distinction between UI selection
   and runtime ownership.

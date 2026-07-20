@@ -133,6 +133,67 @@ impl FileGitWorktreeService {
         Ok(self.git_raw(&["remote", "get-url", remote])?.success)
     }
 
+    pub fn fetch_branch(&self, remote: &str, branch: &str) -> RefineResult<()> {
+        validate_branch_name(branch)?;
+        if !self.remote_exists(remote)? {
+            return Err(RefineError::NotFound(format!(
+                "Git remote {remote} was not found"
+            )));
+        }
+        self.git_output(&["fetch", remote, branch])?;
+        self.audit(
+            "branch_fetch",
+            "ok",
+            json!({"remote": remote, "branch": branch}),
+        )
+    }
+
+    pub fn fast_forward_from_remote(&self, remote: &str, branch: &str) -> RefineResult<()> {
+        self.fetch_branch(remote, branch)?;
+        let remote_branch = format!("{remote}/{branch}");
+        self.git_output(&["merge", "--ff-only", &remote_branch])?;
+        self.audit(
+            "branch_fast_forward",
+            "ok",
+            json!({"remote": remote, "branch": branch}),
+        )
+    }
+
+    pub fn resolve_commit(&self, commitish: &str) -> RefineResult<String> {
+        validate_commitish(commitish)?;
+        stdout(self.git_output(&["rev-parse", "--verify", &format!("{commitish}^{{commit}}")])?)
+            .map(|value| value.trim().to_string())
+    }
+
+    pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
+        validate_commitish(commit)?;
+        let output = self.git_raw(&["merge", "--no-ff", "--no-edit", commit])?;
+        if output.success {
+            let result = MergeResult {
+                ok: true,
+                conflicts: Vec::new(),
+                message: Some(trimmed_command_text(&output)),
+            };
+            self.audit(
+                "merge_commit_no_ff",
+                "ok",
+                json!({"commit": commit, "result": &result}),
+            )?;
+            return Ok(result);
+        }
+        let result = MergeResult {
+            ok: false,
+            conflicts: self.conflicts().unwrap_or_default(),
+            message: Some(trimmed_command_text(&output)),
+        };
+        let _ = self.audit(
+            "merge_commit_no_ff",
+            "conflict",
+            json!({"commit": commit, "result": &result}),
+        );
+        Ok(result)
+    }
+
     pub fn ensure_branch_from_remote(&self, remote: &str, branch: &str) -> RefineResult<()> {
         validate_branch_name(branch)?;
         if self.branch_exists(branch)? {
@@ -143,7 +204,7 @@ impl FileGitWorktreeService {
                 "Git remote {remote} was not found"
             )));
         }
-        self.git_output(&["fetch", remote, branch])?;
+        self.fetch_branch(remote, branch)?;
         let remote_branch = format!("{remote}/{branch}");
         self.git_output(&["branch", branch, &remote_branch])?;
         self.audit(

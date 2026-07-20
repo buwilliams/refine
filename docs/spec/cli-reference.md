@@ -69,7 +69,7 @@ Report schema migration requirements. Semantic migrations are agent-operated
 
 ### `refine project sync`
 
-Internal repair command; normal project synchronization is automatic
+Publish and pull Refine control state now
 
 - `--cache-dir` — Cache directory to persist the rebuilt projection snapshot into
 
@@ -456,7 +456,7 @@ Reassign eligible unclaimed Goal ownership across the fleet. Spreads across enab
 
 ### `refine cluster sync`
 
-Internal repair command; normal fleet synchronization is automatic
+Publish and pull this node's Refine control state now
 
 ### `refine cluster run`
 

@@ -12,7 +12,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 pub const CURRENT_PROJECT_SCHEMA_VERSION: u64 = 2;
 const LEGACY_0_TO_1_ID: &str = "legacy-0-to-1";
 const GOALS_PROMPT_1_TO_2_ID: &str = "goals-prompt-1-to-2";
-const GAP_TO_GOAL_RUNBOOK: &str = "docs/runbooks/migrate-gap-state.md";
+const V2_TO_V4_RUNBOOK: &str = "docs/runbooks/v2-to-v4-migration-runbook.md";
 
 #[derive(Clone, Debug)]
 pub struct FileProjectMigrationService {
@@ -106,7 +106,7 @@ impl FileProjectMigrationService {
 
         Err(RefineError::Conflict(
             before.operator_instructions.unwrap_or_else(|| {
-                format!("An agent must migrate this project using {GAP_TO_GOAL_RUNBOOK}")
+                format!("An agent must migrate this project using {V2_TO_V4_RUNBOOK}")
             }),
         ))
     }
@@ -220,7 +220,7 @@ fn migration_required_status(
         safe_auto: false,
         requires_cluster_quiescence: true,
         operator_instructions: Some(format!(
-            "Use a migration agent and follow {GAP_TO_GOAL_RUNBOOK}; this semantic migration is not performed by deterministic application code."
+            "Use a migration agent and follow {V2_TO_V4_RUNBOOK}; this semantic migration is not performed by deterministic application code."
         )),
     }
 }
@@ -367,12 +367,16 @@ mod tests {
             status
                 .operator_instructions
                 .unwrap()
-                .contains(GAP_TO_GOAL_RUNBOOK)
+                .contains(V2_TO_V4_RUNBOOK)
         );
         let error = service.migrate().unwrap_err().to_string();
         assert!(error.contains("migration agent"));
         assert!(refine_dir.join("gaps/GA/P1").exists());
         assert!(!refine_dir.join("goals").exists());
+        let runbook = Path::new(env!("CARGO_MANIFEST_DIR")).join(V2_TO_V4_RUNBOOK);
+        let instructions = fs::read_to_string(runbook).unwrap();
+        assert!(instructions.contains("Migrate a Refine v2 Project to v4"));
+        assert!(instructions.contains("origin/refine/state"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

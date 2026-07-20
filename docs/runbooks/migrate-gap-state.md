@@ -3,6 +3,9 @@
 Use this runbook only when Refine reports that an attached project requires the
 `goals-prompt-1-to-2` migration. This is an agent-operated semantic migration,
 not a user workflow and not a deterministic Refine application transform.
+For a complete Refine v2 product upgrade, follow
+`docs/runbooks/v2-to-v4-migration-runbook.md`; this document covers only its
+Gap-to-Goal portion.
 
 ## Outcome
 
@@ -13,8 +16,9 @@ the current Goal schema. Refine can attach to the project at schema version 2.
 
 - Stop workflow execution on every node that uses the project.
 - Confirm that `.refine/gaps/` exists and `.refine/goals/` does not.
-- Create a recoverable copy of `.refine/` under
-  `.refine/backups/migrations/<timestamp>-goals-prompt-1-to-2/`.
+- Create a recoverable copy of `.refine/` outside the application repository
+  and outside `.refine`, with a path and checksum manifest recorded in the
+  migration report.
 - Do not modify application source files or Git history as part of migration.
 
 ## Agent procedure

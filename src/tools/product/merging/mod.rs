@@ -40,6 +40,7 @@ impl FileMergerService {
         }
         let settings =
             FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
+        let detail = work_items.show_goal_detail(goal_id)?;
         let branch_name = goal
             .goal
             .branch_name
@@ -51,22 +52,59 @@ impl FileMergerService {
                 ))
             })?
             .to_string();
-        let target_branch = setting_string(&settings, "merge_target_branch", "main");
+        let target_branch = detail
+            .get("target_branch")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| setting_string(&settings, "merge_target_branch", "main"));
+        let candidate_commit = detail
+            .get("candidate_commit")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
         let remote = setting_string(&settings, "git_remote", "origin");
         let target_root = target_root(&self.refine_dir)?;
 
         with_repository_git_lock(&target_root, || {
             let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
             if git.remote_exists(&remote)? {
+                git.fetch_branch(&remote, &branch_name)?;
                 git.ensure_branch_from_remote(&remote, &branch_name)?;
+                if let Some(expected) = candidate_commit.as_deref() {
+                    let published = git.resolve_commit(&format!("{remote}/{branch_name}"))?;
+                    if published != expected {
+                        return Err(RefineError::Conflict(format!(
+                            "Published candidate {branch_name} is {published}, expected {expected}"
+                        )));
+                    }
+                }
             }
             git.switch(&target_branch)?;
-            let merge = git.merge_no_ff(&branch_name)?;
+            if git.remote_exists(&remote)? {
+                git.fast_forward_from_remote(&remote, &target_branch)?;
+            }
+            let merge = if let Some(candidate) = candidate_commit.as_deref() {
+                let resolved = git.resolve_commit(candidate)?;
+                if resolved != candidate {
+                    return Err(RefineError::Conflict(format!(
+                        "Candidate commit {candidate} resolved unexpectedly to {resolved}"
+                    )));
+                }
+                git.merge_commit_no_ff(candidate)?
+            } else {
+                git.merge_no_ff(&branch_name)?
+            };
             if !merge.ok {
                 let _ = git.recover();
                 return Err(RefineError::Conflict(merge.message.unwrap_or_else(|| {
                     "implementation integration failed".to_string()
                 })));
+            }
+            if git.remote_exists(&remote)? {
+                git.push(&remote, &target_branch)?;
             }
             git.cleanup_merged_branch(&branch_name)?;
             Ok(())
@@ -117,9 +155,21 @@ mod tests {
         let refine_dir = repo.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let worktree_path = temp_root.join("repo-refine-GOAL1-round-1");
+        let remote = temp_root.join("remote.git");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
         commit_file(&repo, "app.txt", "base\n", "initial");
+        git(
+            &temp_root,
+            &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+        )
+        .unwrap();
+        git(
+            &repo,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        )
+        .unwrap();
+        git(&repo, &["push", "-u", "origin", "main"]).unwrap();
 
         let branch = "refine/GOAL1/round-1";
         git(
@@ -134,6 +184,9 @@ mod tests {
         )
         .unwrap();
         commit_file(&worktree_path, "feature.txt", "change\n", "GOAL1");
+        git(&worktree_path, &["push", "-u", "origin", branch]).unwrap();
+        let base_commit = git_stdout(&repo, &["rev-parse", "main"]);
+        let candidate_commit = git_stdout(&worktree_path, &["rev-parse", "HEAD"]);
 
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -157,7 +210,15 @@ mod tests {
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::Review)
             .unwrap();
-        work_items.set_goal_branch_name("GOAL1", branch).unwrap();
+        work_items
+            .update_goal_git_refs(
+                "GOAL1",
+                branch,
+                "main",
+                &base_commit,
+                Some(&candidate_commit),
+            )
+            .unwrap();
 
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let approved = merger.approve_reviewed_goal("GOAL1").unwrap();
@@ -172,6 +233,8 @@ mod tests {
             fs::read_to_string(repo.join("feature.txt")).unwrap(),
             "change\n"
         );
+        let head = git_stdout(&repo, &["rev-parse", "HEAD"]);
+        assert!(git_stdout(&repo, &["ls-remote", "origin", "refs/heads/main"]).starts_with(&head));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

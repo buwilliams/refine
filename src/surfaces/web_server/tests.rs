@@ -366,6 +366,23 @@ fn web_server_route_groups_cover_static_web_surface() {
 }
 
 #[test]
+fn static_runtime_settings_expose_state_sync_controls() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let runtime = fs::read_to_string(static_root.join("js/features/settings_runtime.js")).unwrap();
+
+    assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
+    assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
+    assert!(runtime.contains(r#"data-testid="runtime-project-update-pulse""#));
+    assert!(runtime.contains(r#"api("POST", "/api/project/sync", {})"#));
+    assert!(
+        runtime.contains(r##"state_sync_debounce_seconds: $("#s-state-sync-debounce").value"##)
+    );
+    assert!(runtime.contains(
+        r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
+    ));
+}
+
+#[test]
 fn static_import_modal_exposes_feature_import_surface() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
@@ -2872,7 +2889,7 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     assert_eq!(missing_upstream.body["git_sync"]["attempted"], false);
     assert_eq!(
         missing_upstream.body["git_sync"]["detail"],
-        "No upstream branch is configured."
+        "Git remote origin is not configured."
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -2931,10 +2948,11 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200);
+    assert_eq!(sync.status, 200, "{:#}", sync.body);
     assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["pulled"], true);
-    assert!(app_root.join("remote.txt").exists());
+    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
+    assert_eq!(sync.body["git_sync"]["pulled"], false);
+    assert!(!app_root.join("remote.txt").exists());
     assert!(
         app_root
             .join(".refine/runtime/processes/local.json")
@@ -2945,7 +2963,7 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
 }
 
 #[test]
-fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
+fn web_server_project_sync_ignores_dirty_user_worktree() {
     let temp_root = unique_temp_dir("http-project-sync-dirty");
     let (seed, app_root) = seeded_remote_clone(&temp_root);
     fs::write(seed.join("remote.txt"), "remote\n").unwrap();
@@ -2962,14 +2980,9 @@ fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200);
-    assert_eq!(sync.body["git_sync"]["attempted"], false);
-    assert!(
-        sync.body["git_sync"]["detail"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("local.txt")
-    );
+    assert_eq!(sync.status, 200, "{:#}", sync.body);
+    assert_eq!(sync.body["git_sync"]["attempted"], true);
+    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
     assert!(!app_root.join("remote.txt").exists());
     assert_eq!(
         fs::read_to_string(app_root.join("local.txt")).unwrap(),
@@ -2980,7 +2993,7 @@ fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
 }
 
 #[test]
-fn web_server_project_sync_rebases_and_pushes_diverged_branch() {
+fn web_server_project_sync_does_not_rebase_or_push_application_branches() {
     let temp_root = unique_temp_dir("http-project-sync-diverged");
     let (seed, app_root) = seeded_remote_clone(&temp_root);
     git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -3001,11 +3014,12 @@ fn web_server_project_sync_rebases_and_pushes_diverged_branch() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200);
+    assert_eq!(sync.status, 200, "{:#}", sync.body);
     assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["pulled"], true);
+    assert_eq!(sync.body["git_sync"]["pulled"], false);
     assert_eq!(sync.body["git_sync"]["pushed"], true);
-    assert!(app_root.join("remote.txt").exists());
+    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
+    assert!(!app_root.join("remote.txt").exists());
     assert!(app_root.join("local.txt").exists());
 
     fs::remove_dir_all(temp_root).unwrap();

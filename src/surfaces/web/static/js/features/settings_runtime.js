@@ -33,14 +33,19 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["21600", "6 hours"],
     ["86400", "24 hours"],
   ];
-  const pulseOptions = [
-    ["-1",   "Never"],
-    ["30",   "30 seconds"],
-    ["60",   "1 minute"],
-    ["300",  "5 minutes"],
-    ["900",  "15 minutes"],
-    ["1800", "30 minutes"],
-    ["3600", "1 hour"],
+  const stateDebounceOptions = [
+    ["1",  "1 second"],
+    ["5",  "5 seconds"],
+    ["15", "15 seconds"],
+    ["30", "30 seconds"],
+    ["60", "1 minute"],
+  ];
+  const remoteFetchOptions = [
+    ["-1",    "Manual only"],
+    ["300",   "5 minutes"],
+    ["900",   "15 minutes"],
+    ["1800",  "30 minutes"],
+    ["3600",  "1 hour"],
   ];
   const providerOptions = [
     ["claude", "Claude Code (default)"],
@@ -53,13 +58,15 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
   const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
-  const projectPulse = String(s.project_update_pulse_interval_seconds ?? "60");
+  const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
+  const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-runtime-copy-node">Copy from node</button>
+        <button class="secondary" id="s-state-sync-now" data-testid="runtime-state-sync-now">Sync state now</button>
       </div>
       ${renderSettingsEditableField({
         id: "s-cap",
@@ -156,13 +163,23 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         </select>`,
       })}
       ${renderSettingsEditableField({
-        id: "s-project-update-pulse",
-        label: "Target repo update pulse",
+        id: "s-state-sync-debounce",
+        label: "State sync debounce",
         guideItemId: "runtime-project-update-pulse",
-        description: "checks for local commits or upstream commits and refreshes this node's projected state.",
-        valueLabel: optionLabel(pulseOptions, projectPulse),
+        description: "coalesces nearby .refine mutations before publishing one readable state commit.",
+        valueLabel: optionLabel(stateDebounceOptions, stateDebounce),
+        control: `<select id="s-state-sync-debounce" data-testid="runtime-state-sync-debounce">
+          ${stateDebounceOptions.map(([v, lbl]) => `<option value="${v}" ${stateDebounce === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-project-update-pulse",
+        label: "Project update pulse",
+        guideItemId: "runtime-project-update-pulse",
+        description: "fetches human and Refine remote branches without changing the checked-out application branch.",
+        valueLabel: optionLabel(remoteFetchOptions, remoteFetchInterval),
         control: `<select id="s-project-update-pulse" data-testid="runtime-project-update-pulse">
-          ${pulseOptions.map(([v, lbl]) => `<option value="${v}" ${projectPulse === v ? "selected" : ""}>${lbl}</option>`).join("")}
+          ${remoteFetchOptions.map(([v, lbl]) => `<option value="${v}" ${remoteFetchInterval === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
       })}
       ${renderSettingsEditableField({
@@ -294,6 +311,7 @@ async function autosaveSettingsRuntime(options = {}) {
     agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
+    state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
@@ -308,7 +326,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-state-sync-debounce, #s-project-update-pulse, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );
@@ -319,6 +337,25 @@ function bindNodeRuntimeConfigControls() {
     { event: "settings-editable-commit" },
   );
   bindCommand("#s-recheck", "runtime.recheck_auth");
+  const syncNow = document.querySelector("#s-state-sync-now");
+  syncNow?.addEventListener("click", async () => {
+    await withButtonBusy(syncNow, "Syncing...", async () => {
+      try {
+        const result = await api("POST", "/api/project/sync", {});
+        const state = result.git_sync || {};
+        toast(
+          state.committed
+            ? "Refine state committed and synchronized"
+            : state.pulled
+              ? "Remote Refine state synchronized"
+              : "Refine state is already synchronized",
+          "info",
+        );
+      } catch (error) {
+        toast(error.message || "State synchronization failed", "error");
+      }
+    });
+  });
   bindSettingsEditableFields(root);
   return autosaveRuntime;
 }

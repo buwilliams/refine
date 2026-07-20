@@ -1240,7 +1240,7 @@ impl InProcessWebServer {
             200,
             json!({
                 "ok": true,
-                "message": "Project state projection rebuilt.",
+                "message": "Refine state synchronized and projection rebuilt.",
                 "projection_version": projection.version,
                 "goal_count": projection.goals.len(),
                 "feature_count": projection.features.len(),

@@ -106,10 +106,13 @@ impl RefineInstance {
         let settings = instance.api_json(
             "PATCH",
             "/api/settings",
-            json!({"project_update_pulse_interval_seconds": "1"}),
+            json!({
+                "state_sync_debounce_seconds": "1",
+                "project_update_pulse_interval_seconds": "1"
+            }),
         );
         assert_eq!(
-            settings["settings"]["project_update_pulse_interval_seconds"], "1",
+            settings["settings"]["state_sync_debounce_seconds"], "1",
             "{settings:#}"
         );
         instance

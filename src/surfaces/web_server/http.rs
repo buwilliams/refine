@@ -125,7 +125,8 @@ static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry
     OnceLock::new();
 
 const AGENT_WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
-const DEFAULT_GIT_SYNC_INTERVAL: Duration = Duration::from_secs(300);
+const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
+const DEFAULT_GIT_SYNC_DEBOUNCE: Duration = Duration::from_secs(5);
 const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -280,8 +281,10 @@ impl LocalHttpDaemon {
         let server = self.server.clone();
         let handle = thread::spawn(move || {
             let mut active_root = None;
-            let mut last_reconciled_fingerprint = None;
-            let mut next_remote_sync = Instant::now();
+            let mut last_observed_fingerprint = None;
+            let mut pending_sync = None;
+            let mut next_remote_fetch = None;
+            let mut active_schedule = None;
             let mut next_attempt = Instant::now();
             while !thread_stop.load(Ordering::Relaxed) {
                 let now = Instant::now();
@@ -294,21 +297,45 @@ impl LocalHttpDaemon {
                         .unwrap_or_else(|_| service.target_root.clone());
                     if active_root.as_ref() != Some(&root) {
                         active_root = Some(root);
-                        last_reconciled_fingerprint = None;
-                        next_remote_sync = now;
+                        last_observed_fingerprint = None;
+                        pending_sync = None;
+                        next_remote_fetch = None;
+                        active_schedule = None;
                     }
                     if let Ok(fingerprint) = service.durable_state_fingerprint() {
-                        let local_change = last_reconciled_fingerprint != Some(fingerprint);
-                        if local_change || now >= next_remote_sync {
-                            match service.try_sync() {
+                        let schedule = git_sync_configuration(&server).unwrap_or_default();
+                        if active_schedule != Some(schedule) {
+                            if pending_sync.is_some() {
+                                pending_sync = Some(now + schedule.debounce);
+                            }
+                            next_remote_fetch = schedule
+                                .remote_fetch_interval
+                                .map(|interval| now + interval);
+                            active_schedule = Some(schedule);
+                        }
+                        if last_observed_fingerprint != Some(fingerprint) {
+                            last_observed_fingerprint = Some(fingerprint);
+                            pending_sync = Some(now + schedule.debounce);
+                        }
+                        let demand_due = pending_sync.is_some_and(|deadline| now >= deadline);
+                        let remote_fetch_due =
+                            next_remote_fetch.is_some_and(|deadline| now >= deadline);
+                        if demand_due || remote_fetch_due {
+                            let result = if remote_fetch_due {
+                                service.try_sync()
+                            } else {
+                                service.try_sync_state()
+                            };
+                            match result {
                                 Ok(result) if !result.deferred => {
-                                    last_reconciled_fingerprint = service
+                                    last_observed_fingerprint = service
                                         .durable_state_fingerprint()
                                         .ok()
                                         .or(Some(fingerprint));
-                                    next_remote_sync = now
-                                        + git_sync_configuration(&server)
-                                            .unwrap_or(DEFAULT_GIT_SYNC_INTERVAL);
+                                    pending_sync = None;
+                                    next_remote_fetch = schedule
+                                        .remote_fetch_interval
+                                        .map(|interval| now + interval);
                                     next_attempt = now;
                                     let _ = server.refresh_projection_cache_after_mutation();
                                 }
@@ -922,28 +949,60 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     Ok(())
 }
 
-fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<Duration> {
-    let Some(runtime_root) = &server.runtime_root else {
-        return Ok(DEFAULT_GIT_SYNC_INTERVAL);
-    };
-    let Some(refine_dir) = server.current_refine_dir()? else {
-        return Ok(DEFAULT_GIT_SYNC_INTERVAL);
-    };
-    let settings = FileSettingsService::with_active_root(refine_dir, runtime_root).load()?;
-    Ok(git_sync_interval(
-        settings.get("project_update_pulse_interval_seconds"),
-    ))
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct GitSyncSchedule {
+    debounce: Duration,
+    remote_fetch_interval: Option<Duration>,
 }
 
-fn git_sync_interval(value: Option<&Value>) -> Duration {
+impl Default for GitSyncSchedule {
+    fn default() -> Self {
+        Self {
+            debounce: DEFAULT_GIT_SYNC_DEBOUNCE,
+            remote_fetch_interval: Some(DEFAULT_REMOTE_FETCH_INTERVAL),
+        }
+    }
+}
+
+fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<GitSyncSchedule> {
+    let Some(runtime_root) = &server.runtime_root else {
+        return Ok(GitSyncSchedule::default());
+    };
+    let Some(refine_dir) = server.current_refine_dir()? else {
+        return Ok(GitSyncSchedule::default());
+    };
+    let settings = FileSettingsService::with_active_root(refine_dir, runtime_root).load()?;
+    Ok(GitSyncSchedule {
+        debounce: positive_duration(
+            settings.get("state_sync_debounce_seconds"),
+            DEFAULT_GIT_SYNC_DEBOUNCE,
+        ),
+        remote_fetch_interval: optional_positive_duration(
+            settings.get("project_update_pulse_interval_seconds"),
+            DEFAULT_REMOTE_FETCH_INTERVAL,
+        ),
+    })
+}
+
+fn positive_duration(value: Option<&Value>, fallback: Duration) -> Duration {
     let seconds = value
         .and_then(Value::as_str)
         .and_then(|value| value.trim().parse::<i64>().ok())
-        .unwrap_or(DEFAULT_GIT_SYNC_INTERVAL.as_secs() as i64);
+        .unwrap_or(fallback.as_secs() as i64);
     if seconds <= 0 {
-        return DEFAULT_GIT_SYNC_INTERVAL;
+        return fallback;
     }
     Duration::from_secs(seconds as u64)
+}
+
+fn optional_positive_duration(value: Option<&Value>, fallback: Duration) -> Option<Duration> {
+    let Some(value) = value.and_then(Value::as_str) else {
+        return Some(fallback);
+    };
+    let Ok(seconds) = value.trim().parse::<i64>() else {
+        return Some(fallback);
+    };
+    (seconds > 0).then(|| Duration::from_secs(seconds as u64))
 }
 
 #[cfg(test)]
@@ -951,15 +1010,28 @@ mod git_sync_schedule_tests {
     use super::*;
 
     #[test]
-    fn project_update_pulse_controls_git_sync_cadence() {
-        assert_eq!(git_sync_interval(None), Duration::from_secs(300));
+    fn state_sync_schedule_defaults_and_normalizes() {
         assert_eq!(
-            git_sync_interval(Some(&Value::String("30".to_string()))),
+            positive_duration(None, DEFAULT_GIT_SYNC_DEBOUNCE),
+            Duration::from_secs(5)
+        );
+        assert_eq!(
+            positive_duration(
+                Some(&Value::String("30".to_string())),
+                DEFAULT_GIT_SYNC_DEBOUNCE
+            ),
             Duration::from_secs(30)
         );
         assert_eq!(
-            git_sync_interval(Some(&Value::String("-1".to_string()))),
-            Duration::from_secs(300)
+            optional_positive_duration(None, DEFAULT_REMOTE_FETCH_INTERVAL),
+            Some(Duration::from_secs(300))
+        );
+        assert_eq!(
+            optional_positive_duration(
+                Some(&Value::String("-1".to_string())),
+                DEFAULT_REMOTE_FETCH_INTERVAL
+            ),
+            None
         );
     }
 }

@@ -65,6 +65,15 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     let latest = &goal["goal"]["rounds"][0];
     assert_eq!(goal["goal"]["status"], "review", "{goal:#}");
     assert_eq!(goal["goal"]["branch_name"], branch);
+    assert_eq!(goal["goal"]["target_branch"], "main");
+    assert!(
+        goal["goal"]["base_commit"]
+            .as_str()
+            .is_some_and(|commit| commit.len() == 40),
+        "{goal:#}"
+    );
+    let candidate_commit = git(&worktree, &["rev-parse", "HEAD"]).trim().to_string();
+    assert_eq!(goal["goal"]["candidate_commit"], candidate_commit);
     assert_eq!(latest["quality_state"], "passed", "{goal:#}");
     assert_eq!(latest["rule_state"], "passed", "{goal:#}");
 
@@ -80,6 +89,10 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     assert!(
         log.contains(&format!("Implement {goal_id} round 1")),
         "missing approved implementation commit in target app log:\n{log}"
+    );
+    assert!(
+        !log.contains("Sync Refine state"),
+        "application history contains a Refine state commit:\n{log}"
     );
 
     unsafe {

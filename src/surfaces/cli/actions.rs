@@ -191,8 +191,7 @@ pub enum ProjectAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Internal repair command; normal project synchronization is automatic.
-    #[command(hide = true)]
+    /// Publish and pull Refine control state now.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
@@ -811,8 +810,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Internal repair command; normal fleet synchronization is automatic.
-    #[command(hide = true)]
+    /// Publish and pull this node's Refine control state now.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

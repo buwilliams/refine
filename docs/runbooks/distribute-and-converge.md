@@ -23,9 +23,9 @@ refine cluster distribute --to worker-1  # or: fill one specific node
 
 Distribution reassigns node ownership of unclaimed work — that is the entire
 mechanism. There is no background scheduler; work moved because this command
-was invoked. Refine's daemon observes the durable state change and reconciles
-it through the shared remote. Other nodes do the same, so no Git or sync action
-is part of the user's workflow.
+was invoked. Refine's daemon observes the durable state change and publishes a
+debounced batch through the shared `refine/state` branch. Other nodes do the
+same. Use **Sync state now** only when an immediate handoff is required.
 
 ## Converge for review
 

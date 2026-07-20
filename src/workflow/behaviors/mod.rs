@@ -72,6 +72,11 @@ impl WorkflowBehavior for WorkflowTodo {
             ctx.round_idx,
         );
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+        let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
+        let base_commit = match app_git.resolve_commit(&target_branch) {
+            Ok(commit) => commit,
+            Err(error) => return fail(ctx, "branch", error),
+        };
         ctx.request_transition(GoalStatus::Todo, GoalStatus::InProgress)?;
         let worktree_target = ctx
             .target_root
@@ -97,10 +102,13 @@ impl WorkflowBehavior for WorkflowTodo {
                 "worktree": worktree_path
             }))),
         )?;
-        if let Err(error) = ctx
-            .work_items
-            .update_goal_branch_name(&ctx.goal_id, Some(&branch))
-        {
+        if let Err(error) = ctx.work_items.update_goal_git_refs(
+            &ctx.goal_id,
+            &branch,
+            &target_branch,
+            &base_commit,
+            None,
+        ) {
             return fail(ctx, "branch", error);
         }
         ctx.branch = Some(branch);
@@ -163,6 +171,12 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(outcome) => outcome,
             Err(error) => return fail(ctx, "commit", error),
         };
+        if let Err(error) = ctx
+            .work_items
+            .update_goal_candidate_commit(&ctx.goal_id, &commit.commit)
+        {
+            return fail(ctx, "commit", error);
+        }
         if commit.has_changes_since_base {
             ctx.log(
                 "git",

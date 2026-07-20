@@ -448,6 +448,7 @@ fn default_settings() -> JsonObject {
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
         ("backlog_promote_after_seconds", "3600"),
+        ("state_sync_debounce_seconds", "5"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
         ("agent_subpath", ""),
@@ -504,6 +505,7 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "resource_isolation_mode",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
+        "state_sync_debounce_seconds",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
         "agent_subpath",
@@ -617,6 +619,7 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
                     | "agent_hard_cap_seconds"
                     | "agent_limit_pause_seconds"
                     | "backlog_promote_after_seconds"
+                    | "state_sync_debounce_seconds"
                     | "project_update_pulse_interval_seconds"
             ) =>
         {

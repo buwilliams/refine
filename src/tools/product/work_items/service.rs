@@ -209,6 +209,9 @@ impl FileWorkItemService {
         object.insert("priority".to_string(), Value::String("low".to_string()));
         object.insert("reporter".to_string(), Value::Null);
         object.insert("branch_name".to_string(), Value::Null);
+        object.insert("target_branch".to_string(), Value::Null);
+        object.insert("base_commit".to_string(), Value::Null);
+        object.insert("candidate_commit".to_string(), Value::Null);
         object.insert("feature_id".to_string(), Value::Null);
         object.insert("feature_order".to_string(), Value::Null);
         object.insert("node_id".to_string(), Value::String(node_id));
@@ -1724,6 +1727,70 @@ impl FileWorkItemService {
                 object.insert("branch_name".to_string(), Value::Null);
             }
         }
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
+    }
+
+    pub fn update_goal_git_refs(
+        &self,
+        goal_id: &str,
+        branch_name: &str,
+        target_branch: &str,
+        base_commit: &str,
+        candidate_commit: Option<&str>,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        for (key, raw) in [
+            ("branch_name", branch_name),
+            ("target_branch", target_branch),
+            ("base_commit", base_commit),
+        ] {
+            let raw = raw.trim();
+            if raw.is_empty() {
+                return Err(RefineError::InvalidInput(format!("{key} is required")));
+            }
+            object.insert(key.to_string(), Value::String(raw.to_string()));
+        }
+        object.insert(
+            "candidate_commit".to_string(),
+            candidate_commit
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| Value::String(value.to_string()))
+                .unwrap_or(Value::Null),
+        );
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
+    }
+
+    pub fn update_goal_candidate_commit(
+        &self,
+        goal_id: &str,
+        candidate_commit: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let candidate_commit = candidate_commit.trim();
+        if candidate_commit.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "candidate commit is required".to_string(),
+            ));
+        }
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        object.insert(
+            "candidate_commit".to_string(),
+            Value::String(candidate_commit.to_string()),
+        );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)
