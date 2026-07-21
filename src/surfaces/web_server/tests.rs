@@ -566,6 +566,35 @@ fn static_plan_chat_shows_initial_design_prompt() {
 }
 
 #[test]
+fn static_system_log_exposes_sources_and_diagnostic_details() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
+    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+    let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
+
+    assert!(common.contains("if (details) payload.details = details"));
+    assert!(common.contains(r#"details: { operation_id: response.operation.id }"#));
+    assert!(common.contains("function activitySystemOperationDetails"));
+    assert!(common.contains("details.activity_id = entry.id"));
+    assert!(common.contains("details.goal_id = entry.goal_id"));
+    assert!(common.contains("details: activitySystemOperationDetails(entry)"));
+    assert!(commands.contains(r#"details: { operation_id: operationId }"#));
+    assert!(commands.contains(r#"details: { operation_id: response.operation.id }"#));
+    assert!(toolbar.contains("details: payload?.details ?? null"));
+    assert!(toolbar.contains("function systemOperationDetailEntries"));
+    assert!(toolbar.contains(r#"data-testid="system-log-status""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-category""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-details""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-detail""#));
+    assert!(toolbar.contains("existing.category !== item.category"));
+    assert!(toolbar.contains("formatSystemOperationDetails(existing.details) !== itemDetails"));
+    assert!(toolbar_css.contains(".system-log-status"));
+    assert!(toolbar_css.contains(".system-log-category"));
+    assert!(toolbar_css.contains(".system-log-detail dd"));
+}
+
+#[test]
 fn static_work_item_tables_use_shared_readable_name_layout() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();
