@@ -1,0 +1,28 @@
+{
+  "id": "19f864041182b0b41",
+  "mode": "plan",
+  "provider": "claude",
+  "provider_session_id": null,
+  "attachment": "standalone",
+  "worktree": {
+    "branch": "refine/standalone/19f864041182b0b41",
+    "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f864041182b0b41"
+  },
+  "created_at": "2026-07-21T19:56:25Z",
+  "updated_at": "2026-07-21T19:56:29Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-21T19:56:29Z",
+      "delivered": false,
+      "id": "evt-1784663789631-4",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    }
+  ],
+  "importable_artifacts": [],
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "stopped"
+}
