@@ -14,26 +14,59 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T23:37:41Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-21T23:57:02Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1RATKM3716TBEKWR006-round-1",
+        "failed_actions": [
+          {
+            "message": "The durable GoalRound schema gained implementation_report and implementation_reported_at, but docs/spec/rust-spec.md still enumerates GoalRound fields without them. The UI intent document was updated, but this directly affected architecture/schema documentation was not.",
+            "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+            "rule_id": "rule-5"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"The implementation is compatible and well tested, but leaves the canonical GoalRound schema documentation stale.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.\",\"message\":\"The durable GoalRound schema gained implementation_report and implementation_reported_at, but docs/spec/rust-spec.md still enumerates GoalRound fields without them. The UI intent document was updated, but this directly affected architecture/schema documentation was not.\"}]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "The implementation is compatible and well tested, but leaves the canonical GoalRound schema documentation stale.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The durable GoalRound schema gained implementation_report and implementation_reported_at, but docs/spec/rust-spec.md still enumerates GoalRound fields without them. The UI intent document was updated, but this directly affected architecture/schema documentation was not.",
+              "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+              "rule_id": "rule-5"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1RATKM3716TBEKWR006-round-1"
+      },
+      "governance_message": "The implementation is compatible and well tested, but leaves the canonical GoalRound schema documentation stale.",
+      "governance_rule_actions": [
+        {
+          "message": "The durable GoalRound schema gained implementation_report and implementation_reported_at, but docs/spec/rust-spec.md still enumerates GoalRound fields without them. The UI intent document was updated, but this directly affected architecture/schema documentation was not.",
+          "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+          "rule_id": "rule-5"
+        }
+      ],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "I think after any Goal is implemented there should be a short after action report that explains what was done in simple terms. It should be accessible by opening the Goal to find the implementation report. Make it fit nicely into the existing UI. This is important for SOC2 compliance where its documented what was done and why.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T23:45:32Z"
+      "rule_state": "failed",
+      "updated": "2026-07-21T23:57:02Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-21T23:54:44Z"
+  "updated": "2026-07-21T23:57:02Z"
 }
