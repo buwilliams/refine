@@ -10,6 +10,7 @@ const GOAL_AGENT: &str = "smoke-ai goal-agent response\n\nThe disposable refine-
 const GOVERNANCE: &str = "smoke-ai governance response\n\nUse clear ownership, reversible changes, and explicit cleanup for refine-smoke artifacts.\n";
 const IMPORT: &str = "{\"kind\": \"import\", \"name\": \"refine-smoke imported goal one\", \"priority\": \"low\"}\n{\"kind\": \"import\", \"name\": \"refine-smoke imported goal two\", \"priority\": \"low\"}\n";
 const PLAN: &str = "{\n  \"feature\": {\n    \"name\": \"Smoke AI Plan Feature\",\n    \"description\": \"A deterministic product capability planned by the Smoke AI fixture.\",\n    \"goals\": [\n      {\n        \"name\": \"Smoke AI plan goal one\",\n        \"actual\": \"smoke-ai plan actual behavior one\",\n        \"target\": \"smoke-ai plan target behavior one\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      },\n      {\n        \"name\": \"Smoke AI plan goal two\",\n        \"actual\": \"smoke-ai plan actual behavior two\",\n        \"target\": \"smoke-ai plan target behavior two\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      }\n    ]\n  }\n}\n";
+const PLAN_GOAL: &str = "{\n  \"name\": \"Smoke AI Plan Goal\",\n  \"prompt\": \"Implement one independently actionable Goal selected from the Plan transcript and verify its behavior.\",\n  \"reporter\": \"\",\n  \"priority\": \"low\"\n}\n";
 const ROUND: &str = "smoke-ai round actual behavior => smoke-ai round target behavior\n";
 const STANDALONE_GOAL: &str =
     "smoke-ai standalone actual behavior => smoke-ai standalone target behavior\n";
@@ -27,6 +28,12 @@ const MATCHERS: &[(&str, &[&str], &str, &str)] = &[
         ],
         "preflight.md",
         PREFLIGHT,
+    ),
+    (
+        "plan-goal",
+        &["exactly one implementation-ready goal", "plan goal"],
+        "plan-goal.json",
+        PLAN_GOAL,
     ),
     (
         "goal-agent",

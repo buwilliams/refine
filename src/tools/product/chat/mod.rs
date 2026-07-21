@@ -1181,8 +1181,8 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
                 performance, recovery, and verification when they clarify the work, but do not \
                 force a fixed checklist or categories that do not fit the domain. Include enough \
                 concrete behavior, implementation tradeoffs, natural build order, and test or \
-                verification work that the Draft Feature action can later extract \
-                implementation-ready Features and Goals from the transcript. Do not reduce the \
+                verification work that the Draft Feature or Draft Goal action can later extract \
+                implementation-ready work from the transcript. Do not reduce the \
                 answer to generic strategy, prioritization advice, or a single suggested next \
                 action.";
     }
@@ -1602,7 +1602,8 @@ mod tests {
         assert!(prompt.contains("do not force a fixed checklist"));
         assert!(prompt.contains("natural build order"));
         assert!(prompt.contains("test or verification work"));
-        assert!(prompt.contains("implementation-ready Features and Goals"));
+        assert!(prompt.contains("Draft Feature or Draft Goal action"));
+        assert!(prompt.contains("implementation-ready work"));
         assert!(prompt.contains("Do not reduce the answer to generic strategy"));
         assert!(!prompt.contains("highest-leverage"));
         assert!(prompt.contains("Plan authentication cleanup."));

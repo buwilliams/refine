@@ -672,6 +672,7 @@ function drawToolbar() {
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
   if (!filesActive && !systemActive && !terminalActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
+    $("#btn-plan-draft-goal")?.addEventListener("click", draftGoalFromPlan);
     $("#btn-plan-draft")?.addEventListener("click", draftGoalsFromPlan);
     $("#btn-standalone-draft-goal")?.addEventListener("click", draftGoalFromStandaloneChat);
     $("#btn-standalone-submit-merge")?.addEventListener("click", submitStandaloneChatForMerge);
@@ -777,6 +778,10 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>
         ${active.mode === "plan" ? `
+          <button id="btn-plan-draft-goal" class="secondary" data-testid="plan-draft-goal"
+                  ${planHasAgentResponse(active) ? "" : "disabled"}>
+            Draft Goal
+          </button>
           <button id="btn-plan-draft" class="secondary" data-testid="plan-draft"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
             Draft Feature
@@ -2348,9 +2353,10 @@ function syncChatActionButtons(tab) {
 }
 
 function syncPlanDraftButton(tab) {
-  const btn = $("#btn-plan-draft");
-  if (!btn || !tab || tab.mode !== "plan") return;
-  btn.disabled = !planHasAgentResponse(tab);
+  if (!tab || tab.mode !== "plan") return;
+  [$("#btn-plan-draft-goal"), $("#btn-plan-draft")].forEach((btn) => {
+    if (btn) btn.disabled = !planHasAgentResponse(tab);
+  });
 }
 
 function syncStandaloneDraftGoalButton(tab) {
@@ -2622,6 +2628,33 @@ async function draftGoalsFromPlan() {
   }
 }
 
+async function draftGoalFromPlan() {
+  const t = chatState.tabs.plan;
+  if (!t) return;
+  const transcript = planTranscriptText(t);
+  if (!planHasAgentResponse(t) || !transcript) {
+    toast("Wait for the agent to respond before drafting a Goal.", "error");
+    return;
+  }
+  if (!state.lastReporter) {
+    toast("Pick a reporter in the top-right selector", "error");
+    return;
+  }
+  if (typeof extractImportDrafts !== "function") {
+    toast("Goal drafting is unavailable.", "error");
+    return;
+  }
+  openGoalDraftModalFromText(transcript, {
+    purpose: "plan_goal",
+    sourceTabId: "plan",
+    testIdPrefix: "plan-goal-draft",
+    description: "Review the drafted Goal before saving it as standalone work from this Plan.",
+    completionSource: "Plan",
+    chatSessionId: t.sessionId || "",
+  });
+  minimizeToolbar();
+}
+
 async function draftGoalFromStandaloneChat() {
   const t = chatState.tabs.standalone;
   if (!t) return;
@@ -2638,7 +2671,7 @@ async function draftGoalFromStandaloneChat() {
     toast("Goal drafting is unavailable.", "error");
     return;
   }
-  openStandaloneGoalDraftModalFromText(transcript);
+  openGoalDraftModalFromText(transcript);
   minimizeToolbar();
 }
 
@@ -2656,23 +2689,29 @@ async function submitStandaloneChatForMerge() {
   minimizeToolbar();
 }
 
-function openStandaloneGoalDraftModalFromText(transcript) {
+function openGoalDraftModalFromText(transcript, options = {}) {
+  const purpose = options.purpose || "standalone_goal";
+  const sourceTabId = options.sourceTabId || "standalone";
+  const testIdPrefix = options.testIdPrefix || "standalone-goal-draft";
+  const description = options.description || "Review the drafted Goal before saving it as standalone work.";
+  const completionSource = options.completionSource || "standalone chat";
+  const chatSessionId = options.chatSessionId || "";
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="standalone-goal-draft-modal"
-         aria-labelledby="standalone-goal-draft-title">
-      <div class="modal-title" id="standalone-goal-draft-title">Draft Goal</div>
+         data-testid="${testIdPrefix}-modal"
+         aria-labelledby="${testIdPrefix}-title">
+      <div class="modal-title" id="${testIdPrefix}-title">Draft Goal</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
-          Review the drafted Goal before saving it as standalone work.
+          ${htmlEscape(description)}
         </div>
-        <div id="standalone-goal-draft-body" data-testid="standalone-goal-draft-body"></div>
+        <div data-goal-draft-body data-testid="${testIdPrefix}-body"></div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="standalone-goal-draft-cancel">Cancel</button>
-        <button id="btn-save-standalone-goal-draft" data-testid="standalone-goal-draft-submit" disabled>Create Goal</button>
+        <button class="secondary" data-cancel data-testid="${testIdPrefix}-cancel">Cancel</button>
+        <button data-save-goal-draft data-testid="${testIdPrefix}-submit" disabled>Create Goal</button>
       </div>
     </div>
   `;
@@ -2697,15 +2736,20 @@ function openStandaloneGoalDraftModalFromText(transcript) {
     if (e.target === root) close();
   });
   root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("#standalone-goal-draft-body");
-  const saveButton = root.querySelector("#btn-save-standalone-goal-draft");
-  loadStandaloneGoalDraft({
+  const bodyRoot = root.querySelector("[data-goal-draft-body]");
+  const saveButton = root.querySelector("[data-save-goal-draft]");
+  loadGoalDraft({
     transcript,
     root,
     bodyRoot,
     saveButton,
     close,
     signal: abort.signal,
+    purpose,
+    sourceTabId,
+    testIdPrefix,
+    completionSource,
+    chatSessionId,
   }).catch((e) => {
     if (e.name === "AbortError") return;
     if (bodyRoot) {
@@ -2714,8 +2758,23 @@ function openStandaloneGoalDraftModalFromText(transcript) {
   });
 }
 
-async function loadStandaloneGoalDraft({ transcript, root, bodyRoot, saveButton, close, signal }) {
-  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_goal" });
+async function loadGoalDraft({
+  transcript,
+  root,
+  bodyRoot,
+  saveButton,
+  close,
+  signal,
+  purpose,
+  sourceTabId,
+  testIdPrefix,
+  completionSource,
+  chatSessionId,
+}) {
+  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, {
+    purpose,
+    ...(chatSessionId ? { chat_session_id: chatSessionId } : {}),
+  });
   if (signal.aborted) return;
   const draft = (drafts || []).find((item) => {
     return String(item?.prompt || item?.name || "").trim();
@@ -2730,14 +2789,14 @@ async function loadStandaloneGoalDraft({ transcript, root, bodyRoot, saveButton,
       ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
       : ""}
     <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form id="standalone-goal-draft-form" class="round-form">
+    <form data-goal-draft-form class="round-form">
       <div class="form-row">
         <label>Prompt</label>
-        <textarea name="prompt" data-testid="standalone-goal-draft-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
+        <textarea name="prompt" data-testid="${testIdPrefix}-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
       </div>
       <div class="form-row">
         <label>Priority</label>
-        <select name="priority" data-testid="standalone-goal-draft-priority">
+        <select name="priority" data-testid="${testIdPrefix}-priority">
           ${["low", "medium", "high"].map((priority) => `
             <option value="${priority}" ${(draft.priority || "low") === priority ? "selected" : ""}>${priority[0].toUpperCase()}${priority.slice(1)}</option>
           `).join("")}
@@ -2747,7 +2806,7 @@ async function loadStandaloneGoalDraft({ transcript, root, bodyRoot, saveButton,
   `;
   saveButton.disabled = false;
   saveButton.addEventListener("click", async () => {
-    const form = root.querySelector("#standalone-goal-draft-form");
+    const form = root.querySelector("[data-goal-draft-form]");
     if (!form) return;
     const fd = new FormData(form);
     const nextReporter = String(state.lastReporter || reporter || "").trim();
@@ -2763,9 +2822,9 @@ async function loadStandaloneGoalDraft({ transcript, root, bodyRoot, saveButton,
           priority,
         });
         const goalId = r?.goal?.id || "";
-        const tab = chatState.tabs.standalone;
+        const tab = chatState.tabs[sourceTabId];
         if (tab) {
-          tab.output = `${tab.output || ""}\n[refine] Drafted this standalone chat into Goal ${goalId || "new"}.\n`;
+          tab.output = `${tab.output || ""}\n[refine] Drafted this ${completionSource} into Goal ${goalId || "new"}.\n`;
           saveChatStateToStorage();
           drawChat();
         }

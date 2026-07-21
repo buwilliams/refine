@@ -41,6 +41,26 @@ pub struct PlanFeatureDestination {
     pub description: String,
 }
 
+pub fn validate_import_extraction_result(
+    mut result: ImportExtractionResult,
+    purpose: &str,
+) -> RefineResult<ImportExtractionResult> {
+    if purpose == "plan" && result.drafts.is_empty() {
+        return Err(RefineError::InvalidInput(
+            "Plan Draft extraction did not return any Goal drafts".to_string(),
+        ));
+    }
+    if matches!(purpose, "plan_goal" | "plan-goal") {
+        if result.drafts.len() != 1 {
+            return Err(RefineError::InvalidInput(
+                "Plan Goal extraction must return exactly one Goal draft".to_string(),
+            ));
+        }
+        result.feature_destination = None;
+    }
+    Ok(result)
+}
+
 #[derive(Clone, Debug)]
 pub struct FileImportService {
     pub refine_dir: PathBuf,
@@ -479,6 +499,13 @@ pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
         "round" => {
             "Draft Round data from this Goal chat transcript. Return only one actionable prompt."
         }
+        "plan_goal" | "plan-goal" => {
+            "Extract exactly one implementation-ready Goal from this Plan transcript. Return only one \
+             JSON object with name, prompt, reporter, and priority. The Goal must be a coherent, \
+             independently actionable slice of the plan, with enough concrete behavior, constraints, \
+             implementation context, and verification expectations for an agent to complete it. Do not \
+             return a Feature, multiple Goals, dependencies, or planning commentary."
+        }
         "standalone_goal" => {
             "Draft one standalone Goal from this Standalone chat transcript. Return only one \
              JSON object with name, prompt, reporter, and priority, or one actionable prompt."
@@ -870,6 +897,17 @@ mod tests {
         assert_eq!(goal.goal.reporter.as_deref(), Some("Reporter"));
 
         std::fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn plan_goal_extraction_prompt_requests_one_goal_without_a_feature() {
+        let prompt = import_extraction_prompt("Plan transcript", "plan_goal");
+
+        assert!(prompt.contains("exactly one implementation-ready Goal"));
+        assert!(prompt.contains("independently actionable slice"));
+        assert!(prompt.contains("verification expectations"));
+        assert!(prompt.contains("Do not return a Feature, multiple Goals"));
+        assert!(prompt.ends_with("\n\nPlan transcript"));
     }
 
     #[test]
