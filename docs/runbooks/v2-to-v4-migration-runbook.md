@@ -13,9 +13,9 @@ alone.
 ## Outcome
 
 - Durable project state is removed from the primary application worktree. The
-  local mutation projection lives at sibling `<app>-refine-live-state/`, while
-  `.refine/` is checked out only at sibling
-  `<app>-refine-state-worktree/.refine/` on `refine/state`.
+  local mutation projection lives at `<app>/.git/refine-live-state/`, while
+  `.refine/` is checked out only at
+  `<app>/.git/refine-state-worktree/.refine/` on `refine/state`.
 - Local process state is recreated in Refine's port-scoped runtime root and is
   not copied into durable state.
 - The migrated `.refine` tree is published through the configured `git_remote`
@@ -105,7 +105,7 @@ secrets, or host authentication material into `.refine` or Git.
    backed up. Verify that `git ls-files -- .refine` prints nothing.
 7. Place the migrated destination at `<app>/.refine` as a temporary untracked
    handoff, then attach the application with v4. Refine atomically moves that
-   tree into the sibling live-state location; it refuses attachment if
+   tree into the Git-owned live-state location; it refuses attachment if
    `.refine` remains tracked. Verify that no physical `<app>/.refine` directory
    remains, then run `refine project status`. If Refine
    still reports a migration requirement, inspect and correct the state; do
@@ -126,8 +126,9 @@ secrets, or host authentication material into `.refine` or Git.
   no migration requirement.
 - The application branch contains the expected commit removing legacy
   `.refine`; no other application source file changed.
-- `<app>/.refine` does not exist. The sibling live-state directory and isolated
-  state worktree are present, and `.refine` exists only inside the latter.
+- `<app>/.refine` does not exist. The `.git/refine-live-state` directory and
+  `.git/refine-state-worktree` are present, and `.refine` exists only inside
+  the latter.
 - Source and destination counts match for Goals, Features, rounds, notes, and
   evidence files. Any intentional count difference is explained in the
   migration report.
@@ -147,9 +148,10 @@ verification evidence, and the resulting `refine/state` commit.
 
 ## Rollback
 
-Stop all v4 nodes. Preserve the failed sibling live-state and state-worktree
-directories for diagnosis. Restore the external backup to `<app>/.refine` only
-if the project owner explicitly chooses to resume v2 operation, and restore or
-revert the corresponding application-branch removal commit normally. Do not
-delete or force-push `refine/state`; correct a v4 migration in a new attempt and
-publish a normal follow-up state commit.
+Stop all v4 nodes. Preserve the failed `.git/refine-live-state` and
+`.git/refine-state-worktree` directories for diagnosis. Restore the external
+backup to `<app>/.refine` only if the project owner explicitly chooses to
+resume v2 operation, and restore or revert the corresponding
+application-branch removal commit normally. Do not delete or force-push
+`refine/state`; correct a v4 migration in a new attempt and publish a normal
+follow-up state commit.

@@ -1287,7 +1287,7 @@ fn is_manage_app_wrapper_entrypoint(command: &str, action: &str) -> bool {
 }
 
 fn manage_app_wrapper_entrypoint(action: &str) -> String {
-    format!("sh \"$(git rev-parse --show-toplevel)-refine-live-state/manage-app.sh\" {action}")
+    format!("sh \"$(git rev-parse --git-common-dir)/refine-live-state/manage-app.sh\" {action}")
 }
 
 fn first_nonempty(values: &[String]) -> String {

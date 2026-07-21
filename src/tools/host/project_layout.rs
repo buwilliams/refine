@@ -5,8 +5,8 @@ use std::process::Command;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const LEGACY_REFINE_DIR: &str = ".refine";
-pub const LIVE_REFINE_STATE_SUFFIX: &str = "refine-live-state";
-pub const REFINE_STATE_WORKTREE_SUFFIX: &str = "refine-state-worktree";
+pub const LIVE_REFINE_STATE_DIR: &str = "refine-live-state";
+pub const REFINE_STATE_WORKTREE_DIR: &str = "refine-state-worktree";
 
 /// Locate the repository's shared Git directory.
 pub fn git_common_dir(target_root: &Path) -> RefineResult<PathBuf> {
@@ -38,17 +38,18 @@ pub fn git_common_dir(target_root: &Path) -> RefineResult<PathBuf> {
 
 /// The live durable-state projection used by Refine services. Its contents
 /// mirror the `.refine/` tree committed on `refine/state`, but the projection
-/// itself is outside the primary application worktree.
+/// itself is below the repository's Git directory, outside the primary
+/// application worktree.
 pub fn refine_dir_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
     #[cfg(test)]
     if !target_root.join(".git").exists() {
         return Ok(target_root.join(LEGACY_REFINE_DIR));
     }
-    sibling_state_path(target_root, LIVE_REFINE_STATE_SUFFIX)
+    Ok(git_common_dir(target_root)?.join(LIVE_REFINE_STATE_DIR))
 }
 
 pub fn state_worktree_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
-    sibling_state_path(target_root, REFINE_STATE_WORKTREE_SUFFIX)
+    Ok(git_common_dir(target_root)?.join(REFINE_STATE_WORKTREE_DIR))
 }
 
 /// Resolve the application worktree associated with either the external live
@@ -72,49 +73,22 @@ pub fn target_root_for_refine_dir(refine_dir: &Path) -> RefineResult<PathBuf> {
     if name == LEGACY_REFINE_DIR {
         return Ok(parent.to_path_buf());
     }
-    let suffix = format!("-{LIVE_REFINE_STATE_SUFFIX}");
-    let app_name = name.strip_suffix(&suffix).ok_or_else(|| {
+    if name != LIVE_REFINE_STATE_DIR {
+        return Err(RefineError::InvalidInput(format!(
+            "Refine state directory {} does not match the Git-owned state layout",
+            refine_dir.display()
+        )));
+    }
+    let target_root = parent.parent().ok_or_else(|| {
         RefineError::InvalidInput(format!(
-            "Refine state directory {} does not match the external state layout",
+            "Refine state directory {} has no target-app parent",
             refine_dir.display()
         ))
     })?;
-    Ok(parent.join(app_name))
+    Ok(target_root.to_path_buf())
 }
 
-fn sibling_state_path(target_root: &Path, suffix: &str) -> RefineResult<PathBuf> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .current_dir(target_root)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to locate Git worktree: {error}")))?;
-    if !output.status.success() {
-        return Err(RefineError::InvalidInput(format!(
-            "target app {} must be a Git worktree",
-            target_root.display()
-        )));
-    }
-    let root = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
-    let parent = root.parent().ok_or_else(|| {
-        RefineError::InvalidInput(format!(
-            "target app {} has no parent directory for isolated Refine state",
-            root.display()
-        ))
-    })?;
-    let name = root
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| {
-            RefineError::InvalidInput(format!(
-                "target app {} has no usable directory name",
-                root.display()
-            ))
-        })?;
-    Ok(parent.join(format!("{name}-{suffix}")))
-}
-
-/// Move a pre-v4 `<target>/.refine` tree into the sibling live-state directory.
+/// Move a pre-v4 `<target>/.refine` tree into the Git-owned live-state directory.
 /// This is intentionally a rename: the old path disappears atomically and no
 /// second live copy remains in the application worktree.
 pub fn prepare_refine_dir(target_root: &Path) -> RefineResult<PathBuf> {
@@ -198,11 +172,11 @@ mod tests {
 
         assert!(!app.join(".refine").exists());
         assert!(refine_dir.join("goals/GOAL1/goal.json").exists());
-        assert_eq!(refine_dir, root.join("app-refine-live-state"));
+        assert_eq!(refine_dir, app.join(".git/refine-live-state"));
         assert_eq!(target_root_for_refine_dir(&refine_dir).unwrap(), app);
         assert_eq!(
             state_worktree_for_target_root(&app).unwrap(),
-            root.join("app-refine-state-worktree")
+            app.join(".git/refine-state-worktree")
         );
         fs::remove_dir_all(root).unwrap();
     }

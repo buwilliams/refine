@@ -1936,10 +1936,7 @@ mod tests {
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         let result = automation.evaluate_workflow().unwrap();
-        let worktree_path = temp_root.parent().unwrap().join(format!(
-            "{}-refine-GOAL1-round-1",
-            temp_root.file_name().unwrap().to_string_lossy()
-        ));
+        let worktree_path = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
         assert_eq!(result.steps.len(), 1);
         assert_eq!(result.steps[0].commit.len(), 40);
         assert_eq!(
@@ -2068,11 +2065,6 @@ mod tests {
             }
         }
 
-        fs::remove_dir_all(temp_root.parent().unwrap().join(format!(
-            "{}-refine-GOAL1-round-1",
-            temp_root.file_name().unwrap().to_string_lossy()
-        )))
-        .ok();
         fs::remove_dir_all(temp_root).unwrap();
     }
 
@@ -2096,11 +2088,10 @@ mod tests {
         git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
 
         let branch = "refine/GOAL1/round-1";
-        let worktree_path = temp_root.parent().unwrap().join(format!(
-            "{}-{}",
-            temp_root.file_name().unwrap().to_string_lossy(),
-            branch.replace('/', "-")
-        ));
+        let worktree_path = temp_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
+        fs::create_dir_all(worktree_path.parent().unwrap()).unwrap();
         git(
             &temp_root,
             &[
@@ -2219,11 +2210,9 @@ mod tests {
         }
 
         let branch = "refine/GOAL1/round-1";
-        let worktree_path = temp_root.parent().unwrap().join(format!(
-            "{}-{}",
-            temp_root.file_name().unwrap().to_string_lossy(),
-            branch.replace('/', "-")
-        ));
+        let worktree_path = target_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
         let initial_head = git_stdout(&target_root, &["rev-parse", "HEAD"]).unwrap();
 
         let _smoke_ai_env_guard = smoke_ai_env_lock()

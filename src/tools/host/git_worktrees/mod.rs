@@ -735,15 +735,10 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn worktree(&self, branch: &str) -> RefineResult<String> {
         validate_branch_name(branch)?;
         self.ensure_head_commit()?;
-        let parent = self.root.parent().unwrap_or_else(|| Path::new("."));
-        let target = parent.join(format!(
-            "{}-{}",
-            self.root
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or("worktree"),
-            branch.replace('/', "-")
-        ));
+        let target = self
+            .git_path("refine-worktrees")?
+            .join(branch.replace('/', "-"));
+        create_worktree_parent(&target)?;
         self.git_output(&[
             "worktree",
             "add",
@@ -786,6 +781,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         } else {
             self.root.join(target)
         };
+        create_worktree_parent(&target)?;
         if !self.branch_exists(branch)? {
             self.ensure_head_commit()?;
             self.git_output(&[
@@ -987,6 +983,18 @@ impl GitWorktreeService for FileGitWorktreeService {
         }
         Ok(result)
     }
+}
+
+fn create_worktree_parent(target: &Path) -> RefineResult<()> {
+    let Some(parent) = target.parent() else {
+        return Ok(());
+    };
+    fs::create_dir_all(parent).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to create worktree parent {}: {error}",
+            parent.display()
+        ))
+    })
 }
 
 fn relative_child_path(root: &Path, child: &Path) -> Option<String> {
@@ -1252,6 +1260,10 @@ mod tests {
 
         git(&repo, &["switch", "main"]).unwrap();
         let worktree_path = PathBuf::from(service.worktree("feature/worktree").unwrap());
+        assert_eq!(
+            worktree_path,
+            repo.join(".git/refine-worktrees/feature-worktree")
+        );
         assert!(worktree_path.join(".git").exists());
         assert_eq!(current_branch(&worktree_path), "feature/worktree");
         let worktree_status = service.inspect(worktree_path.to_str().unwrap()).unwrap();

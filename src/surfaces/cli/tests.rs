@@ -936,11 +936,10 @@ fn goal_approve_and_undo_use_shared_file_work_item_service() {
     )
     .unwrap();
     let branch = "refine/GOAL1/round-1";
-    let worktree = temp_root.parent().unwrap().join(format!(
-        "{}-{}",
-        temp_root.file_name().unwrap().to_string_lossy(),
-        branch.replace('/', "-")
-    ));
+    let worktree = target_root
+        .join(".git/refine-worktrees")
+        .join(branch.replace('/', "-"));
+    fs::create_dir_all(worktree.parent().unwrap()).unwrap();
     run_git(
         &target_root,
         &["worktree", "add", "-b", branch, worktree.to_str().unwrap()],

@@ -170,8 +170,8 @@ Distributed/node commands:
 
 Refine publishes durable state automatically on the dedicated `refine/state`
 branch without touching application branches. Its live local projection and
-isolated branch worktree are siblings of the target app, so the primary
-target-app worktree never contains `.refine`. The Target App **Git remote**
+isolated branch worktree live under the target repository's `.git/` directory,
+so `<app>/.refine` never exists in the primary target-app worktree. The Target App **Git remote**
 setting controls both state and Goal-branch publication and defaults to
 `origin`. If that remote is unavailable, Refine still initializes and commits
 local state; it simply cannot publish it. Use `project sync` or the Node screen's

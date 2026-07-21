@@ -280,10 +280,11 @@ unless a migration intentionally changes it.
 Module: `model::project`; path: `src/model/project/`.
 
 Owns the canonical shape of a Refine target-app attachment and project state.
-This covers persisted `.refine` state in the isolated sibling state worktree,
-its sibling live mutation projection, and port-scoped runtime selection state
-under the Refine checkout's `run/` directory. The primary target-app worktree
-must never contain `.refine`.
+This covers persisted `.refine` state in the isolated
+`<app>/.git/refine-state-worktree/`, its `.git/refine-live-state/` mutation
+projection, and port-scoped runtime selection state under the Refine checkout's
+`run/` directory. The primary target-app worktree must never contain
+`<app>/.refine`.
 
 Properties:
 
@@ -817,7 +818,7 @@ Requirements:
 
 - Local daemon identity is explicit.
 - Work ownership is enforced before workflow claims or mutation.
-- Project-state sync is a shared workflow/tools operation over the dedicated `refine/state` branch. It uses sibling `<app>-refine-live-state/` and `<app>-refine-state-worktree/` directories so `.refine` never exists beneath the primary application worktree. It batches demand-driven mutations, fetches only the state branch for those mutations, fetches all remote branches on the configurable project update pulse, and never moves an application branch. The shared `git_remote` setting, defaulting to `origin`, applies to state and Goal/application operations. A missing configured remote prevents publication but not local exclusion, state-worktree initialization, or local state commits.
+- Project-state sync is a shared workflow/tools operation over the dedicated `refine/state` branch. It uses `<app>/.git/refine-live-state/` and `<app>/.git/refine-state-worktree/`, while Goal and standalone worktrees also remain under `.git/`; `<app>/.refine` never exists in the primary application worktree. It batches demand-driven mutations, fetches only the state branch for those mutations, fetches all remote branches on the configurable project update pulse, and never moves an application branch. The shared `git_remote` setting, defaulting to `origin`, applies to state and Goal/application operations. A missing configured remote prevents publication but not local exclusion, state-worktree initialization, or local state commits.
 - Remote execution and cluster maintenance have bounded, visible operations.
 - The Rust architecture should preserve the distinction between UI selection
   and runtime ownership.

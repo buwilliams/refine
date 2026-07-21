@@ -1049,7 +1049,7 @@ mod tests {
         assert!(!fixture.a.join(".refine").exists());
         assert!(!fixture.b.join(".refine").exists());
         let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
-        assert!(!state_worktree.starts_with(&fixture.a));
+        assert_eq!(state_worktree, fixture.a.join(".git/refine-state-worktree"));
         assert!(
             state_worktree
                 .join(".refine/goals/GOALA/goal.json")

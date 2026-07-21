@@ -22,7 +22,7 @@ Without durable target-app context, agentic work becomes chat transcript memory 
 Target App should be the foundation that ties durable work to the real project. It should connect:
 
 - the active app and project registry;
-- durable product state in the sibling Refine state layout, with `.refine` checked out only in the isolated `refine/state` worktree;
+- durable product state in the repository's Git-owned Refine layout, with `.refine` checked out only in the isolated `refine/state` worktree;
 - runtime state for the local daemon, processes, operations, claims, and caches;
 - workflow state that explains what can happen next;
 - projection snapshots and other derived state that keep the product fast without becoming authoritative;
@@ -32,7 +32,7 @@ Target App should be the foundation that ties durable work to the real project. 
 
 The current implementation details that matter to intent are:
 
-- durable product state is associated with the target app but never lives beneath its primary worktree: the local mutation projection is `<app>-refine-live-state/` and the branch checkout is `<app>-refine-state-worktree/.refine/`;
+- durable product state is associated with the target app but never appears at `<app>/.refine` or in the primary worktree: the local mutation projection is `<app>/.git/refine-live-state/` and the branch checkout is `<app>/.git/refine-state-worktree/.refine/`;
 - runtime state is separated from durable product state so processes and daemons can recover cleanly;
 - flat JSON-like records keep Goals, Features, settings, guidance, governance, and logs inspectable;
 - projections and caches exist for speed but should be rebuildable from durable state;

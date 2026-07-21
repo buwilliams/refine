@@ -43,11 +43,10 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     wait_for_goal_status(&fixture, &goal_id, "review");
 
     let branch = format!("refine/{goal_id}/round-1");
-    let worktree = fixture.app_root.parent().unwrap().join(format!(
-        "{}-{}",
-        fixture.app_root.file_name().unwrap().to_string_lossy(),
-        branch.replace('/', "-")
-    ));
+    let worktree = fixture
+        .app_root
+        .join(".git/refine-worktrees")
+        .join(branch.replace('/', "-"));
     let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
     assert!(
         !app_py.contains("full workflow provider edit"),
