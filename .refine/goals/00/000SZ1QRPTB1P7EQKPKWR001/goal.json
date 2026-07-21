@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T23:17:54Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1QRPTB1P7EQKPKWR001",
+  "name": "Review the UI > System tab. I like the color formatting, but I feel the informat",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T23:17:54Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Review the UI > System tab. I like the color formatting, but I feel the information could be more useful. It doesn't contain any concrete ids or messages that would help a user or agent debug.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T23:17:54Z"
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T23:17:54Z"
+}
