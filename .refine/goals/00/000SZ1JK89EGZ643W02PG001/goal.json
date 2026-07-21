@@ -1,7 +1,7 @@
 {
   "base_commit": "2bbc280e37850d3a3a34c2dd7882be27a8866c6f",
-  "branch_name": "refine/00000SZ1JK89EGZ643W02PG001/round-1",
-  "candidate_commit": "463886d6d9e6987b1c880edc072a869e44d37c0d",
+  "branch_name": "refine/00000SZ1JK89EGZ643W02PG001/round-2",
+  "candidate_commit": "3e81106b4f1d87f0edd69d4661e0fe9f4c71c589",
   "created": "2026-07-21T20:17:11Z",
   "feature_id": "00000SZ1JK6P23KW6X0G2PG000",
   "feature_order": 1,
@@ -41,9 +41,39 @@
       "reporter": "Buddy Williams",
       "rule_state": "passed",
       "updated": "2026-07-21T20:35:36Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-21T20:36:39Z",
+      "governance_checked_at": "2026-07-21T20:47:48Z",
+      "governance_details": {
+        "configured": false,
+        "failed_actions": [],
+        "governance_configured": false,
+        "phase": "post_implementation",
+        "rules_checked": 0
+      },
+      "governance_message": "No governance rules configured.",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Address two source-promotion retry/recovery defects found in review of round 1.\n\n1. FileSourcePromotionService::queue persists status=queued before spawning the external helper. If Command::spawn fails, the method returns an error but leaves a queued operation that active_work treats as permanently active, blocking every retry. On helper launch failure, atomically persist a terminal failed operation with an actionable stage/error/recovery message before returning. Add a focused test using a fakeable helper-launch seam so no real helper or self-update runs.\n\n2. FileSourcePromotionHost::build_candidate can leave the temporary Git worktree behind when spawning cargo fails or when target cleanup/removal fails. The next attempt uses the same commit-derived path and then fails forever with candidate worktree already exists. Make candidate artifacts operation-unique or safely reusable and guarantee best-effort cleanup on every build/copy/command error. Preserve the primary failure while including cleanup failure details and actionable recovery. Add focused filesystem/host tests for the stranded-worktree retry path without performing a real source promotion.\n\nRe-run fmt, strict Clippy, focused tests, complete unit tests, and release build. Keep the existing round 1 architecture and UI behavior otherwise unchanged.",
+      "quality_checked_at": "2026-07-21T20:47:49Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-21T20:47:49Z"
     }
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-21T20:35:36Z"
+  "updated": "2026-07-21T20:47:50Z"
 }
