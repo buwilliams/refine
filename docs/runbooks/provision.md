@@ -12,7 +12,7 @@ and the daemon before distributing work.
 
 ## Preconditions
 
-- A target project is attached and has an `origin` remote where Refine can publish its dedicated `refine/state` branch and implementation branches.
+- A target project is attached and has the configured `git_remote` (default `origin`) where Refine can publish its dedicated `refine/state` branch and implementation branches.
 - The target repository is reachable from the worker, including credentials
   for a private repository.
 - The provider CLI is installed and authenticated on the control machine.

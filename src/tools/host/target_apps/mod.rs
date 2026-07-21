@@ -19,6 +19,7 @@ use crate::tools::host::agent_providers::{
 };
 
 pub const TARGET_APP_STATE_FILE: &str = "target-app-state.json";
+const MANAGE_APP_LOG_PATH: &str = "@refine-state/manage-app.log";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TargetAppOperation {
@@ -519,7 +520,7 @@ impl FileTargetAppService {
         &self,
         config: &mut TargetAppGeneratedConfig,
     ) -> RefineResult<()> {
-        let wrapper_dir = self.target_root.join(".refine");
+        let wrapper_dir = self.refine_dir.clone();
         fs::create_dir_all(&wrapper_dir).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create target-app wrapper directory {}: {error}",
@@ -528,7 +529,7 @@ impl FileTargetAppService {
         })?;
 
         if config.log_path.trim().is_empty() {
-            config.log_path = ".refine/manage-app.log".to_string();
+            config.log_path = MANAGE_APP_LOG_PATH.to_string();
         }
         let mut notes = Vec::new();
         if clear_generated_wrapper_entrypoints(config) {
@@ -553,15 +554,15 @@ impl FileTargetAppService {
         })?;
         make_executable(&wrapper_path)?;
 
-        config.start_command = "./.refine/manage-app.sh start".to_string();
-        config.stop_command = "./.refine/manage-app.sh stop".to_string();
-        config.build_command = "./.refine/manage-app.sh build".to_string();
-        config.test_command = "./.refine/manage-app.sh test".to_string();
-        config.status_command = "./.refine/manage-app.sh status".to_string();
+        config.start_command = manage_app_wrapper_entrypoint("start");
+        config.stop_command = manage_app_wrapper_entrypoint("stop");
+        config.build_command = manage_app_wrapper_entrypoint("build");
+        config.test_command = manage_app_wrapper_entrypoint("test");
+        config.status_command = manage_app_wrapper_entrypoint("status");
         config.cwd = ".".to_string();
         append_note(
             &mut config.notes,
-            "Wrote .refine/manage-app.sh with timestamped logging and pointed target-app commands at it.",
+            "Wrote the managed target-app wrapper outside the application worktree and pointed target-app commands at it.",
         );
         Ok(())
     }
@@ -1097,9 +1098,10 @@ fn static_web_start_command(port: u16, serve_dir: &str, url: &str) -> String {
         format!("PORT={port};"),
         format!("URL={};", shell_quote(url)),
         format!("SERVE_DIR={};", shell_quote(serve_dir)),
-        "PID_FILE=.refine/run/target-app.pid;".to_string(),
-        "SERVER_LOG=.refine/logs/target-app-server.log;".to_string(),
-        "mkdir -p .refine/run .refine/logs;".to_string(),
+        "RUNTIME_DIR=$(git rev-parse --git-path refine-target-app-runtime);".to_string(),
+        "PID_FILE=$RUNTIME_DIR/target-app.pid;".to_string(),
+        "SERVER_LOG=$RUNTIME_DIR/target-app-server.log;".to_string(),
+        "mkdir -p \"$RUNTIME_DIR\";".to_string(),
         "if curl -fsS \"$URL\" >/dev/null 2>&1; then exit 0; fi;".to_string(),
         "if [ -s \"$PID_FILE\" ] && kill -0 \"$(cat \"$PID_FILE\")\" 2>/dev/null; then :; else"
             .to_string(),
@@ -1123,7 +1125,8 @@ fn static_web_start_command(port: u16, serve_dir: &str, url: &str) -> String {
 
 fn static_web_stop_command() -> String {
     [
-        "PID_FILE=.refine/run/target-app.pid;",
+        "RUNTIME_DIR=$(git rev-parse --git-path refine-target-app-runtime);",
+        "PID_FILE=$RUNTIME_DIR/target-app.pid;",
         "if [ -s \"$PID_FILE\" ]; then",
         "PID=$(cat \"$PID_FILE\");",
         "if kill -0 \"$PID\" 2>/dev/null; then",
@@ -1276,10 +1279,15 @@ fn clear_generated_wrapper_entrypoints(config: &mut TargetAppGeneratedConfig) ->
 
 fn is_manage_app_wrapper_entrypoint(command: &str, action: &str) -> bool {
     let command = command.trim();
-    command == format!("./.refine/manage-app.sh {action}")
+    command == manage_app_wrapper_entrypoint(action)
+        || command == format!("./.refine/manage-app.sh {action}")
         || command == format!(".refine/manage-app.sh {action}")
         || command == format!("sh ./.refine/manage-app.sh {action}")
         || command == format!("sh .refine/manage-app.sh {action}")
+}
+
+fn manage_app_wrapper_entrypoint(action: &str) -> String {
+    format!("sh \"$(git rev-parse --show-toplevel)-refine-live-state/manage-app.sh\" {action}")
 }
 
 fn first_nonempty(values: &[String]) -> String {
@@ -1333,8 +1341,10 @@ fn manage_app_wrapper_script(config: &TargetAppGeneratedConfig) -> String {
 
     lines.extend([
         String::new(),
-        "ROOT=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd)".to_string(),
+        "ROOT=$(git rev-parse --show-toplevel)".to_string(),
+        "WRAPPER_DIR=$(CDPATH= cd -- \"$(dirname -- \"$0\")\" && pwd)".to_string(),
         "case \"$LOG_PATH\" in".to_string(),
+        "  @refine-state/*) LOG_FILE=$WRAPPER_DIR/${LOG_PATH#@refine-state/} ;;".to_string(),
         "  /*) LOG_FILE=$LOG_PATH ;;".to_string(),
         "  *) LOG_FILE=$ROOT/$LOG_PATH ;;".to_string(),
         "esac".to_string(),
@@ -1894,11 +1904,13 @@ mod tests {
     fn target_app_service_writes_manage_app_wrapper() {
         let temp_root = unique_temp_dir("target-app-wrapper");
         let target_root = temp_root.join("app");
-        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let inner_root = target_root.join("client");
-        fs::create_dir_all(&refine_dir).unwrap();
         fs::create_dir_all(&inner_root).unwrap();
+        git_init(&target_root);
+        let refine_dir =
+            crate::tools::host::project_layout::refine_dir_for_target_root(&target_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
 
         let mut config = TargetAppGeneratedConfig {
             start_instructions: String::new(),
@@ -1930,15 +1942,18 @@ mod tests {
 
         service.write_manage_app_wrapper(&mut config).unwrap();
 
-        assert_eq!(config.start_command, "./.refine/manage-app.sh start");
-        assert_eq!(config.stop_command, "./.refine/manage-app.sh stop");
-        assert_eq!(config.build_command, "./.refine/manage-app.sh build");
-        assert_eq!(config.test_command, "./.refine/manage-app.sh test");
-        assert_eq!(config.status_command, "./.refine/manage-app.sh status");
+        assert_eq!(config.start_command, manage_app_wrapper_entrypoint("start"));
+        assert_eq!(config.stop_command, manage_app_wrapper_entrypoint("stop"));
+        assert_eq!(config.build_command, manage_app_wrapper_entrypoint("build"));
+        assert_eq!(config.test_command, manage_app_wrapper_entrypoint("test"));
+        assert_eq!(
+            config.status_command,
+            manage_app_wrapper_entrypoint("status")
+        );
         assert_eq!(config.cwd, ".");
-        assert_eq!(config.log_path, ".refine/manage-app.log");
+        assert_eq!(config.log_path, MANAGE_APP_LOG_PATH);
 
-        let wrapper_path = target_root.join(".refine/manage-app.sh");
+        let wrapper_path = refine_dir.join("manage-app.sh");
         let script = fs::read_to_string(&wrapper_path).unwrap();
         assert!(script.contains("APP_CWD='client'"));
         assert!(script.contains("START_COMMAND='printf \"$WRAP_VALUE\" > ../started'"));
@@ -1956,9 +1971,10 @@ mod tests {
             fs::read_to_string(target_root.join("started")).unwrap(),
             "wrapped"
         );
-        let log = fs::read_to_string(target_root.join(".refine/manage-app.log")).unwrap();
+        let log = fs::read_to_string(refine_dir.join("manage-app.log")).unwrap();
         assert!(log.contains("[start] cwd="));
         assert!(log.contains("[start] exit=0"));
+        assert!(!target_root.join(".refine").exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1967,11 +1983,13 @@ mod tests {
     fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
         let temp_root = unique_temp_dir("target-app-wrapper-static");
         let target_root = temp_root.join("app");
-        let refine_dir = target_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         let port = free_test_port();
-        fs::create_dir_all(&refine_dir).unwrap();
         fs::create_dir_all(&target_root).unwrap();
+        git_init(&target_root);
+        let refine_dir =
+            crate::tools::host::project_layout::refine_dir_for_target_root(&target_root).unwrap();
+        fs::create_dir_all(&refine_dir).unwrap();
         fs::write(target_root.join("index.html"), "<h1>AI static app</h1>").unwrap();
 
         let mut config = TargetAppGeneratedConfig {
@@ -2001,14 +2019,17 @@ mod tests {
 
         service.write_manage_app_wrapper(&mut config).unwrap();
 
-        assert_eq!(config.start_command, "./.refine/manage-app.sh start");
-        assert_eq!(config.stop_command, "./.refine/manage-app.sh stop");
-        assert_eq!(config.build_command, "./.refine/manage-app.sh build");
-        assert_eq!(config.test_command, "./.refine/manage-app.sh test");
-        assert_eq!(config.status_command, "./.refine/manage-app.sh status");
+        assert_eq!(config.start_command, manage_app_wrapper_entrypoint("start"));
+        assert_eq!(config.stop_command, manage_app_wrapper_entrypoint("stop"));
+        assert_eq!(config.build_command, manage_app_wrapper_entrypoint("build"));
+        assert_eq!(config.test_command, manage_app_wrapper_entrypoint("test"));
+        assert_eq!(
+            config.status_command,
+            manage_app_wrapper_entrypoint("status")
+        );
         assert!(config.notes.contains("static web content"));
 
-        let wrapper_path = target_root.join(".refine/manage-app.sh");
+        let wrapper_path = refine_dir.join("manage-app.sh");
         let script = fs::read_to_string(&wrapper_path).unwrap();
         assert!(!script.contains("START_COMMAND=''"));
         assert!(!script.contains("STOP_COMMAND=''"));
@@ -2028,6 +2049,7 @@ mod tests {
             String::from_utf8_lossy(&start.stdout),
             String::from_utf8_lossy(&start.stderr)
         );
+        assert!(!target_root.join(".refine").exists());
         let status = std::process::Command::new(&wrapper_path)
             .arg("status")
             .current_dir(&target_root)
@@ -2060,6 +2082,20 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn git_init(root: &Path) {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(["init", "-q"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     fn free_test_port() -> u16 {

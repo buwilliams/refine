@@ -31,6 +31,7 @@ use crate::surfaces::web_server::support::{
     runtime_process_status_value, runtime_process_summary_value,
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
+use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::project_state::{
     DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection,
     PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, ProjectStateStore, ProjectionSnapshot,
@@ -2298,9 +2299,9 @@ fn web_server_background_feature_import_promotes_all_instant_backlog_goals() {
 #[test]
 fn web_server_extracts_plan_drafts_from_chat_session_context() {
     let temp_root = unique_temp_dir("http-import-plan-chat-context");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let _smoke_ai_env_guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -2318,7 +2319,7 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
     .to_string();
     write_fake_provider(&refine_dir, "smoke-ai", 0, &plan_feature);
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root);
 
     let started = server.handle(ApiRequest {
@@ -2374,11 +2375,10 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
 #[test]
 fn web_server_fails_background_plan_extraction_without_goal_drafts() {
     let temp_root = unique_temp_dir("http-import-plan-empty-background");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -2407,8 +2407,8 @@ fn web_server_fails_background_plan_extraction_without_goal_drafts() {
 #[test]
 fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
     let temp_root = unique_temp_dir("http-import-plan-force-provider");
-    let refine_dir = temp_root.join(".refine");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let _smoke_ai_env_guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -2436,7 +2436,7 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
         );
     }
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
 
     let extracted = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2886,11 +2886,25 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
         body: Some(json!({})),
     });
     assert_eq!(missing_upstream.status, 200);
-    assert_eq!(missing_upstream.body["git_sync"]["attempted"], false);
-    assert_eq!(
-        missing_upstream.body["git_sync"]["detail"],
-        "Git remote origin is not configured."
+    assert_eq!(missing_upstream.body["git_sync"]["attempted"], true);
+    assert_eq!(missing_upstream.body["git_sync"]["committed"], true);
+    assert_eq!(missing_upstream.body["git_sync"]["pushed"], false);
+    assert!(
+        missing_upstream.body["git_sync"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("Git remote origin is not configured")
     );
+    assert!(!app_root.join(".refine").exists());
+    assert_eq!(git_stdout(&app_root, &["branch", "--show-current"]), "main");
+    assert!(
+        git(
+            &app_root,
+            &["show-ref", "--verify", "refs/heads/refine/state"]
+        )
+        .is_ok()
+    );
+    assert!(git(&app_root, &["check-ignore", "-q", ".refine/probe.json"]).is_ok());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2929,9 +2943,10 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
         ],
     )
     .unwrap();
-    fs::create_dir_all(app_root.join(".refine/runtime/processes")).unwrap();
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
+    fs::create_dir_all(refine_dir.join("runtime/processes")).unwrap();
     fs::write(
-        app_root.join(".refine/runtime/processes/local.json"),
+        refine_dir.join("runtime/processes/local.json"),
         r#"{"id":"local","owner":"maintenance","pid":null,"state":"running","label":"local","details":"runtime noise","started_at":"now"}"#,
     )
     .unwrap();
@@ -2953,11 +2968,8 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
     assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
     assert_eq!(sync.body["git_sync"]["pulled"], false);
     assert!(!app_root.join("remote.txt").exists());
-    assert!(
-        app_root
-            .join(".refine/runtime/processes/local.json")
-            .exists()
-    );
+    assert!(refine_dir.join("runtime/processes/local.json").exists());
+    assert!(!app_root.join(".refine").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -3551,12 +3563,12 @@ fn web_server_runs_interactive_terminal_session() {
 #[test]
 fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let temp_root = unique_temp_dir("http-project-utils");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join("child")).unwrap();
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let path = server.handle(ApiRequest {
@@ -3741,7 +3753,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
         path: format!("/api/operations/{}", operation.id),
         body: None,
     });
-    assert_eq!(status.status, 200);
+    assert_eq!(status.status, 200, "{:#}", status.body);
     assert_eq!(status.body["operation"]["status"], "running");
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -3819,9 +3831,9 @@ fn web_server_retries_workflow_executions() {
 #[test]
 fn web_server_lists_processes_and_updates_pause_controls() {
     let temp_root = unique_temp_dir("http-processes");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let supervisor = FileProcessSupervisor::new(&runtime_root);
     let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
     let standalone_chat = chat
@@ -3948,7 +3960,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     )
     .unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let listed = server.handle(ApiRequest {
@@ -4535,11 +4547,11 @@ fn web_server_manages_refine_chat_sessions() {
 #[test]
 fn web_server_edits_and_removes_queued_chat_messages() {
     let temp_root = unique_temp_dir("http-chat-queue");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -4594,11 +4606,10 @@ fn web_server_edits_and_removes_queued_chat_messages() {
 #[test]
 fn web_server_standalone_chat_start_and_stop_manage_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-worktree");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -4637,11 +4648,11 @@ fn web_server_standalone_chat_start_and_stop_manage_worktree() {
 #[test]
 fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-submit");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let started = server.handle(ApiRequest {
@@ -4703,9 +4714,9 @@ fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_work
 #[test]
 fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let temp_root = unique_temp_dir("http-chat-recovery");
-    let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
     let session = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
@@ -4716,7 +4727,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let session_path = refine_dir.join(format!("chat/sessions/{}.json", session.id));
 
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
     let daemon = LocalHttpDaemon {
         server,
@@ -4750,11 +4761,14 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
 fn web_server_reports_project_registry_and_updates_settings() {
     let temp_root = unique_temp_dir("http-project-settings");
     let app_root = temp_root.join("app");
-    let refine_dir = app_root.join(".refine");
+    let legacy_refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&refine_dir).unwrap();
+    fs::create_dir_all(&legacy_refine_dir).unwrap();
+    git(&app_root, &["init", "-q"]).unwrap();
+    let refine_dir =
+        crate::tools::host::project_layout::refine_dir_for_target_root(&app_root).unwrap();
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(app_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
@@ -4762,7 +4776,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         path: "/api/project/status".to_string(),
         body: None,
     });
-    assert_eq!(status.status, 200);
+    assert_eq!(status.status, 200, "{:#}", status.body);
     assert_eq!(status.body["attached"], true);
     assert_eq!(status.body["target_root"], app_root.display().to_string());
     assert_eq!(status.body["apps"].as_array().unwrap().len(), 1);
@@ -4826,6 +4840,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
 
     let third_app = temp_root.join("third");
     fs::create_dir_all(&third_app).unwrap();
+    git(&third_app, &["init", "-q"]).unwrap();
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/register".to_string(),
@@ -4955,7 +4970,13 @@ fn web_server_project_attach_creates_missing_local_project() {
         destination.display().to_string()
     );
     assert!(destination.join(".git").exists());
-    assert!(destination.join(".refine/refine.json").exists());
+    assert!(
+        refine_dir_for_target_root(&destination)
+            .unwrap()
+            .join("refine.json")
+            .exists()
+    );
+    assert!(!destination.join(".refine").exists());
     assert!(runtime_root.join("processes").exists());
     assert!(!destination.join(".refine/runtime/processes").exists());
 
@@ -5736,13 +5757,14 @@ fn git_stdout(repo: &Path, args: &[&str]) -> String {
 }
 
 fn init_git_app(repo: &Path) {
-    fs::create_dir_all(repo.join(".refine")).unwrap();
+    fs::create_dir_all(repo).unwrap();
     git(repo, &["init", "-b", "main"]).unwrap();
     git(repo, &["config", "user.email", "test@example.com"]).unwrap();
     git(repo, &["config", "user.name", "Test User"]).unwrap();
     fs::write(repo.join("app.txt"), "base\n").unwrap();
     git(repo, &["add", "app.txt"]).unwrap();
     git(repo, &["commit", "-m", "initial"]).unwrap();
+    fs::create_dir_all(refine_dir_for_target_root(repo).unwrap()).unwrap();
 }
 
 fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {

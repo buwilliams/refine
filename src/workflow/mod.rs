@@ -21,6 +21,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::MergeResult;
+use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
@@ -167,10 +168,11 @@ impl WorkflowEngine {
         self.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)
     }
 
-    fn refine_dir(&self) -> Option<PathBuf> {
+    fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
         self.target_root
             .as_ref()
-            .map(|target_root| target_root.join(".refine"))
+            .map(|target_root| prepare_refine_dir(target_root))
+            .transpose()
     }
 
     pub fn load_state(&self) -> RefineResult<WorkflowAutomationState> {
@@ -186,7 +188,7 @@ impl WorkflowEngine {
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
-            let refine_dir = target_root.join(".refine");
+            let refine_dir = prepare_refine_dir(target_root)?;
             let settings =
                 FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
@@ -230,7 +232,7 @@ impl WorkflowEngine {
     }
 
     pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
-        let Some(refine_dir) = self.refine_dir() else {
+        let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
         };
         self.promote_backlog_to_todo_for_refine_dir(&refine_dir)
@@ -264,7 +266,7 @@ impl WorkflowEngine {
     }
 
     pub fn rollback_in_progress_goals_to_todo(&self) -> RefineResult<usize> {
-        let Some(refine_dir) = self.refine_dir() else {
+        let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
         };
         let snapshot = self.projection_snapshot(&refine_dir)?;
@@ -537,7 +539,7 @@ impl WorkflowEngine {
                 "target root is required to execute claimed workflow work".to_string(),
             )
         })?;
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = prepare_refine_dir(target_root)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
             self.runtime_root.join("cache"),
@@ -716,7 +718,7 @@ impl WorkflowAutomation for WorkflowEngine {
         let policy = self.policy()?;
         state.policy = policy.clone();
         self.ensure_automation_running(&state)?;
-        let Some(refine_dir) = self.refine_dir() else {
+        let Some(refine_dir) = self.refine_dir()? else {
             return Ok(state
                 .claims
                 .iter()
@@ -794,7 +796,7 @@ impl WorkflowAutomation for WorkflowEngine {
         if let Some(existing) = Self::active_claim(&state, goal_id) {
             return Ok(existing.claim_id.clone());
         }
-        let goal = if let Some(refine_dir) = self.refine_dir() {
+        let goal = if let Some(refine_dir) = self.refine_dir()? {
             let snapshot = self.projection_snapshot(&refine_dir)?;
             let goal = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
                 RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
@@ -861,7 +863,7 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim {claim_id} is not claimed"
             )));
         }
-        if let Some(refine_dir) = self.refine_dir() {
+        if let Some(refine_dir) = self.refine_dir()? {
             let policy = self.policy()?;
             let snapshot = self.projection_snapshot(&refine_dir)?;
             let goal = snapshot.goals.get(&claim.goal_id).ok_or_else(|| {
@@ -1356,7 +1358,7 @@ mod tests {
     fn file_automation_promotes_todo_goals_and_starts_executions() {
         let temp_root = unique_temp_dir("automation");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -1392,7 +1394,7 @@ mod tests {
     fn file_automation_auto_promotes_backlog_goals_when_configured() {
         let temp_root = unique_temp_dir("automation-backlog-promote");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -1442,7 +1444,7 @@ mod tests {
     fn file_automation_promotes_all_ordered_feature_backlog_goals() {
         let temp_root = unique_temp_dir("automation-feature-backlog-promote");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -1473,7 +1475,7 @@ mod tests {
     fn file_automation_uses_global_cap_for_single_node_defaults() {
         let temp_root = unique_temp_dir("automation-global-cap");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         FileSettingsService::new(&refine_dir)
             .update(&json!({"parallel_run_cap": 3}))
@@ -1513,7 +1515,7 @@ mod tests {
     fn file_automation_blocks_lower_priority_work_behind_higher_priority_goals() {
         let temp_root = unique_temp_dir("automation-priority-band");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         FileSettingsService::new(&refine_dir)
             .update(&json!({"parallel_run_cap": 3}))
@@ -1544,7 +1546,7 @@ mod tests {
     fn file_automation_applies_runtime_settings_without_waiting_for_automation() {
         let temp_root = unique_temp_dir("automation-apply-runtime-settings");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -1579,7 +1581,7 @@ mod tests {
     fn file_automation_runtime_settings_skip_off_node_backlog_promotions() {
         let temp_root = unique_temp_dir("automation-runtime-settings-off-node");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         FileSettingsService::new(&refine_dir)
             .update(&json!({"backlog_promote_after_seconds": "0"}))
@@ -1625,7 +1627,7 @@ mod tests {
     fn file_automation_enforces_configured_concurrency_limits() {
         let temp_root = unique_temp_dir("automation-limits");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         FileSettingsService::new(&refine_dir)
             .update(&json!({
@@ -1661,7 +1663,7 @@ mod tests {
     fn file_automation_enforces_active_node_ownership() {
         let temp_root = unique_temp_dir("automation-node-ownership");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -1713,7 +1715,7 @@ mod tests {
     fn file_automation_respects_feature_order_on_promote_claim_and_start() {
         let temp_root = unique_temp_dir("automation-feature-order");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let claim_runtime_root = temp_root.join("run/8081");
         FileSettingsService::new(&refine_dir)
@@ -1784,7 +1786,7 @@ mod tests {
     fn file_automation_fails_in_progress_goal_on_post_implementation_governance_violation() {
         let temp_root = unique_temp_dir("automation-governance");
         let target_root = temp_root.clone();
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -1878,7 +1880,7 @@ mod tests {
     fn file_automation_accepts_agent_precommitted_implementation_branch() {
         let temp_root = unique_temp_dir("automation-agent-precommit");
         let target_root = temp_root.clone();
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -1978,7 +1980,7 @@ mod tests {
     fn file_automation_treats_clean_noop_implementation_as_reviewable() {
         let temp_root = unique_temp_dir("automation-agent-noop");
         let target_root = temp_root.clone();
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -2078,7 +2080,7 @@ mod tests {
     fn file_automation_reuses_existing_round_worktree_on_retry() {
         let temp_root = unique_temp_dir("automation-existing-worktree-retry");
         let target_root = temp_root.clone();
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -2188,7 +2190,7 @@ mod tests {
     fn file_automation_fails_goal_and_preserves_candidate_on_qa_failure() {
         let temp_root = unique_temp_dir("automation-qa-candidate");
         let target_root = temp_root.clone();
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let smoke_ai = temp_root.join("smoke-ai");
         fs::create_dir_all(&temp_root).unwrap();
@@ -2326,7 +2328,7 @@ mod tests {
     fn file_automation_pause_moves_in_progress_goals_back_to_todo() {
         let temp_root = unique_temp_dir("automation-pause-rollback");
         let target_root = temp_root.join("target");
-        let refine_dir = target_root.join(".refine");
+        let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
         let work_items = FileWorkItemService::new(&refine_dir);
         work_items
@@ -2361,6 +2363,14 @@ mod tests {
         assert_eq!(state.claims[0].state, WorkflowClaimState::Interrupted);
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn test_refine_dir(target_root: &Path) -> PathBuf {
+        fs::create_dir_all(target_root).unwrap();
+        if !target_root.join(".git").exists() {
+            git(target_root, &["init", "-q"]).unwrap();
+        }
+        crate::tools::host::project_layout::refine_dir_for_target_root(target_root).unwrap()
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

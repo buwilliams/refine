@@ -12,6 +12,7 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::tools::host::git_sync::FileGitSyncService;
+use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -56,7 +57,7 @@ impl InProcessWebServer {
         let runtime_root = self
             .runtime_root
             .clone()
-            .unwrap_or_else(|| target_root.join(".refine/runtime"));
+            .unwrap_or(refine_dir_for_target_root(&target_root)?.join("runtime"));
         Ok(Some(FileGitSyncService::new(target_root, runtime_root)))
     }
 
@@ -103,9 +104,15 @@ impl InProcessWebServer {
     }
 
     pub(super) fn current_refine_dir(&self) -> RefineResult<Option<PathBuf>> {
-        Ok(self
-            .current_target_root()?
-            .map(|target_root| target_root.join(".refine")))
+        self.current_target_root()?
+            .map(|target_root| {
+                #[cfg(test)]
+                if !target_root.join(".git").exists() {
+                    return Ok(target_root.join(".refine"));
+                }
+                prepare_refine_dir(&target_root)
+            })
+            .transpose()
     }
 
     pub(super) fn chat_service(&self, refine_dir: &Path) -> FileChatService {

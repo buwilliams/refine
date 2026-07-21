@@ -84,6 +84,16 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
                          value="${htmlEscape(s.agent_subpath || "")}">`,
       })}
       ${renderSettingsEditableField({
+        id: "s-git-remote",
+        label: "Git remote",
+        guideItemId: "application-git-remote",
+        description: "remote used for Refine state synchronization and Goal branch publication.",
+        valueLabel: s.git_remote || "origin",
+        control: `<input type="text" id="s-git-remote"
+                         placeholder="origin"
+                         value="${htmlEscape(s.git_remote || "origin")}">`,
+      })}
+      ${renderSettingsEditableField({
         id: "s-merge-target",
         label: "Integration branch",
         guideItemId: "application-merge-target",
@@ -307,6 +317,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
 function collectSettingsApplicationPayload() {
   return {
     agent_subpath: $("#s-subpath").value,
+    git_remote: $("#s-git-remote").value,
     merge_target_branch: $("#s-merge-target").value,
     target_app_url: $("#s-target-app-url").value,
     target_app_start_instructions: $("#s-target-start-instructions").value,

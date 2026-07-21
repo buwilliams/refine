@@ -21,6 +21,7 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
 
@@ -356,12 +357,7 @@ impl FileChatService {
             .unwrap_or("main");
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree.path, &self.runtime_root);
-        let target_root = self.refine_dir.parent().ok_or_else(|| {
-            RefineError::InvalidInput(format!(
-                "refine dir {} has no target root",
-                self.refine_dir.display()
-            ))
-        })?;
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
             self.runtime_root.join("cache"),
@@ -379,7 +375,7 @@ impl FileChatService {
                     None,
                 )?;
             }
-            with_repository_git_lock(target_root, || {
+            with_repository_git_lock(&target_root, || {
                 match worktree_git.commit(&format!("Submit {goal_id} from standalone chat"), &[]) {
                     Ok(_) => {}
                     Err(error) => {
@@ -512,14 +508,9 @@ impl FileChatService {
     }
 
     fn create_standalone_worktree(&self, session_id: &str) -> RefineResult<ChatSessionWorktree> {
-        let target_root = self.refine_dir.parent().ok_or_else(|| {
-            RefineError::InvalidInput(format!(
-                "refine dir {} has no target root",
-                self.refine_dir.display()
-            ))
-        })?;
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let branch = format!("refine/standalone/{session_id}");
-        let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root);
+        let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
         let target = git
             .git_path("refine-standalone-worktrees")?
             .join(session_id);
@@ -531,7 +522,8 @@ impl FileChatService {
                 ))
             })?;
         }
-        let path = with_repository_git_lock(target_root, || git.ensure_worktree(&branch, &target))?;
+        let path =
+            with_repository_git_lock(&target_root, || git.ensure_worktree(&branch, &target))?;
         Ok(ChatSessionWorktree {
             branch,
             path,
@@ -540,15 +532,10 @@ impl FileChatService {
     }
 
     fn cleanup_standalone_worktree(&self, worktree: &ChatSessionWorktree) -> RefineResult<()> {
-        let target_root = self.refine_dir.parent().ok_or_else(|| {
-            RefineError::InvalidInput(format!(
-                "refine dir {} has no target root",
-                self.refine_dir.display()
-            ))
-        })?;
-        let git = FileGitWorktreeService::new(target_root);
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
+        let git = FileGitWorktreeService::new(&target_root);
         let path = PathBuf::from(&worktree.path);
-        with_repository_git_lock(target_root, || {
+        with_repository_git_lock(&target_root, || {
             if path.exists() {
                 git.remove_worktree(&path, true)?;
             }

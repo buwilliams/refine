@@ -26,6 +26,7 @@ use crate::tools::host::deployed_update::{
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
+use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
@@ -184,7 +185,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 target_root: Some(target_root),
             },
         } => {
-            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .list_response()?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
@@ -196,8 +197,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let node =
-                FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
+                .show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -208,7 +209,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .create(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
@@ -220,7 +221,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let nodes = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .activate(&id)?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
@@ -232,7 +233,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .archive(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
@@ -245,7 +246,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let node = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .rename(&id, &name)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
@@ -257,7 +258,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let settings = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root))
+            let settings = FileNodeRegistryService::new(refine_dir_for_target_root(&target_root)?)
                 .settings(&id)?;
             println!("{}", serde_json::to_string_pretty(&settings).unwrap());
             Ok(())
@@ -270,7 +271,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -281,7 +282,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .list_response()?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -294,7 +295,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let node =
-                FileClusterService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
+                FileClusterService::new(refine_dir_for_target_root(&target_root)?).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -306,7 +307,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let cluster =
-                FileClusterService::new(refine_dir_for_target_root(&target_root)).add_node(&id)?;
+                FileClusterService::new(refine_dir_for_target_root(&target_root)?).add_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -326,7 +327,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .upsert_node(
                     &id,
                     NodeRemoteUpdate {
@@ -351,7 +352,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .set_enabled(&id, true)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -363,7 +364,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .set_enabled(&id, false)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -375,7 +376,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .remove_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -388,7 +389,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .bootstrap_node_response(&id, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -402,7 +403,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .distribute_response(to.as_deref(), converge, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -413,8 +414,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let sync = FileGitSyncService::new(&target_root, target_root.join(".refine/runtime"))
-                .sync()?;
+            let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
+            let sync = FileGitSyncService::new(&target_root, runtime_root).sync()?;
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
             Ok(())
         }
@@ -426,7 +427,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .run_remote(&id, &command)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -439,9 +440,9 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileClusterService::new(refine_dir_for_target_root(&target_root));
+            let service = FileClusterService::new(refine_dir_for_target_root(&target_root)?);
             service.transfer(&item_id, &id)?;
-            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -452,7 +453,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let maintenance = FileClusterService::new(refine_dir_for_target_root(&target_root))
+            let maintenance = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
                 .maintenance_response()?;
             println!("{}", serde_json::to_string_pretty(&maintenance).unwrap());
             Ok(())
@@ -460,7 +461,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Next {
             target_root: Some(target_root),
         } => {
-            let next = FileNextActionsService::new(refine_dir_for_target_root(&target_root))
+            let next = FileNextActionsService::new(refine_dir_for_target_root(&target_root)?)
                 .next_response()?;
             println!("{}", serde_json::to_string_pretty(&next).unwrap());
             Ok(())
@@ -484,8 +485,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }));
                 return Ok(());
             }
-            let entries =
-                FileActivityService::new(refine_dir_for_target_root(&target_root)).recent(limit)?;
+            let entries = FileActivityService::new(refine_dir_for_target_root(&target_root)?)
+                .recent(limit)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries})).unwrap()
@@ -503,8 +504,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }));
                 return Ok(());
             }
-            let entries =
-                FileActivityService::new(refine_dir_for_target_root(&target_root)).recent(limit)?;
+            let entries = FileActivityService::new(refine_dir_for_target_root(&target_root)?)
+                .recent(limit)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries, "tail": true})).unwrap()
@@ -533,7 +534,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 print_json(&json!({ "entry": entry }));
                 return Ok(());
             }
-            let service = FileActivityService::new(refine_dir_for_target_root(&target_root));
+            let service = FileActivityService::new(refine_dir_for_target_root(&target_root)?);
             let limit = service.count()?.max(1);
             let Some(entry) = service
                 .query(limit, 0, None, None, None, None, None)?
@@ -587,7 +588,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }));
                 return Ok(());
             }
-            let entries = FileActivityService::new(refine_dir_for_target_root(&target_root))
+            let entries = FileActivityService::new(refine_dir_for_target_root(&target_root)?)
                 .query(
                     limit,
                     offset,
@@ -609,7 +610,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileActivityService::new(refine_dir_for_target_root(&target_root));
+            let service = FileActivityService::new(refine_dir_for_target_root(&target_root)?);
             let limit = service.count()?;
             let entries = if limit == 0 {
                 Vec::new()
@@ -652,7 +653,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 return Ok(());
             }
             let bundle = FileSupportBundleService::new(
-                refine_dir_for_target_root(&target_root),
+                refine_dir_for_target_root(&target_root)?,
                 runtime_root,
                 repo_root,
             )
@@ -948,7 +949,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     cache_dir,
                 },
         } => {
-            let refine_dir = refine_dir_for_target_root(&target_root);
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
             let runtime_root = cache_dir
                 .as_ref()
                 .and_then(|cache_dir| cache_dir.parent())
@@ -997,7 +998,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     id,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .create_goal_summary(&name, id.as_deref())?;
             println!(
                 "{}",
@@ -1010,7 +1011,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 target_root: Some(target_root),
             },
         } => {
-            let goals: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goals: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .list_goal_summaries()?
                 .into_iter()
                 .map(|goal| goal.goal)
@@ -1028,7 +1029,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .show_goal_summary(&id)?;
             println!(
                 "{}",
@@ -1045,7 +1046,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     priority,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .update_goal_metadata_summary(
                     &id,
                     name.as_deref(),
@@ -1068,7 +1069,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     author,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .add_goal_note_summary(&id, &author, &body)?;
             println!(
                 "{}",
@@ -1085,7 +1086,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let detail = service.show_goal_detail(&id)?;
             let notes = edit_goal_note_values(goal_notes_from_detail(&detail), &note_id, &body)?;
             let goal = service.replace_goal_notes_summary(&id, &notes)?;
@@ -1103,7 +1104,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let detail = service.show_goal_detail(&id)?;
             let notes = delete_goal_note_values(goal_notes_from_detail(&detail), &note_id)?;
             let goal = service.replace_goal_notes_summary(&id, &notes)?;
@@ -1123,7 +1124,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     edit_latest,
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let goal = if edit_latest {
                 service.edit_latest_goal_round_summary(
                     &id,
@@ -1161,7 +1162,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .delete_goal_record(&id)?;
             println!(
                 "{}",
@@ -1176,7 +1177,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .cancel_goal_summary(&id)?;
             println!(
                 "{}",
@@ -1191,7 +1192,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .start_goal_workflow(&id)?;
             println!(
                 "{}",
@@ -1207,7 +1208,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     stage,
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let goal = match stage.as_str() {
                 "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
                 "merge" => service.retry_goal_merge_summary(&id)?,
@@ -1232,9 +1233,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let refine_dir = refine_dir_for_target_root(&target_root);
-            let goal = FileMergerService::new(refine_dir.join("runtime"), &refine_dir)
-                .approve_reviewed_goal(&id)?;
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let goal = FileMergerService::with_target_root(
+                refine_dir.join("runtime"),
+                &refine_dir,
+                &target_root,
+            )
+            .approve_reviewed_goal(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -1248,9 +1253,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let refine_dir = refine_dir_for_target_root(&target_root);
-            let goal = FileMergerService::new(refine_dir.join("runtime"), &refine_dir)
-                .approve_reviewed_goal(&id)?;
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let goal = FileMergerService::with_target_root(
+                refine_dir.join("runtime"),
+                &refine_dir,
+                &target_root,
+            )
+            .approve_reviewed_goal(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -1264,7 +1273,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .undo_goal_summary(&id)?;
             println!(
                 "{}",
@@ -1280,7 +1289,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .assign_goal_to_feature(&feature_id, &id)?;
             println!(
                 "{}",
@@ -1300,7 +1309,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root));
+            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let current = service.show_goal_summary(&id)?;
             let Some(feature_id) = current.goal.feature_id.clone() else {
                 return Err(
@@ -1331,7 +1340,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .create_feature_summary(
                     &name,
                     id.as_deref(),
@@ -1360,7 +1369,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .update_feature_metadata_summary(
                     &id,
                     name.as_deref(),
@@ -1386,7 +1395,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let features: Vec<_> =
-                FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+                FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                     .list_feature_summaries()?
                     .into_iter()
                     .map(|feature| {
@@ -1410,7 +1419,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .show_feature_summary(&id)?;
             println!(
                 "{}",
@@ -1431,7 +1440,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .assign_goal_to_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -1452,7 +1461,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .remove_goal_from_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -1474,7 +1483,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .reorder_goal_in_feature(&id, &goal_id, order)?;
             println!(
                 "{}",
@@ -1495,7 +1504,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .order_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -1516,7 +1525,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .unorder_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -1544,7 +1553,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     ),
                 );
             };
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .move_feature_workflow(&id, target)?;
             println!(
                 "{}",
@@ -1565,7 +1574,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .transfer_feature_to_node(&node_id, &id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -1577,7 +1586,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .cancel_feature_summary(&id)?;
             println!(
                 "{}",
@@ -1597,7 +1606,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(refine_dir_for_target_root(&target_root))
+            FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .delete_feature_record(&id)?;
             println!(
                 "{}",
@@ -1654,7 +1663,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 print_json(&response);
                 return Ok(());
             }
-            let service = FileImportService::new(refine_dir_for_target_root(&target_root));
+            let service = FileImportService::new(refine_dir_for_target_root(&target_root)?);
             let result = if let Some(file) = file {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
             } else {
@@ -1757,7 +1766,7 @@ fn run_system_start(
     let snapshot = if let Some(target_root) = project_status.target_root {
         eprintln!("refine: warming project cache for {target_root}");
         let target_root = PathBuf::from(target_root);
-        let refine_dir = refine_dir_for_target_root(&target_root);
+        let refine_dir = refine_dir_for_target_root(&target_root)?;
         let cache_root = cache_dir
             .clone()
             .unwrap_or_else(|| port_runtime_root.join("cache"));
@@ -3050,8 +3059,12 @@ fn skipped_target_root(path: &PathBuf) -> bool {
     path.as_os_str().is_empty()
 }
 
-fn refine_dir_for_target_root(target_root: &Path) -> PathBuf {
-    target_root.join(".refine")
+fn refine_dir_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
+    #[cfg(test)]
+    if !target_root.join(".git").exists() {
+        return Ok(target_root.join(".refine"));
+    }
+    prepare_refine_dir(target_root)
 }
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {

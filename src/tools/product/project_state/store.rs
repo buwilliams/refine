@@ -13,6 +13,7 @@ use crate::model::log::{ActivityEntry, RoundLogEntry};
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
 use crate::tools::observability::logs::FileLogService;
 
@@ -399,7 +400,7 @@ impl FileProjectStateStore {
     }
 
     fn target_root(&self) -> Option<PathBuf> {
-        self.refine_dir.parent().map(Path::to_path_buf)
+        target_root_for_refine_dir(&self.refine_dir).ok()
     }
 
     fn git_head_fingerprint(&self) -> Option<SourceFingerprint> {

@@ -5,5 +5,6 @@ pub mod git_sync;
 pub mod git_worktrees;
 pub mod installation;
 pub mod node_init;
+pub mod project_layout;
 pub mod quality;
 pub mod target_apps;

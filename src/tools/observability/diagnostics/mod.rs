@@ -9,6 +9,7 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::installation::{
     FileInstallationService, InstallTarget, InstallationService,
 };
+use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::activity::FileActivityService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 
@@ -94,7 +95,8 @@ impl DiagnosticsService for FileDiagnosticsService {
         let activity_count = self
             .target_root
             .as_ref()
-            .and_then(|root| FileActivityService::new(root.join(".refine")).count().ok())
+            .and_then(|root| refine_dir_for_target_root(root).ok())
+            .and_then(|root| FileActivityService::new(root).count().ok())
             .unwrap_or(0);
         let docker_status = command_status(
             &self.runtime_root,
@@ -223,6 +225,9 @@ fn install_target_label(target: &InstallTarget) -> &'static str {
 fn target_root_exists(target_root: &Option<PathBuf>) -> bool {
     target_root
         .as_ref()
-        .map(|path| path.exists() && path.join(".refine").exists())
+        .map(|path| {
+            path.exists()
+                && refine_dir_for_target_root(path).is_ok_and(|refine_dir| refine_dir.exists())
+        })
         .unwrap_or(false)
 }

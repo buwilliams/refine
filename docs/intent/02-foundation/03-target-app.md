@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Attached Work Context**: Refine acts on a target app, not an abstract task list.
-- **Local Target-App Authority**: the active app, `.refine` state, runtime root, commands, and Git context define where work happens.
+- **Local Target-App Authority**: the active app, its external Refine state, runtime root, commands, and Git context define where work happens.
 - **Durable And Inspectable State**: product, runtime, workflow, and derived state should survive interruption and remain readable.
 - **Flat Files First**: target-app state should be easy to inspect, copy, version, repair, and read by agents.
 - **Detached Is Valid**: Refine can operate without an attached app, but that mode should be explicit.
@@ -22,7 +22,7 @@ Without durable target-app context, agentic work becomes chat transcript memory 
 Target App should be the foundation that ties durable work to the real project. It should connect:
 
 - the active app and project registry;
-- `.refine` product state under the target app;
+- durable product state in the sibling Refine state layout, with `.refine` checked out only in the isolated `refine/state` worktree;
 - runtime state for the local daemon, processes, operations, claims, and caches;
 - workflow state that explains what can happen next;
 - projection snapshots and other derived state that keep the product fast without becoming authoritative;
@@ -32,7 +32,7 @@ Target App should be the foundation that ties durable work to the real project. 
 
 The current implementation details that matter to intent are:
 
-- durable product state lives under the target app;
+- durable product state is associated with the target app but never lives beneath its primary worktree: the local mutation projection is `<app>-refine-live-state/` and the branch checkout is `<app>-refine-state-worktree/.refine/`;
 - runtime state is separated from durable product state so processes and daemons can recover cleanly;
 - flat JSON-like records keep Goals, Features, settings, guidance, governance, and logs inspectable;
 - projections and caches exist for speed but should be rebuildable from durable state;

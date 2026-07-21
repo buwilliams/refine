@@ -1,5 +1,9 @@
 # Migrate Gap State to Goals
 
+In v4, every `.refine` path below refers to the tree in the isolated sibling
+`refine/state` worktree. It must not be created beneath the primary target-app
+worktree.
+
 Use this runbook only when Refine reports that an attached project requires the
 `goals-prompt-1-to-2` migration. This is an agent-operated semantic migration,
 not a user workflow and not a deterministic Refine application transform.

@@ -322,10 +322,11 @@ impl InProcessWebServer {
         } else {
             "current"
         };
-        let (active_node_id, active_node_display_name) = match current_target_root
-            .as_ref()
-            .map(|target_root| target_root.join(".refine"))
-        {
+        let current_refine_dir = match self.current_refine_dir() {
+            Ok(value) => value,
+            Err(error) => return error_response(error),
+        };
+        let (active_node_id, active_node_display_name) = match current_refine_dir {
             Some(refine_dir) => {
                 let service = self.node_registry_service(refine_dir);
                 match dashboard_active_node(&service) {
@@ -1213,10 +1214,10 @@ impl InProcessWebServer {
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
         let git_sync = match self.current_target_root() {
             Ok(Some(target_root)) => {
-                let runtime_root = self
-                    .runtime_root
-                    .clone()
-                    .unwrap_or_else(|| target_root.join(".refine/runtime"));
+                let runtime_root = match &self.runtime_root {
+                    Some(runtime_root) => runtime_root.clone(),
+                    None => target_root.join("run"),
+                };
                 match FileGitSyncService::new(target_root, runtime_root).sync() {
                     Ok(result) => result,
                     Err(error) => return error_response(error),
@@ -1225,7 +1226,9 @@ impl InProcessWebServer {
             Ok(None) => GitSyncResult::default(),
             Err(error) => return error_response(error),
         };
-        let projection = if self.runtime_root.is_some() {
+        let projection = if !git_sync.attempted {
+            self.projection.clone()
+        } else if self.runtime_root.is_some() {
             match self.rebuild_current_project_projection_cache() {
                 Ok(projection) => projection,
                 Err(error) => return error_response(error),

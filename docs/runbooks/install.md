@@ -169,8 +169,13 @@ Distributed/node commands:
 ```
 
 Refine publishes durable state automatically on the dedicated `refine/state`
-branch without touching application branches. Use `project sync` or the Node
-screen's **Sync state now** action when a state handoff must happen immediately;
+branch without touching application branches. Its live local projection and
+isolated branch worktree are siblings of the target app, so the primary
+target-app worktree never contains `.refine`. The Target App **Git remote**
+setting controls both state and Goal-branch publication and defaults to
+`origin`. If that remote is unavailable, Refine still initializes and commits
+local state; it simply cannot publish it. Use `project sync` or the Node screen's
+**Sync state now** action when a state handoff must happen immediately;
 `cluster sync` invokes the same shared capability for the current node.
 
 Cloud worker creation is provider-operated rather than part of the Refine

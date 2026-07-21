@@ -927,10 +927,6 @@ impl GitWorktreeService for FileGitWorktreeService {
             "clean".to_string(),
             "-fd".to_string(),
             "-e".to_string(),
-            ".refine".to_string(),
-            "-e".to_string(),
-            ".refine/**".to_string(),
-            "-e".to_string(),
             "run".to_string(),
             "-e".to_string(),
             "run/**".to_string(),
@@ -1097,10 +1093,7 @@ fn now_timestamp() -> String {
 }
 
 fn is_refine_owned_artifact(path: &str) -> bool {
-    path.starts_with(".refine/")
-        || path == ".refine"
-        || path.starts_with("run/")
-        || path.starts_with("target/")
+    path.starts_with("run/") || path.starts_with("target/")
 }
 
 fn sanitize_runtime_component(value: &str) -> String {
@@ -1161,7 +1154,7 @@ mod tests {
     }
 
     #[test]
-    fn file_git_worktree_service_separates_refine_artifacts_from_user_changes() {
+    fn file_git_worktree_service_treats_primary_worktree_refine_state_as_user_change() {
         let temp_root = unique_temp_dir("git-status");
         let repo = temp_root.join("repo");
         fs::create_dir_all(repo.join(".refine")).unwrap();
@@ -1171,7 +1164,7 @@ mod tests {
 
         let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
         assert!(status.dirty_user_changes);
-        assert_eq!(status.refine_owned_artifacts, vec![".refine/"]);
+        assert!(status.refine_owned_artifacts.is_empty());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1198,7 +1191,7 @@ mod tests {
             "committed\n"
         );
         assert!(!repo.join("untracked.txt").exists());
-        assert!(repo.join(".refine/state.json").exists());
+        assert!(!repo.join(".refine").exists());
         let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
         assert!(audit.contains("\"action\":\"hard_reset\""));
         assert!(audit.contains("\"status\":\"ok\""));

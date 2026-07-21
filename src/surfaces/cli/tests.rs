@@ -8,6 +8,7 @@ use crate::process::subprocess::{
 };
 use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::activity::ActivityService;
 use crate::tools::observability::activity::FileActivityService;
 use crate::tools::product::project_state::PROJECTION_SNAPSHOT_FILE;
@@ -17,6 +18,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, TcpListener};
 use std::path::PathBuf;
+use std::process::Command;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -227,6 +229,8 @@ fn project_registry_commands_use_shared_file_project_registry_service() {
     let app_two = temp_root.join("app-two");
     fs::create_dir_all(app_one.join(".refine")).unwrap();
     fs::create_dir_all(app_two.join(".refine")).unwrap();
+    git_init(&app_one);
+    git_init(&app_two);
 
     dispatch(
         Cli::try_parse_from([
@@ -388,7 +392,13 @@ fn project_attach_creates_missing_local_project() {
     .unwrap();
 
     assert!(destination.join(".git").exists());
-    assert!(destination.join(".refine/refine.json").exists());
+    assert!(
+        refine_dir_for_target_root(&destination)
+            .unwrap()
+            .join("refine.json")
+            .exists()
+    );
+    assert!(!destination.join(".refine").exists());
     let registry: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(runtime_root.join("apps.json")).unwrap()).unwrap();
     assert_eq!(registry["active_app"], destination.to_str().unwrap());
@@ -903,7 +913,6 @@ fn goal_round_append_and_edit_use_shared_file_work_item_service() {
 fn goal_approve_and_undo_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-goal-merge-undo");
     let target_root = temp_root.clone();
-    let refine_dir = target_root.join(".refine");
     fs::create_dir_all(&target_root).unwrap();
     run_git(&target_root, &["init", "-b", "main"]);
     run_git(&target_root, &["config", "user.email", "test@example.com"]);
@@ -911,6 +920,7 @@ fn goal_approve_and_undo_use_shared_file_work_item_service() {
     fs::write(target_root.join("app.txt"), "base\n").unwrap();
     run_git(&target_root, &["add", "app.txt"]);
     run_git(&target_root, &["commit", "-m", "initial"]);
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
     dispatch(
         Cli::try_parse_from([
             "refine",
@@ -2046,4 +2056,18 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+}
+
+fn git_init(root: &std::path::Path) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["init", "-q"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

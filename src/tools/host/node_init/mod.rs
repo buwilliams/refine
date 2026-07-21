@@ -4,6 +4,7 @@ use crate::process::supervisor::config::FileSettingsService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProviderService};
+use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 
@@ -59,7 +60,7 @@ pub fn initialize_worker(options: WorkerInitOptions) -> RefineResult<serde_json:
         }
     }
 
-    let refine_dir = target_path.join(".refine");
+    let refine_dir = prepare_refine_dir(&target_path)?;
     let nodes = FileNodeRegistryService::new(&refine_dir);
     match nodes.create(&node_id) {
         Ok(_) => record(&mut steps, "ensure_node", true, "created"),
@@ -285,7 +286,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(report["ok"], true, "report: {report}");
-        let refine_dir = target.join(".refine");
+        let refine_dir =
+            crate::tools::host::project_layout::refine_dir_for_target_root(&target).unwrap();
         let nodes = fs::read_to_string(refine_dir.join("nodes.json")).unwrap();
         assert!(nodes.contains("fly-worker-1"));
         let active =
@@ -302,6 +304,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(second["ok"], true, "second report: {second}");
+        assert!(!target.join(".refine").exists());
         fs::remove_dir_all(temp_root).unwrap();
     }
 

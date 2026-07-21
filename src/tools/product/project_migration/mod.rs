@@ -376,7 +376,7 @@ mod tests {
         let runbook = Path::new(env!("CARGO_MANIFEST_DIR")).join(V2_TO_V4_RUNBOOK);
         let instructions = fs::read_to_string(runbook).unwrap();
         assert!(instructions.contains("Migrate a Refine v2 Project to v4"));
-        assert!(instructions.contains("origin/refine/state"));
+        assert!(instructions.contains("<git_remote>/refine/state"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

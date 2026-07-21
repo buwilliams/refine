@@ -8,6 +8,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
 
@@ -15,6 +16,7 @@ use crate::tools::product::work_items::FileWorkItemService;
 pub struct FileMergerService {
     pub runtime_root: PathBuf,
     pub refine_dir: PathBuf,
+    pub target_root: Option<PathBuf>,
 }
 
 impl FileMergerService {
@@ -22,6 +24,19 @@ impl FileMergerService {
         Self {
             runtime_root: runtime_root.into(),
             refine_dir: refine_dir.into(),
+            target_root: None,
+        }
+    }
+
+    pub fn with_target_root(
+        runtime_root: impl Into<PathBuf>,
+        refine_dir: impl Into<PathBuf>,
+        target_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            refine_dir: refine_dir.into(),
+            target_root: Some(target_root.into()),
         }
     }
 
@@ -66,7 +81,10 @@ impl FileMergerService {
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
         let remote = setting_string(&settings, "git_remote", "origin");
-        let target_root = target_root(&self.refine_dir)?;
+        let target_root = match &self.target_root {
+            Some(target_root) => target_root.clone(),
+            None => target_root(&self.refine_dir)?,
+        };
 
         with_repository_git_lock(&target_root, || {
             let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
@@ -120,12 +138,7 @@ pub fn branch_name_for_goal(settings: &JsonObject, goal_id: &str) -> String {
 }
 
 pub fn target_root(refine_dir: &Path) -> RefineResult<PathBuf> {
-    refine_dir.parent().map(Path::to_path_buf).ok_or_else(|| {
-        RefineError::InvalidInput(format!(
-            "refine dir {} has no target root",
-            refine_dir.display()
-        ))
-    })
+    target_root_for_refine_dir(refine_dir)
 }
 
 fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {

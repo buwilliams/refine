@@ -72,7 +72,7 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn refine_dir(&self) -> PathBuf {
-        self.target_root.join(".refine")
+        self.work_items.refine_dir.clone()
     }
 
     pub fn request_transition(&mut self, from: GoalStatus, to: GoalStatus) -> RefineResult<()> {

@@ -687,13 +687,18 @@ impl InProcessWebServer {
             return goal_id_required();
         };
         let service = self.work_item_service(refine_dir);
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("approve reviewed Goals"),
+            Err(error) => return error_response(error),
+        };
         let result = match action {
             "start" => service.start_goal_workflow(goal_id),
             "approve" => {
                 let Some(runtime_root) = &self.runtime_root else {
                     return runtime_root_unavailable("approve reviewed Goals");
                 };
-                FileMergerService::new(runtime_root, &service.refine_dir)
+                FileMergerService::with_target_root(runtime_root, &service.refine_dir, &target_root)
                     .approve_reviewed_goal(goal_id)
             }
             "verify" => match service.show_goal_summary(goal_id) {
@@ -701,8 +706,12 @@ impl InProcessWebServer {
                     let Some(runtime_root) = &self.runtime_root else {
                         return runtime_root_unavailable("approve reviewed Goals");
                     };
-                    FileMergerService::new(runtime_root, &service.refine_dir)
-                        .approve_reviewed_goal(goal_id)
+                    FileMergerService::with_target_root(
+                        runtime_root,
+                        &service.refine_dir,
+                        &target_root,
+                    )
+                    .approve_reviewed_goal(goal_id)
                 }
                 Ok(_) => service.verify_goal_summary(goal_id),
                 Err(error) => Err(error),
@@ -711,7 +720,7 @@ impl InProcessWebServer {
                 let Some(runtime_root) = &self.runtime_root else {
                     return runtime_root_unavailable("approve reviewed Goals");
                 };
-                FileMergerService::new(runtime_root, &service.refine_dir)
+                FileMergerService::with_target_root(runtime_root, &service.refine_dir, &target_root)
                     .approve_reviewed_goal(goal_id)
             }
             "retry-quality" => service.retry_goal_quality_summary(goal_id),

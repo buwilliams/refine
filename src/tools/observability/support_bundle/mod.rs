@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
@@ -47,12 +48,10 @@ impl FileSupportBundleService {
 
 impl SupportBundleService for FileSupportBundleService {
     fn export(&self, redact_secrets: bool) -> RefineResult<SupportBundle> {
-        let diagnostics = FileDiagnosticsService::new(
-            Some(self.refine_dir.clone()),
-            &self.runtime_root,
-            &self.repo_root,
-        )
-        .doctor()?;
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
+        let diagnostics =
+            FileDiagnosticsService::new(Some(target_root), &self.runtime_root, &self.repo_root)
+                .doctor()?;
         let activity = FileActivityService::new(&self.refine_dir)
             .recent(200)
             .unwrap_or_default();

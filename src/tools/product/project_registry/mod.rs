@@ -9,6 +9,7 @@ use crate::model::project::{
 };
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_migration::FileProjectMigrationService;
 
@@ -284,11 +285,9 @@ impl FileProjectRegistryService {
             ))
         })?;
         self.git_init(app_path)?;
-        FileProjectMigrationService::with_runtime_root(
-            app_path.join(".refine"),
-            self.runtime_root.clone(),
-        )
-        .initialize_current_schema()?;
+        let refine_dir = prepare_refine_dir(app_path)?;
+        FileProjectMigrationService::with_runtime_root(refine_dir, self.runtime_root.clone())
+            .initialize_current_schema()?;
         let display_path = app_path.display().to_string();
         self.register_path(name, &display_path, make_current)?;
         self.inspect(&display_path)
@@ -315,11 +314,9 @@ impl FileProjectRegistryService {
 
     pub fn migrate_current(&self) -> RefineResult<ProjectMigrationReport> {
         let target_root = self.current_target_root()?;
-        FileProjectMigrationService::with_runtime_root(
-            target_root.join(".refine"),
-            self.runtime_root.clone(),
-        )
-        .migrate()
+        let refine_dir = prepare_refine_dir(&target_root)?;
+        FileProjectMigrationService::with_runtime_root(refine_dir, self.runtime_root.clone())
+            .migrate()
     }
 
     fn ensure_schema_ready(&self, app_path: &Path) -> RefineResult<()> {
@@ -327,7 +324,7 @@ impl FileProjectRegistryService {
         if migrated {
             return Ok(());
         }
-        let refine_dir = app_path.join(".refine");
+        let refine_dir = prepare_refine_dir(app_path)?;
         let service =
             FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
@@ -355,7 +352,7 @@ impl FileProjectRegistryService {
     }
 
     fn migrate_schema_if_safe(&self, app_path: &Path) -> RefineResult<bool> {
-        let refine_dir = app_path.join(".refine");
+        let refine_dir = prepare_refine_dir(app_path)?;
         let service =
             FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
@@ -505,7 +502,8 @@ fn project_status_for(
 ) -> RefineResult<ProjectStatus> {
     let active_refine_dir = current
         .as_ref()
-        .map(|path| PathBuf::from(path).join(".refine"));
+        .map(|path| refine_dir_for_target_root(&PathBuf::from(path)))
+        .transpose()?;
     let schema = match &active_refine_dir {
         Some(root) => FileProjectMigrationService::new(root).status()?,
         None => detached_schema_status(),
@@ -706,6 +704,7 @@ mod tests {
         let runtime_root = temp_root.join("run/8080");
         let app_root = temp_root.join("app");
         fs::create_dir_all(app_root.join(".refine")).unwrap();
+        git_init(&app_root);
         let service = FileProjectRegistryService::new(&runtime_root, Some(app_root.clone()));
 
         let status = service.status().unwrap();
@@ -789,7 +788,9 @@ mod tests {
             Some(destination.to_str().unwrap())
         );
         assert!(destination.join(".git").exists());
-        assert!(destination.join(".refine/refine.json").exists());
+        let refine_dir = refine_dir_for_target_root(&destination).unwrap();
+        assert!(refine_dir.join("refine.json").exists());
+        assert!(!destination.join(".refine").exists());
         assert!(runtime_root.join("processes").exists());
         assert!(!destination.join(".refine/runtime/processes").exists());
         let registry = service.load().unwrap();
@@ -807,6 +808,7 @@ mod tests {
         let runtime_root = temp_root.join("run/8080");
         let app_root = temp_root.join("app");
         fs::create_dir_all(app_root.join(".refine")).unwrap();
+        git_init(&app_root);
         FileProjectMigrationService::new(app_root.join(".refine"))
             .initialize_current_schema()
             .unwrap();
@@ -841,5 +843,19 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn git_init(root: &Path) {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(["init", "-q"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }

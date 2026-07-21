@@ -12,14 +12,16 @@ alone.
 
 ## Outcome
 
-- Durable project state remains at `<app>/.refine/`, represented in the v4
-  Goal, Feature, node, governance, guidance, and reporter shapes.
+- Durable project state is removed from the primary application worktree. The
+  local mutation projection lives at sibling `<app>-refine-live-state/`, while
+  `.refine/` is checked out only at sibling
+  `<app>-refine-state-worktree/.refine/` on `refine/state`.
 - Local process state is recreated in Refine's port-scoped runtime root and is
   not copied into durable state.
-- The migrated `.refine` tree is published on `origin/refine/state` through
-  Refine's isolated state worktree.
-- The application branch, application files, index, and HEAD are unchanged by
-  the migration.
+- The migrated `.refine` tree is published through the configured `git_remote`
+  (default `origin`) on `refine/state`.
+- The application branch receives only the reviewed removal of legacy tracked
+  `.refine`; other application files remain unchanged.
 - Every upgraded node can attach, synchronize, and show equivalent work and
   configuration.
 
@@ -29,7 +31,7 @@ Stop and request project-owner judgment if any of these are true:
 
 - A v2 or v4 daemon is still running against the project.
 - An agent, merge, rebase, or application deployment is in progress.
-- `origin/refine/state` already exists and does not represent this same
+- `<git_remote>/refine/state` already exists and does not represent this same
   migration.
 - The application worktree has changes that cannot be attributed and safely
   left untouched.
@@ -37,9 +39,10 @@ Stop and request project-owner judgment if any of these are true:
   meaning.
 - Verification changes the application branch or any non-Refine source file.
 
-Never force-push, rewrite application history, or delete the legacy
-application-branch copy of `.refine` during this migration. Refine v4 makes
-legacy tracked state inert locally while `refine/state` becomes authoritative.
+Never force-push or rewrite application history. Back up legacy `.refine`
+before migration, then remove it from the application branch and commit that
+removal normally. Refine v4 refuses to operate while the application branch
+still tracks `.refine`.
 
 ## Preconditions and evidence
 
@@ -52,8 +55,9 @@ legacy tracked state inert locally while `refine/state` becomes authoritative.
 4. Inspect `.refine/refine.toml`, `.refine/config.json`, `.refine/gaps/`,
    `.refine/features/`, `.refine/nodes.json`, `.refine/nodes/`, and all other
    JSON or JSONL evidence. Count records by type and record their ids.
-5. Check whether `origin/refine/state` exists. If it does, fetch and inspect it
-   before changing local state; do not assume the local v2 tree wins.
+5. Record the configured `git_remote` (default `origin`) and check whether its
+   `refine/state` branch exists. If it does, fetch and inspect it before
+   changing local state; do not assume the local v2 tree wins.
 6. Make a byte-for-byte backup outside the application repository and outside
    `.refine`. Include a manifest with file paths and checksums. Do not put the
    backup under `.refine/backups`, because durable-state synchronization would
@@ -96,24 +100,34 @@ secrets, or host authentication material into `.refine` or Git.
    be resolved.
 5. Remove runtime-only artifacts from the destination. Preserve them only in
    the external backup when they are useful for audit evidence.
-6. Replace the live `.refine` tree only after the destination is internally
-   consistent. Keep the backup untouched.
-7. Attach the application with v4 and run `refine project status`. If Refine
+6. Remove the legacy `.refine` tree from the application branch and commit that
+   removal after the migrated destination is internally consistent and safely
+   backed up. Verify that `git ls-files -- .refine` prints nothing.
+7. Place the migrated destination at `<app>/.refine` as a temporary untracked
+   handoff, then attach the application with v4. Refine atomically moves that
+   tree into the sibling live-state location; it refuses attachment if
+   `.refine` remains tracked. Verify that no physical `<app>/.refine` directory
+   remains, then run `refine project status`. If Refine
    still reports a migration requirement, inspect and correct the state; do
    not invoke deterministic migration code to bypass the check.
 8. Activate or confirm the intended node, then review settings through the
    shared Refine surface. Correct unsupported or renamed values explicitly.
 9. Run `refine project sync`. This initializes or reconciles the isolated
-   `refine/state` branch without moving the application branch.
-10. Inspect `origin/refine/state`, then bring up one v4 node. Add remaining
-    nodes one at a time, synchronizing and verifying each before enabling work.
+   `refine/state` branch without moving the application branch. If the
+   configured remote is absent, verify the local branch and commit, then
+   configure the remote before expecting publication.
+10. Inspect `<git_remote>/refine/state`, then bring up one v4 node. Add
+    remaining nodes one at a time, synchronizing and verifying each before
+    enabling work.
 
 ## Verification
 
 - `refine project status` reports `compatible: true`, schema version `2`, and
   no migration requirement.
-- The application branch and HEAD equal the values recorded before migration;
-  no application source file changed.
+- The application branch contains the expected commit removing legacy
+  `.refine`; no other application source file changed.
+- `<app>/.refine` does not exist. The sibling live-state directory and isolated
+  state worktree are present, and `.refine` exists only inside the latter.
 - Source and destination counts match for Goals, Features, rounds, notes, and
   evidence files. Any intentional count difference is explained in the
   migration report.
@@ -121,8 +135,8 @@ secrets, or host authentication material into `.refine` or Git.
   workflow status, and history.
 - Governance, guidance, quality behavior, provider choice, target-app
   lifecycle instructions, and test commands retain their intended behavior.
-- `origin/refine/state` contains durable `.refine` files and excludes runtime
-  directories, caches, logs, credentials, and the external backup.
+- `<git_remote>/refine/state` contains durable `.refine` files and excludes
+  runtime directories, caches, logs, credentials, and the external backup.
 - A second v4 node can synchronize the state and reports the same durable
   records without an application-branch commit or checkout.
 - A no-op `refine project sync` creates no additional commit or push.
@@ -133,8 +147,9 @@ verification evidence, and the resulting `refine/state` commit.
 
 ## Rollback
 
-Stop all v4 nodes. Restore the external backup atomically to the application
-only after preserving the failed migrated tree for diagnosis. Do not delete or
-force-push `refine/state`; correct the migration in a new attempt and publish a
-normal follow-up state commit. Restore the original Refine version only if the
-project owner explicitly chooses to resume v2 operation.
+Stop all v4 nodes. Preserve the failed sibling live-state and state-worktree
+directories for diagnosis. Restore the external backup to `<app>/.refine` only
+if the project owner explicitly chooses to resume v2 operation, and restore or
+revert the corresponding application-branch removal commit normally. Do not
+delete or force-push `refine/state`; correct a v4 migration in a new attempt and
+publish a normal follow-up state commit.
