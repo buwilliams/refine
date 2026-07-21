@@ -1,7 +1,7 @@
 {
-  "base_commit": null,
-  "branch_name": null,
-  "candidate_commit": null,
+  "base_commit": "2bbc280e37850d3a3a34c2dd7882be27a8866c6f",
+  "branch_name": "refine/00000SZ1JK89EGZ643W02PG001/round-1",
+  "candidate_commit": "463886d6d9e6987b1c880edc072a869e44d37c0d",
   "created": "2026-07-21T20:17:11Z",
   "feature_id": "00000SZ1JK6P23KW6X0G2PG000",
   "feature_order": 1,
@@ -14,26 +14,36 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T20:17:38Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-21T20:35:34Z",
+      "governance_details": {
+        "configured": false,
+        "failed_actions": [],
+        "governance_configured": false,
+        "phase": "post_implementation",
+        "rules_checked": 0
+      },
+      "governance_message": "No governance rules configured.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Implement a UI-first dogfood source-promotion workflow for a running Refine checkout. Add an explicit source/dogfood update channel distinct from the existing published-release updater. From the System UI, show the running checkout path, current commit, configured remote/branch, fetched available commit, and controls to check for source updates and promote the latest source. Promotion must use shared backend services with thin UI/API adapters; require a clean controller checkout, fast-forward-only ancestry, an idle/quiescent Refine runtime, and a successful candidate build before activation. Because the daemon must stop and restart, use a restart-safe external handoff/helper that outlives the HTTP request, persists stage-by-stage operation state under the port runtime root, supports UI reconnect/poll/SSE feedback, verifies daemon health after restart, and reports actionable stage failures plus rollback/recovery information. Never reset, merge, overwrite dirty work, or silently stop active Goal work. Keep the existing release-channel updater intact. Add CLI/API parity where appropriate, System UI controls and accessible states, focused unit/web tests for success, dirty/non-fast-forward/active-operation/build/restart failures, and documentation/spec updates. Tests must not perform a real self-update.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T20:35:36Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T20:17:38Z"
+      "rule_state": "passed",
+      "updated": "2026-07-21T20:35:36Z"
     }
   ],
-  "status": "backlog",
-  "target_branch": null,
-  "updated": "2026-07-21T20:17:39Z"
+  "status": "review",
+  "target_branch": "main",
+  "updated": "2026-07-21T20:35:36Z"
 }
