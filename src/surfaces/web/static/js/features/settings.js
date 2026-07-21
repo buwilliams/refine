@@ -94,7 +94,7 @@ async function loadSettingsSurfaceData() {
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
-    s, diag, reps, gov, quality, dash, nodes, guidance, performance, processes,
+    s, diag, reps, gov, quality, dash, nodes, guidance, performance, processes, releases,
   ] = await Promise.all([
     needs.settings ? api("GET", "/api/settings") : Promise.resolve({}),
     needs.diagnostics ? api("GET", "/api/diagnostics") : Promise.resolve({}),
@@ -108,6 +108,7 @@ async function loadSettingsSurfaceData() {
       ? performanceApiPath()
       : "/api/performance") : Promise.resolve({}),
     needs.processes ? api("GET", "/api/processes") : Promise.resolve({}),
+    needs.releases ? api("GET", "/api/system/releases") : Promise.resolve({}),
   ]);
   state.project = project;
   state.reporters = reps.reporters || [];
@@ -140,6 +141,7 @@ async function loadSettingsSurfaceData() {
     performance: performance || {},
     performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
     processes: processes || {},
+    releases: releases.releases || { operations: [] },
     cli: (settings.agent_cli || "claude").toLowerCase(),
     projectApps,
     currentProject,
@@ -160,9 +162,12 @@ function settingsSurfaceDataNeeds(surface, slug) {
     guidance: false,
     performance: false,
     processes: false,
+    releases: false,
   };
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "processes") {
+    if (slug === "releases") {
+      needs.releases = true;
+    } else if (slug === "processes") {
       needs.settings = true;
       needs.diagnostics = true;
       needs.dashboard = true;
@@ -178,7 +183,9 @@ function settingsSurfaceDataNeeds(surface, slug) {
       needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.node) {
-    if (slug === "application") {
+    if (slug === "releases") {
+      needs.releases = true;
+    } else if (slug === "application") {
       needs.nodes = true;
     } else if (slug === "reporters") {
       needs.reporters = true;
@@ -245,6 +252,7 @@ function detachedSettingsSurfaceData(project = {}) {
       processes: [],
       target_app: { state: "unknown" },
     },
+    releases: { operations: [] },
     cli: "",
     projectApps,
     currentProject,
@@ -782,6 +790,7 @@ const SETTINGS_SURFACES = {
     basePath: "#/node",
     storageKey: "refine_system_tab",
     tabs: [
+      { slug: "releases", label: "Releases" },
       { slug: "processes", label: "Processes" },
       { slug: "performance", label: "Performance" },
     ],
@@ -792,6 +801,7 @@ const SETTINGS_SURFACES = {
     storageKey: "refine_node_tab",
     tabs: [
       { slug: "application", label: "Application" },
+      { slug: "releases", label: "Releases" },
       { slug: "reporters", label: "Reporters" },
       { slug: "processes", label: "Processes" },
       { slug: "performance", label: "Performance" },
@@ -996,6 +1006,9 @@ function renderSettingsTabBody(surface, slug, data) {
     return renderSettingsNoProjectTab(surface.title);
   }
   if (surface === SETTINGS_SURFACES.settings) {
+    if (slug === "releases") {
+      return renderSettingsReleasesTab(data.releases);
+    }
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.s, data.diag, data.dash);
     }
@@ -1004,6 +1017,9 @@ function renderSettingsTabBody(surface, slug, data) {
     }
   }
   if (surface === SETTINGS_SURFACES.node) {
+    if (slug === "releases") {
+      return renderSettingsReleasesTab(data.releases);
+    }
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.s, data.diag, data.dash);
     }
@@ -1096,7 +1112,8 @@ function bindSettingsTabBody(surface, slug, data) {
     return;
   }
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "processes") bindSettingsProcessesTab(data.s);
+    if (slug === "releases") bindSettingsReleasesTab(data.releases);
+    else if (slug === "processes") bindSettingsProcessesTab(data.s);
     else if (slug === "performance") {
       bindSettingsPerformanceTab(
         data.s, data.diag, data.reps, null, data.gov,
@@ -1105,7 +1122,8 @@ function bindSettingsTabBody(surface, slug, data) {
       );
     }
   } else if (surface === SETTINGS_SURFACES.node) {
-    if (slug === "processes") bindSettingsProcessesTab(data.s);
+    if (slug === "releases") bindSettingsReleasesTab(data.releases);
+    else if (slug === "processes") bindSettingsProcessesTab(data.s);
     else if (slug === "performance") {
       bindSettingsPerformanceTab(
         data.s, data.diag, data.reps, null, data.gov,

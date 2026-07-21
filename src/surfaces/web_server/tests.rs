@@ -390,6 +390,67 @@ fn static_runtime_settings_expose_state_sync_controls() {
 }
 
 #[test]
+fn static_releases_surface_separates_prepare_from_confirmed_publish() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let settings = fs::read_to_string(static_root.join("js/features/settings.js")).unwrap();
+    let releases =
+        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+
+    assert!(index.contains("settings_releases.js"));
+    assert!(settings.contains(r#"{ slug: "releases", label: "Releases" }"#));
+    assert!(releases.contains(r#"data-testid="release-bump""#));
+    assert!(releases.contains(r#"data-testid="release-preview""#));
+    assert!(releases.contains(r#"data-testid="release-prepare""#));
+    assert!(releases.contains(r#"data-testid="release-publish""#));
+    assert!(releases.contains("explicit confirmation"));
+    assert!(releases.contains("/api/system/releases/prepare"));
+    assert!(releases.contains("/api/system/releases/publish"));
+    assert!(releases.contains("/retry"));
+}
+
+#[test]
+fn release_api_previews_semver_and_rejects_unconfirmed_publication() {
+    let runtime_root = unique_temp_dir("http-releases");
+    fs::create_dir_all(&runtime_root).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let plan = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/system/releases/plan".to_string(),
+        body: Some(json!({"bump": "patch"})),
+    });
+    assert_eq!(plan.status, 200, "{}", plan.body);
+    assert_eq!(plan.body["plan"]["current_version"], "4.0.0");
+    assert_eq!(plan.body["plan"]["proposed_version"], "4.0.1");
+    assert_eq!(plan.body["plan"]["proposed_tag"], "4.0.1");
+
+    let publish = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/system/releases/publish".to_string(),
+        body: Some(json!({
+            "confirmed": false,
+            "candidate": {
+                "version": "4.0.1", "tag": "v4.0.1", "branch": "release/v4.0.1",
+                "commit": "abc", "worktree": "/tmp/release", "release_notes": "RELEASE_NOTES.md",
+                "changed_files": [], "gates": []
+            }
+        })),
+    });
+    assert_eq!(publish.status, 400);
+    assert!(
+        publish.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("confirmed=true")
+    );
+
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn static_import_modal_exposes_feature_import_surface() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();

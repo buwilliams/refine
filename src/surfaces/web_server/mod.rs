@@ -19,7 +19,7 @@ pub struct ApiRouteGroup {
 pub const API_GROUPS: &[ApiRouteGroup] = &[
     ApiRouteGroup {
         prefix: "/system",
-        capability: "install state, daemon status, release update, source promotion, doctor",
+        capability: "install state, daemon status, semantic releases, release update, source promotion, doctor",
     },
     ApiRouteGroup {
         prefix: "/apps",

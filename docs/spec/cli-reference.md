@@ -591,6 +591,31 @@ Self-update Refine to the latest available version
 - `--yes` — Skip the confirmation prompt
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 
+### `refine system release-plan`
+
+Preview a semantic release without changing files
+
+- `--bump` (required) — Semantic version increment: major, minor, or patch
+- `--repo-root` — Git checkout to release
+- `--runtime-root` — Runtime directory where durable release operations are stored
+
+### `refine system release-prepare`
+
+Prepare a reviewable semantic-release branch and commit
+
+- `--bump` (required) — Semantic version increment: major, minor, or patch
+- `--repo-root` — Git checkout to release
+- `--runtime-root` — Runtime directory where durable release operations are stored
+
+### `refine system release-publish`
+
+Publish a reviewed release candidate. Requires explicit --confirm
+
+- `--candidate` (required) — JSON file containing the PreparedRelease candidate returned by preparation
+- `--confirm` — Confirm creation and push of the tag and external GitHub publication
+- `--repo-root` — Git checkout whose synchronized main will be published
+- `--runtime-root` — Runtime directory where durable release operations are stored
+
 ### `refine system source-status`
 
 Inspect the running source checkout and its configured upstream branch

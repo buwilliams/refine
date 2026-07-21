@@ -235,3 +235,11 @@ Effort: Very High (18 commits, 5 milestones)
 Milestones started: workflow behavior-engine refactor; operation naming cleanup; target-root/runtime clarification; target-app QA gate; canonical Node model.
 
 Workflow internals were reshaped around clearer architecture: the scheduler moved into workflow-oriented services, process handling was refactored, behavior engines landed, and background jobs were renamed to operations. Runtime and target-root boundaries were clarified across daemon launch and web handling, Playwright integration scaffolding was removed, QA now runs through target-app tests, and daemon launch liveness detection was fixed. The day closed by cleaning up flaky Rust unit tests around Smoke AI isolation, chat session persistence, the automation loop's build-stage fixture, system process visibility, and the Node/cluster split: Node became the canonical model, while cluster became operations over registered nodes and legacy `cluster.json` state migrates into `nodes.json`.
+
+## Day 31: 2026-06-12 (Friday)
+
+Effort: High (1 milestone)
+
+Milestones started: UI-first agent-assisted semantic releases.
+
+Semantic delivery became an explicit two-phase workflow in System: users preview major, minor, or patch versions and prepare a durable, agent-operated, reviewable candidate before any external publication. Shared release services now centralize commit analysis, version and documentation updates, breaking-change identification, deterministic gates, isolated release worktrees, publication preflights, tag and GitHub release creation, and verification for UI and CLI callers. Runtime-root operation records keep stages, activity, failures, results, and retry guidance available across reconnects, while publication remains separately confirmed and blocked unless clean synchronized main matches the reviewed candidate.

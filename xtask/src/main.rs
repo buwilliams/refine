@@ -5,6 +5,7 @@ use std::process::Command;
 
 use refine::process::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
 use refine::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
+use refine::tools::host::release::{FileReleaseService, ReleaseBump};
 use serde_json::json;
 
 fn main() {
@@ -13,6 +14,8 @@ fn main() {
         Some("cli-reference") => write_cli_reference(),
         Some("check-static-assets") => check_static_assets(),
         Some("runtime-layout") => print_runtime_layout(),
+        Some("release-plan") => release_plan(),
+        Some("release-check") => release_check(),
         Some("test-unit") => test_unit(),
         Some("test-integration") => test_integration(),
         Some("test-rust") => test_rust(),
@@ -30,6 +33,35 @@ fn main() {
         eprintln!("{error}");
         std::process::exit(1);
     }
+}
+
+fn release_plan() -> Result<(), String> {
+    let root = repo_root()?;
+    let bump = std::env::args().nth(2).unwrap_or_else(|| "patch".to_string());
+    let bump = ReleaseBump::parse(&bump).map_err(|error| error.to_string())?;
+    let plan = FileReleaseService::new(&root, root.join("run"))
+        .plan(bump)
+        .map_err(|error| error.to_string())?;
+    println!("{}", serde_json::to_string_pretty(&plan).map_err(|error| error.to_string())?);
+    Ok(())
+}
+
+fn release_check() -> Result<(), String> {
+    let root = repo_root()?;
+    let checks = [
+        ("format", vec!["fmt", "--all", "--", "--check"]),
+        ("unit tests", vec!["test", "--lib", "--bins", "--", "--test-threads=1"]),
+        ("locked release build", vec!["build", "--release", "--locked"]),
+    ];
+    for (label, args) in checks {
+        run(Command::new("cargo").args(args).current_dir(&root), label)?;
+    }
+    check_git_diff()?;
+    println!("{}", serde_json::to_string_pretty(&json!({
+        "release_ready": true,
+        "checks": ["cargo fmt --all -- --check", "cargo test --lib --bins -- --test-threads=1", "cargo build --release --locked", "git diff --check"]
+    })).map_err(|error| error.to_string())?);
+    Ok(())
 }
 
 fn check_all() -> Result<(), String> {
