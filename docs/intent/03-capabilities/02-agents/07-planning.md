@@ -30,10 +30,14 @@ These are lenses, not mandatory headings. If a concern is irrelevant, temporary,
 
 Draft Feature should convert the selected plan into ordinary Refine work. It should produce one Feature plus implementation-ready Goals in the plan's natural build order. When dependency order is clear, the drafts should reflect it. When the work is exploratory, visual, research-heavy, or prototype-oriented, the drafts should be the smallest useful implementation slices rather than forced architecture categories.
 
+Draft Goal should offer the narrower conversion boundary for a user who wants help shaping one independently actionable Goal rather than decomposing the plan into a Feature. It should extract exactly one reviewable Goal and must not create or imply a Feature.
+
 Current implementation details that matter to intent:
 
 - Plan Mode is a chat mode that drafts product and implementation intent;
 - Draft Feature extracts a Feature and Goals from a Plan transcript through shared import extraction;
+- Draft Goal extracts exactly one standalone Goal through the same shared import-extraction capability;
+- browser, CLI, HTTP API, and MCP adapters all expose Plan-to-Goal drafting without persisting before review;
 - Plan and spec-like extraction should use architecture-aware drafting;
 - simple CSV, issue-list, and direct import flows should remain direct and not become planning exercises;
 - review-before-persist should remain the boundary before creating durable work.

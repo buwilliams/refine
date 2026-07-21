@@ -22,7 +22,7 @@ Chat should support standalone sessions, Plan Mode, and Goal-attached sessions. 
 Current implementation details that matter to intent:
 
 - toolbar state holds one permanent standalone tab plus one tab per opened Goal chat;
-- Plan Mode uses the toolbar chat surface and can later be drafted into a Feature;
+- Plan Mode uses the toolbar chat surface and can later be drafted into either one standalone Goal or a Feature with Goals;
 - chat sessions have server-side identifiers and output queues;
 - Goal chat eligibility depends on shared Goal status semantics;
 - session recovery should handle daemon restarts and interrupted turns;

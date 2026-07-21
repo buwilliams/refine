@@ -70,6 +70,10 @@ fn smoke_ai_contract() {
             "Run the goal agent for a ready Goal.",
             "smoke-ai goal-agent response",
         ),
+        (
+            "Extract exactly one implementation-ready Goal from this Plan transcript.",
+            "Smoke AI Plan Goal",
+        ),
         ("Import these CSV rows into goals.", "\"kind\": \"import\""),
         (
             "Check the target app and report health.",

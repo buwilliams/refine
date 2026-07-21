@@ -23,6 +23,14 @@ enum ToolBinding {
         path: &'static str,
         path_params: &'static [&'static str],
     },
+    /// A fixed capability route whose JSON body is assembled from tool arguments.
+    BodyApi {
+        method: &'static str,
+        path: &'static str,
+        required: &'static [&'static str],
+        optional: &'static [&'static str],
+        fixed: &'static [(&'static str, &'static str)],
+    },
     /// Escape hatch: method, path, and body are taken from the arguments so an
     /// agent can reach any daemon route, including writes.
     Passthrough,
@@ -71,6 +79,42 @@ impl McpTool {
                     method: method.to_string(),
                     path: resolved,
                     body: None,
+                })
+            }
+            ToolBinding::BodyApi {
+                method,
+                path,
+                required,
+                optional,
+                fixed,
+            } => {
+                let mut body = serde_json::Map::new();
+                for name in *required {
+                    let value = arguments
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| format!("missing required string argument: {name}"))?;
+                    body.insert((*name).to_string(), json!(value));
+                }
+                for name in *optional {
+                    if let Some(value) = arguments
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                    {
+                        body.insert((*name).to_string(), json!(value));
+                    }
+                }
+                for (name, value) in *fixed {
+                    body.insert((*name).to_string(), json!(value));
+                }
+                Ok(RequestParts {
+                    method: method.to_string(),
+                    path: path.to_string(),
+                    body: Some(Value::Object(body)),
                 })
             }
             ToolBinding::Passthrough => {
@@ -155,6 +199,18 @@ pub fn tool_catalog() -> Vec<McpTool> {
             },
         },
         McpTool {
+            name: "refine_draft_goal",
+            description: "Draft exactly one implementation-ready Goal from a Plan transcript for review. This does not persist the Goal.",
+            input_schema: plan_goal_draft_schema,
+            binding: ToolBinding::BodyApi {
+                method: "POST",
+                path: "/import/extract",
+                required: &["text"],
+                optional: &["reporter", "provider"],
+                fixed: &[("purpose", "plan_goal")],
+            },
+        },
+        McpTool {
             name: "refine_list_features",
             description: "List Features (grouped Goals) for the active app.",
             input_schema: empty_schema,
@@ -201,6 +257,28 @@ fn goal_id_schema() -> Value {
             },
         },
         "required": ["goal_id"],
+        "additionalProperties": false,
+    })
+}
+
+fn plan_goal_draft_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "Plan transcript to turn into one reviewable Goal draft",
+            },
+            "reporter": {
+                "type": "string",
+                "description": "Reporter to include in the drafted Goal",
+            },
+            "provider": {
+                "type": "string",
+                "description": "Configured AI provider to use for extraction",
+            },
+        },
+        "required": ["text"],
         "additionalProperties": false,
     })
 }

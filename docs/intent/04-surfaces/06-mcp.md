@@ -24,6 +24,8 @@ Its tools should map onto real system capabilities the same way the API route gr
 
 Because MCP delegates to the shared daemon API, it inherits the system's local-first security, idempotency, logging, and state-repair behavior rather than re-deriving them.
 
+Current agent-facing planning support includes `refine_draft_goal`, which sends a Plan transcript through the same one-Goal extraction capability used by the browser, CLI, and HTTP API and returns the draft for review without persisting it.
+
 ## Future Direction
 
 As agent-native interaction grows, MCP may become a primary way external assistants drive Refine. The tool catalog should grow toward the most valuable capabilities — planning, import, workflow advancement, review — while keeping each tool aligned to a shared capability rather than a one-off behavior.

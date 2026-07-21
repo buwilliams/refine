@@ -2173,6 +2173,17 @@ fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
                 "id": id
             })),
         )?,
+        GoalAction::Draft {
+            target_root: None,
+            text,
+            file,
+            reporter,
+            provider,
+        } => daemon_json(
+            "POST",
+            "/import/extract",
+            Some(plan_goal_draft_body(text, file, reporter, provider)?),
+        )?,
         GoalAction::List { target_root: None } => {
             daemon_json("GET", "/work/goals?limit=1000", None)?
         }
@@ -3133,6 +3144,45 @@ fn query_component(value: &str) -> String {
     path_segment(value)
 }
 
+pub(super) fn plan_goal_draft_body(
+    text: Option<String>,
+    file: Option<PathBuf>,
+    reporter: Option<String>,
+    provider: Option<String>,
+) -> RefineResult<Value> {
+    if text.is_some() && file.is_some() {
+        return Err(RefineError::InvalidInput(
+            "goal draft accepts either --text or --file, not both".to_string(),
+        ));
+    }
+    let source = match (text, file) {
+        (Some(text), None) => text,
+        (None, Some(file)) => fs::read_to_string(&file).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read Plan transcript {}: {error}",
+                file.display()
+            ))
+        })?,
+        (None, None) => {
+            return Err(RefineError::InvalidInput(
+                "goal draft requires --text or --file".to_string(),
+            ));
+        }
+        (Some(_), Some(_)) => unreachable!("validated above"),
+    };
+    if source.trim().is_empty() {
+        return Err(RefineError::InvalidInput(
+            "goal draft Plan transcript cannot be empty".to_string(),
+        ));
+    }
+    Ok(json!({
+        "text": source,
+        "purpose": "plan_goal",
+        "reporter": reporter,
+        "provider": provider
+    }))
+}
+
 fn goal_notes_from_detail(detail: &Value) -> Vec<Value> {
     detail
         .get("notes")
@@ -3213,6 +3263,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         },
         Commands::Goal { action } => match action {
             GoalAction::Create { target_root, .. }
+            | GoalAction::Draft { target_root, .. }
             | GoalAction::List { target_root }
             | GoalAction::Show { target_root, .. }
             | GoalAction::Edit { target_root, .. }

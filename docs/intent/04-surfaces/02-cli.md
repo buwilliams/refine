@@ -21,6 +21,7 @@ The CLI should be the most stable surface for automation and system control. Bro
 Current implementation details that matter to intent:
 
 - command groups include project, goal, feature, workflow, node, cluster, log, agent, and system.
+- `goal draft` turns Plan text into exactly one reviewable, unpersisted Goal draft through the shared import-extraction API.
 - normal target-state mutations are routed to the daemon instead of directly writing files in normal operation.
 - system commands handle lifecycle, install, repair, update, rollback, uninstall, doctor, and API group discovery.
 - CLI tests verify daemon routing and shared service behavior.

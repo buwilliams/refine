@@ -534,11 +534,18 @@ fn static_import_modal_exposes_feature_import_surface() {
 fn static_plan_chat_shows_initial_design_prompt() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
 
     assert!(toolbar.contains("function renderChatOutput"));
     assert!(toolbar.contains("What do you want to design together?"));
     assert!(toolbar.contains("renderChatOutput(active)"));
     assert!(toolbar.contains("renderChatOutput(tab)"));
+    assert!(toolbar.contains(r#"data-testid="plan-draft-goal""#));
+    assert!(toolbar.contains("async function draftGoalFromPlan"));
+    assert!(toolbar.contains(r#"purpose: "plan_goal""#));
+    assert!(toolbar.contains(r#"testIdPrefix: "plan-goal-draft""#));
+    assert!(commands.contains(r#"id: "plan.draft_goal""#));
+    assert!(commands.contains(r#"title: "Draft Goal from plan""#));
 }
 
 #[test]
@@ -2580,6 +2587,94 @@ fn web_server_fails_background_plan_extraction_without_goal_drafts() {
         "Plan Draft extraction did not return any Goal drafts"
     );
 
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_extracts_exactly_one_plan_goal_without_a_feature_destination() {
+    let temp_root = unique_temp_dir("http-import-plan-goal");
+    init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
+    let _smoke_ai_env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    write_fake_provider(
+        &refine_dir,
+        "smoke-ai",
+        0,
+        &json!({
+            "feature": {
+                "name": "Must not escape",
+                "goals": [{
+                    "name": "One planned Goal",
+                    "prompt": "Implement one reviewable slice from the Plan transcript.",
+                    "priority": "medium"
+                }]
+            }
+        })
+        .to_string(),
+    );
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            refine_dir.join("provider-bin/smoke-ai").to_str().unwrap(),
+        );
+    }
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+
+    let extracted = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/extract".to_string(),
+        body: Some(json!({
+            "purpose": "plan_goal",
+            "provider": "smoke-ai",
+            "text": "Plan one independently actionable implementation slice."
+        })),
+    });
+
+    assert_eq!(extracted.status, 200, "{}", extracted.body);
+    assert_eq!(extracted.body["purpose"], "plan_goal");
+    assert_eq!(extracted.body["drafts"].as_array().unwrap().len(), 1);
+    assert_eq!(extracted.body["drafts"][0]["name"], "One planned Goal");
+    assert!(extracted.body.get("feature_destination").is_none());
+
+    let through_mcp = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/mcp".to_string(),
+        body: Some(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "refine_draft_goal",
+                "arguments": {
+                    "provider": "smoke-ai",
+                    "text": "Plan one independently actionable implementation slice."
+                }
+            }
+        })),
+    });
+    assert_eq!(through_mcp.status, 200, "{}", through_mcp.body);
+    assert_eq!(through_mcp.body["result"]["isError"], false);
+    let mcp_drafts = through_mcp.body["result"]["structuredContent"]["drafts"]
+        .as_array()
+        .unwrap();
+    assert_eq!(mcp_drafts.len(), 1);
+    assert_eq!(mcp_drafts[0]["name"], "One planned Goal");
+    assert!(
+        through_mcp.body["result"]["structuredContent"]
+            .get("feature_destination")
+            .is_none()
+    );
+
+    unsafe {
+        match previous_smoke_ai {
+            Some(value) => std::env::set_var("REFINE_SMOKE_AI_PATH", value),
+            None => std::env::remove_var("REFINE_SMOKE_AI_PATH"),
+        }
+    }
     fs::remove_dir_all(temp_root).unwrap();
 }
 

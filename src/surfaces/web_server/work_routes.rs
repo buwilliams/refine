@@ -24,7 +24,7 @@ use crate::tools::product::chat::FileChatService;
 use crate::tools::product::imports::{
     FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
     import_extraction_prompt, order_feature_dependency_drafts, parse_provider_import_result,
-    parse_structured_import_result,
+    parse_structured_import_result, validate_import_extraction_result,
 };
 use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::project_state::{
@@ -305,18 +305,6 @@ fn import_extraction_response(
         );
     }
     ApiResponse::json(200, body)
-}
-
-fn validate_import_extraction_result(
-    result: ImportExtractionResult,
-    purpose: &str,
-) -> Result<ImportExtractionResult, RefineError> {
-    if purpose == "plan" && result.drafts.is_empty() {
-        return Err(RefineError::InvalidInput(
-            "Plan Draft extraction did not return any Goal drafts".to_string(),
-        ));
-    }
-    Ok(result)
 }
 
 fn feature_detail_response_from_goals(
@@ -3157,6 +3145,42 @@ impl InProcessWebServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::product::imports::PlanFeatureDestination;
+
+    fn plan_goal_extraction_result(draft_count: usize) -> ImportExtractionResult {
+        ImportExtractionResult {
+            drafts: (0..draft_count)
+                .map(|index| ImportDraft {
+                    name: format!("Goal {}", index + 1),
+                    prompt: format!("Implement goal {}.", index + 1),
+                    reporter: String::new(),
+                    assignee: None,
+                    priority: "low".to_string(),
+                    duplicate_decision: String::new(),
+                    dependency_names: Vec::new(),
+                })
+                .collect(),
+            feature_destination: Some(PlanFeatureDestination {
+                name: "Should be discarded".to_string(),
+                description: "Plan Goal creates no Feature.".to_string(),
+            }),
+        }
+    }
+
+    #[test]
+    fn plan_goal_extraction_requires_one_goal_and_discards_feature_destination() {
+        let result =
+            validate_import_extraction_result(plan_goal_extraction_result(1), "plan_goal").unwrap();
+        assert_eq!(result.drafts.len(), 1);
+        assert_eq!(result.feature_destination, None);
+
+        let error = validate_import_extraction_result(plan_goal_extraction_result(2), "plan_goal")
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Plan Goal extraction must return exactly one Goal draft"
+        );
+    }
 
     #[test]
     fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals() {

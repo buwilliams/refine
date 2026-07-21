@@ -91,6 +91,15 @@ Create a new prompt-driven Goal. It starts in the backlog; add a round to descri
 - `<NAME>` (required) — Human-readable Goal name
 - `--id` — Explicit Goal id (generated when omitted)
 
+### `refine goal draft`
+
+Draft exactly one reviewable Goal from a Plan transcript without persisting it
+
+- `--text` — Inline Plan transcript (alternative to --file)
+- `--file` — File containing the Plan transcript (alternative to --text)
+- `--reporter` — Reporter to include in the drafted Goal
+- `--provider` — Configured AI provider to use for extraction
+
 ### `refine goal list`
 
 List all Goals with their status and ownership

@@ -146,7 +146,7 @@ Nav: Command Palette
 	Commands
 		Nav: Dashboard, Goals, Changes, Logs, node/settings surfaces & tabs
 		Create: New Goal, Import
-		AI: Plan (make a plan), Draft Goals from plan, Generate target-app config with AI
+		AI: Plan (make a plan), Draft Goal from plan, Draft Feature from plan, Generate target-app config with AI
 		Toolbar: Toggle Toolbar, Maximize Toolbar, Files open, Files search
 		Goals: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
 		Changes: clear filters
@@ -198,6 +198,7 @@ Nav: Toolbar (bottom dock)
 		Plan chat / Plan Mode (toolbar tab, mode "plan")
 			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
 			Same chat input/output/queue/activity
+			Draft Goal: enabled when agent responded → extracts exactly one standalone Goal for review, minimizes toolbar
 			Draft Feature: enabled when agent responded → opens Plan draft modal, minimizes toolbar
 		Tab management: active-session dot, activity pulse, close (non-standard tabs), reorder
 Modals
@@ -260,7 +261,7 @@ Implementation Internals (for e2e testing)
 	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
 			[crud] deterministic, assert directly: create/edit goals·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Approve, done↔review); reporter/node/cluster mgmt; settings edits; Undo
-				[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
+			[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Goal / Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
 		Preconditions — gated features; build the state first
 			Verify / Verify selected: a review goal assigned to the currently selected reporter
 			←QA / ←Merge buttons: only on failed goals in quality-retry / merge-retry context
