@@ -14,7 +14,7 @@ confirmation.
 
 ## Prepare
 
-1. Open **Node > Releases** (the System release surface).
+1. Open **Node > Refine (dev)**.
 2. Select major, minor, or patch and choose **Preview**.
 3. Review the current/proposed versions, previous tag, commits, breaking-change
    findings, affected files, and deterministic gates.
@@ -40,7 +40,7 @@ cargo run --manifest-path xtask/Cargo.toml -- release-check
 
 ## Publish
 
-Return to Releases after the candidate is reviewed and merged. Choose
+Return to **Refine (dev)** after the candidate is reviewed and merged. Choose
 **Publish release…** and explicitly confirm. Refine rejects publication unless:
 
 - the current branch is clean `main`;

@@ -106,7 +106,7 @@ const GUIDE_CATEGORIES = [
         { hash: "#/node/reporters", selector: "[data-rmerge]" },
         { canUseDefault: false }),
       guideItem("node-copy-settings-source", "Source node", "Educate and configure",
-        "Source node chooses another node to copy Target App Config or Refine Runtime Config settings from into the active node.",
+        "Source node chooses another node to copy Target App Config or Runtime Config settings from into the active node.",
         "Default: copy only when the source node is known to have the desired local configuration.",
         { hash: "#/node/target-app", selector: "#s-application-copy-node" },
         { canUseDefault: false }),
