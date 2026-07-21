@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T21:31:27Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1MQ85B1N7HVB02PG003",
+  "name": "Plan Mode should have a Draft Goal similar to Draft Feature, but only for a Goal",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T21:31:27Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Plan Mode should have a Draft Goal similar to Draft Feature, but only for a Goal. This will help users who just want help deciding what to put into the Goal requirements. This should be usage by all surfaces. The button in the UI will go beside the Draft Feature button.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T21:32:18Z"
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T21:32:18Z"
+}

@@ -1,7 +1,7 @@
 {
   "base_commit": "de36298d80c369034f6f2c30494211ade651a12c",
-  "branch_name": "refine/00000SZ1JK9TD1F0J3B02PG002/round-1",
-  "candidate_commit": "456c6e3cbe564ffbf6c2dd7a8065811d19b0abd1",
+  "branch_name": "refine/00000SZ1JK9TD1F0J3B02PG002/round-2",
+  "candidate_commit": "0935e7bf95b32536c4f51594159b96ef2ae4eb31",
   "created": "2026-07-21T20:17:14Z",
   "feature_id": "00000SZ1JK6P23KW6X0G2PG000",
   "feature_order": 2,
@@ -41,9 +41,39 @@
       "reporter": "Buddy Williams",
       "rule_state": "passed",
       "updated": "2026-07-21T21:10:28Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-21T21:11:57Z",
+      "governance_checked_at": "2026-07-21T21:32:34Z",
+      "governance_details": {
+        "configured": false,
+        "failed_actions": [],
+        "governance_configured": false,
+        "phase": "post_implementation",
+        "rules_checked": 0
+      },
+      "governance_message": "No governance rules configured.",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Correct the blocking release-workflow findings from review of round 1. Round 2 must carry forward candidate 456c6e3cbe564ffbf6c2dd7a8065811d19b0abd1 and preserve its useful UI, CLI, xtask, durable-operation, and documentation work while replacing the unsafe preparation/publication design.\n\n1. Preparation must actually be agent-operated. Use Refine existing Goal/workflow service as the release-preparation execution boundary: Prepare Release should create and queue a normal visible Goal with an actionable prompt derived from the trusted ReleasePlan. That Goal tells the configured agent to analyze completed Goals and commits, update all applicable version/lock files, preserve established documentation formats, write release notes and breaking/migration guidance, and run xtask release-check. Return and persist the created goal_id and surface its real workflow state, activity/logs, candidate branch/commit, failures, and review link in Releases. Do not label deterministic shell edits as release-agent activity. Do not directly synthesize or append docs/story content in the release service.\n\n2. The release preparation candidate must use the normal Goal-managed worktree/branch and review/approval path. All managed worktrees must remain under the target repository .git/refine-worktrees invariant. Remove the custom runtime-root releases/worktrees path. Retry/resume must never reset --hard, clean, overwrite, or discard review edits; retry the linked Goal/workflow stage or create an explicit new Goal only when safe.\n\n3. Publication must use trusted server-side persisted preparation identity, not a PreparedRelease object supplied by the browser. The UI/API should submit a preparation operation id or goal id; the service resolves and validates its persisted candidate/version/notes. Reject tampering and candidates that were not prepared and approved through this workflow.\n\n4. Make publication compatible with the normal reviewed merge. Require clean synchronized main on its configured upstream remote/branch, require the approved preparation commit to be an ancestor of main, verify the merged version and tag alignment, and tag synchronized main HEAD (the merge commit), not require main HEAD to equal the pre-merge candidate commit. Discover the configured remote instead of hardcoding origin.\n\n5. Make external publication truly resumable and verifiable with a fakeable stage-level host. Complete all non-mutating preflight including auth before creating a tag. On retry, accept an existing local tag, remote tag, or GitHub release only when it resolves to the expected main commit, continue from the first missing stage, and reject conflicts. Observe relevant deployment/package workflow runs to a terminal conclusion or explicitly report that none are configured; do not mark verified merely because gh run list returned JSON. Verify the final GitHub release URL/tag after creation. Add focused fake-host tests for no-confirmation, tampered preparation identity, standard merge ancestry, configured non-origin remote, failure after tag push followed by successful resume, conflicting tag, failed workflow, and verified success. No test may push a real tag or create a real release.\n\n6. Keep UI confirmation explicit for every publish attempt and show durable stage errors/recovery. Add UI/API tests proving the server loads trusted candidate state and the browser does not post arbitrary candidate paths/commits. Re-run generated CLI docs, JavaScript checks, fmt, strict Clippy, focused tests, the full unit suite, xtask release-check, and locked release build. No real release or tag is authorized.",
+      "quality_checked_at": "2026-07-21T21:32:34Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-21T21:32:34Z"
     }
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-21T21:10:28Z"
+  "updated": "2026-07-21T21:32:34Z"
 }
