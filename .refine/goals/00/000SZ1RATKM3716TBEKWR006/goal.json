@@ -23,17 +23,17 @@
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
-      "prompt": "I think after any Goal is implemented there should be a short after action report that explains what was done in simple terms. It should be accessible by opening the Goal to find the implementation report. Make it fit nicely into the existing UI.",
+      "prompt": "I think after any Goal is implemented there should be a short after action report that explains what was done in simple terms. It should be accessible by opening the Goal to find the implementation report. Make it fit nicely into the existing UI. This is important for SOC2 compliance where its documented what was done and why.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-21T23:37:41Z"
+      "updated": "2026-07-21T23:45:32Z"
     }
   ],
   "status": "todo",
   "target_branch": null,
-  "updated": "2026-07-21T23:37:45Z"
+  "updated": "2026-07-21T23:45:32Z"
 }
