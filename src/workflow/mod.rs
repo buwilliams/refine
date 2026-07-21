@@ -15,6 +15,7 @@ use uuid::Uuid;
 use crate::model::JsonObject;
 use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal};
 use crate::model::goal::GoalPriority;
+use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
@@ -22,6 +23,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
@@ -287,6 +289,72 @@ impl WorkflowEngine {
         let work_items = FileWorkItemService::new(refine_dir);
         for goal_id in &goal_ids {
             work_items.rollback_in_progress_goal_to_todo(goal_id)?;
+        }
+        self.interrupt_active_claims(&goal_ids)?;
+        Ok(goal_ids.len())
+    }
+
+    pub fn fail_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
+        if let Some(target_root) = &self.target_root {
+            return with_repository_git_lock(target_root, || {
+                self.fail_interrupted_goals_locked(detail)
+            });
+        }
+        self.fail_interrupted_goals_locked(detail)
+    }
+
+    fn fail_interrupted_goals_locked(&self, detail: &str) -> RefineResult<usize> {
+        let Some(refine_dir) = self.refine_dir()? else {
+            return Ok(0);
+        };
+        let snapshot = self.projection_snapshot(&refine_dir)?;
+        let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
+        let goal_ids = snapshot
+            .goals
+            .values()
+            .filter(|projection| {
+                matches!(
+                    projection.goal.status,
+                    GoalStatus::InProgress
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Qa
+                )
+            })
+            .filter(|projection| {
+                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
+            })
+            .map(|projection| projection.goal.id.clone())
+            .collect::<Vec<_>>();
+        if goal_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let detail = detail.trim();
+        let detail = if detail.is_empty() {
+            "workflow runner stopped before the Goal completed"
+        } else {
+            detail
+        };
+        let work_items = FileWorkItemService::new(&refine_dir);
+        let logs = FileLogService::new(&refine_dir);
+        for goal_id in &goal_ids {
+            work_items.advance_automated_goal_status(goal_id, GoalStatus::Failed)?;
+            let round_idx = ensure_workflow_round(&work_items, goal_id)?;
+            logs.append_round_log(
+                goal_id,
+                round_idx,
+                LogEntry {
+                    datetime: now_timestamp(),
+                    severity: "error".to_string(),
+                    category: "workflow".to_string(),
+                    message: format!("Workflow interrupted: {detail}"),
+                    details: Some(json_object(json!({"reason": detail}))),
+                    actions: Vec::new(),
+                    actor: Some("refine".to_string()),
+                    goal_id: Some(goal_id.clone()),
+                },
+            )?;
         }
         self.interrupt_active_claims(&goal_ids)?;
         Ok(goal_ids.len())
@@ -2393,6 +2461,59 @@ mod tests {
         );
         let state = automation.load_state().unwrap();
         assert_eq!(state.claims[0].state, WorkflowClaimState::Interrupted);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_recovery_fails_interrupted_goals_for_restart() {
+        let temp_root = unique_temp_dir("automation-interrupted-recovery");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Interrupted work", Some("GOAL1"))
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        automation.start_claim(&claim_id).unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+            .unwrap();
+
+        assert_eq!(
+            automation
+                .fail_interrupted_goals("runner terminated")
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Failed
+        );
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Interrupted
+        );
+        let logs = FileLogService::new(&refine_dir)
+            .all_round_logs("GOAL1")
+            .unwrap();
+        assert!(logs.iter().any(|entry| {
+            entry.entry.severity == "error" && entry.entry.message.contains("runner terminated")
+        }));
+
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Todo
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

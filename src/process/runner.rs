@@ -126,9 +126,26 @@ pub fn run_worker(
 }
 
 fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
+    let mut recovered_root = None;
     loop {
         if let Some(target_root) = current_target_root(runtime_root)? {
-            match WorkflowEngine::with_target_root(runtime_root, &target_root).evaluate_workflow() {
+            let root = target_root
+                .canonicalize()
+                .unwrap_or_else(|_| target_root.clone());
+            let workflow = WorkflowEngine::with_target_root(runtime_root, &target_root);
+            if recovered_root.as_ref() != Some(&root) {
+                match workflow.fail_interrupted_goals(
+                    "workflow runner stopped before the Goal completed; restart the Goal when ready",
+                ) {
+                    Ok(count) if count > 0 => {
+                        let _ = refresh_projection(runtime_root, &target_root);
+                    }
+                    Ok(_) => {}
+                    Err(error) => eprintln!("refine workflow recovery: {error}"),
+                }
+                recovered_root = Some(root);
+            }
+            match workflow.evaluate_workflow() {
                 Ok(_) => {
                     let _ = refresh_projection(runtime_root, &target_root);
                 }
