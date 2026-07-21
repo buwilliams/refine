@@ -558,6 +558,10 @@ fn static_system_log_exposes_sources_and_diagnostic_details() {
 
     assert!(common.contains("if (details) payload.details = details"));
     assert!(common.contains(r#"details: { operation_id: response.operation.id }"#));
+    assert!(common.contains("function activitySystemOperationDetails"));
+    assert!(common.contains("details.activity_id = entry.id"));
+    assert!(common.contains("details.goal_id = entry.goal_id"));
+    assert!(common.contains("details: activitySystemOperationDetails(entry)"));
     assert!(commands.contains(r#"details: { operation_id: operationId }"#));
     assert!(commands.contains(r#"details: { operation_id: response.operation.id }"#));
     assert!(toolbar.contains("details: payload?.details ?? null"));

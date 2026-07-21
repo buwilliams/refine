@@ -1677,6 +1677,16 @@ function sseEventChanged(key, event) {
   return true;
 }
 
+function activitySystemOperationDetails(entry) {
+  const details = entry?.details && typeof entry.details === "object" && !Array.isArray(entry.details)
+    ? { ...entry.details }
+    : {};
+  if (entry?.id) details.activity_id = entry.id;
+  if (entry?.goal_id) details.goal_id = entry.goal_id;
+  if (entry?.actor) details.actor = entry.actor;
+  return Object.keys(details).length ? details : null;
+}
+
 function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
@@ -1691,6 +1701,7 @@ function initSSE() {
           status: entry.severity || "info",
           category: entry.category || "activity",
           timestamp: entry.datetime,
+          details: activitySystemOperationDetails(entry),
         });
       }
     } catch {}
