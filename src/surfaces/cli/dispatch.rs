@@ -27,6 +27,7 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::host::source_promotion::FileSourcePromotionService;
 use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
@@ -139,6 +140,64 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             }
             Ok(())
         }
+        Commands::System {
+            action:
+                SystemAction::SourceStatus {
+                    checkout,
+                    fetch,
+                    port,
+                    runtime_root,
+                },
+        } => {
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let checkout = checkout
+                .map(absolute_cli_path)
+                .transpose()?
+                .map(Ok)
+                .unwrap_or_else(discover_refine_checkout)?;
+            let service = FileSourcePromotionService::new(
+                checkout,
+                RuntimeRoot { root: runtime_root }.port_root(port),
+                port,
+            );
+            let status = service.inspect(fetch)?;
+            print_json(&serde_json::to_value(status).unwrap());
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::SourcePromote {
+                    checkout,
+                    port,
+                    runtime_root,
+                },
+        } => {
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let checkout = checkout
+                .map(absolute_cli_path)
+                .transpose()?
+                .map(Ok)
+                .unwrap_or_else(discover_refine_checkout)?;
+            let service = FileSourcePromotionService::new(
+                checkout,
+                RuntimeRoot { root: runtime_root }.port_root(port),
+                port,
+            );
+            let operation = service.queue()?;
+            print_json(&json!({"operation": operation}));
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::SourcePromoteHelper {
+                    checkout,
+                    port_runtime_root,
+                    port,
+                    operation_id,
+                },
+        } => FileSourcePromotionService::new(checkout, port_runtime_root, port)
+            .run_helper(&operation_id)
+            .map(|_| ()),
         Commands::System {
             action:
                 SystemAction::Rollback {
@@ -3169,6 +3228,9 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             SystemAction::Install { .. }
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
+            | SystemAction::SourceStatus { .. }
+            | SystemAction::SourcePromote { .. }
+            | SystemAction::SourcePromoteHelper { .. }
             | SystemAction::Rollback { .. }
             | SystemAction::Uninstall { .. }
             | SystemAction::Start { .. }

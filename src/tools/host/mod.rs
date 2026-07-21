@@ -7,4 +7,5 @@ pub mod installation;
 pub mod node_init;
 pub mod project_layout;
 pub mod quality;
+pub mod source_promotion;
 pub mod target_apps;

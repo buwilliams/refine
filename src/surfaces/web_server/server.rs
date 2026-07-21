@@ -142,6 +142,18 @@ impl InProcessWebServer {
             return self.handle_install_update(request);
         }
 
+        if request.method == "GET" && request.path == "/system/source" {
+            return self.handle_source_status(false);
+        }
+
+        if request.method == "POST" && request.path == "/system/source/check" {
+            return self.handle_source_status(true);
+        }
+
+        if request.method == "POST" && request.path == "/system/source/promote" {
+            return self.handle_source_promote();
+        }
+
         if request.method == "POST" && request.path == "/system/rollback" {
             return self.handle_install_rollback();
         }
@@ -875,7 +887,10 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     let path = normalize_api_path(path);
     // The MCP surface refreshes the cache through the inner tool dispatch when a
     // tool actually mutates state, so the outer `/mcp` POST itself is exempt.
-    !path.starts_with("/terminal/") && path != "/project/sync" && path != mcp::MCP_ROUTE
+    !path.starts_with("/terminal/")
+        && path != "/project/sync"
+        && !path.starts_with("/system/source/")
+        && path != mcp::MCP_ROUTE
 }
 
 fn node_id_from_cluster_path(path: &str) -> Option<String> {

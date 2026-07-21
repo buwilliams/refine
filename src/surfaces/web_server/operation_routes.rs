@@ -11,7 +11,9 @@ use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::tools::host::deployed_update::discover_refine_checkout;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
+use crate::tools::host::source_promotion::FileSourcePromotionService;
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
@@ -370,6 +372,36 @@ impl InProcessWebServer {
         error_response(RefineError::NotImplemented(
             "HTTP system update is disabled; run `./r system update` from the Refine checkout so the installer can stop daemons, update the deployed binary, refresh service metadata, and restart ports.".to_string(),
         ))
+    }
+
+    pub(super) fn handle_source_status(&self, fetch: bool) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("inspect source promotion status");
+        };
+        let checkout = match discover_refine_checkout() {
+            Ok(checkout) => checkout,
+            Err(error) => return error_response(error),
+        };
+        let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
+        match service.inspect(fetch) {
+            Ok(source) => ApiResponse::json(200, json!({"source": source})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_source_promote(&self) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("promote source checkout");
+        };
+        let checkout = match discover_refine_checkout() {
+            Ok(checkout) => checkout,
+            Err(error) => return error_response(error),
+        };
+        let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
+        match service.queue() {
+            Ok(operation) => ApiResponse::json(202, json!({"operation": operation})),
+            Err(error) => error_response(error),
+        }
     }
 
     pub(super) fn handle_install_rollback(&self) -> ApiResponse {
