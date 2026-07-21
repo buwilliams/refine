@@ -1,7 +1,5 @@
 // ---- System / Runtime -------------------------------------------------------
 
-let _sourcePromotionPollTimer = null;
-
 function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
@@ -196,8 +194,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       })}
     </section>
 
-    ${renderSourcePromotionSection()}
-
     <section class="settings-section">
       <h3>AI Provider</h3>
       ${renderSettingsEditableField({
@@ -219,140 +215,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>), or after setting <code>REFINE_SMOKE_AI_PATH</code> for Smoke AI.</p>
       <button id="s-recheck" data-testid="runtime-recheck-auth">Re-check auth</button>
     </section>`;
-}
-
-function renderSourcePromotionSection() {
-  return `
-    <section class="settings-section" data-testid="source-promotion-section">
-      <h3>Dogfood source</h3>
-      <p class="muted small" style="margin-top:0">
-        Check and promote the configured upstream source separately from published release updates.
-        Promotion requires a clean checkout, fast-forward ancestry, paused automation with no active work, and a successful candidate build.
-      </p>
-      <div id="source-promotion-status" aria-live="polite" aria-busy="true">
-        <p class="muted">Loading source checkout…</p>
-      </div>
-      <div class="actions settings-section-actions">
-        <button class="secondary" type="button" id="source-promotion-check" data-testid="source-promotion-check">
-          Check for source updates
-        </button>
-        <button type="button" id="source-promotion-promote" data-testid="source-promotion-promote" disabled>
-          Promote latest source
-        </button>
-      </div>
-    </section>`;
-}
-
-function shortSourceCommit(commit) {
-  return commit ? String(commit).slice(0, 12) : "unknown";
-}
-
-function renderSourcePromotionStatus(source = {}) {
-  const operation = source.operation || null;
-  const activeOperation = operation && ["queued", "running"].includes(operation.status);
-  const blockers = [];
-  if (!source.clean) blockers.push("checkout has uncommitted changes");
-  if (!source.fast_forward) blockers.push("upstream is not a fast-forward");
-  if (!source.update_available) blockers.push("already at the fetched source commit");
-  if ((source.active_work || []).length) blockers.push(...source.active_work);
-  if (activeOperation) blockers.push(`promotion ${operation.id} is ${operation.status}`);
-  const operationClass = operation?.status === "failed" ? "error" : "muted";
-  return `
-    <dl class="source-promotion-facts">
-      <div><dt>Checkout</dt><dd><code title="${htmlEscape(source.checkout_path || "")}">${htmlEscape(source.checkout_path || "unknown")}</code></dd></div>
-      <div><dt>Current commit</dt><dd><code title="${htmlEscape(source.current_commit || "")}">${htmlEscape(shortSourceCommit(source.current_commit))}</code></dd></div>
-      <div><dt>Upstream</dt><dd><code>${htmlEscape(`${source.remote || "unknown"}/${source.branch || "unknown"}`)}</code></dd></div>
-      <div><dt>Available commit</dt><dd><code title="${htmlEscape(source.available_commit || "")}">${htmlEscape(shortSourceCommit(source.available_commit))}</code></dd></div>
-    </dl>
-    ${operation ? `
-      <p class="small ${operationClass}" data-testid="source-promotion-operation">
-        ${htmlEscape(operation.message || operation.stage || operation.status)}
-        ${operation.error ? ` — ${htmlEscape(operation.error)}` : ""}
-      </p>
-      ${operation.recovery ? `<p class="muted small" data-testid="source-promotion-recovery">Recovery: ${htmlEscape(operation.recovery)}</p>` : ""}
-    ` : ""}
-    <p class="muted small" data-testid="source-promotion-readiness">
-      ${blockers.length
-        ? `Promotion unavailable: ${htmlEscape(blockers.join("; "))}`
-        : "Ready to build, promote, and restart from the fetched source commit."}
-    </p>`;
-}
-
-function applySourcePromotionStatus(source) {
-  const root = document.getElementById("source-promotion-status");
-  if (!root) return;
-  root.setAttribute("aria-busy", "false");
-  root.innerHTML = renderSourcePromotionStatus(source);
-  const operation = source?.operation || null;
-  const activeOperation = operation && ["queued", "running"].includes(operation.status);
-  const promotable = source?.clean && source?.fast_forward && source?.update_available
-    && !(source?.active_work || []).length && !activeOperation;
-  const promote = document.getElementById("source-promotion-promote");
-  const check = document.getElementById("source-promotion-check");
-  if (promote) promote.disabled = !promotable;
-  if (check) check.disabled = !!activeOperation;
-  if (activeOperation) startSourcePromotionPolling();
-  else stopSourcePromotionPolling();
-}
-
-async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false } = {}) {
-  const root = document.getElementById("source-promotion-status");
-  if (!root) return;
-  try {
-    const result = await api(
-      fetchRemote ? "POST" : "GET",
-      fetchRemote ? "/api/system/source/check" : "/api/system/source",
-      fetchRemote ? {} : undefined,
-      { cache: false },
-    );
-    applySourcePromotionStatus(result.source || {});
-  } catch (error) {
-    if (!document.getElementById("source-promotion-status")) return;
-    root.setAttribute("aria-busy", "true");
-    root.innerHTML = `<p class="muted small">${quiet
-      ? "Refine is restarting; reconnecting to source-promotion state…"
-      : htmlEscape(error.message || "Source checkout status is unavailable")}</p>`;
-    if (!quiet) stopSourcePromotionPolling();
-  }
-}
-
-function startSourcePromotionPolling() {
-  if (_sourcePromotionPollTimer) return;
-  _sourcePromotionPollTimer = window.setInterval(() => {
-    refreshSourcePromotionStatus({ quiet: true });
-  }, 1000);
-}
-
-function stopSourcePromotionPolling() {
-  if (!_sourcePromotionPollTimer) return;
-  window.clearInterval(_sourcePromotionPollTimer);
-  _sourcePromotionPollTimer = null;
-}
-
-function bindSourcePromotionControls() {
-  stopSourcePromotionPolling();
-  const check = document.getElementById("source-promotion-check");
-  const promote = document.getElementById("source-promotion-promote");
-  check?.addEventListener("click", () => withButtonBusy(check, "Checking…", async () => {
-    await refreshSourcePromotionStatus({ fetchRemote: true });
-  }));
-  promote?.addEventListener("click", () => withButtonBusy(promote, "Queuing…", async () => {
-    const confirmed = window.confirm(
-      "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
-    );
-    if (!confirmed) return;
-    try {
-      const result = await api("POST", "/api/system/source/promote", {});
-      const current = await api("GET", "/api/system/source", undefined, { cache: false });
-      current.source.operation = result.operation;
-      applySourcePromotionStatus(current.source);
-      toast("Source promotion queued; Refine will reconnect after restart", "info");
-    } catch (error) {
-      toast(error.message || "Source promotion could not start", "error");
-      await refreshSourcePromotionStatus();
-    }
-  }));
-  refreshSourcePromotionStatus();
 }
 
 function renderRuntimeUpgradeBanner(upgrade) {
@@ -495,7 +357,6 @@ function bindNodeRuntimeConfigControls() {
     });
   });
   bindSettingsEditableFields(root);
-  bindSourcePromotionControls();
   return autosaveRuntime;
 }
 

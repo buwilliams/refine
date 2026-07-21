@@ -89,7 +89,7 @@ Nav & Guide: Manage Drop-down
 					Field explanations (description + guide text)
 			Field guide links throughout settings (info icon → opens guide to that item)
 		Node (#/node)
-			Tabs: Application, Reporters, Processes, Performance, Target App Config, Refine Runtime Config
+			Tabs: Application, Reporters, Processes, Performance, Target App Config, Runtime Config, Refine (dev)
 			Application
 				Target application: select known app, status indicator, app path
 				Add app (file path / Git clone URL / new directory), Switch to selected (migration check), Remove selected (danger), Copy from node, Generate with AI
@@ -113,11 +113,14 @@ Nav & Guide: Manage Drop-down
 				Application scope: agent subpath, merge target branch
 				Target app: URL, start/stop/build agent instructions, test/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
 				Optional checks: HTTP URL, TCP host + port, process check command
-			Refine Runtime Config
+			Runtime Config
 				Scope label, Copy from node
 				Runtime: parallel-run cap, branch name pattern ({goal_id}), agent idle/hard timeouts, worker/UI memory limits, worker CPU priority, resource isolation mode, rate/token-limit pause, standalone chat idle timeout, auto-promote backlog→todo, target repo update pulse, file browser ignore patterns
 				AI Provider: provider selector (Claude Code / Codex / Gemini / Copilot / Smoke AI), auth help, Re-check auth (pre-flight)
 				Runtime upgrade banner (current + latest versions, copy upgrade command)
+			Refine (dev)
+				Semantic releases: version preview, reviewable preparation Goal, persisted activity, explicitly confirmed publication
+				Dogfood source: checkout and upstream status, update check, promotion readiness, promote and restart controls
 		Governance (#/project)
 			Tabs: Governance, Quality, Guidance
 			Governance

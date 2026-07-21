@@ -790,9 +790,9 @@ const SETTINGS_SURFACES = {
     basePath: "#/node",
     storageKey: "refine_system_tab",
     tabs: [
-      { slug: "releases", label: "Releases" },
       { slug: "processes", label: "Processes" },
       { slug: "performance", label: "Performance" },
+      { slug: "releases", label: "Refine (dev)" },
     ],
   },
   node: {
@@ -801,12 +801,12 @@ const SETTINGS_SURFACES = {
     storageKey: "refine_node_tab",
     tabs: [
       { slug: "application", label: "Application" },
-      { slug: "releases", label: "Releases" },
       { slug: "reporters", label: "Reporters" },
       { slug: "processes", label: "Processes" },
       { slug: "performance", label: "Performance" },
       { slug: "target-app", label: "Target App Config" },
-      { slug: "runtime", label: "Refine Runtime Config" },
+      { slug: "runtime", label: "Runtime Config" },
+      { slug: "releases", label: "Refine (dev)" },
     ],
   },
   project: {

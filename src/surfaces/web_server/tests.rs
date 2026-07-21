@@ -370,6 +370,8 @@ fn web_server_route_groups_cover_static_web_surface() {
 fn static_runtime_settings_expose_state_sync_controls() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let runtime = fs::read_to_string(static_root.join("js/features/settings_runtime.js")).unwrap();
+    let releases =
+        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
 
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
@@ -381,12 +383,13 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(
         r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
     ));
-    assert!(runtime.contains(r#"data-testid="source-promotion-section""#));
-    assert!(runtime.contains(r#"data-testid="source-promotion-check""#));
-    assert!(runtime.contains(r#"data-testid="source-promotion-promote""#));
-    assert!(runtime.contains("/api/system/source/check"));
-    assert!(runtime.contains("/api/system/source/promote"));
-    assert!(runtime.contains("Refine is restarting; reconnecting"));
+    assert!(!runtime.contains(r#"data-testid="source-promotion-section""#));
+    assert!(releases.contains(r#"data-testid="source-promotion-section""#));
+    assert!(releases.contains(r#"data-testid="source-promotion-check""#));
+    assert!(releases.contains(r#"data-testid="source-promotion-promote""#));
+    assert!(releases.contains("/api/system/source/check"));
+    assert!(releases.contains("/api/system/source/promote"));
+    assert!(releases.contains("Refine is restarting; reconnecting"));
 }
 
 #[test]
@@ -398,7 +401,22 @@ fn static_releases_surface_separates_prepare_from_confirmed_publish() {
         fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
 
     assert!(index.contains("settings_releases.js"));
-    assert!(settings.contains(r#"{ slug: "releases", label: "Releases" }"#));
+    let node_tabs = settings
+        .split("  node: {")
+        .nth(1)
+        .and_then(|node| node.split("  project: {").next())
+        .expect("Node settings surface");
+    assert!(node_tabs.contains(r#"{ slug: "runtime", label: "Runtime Config" }"#));
+    assert!(node_tabs.contains(r#"{ slug: "releases", label: "Refine (dev)" }"#));
+    assert!(
+        node_tabs.find(r#"slug: "runtime""#).unwrap()
+            < node_tabs.find(r#"slug: "releases""#).unwrap()
+    );
+    assert!(
+        node_tabs
+            .trim_end()
+            .ends_with("{ slug: \"releases\", label: \"Refine (dev)\" },\n    ],\n  },")
+    );
     assert!(releases.contains(r#"data-testid="release-bump""#));
     assert!(releases.contains(r#"data-testid="release-preview""#));
     assert!(releases.contains(r#"data-testid="release-prepare""#));

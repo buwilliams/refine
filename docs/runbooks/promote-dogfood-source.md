@@ -17,7 +17,7 @@ dirty or divergent checkout explicitly before retrying.
 
 ## UI Workflow
 
-1. Open **System → Runtime** and find **Dogfood source**.
+1. Open **Node → Refine (dev)** and find **Dogfood source**.
 2. Select **Check for source updates**. Confirm the checkout, current commit,
    upstream remote/branch, and available commit.
 3. If the panel reports a blocker, resolve it without overwriting work and
