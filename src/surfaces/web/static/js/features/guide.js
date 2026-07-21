@@ -337,6 +337,11 @@ const GUIDE_CATEGORIES = [
     title: "Node runtime",
     description: "Process and performance management for this node.",
     items: [
+      guideItem("release-workflow", "Semantic releases", "Educate and operate",
+        "Releases separates reviewable semantic preparation from explicitly confirmed external publication. Preview the version and gates, prepare and merge the candidate, then publish from synchronized main.",
+        "Default: prepare first; publish only after review and merge.",
+        { hash: "#/node/releases", selector: "[data-testid='release-planner']" },
+        { canUseDefault: false }),
       guideItem("process-management", "Process management", "Educate",
         "Process management shows supervised services and controls for background processing, workflow automation, and the target app.",
         "Default: leave healthy processes running.",

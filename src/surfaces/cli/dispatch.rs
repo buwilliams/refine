@@ -27,6 +27,7 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
 use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -138,6 +139,55 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     "system update failed; see JSON summary above".to_string(),
                 ));
             }
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::ReleasePlan {
+                    bump,
+                    repo_root,
+                    runtime_root,
+                },
+        } => {
+            let service = FileReleaseService::new(
+                absolute_cli_path(repo_root)?,
+                absolute_cli_path(runtime_root)?,
+            );
+            let plan = service.plan(ReleaseBump::parse(&bump)?)?;
+            print_json(&serde_json::to_value(plan).unwrap());
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::ReleasePrepare {
+                    bump,
+                    repo_root,
+                    runtime_root,
+                },
+        } => {
+            let service = FileReleaseService::new(
+                absolute_cli_path(repo_root)?,
+                absolute_cli_path(runtime_root)?,
+            );
+            let operation = service.prepare_blocking(ReleaseBump::parse(&bump)?)?;
+            print_json(&serde_json::to_value(operation).unwrap());
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::ReleasePublish {
+                    preparation_id,
+                    confirm,
+                    repo_root,
+                    runtime_root,
+                },
+        } => {
+            let service = FileReleaseService::new(
+                absolute_cli_path(repo_root)?,
+                absolute_cli_path(runtime_root)?,
+            );
+            let operation = service.publish_blocking(&preparation_id, confirm)?;
+            print_json(&serde_json::to_value(operation).unwrap());
             Ok(())
         }
         Commands::System {
@@ -3228,6 +3278,9 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             SystemAction::Install { .. }
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
+            | SystemAction::ReleasePlan { .. }
+            | SystemAction::ReleasePrepare { .. }
+            | SystemAction::ReleasePublish { .. }
             | SystemAction::SourceStatus { .. }
             | SystemAction::SourcePromote { .. }
             | SystemAction::SourcePromoteHelper { .. }

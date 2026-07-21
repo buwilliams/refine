@@ -805,6 +805,19 @@ Requirements:
 - Every capability emits structured events.
 - System operations have status, progress, timestamps, errors, and owning
   surface.
+- Semantic release preparation and publication use `tools::host::release` from
+  UI and CLI surfaces. Preparation persists a trusted plan and queues a normal
+  Goal whose configured agent updates version-bearing files, release notes, and
+  affected documentation in the Goal-managed `.git/refine-worktrees` worktree,
+  runs deterministic gates, and follows standard review and approval.
+  Publication accepts only the persisted preparation identity, requires
+  explicit confirmation and synchronized clean main with the approved candidate
+  in its ancestry, and tags the merged main commit. Git, GitHub, credentials,
+  terminal delivery observation, and verification are idempotent stages behind
+  the fakeable `ReleaseHost`.
+- Release operation requests, progress, agent activity, results, and errors are
+  stored under the runtime root so reconnect, retry, and resume do not depend on
+  browser memory.
 - Logs are queryable from UI and CLI.
 - `doctor` reports daemon, install, OS backend, target app, Git, provider,
   browser, Docker, and storage health.
