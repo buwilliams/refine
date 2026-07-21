@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T23:16:19Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1QQ8G526TQQ36KWR000",
+  "name": "Plan Mode should also have a \"Draft Goal\" similar to the Standalone tab.",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T23:16:19Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Plan Mode should also have a \"Draft Goal\" similar to the Standalone tab.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T23:16:19Z"
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T23:16:19Z"
+}
