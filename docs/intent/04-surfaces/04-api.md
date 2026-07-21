@@ -20,6 +20,8 @@ The API should expose system capability groups that match Refine's product desig
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
+Plan-to-Goal drafting uses the shared `/import/extract` route with purpose `plan_goal`; it returns exactly one unpersisted Goal draft so browser, CLI, and agent adapters can preserve their own explicit review boundary.
+
 The API should remain local-first. It should be secure by context, constrained by local daemon ownership, and careful about which operations mutate target state.
 
 ## Future Direction

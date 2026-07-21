@@ -2553,6 +2553,35 @@ fn web_server_extracts_exactly_one_plan_goal_without_a_feature_destination() {
     assert_eq!(extracted.body["drafts"][0]["name"], "One planned Goal");
     assert!(extracted.body.get("feature_destination").is_none());
 
+    let through_mcp = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/mcp".to_string(),
+        body: Some(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "refine_draft_goal",
+                "arguments": {
+                    "provider": "smoke-ai",
+                    "text": "Plan one independently actionable implementation slice."
+                }
+            }
+        })),
+    });
+    assert_eq!(through_mcp.status, 200, "{}", through_mcp.body);
+    assert_eq!(through_mcp.body["result"]["isError"], false);
+    let mcp_drafts = through_mcp.body["result"]["structuredContent"]["drafts"]
+        .as_array()
+        .unwrap();
+    assert_eq!(mcp_drafts.len(), 1);
+    assert_eq!(mcp_drafts[0]["name"], "One planned Goal");
+    assert!(
+        through_mcp.body["result"]["structuredContent"]
+            .get("feature_destination")
+            .is_none()
+    );
+
     unsafe {
         match previous_smoke_ai {
             Some(value) => std::env::set_var("REFINE_SMOKE_AI_PATH", value),

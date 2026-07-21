@@ -228,6 +228,24 @@ pub enum GoalAction {
         #[arg(long)]
         id: Option<String>,
     },
+    /// Draft exactly one reviewable Goal from a Plan transcript without persisting it.
+    Draft {
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+        /// Inline Plan transcript (alternative to --file).
+        #[arg(long)]
+        text: Option<String>,
+        /// File containing the Plan transcript (alternative to --text).
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Reporter to include in the drafted Goal.
+        #[arg(long)]
+        reporter: Option<String>,
+        /// Configured AI provider to use for extraction.
+        #[arg(long)]
+        provider: Option<String>,
+    },
     /// List all Goals with their status and ownership.
     List {
         #[cfg_attr(test, arg(long, hide = true))]

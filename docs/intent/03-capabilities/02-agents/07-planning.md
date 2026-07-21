@@ -37,6 +37,7 @@ Current implementation details that matter to intent:
 - Plan Mode is a chat mode that drafts product and implementation intent;
 - Draft Feature extracts a Feature and Goals from a Plan transcript through shared import extraction;
 - Draft Goal extracts exactly one standalone Goal through the same shared import-extraction capability;
+- browser, CLI, HTTP API, and MCP adapters all expose Plan-to-Goal drafting without persisting before review;
 - Plan and spec-like extraction should use architecture-aware drafting;
 - simple CSV, issue-list, and direct import flows should remain direct and not become planning exercises;
 - review-before-persist should remain the boundary before creating durable work.

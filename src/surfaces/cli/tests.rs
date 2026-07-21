@@ -1,6 +1,6 @@
 use super::dispatch::{
-    absolute_cli_path, dispatch, explicit_target_root_path, system_ps_response,
-    system_status_response,
+    absolute_cli_path, dispatch, explicit_target_root_path, plan_goal_draft_body,
+    system_ps_response, system_status_response,
 };
 use super::*;
 use crate::process::subprocess::{
@@ -40,6 +40,64 @@ fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
         },
     };
     assert_eq!(explicit_target_root_path(&default_daemon_command), None);
+}
+
+#[test]
+fn goal_draft_cli_builds_the_shared_plan_goal_extraction_request() {
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "goal",
+        "draft",
+        "--text",
+        "Plan one independently actionable slice.",
+        "--reporter",
+        "Buddy",
+        "--provider",
+        "smoke-ai",
+    ])
+    .unwrap();
+    let Commands::Goal {
+        action:
+            GoalAction::Draft {
+                text,
+                file,
+                reporter,
+                provider,
+                ..
+            },
+    } = parsed.command
+    else {
+        panic!("expected goal draft command");
+    };
+    let body = plan_goal_draft_body(text, file, reporter, provider).unwrap();
+    assert_eq!(body["purpose"], "plan_goal");
+    assert_eq!(body["text"], "Plan one independently actionable slice.");
+    assert_eq!(body["reporter"], "Buddy");
+    assert_eq!(body["provider"], "smoke-ai");
+}
+
+#[test]
+fn goal_draft_cli_requires_exactly_one_nonempty_plan_source() {
+    let missing = plan_goal_draft_body(None, None, None, None).unwrap_err();
+    assert_eq!(missing.to_string(), "goal draft requires --text or --file");
+
+    let empty = plan_goal_draft_body(Some("  ".to_string()), None, None, None).unwrap_err();
+    assert_eq!(
+        empty.to_string(),
+        "goal draft Plan transcript cannot be empty"
+    );
+
+    let both = plan_goal_draft_body(
+        Some("Plan".to_string()),
+        Some(PathBuf::from("plan.md")),
+        None,
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(
+        both.to_string(),
+        "goal draft accepts either --text or --file, not both"
+    );
 }
 
 #[test]

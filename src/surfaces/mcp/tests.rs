@@ -50,9 +50,48 @@ fn tools_list_exposes_the_catalog() {
         .collect();
     assert!(names.contains(&"refine_system_status"));
     assert!(names.contains(&"refine_list_goals"));
+    assert!(names.contains(&"refine_draft_goal"));
     assert!(names.contains(&"refine_request"));
     // Every advertised tool must carry an input schema.
     assert!(tools.iter().all(|tool| tool["inputSchema"].is_object()));
+}
+
+#[test]
+fn draft_goal_tool_maps_plan_text_onto_shared_extraction() {
+    let response = call(json!({
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+            "name": "refine_draft_goal",
+            "arguments": {
+                "text": "Plan one independently actionable slice.",
+                "reporter": "Buddy",
+                "provider": "smoke-ai"
+            },
+        },
+    }));
+    let echoed = &response["result"]["structuredContent"];
+    assert_eq!(echoed["method"], "POST");
+    assert_eq!(echoed["path"], "/import/extract");
+    assert_eq!(echoed["body"]["purpose"], "plan_goal");
+    assert_eq!(
+        echoed["body"]["text"],
+        "Plan one independently actionable slice."
+    );
+    assert_eq!(echoed["body"]["reporter"], "Buddy");
+    assert_eq!(echoed["body"]["provider"], "smoke-ai");
+}
+
+#[test]
+fn draft_goal_tool_rejects_an_empty_plan_transcript() {
+    let response = call(json!({
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {"name": "refine_draft_goal", "arguments": {"text": "  "}},
+    }));
+    assert_eq!(response["result"]["isError"], true);
 }
 
 #[test]
