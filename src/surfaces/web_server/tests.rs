@@ -381,6 +381,12 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(
         r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
     ));
+    assert!(runtime.contains(r#"data-testid="source-promotion-section""#));
+    assert!(runtime.contains(r#"data-testid="source-promotion-check""#));
+    assert!(runtime.contains(r#"data-testid="source-promotion-promote""#));
+    assert!(runtime.contains("/api/system/source/check"));
+    assert!(runtime.contains("/api/system/source/promote"));
+    assert!(runtime.contains("Refine is restarting; reconnecting"));
 }
 
 #[test]

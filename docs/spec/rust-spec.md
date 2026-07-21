@@ -522,6 +522,23 @@ Requirements:
 - Support rollback when an update fails before state migration completes.
 - Preserve user data and target-app state across upgrades.
 
+Source/dogfood promotion is a separate update channel owned by
+`tools::host::source_promotion`; it must not change the published-release
+installer contract. It reports the controller checkout, current commit,
+configured remote and branch, and latest fetched commit through the shared
+CLI/API/UI service. Promotion requires a clean checkout, fast-forward-only
+ancestry, paused automation with no active Goal claim or non-daemon process,
+and a successful locked release build of the candidate before the daemon
+stops.
+
+The promotion handoff runs as an external helper that outlives the initiating
+HTTP request. It persists atomic stage state under the port runtime root,
+rechecks Git and runtime preconditions before activation, advances the checked
+out branch without reset or merge, restarts from the candidate binary, and
+verifies daemon health. Restart failure attempts to restore the prior commit
+and daemon and always records actionable recovery state. Tests use host fakes
+and must never perform a real source promotion.
+
 OS backends:
 
 - macOS: signed app bundle, notarization, launchd or Login Item integration,
@@ -1063,7 +1080,8 @@ API requirements:
 
 Representative API groups:
 
-- `/system`: install state, daemon status, update, doctor.
+- `/system`: install state, daemon status, published-release update,
+  source/dogfood check and promotion, doctor.
 - `/apps`: target-app registry, attach, switch, detach, commands.
 - `/work`: Goals, Features, imports, state transitions.
 - `/agents`: provider configuration, auth, diagnostics.

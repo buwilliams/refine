@@ -19,6 +19,8 @@ Runbooks:
 
 - [Install Refine](install.md) — install or update Refine, configure an agent
   provider, start the daemon, and verify the result.
+- [Promote dogfood source](promote-dogfood-source.md) — safely build,
+  fast-forward, and restart a running Refine source checkout from the UI or CLI.
 - [Provision a fleet worker](provision.md) — create and verify a worker using
   provider tools while Refine owns node identity and work.
 - [Distribute and converge work](distribute-and-converge.md) — move Goals to
