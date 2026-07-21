@@ -1,7 +1,7 @@
 {
   "base_commit": "afa9af0c2aeed2f0381454b331417d8e4b7b963b",
-  "branch_name": "refine/00000SZ1MQ85B1N7HVB02PG003/round-1",
-  "candidate_commit": "bb6e7a3ec91f4f38da0984181ac07be5b6ce5c6b",
+  "branch_name": "refine/00000SZ1MQ85B1N7HVB02PG003/round-2",
+  "candidate_commit": "82c6ab565e0c0a5b03dcb9564dcfa835eff82d63",
   "created": "2026-07-21T21:31:27Z",
   "feature_id": null,
   "feature_order": null,
@@ -64,9 +64,48 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-21T21:51:12Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-21T21:56:44Z",
+      "governance_checked_at": "2026-07-21T22:10:06Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MQ85B1N7HVB02PG003-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Shared Plan-to-Goal drafting is consistently exposed through browser, CLI, API, and MCP adapters with documentation and proportional verification.\",\"violations\":[]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "Shared Plan-to-Goal drafting is consistently exposed through browser, CLI, API, and MCP adapters with documentation and proportional verification.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MQ85B1N7HVB02PG003-round-2"
+      },
+      "governance_message": "Shared Plan-to-Goal drafting is consistently exposed through browser, CLI, API, and MCP adapters with documentation and proportional verification.",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "The previous implementation did not implement for all surfaces. The requirements: Plan Mode should have a Draft Goal similar to Draft Feature, but only for a Goal. This will help users who just want help deciding what to put into the Goal requirements. This should be usage by all surfaces. The button in the UI will go beside the Draft Feature button.",
+      "quality_checked_at": "2026-07-21T22:10:08Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-21T22:10:08Z"
     }
   ],
-  "status": "failed",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-21T21:51:12Z"
+  "updated": "2026-07-21T22:10:08Z"
 }

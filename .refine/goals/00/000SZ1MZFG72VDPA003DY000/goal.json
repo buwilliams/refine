@@ -1,7 +1,7 @@
 {
-  "base_commit": null,
-  "branch_name": null,
-  "candidate_commit": null,
+  "base_commit": "afa9af0c2aeed2f0381454b331417d8e4b7b963b",
+  "branch_name": "refine/00000SZ1MZFG72VDPA003DY000/round-1",
+  "candidate_commit": "c055e46c71c169badd18987b8aa8ee0d84caaed0",
   "created": "2026-07-21T21:40:26Z",
   "feature_id": null,
   "feature_order": null,
@@ -14,26 +14,45 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T21:40:26Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-21T22:00:13Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MZFG72VDPA003DY000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance violations found; the UI-only reorganization preserves routes, shared backend behavior, safeguards, compatibility, documentation, and focused verification.\",\"violations\":[]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "No Governance violations found; the UI-only reorganization preserves routes, shared backend behavior, safeguards, compatibility, documentation, and focused verification.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MZFG72VDPA003DY000-round-1"
+      },
+      "governance_message": "No Governance violations found; the UI-only reorganization preserves routes, shared backend behavior, safeguards, compatibility, documentation, and focused verification.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Rename \"Releases\" tab in Node config to \"Refine (dev)\" and move to the end of the UI tabs. Also, move the dogfood section to the Refine tab. Rename \"Refine Runtime Config\" to simply \"Runtime Config\". These changes will help ensure the user understands work that is targeting Refine itself vs. a targeted app.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T22:00:14Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T21:40:26Z"
+      "rule_state": "passed",
+      "updated": "2026-07-21T22:00:14Z"
     }
   ],
-  "status": "todo",
-  "target_branch": null,
-  "updated": "2026-07-21T21:40:44Z"
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-21T22:24:34Z"
 }
