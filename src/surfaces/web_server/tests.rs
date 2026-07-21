@@ -842,6 +842,42 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
 }
 
 #[test]
+fn web_server_instantly_promotes_new_goal_when_configured() {
+    let temp_root = unique_temp_dir("http-goal-create-instant-promote");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+        .update(&json!({"backlog_promote_after_seconds": "0"}))
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "id": "GOAL1",
+            "name": "Instantly promoted Goal"
+        })),
+    });
+
+    assert_eq!(created.status, 201);
+    assert_eq!(created.body["goal"]["status"], "todo");
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Todo
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_handles_new_goal_duplicate_decisions() {
     let temp_root = unique_temp_dir("http-goal-duplicate-modal");
     let refine_dir = temp_root.join(".refine");
