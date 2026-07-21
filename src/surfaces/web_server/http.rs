@@ -741,7 +741,22 @@ async fn axum_entrypoint(
             Some(body.to_vec())
         },
     };
-    let response = state.daemon.handle_axum_request(request);
+    let response = if request.method == "GET"
+        && (request.path == "/events"
+            || request.path == "/api/sse"
+            || terminal_events_route(&request.path).is_some())
+    {
+        state.daemon.handle_axum_request(request)
+    } else {
+        let daemon = state.daemon.clone();
+        match tokio::task::spawn_blocking(move || daemon.handle_axum_request(request)).await {
+            Ok(response) => response,
+            Err(error) => WireResponse::json(error_response(RefineError::Io(format!(
+                "HTTP request worker failed: {error}"
+            ))))
+            .into_response(),
+        }
+    };
     if let Some(notify) = state.complete_after_request {
         notify.notify_one();
     }
@@ -797,12 +812,25 @@ impl LocalHttpDaemon {
             let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> =
                 BTreeMap::new();
             loop {
-                let frames = match daemon.server_sent_event_frames(stream_name) {
-                    Ok(frames) => frames,
-                    Err(error) => {
+                let frame_daemon = daemon.clone();
+                let frames = match tokio::task::spawn_blocking(move || {
+                    frame_daemon.server_sent_event_frames(stream_name)
+                })
+                .await
+                {
+                    Ok(Ok(frames)) => frames,
+                    Ok(Err(error)) => {
                         let event = Event::default()
                             .event("error")
                             .data(json!({"message": error.to_string()}).to_string());
+                        let _ = tx.send(Ok(event)).await;
+                        break;
+                    }
+                    Err(error) => {
+                        let event = Event::default().event("error").data(
+                            json!({"message": format!("SSE projection worker failed: {error}")})
+                                .to_string(),
+                        );
                         let _ = tx.send(Ok(event)).await;
                         break;
                     }

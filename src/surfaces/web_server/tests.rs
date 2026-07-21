@@ -1075,6 +1075,74 @@ fn local_http_daemon_handles_tcp_requests_on_worker_threads() {
 }
 
 #[test]
+fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
+    let temp_root = unique_temp_dir("http-plan-git-wait");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&app_root);
+    fs::create_dir_all(refine_dir_for_target_root(&app_root).unwrap()).unwrap();
+
+    let (locked_tx, locked_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let lock_root = app_root.clone();
+    let lock_thread = thread::spawn(move || {
+        crate::tools::host::git_sync::with_repository_git_lock(&lock_root, || {
+            locked_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+            Ok(())
+        })
+        .unwrap();
+    });
+    locked_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root);
+    let daemon = LocalHttpDaemon {
+        server,
+        static_root: None,
+    };
+    let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
+    let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
+    let server_thread = thread::spawn(move || daemon.serve_once(listener).unwrap());
+
+    let (sent_tx, sent_rx) = std::sync::mpsc::channel();
+    let blocked_request = thread::spawn(move || {
+        let body = r#"{"purpose":"plan"}"#;
+        let mut stream = TcpStream::connect(addr).unwrap();
+        let request = format!(
+            "POST /api/chat/start HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        sent_tx.send(()).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        response
+    });
+    sent_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    thread::sleep(Duration::from_millis(50));
+
+    let mut responsive = TcpStream::connect(addr).unwrap();
+    responsive
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .unwrap();
+    responsive
+        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    responsive.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+
+    release_tx.send(()).unwrap();
+    lock_thread.join().unwrap();
+    let plan_response = blocked_request.join().unwrap();
+    assert!(plan_response.starts_with("HTTP/1.1 201 Created"));
+    server_thread.join().unwrap();
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn local_http_daemon_serves_static_assets() {
     let temp_root = unique_temp_dir("static-assets");
     fs::create_dir_all(&temp_root).unwrap();

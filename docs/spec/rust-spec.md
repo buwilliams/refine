@@ -701,11 +701,17 @@ Requirements:
   quality, import, maintenance, or user-initiated helper.
 - Runner processes own long-running workflow and Git orchestration, including
   repository-lock acquisition and waiting for their agent or Git children.
+- Repository locks cover individual Git mutations only. Agent, build, quality,
+  and governance waits must not hold the repository lock or prevent Plan and
+  chat worktrees from starting.
 - When a workflow runner stops during automated Goal work, runner recovery
   records the interruption, moves the Goal to `failed`, and leaves normal retry
   controls available.
 - The daemon may monitor or restart a runner, but it must not synchronously wait
   for runner completion on an HTTP runtime thread.
+- Synchronous capability adapters run on Tokio's blocking pool; SSE projection
+  refreshes do the same so a waiting filesystem or Git operation cannot stop
+  the listener from serving UI assets and health routes.
 - Daemon bootstrap, provider CLIs, target-app commands, quality checks, Git and
   SSH maintenance commands, service-manager commands, diagnostics probes, and
   native secret-store command helpers should enter through process supervision

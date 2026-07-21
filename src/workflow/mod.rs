@@ -557,9 +557,6 @@ impl WorkflowEngine {
     }
 
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
-        if let Some(target_root) = &self.target_root {
-            return with_repository_git_lock(target_root, || self.evaluate_workflow_locked());
-        }
         self.evaluate_workflow_locked()
     }
 
@@ -1421,7 +1418,7 @@ mod tests {
     use crate::tools::product::nodes::FileNodeRegistryService;
     use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
     use std::process::Command;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[test]
     fn file_automation_promotes_todo_goals_and_starts_executions() {
@@ -2514,6 +2511,43 @@ mod tests {
             work_items.show_goal_summary("GOAL1").unwrap().goal.status,
             GoalStatus::Todo
         );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn workflow_evaluation_does_not_hold_the_repository_lock_between_git_steps() {
+        let temp_root = unique_temp_dir("automation-narrow-git-lock");
+        let target_root = temp_root.join("target");
+        let _refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+
+        let (locked_tx, locked_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let lock_root = target_root.clone();
+        let lock_thread = std::thread::spawn(move || {
+            with_repository_git_lock(&lock_root, || {
+                locked_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+                Ok(())
+            })
+            .unwrap();
+        });
+        locked_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        let evaluation_thread = std::thread::spawn(move || {
+            finished_tx.send(automation.evaluate_workflow()).unwrap();
+        });
+        let evaluation = finished_rx.recv_timeout(Duration::from_millis(250));
+
+        release_tx.send(()).unwrap();
+        lock_thread.join().unwrap();
+        evaluation_thread.join().unwrap();
+        evaluation
+            .expect("workflow evaluation waited on the repository lock outside a Git step")
+            .unwrap();
 
         fs::remove_dir_all(temp_root).unwrap();
     }

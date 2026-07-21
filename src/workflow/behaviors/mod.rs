@@ -7,6 +7,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::QualityCheckResult;
 use crate::tools::host::target_apps::FileTargetAppService;
@@ -82,7 +83,9 @@ impl WorkflowBehavior for WorkflowTodo {
             Ok(root) => root.join(branch.replace('/', "-")),
             Err(error) => return fail(ctx, "branch", error),
         };
-        let worktree_path = match app_git.ensure_worktree(&branch, &worktree_target) {
+        let worktree_path = match with_repository_git_lock(ctx.target_root, || {
+            app_git.ensure_worktree(&branch, &worktree_target)
+        }) {
             Ok(path) => path,
             Err(error) => return fail(ctx, "branch", error),
         };
@@ -155,11 +158,13 @@ impl WorkflowBehavior for WorkflowImplementation {
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
-        let commit = match worktree_git.commit_or_clean_noop_since(
-            &format!("Implement {} round {}", ctx.goal_id, ctx.round_idx + 1),
-            &[],
-            &target_branch,
-        ) {
+        let commit = match with_repository_git_lock(ctx.target_root, || {
+            worktree_git.commit_or_clean_noop_since(
+                &format!("Implement {} round {}", ctx.goal_id, ctx.round_idx + 1),
+                &[],
+                &target_branch,
+            )
+        }) {
             Ok(outcome) => outcome,
             Err(error) => return fail(ctx, "commit", error),
         };
@@ -209,7 +214,9 @@ impl WorkflowBehavior for WorkflowImplementation {
 
         let remote = setting_string(&ctx.settings, "git_remote", "origin");
         if worktree_git.remote_exists(&remote)? {
-            if let Err(error) = worktree_git.push(&remote, &branch) {
+            if let Err(error) =
+                with_repository_git_lock(ctx.target_root, || worktree_git.push(&remote, &branch))
+            {
                 return fail(ctx, "git", error);
             }
             ctx.log(
