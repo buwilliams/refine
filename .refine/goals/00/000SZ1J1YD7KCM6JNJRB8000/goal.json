@@ -1,7 +1,7 @@
 {
-  "base_commit": null,
-  "branch_name": null,
-  "candidate_commit": null,
+  "base_commit": "546e40ed0b2e12f7d3e8a49c67e20f99ebc662de",
+  "branch_name": "refine/00000SZ1J1YD7KCM6JNJRB8000/round-1",
+  "candidate_commit": "c3b9c132b01412d5bce4de9412e120b0194099ce",
   "created": "2026-07-21T19:58:16Z",
   "feature_id": null,
   "feature_order": null,
@@ -14,26 +14,36 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T19:58:16Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-21T20:09:03Z",
+      "governance_details": {
+        "configured": false,
+        "failed_actions": [],
+        "governance_configured": false,
+        "phase": "post_implementation",
+        "rules_checked": 0
+      },
+      "governance_message": "No governance rules configured.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "When I tried to change the model I get an error (below), please fix.\n\nSave failed: failed to parse automation state /home/buddy/projects/refine/run/8082/workflow-automation-state.json: missing field `goal_id` at line 23 column 5\n\nThe fields were restored to the last saved values.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T20:09:05Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T19:58:16Z"
+      "rule_state": "passed",
+      "updated": "2026-07-21T20:09:05Z"
     }
   ],
-  "status": "todo",
-  "target_branch": null,
-  "updated": "2026-07-21T19:58:51Z"
+  "status": "review",
+  "target_branch": "main",
+  "updated": "2026-07-21T20:09:05Z"
 }
