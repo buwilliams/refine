@@ -601,7 +601,7 @@ Preview a semantic release without changing files
 
 ### `refine system release-prepare`
 
-Prepare a reviewable semantic-release branch and commit
+Queue an agent-operated Goal to prepare a reviewable semantic release
 
 - `--bump` (required) — Semantic version increment: major, minor, or patch
 - `--repo-root` — Git checkout to release
@@ -609,9 +609,9 @@ Prepare a reviewable semantic-release branch and commit
 
 ### `refine system release-publish`
 
-Publish a reviewed release candidate. Requires explicit --confirm
+Publish an approved preparation by persisted id. Requires explicit --confirm
 
-- `--candidate` (required) — JSON file containing the PreparedRelease candidate returned by preparation
+- `--preparation-id` (required) — Persisted release preparation operation id returned by release-prepare
 - `--confirm` — Confirm creation and push of the tag and external GitHub publication
 - `--repo-root` — Git checkout whose synchronized main will be published
 - `--runtime-root` — Runtime directory where durable release operations are stored

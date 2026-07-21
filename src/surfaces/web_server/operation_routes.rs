@@ -13,7 +13,7 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::deployed_update::discover_refine_checkout;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
-use crate::tools::host::release::{FileReleaseService, PreparedRelease, ReleaseBump};
+use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
@@ -101,16 +101,17 @@ impl InProcessWebServer {
             .get("confirmed")
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let candidate = body
-            .get("candidate")
-            .cloned()
-            .ok_or_else(|| RefineError::InvalidInput("release candidate is required".to_string()))
-            .and_then(|value| {
-                serde_json::from_value::<PreparedRelease>(value).map_err(|error| {
-                    RefineError::InvalidInput(format!("invalid release candidate: {error}"))
-                })
+        let preparation_id = body
+            .get("preparation_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                RefineError::InvalidInput("release preparation_id is required".to_string())
             });
-        match candidate.and_then(|candidate| service.start_publish(candidate, confirmed)) {
+        match preparation_id
+            .and_then(|preparation_id| service.start_publish(preparation_id, confirmed))
+        {
             Ok(operation) => {
                 ApiResponse::json(202, json!({"operation": operation_response(operation)}))
             }

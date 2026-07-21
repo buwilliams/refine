@@ -5,7 +5,7 @@ let _releaseRefreshTimer = null;
 
 function renderSettingsReleasesTab(releases = {}) {
   const operations = [...(releases.operations || [])].reverse();
-  const prepared = operations.find((operation) => operation.status === "complete" && operation.owner === "release:prepare")?.result?.candidate || null;
+  const prepared = operations.find((operation) => operation.owner === "release:prepare" && operation.preparation)?.preparation || null;
   return `
     <section class="settings-section" data-testid="release-planner">
       <h3>${renderSettingsGuideLabel("Semantic releases", "release-workflow")}</h3>
@@ -40,22 +40,30 @@ function renderReleasePlan(plan) {
     </details></div>`;
 }
 
-function renderPreparedRelease(candidate) {
+function renderPreparedRelease(preparation) {
+  const plan = preparation.plan || {};
+  const candidate = preparation.candidate_commit || "";
+  const publishable = preparation.publishable === true;
   return `<section class="settings-section" data-testid="prepared-release">
-    <h3>Reviewable candidate ${htmlEscape(candidate.tag)}</h3>
-    <p class="small"><code>${htmlEscape(candidate.branch)}</code> at <code>${htmlEscape((candidate.commit || "").slice(0, 12))}</code></p>
-    <p class="muted small">Review and merge this candidate into synchronized <code>main</code> before publishing.</p>
-    <button type="button" class="danger" id="release-publish" data-testid="release-publish">Publish release…</button>
+    <h3>Preparation Goal · ${htmlEscape(plan.proposed_tag || "release")}</h3>
+    <p class="small">Status: <strong>${htmlEscape(preparation.status || "queued")}</strong> · <a href="${htmlEscape(preparation.review_url || "#/goals")}"><code>${htmlEscape(preparation.goal_id || "")}</code></a></p>
+    ${preparation.branch ? `<p class="small"><code>${htmlEscape(preparation.branch)}</code>${candidate ? ` at <code>${htmlEscape(candidate.slice(0, 12))}</code>` : ""}</p>` : ""}
+    <p class="muted small">The configured agent works in the normal Goal worktree. Review and approve that Goal before publishing synchronized main.</p>
+    <button type="button" class="danger" id="release-publish" data-testid="release-publish" ${publishable ? "" : "disabled"}>Publish release…</button>
   </section>`;
 }
 
 function renderReleaseOperation(operation) {
   const progress = operation.progress || {};
-  const retryable = ["failed", "interrupted", "cancelled"].includes(operation.status);
+  const goal = operation.preparation || {};
+  const retryable = ["failed", "interrupted", "cancelled"].includes(operation.status) || (operation.owner === "release:prepare" && goal.status === "failed");
+  const goalLogs = (goal.rounds || []).flatMap((round) => round.logs || []);
   return `<article class="card" style="margin-top:10px" data-release-operation="${htmlEscape(operation.id)}">
     <p><strong>${htmlEscape(operation.owner === "release:publish" ? "Publish" : "Prepare")}</strong> · ${htmlEscape(operation.status)}</p>
     <p class="muted small">${htmlEscape(progress.message || operation.error?.message || operation.id)}</p>
-    ${(operation.logs || []).length ? `<details><summary>Agent activity and outputs</summary><ul class="small">${operation.logs.map((log) => `<li>${htmlEscape(log.message)}</li>`).join("")}</ul></details>` : ""}
+    ${goal.goal_id ? `<p class="small">Linked Goal: <a href="${htmlEscape(goal.review_url)}"><code>${htmlEscape(goal.goal_id)}</code></a> · ${htmlEscape(goal.status || "queued")}</p>` : ""}
+    ${(operation.logs || []).length ? `<details><summary>Release stages</summary><ul class="small">${operation.logs.map((log) => `<li>${htmlEscape(log.message)}</li>`).join("")}</ul></details>` : ""}
+    ${goalLogs.length ? `<details><summary>Agent activity and outputs</summary><ul class="small">${goalLogs.map((log) => `<li>${htmlEscape(log.message)}</li>`).join("")}</ul></details>` : ""}
     ${retryable ? `<button type="button" class="secondary" data-release-retry="${htmlEscape(operation.id)}" data-release-publish-retry="${operation.owner === "release:publish"}">Retry / resume</button>` : ""}
   </article>`;
 }
@@ -64,7 +72,7 @@ function bindSettingsReleasesTab(releases = {}) {
   clearTimeout(_releaseRefreshTimer);
   $("#release-preview")?.addEventListener("click", previewRelease);
   $("#release-prepare")?.addEventListener("click", prepareRelease);
-  const prepared = [...(releases.operations || [])].reverse().find((operation) => operation.status === "complete" && operation.owner === "release:prepare")?.result?.candidate;
+  const prepared = [...(releases.operations || [])].reverse().find((operation) => operation.owner === "release:prepare" && operation.preparation)?.preparation;
   $("#release-publish")?.addEventListener("click", () => publishRelease(prepared));
   $$('[data-release-retry]').forEach((button) => button.addEventListener("click", async () => {
     const publish = button.dataset.releasePublishRetry === "true";
@@ -72,7 +80,8 @@ function bindSettingsReleasesTab(releases = {}) {
     await api("POST", `/api/system/releases/${button.dataset.releaseRetry}/retry`, { confirmed: publish });
     await refreshActiveSettingsTab({ force: true });
   }));
-  if ((releases.operations || []).some((operation) => ["pending", "running"].includes(operation.status))) {
+  const activeGoalStates = ["backlog", "todo", "in-progress", "ready-merge", "build", "qa", "review"];
+  if ((releases.operations || []).some((operation) => ["pending", "running"].includes(operation.status) || activeGoalStates.includes(operation.preparation?.status))) {
     _releaseRefreshTimer = setTimeout(() => refreshActiveSettingsTab({ force: true }), 1500);
   }
 }
@@ -95,10 +104,10 @@ async function prepareRelease() {
   } catch (error) { await showActionError(error); }
 }
 
-async function publishRelease(candidate) {
-  if (!candidate || !confirm(`Publish ${candidate.tag}? This will create and push the semantic tag and publish the GitHub release.`)) return;
+async function publishRelease(preparation) {
+  if (!preparation?.publishable || !confirm(`Publish ${preparation.plan?.proposed_tag}? This will create and push the semantic tag and publish the GitHub release. This explicit confirmation applies only to this attempt.`)) return;
   try {
-    await api("POST", "/api/system/releases/publish", { candidate, confirmed: true });
+    await api("POST", "/api/system/releases/publish", { preparation_id: preparation.preparation_id, confirmed: true });
     await refreshActiveSettingsTab({ force: true });
   } catch (error) { await showActionError(error); }
 }

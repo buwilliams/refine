@@ -27,7 +27,7 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::host::release::{FileReleaseService, PreparedRelease, ReleaseBump};
+use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
 use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -176,28 +176,17 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::ReleasePublish {
-                    candidate,
+                    preparation_id,
                     confirm,
                     repo_root,
                     runtime_root,
                 },
         } => {
-            let candidate_path = absolute_cli_path(candidate)?;
-            let candidate: PreparedRelease =
-                serde_json::from_slice(&fs::read(&candidate_path).map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to read {}: {error}",
-                        candidate_path.display()
-                    ))
-                })?)
-                .map_err(|error| {
-                    RefineError::InvalidInput(format!("invalid release candidate JSON: {error}"))
-                })?;
             let service = FileReleaseService::new(
                 absolute_cli_path(repo_root)?,
                 absolute_cli_path(runtime_root)?,
             );
-            let operation = service.publish_blocking(candidate, confirm)?;
+            let operation = service.publish_blocking(&preparation_id, confirm)?;
             print_json(&serde_json::to_value(operation).unwrap());
             Ok(())
         }

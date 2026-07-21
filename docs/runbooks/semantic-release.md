@@ -9,8 +9,8 @@ confirmation.
 - The target app is a Git checkout with a clean base branch.
 - The package version is a three-part semantic version.
 - Completed Goals and commits intended for the release have landed.
-- Publication credentials and the `origin` remote are configured before the
-  publish phase.
+- Publication credentials and the target branch's configured upstream remote
+  are available before the publish phase.
 
 ## Prepare
 
@@ -18,11 +18,11 @@ confirmation.
 2. Select major, minor, or patch and choose **Preview**.
 3. Review the current/proposed versions, previous tag, commits, breaking-change
    findings, affected files, and deterministic gates.
-4. Choose **Prepare release**. Watch the persisted stage and agent activity.
-5. Review the resulting `release/vX.Y.Z` branch and candidate commit. The
-   preparation worktree is under the runtime root; the main checkout is not
-   switched.
-6. Review and merge the candidate normally.
+4. Choose **Prepare release**. Refine creates and queues a normal visible Goal
+   whose prompt contains the trusted release plan.
+5. Follow the linked Goal's real workflow state and agent logs. Its worktree is
+   managed by the normal Goal workflow under `.git/refine-worktrees`.
+6. Review and approve the Goal normally. Preparation never tags or publishes.
 
 CLI equivalents:
 
@@ -44,22 +44,27 @@ Return to Releases after the candidate is reviewed and merged. Choose
 **Publish release…** and explicitly confirm. Refine rejects publication unless:
 
 - the current branch is clean `main`;
-- local `main`, `origin/main`, and the reviewed candidate commit match;
+- local `main` and its configured upstream branch are synchronized;
+- the approved preparation commit is an ancestor of `main` (the normal
+  no-fast-forward merge commit may be `main` HEAD);
 - the package version and proposed semantic tag align;
-- the tag does not already exist; and
+- any existing local tag, remote tag, or GitHub release resolves to the
+  expected synchronized `main` commit; and
 - GitHub credentials work.
 
-Publication creates and pushes the annotated tag, creates the GitHub release
-from the prepared notes, and verifies that the release has a published URL.
-Repository workflows remain responsible for deployment and package delivery;
-their work begins from the pushed tag.
+Publication tags synchronized `main` HEAD, creates or validates the tag and
+GitHub release stage by stage, waits for relevant workflow runs to finish, and
+verifies the final remote tag and release URL. If no deployment or package
+workflows are configured, the operation records that explicitly.
 
-For CLI publication, save the `candidate` object returned by preparation as
-JSON, then run:
+For CLI publication, retain the persisted preparation operation id returned by
+`release-prepare`, then run:
 
 ```text
-refine system release-publish --candidate candidate.json --confirm --repo-root .
+refine system release-publish --preparation-id <operation-id> --confirm --repo-root .
 ```
 
-If an operation fails or is interrupted, use **Retry / resume**. Retrying a
-publish operation asks for confirmation again.
+If preparation fails, retry its linked Goal without discarding review edits. If
+publication fails or is interrupted, use **Retry / resume**; Refine validates
+completed external stages and continues from the first missing stage. Every
+publish attempt asks for confirmation again.

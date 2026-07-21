@@ -432,11 +432,7 @@ fn release_api_previews_semver_and_rejects_unconfirmed_publication() {
         path: "/api/system/releases/publish".to_string(),
         body: Some(json!({
             "confirmed": false,
-            "candidate": {
-                "version": "4.0.1", "tag": "v4.0.1", "branch": "release/v4.0.1",
-                "commit": "abc", "worktree": "/tmp/release", "release_notes": "RELEASE_NOTES.md",
-                "changed_files": [], "gates": []
-            }
+            "preparation_id": "browser-controlled-value"
         })),
     });
     assert_eq!(publish.status, 400);
@@ -446,8 +442,38 @@ fn release_api_previews_semver_and_rejects_unconfirmed_publication() {
             .unwrap()
             .contains("confirmed=true")
     );
+    assert!(!releases_request_body_accepts_candidate_objects());
+
+    let tampered = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/system/releases/publish".to_string(),
+        body: Some(json!({
+            "confirmed": true,
+            "preparation_id": "browser-controlled-value",
+            "candidate": {
+                "commit": "attacker-selected-commit",
+                "worktree": "/tmp/attacker-selected-worktree"
+            }
+        })),
+    });
+    assert_eq!(tampered.status, 404, "{}", tampered.body);
+    assert!(
+        tampered.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("release request browser-controlled-value was not found")
+    );
 
     fs::remove_dir_all(runtime_root).unwrap();
+}
+
+fn releases_request_body_accepts_candidate_objects() -> bool {
+    let source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/surfaces/web/static/js/features/settings_releases.js"),
+    )
+    .unwrap();
+    source.contains("{ candidate, confirmed: true }")
 }
 
 #[test]

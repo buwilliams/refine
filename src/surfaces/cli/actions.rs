@@ -1014,7 +1014,7 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Prepare a reviewable semantic-release branch and commit.
+    /// Queue an agent-operated Goal to prepare a reviewable semantic release.
     ReleasePrepare {
         /// Semantic version increment: major, minor, or patch.
         #[arg(long)]
@@ -1026,11 +1026,11 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Publish a reviewed release candidate. Requires explicit --confirm.
+    /// Publish an approved preparation by persisted id. Requires explicit --confirm.
     ReleasePublish {
-        /// JSON file containing the PreparedRelease candidate returned by preparation.
+        /// Persisted release preparation operation id returned by release-prepare.
         #[arg(long)]
-        candidate: PathBuf,
+        preparation_id: String,
         /// Confirm creation and push of the tag and external GitHub publication.
         #[arg(long)]
         confirm: bool,
