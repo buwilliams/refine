@@ -88,6 +88,18 @@ pub trait SourcePromotionHost {
     fn restart_previous_daemon(&mut self) -> RefineResult<()>;
 }
 
+trait SourcePromotionHelperLauncher {
+    fn launch(&self, command: &mut Command) -> std::io::Result<()>;
+}
+
+struct ProcessSourcePromotionHelperLauncher;
+
+impl SourcePromotionHelperLauncher for ProcessSourcePromotionHelperLauncher {
+    fn launch(&self, command: &mut Command) -> std::io::Result<()> {
+        command.spawn().map(|_| ())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FileSourcePromotionService {
     pub checkout_path: PathBuf,
@@ -175,14 +187,27 @@ impl FileSourcePromotionService {
         })?;
         let snapshot = self.check()?;
         validate_promotion(&snapshot)?;
-        let operation = SourcePromotionOperation::queued(&snapshot);
-        self.save_operation(&operation)?;
         let executable = std::env::current_exe().map_err(|error| {
             RefineError::Io(format!(
                 "failed to locate source-promotion helper executable: {error}"
             ))
         })?;
-        let mut command = Command::new(&executable);
+        self.queue_validated(
+            &snapshot,
+            &executable,
+            &ProcessSourcePromotionHelperLauncher,
+        )
+    }
+
+    fn queue_validated(
+        &self,
+        snapshot: &SourcePromotionSnapshot,
+        executable: &Path,
+        launcher: &dyn SourcePromotionHelperLauncher,
+    ) -> RefineResult<SourcePromotionOperation> {
+        let operation = SourcePromotionOperation::queued(snapshot);
+        self.save_operation(&operation)?;
+        let mut command = Command::new(executable);
         command
             .args([
                 "system",
@@ -200,8 +225,8 @@ impl FileSourcePromotionService {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-        if let Err(error) = command.spawn() {
-            let error = RefineError::Io(format!(
+        if let Err(error) = launcher.launch(&mut command) {
+            let launch_error = RefineError::Io(format!(
                 "failed to launch restart-safe source-promotion helper {}: {error}",
                 executable.display()
             ));
@@ -209,14 +234,21 @@ impl FileSourcePromotionService {
             failed.status = "failed".to_string();
             failed.stage = "launch_helper".to_string();
             failed.message = "Source promotion helper could not start".to_string();
-            failed.error = Some(error.to_string());
+            failed.error = Some(launch_error.to_string());
             failed.recovery = Some(
                 "No checkout or daemon changes were made; resolve the launch failure and retry"
                     .to_string(),
             );
             failed.updated_at = now_timestamp();
-            self.save_operation(&failed)?;
-            return Err(error);
+            if let Err(persist_error) = self.save_operation(&failed) {
+                return Err(append_error_context(
+                    launch_error,
+                    &format!(
+                        "the terminal failure state also could not be persisted: {persist_error}"
+                    ),
+                ));
+            }
+            return Err(launch_error);
         }
         Ok(operation)
     }
@@ -556,6 +588,7 @@ fn update_operation(
 struct FileSourcePromotionHost {
     service: FileSourcePromotionService,
     previous_executable: PathBuf,
+    candidate_builder: PathBuf,
 }
 
 impl FileSourcePromotionHost {
@@ -565,6 +598,7 @@ impl FileSourcePromotionHost {
         Self {
             service,
             previous_executable,
+            candidate_builder: PathBuf::from("cargo"),
         }
     }
 
@@ -610,18 +644,17 @@ impl FileSourcePromotionHost {
 impl SourcePromotionHost for FileSourcePromotionHost {
     fn build_candidate(&mut self, commit: &str) -> RefineResult<PathBuf> {
         let root = self.service.port_runtime_root.join("source-promotion");
-        let worktree = root.join(format!("candidate-{}", &commit[..commit.len().min(12)]));
-        let binary = root.join(format!("refine-{}", &commit[..commit.len().min(12)]));
+        let artifact_id = format!(
+            "{}-{}",
+            &commit[..commit.len().min(12)],
+            Uuid::new_v4().simple()
+        );
+        let worktree = root.join(format!("candidate-{artifact_id}"));
+        let binary = root.join(format!("refine-{artifact_id}"));
         fs::create_dir_all(&root).map_err(|error| {
             RefineError::Io(format!("failed to create {}: {error}", root.display()))
         })?;
-        if worktree.exists() {
-            return Err(RefineError::Conflict(format!(
-                "candidate worktree already exists: {}",
-                worktree.display()
-            )));
-        }
-        git_ok(
+        if let Err(error) = git_ok(
             &self.service.checkout_path,
             &[
                 "worktree",
@@ -630,45 +663,53 @@ impl SourcePromotionHost for FileSourcePromotionHost {
                 &worktree.display().to_string(),
                 commit,
             ],
-        )?;
-        let build = Command::new("cargo")
+        ) {
+            let cleanup_errors =
+                cleanup_candidate_worktree(&self.service.checkout_path, &worktree, false);
+            return Err(with_candidate_cleanup(error, &worktree, cleanup_errors));
+        }
+        let candidate_result = Command::new(&self.candidate_builder)
             .args(["build", "--release", "--locked"])
             .current_dir(&worktree)
             .output()
-            .map_err(|error| {
-                RefineError::Io(format!("failed to launch candidate build: {error}"))
-            })?;
-        let built = worktree.join("target/release/refine");
-        let candidate_result = if build.status.success() {
-            fs::copy(&built, &binary).map(|_| ()).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to preserve candidate binary {} as {}: {error}",
-                    built.display(),
-                    binary.display()
+            .map_err(|error| RefineError::Io(format!("failed to launch candidate build: {error}")))
+            .and_then(|build| {
+                let built = worktree.join("target/release/refine");
+                if build.status.success() {
+                    fs::copy(&built, &binary).map(|_| ()).map_err(|error| {
+                        RefineError::Io(format!(
+                            "failed to preserve candidate binary {} as {}: {error}",
+                            built.display(),
+                            binary.display()
+                        ))
+                    })
+                } else {
+                    Err(RefineError::Degraded(format!(
+                        "candidate build failed with status {}: {}",
+                        build.status,
+                        String::from_utf8_lossy(&build.stderr).trim()
+                    )))
+                }
+            });
+        let mut cleanup_errors =
+            cleanup_candidate_worktree(&self.service.checkout_path, &worktree, true);
+        match candidate_result {
+            Ok(()) if cleanup_errors.is_empty() => Ok(binary),
+            Ok(()) => {
+                cleanup_errors.extend(remove_candidate_binary(&binary));
+                Err(with_candidate_cleanup(
+                    RefineError::Io(
+                        "candidate build succeeded but artifact cleanup failed".to_string(),
+                    ),
+                    &worktree,
+                    cleanup_errors,
                 ))
-            })
-        } else {
-            Err(RefineError::Degraded(format!(
-                "candidate build failed with status {}: {}",
-                build.status,
-                String::from_utf8_lossy(&build.stderr).trim()
-            )))
-        };
-        let target_dir = worktree.join("target");
-        if target_dir.exists() {
-            fs::remove_dir_all(&target_dir).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to clean generated candidate build directory {}: {error}",
-                    target_dir.display()
-                ))
-            })?;
+            }
+            Err(error) => {
+                cleanup_errors.extend(remove_candidate_binary(&binary));
+                Err(with_candidate_cleanup(error, &worktree, cleanup_errors))
+            }
         }
-        git_ok(
-            &self.service.checkout_path,
-            &["worktree", "remove", &worktree.display().to_string()],
-        )?;
-        candidate_result?;
-        Ok(binary)
     }
 
     fn verify_preconditions(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()> {
@@ -774,6 +815,102 @@ impl SourcePromotionHost for FileSourcePromotionHost {
     }
 }
 
+fn cleanup_candidate_worktree(checkout: &Path, worktree: &Path, registered: bool) -> Vec<String> {
+    if registered {
+        match git_ok(
+            checkout,
+            &[
+                "worktree",
+                "remove",
+                "--force",
+                &worktree.display().to_string(),
+            ],
+        ) {
+            Ok(()) => return Vec::new(),
+            Err(remove_error) => {
+                let filesystem_cleanup = if worktree.exists() {
+                    fs::remove_dir_all(worktree).map_err(|error| {
+                        format!("failed to remove {}: {error}", worktree.display())
+                    })
+                } else {
+                    Ok(())
+                };
+                let prune_cleanup = git_ok(checkout, &["worktree", "prune"])
+                    .map_err(|error| format!("failed to prune Git worktree metadata: {error}"));
+                if filesystem_cleanup.is_ok() && prune_cleanup.is_ok() {
+                    return Vec::new();
+                }
+                let mut errors = vec![format!("Git worktree removal failed: {remove_error}")];
+                if let Err(error) = filesystem_cleanup {
+                    errors.push(error);
+                }
+                if let Err(error) = prune_cleanup {
+                    errors.push(error);
+                }
+                return errors;
+            }
+        }
+    }
+
+    let mut errors = Vec::new();
+    if worktree.exists()
+        && let Err(error) = fs::remove_dir_all(worktree)
+    {
+        errors.push(format!("failed to remove {}: {error}", worktree.display()));
+    }
+    if let Err(error) = git_ok(checkout, &["worktree", "prune"]) {
+        errors.push(format!("failed to prune Git worktree metadata: {error}"));
+    }
+    errors
+}
+
+fn remove_candidate_binary(binary: &Path) -> Vec<String> {
+    if !binary.exists() {
+        return Vec::new();
+    }
+    fs::remove_file(binary)
+        .err()
+        .map(|error| {
+            vec![format!(
+                "failed to remove candidate binary {}: {error}",
+                binary.display()
+            )]
+        })
+        .unwrap_or_default()
+}
+
+fn with_candidate_cleanup(
+    primary: RefineError,
+    worktree: &Path,
+    cleanup_errors: Vec<String>,
+) -> RefineError {
+    if cleanup_errors.is_empty() {
+        return primary;
+    }
+    append_error_context(
+        primary,
+        &format!(
+            "candidate cleanup also failed: {}; remove {} and run `git worktree prune` before retrying",
+            cleanup_errors.join("; "),
+            worktree.display()
+        ),
+    )
+}
+
+fn append_error_context(error: RefineError, context: &str) -> RefineError {
+    let append = |message: String| format!("{message}; {context}");
+    match error {
+        RefineError::InvalidInput(message) => RefineError::InvalidInput(append(message)),
+        RefineError::NotFound(message) => RefineError::NotFound(append(message)),
+        RefineError::Unauthorized(message) => RefineError::Unauthorized(append(message)),
+        RefineError::Conflict(message) => RefineError::Conflict(append(message)),
+        RefineError::Degraded(message) => RefineError::Degraded(append(message)),
+        RefineError::Io(message) => RefineError::Io(append(message)),
+        RefineError::Serialization(message) => RefineError::Serialization(append(message)),
+        RefineError::NotImplemented(message) => RefineError::NotImplemented(append(message)),
+    }
+}
+
 fn ensure_checkout(checkout: &Path) -> RefineResult<()> {
     if checkout.join(".git").exists() && checkout.join("Cargo.toml").is_file() {
         Ok(())
@@ -848,6 +985,17 @@ fn now_timestamp() -> String {
 mod tests {
     use super::*;
 
+    struct FailingHelperLauncher;
+
+    impl SourcePromotionHelperLauncher for FailingHelperLauncher {
+        fn launch(&self, _command: &mut Command) -> std::io::Result<()> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "mock helper launch denied",
+            ))
+        }
+    }
+
     #[derive(Default)]
     struct FakeHost {
         fail: Option<&'static str>,
@@ -909,6 +1057,146 @@ mod tests {
             rollback_succeeded: None,
             recovery: None,
         }
+    }
+
+    fn test_snapshot(checkout: &Path) -> SourcePromotionSnapshot {
+        SourcePromotionSnapshot {
+            checkout_path: checkout.display().to_string(),
+            current_commit: "aaa".to_string(),
+            remote: "origin".to_string(),
+            local_branch: "main".to_string(),
+            branch: "main".to_string(),
+            available_commit: "bbb".to_string(),
+            clean: true,
+            fast_forward: true,
+            update_available: true,
+            active_work: Vec::new(),
+            operation: None,
+        }
+    }
+
+    fn test_directory(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("refine-{label}-{}", Uuid::new_v4()))
+    }
+
+    fn initialize_git_repository(root: &Path) -> String {
+        fs::create_dir_all(root).unwrap();
+        git_ok(root, &["init", "--quiet", "."]).unwrap();
+        git_ok(root, &["config", "user.email", "refine-test@example.com"]).unwrap();
+        git_ok(root, &["config", "user.name", "Refine Test"]).unwrap();
+        fs::write(root.join("fixture.txt"), "candidate fixture\n").unwrap();
+        git_ok(root, &["add", "fixture.txt"]).unwrap();
+        git_ok(root, &["commit", "--quiet", "-m", "fixture"]).unwrap();
+        git_text(root, &["rev-parse", "HEAD"]).unwrap()
+    }
+
+    #[test]
+    fn helper_launch_failure_persists_terminal_retryable_operation() {
+        let root = test_directory("source-helper-launch");
+        let service = FileSourcePromotionService::new(&root, root.join("runtime/8080"), 8080);
+        let snapshot = test_snapshot(&root);
+
+        let error = service
+            .queue_validated(&snapshot, Path::new("/mock/refine"), &FailingHelperLauncher)
+            .unwrap_err();
+
+        assert!(error.to_string().contains("mock helper launch denied"));
+        let failed = service.load_operation().unwrap().unwrap();
+        assert_eq!(failed.status, "failed");
+        assert_eq!(failed.stage, "launch_helper");
+        assert!(
+            failed
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("mock helper launch denied")
+        );
+        assert!(failed.recovery.as_deref().unwrap().contains("retry"));
+        assert!(
+            service
+                .active_work()
+                .unwrap()
+                .iter()
+                .all(|item| !item.starts_with("source promotion "))
+        );
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn candidate_build_spawn_failure_cleans_worktree_and_allows_retry() {
+        let root = test_directory("source-candidate-retry");
+        let checkout = root.join("checkout");
+        let commit = initialize_git_repository(&checkout);
+        let service = FileSourcePromotionService::new(&checkout, root.join("runtime/8080"), 8080);
+        let mut host = FileSourcePromotionHost::new(service.clone());
+        host.candidate_builder = root.join("missing-candidate-builder");
+
+        for _ in 0..2 {
+            let error = host.build_candidate(&commit).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("failed to launch candidate build"),
+                "{error}"
+            );
+            let worktrees = git_text(&checkout, &["worktree", "list", "--porcelain"]).unwrap();
+            assert_eq!(
+                worktrees
+                    .lines()
+                    .filter(|line| line.starts_with("worktree "))
+                    .count(),
+                1,
+                "{worktrees}"
+            );
+        }
+        let artifact_root = service.port_runtime_root.join("source-promotion");
+        assert_eq!(fs::read_dir(artifact_root).unwrap().count(), 0);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn candidate_build_reports_primary_and_unrecovered_cleanup_failures() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = test_directory("source-candidate-cleanup-failure");
+        let checkout = root.join("checkout");
+        let commit = initialize_git_repository(&checkout);
+        let service = FileSourcePromotionService::new(&checkout, root.join("runtime/8080"), 8080);
+        let builder = root.join("fail-build");
+        fs::write(
+            &builder,
+            "#!/bin/sh\nchmod 0555 ..\necho 'mock primary build failure' >&2\nexit 42\n",
+        )
+        .unwrap();
+        fs::set_permissions(&builder, fs::Permissions::from_mode(0o755)).unwrap();
+        let mut host = FileSourcePromotionHost::new(service.clone());
+        host.candidate_builder = builder;
+
+        let error = host.build_candidate(&commit).unwrap_err();
+        let artifact_root = service.port_runtime_root.join("source-promotion");
+        fs::set_permissions(&artifact_root, fs::Permissions::from_mode(0o755)).unwrap();
+        let candidate = fs::read_dir(&artifact_root)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| path.is_dir())
+            .unwrap();
+        assert!(
+            cleanup_candidate_worktree(&checkout, &candidate, true).is_empty(),
+            "test cleanup should recover after restoring permissions"
+        );
+
+        let message = error.to_string();
+        assert!(message.contains("mock primary build failure"), "{message}");
+        assert!(
+            message.contains("candidate cleanup also failed"),
+            "{message}"
+        );
+        assert!(message.contains("git worktree prune"), "{message}");
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
