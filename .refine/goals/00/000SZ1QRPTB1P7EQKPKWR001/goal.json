@@ -16,7 +16,7 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:17:54Z",
-      "governance_checked_at": "2026-07-21T23:38:56Z",
+      "governance_checked_at": "2026-07-21T23:58:21Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QRPTB1P7EQKPKWR001-round-1",
@@ -39,16 +39,20 @@
       "meta_rule_state": "passed",
       "product_state": "passed",
       "prompt": "Review the UI > System tab. I like the color formatting, but I feel the information could be more useful. It doesn't contain any concrete ids or messages that would help a user or agent debug.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T23:58:24Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-21T23:38:56Z"
+      "updated": "2026-07-21T23:58:24Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-21T23:56:50Z"
+  "updated": "2026-07-21T23:58:24Z"
 }
