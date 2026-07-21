@@ -1,7 +1,7 @@
 {
-  "base_commit": null,
-  "branch_name": null,
-  "candidate_commit": null,
+  "base_commit": "de36298d80c369034f6f2c30494211ade651a12c",
+  "branch_name": "refine/00000SZ1JK9TD1F0J3B02PG002/round-1",
+  "candidate_commit": "456c6e3cbe564ffbf6c2dd7a8065811d19b0abd1",
   "created": "2026-07-21T20:17:14Z",
   "feature_id": "00000SZ1JK6P23KW6X0G2PG000",
   "feature_order": 2,
@@ -14,26 +14,36 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T20:17:38Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-21T21:10:26Z",
+      "governance_details": {
+        "configured": false,
+        "failed_actions": [],
+        "governance_configured": false,
+        "phase": "post_implementation",
+        "rules_checked": 0
+      },
+      "governance_message": "No governance rules configured.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Implement a complete UI-first agent-assisted semantic release workflow, building on Refine durable operations. In System > Releases, let the user initiate Prepare Release, explicitly choose major/minor/patch, preview current and proposed versions, and start an agent-operated release preparation that analyzes completed Goals and commits since the prior release, updates all applicable version-bearing files and lockfiles, writes release notes and updates story/runbooks/migration or other affected docs, identifies breaking changes, and runs deterministic release gates. Show live persisted stages, agent activity, outputs, failures, and retry/resume actions in the UI. Preparation must produce a normal reviewable candidate rather than publishing directly. After the prepared change is reviewed/merged, expose an explicitly confirmed Publish Release UI action that preflights clean synchronized main, version/tag alignment, credentials and remote, then creates/pushes the semantic tag, observes deployment/package work, creates the GitHub release with notes/artifacts, and verifies publication. Publishing is externally mutating and must never occur without explicit confirmation. Implement shared backend release services and host abstractions so UI and any CLI surface reuse one implementation; make external Git/GitHub/deploy actions fully fakeable in tests. Persist operation progress under the runtime root so reload/reconnect preserves feedback. Add xtask release plan/check support where repository automation belongs, focused success/failure tests, UI coverage, and documentation/spec updates.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T21:10:27Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T20:17:38Z"
+      "rule_state": "passed",
+      "updated": "2026-07-21T21:10:28Z"
     }
   ],
-  "status": "backlog",
-  "target_branch": null,
-  "updated": "2026-07-21T20:17:39Z"
+  "status": "review",
+  "target_branch": "main",
+  "updated": "2026-07-21T21:10:28Z"
 }
