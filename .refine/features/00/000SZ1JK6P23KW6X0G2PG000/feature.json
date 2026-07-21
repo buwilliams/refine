@@ -1,0 +1,10 @@
+{
+  "assignee": "Buddy Williams",
+  "created": "2026-07-21T20:17:07Z",
+  "description": "Operate source promotion and semantic release preparation/publication entirely from the Refine UI with durable stage feedback, actionable failures, and safe recovery.",
+  "id": "00000SZ1JK6P23KW6X0G2PG000",
+  "name": "UI-operated dogfood updates and releases",
+  "node_id": "default",
+  "reporter": "Buddy Williams",
+  "updated": "2026-07-21T20:17:07Z"
+}

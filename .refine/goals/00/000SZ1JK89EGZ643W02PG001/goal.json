@@ -1,0 +1,18 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T20:17:11Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1JK89EGZ643W02PG001",
+  "name": "Promote latest source and restart from the UI",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T20:17:11Z"
+}

@@ -1,0 +1,18 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T20:17:14Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1JK9TD1F0J3B02PG002",
+  "name": "Prepare and publish semantic releases from the UI",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T20:17:14Z"
+}
