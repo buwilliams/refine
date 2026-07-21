@@ -1002,6 +1002,49 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
+    /// Inspect the running source checkout and its configured upstream branch.
+    SourceStatus {
+        /// Refine source checkout; auto-discovered when omitted.
+        #[arg(long)]
+        checkout: Option<PathBuf>,
+        /// Fetch the configured upstream before reporting status.
+        #[arg(long)]
+        fetch: bool,
+        /// Port of the running Refine daemon.
+        #[arg(long, default_value_t = 8082)]
+        port: u16,
+        /// Directory where Refine keeps daemon state.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
+    /// Build, fast-forward, and restart a running Refine source checkout.
+    SourcePromote {
+        /// Refine source checkout; auto-discovered when omitted.
+        #[arg(long)]
+        checkout: Option<PathBuf>,
+        /// Port of the running Refine daemon.
+        #[arg(long, default_value_t = 8082)]
+        port: u16,
+        /// Directory where Refine keeps daemon state.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
+    /// Continue source promotion outside the daemon process.
+    #[command(hide = true)]
+    SourcePromoteHelper {
+        /// Refine controller checkout selected by the initiating request.
+        #[arg(long)]
+        checkout: PathBuf,
+        /// Port-scoped runtime directory containing durable operation state.
+        #[arg(long)]
+        port_runtime_root: PathBuf,
+        /// Refine daemon port to stop, restart, and verify.
+        #[arg(long)]
+        port: u16,
+        /// Durable source-promotion operation identifier.
+        #[arg(long)]
+        operation_id: String,
+    },
     /// Roll the installation back to a previously installed version.
     Rollback {
         /// Daemon port the installation is configured for.

@@ -591,6 +591,32 @@ Self-update Refine to the latest available version
 - `--yes` — Skip the confirmation prompt
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 
+### `refine system source-status`
+
+Inspect the running source checkout and its configured upstream branch
+
+- `--checkout` — Refine source checkout; auto-discovered when omitted
+- `--fetch` — Fetch the configured upstream before reporting status
+- `--port` — Port of the running Refine daemon
+- `--runtime-root` — Directory where Refine keeps daemon state
+
+### `refine system source-promote`
+
+Build, fast-forward, and restart a running Refine source checkout
+
+- `--checkout` — Refine source checkout; auto-discovered when omitted
+- `--port` — Port of the running Refine daemon
+- `--runtime-root` — Directory where Refine keeps daemon state
+
+### `refine system source-promote-helper`
+
+Continue source promotion outside the daemon process
+
+- `--checkout` (required) — Refine controller checkout selected by the initiating request
+- `--port-runtime-root` (required) — Port-scoped runtime directory containing durable operation state
+- `--port` (required) — Refine daemon port to stop, restart, and verify
+- `--operation-id` (required) — Durable source-promotion operation identifier
+
 ### `refine system rollback`
 
 Roll the installation back to a previously installed version

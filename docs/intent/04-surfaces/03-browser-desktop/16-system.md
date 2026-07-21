@@ -23,6 +23,8 @@ Current implementation details that matter to intent:
 - pending System operations queue before toolbar initialization;
 - System filters distinguish info, started, queued, completed, and errors;
 - failed blocking Goal notices and other important UI messages should be visible here.
+- runtime settings expose source/dogfood status separately from published-release status: controller checkout, current and fetched commits, upstream, blockers, check, and promote controls;
+- source promotion persists stage-by-stage state outside the daemon so the UI can reconnect and continue polling through a deliberate restart, including failure and recovery guidance.
 
 System should not be only a toast sink. It should make local operations inspectable and reduce surprise.
 

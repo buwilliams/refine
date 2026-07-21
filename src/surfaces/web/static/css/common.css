@@ -133,6 +133,26 @@
 .status-pill.ready-merge { background: #fff0d7; color: #9a5b00; }
 .status-pill.build { background: var(--color-warning-soft); color: var(--color-warning); }
 
+.source-promotion-facts {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.source-promotion-facts > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.35fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.source-promotion-facts dt {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.source-promotion-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* System screen tab strip. Mirrors the Toolbar dock tabs so Settings
    sections read as tabs instead of plain text links. */
 .settings-tabs-row {
