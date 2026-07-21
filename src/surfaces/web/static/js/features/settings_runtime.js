@@ -341,7 +341,11 @@ function bindNodeRuntimeConfigControls() {
   syncNow?.addEventListener("click", async () => {
     await withButtonBusy(syncNow, "Syncing...", async () => {
       try {
-        const result = await api("POST", "/api/project/sync", {});
+        const queued = await api("POST", "/api/project/sync", {});
+        const result = await resolveBackgroundOperationResponse(
+          queued,
+          "Refine state synchronization queued",
+        );
         const state = result.git_sync || {};
         toast(
           state.committed

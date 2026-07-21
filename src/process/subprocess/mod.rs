@@ -17,6 +17,7 @@ use crate::process::supervisor::security::FileSecurityService;
 #[serde(rename_all = "snake_case")]
 pub enum ProcessOwner {
     Daemon,
+    Runner,
     TargetApp,
     Agent,
     Quality,
@@ -29,6 +30,7 @@ impl ProcessOwner {
     pub fn as_kind(&self) -> &'static str {
         match self {
             Self::Daemon => "daemon",
+            Self::Runner => "runner",
             Self::TargetApp => "target_app",
             Self::Agent => "agent",
             Self::Quality => "quality",
@@ -128,7 +130,14 @@ impl ManagedProcess {
                 .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
                 .and_then(|details| details.as_object().cloned())
         {
-            for key in ["goal_id", "session_id", "mode", "round_idx"] {
+            for key in [
+                "goal_id",
+                "session_id",
+                "mode",
+                "round_idx",
+                "worker_kind",
+                "operation_id",
+            ] {
                 if let Some(field) = details.get(key) {
                     object.insert(key.to_string(), field.clone());
                 }
@@ -698,6 +707,30 @@ impl ProcessSupervisor for FileProcessSupervisor {
             exit_code: None,
         };
         self.write_process(&process)?;
+        let reaper = self.clone();
+        let reaped_process = process.clone();
+        std::thread::spawn(move || {
+            let mut reaped_process = reaped_process;
+            match child.wait() {
+                Ok(status) => {
+                    reaped_process.state = if status.success() {
+                        "exited".to_string()
+                    } else {
+                        "failed".to_string()
+                    };
+                    reaped_process.exit_code = status.code();
+                    let _ = reaper.remove_process_artifacts(&reaped_process);
+                }
+                Err(error) => {
+                    reaped_process.state = "failed".to_string();
+                    reaped_process.details = Some(append_detail(
+                        reaped_process.details.take(),
+                        &format!("failed to reap managed process: {error}"),
+                    ));
+                    let _ = reaper.remove_process_artifacts(&reaped_process);
+                }
+            }
+        });
         Ok(process)
     }
 
@@ -869,7 +902,8 @@ impl FileProcessSupervisor {
 fn is_background_owner(owner: &ProcessOwner) -> bool {
     matches!(
         owner,
-        ProcessOwner::TargetApp
+        ProcessOwner::Runner
+            | ProcessOwner::TargetApp
             | ProcessOwner::Agent
             | ProcessOwner::Quality
             | ProcessOwner::Import
@@ -910,26 +944,48 @@ fn process_command(spec: &ManagedProcessSpec) -> Command {
             command.env_remove(key);
         }
     }
-    configure_detached_process(&mut command, &spec.owner);
+    configure_process_lifecycle(&mut command, spec);
     command
 }
 
 #[cfg(unix)]
-fn configure_detached_process(command: &mut Command, owner: &ProcessOwner) {
-    if owner != &ProcessOwner::Daemon {
-        return;
-    }
-
+fn configure_process_lifecycle(command: &mut Command, spec: &ManagedProcessSpec) {
     use std::os::unix::process::CommandExt;
 
     unsafe extern "C" {
         fn setsid() -> i32;
     }
 
+    let detached_daemon = spec.owner == ProcessOwner::Daemon;
+    let kill_on_parent_exit = spec
+        .limits
+        .as_ref()
+        .is_some_and(|limits| limits.kill_on_parent_exit);
+    if !detached_daemon && !kill_on_parent_exit {
+        return;
+    }
     unsafe {
-        command.pre_exec(|| {
-            if setsid() == -1 {
+        command.pre_exec(move || {
+            if detached_daemon && setsid() == -1 {
                 return Err(std::io::Error::last_os_error());
+            }
+            #[cfg(target_os = "linux")]
+            if kill_on_parent_exit {
+                const PR_SET_PDEATHSIG: i32 = 1;
+                const SIGTERM: i32 = 15;
+                unsafe extern "C" {
+                    fn prctl(option: i32, arg2: usize, ...) -> i32;
+                    fn getppid() -> i32;
+                }
+                if prctl(PR_SET_PDEATHSIG, SIGTERM as usize) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if getppid() == 1 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
+                        "managed process parent exited during launch",
+                    ));
+                }
             }
             Ok(())
         });
@@ -937,7 +993,7 @@ fn configure_detached_process(command: &mut Command, owner: &ProcessOwner) {
 }
 
 #[cfg(not(unix))]
-fn configure_detached_process(_command: &mut Command, _owner: &ProcessOwner) {}
+fn configure_process_lifecycle(_command: &mut Command, _spec: &ManagedProcessSpec) {}
 
 const AGENT_DIRECT_API_KEY_ENV: &[&str] = &[
     "ANTHROPIC_API_KEY",
@@ -1176,7 +1232,7 @@ fn tail_text(value: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn file_process_supervisor_tracks_running_processes_and_pause_state() {
@@ -1215,6 +1271,39 @@ mod tests {
         assert!(supervisor.inspect(&process.id).is_err());
         assert_eq!(supervisor.list().unwrap().len(), 0);
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_reaps_launched_processes_after_exit() {
+        let temp_root = unique_temp_dir("process-reaper");
+        let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));
+        let process = supervisor
+            .launch(ManagedProcessSpec {
+                owner: ProcessOwner::Runner,
+                command: shell_binary().to_string(),
+                args: shell_args("exit 0"),
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+                metadata: Default::default(),
+            })
+            .unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while supervisor
+            .processes_dir()
+            .join(format!("{}.json", process.id))
+            .exists()
+            && Instant::now() < deadline
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        assert!(supervisor.list().unwrap().is_empty());
         fs::remove_dir_all(temp_root).unwrap();
     }
 

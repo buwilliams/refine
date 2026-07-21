@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
@@ -70,7 +69,7 @@ pub fn process_summary_value_with_chat_sessions(
         }
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
-    let runner_reachable = runner_reachable_value(runtime_root);
+    let runner_reachable = required_runner_workers_reachable(&process_values);
     Ok(json!({
         "runner_reachable": runner_reachable,
         "paused": pause_state.background_processes_stopped || pause_state.agents_paused,
@@ -279,19 +278,14 @@ fn is_terminal_process_status(status: &str) -> bool {
     )
 }
 
-fn runner_reachable_value(runtime_root: &Path) -> bool {
-    let path = runtime_root.join("runner-health.json");
-    let Ok(bytes) = fs::read(&path) else {
-        return true;
-    };
-    let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
-        return true;
-    };
-    value
-        .get("runner_reachable")
-        .or_else(|| value.get("reachable"))
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
+fn required_runner_workers_reachable(processes: &[Value]) -> bool {
+    ["workflow", "git-sync"].into_iter().all(|required| {
+        processes.iter().any(|process| {
+            process.get("kind").and_then(Value::as_str) == Some("runner")
+                && process.get("worker_kind").and_then(Value::as_str) == Some(required)
+                && process.get("status").and_then(Value::as_str) == Some("running")
+        })
+    })
 }
 
 fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {

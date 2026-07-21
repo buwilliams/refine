@@ -1084,6 +1084,22 @@ pub enum SystemAction {
         #[arg(long)]
         operation_id: String,
     },
+    /// Run a supervised background worker outside the daemon process.
+    #[command(hide = true)]
+    RunnerWorker {
+        /// Worker implementation to run.
+        #[arg(long)]
+        kind: String,
+        /// Port-scoped runtime directory shared with the daemon.
+        #[arg(long)]
+        port_runtime_root: PathBuf,
+        /// Target repository for one-shot project operations.
+        #[arg(long)]
+        target_root: Option<PathBuf>,
+        /// Durable operation identifier for one-shot work.
+        #[arg(long)]
+        operation_id: Option<String>,
+    },
     /// Roll the installation back to a previously installed version.
     Rollback {
         /// Daemon port the installation is configured for.

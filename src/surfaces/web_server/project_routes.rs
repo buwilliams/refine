@@ -9,6 +9,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::workflow::GoalStatus;
+use crate::process::runner::FileRunnerWorkerService;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
@@ -19,7 +20,6 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
-use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
@@ -1212,52 +1212,20 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
-        let git_sync = match self.current_target_root() {
-            Ok(Some(target_root)) => {
-                let runtime_root = match &self.runtime_root {
-                    Some(runtime_root) => runtime_root.clone(),
-                    None => target_root.join("run"),
-                };
-                match FileGitSyncService::new(target_root, runtime_root).sync() {
-                    Ok(result) => result,
-                    Err(error) => return error_response(error),
-                }
-            }
-            Ok(None) => GitSyncResult::default(),
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("synchronize Refine state");
+        };
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("synchronize Refine state"),
             Err(error) => return error_response(error),
         };
-        let projection = if !git_sync.attempted {
-            self.projection.clone()
-        } else if self.runtime_root.is_some() {
-            match self.rebuild_current_project_projection_cache() {
-                Ok(projection) => projection,
-                Err(error) => return error_response(error),
+        match FileRunnerWorkerService::new(runtime_root).queue_project_sync(&target_root) {
+            Ok(operation) => {
+                ApiResponse::json(202, json!({"operation": operation_response(operation)}))
             }
-        } else {
-            match self.current_projection() {
-                Ok(projection) => projection,
-                Err(error) => return error_response(error),
-            }
-        };
-        ApiResponse::json(
-            200,
-            json!({
-                "ok": true,
-                "message": "Refine state synchronized and projection rebuilt.",
-                "projection_version": projection.version,
-                "goal_count": projection.goals.len(),
-                "feature_count": projection.features.len(),
-                "git_sync": {
-                    "attempted": git_sync.attempted,
-                    "committed": git_sync.committed,
-                    "pulled": git_sync.pulled,
-                    "pushed": git_sync.pushed,
-                    "branch": git_sync.branch,
-                    "commit": git_sync.commit,
-                    "detail": git_sync.detail
-                }
-            }),
-        )
+            Err(error) => error_response(error),
+        }
     }
 
     pub(super) fn handle_settings_get(&self) -> ApiResponse {

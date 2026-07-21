@@ -11,8 +11,11 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
+#[cfg(test)]
 use crate::tools::host::git_sync::FileGitSyncService;
-use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
+use crate::tools::host::project_layout::prepare_refine_dir;
+#[cfg(test)]
+use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -50,6 +53,7 @@ static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectio
     OnceLock::new();
 
 impl InProcessWebServer {
+    #[cfg(test)]
     pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
         let Some(target_root) = self.current_target_root()? else {
             return Ok(None);
@@ -432,7 +436,6 @@ fn runtime_projection_fingerprint(
         runtime_root.join("process-control.json"),
         runtime_root.join("operations"),
         runtime_root.join("target-app-state.json"),
-        runtime_root.join("runner-health.json"),
         runtime_root.join("metrics/performance.jsonl"),
     ] {
         collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;

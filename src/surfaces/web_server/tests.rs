@@ -377,6 +377,7 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
     assert!(runtime.contains(r#"data-testid="runtime-project-update-pulse""#));
     assert!(runtime.contains(r#"api("POST", "/api/project/sync", {})"#));
+    assert!(runtime.contains("resolveBackgroundOperationResponse"));
     assert!(
         runtime.contains(r##"state_sync_debounce_seconds: $("#s-state-sync-debounce").value"##)
     );
@@ -2976,11 +2977,13 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(no_repo.status, 200);
-    assert_eq!(no_repo.body["git_sync"]["attempted"], false);
-    assert_eq!(no_repo.body["git_sync"]["pulled"], false);
+    assert_eq!(no_repo.status, 202);
+    let no_repo =
+        wait_for_project_sync_operation(&runtime_root, &no_repo, OperationState::Succeeded);
+    assert_eq!(no_repo.result["git_sync"]["attempted"], false);
+    assert_eq!(no_repo.result["git_sync"]["pulled"], false);
     assert_eq!(
-        no_repo.body["git_sync"]["detail"],
+        no_repo.result["git_sync"]["detail"],
         "Target app is not a Git repository."
     );
 
@@ -2995,12 +2998,16 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(missing_upstream.status, 200);
-    assert_eq!(missing_upstream.body["git_sync"]["attempted"], true);
-    assert_eq!(missing_upstream.body["git_sync"]["committed"], true);
-    assert_eq!(missing_upstream.body["git_sync"]["pushed"], false);
+    let missing_upstream = wait_for_project_sync_operation(
+        &runtime_root,
+        &missing_upstream,
+        OperationState::Succeeded,
+    );
+    assert_eq!(missing_upstream.result["git_sync"]["attempted"], true);
+    assert_eq!(missing_upstream.result["git_sync"]["committed"], true);
+    assert_eq!(missing_upstream.result["git_sync"]["pushed"], false);
     assert!(
-        missing_upstream.body["git_sync"]["detail"]
+        missing_upstream.result["git_sync"]["detail"]
             .as_str()
             .unwrap()
             .contains("Git remote origin is not configured")
@@ -3015,6 +3022,55 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
         .is_ok()
     );
     assert!(git(&app_root, &["check-ignore", "-q", ".refine/probe.json"]).is_ok());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_project_sync_returns_while_repository_worker_is_busy() {
+    let temp_root = unique_temp_dir("http-project-sync-nonblocking");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    git(&app_root, &["init", "-b", "main"]).unwrap();
+    git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&app_root, &["config", "user.name", "Test User"]).unwrap();
+    git(&app_root, &["commit", "--allow-empty", "-m", "initial"]).unwrap();
+
+    let (locked_tx, locked_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let lock_root = app_root.clone();
+    let lock_thread = thread::spawn(move || {
+        crate::tools::host::git_sync::with_repository_git_lock(&lock_root, || {
+            locked_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+            Ok(())
+        })
+        .unwrap();
+    });
+    locked_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let started = Instant::now();
+    let response = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+
+    assert_eq!(response.status, 202, "{:#}", response.body);
+    assert!(
+        started.elapsed() < Duration::from_millis(250),
+        "project sync request waited for the repository lock"
+    );
+    release_tx.send(()).unwrap();
+    lock_thread.join().unwrap();
+    let operation =
+        wait_for_project_sync_operation(&runtime_root, &response, OperationState::Succeeded);
+    assert_eq!(operation.result["git_sync"]["attempted"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -3067,16 +3123,17 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
 
     let mut server = server_with_projection();
     server.target_root = Some(app_root.clone());
-    server.runtime_root = Some(temp_root.join("run/8080"));
+    let runtime_root = temp_root.join("run/8080");
+    server.runtime_root = Some(runtime_root.clone());
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200, "{:#}", sync.body);
-    assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
-    assert_eq!(sync.body["git_sync"]["pulled"], false);
+    let sync = wait_for_project_sync_operation(&runtime_root, &sync, OperationState::Succeeded);
+    assert_eq!(sync.result["git_sync"]["attempted"], true);
+    assert_eq!(sync.result["git_sync"]["branch"], "refine/state");
+    assert_eq!(sync.result["git_sync"]["pulled"], false);
     assert!(!app_root.join("remote.txt").exists());
     assert!(refine_dir.join("runtime/processes/local.json").exists());
     assert!(!app_root.join(".refine").exists());
@@ -3096,15 +3153,16 @@ fn web_server_project_sync_ignores_dirty_user_worktree() {
 
     let mut server = server_with_projection();
     server.target_root = Some(app_root.clone());
-    server.runtime_root = Some(temp_root.join("run/8080"));
+    let runtime_root = temp_root.join("run/8080");
+    server.runtime_root = Some(runtime_root.clone());
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200, "{:#}", sync.body);
-    assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
+    let sync = wait_for_project_sync_operation(&runtime_root, &sync, OperationState::Succeeded);
+    assert_eq!(sync.result["git_sync"]["attempted"], true);
+    assert_eq!(sync.result["git_sync"]["branch"], "refine/state");
     assert!(!app_root.join("remote.txt").exists());
     assert_eq!(
         fs::read_to_string(app_root.join("local.txt")).unwrap(),
@@ -3130,17 +3188,18 @@ fn web_server_project_sync_does_not_rebase_or_push_application_branches() {
 
     let mut server = server_with_projection();
     server.target_root = Some(app_root.clone());
-    server.runtime_root = Some(temp_root.join("run/8080"));
+    let runtime_root = temp_root.join("run/8080");
+    server.runtime_root = Some(runtime_root.clone());
     let sync = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/sync".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(sync.status, 200, "{:#}", sync.body);
-    assert_eq!(sync.body["git_sync"]["attempted"], true);
-    assert_eq!(sync.body["git_sync"]["pulled"], false);
-    assert_eq!(sync.body["git_sync"]["pushed"], true);
-    assert_eq!(sync.body["git_sync"]["branch"], "refine/state");
+    let sync = wait_for_project_sync_operation(&runtime_root, &sync, OperationState::Succeeded);
+    assert_eq!(sync.result["git_sync"]["attempted"], true);
+    assert_eq!(sync.result["git_sync"]["pulled"], false);
+    assert_eq!(sync.result["git_sync"]["pushed"], true);
+    assert_eq!(sync.result["git_sync"]["branch"], "refine/state");
     assert!(!app_root.join("remote.txt").exists());
     assert!(app_root.join("local.txt").exists());
 
@@ -4080,7 +4139,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["processes"][0]["kind"], "agent");
-    assert_eq!(listed.body["runner_reachable"], true);
+    assert_eq!(listed.body["runner_reachable"], false);
     assert_eq!(
         listed.body["runner_work"]
             .as_array()
@@ -4246,7 +4305,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     );
     assert_eq!(
         cached.runtime.supervisor.unwrap()["runner_reachable"],
-        json!(true)
+        json!(false)
     );
 
     let stdout_path = runtime_root.join("stream.stdout.log");
@@ -5937,6 +5996,22 @@ fn wait_for_http_request_metric_count(
         }
         thread::sleep(Duration::from_millis(25));
     }
+}
+
+fn wait_for_project_sync_operation(
+    runtime_root: &Path,
+    response: &ApiResponse,
+    expected: OperationState,
+) -> OperationHandle {
+    assert_eq!(response.status, 202, "{:#}", response.body);
+    let operation_id = response.body["operation"]["id"]
+        .as_str()
+        .expect("project sync response should include an operation id");
+    wait_for_operation_status(
+        &FileOperationRegistry::new(runtime_root),
+        operation_id,
+        expected,
+    )
 }
 
 fn wait_for_operation_status(

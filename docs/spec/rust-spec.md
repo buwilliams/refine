@@ -182,8 +182,11 @@ The supervisor daemon is the single local authority. It contains the local web
 server that serves UI assets and exposes the HTTP and server-sent-event routes
 used by Desktop, browser, and CLI surfaces. Route
 handlers are transport adapters: they handle HTTP concerns, translate requests
-and responses, and call `workflow/tools` for real work. Surfaces do not directly mutate
-persisted state or own long-lived OS processes.
+and responses, and call `workflow/tools` for real work. The daemon is a control
+plane, not a worker: agent workflows and Git synchronization run in supervised
+runner subprocesses so their repository locks and completion waits cannot block
+HTTP service. Surfaces do not directly mutate persisted state or own long-lived
+OS processes.
 
 ## Capability Model
 
@@ -655,6 +658,8 @@ retry, and workflow-state evaluation.
 Requirements:
 
 - Workflow is always on while the daemon is running.
+- The daemon supervises a workflow runner subprocess; it does not execute an
+  agent workflow pass in an HTTP or daemon-control thread.
 - Workflow behavior modules evaluate eligible Goals by workflow state.
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
@@ -692,8 +697,12 @@ Requirements:
 - The daemon owns all managed OS process lifecycle.
 - Surfaces never launch or kill managed target-app, agent, build, test, or
   helper processes directly.
-- Managed processes have typed ownership: daemon, target app, agent, quality,
-  import, maintenance, or user-initiated helper.
+- Managed processes have typed ownership: daemon, runner, target app, agent,
+  quality, import, maintenance, or user-initiated helper.
+- Runner processes own long-running workflow and Git orchestration, including
+  repository-lock acquisition and waiting for their agent or Git children.
+- The daemon may monitor or restart a runner, but it must not synchronously wait
+  for runner completion on an HTTP runtime thread.
 - Daemon bootstrap, provider CLIs, target-app commands, quality checks, Git and
   SSH maintenance commands, service-manager commands, diagnostics probes, and
   native secret-store command helpers should enter through process supervision
@@ -740,6 +749,9 @@ push, recover.
 Requirements:
 
 - Git operations are centralized and auditable.
+- Background and user-initiated Git synchronization runs in supervised runner
+  processes. User-initiated operations return a durable operation identifier
+  immediately and report completion or failure through operation state.
 - Agent implementation work uses isolated worktrees where the workflow requires
   isolation.
 - Dirty-worktree checks distinguish user changes from Refine-owned runtime

@@ -19,7 +19,7 @@ The starting point should be easy: one user, one target app, one local daemon, o
 
 Refine needs this concept because agentic software work will not stay single-threaded. Stronger agents will be able to decompose, implement, review, test, and merge work concurrently. Without explicit ownership and ordering, parallelism becomes confusion. With the right foundation, parallelism becomes faster software composition.
 
-A node is the durable owner of active work. It may represent the local daemon, a runner worker, a machine, or a future distributed actor. Agents may perform the work, but Refine should be able to say which node owns the Goal right now. That ownership is what lets many agents operate in parallel without collapsing into duplicated effort or hidden conflict.
+A node is the durable owner of active work. It may represent the local daemon, a runner worker, a machine, or a future distributed actor. The local daemon remains the responsive control plane while supervised runner processes execute agent and Git work. Agents may perform the work, but Refine should be able to say which node owns the Goal right now. That ownership is what lets many agents operate in parallel without collapsing into duplicated effort or hidden conflict.
 
 ## Expected Role
 

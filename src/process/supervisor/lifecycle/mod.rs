@@ -314,7 +314,17 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
 
     fn stop(&self, port: u16) -> RefineResult<DaemonStatus> {
         let supervisor = FileProcessSupervisor::new(self.runtime_root.port_root(port));
-        for process in supervisor.list()? {
+        let processes = supervisor.list()?;
+        for process in processes
+            .iter()
+            .filter(|process| process.owner != ProcessOwner::Daemon)
+        {
+            let process = supervisor.wait(&process.id)?;
+            if process.state == "running" {
+                let _ = supervisor.signal(&process.id, "terminate");
+            }
+        }
+        for process in processes {
             if process.owner == ProcessOwner::Daemon {
                 let process = supervisor.wait(&process.id)?;
                 if process.state == "running" {

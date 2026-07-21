@@ -404,7 +404,9 @@ impl FileSourcePromotionService {
             active.push("workflow automation is not paused".to_string());
         }
         for process in supervisor.list()? {
-            if process.state == "running" && process.owner != ProcessOwner::Daemon {
+            if process.state == "running"
+                && !matches!(process.owner, ProcessOwner::Daemon | ProcessOwner::Runner)
+            {
                 active.push(format!(
                     "running {} process {}",
                     process.owner.as_kind(),

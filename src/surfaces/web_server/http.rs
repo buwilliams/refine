@@ -23,6 +23,9 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
+#[cfg(not(test))]
+use crate::process::runner::{FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKFLOW_RUNNER};
+#[cfg(test)]
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
@@ -31,6 +34,7 @@ use crate::process::supervisor::lifecycle::{
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
 use crate::tools::product::project_state::ProjectionQuery;
+#[cfg(test)]
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;
@@ -125,9 +129,13 @@ static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry
     OnceLock::new();
 
 const AGENT_WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
+#[cfg(test)]
 const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
+#[cfg(test)]
 const DEFAULT_GIT_SYNC_DEBOUNCE: Duration = Duration::from_secs(5);
+#[cfg(test)]
 const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
+#[cfg(test)]
 const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Debug)]
@@ -253,6 +261,7 @@ impl LocalHttpDaemon {
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
     }
 
+    #[cfg(test)]
     pub(super) fn start_agent_automation_loop(&self, interval: Duration) -> AgentWorkflowLoop {
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
@@ -275,6 +284,28 @@ impl LocalHttpDaemon {
         }
     }
 
+    #[cfg(not(test))]
+    pub(super) fn start_agent_automation_loop(&self, interval: Duration) -> AgentWorkflowLoop {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let runtime_root = self.server.runtime_root.clone();
+        let interval = interval.max(Duration::from_millis(100));
+        let handle = thread::spawn(move || {
+            while !thread_stop.load(Ordering::Relaxed) {
+                if let Some(runtime_root) = &runtime_root {
+                    let _ = FileRunnerWorkerService::new(runtime_root)
+                        .ensure_background_worker(WORKFLOW_RUNNER);
+                }
+                sleep_until_stopped(&thread_stop, interval);
+            }
+        });
+        AgentWorkflowLoop {
+            stop,
+            handle: Some(handle),
+        }
+    }
+
+    #[cfg(test)]
     fn start_git_sync_loop(&self) -> GitSyncLoop {
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
@@ -347,6 +378,26 @@ impl LocalHttpDaemon {
                     }
                 }
                 sleep_until_stopped(&thread_stop, GIT_RECONCILE_POLL_INTERVAL);
+            }
+        });
+        GitSyncLoop {
+            stop,
+            handle: Some(handle),
+        }
+    }
+
+    #[cfg(not(test))]
+    fn start_git_sync_loop(&self) -> GitSyncLoop {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let runtime_root = self.server.runtime_root.clone();
+        let handle = thread::spawn(move || {
+            while !thread_stop.load(Ordering::Relaxed) {
+                if let Some(runtime_root) = &runtime_root {
+                    let _ = FileRunnerWorkerService::new(runtime_root)
+                        .ensure_background_worker(GIT_SYNC_RUNNER);
+                }
+                sleep_until_stopped(&thread_stop, Duration::from_secs(1));
             }
         });
         GitSyncLoop {
@@ -933,6 +984,7 @@ fn terminal_events_route(path: &str) -> Option<String> {
     Some(session_id.to_string())
 }
 
+#[cfg(test)]
 fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     let Some(runtime_root) = &server.runtime_root else {
         return Ok(());
@@ -948,12 +1000,14 @@ fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct GitSyncSchedule {
     debounce: Duration,
     remote_fetch_interval: Option<Duration>,
 }
 
+#[cfg(test)]
 impl Default for GitSyncSchedule {
     fn default() -> Self {
         Self {
@@ -963,6 +1017,7 @@ impl Default for GitSyncSchedule {
     }
 }
 
+#[cfg(test)]
 fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<GitSyncSchedule> {
     let Some(runtime_root) = &server.runtime_root else {
         return Ok(GitSyncSchedule::default());
@@ -983,6 +1038,7 @@ fn git_sync_configuration(server: &InProcessWebServer) -> RefineResult<GitSyncSc
     })
 }
 
+#[cfg(test)]
 fn positive_duration(value: Option<&Value>, fallback: Duration) -> Duration {
     let seconds = value
         .and_then(Value::as_str)
@@ -994,6 +1050,7 @@ fn positive_duration(value: Option<&Value>, fallback: Duration) -> Duration {
     Duration::from_secs(seconds as u64)
 }
 
+#[cfg(test)]
 fn optional_positive_duration(value: Option<&Value>, fallback: Duration) -> Option<Duration> {
     let Some(value) = value.and_then(Value::as_str) else {
         return Some(fallback);

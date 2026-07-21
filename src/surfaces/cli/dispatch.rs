@@ -7,6 +7,7 @@ use clap::Parser;
 use serde_json::{Value, json};
 
 use crate::model::workflow::GoalStatus;
+use crate::process::runner::run_worker;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
@@ -248,6 +249,20 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         } => FileSourcePromotionService::new(checkout, port_runtime_root, port)
             .run_helper(&operation_id)
             .map(|_| ()),
+        Commands::System {
+            action:
+                SystemAction::RunnerWorker {
+                    kind,
+                    port_runtime_root,
+                    target_root,
+                    operation_id,
+                },
+        } => run_worker(
+            &kind,
+            absolute_cli_path(port_runtime_root)?,
+            target_root.map(absolute_cli_path).transpose()?,
+            operation_id,
+        ),
         Commands::System {
             action:
                 SystemAction::Rollback {
@@ -3284,6 +3299,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | SystemAction::SourceStatus { .. }
             | SystemAction::SourcePromote { .. }
             | SystemAction::SourcePromoteHelper { .. }
+            | SystemAction::RunnerWorker { .. }
             | SystemAction::Rollback { .. }
             | SystemAction::Uninstall { .. }
             | SystemAction::Start { .. }

@@ -642,6 +642,15 @@ Continue source promotion outside the daemon process
 - `--port` (required) — Refine daemon port to stop, restart, and verify
 - `--operation-id` (required) — Durable source-promotion operation identifier
 
+### `refine system runner-worker`
+
+Run a supervised background worker outside the daemon process
+
+- `--kind` (required) — Worker implementation to run
+- `--port-runtime-root` (required) — Port-scoped runtime directory shared with the daemon
+- `--target-root` — Target repository for one-shot project operations
+- `--operation-id` — Durable operation identifier for one-shot work
+
 ### `refine system rollback`
 
 Roll the installation back to a previously installed version

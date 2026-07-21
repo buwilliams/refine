@@ -8,6 +8,7 @@ use serde_json::{Map, Value};
 
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessOutputStream, ManagedProcessSpec, ProcessOwner,
+    ProcessResourceLimits,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
@@ -271,7 +272,10 @@ impl HostAgentProviderService {
                 cwd: cwd.map(|path| path.display().to_string()),
                 env: Vec::new(),
                 stdin: None,
-                limits: None,
+                limits: Some(ProcessResourceLimits {
+                    kill_on_parent_exit: true,
+                    ..Default::default()
+                }),
                 authorization_command: Some(args.join(" ")),
                 sensitive: false,
                 metadata: process_metadata,

@@ -20,9 +20,10 @@ The process capability should be the local operating substrate under workflow an
 
 Current implementation details that matter to intent:
 
-- managed processes have owners such as daemon, target app, agent, quality, import, maintenance, and user helper.
+- managed processes have owners such as daemon, runner, target app, agent, quality, import, maintenance, and user helper.
 - process records include pid, state, label, details, output paths, limits, start time, and exit code.
 - process metadata can attach workflow, Goal, session, mode, and runner context.
+- the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 
