@@ -1,7 +1,7 @@
 {
-  "base_commit": null,
-  "branch_name": null,
-  "candidate_commit": null,
+  "base_commit": "afa9af0c2aeed2f0381454b331417d8e4b7b963b",
+  "branch_name": "refine/00000SZ1MQ85B1N7HVB02PG003/round-1",
+  "candidate_commit": "bb6e7a3ec91f4f38da0984181ac07be5b6ce5c6b",
   "created": "2026-07-21T21:31:27Z",
   "feature_id": null,
   "feature_order": null,
@@ -14,26 +14,59 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T21:31:27Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-21T21:51:12Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MQ85B1N7HVB02PG003-round-1",
+        "failed_actions": [
+          {
+            "message": "The shared backend and browser/API adapters support Plan Draft Goal, but the CLI exposes no Plan or Draft Goal adapter and still hard-codes Feature import to purpose \"feature import\". No surface-specific exception is documented.",
+            "rule": "When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.",
+            "rule_id": "rule-1"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Draft Goal is not available consistently across all required surfaces.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.\",\"message\":\"The shared backend and browser/API adapters support Plan Draft Goal, but the CLI exposes no Plan or Draft Goal adapter and still hard-codes Feature import to purpose \\\"feature import\\\". No surface-specific exception is documented.\"}]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "Draft Goal is not available consistently across all required surfaces.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The shared backend and browser/API adapters support Plan Draft Goal, but the CLI exposes no Plan or Draft Goal adapter and still hard-codes Feature import to purpose \"feature import\". No surface-specific exception is documented.",
+              "rule": "When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.",
+              "rule_id": "rule-1"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1MQ85B1N7HVB02PG003-round-1"
+      },
+      "governance_message": "Draft Goal is not available consistently across all required surfaces.",
+      "governance_rule_actions": [
+        {
+          "message": "The shared backend and browser/API adapters support Plan Draft Goal, but the CLI exposes no Plan or Draft Goal adapter and still hard-codes Feature import to purpose \"feature import\". No surface-specific exception is documented.",
+          "rule": "When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.",
+          "rule_id": "rule-1"
+        }
+      ],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Plan Mode should have a Draft Goal similar to Draft Feature, but only for a Goal. This will help users who just want help deciding what to put into the Goal requirements. This should be usage by all surfaces. The button in the UI will go beside the Draft Feature button.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T21:32:18Z"
+      "rule_state": "failed",
+      "updated": "2026-07-21T21:51:12Z"
     }
   ],
-  "status": "backlog",
-  "target_branch": null,
-  "updated": "2026-07-21T21:32:18Z"
+  "status": "failed",
+  "target_branch": "main",
+  "updated": "2026-07-21T21:51:12Z"
 }

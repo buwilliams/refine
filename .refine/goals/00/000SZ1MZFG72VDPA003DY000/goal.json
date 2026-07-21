@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T21:40:26Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1MZFG72VDPA003DY000",
+  "name": "Rename \"Releases\" tab in Node config to \"Refine (dev)\" and move to the end of th",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T21:40:26Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Rename \"Releases\" tab in Node config to \"Refine (dev)\" and move to the end of the UI tabs. Also, move the dogfood section to the Refine tab. Rename \"Refine Runtime Config\" to simply \"Runtime Config\". These changes will help ensure the user understands work that is targeting Refine itself vs. a targeted app.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T21:40:26Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-21T21:40:44Z"
+}

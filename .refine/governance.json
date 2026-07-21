@@ -1,0 +1,49 @@
+{
+  "configured": true,
+  "constitution": "- Preserve product intent over current implementation details. Architectures, storage mechanisms, and surfaces may evolve when the replacement better serves the intent and the change includes proportionate rationale, migration, and verification.\n- Keep the core model understandable: Goals, Features, Nodes, target apps, workflow state, and evidence should remain explicit enough for people and agents to inspect.\n- Prefer one shared capability and source of truth behind every surface. UI, CLI, API, and agent-facing adapters should not silently develop conflicting product behavior.\n- Keep user-owned state durable, inspectable, recoverable, and separate from disposable caches and runtime artifacts. Git remains a safety and collaboration substrate, not an excuse for hidden side effects.\n- Use mitigation, auditability, review, and quality evidence instead of broad capability denial. External, destructive, merge, release, and deployment actions require clear intent and visible outcomes.\n- Preserve room for discovery. Governance should flag unexplained risk or product drift, not reject a change solely because it introduces a new pattern or replaces a documented implementation choice.",
+  "product": "Refine is a local-first, agent-first software delivery system that coordinates Goals, Features, workflows, processes, and evidence across a fleet of nodes and existing coding agents. It helps technical and non-technical contributors turn product intent into reviewable software changes while keeping feedback inexpensive, local, observable, and repeatable.\n\nSuccess means work remains understandable to people and agents; shared capabilities behave consistently across UI, CLI, API, and future surfaces; durable state and Git history make actions inspectable and recoverable; distributed implementation converges to explicit human judgment; and Refine can safely improve itself without requiring centralized infrastructure.",
+  "rules": [
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-1",
+      "source": "manual",
+      "text": "When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.",
+      "updated": "2026-07-21T21:42:32Z"
+    },
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-2",
+      "source": "manual",
+      "text": "When persisted Refine state or its layout changes, keep authoritative state outside the primary target-app worktree, keep caches rebuildable, and include a compatible migration or an explicit transition plan.",
+      "updated": "2026-07-21T21:42:32Z"
+    },
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-3",
+      "source": "manual",
+      "text": "When a change performs destructive, externally mutating, merge, release, deployment, or daemon-replacement work, require explicit scoped intent plus durable progress, actionable failure feedback, and a safe retry or recovery path appropriate to the risk.",
+      "updated": "2026-07-21T21:42:32Z"
+    },
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-4",
+      "source": "manual",
+      "text": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
+      "updated": "2026-07-21T21:42:32Z"
+    },
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-5",
+      "source": "manual",
+      "text": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+      "updated": "2026-07-21T21:42:32Z"
+    },
+    {
+      "created": "2026-07-21T21:42:32Z",
+      "id": "rule-6",
+      "source": "manual",
+      "text": "Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.",
+      "updated": "2026-07-21T21:42:32Z"
+    }
+  ]
+}
