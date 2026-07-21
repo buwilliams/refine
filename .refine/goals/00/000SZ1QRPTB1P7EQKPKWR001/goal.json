@@ -1,7 +1,7 @@
 {
   "base_commit": "4296ed2a3b9d080839f0fd0f7fab5189251fb2ca",
   "branch_name": "refine/00000SZ1QRPTB1P7EQKPKWR001/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "05a84516417939d1f4b77897272d73220ce461bd",
   "created": "2026-07-21T23:17:54Z",
   "feature_id": null,
   "feature_order": null,
@@ -35,5 +35,5 @@
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-21T23:29:30Z"
+  "updated": "2026-07-21T23:37:29Z"
 }
