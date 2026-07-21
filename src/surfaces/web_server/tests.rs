@@ -394,6 +394,23 @@ fn static_runtime_settings_expose_state_sync_controls() {
 }
 
 #[test]
+fn static_project_settings_explain_governance_and_quality_effects() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let governance =
+        fs::read_to_string(static_root.join("js/features/settings_governance.js")).unwrap();
+    let quality = fs::read_to_string(static_root.join("js/features/settings_quality.js")).unwrap();
+
+    assert!(governance.contains(r#"data-testid="governance-explanation""#));
+    assert!(governance.contains("A rule violation stops the Goal before"));
+    assert!(governance.contains("do not start a check now"));
+
+    assert!(quality.contains(r#"data-testid="quality-explanation""#));
+    assert!(quality.contains("Passing checks advance the Goal to review"));
+    assert!(quality.contains("preserve the candidate"));
+    assert!(quality.contains("do not start a run now"));
+}
+
+#[test]
 fn static_releases_surface_separates_prepare_from_confirmed_publish() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
