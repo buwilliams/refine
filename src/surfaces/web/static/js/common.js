@@ -1688,6 +1688,7 @@ function initSSE() {
           timestamp: entry.datetime,
         });
       }
+      if (typeof handleGoalLogSseEvent === "function") handleGoalLogSseEvent(entry);
     } catch {}
     // Refresh dashboard activity if visible; refresh current goal if relevant.
     // Route through the silent `refresh*` paths — not `render*` — so the
@@ -1696,6 +1697,13 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
+  });
+  sseSource.addEventListener("goal_log_added", (e) => {
+    if (!sseEventChanged("GoalLog", e)) return;
+    try {
+      const entry = JSON.parse(e.data || "{}");
+      if (typeof handleGoalLogSseEvent === "function") handleGoalLogSseEvent(entry);
+    } catch {}
   });
   sseSource.addEventListener("status_change", (e) => {
     if (!sseEventChanged("Status", e)) return;

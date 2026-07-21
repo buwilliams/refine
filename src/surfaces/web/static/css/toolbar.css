@@ -589,6 +589,102 @@ button.chat-activity-toggle:hover:not(:disabled) {
   font-style: italic;
 }
 
+/* --- Goal log tail ---------------------------------------------------- */
+.goal-log-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.goal-log-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.goal-log-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 750;
+}
+.goal-log-live > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px var(--success-bg);
+}
+.goal-log-tail {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.goal-log-line {
+  display: grid;
+  grid-template-columns: 84px 58px minmax(80px, 120px) minmax(240px, 1fr) minmax(70px, 110px);
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+.goal-log-line:last-child { border-bottom: 0; }
+.goal-log-time,
+.goal-log-severity,
+.goal-log-category,
+.goal-log-actor { white-space: nowrap; }
+.goal-log-category,
+.goal-log-actor {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+.goal-log-message {
+  min-width: 0;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.goal-log-message details { margin-top: 3px; }
+.goal-log-message summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+.goal-log-message pre {
+  max-height: 180px;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  white-space: pre-wrap;
+}
+.goal-log-error .goal-log-severity,
+.goal-log-error .goal-log-message { color: var(--error); }
+.goal-log-warn .goal-log-severity { color: var(--warn); }
+.goal-log-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+@media (max-width: 800px) {
+  .goal-log-header { flex-wrap: wrap; }
+  .goal-log-line {
+    grid-template-columns: 78px 52px minmax(70px, 100px) minmax(180px, 1fr);
+  }
+  .goal-log-actor { display: none; }
+}
+
 /* --- Terminal tab ----------------------------------------------------- */
 .terminal-panel {
   display: flex;

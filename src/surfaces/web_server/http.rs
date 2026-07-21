@@ -942,6 +942,24 @@ impl LocalHttpDaemon {
                 }),
             },
         ];
+        let mut recent_goal_logs = projection
+            .activity
+            .values()
+            .filter(|activity| activity.entry.id.starts_with("round-log:"))
+            .map(|activity| activity.entry.clone())
+            .collect::<Vec<_>>();
+        recent_goal_logs.sort_by(|left, right| {
+            left.datetime
+                .cmp(&right.datetime)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        let keep_from = recent_goal_logs.len().saturating_sub(200);
+        for entry in recent_goal_logs.drain(keep_from..) {
+            events.push(SseEventFrame {
+                event: "goal_log_added",
+                data: json!(entry),
+            });
+        }
         if let Some(refine_dir) = self.server.current_refine_dir()? {
             if let Some(entry) = FileActivityService::new(&refine_dir)
                 .recent(1)?

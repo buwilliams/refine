@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Persistent Utility Dock**: the toolbar is always available without replacing the main route.
-- **Multi-Tool Surface**: System, Files, Terminal, Standalone, and Goal chat belong together as operational aids.
+- **Multi-Tool Surface**: System, Files, Terminal, Standalone, Goal chat, and live Goal logs belong together as operational aids.
 - **Contextual Chat**: chat can attach to a Goal or remain standalone.
 - **Stateful But Recoverable**: toolbar state should persist enough to survive normal navigation without owning product state.
 
@@ -11,7 +11,7 @@
 
 The toolbar exists to keep supporting work close at hand. Users need system notices, source files, terminal access, standalone agent conversations, and Goal chat while they inspect or edit the main surface.
 
-It should reduce context switching without turning every tool into a full page.
+It should reduce context switching without turning every tool into a full page. In particular, users should be able to follow an agent's Goal activity in place while continuing to inspect the product.
 
 ## Expected Role
 
@@ -21,11 +21,12 @@ The toolbar should provide persistent assistance for work in progress:
 - Files lets users inspect project files and search source;
 - Terminal exposes controlled shell access;
 - Standalone supports broad agent conversation and worktree-backed experiments;
-- Goal chat supports conversation tied to specific work.
+- Goal chat supports conversation tied to specific work;
+- Goal log tails show recent canonical Goal activity and append new entries from the shared event stream.
 
 Current implementation details that matter to intent:
 
-- toolbar tab order is System, Files, Terminal, Standalone, then opened Goal chats;
+- toolbar tab order is System, Files, Terminal, Standalone, then opened Goal chat and log tabs;
 - tab state is stored in browser local storage;
 - only relevant chat tabs are polled;
 - output and queued messages are session-specific;

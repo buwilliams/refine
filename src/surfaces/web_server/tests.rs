@@ -549,6 +549,25 @@ fn static_plan_chat_shows_initial_design_prompt() {
 }
 
 #[test]
+fn static_goal_log_tail_uses_toolbar_and_shared_sse_activity() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+    let goal_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
+    let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
+    let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
+
+    assert!(goal_detail.contains(r#"data-testid="goal-action-watch-logs""#));
+    assert!(goal_detail.contains("openGoalLogTail({ goalId: goal.id"));
+    assert!(toolbar.contains("function openGoalLogTail"));
+    assert!(toolbar.contains("function loadGoalLogTail"));
+    assert!(toolbar.contains("/api/activity?${params}"));
+    assert!(toolbar.contains(r#"role="log" aria-live="polite""#));
+    assert!(toolbar.contains("function handleGoalLogSseEvent"));
+    assert!(common.contains(r#"addEventListener("goal_log_added""#));
+    assert!(toolbar_css.contains(".goal-log-tail"));
+}
+
+#[test]
 fn static_work_item_tables_use_shared_readable_name_layout() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();
@@ -4066,6 +4085,38 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("SSE chat event"));
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn native_sse_streams_projected_goal_round_logs() {
+    let mut server = server_with_projection();
+    server.projection.activity.insert(
+        "round-log:GOAL1:0:0".to_string(),
+        crate::tools::product::project_state::ActivitySummaryProjection {
+            entry: ActivityEntry {
+                id: "round-log:GOAL1:0:0".to_string(),
+                datetime: "2026-07-21T12:00:00Z".to_string(),
+                severity: "info".to_string(),
+                category: "agent".to_string(),
+                message: "Agent edited the implementation".to_string(),
+                goal_id: Some("GOAL1".to_string()),
+                actor: Some("codex".to_string()),
+                details: None,
+                actions: Vec::new(),
+            },
+            searchable_text: "Agent edited the implementation".to_string(),
+        },
+    );
+    let daemon = LocalHttpDaemon {
+        server,
+        static_root: None,
+    };
+
+    let events = daemon.server_sent_events("events").unwrap();
+
+    assert!(events.contains("event: goal_log_added"));
+    assert!(events.contains("Agent edited the implementation"));
+    assert!(events.contains(r#""goal_id":"GOAL1""#));
 }
 
 #[test]
