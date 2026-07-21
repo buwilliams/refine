@@ -928,6 +928,7 @@ fn repository_lock_file(target_root: &std::path::Path) -> RefineResult<Option<Fi
     let path = common_dir.join("refine-repository.lock");
     OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .open(&path)

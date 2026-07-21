@@ -236,8 +236,10 @@ fn file_store_persists_projection_snapshot_concurrently() {
             let cache_dir = cache_dir.clone();
             let barrier = barrier.clone();
             thread::spawn(move || {
-                let mut snapshot = ProjectionSnapshot::default();
-                snapshot.generated_at = format!("concurrent-{index}");
+                let snapshot = ProjectionSnapshot {
+                    generated_at: format!("concurrent-{index}"),
+                    ..ProjectionSnapshot::default()
+                };
                 barrier.wait();
                 store.persist_projection_snapshot(&cache_dir, &snapshot)
             })

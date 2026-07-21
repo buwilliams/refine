@@ -514,7 +514,7 @@ impl FileInstallationService {
         #[cfg(test)]
         {
             let _ = command;
-            return Ok(());
+            Ok(())
         }
 
         #[cfg(not(test))]

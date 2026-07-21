@@ -416,7 +416,7 @@ impl WorkflowEngine {
     ) -> RefineResult<ClaimMetadata> {
         let node_id = goal
             .and_then(|goal| goal.goal.node_id.clone())
-            .unwrap_or_else(|| default_node_id());
+            .unwrap_or_else(default_node_id);
         if node_id != policy.active_node_id {
             let goal_id = goal
                 .map(|goal| goal.goal.id.as_str())
@@ -1202,7 +1202,7 @@ fn governance_evaluation_from_json(
                 )
             })
         })
-        .unwrap_or_else(|| !violations.is_empty());
+        .unwrap_or(!violations.is_empty());
     let provider_message = value
         .get("message")
         .or_else(|| value.get("reason"))

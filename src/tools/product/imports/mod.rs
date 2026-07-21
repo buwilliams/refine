@@ -302,7 +302,7 @@ fn dependency_ordered_goal_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<
     let mut position_by_goal_id = BTreeMap::new();
     for (index, (draft, goal_id)) in created_drafts.iter().enumerate() {
         position_by_goal_id.insert(goal_id.clone(), index);
-        for key in [&draft.name, &goal_id] {
+        for key in [&draft.name, goal_id] {
             let key = normalize_dependency_key(key);
             if !key.is_empty() {
                 name_to_goal_id.insert(key, goal_id.clone());
@@ -346,20 +346,17 @@ fn dependency_ordered_goal_ids(created_drafts: &[(ImportDraft, String)]) -> Vec<
     }
 
     let mut ordered = Vec::new();
-    loop {
-        let Some(next_id) = incoming
-            .iter()
-            .filter(|(_, count)| **count == 0)
-            .min_by_key(|(goal_id, _)| {
-                position_by_goal_id
-                    .get(*goal_id)
-                    .copied()
-                    .unwrap_or(usize::MAX)
-            })
-            .map(|(goal_id, _)| goal_id.clone())
-        else {
-            break;
-        };
+    while let Some(next_id) = incoming
+        .iter()
+        .filter(|(_, count)| **count == 0)
+        .min_by_key(|(goal_id, _)| {
+            position_by_goal_id
+                .get(*goal_id)
+                .copied()
+                .unwrap_or(usize::MAX)
+        })
+        .map(|(goal_id, _)| goal_id.clone())
+    {
         incoming.remove(&next_id);
         ordered.push(next_id.clone());
         if let Some(dependents) = edges.get(&next_id) {

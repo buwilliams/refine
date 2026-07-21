@@ -76,10 +76,10 @@ impl InProcessWebServer {
             if let Some(runtime_root) = &self.runtime_root {
                 let key = projection_cache_key(&refine_dir, runtime_root);
                 let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
-                if let Some(snapshot) = hot_projection(&key)? {
-                    if snapshot.source_fingerprints == store.collect_source_fingerprints()? {
-                        return Ok(snapshot);
-                    }
+                if let Some(snapshot) = hot_projection(&key)?
+                    && snapshot.source_fingerprints == store.collect_source_fingerprints()?
+                {
+                    return Ok(snapshot);
                 }
                 let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
                 store_hot_projection(key, snapshot.clone())?;

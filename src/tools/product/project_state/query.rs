@@ -273,18 +273,13 @@ fn goal_matches(
         .node
         .as_deref()
         .filter(|value| !value.trim().is_empty())
+        && !goal_matches_node(
+            goal.node_id.as_deref(),
+            node,
+            query.current_node_id.as_deref(),
+        )
     {
-        match node {
-            value => {
-                if !goal_matches_node(
-                    goal.node_id.as_deref(),
-                    value,
-                    query.current_node_id.as_deref(),
-                ) {
-                    return false;
-                }
-            }
-        }
+        return false;
     }
     if let Some(feature) = query
         .feature
@@ -541,18 +536,13 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
         .node
         .as_deref()
         .filter(|value| !value.trim().is_empty())
+        && !goal_matches_node(
+            feature.node_id.as_deref(),
+            node,
+            query.current_node_id.as_deref(),
+        )
     {
-        match node {
-            value => {
-                if !goal_matches_node(
-                    feature.node_id.as_deref(),
-                    value,
-                    query.current_node_id.as_deref(),
-                ) {
-                    return false;
-                }
-            }
-        }
+        return false;
     }
     if let Some(q) = query.q.as_deref().filter(|value| !value.trim().is_empty()) {
         let q = q.to_lowercase();

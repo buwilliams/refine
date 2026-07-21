@@ -623,10 +623,7 @@ impl InProcessWebServer {
                 return Ok(entry.value.clone());
             }
         }
-        let projection = match self.current_projection_with_runtime() {
-            Ok(projection) => projection,
-            Err(error) => return Err(error),
-        };
+        let projection = self.current_projection_with_runtime()?;
         let doctor =
             FileDiagnosticsService::new(target_root, runtime_root.clone(), repo_root).doctor()?;
         let provider = projection

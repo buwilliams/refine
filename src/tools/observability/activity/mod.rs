@@ -17,6 +17,17 @@ pub trait ActivityService {
     fn by_goal(&self, goal_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>>;
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ActivityQuery<'a> {
+    pub limit: usize,
+    pub offset: usize,
+    pub goal_id: Option<&'a str>,
+    pub severity: Option<&'a str>,
+    pub category: Option<&'a str>,
+    pub actor: Option<&'a str>,
+    pub q: Option<&'a str>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActivityCleanupResult {
     pub ok: bool,
@@ -62,48 +73,39 @@ impl FileActivityService {
         }
     }
 
-    pub fn query(
-        &self,
-        limit: usize,
-        offset: usize,
-        goal_id: Option<&str>,
-        severity: Option<&str>,
-        category: Option<&str>,
-        actor: Option<&str>,
-        q: Option<&str>,
-    ) -> RefineResult<Vec<ActivityEntry>> {
+    pub fn query(&self, query: ActivityQuery<'_>) -> RefineResult<Vec<ActivityEntry>> {
         let mut entries = self.read_all()?;
         entries.retain(|entry| {
-            if let Some(goal_id) = goal_id {
-                if entry.goal_id.as_deref() != Some(goal_id) {
-                    return false;
-                }
+            if let Some(goal_id) = query.goal_id
+                && entry.goal_id.as_deref() != Some(goal_id)
+            {
+                return false;
             }
-            if let Some(severity) = severity {
-                if entry.severity != severity {
-                    return false;
-                }
+            if let Some(severity) = query.severity
+                && entry.severity != severity
+            {
+                return false;
             }
-            if let Some(category) = category {
-                if entry.category != category {
-                    return false;
-                }
+            if let Some(category) = query.category
+                && entry.category != category
+            {
+                return false;
             }
-            if let Some(actor) = actor {
-                if entry.actor.as_deref() != Some(actor) {
-                    return false;
-                }
+            if let Some(actor) = query.actor
+                && entry.actor.as_deref() != Some(actor)
+            {
+                return false;
             }
-            if let Some(query) = q {
-                let query = query.to_lowercase();
-                if !entry.message.to_lowercase().contains(&query)
-                    && !entry.category.to_lowercase().contains(&query)
-                    && !entry.severity.to_lowercase().contains(&query)
+            if let Some(text) = query.q {
+                let text = text.to_lowercase();
+                if !entry.message.to_lowercase().contains(&text)
+                    && !entry.category.to_lowercase().contains(&text)
+                    && !entry.severity.to_lowercase().contains(&text)
                     && !entry
                         .details
                         .as_ref()
                         .and_then(|details| serde_json::to_string(details).ok())
-                        .map(|details| details.to_lowercase().contains(&query))
+                        .map(|details| details.to_lowercase().contains(&text))
                         .unwrap_or(false)
                 {
                     return false;
@@ -112,7 +114,11 @@ impl FileActivityService {
             true
         });
         entries.sort_by(|a, b| b.datetime.cmp(&a.datetime).then_with(|| b.id.cmp(&a.id)));
-        Ok(entries.into_iter().skip(offset).take(limit).collect())
+        Ok(entries
+            .into_iter()
+            .skip(query.offset)
+            .take(query.limit)
+            .collect())
     }
 
     pub fn count(&self) -> RefineResult<usize> {
@@ -298,11 +304,18 @@ impl ActivityService for FileActivityService {
     }
 
     fn recent(&self, limit: usize) -> RefineResult<Vec<ActivityEntry>> {
-        self.query(limit, 0, None, None, None, None, None)
+        self.query(ActivityQuery {
+            limit,
+            ..ActivityQuery::default()
+        })
     }
 
     fn by_goal(&self, goal_id: &str, limit: usize) -> RefineResult<Vec<ActivityEntry>> {
-        self.query(limit, 0, Some(goal_id), None, None, None, None)
+        self.query(ActivityQuery {
+            limit,
+            goal_id: Some(goal_id),
+            ..ActivityQuery::default()
+        })
     }
 }
 
@@ -342,7 +355,11 @@ mod tests {
         assert_eq!(service.by_goal("GOAL1", 10).unwrap()[0].category, "ui");
         assert_eq!(
             service
-                .query(10, 0, None, Some("error"), None, None, None)
+                .query(ActivityQuery {
+                    limit: 10,
+                    severity: Some("error"),
+                    ..ActivityQuery::default()
+                })
                 .unwrap()
                 .len(),
             1

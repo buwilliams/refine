@@ -1053,7 +1053,7 @@ fn unread_lines(record: &ChatSessionRecord) -> Vec<String> {
         .iter()
         .filter(|event| !event_bool(event, "delivered"))
         .filter(|event| !event_bool(event, "progress"))
-        .filter_map(|event| event_text(event))
+        .filter_map(event_text)
         .collect()
 }
 
@@ -1063,7 +1063,7 @@ fn unread_progress(record: &ChatSessionRecord) -> Vec<String> {
         .iter()
         .filter(|event| !event_bool(event, "delivered"))
         .filter(|event| event_bool(event, "progress"))
-        .filter_map(|event| event_text(event))
+        .filter_map(event_text)
         .collect()
 }
 
@@ -1501,7 +1501,7 @@ mod tests {
         }));
         let stopped = service.stop(&session.id).unwrap();
         assert!(stopped.closed);
-        assert_eq!(service.read(&session.id).unwrap().alive, false);
+        assert!(!service.read(&session.id).unwrap().alive);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -2016,7 +2016,7 @@ mod tests {
         }
     }
 
-    fn write_fake_provider_script(refine_dir: &PathBuf, name: &str, script: &str) {
+    fn write_fake_provider_script(refine_dir: &Path, name: &str, script: &str) {
         let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);
@@ -2024,7 +2024,7 @@ mod tests {
         make_provider_executable(&path);
     }
 
-    fn write_fake_provider(refine_dir: &PathBuf, name: &str, exit_code: i32, output: &str) {
+    fn write_fake_provider(refine_dir: &Path, name: &str, exit_code: i32, output: &str) {
         let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);
@@ -2041,13 +2041,13 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(&path).unwrap().permissions();
+            let mut permissions = fs::metadata(path).unwrap().permissions();
             permissions.set_mode(0o755);
-            fs::set_permissions(&path, permissions).unwrap();
+            fs::set_permissions(path, permissions).unwrap();
         }
     }
 
-    fn write_cwd_provider(refine_dir: &PathBuf, name: &str) {
+    fn write_cwd_provider(refine_dir: &Path, name: &str) {
         let bin_dir = refine_dir.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
         let path = bin_dir.join(name);

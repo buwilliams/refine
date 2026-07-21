@@ -738,14 +738,13 @@ fn extract_final_text(stdout: &str, output_format: &str) -> String {
             }
             continue;
         }
-        if object.get("type").and_then(|value| value.as_str()) == Some("assistant") {
-            if let Some(text) = object
+        if object.get("type").and_then(|value| value.as_str()) == Some("assistant")
+            && let Some(text) = object
                 .get("message")
                 .and_then(|value| value.get("content"))
                 .and_then(text_from_content)
-            {
-                last = text;
-            }
+        {
+            last = text;
         }
     }
     if last.is_empty() {

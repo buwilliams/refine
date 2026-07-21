@@ -269,10 +269,11 @@ impl FileProcessSupervisor {
     pub fn recover_owner(&self, owner: ProcessOwner) -> RefineResult<Vec<ManagedProcess>> {
         let mut recovered = Vec::new();
         for mut process in self.list()? {
-            if process.owner == owner && process.state == "running" {
-                if !self.recover_running_process(&mut process)? {
-                    continue;
-                }
+            if process.owner == owner
+                && process.state == "running"
+                && !self.recover_running_process(&mut process)?
+            {
+                continue;
             }
             recovered.push(process);
         }
@@ -703,15 +704,15 @@ impl ProcessSupervisor for FileProcessSupervisor {
     fn signal(&self, process_id: &str, signal: &str) -> RefineResult<ManagedProcess> {
         let mut process = self.inspect(process_id)?;
         if matches!(signal, "stop" | "terminate" | "kill") {
-            if let Some(pid) = process.pid {
-                if let Some(message) = signal_os_process(pid, signal)? {
-                    process.details = Some(match process.details {
-                        Some(details) if !details.trim().is_empty() => {
-                            format!("{details}; {message}")
-                        }
-                        _ => message,
-                    });
-                }
+            if let Some(pid) = process.pid
+                && let Some(message) = signal_os_process(pid, signal)?
+            {
+                process.details = Some(match process.details {
+                    Some(details) if !details.trim().is_empty() => {
+                        format!("{details}; {message}")
+                    }
+                    _ => message,
+                });
             }
             process.state = "stopped".to_string();
             self.remove_process_artifacts(&process)?;
@@ -787,10 +788,8 @@ impl ProcessSupervisor for FileProcessSupervisor {
     fn recover(&self) -> RefineResult<Vec<ManagedProcess>> {
         let mut recovered = Vec::new();
         for mut process in self.list()? {
-            if process.state == "running" {
-                if !self.recover_running_process(&mut process)? {
-                    continue;
-                }
+            if process.state == "running" && !self.recover_running_process(&mut process)? {
+                continue;
             }
             recovered.push(process);
         }

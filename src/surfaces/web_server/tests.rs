@@ -2079,11 +2079,10 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     });
     assert_eq!(bulk_assign.status, 200);
     assert_eq!(bulk_assign.body["updated"], 2);
-    assert_eq!(
+    assert!(
         fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
-            .contains("\"feature_id\": \"FEA1\""),
-        true
+            .contains("\"feature_id\": \"FEA1\"")
     );
 
     let bulk_feature_update = server.handle(ApiRequest {
@@ -5529,12 +5528,11 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
             .contains("npm run dev")
     );
     assert_eq!(generated.body["config"]["start_command"], "");
-    assert_eq!(
+    assert!(
         generated.body["settings"]["target_app_build_instructions"]
             .as_str()
             .unwrap()
-            .contains("npm run build"),
-        true
+            .contains("npm run build")
     );
     assert_eq!(
         generated.body["settings"]["target_app_test_command"],

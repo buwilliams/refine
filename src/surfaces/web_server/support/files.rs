@@ -10,10 +10,10 @@ pub(in crate::surfaces::web_server) fn resolve_project_utility_path(path: &str) 
     if path.is_empty() {
         return std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     }
-    if let Some(rest) = path.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join(rest);
-        }
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Some(home) = std::env::var_os("HOME")
+    {
+        return PathBuf::from(home).join(rest);
     }
     PathBuf::from(path)
 }
@@ -114,17 +114,14 @@ pub(in crate::surfaces::web_server) fn files_tree_response(
     }
     let mut entries_by_path = serde_json::Map::new();
     let mut meta_by_path = serde_json::Map::new();
-    let mut remaining = max_entries;
-    collect_file_tree(
-        target_root,
-        &rel_path,
+    let mut collection = FileTreeCollection {
         recursive,
         max_depth,
-        0,
-        &mut remaining,
-        &mut entries_by_path,
-        &mut meta_by_path,
-    )?;
+        remaining: max_entries,
+        entries_by_path: &mut entries_by_path,
+        meta_by_path: &mut meta_by_path,
+    };
+    collect_file_tree(target_root, &rel_path, 0, &mut collection)?;
     let path = display_rel_path(&rel_path);
     let entries = entries_by_path
         .get(&path)
@@ -142,37 +139,44 @@ pub(in crate::surfaces::web_server) fn files_tree_response(
     }))
 }
 
-pub(in crate::surfaces::web_server) fn collect_file_tree(
-    target_root: &Path,
-    rel_path: &Path,
+struct FileTreeCollection<'a> {
     recursive: bool,
     max_depth: usize,
+    remaining: usize,
+    entries_by_path: &'a mut serde_json::Map<String, Value>,
+    meta_by_path: &'a mut serde_json::Map<String, Value>,
+}
+
+fn collect_file_tree(
+    target_root: &Path,
+    rel_path: &Path,
     depth: usize,
-    remaining: &mut usize,
-    entries_by_path: &mut serde_json::Map<String, Value>,
-    meta_by_path: &mut serde_json::Map<String, Value>,
+    collection: &mut FileTreeCollection<'_>,
 ) -> RefineResult<()> {
     let absolute = target_root.join(rel_path);
     let mut entries = read_file_entries(target_root, &absolute, rel_path)?;
     let mut truncated = false;
-    if entries.len() > *remaining {
-        entries.truncate(*remaining);
+    if entries.len() > collection.remaining {
+        entries.truncate(collection.remaining);
         truncated = true;
-        *remaining = 0;
+        collection.remaining = 0;
     } else {
-        *remaining -= entries.len();
+        collection.remaining -= entries.len();
     }
     let rel_key = display_rel_path(rel_path);
-    entries_by_path.insert(rel_key.clone(), json!(entries));
-    meta_by_path.insert(
+    collection
+        .entries_by_path
+        .insert(rel_key.clone(), json!(entries));
+    collection.meta_by_path.insert(
         rel_key,
         json!({
             "truncated": truncated,
             "depth": depth
         }),
     );
-    if recursive && depth < max_depth && *remaining > 0 {
-        let child_dirs: Vec<PathBuf> = entries_by_path
+    if collection.recursive && depth < collection.max_depth && collection.remaining > 0 {
+        let child_dirs: Vec<PathBuf> = collection
+            .entries_by_path
             .get(&display_rel_path(rel_path))
             .and_then(|value| value.as_array())
             .into_iter()
@@ -186,19 +190,10 @@ pub(in crate::surfaces::web_server) fn collect_file_tree(
             })
             .collect();
         for child in child_dirs {
-            if *remaining == 0 {
+            if collection.remaining == 0 {
                 break;
             }
-            collect_file_tree(
-                target_root,
-                &child,
-                recursive,
-                max_depth,
-                depth + 1,
-                remaining,
-                entries_by_path,
-                meta_by_path,
-            )?;
+            collect_file_tree(target_root, &child, depth + 1, collection)?;
         }
     }
     Ok(())
@@ -554,14 +549,14 @@ pub(in crate::surfaces::web_server) fn percent_decode(value: &str) -> String {
     let mut output = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            if let Ok(hex) = std::str::from_utf8(&bytes[index + 1..index + 3]) {
-                if let Ok(byte) = u8::from_str_radix(hex, 16) {
-                    output.push(byte);
-                    index += 3;
-                    continue;
-                }
-            }
+        if bytes[index] == b'%'
+            && index + 2 < bytes.len()
+            && let Ok(hex) = std::str::from_utf8(&bytes[index + 1..index + 3])
+            && let Ok(byte) = u8::from_str_radix(hex, 16)
+        {
+            output.push(byte);
+            index += 3;
+            continue;
         }
         output.push(if bytes[index] == b'+' {
             b' '

@@ -497,11 +497,11 @@ impl FileTargetAppService {
                 shell_quote(&config.http_check_url)
             );
         }
-        if config.tcp_check_port.trim().is_empty() {
-            if let Some(port) = port_from_url(&config.http_check_url) {
-                config.tcp_check_host = "127.0.0.1".to_string();
-                config.tcp_check_port = port.to_string();
-            }
+        if config.tcp_check_port.trim().is_empty()
+            && let Some(port) = port_from_url(&config.http_check_url)
+        {
+            config.tcp_check_host = "127.0.0.1".to_string();
+            config.tcp_check_port = port.to_string();
         }
         if config.stop_command.trim().is_empty() && !config.tcp_check_port.trim().is_empty() {
             config.stop_command = format!(

@@ -134,137 +134,6 @@ impl ImportDuplicateActions {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals() {
-        let output = json!({
-            "feature": {
-                "name": "Personal Budget App — Product Spec",
-                "description": "created by Plan Mode",
-                "goals": [
-                    {
-                        "name": "Track spending by category",
-                        "prompt": "Let users assign each transaction to a budget category.",
-                        "priority": "medium"
-                    },
-                    {
-                        "name": "Monthly budget overview",
-                        "prompt": "Let users compare month-to-date spending against budget limits.",
-                        "priority": "high"
-                    }
-                ]
-            }
-        })
-        .to_string();
-
-        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
-        let feature = result.feature_destination.unwrap();
-        assert_eq!(feature.name, "Personal Budget App");
-        assert_eq!(feature.description, "");
-        assert_eq!(result.drafts.len(), 2);
-        assert_eq!(result.drafts[0].name, "Track spending by category");
-        assert_eq!(
-            result.drafts[0].prompt,
-            "Let users assign each transaction to a budget category."
-        );
-        assert_eq!(result.drafts[0].reporter, "Product");
-        assert_eq!(result.drafts[1].priority, "high");
-    }
-
-    #[test]
-    fn plan_import_result_reads_embedded_pretty_json_before_text_fallback() {
-        let output = r#"Provider notes before JSON:
-{
-  "feature": {
-    "name": "Smoke AI Plan Feature",
-    "description": "A deterministic product capability planned by the Smoke AI fixture.",
-    "goals": [
-      {
-        "name": "Smoke AI plan goal one",
-        "prompt": "smoke-ai plan prompt one",
-        "priority": "low"
-      }
-    ]
-  }
-}
-Provider notes after JSON."#;
-
-        let result = parse_provider_import_result(output, Some("Product")).unwrap();
-        let feature = result.feature_destination.unwrap();
-        assert_eq!(feature.name, "Smoke AI Plan Feature");
-        assert_eq!(result.drafts.len(), 1);
-        assert_eq!(result.drafts[0].prompt, "smoke-ai plan prompt one");
-    }
-
-    #[test]
-    fn plan_import_result_merges_feature_behavior_and_implementation_goal_arrays() {
-        let output = json!({
-            "feature": {
-                "name": "Budget Alerts",
-                "description": "Alert users when spending nears limits.",
-                "goals": [
-                    {
-                        "name": "Budget threshold alert",
-                        "prompt": "Alert users before a category exceeds its monthly budget.",
-                        "priority": "high"
-                    }
-                ],
-                "implementation_goals": [
-                    {
-                        "name": "Persist alert preferences",
-                        "prompt": "Add a refine model that persists threshold preferences and exposes them through the budget settings API.",
-                        "priority": "medium"
-                    }
-                ],
-                "technical_goals": [
-                    {
-                        "name": "Verify alert trigger coverage",
-                        "prompt": "Add automated tests for below-threshold, threshold-crossing, and disabled-alert cases.",
-                        "priority": "medium"
-                    }
-                ]
-            }
-        })
-        .to_string();
-
-        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
-        assert_eq!(result.drafts.len(), 3);
-        assert_eq!(result.drafts[0].name, "Budget threshold alert");
-        assert_eq!(result.drafts[1].name, "Persist alert preferences");
-        assert_eq!(result.drafts[2].name, "Verify alert trigger coverage");
-        assert!(result.drafts[1].prompt.contains("refine model"));
-        assert!(result.drafts[2].prompt.contains("automated tests"));
-    }
-
-    #[test]
-    fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
-        let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
-        assert!(prompt.contains("feature"));
-        assert!(prompt.contains("implementation_goals"));
-        assert!(prompt.contains("Draft every concrete implementation goal"));
-        assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("durable state"));
-        assert!(prompt.contains("logic and code organization"));
-        assert!(prompt.contains("do not force"));
-        assert!(prompt.contains("natural build order"));
-        assert!(prompt.contains("verification"));
-        assert!(prompt.contains("do not mention Refine"));
-        assert!(prompt.contains("Product Spec"));
-    }
-
-    #[test]
-    fn feature_spec_import_prompt_uses_architecture_lenses() {
-        let prompt = import_extraction_prompt("Build a budget app.", "feature import");
-        assert!(prompt.contains("Plan or feature-spec source"));
-        assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("do not force"));
-        assert!(prompt.contains("natural build order"));
-    }
-}
-
 fn persist_import_draft_with_duplicate_decision(
     service: &FileWorkItemService,
     draft: &ImportDraft,
@@ -274,71 +143,70 @@ fn persist_import_draft_with_duplicate_decision(
     created_drafts: &mut Vec<(ImportDraft, String)>,
 ) -> Result<Option<String>, RefineError> {
     let decision = draft.duplicate_decision.trim();
-    if !decision.is_empty() && decision != "original" {
-        if let Some(duplicate) = latest_round_duplicate_match(service, draft.prompt.trim())? {
-            let duplicate_id = duplicate
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_string();
-            match decision {
-                "duplicate" => return Ok(None),
-                "move_original_to_backlog" => {
-                    let from = duplicate
-                        .get("status")
-                        .and_then(Value::as_str)
-                        .unwrap_or("backlog");
-                    if from == "backlog" || duplicate_id.is_empty() {
-                        actions.move_noop += 1;
-                    } else if service
-                        .transition_goal_status(&duplicate_id, GoalStatus::Backlog)
-                        .is_ok()
-                    {
-                        actions.moved_to_backlog += 1;
-                    } else {
-                        actions.move_noop += 1;
-                    }
-                    return Ok(None);
+    if !decision.is_empty()
+        && decision != "original"
+        && let Some(duplicate) = latest_round_duplicate_match(service, draft.prompt.trim())?
+    {
+        let duplicate_id = duplicate
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        match decision {
+            "duplicate" => return Ok(None),
+            "move_original_to_backlog" => {
+                let from = duplicate
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("backlog");
+                if from == "backlog" || duplicate_id.is_empty() {
+                    actions.move_noop += 1;
+                } else if service
+                    .transition_goal_status(&duplicate_id, GoalStatus::Backlog)
+                    .is_ok()
+                {
+                    actions.moved_to_backlog += 1;
+                } else {
+                    actions.move_noop += 1;
                 }
-                "update_original_prompt"
-                | "update_original_reporter"
-                | "update_original_priority" => {
-                    if !duplicate_id.is_empty() {
-                        if decision == "update_original_priority" {
-                            service.update_goal_metadata_summary(
+                return Ok(None);
+            }
+            "update_original_prompt" | "update_original_reporter" | "update_original_priority" => {
+                if !duplicate_id.is_empty() {
+                    if decision == "update_original_priority" {
+                        service.update_goal_metadata_summary(
+                            &duplicate_id,
+                            None,
+                            Some(&draft.priority),
+                            None,
+                            None,
+                        )?;
+                    } else {
+                        let prompt =
+                            (decision == "update_original_prompt").then_some(draft.prompt.as_str());
+                        let reporter = (decision == "update_original_reporter")
+                            .then(|| nonempty_import_option(&draft.reporter))
+                            .flatten();
+                        if let Some(reporter) = reporter {
+                            service.update_goal_reporter_summary(&duplicate_id, reporter)?;
+                        }
+                        if prompt.is_some() {
+                            service.edit_latest_goal_round_summary(
                                 &duplicate_id,
                                 None,
-                                Some(&draft.priority),
                                 None,
-                                None,
+                                prompt,
                             )?;
-                        } else {
-                            let prompt = (decision == "update_original_prompt")
-                                .then_some(draft.prompt.as_str());
-                            let reporter = (decision == "update_original_reporter")
-                                .then(|| nonempty_import_option(&draft.reporter))
-                                .flatten();
-                            if let Some(reporter) = reporter {
-                                service.update_goal_reporter_summary(&duplicate_id, reporter)?;
-                            }
-                            if prompt.is_some() {
-                                service.edit_latest_goal_round_summary(
-                                    &duplicate_id,
-                                    None,
-                                    None,
-                                    prompt,
-                                )?;
-                            }
                         }
-                        actions.updated_original += 1;
                     }
-                    return Ok(None);
+                    actions.updated_original += 1;
                 }
-                other => {
-                    return Err(RefineError::InvalidInput(format!(
-                        "unknown duplicate_decision: {other}"
-                    )));
-                }
+                return Ok(None);
+            }
+            other => {
+                return Err(RefineError::InvalidInput(format!(
+                    "unknown duplicate_decision: {other}"
+                )));
             }
         }
     }
@@ -582,6 +450,14 @@ fn feature_reorder_order_from_body(
 enum ImportPersistWorkerError {
     Cancelled,
     Failed(RefineError),
+}
+
+struct ImportPersistContext<'a> {
+    feature_id: Option<&'a str>,
+    registry: &'a FileOperationRegistry,
+    operation_id: &'a str,
+    created_goal_ids: &'a mut Vec<String>,
+    duplicate_actions: &'a mut ImportDuplicateActions,
 }
 
 fn import_operation_cancelled(registry: &FileOperationRegistry, operation_id: &str) -> bool {
@@ -3028,15 +2904,14 @@ impl InProcessWebServer {
         let mut created_goal_ids = Vec::new();
         let mut duplicate_actions = ImportDuplicateActions::default();
         if failures.is_empty() {
-            match self.persist_import_drafts_incrementally(
-                &service,
-                drafts,
-                feature_id.as_deref(),
+            let mut context = ImportPersistContext {
+                feature_id: feature_id.as_deref(),
                 registry,
                 operation_id,
-                &mut created_goal_ids,
-                &mut duplicate_actions,
-            ) {
+                created_goal_ids: &mut created_goal_ids,
+                duplicate_actions: &mut duplicate_actions,
+            };
+            match self.persist_import_drafts_incrementally(&service, drafts, &mut context) {
                 Ok(()) => {}
                 Err(ImportPersistWorkerError::Cancelled) => {
                     rollback_import_goals(&service, &created_goal_ids);
@@ -3084,10 +2959,10 @@ impl InProcessWebServer {
             .iter()
             .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
             .collect::<Vec<_>>();
-        if let Some(feature_id) = feature_id.as_deref() {
-            if let Ok(feature) = service.show_feature_summary(feature_id) {
-                feature_response = feature_import_response(&feature);
-            }
+        if let Some(feature_id) = feature_id.as_deref()
+            && let Ok(feature) = service.show_feature_summary(feature_id)
+        {
+            feature_response = feature_import_response(&feature);
         }
 
         ApiResponse::json(
@@ -3109,13 +2984,9 @@ impl InProcessWebServer {
         &self,
         service: &FileWorkItemService,
         drafts: Vec<ImportDraft>,
-        feature_id: Option<&str>,
-        registry: &FileOperationRegistry,
-        operation_id: &str,
-        created_goal_ids: &mut Vec<String>,
-        duplicate_actions: &mut ImportDuplicateActions,
+        context: &mut ImportPersistContext<'_>,
     ) -> Result<(), ImportPersistWorkerError> {
-        if let Some(feature_id) = feature_id {
+        if let Some(feature_id) = context.feature_id {
             service
                 .show_feature_summary(feature_id)
                 .map_err(ImportPersistWorkerError::Failed)?;
@@ -3123,35 +2994,35 @@ impl InProcessWebServer {
         let total = drafts.len();
         let mut created_drafts = Vec::new();
         for draft in drafts {
-            if import_operation_cancelled(registry, operation_id) {
+            if import_operation_cancelled(context.registry, context.operation_id) {
                 return Err(ImportPersistWorkerError::Cancelled);
             }
             if let Some(goal_id) = persist_import_draft_with_duplicate_decision(
                 service,
                 &draft,
-                feature_id,
-                duplicate_actions,
-                created_goal_ids,
+                context.feature_id,
+                context.duplicate_actions,
+                context.created_goal_ids,
                 &mut created_drafts,
             )
             .map_err(ImportPersistWorkerError::Failed)?
             {
                 let _ = goal_id;
             }
-            let _ = registry.update_progress(
-                operation_id,
+            let _ = context.registry.update_progress(
+                context.operation_id,
                 json!({
                     "message": "Saving import",
-                    "completed": created_goal_ids.len(),
+                    "completed": context.created_goal_ids.len(),
                     "total": total
                 }),
             );
             thread::sleep(Duration::from_millis(5));
         }
-        if import_operation_cancelled(registry, operation_id) {
+        if import_operation_cancelled(context.registry, context.operation_id) {
             return Err(ImportPersistWorkerError::Cancelled);
         }
-        if let Some(feature_id) = feature_id {
+        if let Some(feature_id) = context.feature_id {
             order_feature_dependency_drafts(service, feature_id, &created_drafts)
                 .map_err(ImportPersistWorkerError::Failed)?;
         }
@@ -3258,10 +3129,10 @@ impl InProcessWebServer {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        if let Some(feature_id) = feature_id.as_deref() {
-            if let Ok(feature) = service.show_feature_summary(feature_id) {
-                feature_response = feature_import_response(&feature);
-            }
+        if let Some(feature_id) = feature_id.as_deref()
+            && let Ok(feature) = service.show_feature_summary(feature_id)
+        {
+            feature_response = feature_import_response(&feature);
         }
 
         ApiResponse::json(
@@ -3280,5 +3151,136 @@ impl InProcessWebServer {
                 "feature": feature_response
             }),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals() {
+        let output = json!({
+            "feature": {
+                "name": "Personal Budget App — Product Spec",
+                "description": "created by Plan Mode",
+                "goals": [
+                    {
+                        "name": "Track spending by category",
+                        "prompt": "Let users assign each transaction to a budget category.",
+                        "priority": "medium"
+                    },
+                    {
+                        "name": "Monthly budget overview",
+                        "prompt": "Let users compare month-to-date spending against budget limits.",
+                        "priority": "high"
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
+        let feature = result.feature_destination.unwrap();
+        assert_eq!(feature.name, "Personal Budget App");
+        assert_eq!(feature.description, "");
+        assert_eq!(result.drafts.len(), 2);
+        assert_eq!(result.drafts[0].name, "Track spending by category");
+        assert_eq!(
+            result.drafts[0].prompt,
+            "Let users assign each transaction to a budget category."
+        );
+        assert_eq!(result.drafts[0].reporter, "Product");
+        assert_eq!(result.drafts[1].priority, "high");
+    }
+
+    #[test]
+    fn plan_import_result_reads_embedded_pretty_json_before_text_fallback() {
+        let output = r#"Provider notes before JSON:
+{
+  "feature": {
+    "name": "Smoke AI Plan Feature",
+    "description": "A deterministic product capability planned by the Smoke AI fixture.",
+    "goals": [
+      {
+        "name": "Smoke AI plan goal one",
+        "prompt": "smoke-ai plan prompt one",
+        "priority": "low"
+      }
+    ]
+  }
+}
+Provider notes after JSON."#;
+
+        let result = parse_provider_import_result(output, Some("Product")).unwrap();
+        let feature = result.feature_destination.unwrap();
+        assert_eq!(feature.name, "Smoke AI Plan Feature");
+        assert_eq!(result.drafts.len(), 1);
+        assert_eq!(result.drafts[0].prompt, "smoke-ai plan prompt one");
+    }
+
+    #[test]
+    fn plan_import_result_merges_feature_behavior_and_implementation_goal_arrays() {
+        let output = json!({
+            "feature": {
+                "name": "Budget Alerts",
+                "description": "Alert users when spending nears limits.",
+                "goals": [
+                    {
+                        "name": "Budget threshold alert",
+                        "prompt": "Alert users before a category exceeds its monthly budget.",
+                        "priority": "high"
+                    }
+                ],
+                "implementation_goals": [
+                    {
+                        "name": "Persist alert preferences",
+                        "prompt": "Add a refine model that persists threshold preferences and exposes them through the budget settings API.",
+                        "priority": "medium"
+                    }
+                ],
+                "technical_goals": [
+                    {
+                        "name": "Verify alert trigger coverage",
+                        "prompt": "Add automated tests for below-threshold, threshold-crossing, and disabled-alert cases.",
+                        "priority": "medium"
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
+        assert_eq!(result.drafts.len(), 3);
+        assert_eq!(result.drafts[0].name, "Budget threshold alert");
+        assert_eq!(result.drafts[1].name, "Persist alert preferences");
+        assert_eq!(result.drafts[2].name, "Verify alert trigger coverage");
+        assert!(result.drafts[1].prompt.contains("refine model"));
+        assert!(result.drafts[2].prompt.contains("automated tests"));
+    }
+
+    #[test]
+    fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
+        let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
+        assert!(prompt.contains("feature"));
+        assert!(prompt.contains("implementation_goals"));
+        assert!(prompt.contains("Draft every concrete implementation goal"));
+        assert!(prompt.contains("architecture"));
+        assert!(prompt.contains("durable state"));
+        assert!(prompt.contains("logic and code organization"));
+        assert!(prompt.contains("do not force"));
+        assert!(prompt.contains("natural build order"));
+        assert!(prompt.contains("verification"));
+        assert!(prompt.contains("do not mention Refine"));
+        assert!(prompt.contains("Product Spec"));
+    }
+
+    #[test]
+    fn feature_spec_import_prompt_uses_architecture_lenses() {
+        let prompt = import_extraction_prompt("Build a budget app.", "feature import");
+        assert!(prompt.contains("Plan or feature-spec source"));
+        assert!(prompt.contains("architecture"));
+        assert!(prompt.contains("do not force"));
+        assert!(prompt.contains("natural build order"));
     }
 }

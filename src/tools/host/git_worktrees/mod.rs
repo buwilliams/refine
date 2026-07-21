@@ -117,7 +117,7 @@ impl FileGitWorktreeService {
             "--date=iso-strict",
             "--pretty=format:%H%x1f%cI%x1f%s%x1e",
             "-n",
-            &limit.max(1).min(1000).to_string(),
+            &limit.clamp(1, 1000).to_string(),
         ])?;
         let text = stdout(output)?;
         Ok(text

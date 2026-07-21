@@ -814,20 +814,18 @@ fn normalize_governance(value: &mut Value) {
     if !value.is_object() {
         *value = json!({"product": "", "constitution": "", "rules": []});
     }
-    let configured = value
+    let configured = !value
         .get("product")
         .and_then(|value| value.as_str())
         .unwrap_or("")
         .trim()
         .is_empty()
-        == false
-        && value
+        && !value
             .get("constitution")
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim()
-            .is_empty()
-            == false;
+            .is_empty();
     let rules = normalize_rules(value.get("rules").unwrap_or(&Value::Array(Vec::new())));
     value["product"] = Value::String(
         value

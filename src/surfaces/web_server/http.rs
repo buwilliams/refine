@@ -532,10 +532,9 @@ impl LocalHttpDaemon {
             self.server.runtime_root.as_ref(),
             idempotency_key.as_deref(),
             fingerprint.as_deref(),
-        ) {
-            if let Err(error) = save_idempotency_record(runtime_root, key, fingerprint, &response) {
-                return WireResponse::json(error_response(error));
-            }
+        ) && let Err(error) = save_idempotency_record(runtime_root, key, fingerprint, &response)
+        {
+            return WireResponse::json(error_response(error));
         }
         self.with_request_metric(
             &HttpRequest {

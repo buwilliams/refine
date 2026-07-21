@@ -85,10 +85,7 @@ pub fn process_summary_value_with_chat_sessions(
 }
 
 pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
-    let mut summary = runtime
-        .supervisor
-        .clone()
-        .unwrap_or_else(serde_json::Map::new);
+    let mut summary = runtime.supervisor.clone().unwrap_or_default();
     let pause_state = process_pause_state_from_summary(&summary);
     summary.insert(
         "processes".to_string(),
@@ -116,10 +113,7 @@ pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
 }
 
 pub fn runtime_process_status_value(runtime: &RuntimeProjection) -> Value {
-    let mut summary = runtime
-        .supervisor
-        .clone()
-        .unwrap_or_else(serde_json::Map::new);
+    let mut summary = runtime.supervisor.clone().unwrap_or_default();
     let current_processes = runtime
         .processes
         .iter()

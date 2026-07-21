@@ -878,6 +878,14 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     !path.starts_with("/terminal/") && path != "/project/sync" && path != mcp::MCP_ROUTE
 }
 
+fn node_id_from_cluster_path(path: &str) -> Option<String> {
+    path.strip_prefix("/cluster/nodes/")
+        .and_then(|rest| rest.split('/').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -900,12 +908,4 @@ mod tests {
             "/api/goals/GOAL1/start"
         ));
     }
-}
-
-fn node_id_from_cluster_path(path: &str) -> Option<String> {
-    path.strip_prefix("/cluster/nodes/")
-        .and_then(|rest| rest.split('/').next())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
 }

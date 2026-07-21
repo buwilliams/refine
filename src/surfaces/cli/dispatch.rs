@@ -27,7 +27,7 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
@@ -537,7 +537,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let service = FileActivityService::new(refine_dir_for_target_root(&target_root)?);
             let limit = service.count()?.max(1);
             let Some(entry) = service
-                .query(limit, 0, None, None, None, None, None)?
+                .query(ActivityQuery {
+                    limit,
+                    ..ActivityQuery::default()
+                })?
                 .into_iter()
                 .find(|entry| entry.id == id)
             else {
@@ -589,15 +592,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 return Ok(());
             }
             let entries = FileActivityService::new(refine_dir_for_target_root(&target_root)?)
-                .query(
+                .query(ActivityQuery {
                     limit,
                     offset,
-                    goal_id.as_deref(),
-                    severity.as_deref(),
-                    category.as_deref(),
-                    actor.as_deref(),
-                    Some(&q),
-                )?;
+                    goal_id: goal_id.as_deref(),
+                    severity: severity.as_deref(),
+                    category: category.as_deref(),
+                    actor: actor.as_deref(),
+                    q: Some(&q),
+                })?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"entries": entries})).unwrap()
@@ -615,7 +618,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let entries = if limit == 0 {
                 Vec::new()
             } else {
-                service.query(limit, 0, None, None, None, None, None)?
+                service.query(ActivityQuery {
+                    limit,
+                    ..ActivityQuery::default()
+                })?
             };
             let exported = entries.len();
             println!(
@@ -965,7 +971,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 .unwrap_or_else(|| FileProjectStateStore::new(&refine_dir));
             let snapshot = store.rebuild_projection()?;
             if let Some(cache_dir) = &cache_dir {
-                store.persist_projection_snapshot(&cache_dir, &snapshot)?;
+                store.persist_projection_snapshot(cache_dir, &snapshot)?;
             }
             println!(
                 "{}",
@@ -3055,7 +3061,7 @@ fn delete_goal_note_values(notes: Vec<Value>, note_id: &str) -> RefineResult<Vec
     Ok(next)
 }
 
-fn skipped_target_root(path: &PathBuf) -> bool {
+fn skipped_target_root(path: &Path) -> bool {
     path.as_os_str().is_empty()
 }
 

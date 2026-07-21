@@ -1100,10 +1100,10 @@ impl FileWorkItemService {
                 matches!(goal.goal.status, GoalStatus::Backlog | GoalStatus::Todo)
             };
             if !matches {
-                if !is_terminal_status(&goal.goal.status) {
-                    if let Some(index) = node_ids.iter().position(|id| *id == owner) {
-                        load[index] += 1;
-                    }
+                if !is_terminal_status(&goal.goal.status)
+                    && let Some(index) = node_ids.iter().position(|id| *id == owner)
+                {
+                    load[index] += 1;
                 }
                 continue;
             }
@@ -2186,30 +2186,27 @@ fn bulk_goal_matches_filter(goal: &GoalSummaryProjection, filter: &BulkGoalFilte
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && goal.goal.status.as_str() != status
     {
-        if goal.goal.status.as_str() != status {
-            return false;
-        }
+        return false;
     }
     if let Some(reporter) = filter
         .reporter
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && goal.goal.reporter.as_deref() != Some(reporter)
     {
-        if goal.goal.reporter.as_deref() != Some(reporter) {
-            return false;
-        }
+        return false;
     }
     if let Some(assignee) = filter
         .assignee
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && goal.goal.assignee.as_deref() != Some(assignee)
     {
-        if goal.goal.assignee.as_deref() != Some(assignee) {
-            return false;
-        }
+        return false;
     }
     if let Some(feature) = filter
         .feature
@@ -2225,28 +2222,26 @@ fn bulk_goal_matches_filter(goal: &GoalSummaryProjection, filter: &BulkGoalFilte
             return false;
         }
     }
-    if let Some(min_rounds) = filter.rounds_gte {
-        if goal.goal.round_count < min_rounds {
-            return false;
-        }
+    if let Some(min_rounds) = filter.rounds_gte
+        && goal.goal.round_count < min_rounds
+    {
+        return false;
     }
-    if let Some(max_rounds) = filter.rounds_lte {
-        if goal.goal.round_count > max_rounds {
-            return false;
-        }
+    if let Some(max_rounds) = filter.rounds_lte
+        && goal.goal.round_count > max_rounds
+    {
+        return false;
     }
     if let Some(node) = filter
         .node
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && node != "all"
+        && node != "current"
+        && goal.goal.node_id.as_deref().unwrap_or("default") != node
     {
-        if node != "all"
-            && node != "current"
-            && goal.goal.node_id.as_deref().unwrap_or("default") != node
-        {
-            return false;
-        }
+        return false;
     }
     if let Some(query) = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let query = query.to_lowercase();
@@ -2311,30 +2306,27 @@ fn bulk_feature_matches_filter(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && feature.status.as_str() != status
     {
-        if feature.status.as_str() != status {
-            return false;
-        }
+        return false;
     }
     if let Some(reporter) = filter
         .reporter
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && feature.feature.reporter.as_deref() != Some(reporter)
     {
-        if feature.feature.reporter.as_deref() != Some(reporter) {
-            return false;
-        }
+        return false;
     }
     if let Some(assignee) = filter
         .assignee
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        && feature.feature.assignee.as_deref() != Some(assignee)
     {
-        if feature.feature.assignee.as_deref() != Some(assignee) {
-            return false;
-        }
+        return false;
     }
     if let Some(node) = filter
         .node
