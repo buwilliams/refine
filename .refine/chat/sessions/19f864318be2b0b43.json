@@ -1,0 +1,18 @@
+{
+  "id": "19f864318be2b0b43",
+  "mode": "standalone",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "standalone",
+  "worktree": {
+    "branch": "refine/standalone/19f864318be2b0b43",
+    "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f864318be2b0b43"
+  },
+  "created_at": "2026-07-21T19:59:32Z",
+  "updated_at": "2026-07-21T19:59:32Z",
+  "transcript_events": [],
+  "importable_artifacts": [],
+  "closed": false,
+  "interrupted": false,
+  "interruption_detail": null
+}
