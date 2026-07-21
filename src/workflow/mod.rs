@@ -59,6 +59,7 @@ pub enum WorkflowClaimState {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowClaim {
     pub claim_id: String,
+    #[serde(alias = "gap_id")]
     pub goal_id: String,
     #[serde(default = "default_node_id")]
     pub node_id: String,
@@ -1573,6 +1574,48 @@ mod tests {
             work_items.show_goal_summary("GOAL1").unwrap().goal.status,
             GoalStatus::Todo
         );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_applies_runtime_settings_with_legacy_gap_claims() {
+        let temp_root = unique_temp_dir("automation-legacy-gap-claims");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        fs::create_dir_all(&runtime_root).unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({"agent_cli": "smoke-ai"}))
+            .unwrap();
+        fs::write(
+            runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
+            serde_json::to_vec_pretty(&json!({
+                "paused": [],
+                "claims": [{
+                    "claim_id": "res-legacy",
+                    "gap_id": "GOAL1",
+                    "state": "completed",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z"
+                }],
+                "updated_at": "2026-01-01T00:00:00Z"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        assert_eq!(automation.apply_runtime_settings().unwrap(), 0);
+        let state = automation.load_state().unwrap();
+        assert_eq!(state.policy.provider, "smoke-ai");
+        assert_eq!(state.claims[0].goal_id, "GOAL1");
+        let persisted: Value = serde_json::from_slice(
+            &fs::read(runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(persisted["claims"][0]["goal_id"], "GOAL1");
+        assert!(persisted["claims"][0].get("gap_id").is_none());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
