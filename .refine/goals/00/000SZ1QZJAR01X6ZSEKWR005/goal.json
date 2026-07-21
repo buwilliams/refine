@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T23:25:24Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1QZJAR01X6ZSEKWR005",
+  "name": "When an agent is working on a Goal, the user should have the ability in the web",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T23:25:24Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "When an agent is working on a Goal, the user should have the ability in the web surface to watch the logs in real-time. It should show up in the Toolbar, similar to how the goal Chat works but for logs, like a log tail.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T23:25:24Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-21T23:25:28Z"
+}
