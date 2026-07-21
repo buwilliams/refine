@@ -14,26 +14,45 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T23:16:19Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-21T23:29:29Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QQ8G526TQQ36KWR000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance violations: the candidate is a clean no-op because equivalent Plan Mode Draft Goal behavior is already present and verified on the base commit.\",\"violations\":[]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "No governance violations: the candidate is a clean no-op because equivalent Plan Mode Draft Goal behavior is already present and verified on the base commit.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QQ8G526TQQ36KWR000-round-1"
+      },
+      "governance_message": "No governance violations: the candidate is a clean no-op because equivalent Plan Mode Draft Goal behavior is already present and verified on the base commit.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Plan Mode should also have a \"Draft Goal\" similar to the Standalone tab.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-21T23:29:30Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T23:16:19Z"
+      "rule_state": "passed",
+      "updated": "2026-07-21T23:29:30Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-21T23:28:09Z"
+  "updated": "2026-07-21T23:29:30Z"
 }
