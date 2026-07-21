@@ -16,7 +16,7 @@ It should make the work understandable to both humans and agents: what should be
 
 ## Expected Role
 
-The Goal UI should expose identity, status, priority, reporter, assignee, Feature membership, node ownership, notes, rounds, logs, governance, quality, chat, and workflow actions.
+The Goal UI should expose identity, status, priority, reporter, assignee, Feature membership, node ownership, notes, rounds, implementation reports, logs, governance, quality, chat, and workflow actions.
 
 Current implementation details that matter to intent:
 
@@ -25,6 +25,7 @@ Current implementation details that matter to intent:
 - failed Feature-blocking Goals should explain what they block and log user-visible notices to System;
 - new rounds can be submitted for failed or review states where shared rules allow it;
 - bulk operations should use shared work item behavior and preserve node/Feature constraints.
+- each implemented round should retain a timestamped, plain-language report of what changed, why, and the deterministic verification outcomes; the report should be visible with that round when the Goal opens.
 
 The Goal surface should keep agent work concrete. A Goal without an actionable prompt is too vague for reliable automation.
 

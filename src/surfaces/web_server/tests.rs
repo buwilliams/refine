@@ -607,6 +607,17 @@ fn static_goal_detail_uses_shared_governance_review_state_helpers() {
     assert!(!goals_detail.contains(r#"constitution_state === "pass""#));
 }
 
+#[test]
+fn static_goal_detail_renders_round_implementation_reports() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let goals_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
+
+    assert!(goals_detail.contains("rnd.implementation_report"));
+    assert!(goals_detail.contains(r#"data-testid="goal-implementation-report""#));
+    assert!(goals_detail.contains(r#"data-testid="goal-implementation-report-body""#));
+    assert!(goals_detail.contains("rnd.implementation_reported_at"));
+}
+
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut rest = source;

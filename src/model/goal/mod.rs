@@ -86,6 +86,10 @@ pub struct GoalRound {
     pub created: Timestamp,
     pub updated: Timestamp,
     pub guidance_decision: Option<String>,
+    #[serde(default)]
+    pub implementation_report: Option<String>,
+    #[serde(default)]
+    pub implementation_reported_at: Option<Timestamp>,
     pub governance: Option<RoundGovernance>,
     pub quality: Option<RoundQuality>,
     pub logs: Vec<RoundLogEntry>,
