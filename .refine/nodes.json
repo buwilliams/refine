@@ -4,7 +4,7 @@
       "id": "default",
       "display_name": "Default",
       "created_at": "2026-07-21T19:57:32Z",
-      "updated_at": "2026-07-21T20:11:17Z",
+      "updated_at": "2026-07-21T23:18:07Z",
       "settings": {
         "agent_cli": "codex",
         "agent_hard_cap_seconds": "7200",
@@ -12,7 +12,7 @@
         "agent_limit_pause_seconds": "60",
         "agent_subpath": "",
         "allowed_commands": "",
-        "backlog_promote_after_seconds": "3600",
+        "backlog_promote_after_seconds": "0",
         "branch_name_pattern": "refine/{goal_id}",
         "chat_idle_timeout_seconds": "300",
         "file_browser_ignore_patterns": "node_modules, .git, .refine, run",
