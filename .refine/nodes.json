@@ -4,7 +4,7 @@
       "id": "default",
       "display_name": "Default",
       "created_at": "2026-07-21T19:57:32Z",
-      "updated_at": "2026-07-21T23:18:07Z",
+      "updated_at": "2026-07-21T23:45:57Z",
       "settings": {
         "agent_cli": "codex",
         "agent_hard_cap_seconds": "7200",
@@ -21,7 +21,7 @@
         "parallel_per_node_cap": "2",
         "parallel_per_provider_cap": "2",
         "parallel_per_target_app_cap": "2",
-        "parallel_run_cap": "2",
+        "parallel_run_cap": "4",
         "paused": "0",
         "project_update_pulse_interval_seconds": "300",
         "quality_enabled": "0",
