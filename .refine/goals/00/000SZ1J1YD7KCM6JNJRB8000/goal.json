@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T19:58:16Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1J1YD7KCM6JNJRB8000",
+  "name": "When I tried to change the model I get an error (below), please fix. Save failed",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T19:58:16Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "When I tried to change the model I get an error (below), please fix.\n\nSave failed: failed to parse automation state /home/buddy/projects/refine/run/8082/workflow-automation-state.json: missing field `goal_id` at line 23 column 5\n\nThe fields were restored to the last saved values.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T19:58:16Z"
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-07-21T19:58:16Z"
+}
