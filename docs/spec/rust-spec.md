@@ -805,6 +805,16 @@ Requirements:
 - Every capability emits structured events.
 - System operations have status, progress, timestamps, errors, and owning
   surface.
+- Semantic release preparation and publication use `tools::host::release` from
+  UI and CLI surfaces. Preparation analyzes commits since the prior semantic
+  tag, updates version-bearing files and release documentation in an isolated
+  release worktree, runs deterministic gates, and produces a reviewable branch
+  and commit. Publication is a distinct operation requiring explicit
+  confirmation and synchronized clean `main`; Git, GitHub, credentials,
+  deployment, and verification actions sit behind the fakeable `ReleaseHost`.
+- Release operation requests, progress, agent activity, results, and errors are
+  stored under the runtime root so reconnect, retry, and resume do not depend on
+  browser memory.
 - Logs are queryable from UI and CLI.
 - `doctor` reports daemon, install, OS backend, target app, Git, provider,
   browser, Docker, and storage health.

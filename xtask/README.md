@@ -9,6 +9,8 @@ Commands:
 - `cargo run --manifest-path xtask/Cargo.toml -- api-contract`
 - `cargo run --manifest-path xtask/Cargo.toml -- check-static-assets`
 - `cargo run --manifest-path xtask/Cargo.toml -- runtime-layout`
+- `cargo run --manifest-path xtask/Cargo.toml -- release-plan patch`
+- `cargo run --manifest-path xtask/Cargo.toml -- release-check`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-unit`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-integration`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-rust`

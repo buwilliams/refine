@@ -1002,6 +1002,45 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
+    /// Preview a semantic release without changing files.
+    ReleasePlan {
+        /// Semantic version increment: major, minor, or patch.
+        #[arg(long)]
+        bump: String,
+        /// Git checkout to release.
+        #[arg(long, default_value = ".")]
+        repo_root: PathBuf,
+        /// Runtime directory where durable release operations are stored.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
+    /// Prepare a reviewable semantic-release branch and commit.
+    ReleasePrepare {
+        /// Semantic version increment: major, minor, or patch.
+        #[arg(long)]
+        bump: String,
+        /// Git checkout to release.
+        #[arg(long, default_value = ".")]
+        repo_root: PathBuf,
+        /// Runtime directory where durable release operations are stored.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
+    /// Publish a reviewed release candidate. Requires explicit --confirm.
+    ReleasePublish {
+        /// JSON file containing the PreparedRelease candidate returned by preparation.
+        #[arg(long)]
+        candidate: PathBuf,
+        /// Confirm creation and push of the tag and external GitHub publication.
+        #[arg(long)]
+        confirm: bool,
+        /// Git checkout whose synchronized main will be published.
+        #[arg(long, default_value = ".")]
+        repo_root: PathBuf,
+        /// Runtime directory where durable release operations are stored.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
     /// Inspect the running source checkout and its configured upstream branch.
     SourceStatus {
         /// Refine source checkout; auto-discovered when omitted.

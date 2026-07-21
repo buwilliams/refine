@@ -154,6 +154,29 @@ impl InProcessWebServer {
             return self.handle_source_promote();
         }
 
+        if request.method == "GET" && request.path == "/system/releases" {
+            return self.handle_releases_status();
+        }
+
+        if request.method == "POST" && request.path == "/system/releases/plan" {
+            return self.handle_release_plan(request);
+        }
+
+        if request.method == "POST" && request.path == "/system/releases/prepare" {
+            return self.handle_release_prepare(request);
+        }
+
+        if request.method == "POST" && request.path == "/system/releases/publish" {
+            return self.handle_release_publish(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/system/releases/")
+            && request.path.ends_with("/retry")
+        {
+            return self.handle_release_retry(request);
+        }
+
         if request.method == "POST" && request.path == "/system/rollback" {
             return self.handle_install_rollback();
         }
