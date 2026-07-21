@@ -515,25 +515,72 @@ impl WorkflowEngine {
             .filter(|claim| claim.state == WorkflowClaimState::Claimed)
             .map(|claim| claim.claim_id.clone())
             .collect::<Vec<_>>();
-        let mut results = Vec::new();
+        let mut prepared = Vec::with_capacity(claim_ids.len());
+        let mut first_error = None;
         for claim_id in claim_ids {
-            let execution_id = self.start_claim(&claim_id)?;
-            match self.execute_started_claim(&claim_id, &execution_id) {
-                Ok(result) => results.push(result),
+            let preparation = self
+                .start_claim(&claim_id)
+                .and_then(|execution_id| self.prepare_started_claim(&claim_id, &execution_id));
+            match preparation {
+                Ok(ctx) => prepared.push((claim_id, ctx)),
                 Err(error) => {
                     let _ = self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
-                    return Err(error);
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
                 }
             }
+        }
+
+        let mut results = Vec::new();
+        std::thread::scope(|scope| {
+            let handles = prepared
+                .into_iter()
+                .map(|(claim_id, ctx)| {
+                    (
+                        claim_id,
+                        scope.spawn(move || self.execute_prepared_claim(ctx)),
+                    )
+                })
+                .collect::<Vec<_>>();
+            for (claim_id, handle) in handles {
+                let outcome = handle.join().unwrap_or_else(|_| {
+                    Err(RefineError::Conflict(format!(
+                        "workflow worker panicked for claim {claim_id}"
+                    )))
+                });
+                match outcome {
+                    Ok(result) => {
+                        if let Err(error) =
+                            self.mark_claim_state(&claim_id, WorkflowClaimState::Completed)
+                        {
+                            if first_error.is_none() {
+                                first_error = Some(error);
+                            }
+                        } else {
+                            results.push(result);
+                        }
+                    }
+                    Err(error) => {
+                        let _ = self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
+                    }
+                }
+            }
+        });
+        if let Some(error) = first_error {
+            return Err(error);
         }
         Ok(results)
     }
 
-    fn execute_started_claim(
-        &self,
+    fn prepare_started_claim<'a>(
+        &'a self,
         claim_id: &str,
         execution_id: &str,
-    ) -> RefineResult<WorkflowStepResult> {
+    ) -> RefineResult<WorkflowContext<'a>> {
         let claim = self.claim_by_id(claim_id)?;
         let target_root = self.target_root.as_ref().ok_or_else(|| {
             RefineError::InvalidInput(
@@ -543,7 +590,9 @@ impl WorkflowEngine {
         let refine_dir = prepare_refine_dir(target_root)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
-            self.runtime_root.join("cache"),
+            self.runtime_root
+                .join("cache/workflow")
+                .join(&claim.claim_id),
         );
         let round_idx = ensure_workflow_round(&work_items, &claim.goal_id)?;
         let settings =
@@ -557,7 +606,27 @@ impl WorkflowEngine {
             settings,
             work_items,
         );
-        self.advance_claim_behaviors(&mut ctx)?;
+        match WorkflowTodo.advance(&mut ctx)? {
+            WorkflowAdvanceOutcome::Transition {
+                to: GoalStatus::InProgress,
+                ..
+            } => Ok(ctx),
+            WorkflowAdvanceOutcome::Noop { reason }
+            | WorkflowAdvanceOutcome::Blocked { reason }
+            | WorkflowAdvanceOutcome::Failed { reason }
+            | WorkflowAdvanceOutcome::Completed { reason, .. }
+            | WorkflowAdvanceOutcome::Transition { reason, .. } => {
+                Err(RefineError::Conflict(reason))
+            }
+        }
+    }
+
+    fn execute_prepared_claim(
+        &self,
+        mut ctx: WorkflowContext<'_>,
+    ) -> RefineResult<WorkflowStepResult> {
+        self.advance_claim_behaviors(&mut ctx, GoalStatus::InProgress)?;
+        let execution_id = ctx.execution_id.clone();
         let branch = ctx
             .branch
             .clone()
@@ -578,11 +647,10 @@ impl WorkflowEngine {
             .as_str()
             .to_string();
 
-        self.mark_claim_state(&ctx.claim_id, WorkflowClaimState::Completed)?;
         Ok(WorkflowStepResult {
             claim_id: ctx.claim_id,
             goal_id: ctx.goal_id,
-            execution_id: execution_id.to_string(),
+            execution_id,
             provider: ctx.provider,
             branch,
             commit,
@@ -592,16 +660,18 @@ impl WorkflowEngine {
         })
     }
 
-    fn advance_claim_behaviors(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<()> {
-        let todo = WorkflowTodo;
+    fn advance_claim_behaviors(
+        &self,
+        ctx: &mut WorkflowContext<'_>,
+        mut current: GoalStatus,
+    ) -> RefineResult<()> {
         let implementation = WorkflowImplementation;
         let ready_merge = WorkflowReadyMerge;
         let build = WorkflowBuild;
         let qa = WorkflowQa;
         let review = WorkflowReview;
-        let behaviors: [&dyn WorkflowBehavior; 6] =
-            [&todo, &implementation, &ready_merge, &build, &qa, &review];
-        let mut current = GoalStatus::Todo;
+        let behaviors: [&dyn WorkflowBehavior; 5] =
+            [&implementation, &ready_merge, &build, &qa, &review];
         loop {
             let Some(behavior) = behaviors
                 .iter()
@@ -1821,6 +1891,120 @@ mod tests {
             )
             .unwrap();
         assert!(claim_automation.start_claim(&second_claim).is_err());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_executes_eligible_claims_in_parallel() {
+        let temp_root = unique_temp_dir("automation-parallel-execution");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let marker_root = temp_root.join("parallel-markers");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&marker_root).unwrap();
+        fs::write(
+            target_root.join("app.py"),
+            "def health():\n    return 'ok'\n",
+        )
+        .unwrap();
+        git(
+            &target_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&target_root, &["add", "app.py"]).unwrap();
+        git(&target_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            format!(
+                "#!/bin/sh\n\
+                 marker_root='{}'\n\
+                 touch \"$marker_root/$(basename \"$PWD\")\"\n\
+                 attempt=0\n\
+                 while [ \"$(find \"$marker_root\" -type f | wc -l)\" -lt 2 ]; do\n\
+                   attempt=$((attempt + 1))\n\
+                   [ \"$attempt\" -ge 500 ] && exit 42\n\
+                   sleep 0.01\n\
+                 done\n\
+                 printf '%s\\n' 'parallel agent completed' > agent.txt\n\
+                 printf '%s\\n' 'smoke-ai parallel goal-agent response'\n",
+                marker_root.display()
+            ),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        for goal_id in ["GOAL1", "GOAL2"] {
+            work_items
+                .create_goal_summary(goal_id, Some(goal_id))
+                .unwrap();
+            work_items
+                .append_goal_round_summary(goal_id, "Reporter", "Prompt")
+                .unwrap();
+            work_items
+                .transition_goal_status(goal_id, GoalStatus::Todo)
+                .unwrap();
+        }
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "parallel_run_cap": 2,
+                "parallel_per_node_cap": 2,
+                "parallel_per_provider_cap": 2,
+                "parallel_per_target_app_cap": 2,
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let result = automation.evaluate_workflow().unwrap();
+        assert_eq!(
+            result
+                .steps
+                .iter()
+                .map(|step| step.goal_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["GOAL1", "GOAL2"]
+        );
+        assert_eq!(fs::read_dir(&marker_root).unwrap().count(), 2);
+        for goal_id in ["GOAL1", "GOAL2"] {
+            assert_eq!(
+                work_items.show_goal_summary(goal_id).unwrap().goal.status,
+                GoalStatus::Review
+            );
+        }
+        assert!(
+            automation
+                .load_state()
+                .unwrap()
+                .claims
+                .iter()
+                .all(|claim| claim.state == WorkflowClaimState::Completed)
+        );
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
 
         fs::remove_dir_all(temp_root).unwrap();
     }
