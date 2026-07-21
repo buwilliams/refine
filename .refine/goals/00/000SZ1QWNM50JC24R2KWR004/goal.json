@@ -1,0 +1,39 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-21T23:22:14Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1QWNM50JC24R2KWR004",
+  "name": "Add minimal explanation Governance and Quality tabs that explains how those syst",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-21T23:22:14Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Add minimal explanation Governance and Quality tabs that explains how those systems work so that the user doesn't need to wonder what will happen when they update those areas of the refine config.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-21T23:22:14Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-21T23:22:17Z"
+}
