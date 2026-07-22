@@ -243,3 +243,11 @@ Effort: High (1 milestone)
 Milestones started: UI-first agent-assisted semantic releases.
 
 Semantic delivery became an explicit two-phase workflow in System: users preview major, minor, or patch versions, then queue a normal Goal whose configured agent prepares the reviewable change in the standard Goal-managed worktree and approval path. Shared release services persist the trusted plan and Goal identity for UI and CLI callers, while publication remains separately confirmed and resolves only that server-side preparation record. Publication preflights clean synchronized main on its configured upstream, accepts the approved candidate through normal merge ancestry, tags merged main, resumes idempotently across tag, GitHub release, and delivery stages, and verifies the final remote tag and release URL without discarding review edits.
+
+## Day 32: 2026-06-13 (Saturday)
+
+Effort: Extreme (38 commits, 6 milestones)
+
+Milestones started: shared Plan-to-Goal drafting; parallel out-of-daemon workflow execution; Refine development and update controls; implementation evidence and Jira export; System and Goal log diagnostics; workflow feedback polish.
+
+Agent work became more capable and observable across the product: Plan Mode can draft a single Goal through the shared browser, CLI, API, and MCP path, while eligible Goal workflows run in parallel outside the daemon with live cap changes, responsive web requests, restart recovery, and interrupted-run failure evidence. Refine-on-Refine controls now distinguish development configuration, expose safe source-update status and refresh actions, and retain compatibility and recovery coverage. Goal creation can promote work immediately, governance and Quality settings explain their workflow effects, completed rounds retain implementation reports, and a shared Jira CSV export carries Goal, commit, governance, and Quality evidence across every surface. System activity gained concrete diagnostic details, and users can follow chronologically ordered live Goal logs from the toolbar without leaving the work they are reviewing.
