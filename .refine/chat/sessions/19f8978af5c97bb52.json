@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:54:58Z",
+  "updated_at": "2026-07-22T11:59:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -432,6 +432,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Four active recovery rounds remain and all are still moving: Jira is adding the production-path operation evidence, inline authoring is compiling the shared create/dedup refactor, supervisor recovery is revising its agent/claim transaction path, and Quality core is implementing migration and supervised evidence handling. No new queue items have been injected."
+    },
+    {
+      "created_at": "2026-07-22T11:59:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784721572264-62",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The four active agents are in focused implementation/test loops with fresh output—no idle process exceeds the stall threshold. The two downstream Quality rounds remain documented but paused, preventing overlapping rewrites while the core migration/evidence contract is still changing."
     }
   ],
   "queue_dispatching": true,
