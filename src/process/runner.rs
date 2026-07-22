@@ -2,8 +2,10 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::model::log::LogEntry;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor,
@@ -15,14 +17,17 @@ use crate::process::supervisor::operations::{
 };
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
 use crate::tools::product::supervisor_agent::FileSupervisorAgentService;
+use crate::tools::product::work_items::BulkGoalSelection;
 use crate::workflow::WorkflowEngine;
 
 pub const WORKFLOW_RUNNER: &str = "workflow";
 pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
+pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
@@ -33,6 +38,15 @@ const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 #[derive(Clone, Debug)]
 pub struct FileRunnerWorkerService {
     pub runtime_root: PathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct JiraExportOperationRequest {
+    refine_dir: PathBuf,
+    target_root: PathBuf,
+    selection: BulkGoalSelection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recovery_of: Option<String>,
 }
 
 impl FileRunnerWorkerService {
@@ -101,6 +115,100 @@ impl FileRunnerWorkerService {
             }
         }
     }
+
+    pub fn queue_jira_export(
+        &self,
+        refine_dir: &Path,
+        target_root: &Path,
+        selection: BulkGoalSelection,
+    ) -> RefineResult<OperationHandle> {
+        self.queue_jira_export_request(JiraExportOperationRequest {
+            refine_dir: refine_dir.to_path_buf(),
+            target_root: target_root.to_path_buf(),
+            selection,
+            recovery_of: None,
+        })
+    }
+
+    pub fn retry_jira_export(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        let interrupted = registry.status(operation_id)?;
+        if interrupted.owner != "goals:jira-export"
+            || !matches!(interrupted.state, OperationState::Interrupted)
+        {
+            return Err(RefineError::Conflict(
+                "Only interrupted Jira export operations can be recovered".to_string(),
+            ));
+        }
+        if let Some(existing) = registry.recover()?.into_iter().find(|operation| {
+            operation.owner == "goals:jira-export"
+                && operation.request.get("recovery_of").and_then(Value::as_str)
+                    == Some(operation_id)
+        }) {
+            return Ok(existing);
+        }
+        let mut request = serde_json::from_value::<JiraExportOperationRequest>(interrupted.request)
+            .map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to recover Jira export request: {error}"
+                ))
+            })?;
+        request.recovery_of = Some(operation_id.to_string());
+        self.queue_jira_export_request(request)
+    }
+
+    fn queue_jira_export_request(
+        &self,
+        request: JiraExportOperationRequest,
+    ) -> RefineResult<OperationHandle> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        let operation = registry.register_with_request(
+            "goals:jira-export",
+            serde_json::to_value(&request).map_err(|error| {
+                RefineError::Serialization(format!("failed to encode Jira export request: {error}"))
+            })?,
+        )?;
+        registry.update_progress(
+            &operation.id,
+            json!({
+                "stage": "queued",
+                "message": "Waiting for the Jira export worker",
+                "completed": 0,
+                "total": 0
+            }),
+        )?;
+        let operation = registry.status(&operation.id)?;
+        #[cfg(test)]
+        {
+            let runtime_root = self.runtime_root.clone();
+            let operation_id = operation.id.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(10));
+                let _ = run_jira_export_operation(&runtime_root, &operation_id);
+            });
+            return Ok(operation);
+        }
+        #[cfg(not(test))]
+        {
+            let executable = std::env::current_exe().map_err(|error| {
+                RefineError::Io(format!("failed to locate runner executable: {error}"))
+            })?;
+            let spec = jira_export_worker_spec(&executable, &self.runtime_root, &operation.id);
+            match FileProcessSupervisor::new(&self.runtime_root).launch(spec) {
+                Ok(_) => registry.status(&operation.id),
+                Err(error) => {
+                    let _ = registry.fail_with_error(
+                        &operation.id,
+                        json!({
+                            "code": "runner_launch_failed",
+                            "message": error.to_string()
+                        }),
+                    );
+                    Err(error)
+                }
+            }
+        }
+    }
 }
 
 pub fn run_worker(
@@ -121,6 +229,12 @@ pub fn run_worker(
                 RefineError::InvalidInput("project-sync worker requires --operation-id".to_string())
             })?;
             run_project_sync_operation(&runtime_root, &target_root, &operation_id)
+        }
+        JIRA_EXPORT_RUNNER => {
+            let operation_id = operation_id.ok_or_else(|| {
+                RefineError::InvalidInput("jira-export worker requires --operation-id".to_string())
+            })?;
+            run_jira_export_operation(&runtime_root, &operation_id)
         }
         _ => unreachable!(),
     }
@@ -331,6 +445,163 @@ fn run_project_sync_operation(
     }
 }
 
+fn run_jira_export_operation(runtime_root: &Path, operation_id: &str) -> RefineResult<()> {
+    let registry = FileOperationRegistry::new(runtime_root);
+    let operation = registry.status(operation_id)?;
+    if operation.owner != "goals:jira-export" {
+        return Err(RefineError::InvalidInput(format!(
+            "Operation {operation_id} is not a Jira export"
+        )));
+    }
+    if matches!(operation.state, OperationState::Cancelled) {
+        return Ok(());
+    }
+    let request = match serde_json::from_value::<JiraExportOperationRequest>(operation.request) {
+        Ok(request) => request,
+        Err(error) => {
+            let error = RefineError::Serialization(format!(
+                "failed to decode Jira export request: {error}"
+            ));
+            let _ = registry.fail_with_error(
+                operation_id,
+                json!({
+                    "code": "jira_export_request_invalid",
+                    "message": error.to_string()
+                }),
+            );
+            return Err(error);
+        }
+    };
+    let mut last_stage = String::new();
+    let result = FileGoalExportService::with_runtime_root(
+        request.refine_dir,
+        request.target_root,
+        runtime_root,
+    )
+    .with_operation_id(operation_id)
+    .export_bulk_jira_csv_with_progress(&request.selection, |message, completed, total| {
+        ensure_jira_export_active(&registry, operation_id)?;
+        let stage = match message {
+            "Loading selected Goal evidence" => "load-goals",
+            "Looking up commit evidence" => "commit-evidence",
+            "Building Jira CSV" => "build-csv",
+            _ => "export",
+        };
+        registry.update_progress(
+            operation_id,
+            json!({
+                "stage": stage,
+                "message": message,
+                "completed": completed,
+                "total": total
+            }),
+        )?;
+        if last_stage != stage {
+            last_stage = stage.to_string();
+            append_jira_export_log(
+                &registry,
+                operation_id,
+                "info",
+                message,
+                json!({"stage": stage, "completed": completed, "total": total}),
+            )?;
+        }
+        Ok(())
+    });
+
+    match result {
+        Ok(export) => {
+            ensure_jira_export_active(&registry, operation_id)?;
+            registry.update_progress(
+                operation_id,
+                json!({
+                    "stage": "complete",
+                    "message": "Jira CSV ready",
+                    "completed": export.goal_count,
+                    "total": export.goal_count
+                }),
+            )?;
+            append_jira_export_log(
+                &registry,
+                operation_id,
+                "info",
+                "Jira CSV export completed",
+                json!({
+                    "goal_count": export.goal_count,
+                    "commit_count": export.commit_count,
+                    "filename": export.filename
+                }),
+            )?;
+            registry.finish_with_result(
+                operation_id,
+                OperationState::Succeeded,
+                json!({"http_status": 200, "export": export}),
+            )?;
+            Ok(())
+        }
+        Err(_error) if jira_export_cancelled(&registry, operation_id) => Ok(()),
+        Err(error) => {
+            let _ = append_jira_export_log(
+                &registry,
+                operation_id,
+                "error",
+                "Jira CSV export failed",
+                json!({"message": error.to_string()}),
+            );
+            let _ = registry.fail_with_error(
+                operation_id,
+                json!({
+                    "code": "jira_export_failed",
+                    "message": error.to_string()
+                }),
+            );
+            Err(error)
+        }
+    }
+}
+
+fn ensure_jira_export_active(
+    registry: &FileOperationRegistry,
+    operation_id: &str,
+) -> RefineResult<()> {
+    if jira_export_cancelled(registry, operation_id) {
+        return Err(RefineError::Conflict(
+            "Jira export operation was cancelled".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn jira_export_cancelled(registry: &FileOperationRegistry, operation_id: &str) -> bool {
+    registry
+        .status(operation_id)
+        .map(|operation| matches!(operation.state, OperationState::Cancelled))
+        .unwrap_or(false)
+}
+
+fn append_jira_export_log(
+    registry: &FileOperationRegistry,
+    operation_id: &str,
+    severity: &str,
+    message: &str,
+    details: Value,
+) -> RefineResult<()> {
+    registry.append_log(
+        operation_id,
+        LogEntry {
+            datetime: String::new(),
+            severity: severity.to_string(),
+            category: "jira-export".to_string(),
+            message: message.to_string(),
+            details: details.as_object().cloned(),
+            actions: Vec::new(),
+            actor: Some("jira-export-worker".to_string()),
+            goal_id: None,
+        },
+    )?;
+    Ok(())
+}
+
 fn refresh_projection(
     runtime_root: &Path,
     target_root: &Path,
@@ -406,6 +677,20 @@ fn project_sync_worker_spec(
     )
 }
 
+fn jira_export_worker_spec(
+    executable: &Path,
+    runtime_root: &Path,
+    operation_id: &str,
+) -> ManagedProcessSpec {
+    runner_worker_spec(
+        executable,
+        runtime_root,
+        JIRA_EXPORT_RUNNER,
+        None,
+        Some(operation_id),
+    )
+}
+
 fn runner_worker_spec(
     executable: &Path,
     runtime_root: &Path,
@@ -454,7 +739,7 @@ fn runner_worker_spec(
 
 fn validate_worker_kind(worker_kind: &str, allow_one_shot: bool) -> RefineResult<()> {
     if matches!(worker_kind, WORKFLOW_RUNNER | GIT_SYNC_RUNNER)
-        || (allow_one_shot && worker_kind == PROJECT_SYNC_RUNNER)
+        || (allow_one_shot && matches!(worker_kind, PROJECT_SYNC_RUNNER | JIRA_EXPORT_RUNNER))
     {
         return Ok(());
     }
@@ -531,5 +816,12 @@ mod tests {
                 .map(|limits| limits.kill_on_parent_exit),
             Some(true)
         );
+
+        let jira_spec =
+            jira_export_worker_spec(Path::new("/opt/refine"), Path::new("/tmp/run/8082"), "OP2");
+        assert_eq!(jira_spec.owner, ProcessOwner::Runner);
+        assert_eq!(jira_spec.metadata["worker_kind"], JIRA_EXPORT_RUNNER);
+        assert_eq!(jira_spec.metadata["operation_id"], "OP2");
+        assert!(!jira_spec.args.iter().any(|arg| arg == "--target-root"));
     }
 }

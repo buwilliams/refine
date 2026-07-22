@@ -1187,6 +1187,11 @@ impl FileWorkItemService {
         })
     }
 
+    pub fn select_bulk_goal_ids(&self, selection: &BulkGoalSelection) -> RefineResult<Vec<String>> {
+        let (goals, _) = self.select_bulk_goal_summaries(selection, false)?;
+        Ok(goals.into_iter().map(|goal| goal.goal.id).collect())
+    }
+
     pub fn bulk_delete_goals(
         &self,
         selection: BulkGoalSelection,

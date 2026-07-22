@@ -348,13 +348,13 @@ Implementation Internals (for e2e testing)
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab], #goal-log-tail, #btn-goal-log-refresh
 		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
 		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
-		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), table header sort controls
+		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), #bulk-export-jira, table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)
 	API surface (grouped; :id = path param)
 		Project/app: /api/project/status|attach|path|directories|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions
 		Nodes/cluster: /api/nodes(/activate|/copy-settings|/transfer-goals), /api/cluster, /api/cluster/nodes, /api/reporters, /api/reporters/:id/merge
-		Goals: /api/goals, /api/goals/:id, /api/goals/:id/rounds(/latest), /api/goals/:id/approve|cancel|retry-quality|retry-merge, /api/goals/bulk, /api/goals/bulk/delete
+		Goals: /api/goals, /api/goals/:id, /api/goals/:id/rounds(/latest), /api/goals/:id/approve|cancel|retry-quality|retry-merge, /api/goals/bulk, /api/goals/bulk/delete, /api/goals/export/jira(/:operation_id/retry)
 		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/goals/:id(/reorder), /api/features/:id/goals/bulk
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
 		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/checks|/screenshots), /api/guidance
@@ -366,5 +366,5 @@ Implementation Internals (for e2e testing)
 	Testing notes
 		Prefer waiting on SSE-driven DOM updates or button busy-state clearing over fixed sleeps
 		Destructive actions (Delete, Hard reset, Undo, bulk delete) route through danger modalConfirm — assert the confirm dialog, then the okLabel button
-		Long ops (import persist, bulk, cache rebuild) return an operation; poll /api/operations/:id; UI shows progress and supports Cancel/Hide
+		Long ops (import persist, bulk, Jira export, cache rebuild) return an operation; poll /api/operations/:id; UI shows progress and supports Cancel/Hide; Jira export resumes after reload and retries interrupted work
 		Per repo guidance: do not run mutating endpoints against a real refine clone in tests — use a temp/throwaway project

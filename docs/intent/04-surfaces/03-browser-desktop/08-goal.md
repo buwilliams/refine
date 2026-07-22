@@ -26,7 +26,7 @@ Current implementation details that matter to intent:
 - new rounds can be submitted for failed or review states where shared rules allow it;
 - bulk operations should use shared work item behavior and preserve node/Feature constraints.
 - each implemented round should retain a timestamped, plain-language report of what changed, why, and the deterministic verification outcomes; the report should be visible with that round when the Goal opens.
-- Goal actions should export Jira-importable SOC 2 evidence containing the request, implementation reports, review outcomes, notes, and exact commit range without requiring users to reconstruct delivery history manually.
+- Goals bulk actions should export all or a selected subset as Jira-importable SOC 2 evidence containing each request, implementation reports, review outcomes, notes, and exact commit range without requiring users to reconstruct delivery history manually. The export should run as a visible, cancellable operation that survives page reloads and can recover after daemon interruption.
 
 The Goal surface should keep agent work concrete. A Goal without an actionable prompt is too vague for reliable automation.
 

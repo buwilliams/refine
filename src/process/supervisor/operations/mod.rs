@@ -42,6 +42,8 @@ pub struct OperationHandle {
     pub owner: String,
     pub state: OperationState,
     #[serde(default = "empty_object")]
+    pub request: Value,
+    #[serde(default = "empty_object")]
     pub progress: Value,
     #[serde(default = "empty_object")]
     pub result: Value,
@@ -117,6 +119,28 @@ impl FileOperationRegistry {
             }
         }
         Ok(interrupted)
+    }
+
+    pub fn register_with_request(
+        &self,
+        owner: &str,
+        request: Value,
+    ) -> RefineResult<OperationHandle> {
+        let handle = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "info", "Operation registered", None),
+        )?;
+        Ok(handle)
     }
 
     pub fn append_log(&self, operation_id: &str, mut entry: LogEntry) -> RefineResult<LogEntry> {
@@ -301,20 +325,7 @@ impl FileOperationRegistry {
 
 impl OperationRegistry for FileOperationRegistry {
     fn register(&self, owner: &str) -> RefineResult<OperationHandle> {
-        let handle = OperationHandle {
-            id: new_operation_id(),
-            owner: owner.to_string(),
-            state: OperationState::Running,
-            progress: empty_object(),
-            result: empty_object(),
-            error: None,
-        };
-        self.write(&handle)?;
-        self.append_log(
-            &handle.id,
-            operation_log_entry(&handle, "info", "Operation registered", None),
-        )?;
-        Ok(handle)
+        self.register_with_request(owner, empty_object())
     }
 
     fn status(&self, operation_id: &str) -> RefineResult<OperationHandle> {

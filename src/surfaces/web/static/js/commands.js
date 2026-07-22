@@ -441,6 +441,15 @@ registerCommand({
 });
 
 registerCommand({
+  id: "goals.bulk.export_jira",
+  title: "Bulk: export selected Goals for Jira",
+  group: "Goals",
+  aliases: ["bulk-export-jira", "export-jira"],
+  visible: () => state.currentRoute === "goals",
+  run: ({ button } = {}) => exportSelectedGoalsForJira({ button }),
+});
+
+registerCommand({
   id: "goals.bulk.status",
   title: "Bulk: set selected Goal status",
   group: "Goals",

@@ -638,6 +638,17 @@ impl InProcessWebServer {
             return self.handle_goal_bulk_delete(request);
         }
 
+        if request.method == "POST" && request.path == "/work/goals/export/jira" {
+            return self.handle_goals_jira_export(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/goals/export/jira/")
+            && request.path.ends_with("/retry")
+        {
+            return self.handle_goals_jira_export_retry(request);
+        }
+
         if request.method == "POST" && request.path == "/work/features" {
             return self.handle_feature_create(request);
         }

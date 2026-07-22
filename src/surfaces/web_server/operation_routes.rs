@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
-use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
@@ -227,7 +227,12 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        match FileOperationRegistry::new(runtime_root).cancel(operation_id) {
+        let registry = FileOperationRegistry::new(runtime_root);
+        if let Err(error) = registry.status(operation_id) {
+            return error_response(error);
+        }
+        terminate_operation_processes(runtime_root, operation_id);
+        match registry.cancel(operation_id) {
             Ok(operation) => {
                 let operation = operation_response(operation);
                 if let Err(error) = self.current_projection_with_runtime() {
@@ -830,6 +835,32 @@ impl InProcessWebServer {
             );
         Ok(value)
     }
+}
+
+fn terminate_operation_processes(runtime_root: &std::path::Path, operation_id: &str) {
+    let supervisor = FileProcessSupervisor::new(runtime_root);
+    let Ok(processes) = supervisor.list() else {
+        return;
+    };
+    for process in processes
+        .iter()
+        .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+    {
+        let _ = supervisor.request_termination(&process.id, "terminate");
+    }
+}
+
+fn process_operation_id(process: &ManagedProcess) -> Option<String> {
+    process
+        .details
+        .as_deref()
+        .and_then(|details| serde_json::from_str::<Value>(details).ok())
+        .and_then(|details| {
+            details
+                .get("operation_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
 }
 
 fn workflow_retry_response(automation: &WorkflowEngine, execution_id: &str) -> ApiResponse {

@@ -466,6 +466,11 @@ async function waitForBackgroundOperation(operationOrId, {
       err.code = "operation_cancelled";
       throw err;
     }
+    if (operation.status === "interrupted") {
+      const err = new Error("Background operation was interrupted and can be recovered");
+      err.code = "operation_interrupted";
+      throw err;
+    }
     if (Date.now() - started > timeoutMs) {
       throw new Error("Background operation timed out");
     }

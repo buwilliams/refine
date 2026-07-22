@@ -147,6 +147,158 @@ function _selectionCountText(noun = "selected") {
   return `${selectedCount} explicitly ${noun}`;
 }
 
+const GOALS_JIRA_EXPORT_OPERATION_KEY = "refine_goals_jira_export_operation";
+let goalsJiraExportPollOperationId = "";
+let goalsJiraExportPollPromise = null;
+
+function readGoalsJiraExportOperation() {
+  try {
+    const raw = localStorage.getItem(GOALS_JIRA_EXPORT_OPERATION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const operationId = String(parsed?.operationId || "").trim();
+    const startedAt = Number(parsed?.startedAt || 0);
+    if (!operationId || (startedAt && Date.now() - startedAt > 12 * 60 * 60 * 1000)) {
+      localStorage.removeItem(GOALS_JIRA_EXPORT_OPERATION_KEY);
+      return null;
+    }
+    return { operationId, startedAt };
+  } catch {
+    localStorage.removeItem(GOALS_JIRA_EXPORT_OPERATION_KEY);
+    return null;
+  }
+}
+
+function writeGoalsJiraExportOperation(operationId) {
+  if (!operationId) {
+    localStorage.removeItem(GOALS_JIRA_EXPORT_OPERATION_KEY);
+    return;
+  }
+  localStorage.setItem(GOALS_JIRA_EXPORT_OPERATION_KEY, JSON.stringify({
+    operationId,
+    startedAt: Date.now(),
+  }));
+}
+
+function setGoalsJiraExportButtonLoading(active, message = "Exporting…") {
+  const button = $("#bulk-export-jira");
+  if (!button) return;
+  button.disabled = !!active;
+  button.textContent = active ? message : "Export for Jira";
+}
+
+function downloadGoalsJiraExport(payload) {
+  if (!payload?.csv) throw new Error("Jira export did not return CSV content");
+  const blob = new Blob(
+    [payload.csv],
+    { type: payload.content_type || "text/csv;charset=utf-8" },
+  );
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = payload.filename || "refine-goals-jira.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  toast(
+    `Exported ${payload.goal_count} Goal${payload.goal_count === 1 ? "" : "s"} for Jira`,
+    "success",
+  );
+}
+
+async function waitForGoalsJiraExportOperation(operationId, allowRecovery = true) {
+  if (goalsJiraExportPollOperationId === operationId && goalsJiraExportPollPromise) {
+    return await goalsJiraExportPollPromise;
+  }
+  goalsJiraExportPollOperationId = operationId;
+  goalsJiraExportPollPromise = waitForBackgroundOperation(operationId, {
+    onProgress: (progress) => {
+      const message = String(progress?.message || "Exporting…").trim();
+      setGoalsJiraExportButtonLoading(true, message);
+    },
+  });
+  try {
+    return await goalsJiraExportPollPromise;
+  } catch (error) {
+    if (allowRecovery && error?.code === "operation_interrupted") {
+      const recovered = await api(
+        "POST",
+        `/api/goals/export/jira/${encodeURIComponent(operationId)}/retry`,
+        {},
+      );
+      const recoveredId = recovered?.operation?.id;
+      if (!recoveredId) throw error;
+      writeGoalsJiraExportOperation(recoveredId);
+      goalsJiraExportPollOperationId = "";
+      goalsJiraExportPollPromise = null;
+      return await waitForGoalsJiraExportOperation(recoveredId, false);
+    }
+    throw error;
+  } finally {
+    if (goalsJiraExportPollOperationId === operationId) {
+      goalsJiraExportPollOperationId = "";
+      goalsJiraExportPollPromise = null;
+    }
+  }
+}
+
+async function resumeGoalsJiraExportOperation() {
+  const active = readGoalsJiraExportOperation();
+  if (!active) {
+    setGoalsJiraExportButtonLoading(false);
+    return;
+  }
+  setGoalsJiraExportButtonLoading(true);
+  try {
+    const result = await waitForGoalsJiraExportOperation(active.operationId);
+    writeGoalsJiraExportOperation("");
+    setGoalsJiraExportButtonLoading(false);
+    downloadGoalsJiraExport(result.export);
+  } catch (error) {
+    writeGoalsJiraExportOperation("");
+    setGoalsJiraExportButtonLoading(false);
+    await showActionError(error, "Jira export failed");
+  }
+}
+
+function syncGoalsJiraExportOperation() {
+  if (!readGoalsJiraExportOperation()) {
+    setGoalsJiraExportButtonLoading(false);
+    return;
+  }
+  if (goalsJiraExportPollOperationId) {
+    setGoalsJiraExportButtonLoading(true);
+    return;
+  }
+  resumeGoalsJiraExportOperation();
+}
+
+async function exportSelectedGoalsForJira({ button = null } = {}) {
+  if (!_hasAnyGoalSelection()) {
+    toast("No Goals selected.", "warn");
+    return;
+  }
+  const exportButton = button || $("#bulk-export-jira");
+  await withButtonBusy(exportButton, "Exporting…", async () => {
+    try {
+      const response = await api("POST", "/api/goals/export/jira", {
+        filter: goalsBulkFilterFromHash(),
+        ..._selectionRequestFields(),
+      });
+      const operationId = response?.operation?.id;
+      if (!operationId) throw new Error("Jira export operation id missing");
+      writeGoalsJiraExportOperation(operationId);
+      const result = await waitForGoalsJiraExportOperation(operationId);
+      writeGoalsJiraExportOperation("");
+      downloadGoalsJiraExport(result.export);
+    } catch (error) {
+      writeGoalsJiraExportOperation("");
+      await showActionError(error, "Jira export failed");
+    }
+  });
+}
+
 // Highlight each non-default Goals filter control with the accent
 // border + show the "Filtered" pill next to the count when any filter
 // is active. Called after every table refresh.

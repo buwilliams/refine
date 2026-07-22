@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -5,9 +6,21 @@ use serde_json::Value;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitChange};
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
 
 const JIRA_DESCRIPTION_LIMIT: usize = 30_000;
+const JIRA_HEADERS: [&str; 10] = [
+    "Summary",
+    "Description",
+    "Work Type",
+    "Priority",
+    "Labels",
+    "Refine Goal ID",
+    "Refine Status",
+    "Refine Branch",
+    "Base Commit",
+    "Candidate Commit",
+];
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct JiraGoalExport {
@@ -19,11 +32,23 @@ pub struct JiraGoalExport {
     pub csv: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct JiraGoalsExport {
+    pub format: String,
+    pub filename: String,
+    pub content_type: String,
+    pub goal_ids: Vec<String>,
+    pub goal_count: usize,
+    pub commit_count: usize,
+    pub csv: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct FileGoalExportService {
     refine_dir: PathBuf,
     target_root: PathBuf,
     runtime_root: Option<PathBuf>,
+    operation_id: Option<String>,
 }
 
 impl FileGoalExportService {
@@ -32,6 +57,7 @@ impl FileGoalExportService {
             refine_dir: refine_dir.into(),
             target_root: target_root.into(),
             runtime_root: None,
+            operation_id: None,
         }
     }
 
@@ -44,40 +70,155 @@ impl FileGoalExportService {
             refine_dir: refine_dir.into(),
             target_root: target_root.into(),
             runtime_root: Some(runtime_root.into()),
+            operation_id: None,
         }
     }
 
+    pub fn with_operation_id(mut self, operation_id: impl Into<String>) -> Self {
+        self.operation_id = Some(operation_id.into());
+        self
+    }
+
     pub fn export_jira_csv(&self, goal_id: &str) -> RefineResult<JiraGoalExport> {
-        let work_items = match &self.runtime_root {
-            Some(runtime_root) => FileWorkItemService::with_projection_cache(
-                &self.refine_dir,
-                runtime_root.join("cache"),
-            ),
-            None => FileWorkItemService::new(&self.refine_dir),
-        };
+        let work_items = self.work_items();
         let goal = work_items.show_goal_detail(goal_id)?;
         let commits = self.goal_commits(&goal)?;
         jira_export_from_goal(&goal, &commits)
     }
 
+    pub fn export_bulk_jira_csv(
+        &self,
+        selection: &BulkGoalSelection,
+    ) -> RefineResult<JiraGoalsExport> {
+        self.export_bulk_jira_csv_with_progress(selection, |_, _, _| Ok(()))
+    }
+
+    pub fn export_bulk_jira_csv_with_progress<F>(
+        &self,
+        selection: &BulkGoalSelection,
+        mut report: F,
+    ) -> RefineResult<JiraGoalsExport>
+    where
+        F: FnMut(&str, usize, usize) -> RefineResult<()>,
+    {
+        let work_items = self.work_items();
+        let goal_ids = work_items
+            .select_bulk_goal_ids(selection)?
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        if goal_ids.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Select at least one Goal to export for Jira".to_string(),
+            ));
+        }
+
+        let goal_total = goal_ids.len();
+        report("Loading selected Goal evidence", 0, goal_total)?;
+        let mut goals = Vec::with_capacity(goal_total);
+        for (index, goal_id) in goal_ids.iter().enumerate() {
+            goals.push(work_items.show_goal_detail(goal_id)?);
+            report("Loading selected Goal evidence", index + 1, goal_total)?;
+        }
+
+        let ranges = goals
+            .iter()
+            .filter_map(goal_commit_range)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        report("Looking up commit evidence", 0, goal_total)?;
+        let commits_by_range = self.git().changes_between_many(&ranges)?;
+
+        let mut rows = Vec::with_capacity(goal_ids.len());
+        let mut commit_count = 0;
+        for (index, goal) in goals.iter().enumerate() {
+            let commits = commits_for_goal(goal, &commits_by_range);
+            commit_count += commits.len();
+            rows.push(jira_row(goal, commits)?);
+            report("Building Jira CSV", index + 1, goal_total)?;
+        }
+        let csv = format!("{}\r\n{}\r\n", JIRA_HEADERS.join(","), rows.join("\r\n"));
+
+        Ok(JiraGoalsExport {
+            format: "jira_csv".to_string(),
+            filename: "refine-goals-jira.csv".to_string(),
+            content_type: "text/csv; charset=utf-8".to_string(),
+            goal_count: goal_ids.len(),
+            goal_ids,
+            commit_count,
+            csv,
+        })
+    }
+
+    fn work_items(&self) -> FileWorkItemService {
+        match &self.runtime_root {
+            Some(runtime_root) => FileWorkItemService::with_projection_cache(
+                &self.refine_dir,
+                runtime_root.join("cache"),
+            ),
+            None => FileWorkItemService::new(&self.refine_dir),
+        }
+    }
+
     fn goal_commits(&self, goal: &Value) -> RefineResult<Vec<GitChange>> {
-        let Some(base) = nonempty_string(goal, "base_commit") else {
+        let Some(range) = goal_commit_range(goal) else {
             return Ok(Vec::new());
         };
-        let Some(candidate) = nonempty_string(goal, "candidate_commit") else {
-            return Ok(Vec::new());
-        };
+        self.git().changes_between(&range.0, &range.1)
+    }
+
+    fn git(&self) -> FileGitWorktreeService {
         let git = match &self.runtime_root {
             Some(runtime_root) => {
                 FileGitWorktreeService::with_runtime_root(&self.target_root, runtime_root)
             }
             None => FileGitWorktreeService::new(&self.target_root),
         };
-        git.changes_between(base, candidate)
+        match &self.operation_id {
+            Some(operation_id) => git.with_operation_id(operation_id),
+            None => git,
+        }
     }
 }
 
+fn goal_commit_range(goal: &Value) -> Option<(String, String)> {
+    Some((
+        nonempty_string(goal, "base_commit")?.to_string(),
+        nonempty_string(goal, "candidate_commit")?.to_string(),
+    ))
+}
+
+fn commits_for_goal<'a>(
+    goal: &Value,
+    commits_by_range: &'a BTreeMap<(String, String), Vec<GitChange>>,
+) -> &'a [GitChange] {
+    goal_commit_range(goal)
+        .and_then(|range| commits_by_range.get(&range))
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+}
+
 fn jira_export_from_goal(goal: &Value, commits: &[GitChange]) -> RefineResult<JiraGoalExport> {
+    let goal_id = required_string(goal, "id")?;
+    let csv = format!(
+        "{}\r\n{}\r\n",
+        JIRA_HEADERS.join(","),
+        jira_row(goal, commits)?
+    );
+
+    Ok(JiraGoalExport {
+        format: "jira_csv".to_string(),
+        filename: format!("refine-goal-{goal_id}-jira.csv"),
+        content_type: "text/csv; charset=utf-8".to_string(),
+        goal_id: goal_id.to_string(),
+        commit_count: commits.len(),
+        csv,
+    })
+}
+
+fn jira_row(goal: &Value, commits: &[GitChange]) -> RefineResult<String> {
     let goal_id = required_string(goal, "id")?;
     let summary = required_string(goal, "name")?;
     let description = jira_description(goal, commits);
@@ -87,18 +228,6 @@ fn jira_export_from_goal(goal: &Value, commits: &[GitChange]) -> RefineResult<Ji
         )));
     }
 
-    let headers = [
-        "Summary",
-        "Description",
-        "Work Type",
-        "Priority",
-        "Labels",
-        "Refine Goal ID",
-        "Refine Status",
-        "Refine Branch",
-        "Base Commit",
-        "Candidate Commit",
-    ];
     let priority = title_case(nonempty_string(goal, "priority").unwrap_or("low"));
     let values = [
         summary,
@@ -112,24 +241,11 @@ fn jira_export_from_goal(goal: &Value, commits: &[GitChange]) -> RefineResult<Ji
         nonempty_string(goal, "base_commit").unwrap_or(""),
         nonempty_string(goal, "candidate_commit").unwrap_or(""),
     ];
-    let csv = format!(
-        "{}\r\n{}\r\n",
-        headers.join(","),
-        values
-            .iter()
-            .map(|value| csv_cell(value))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-
-    Ok(JiraGoalExport {
-        format: "jira_csv".to_string(),
-        filename: format!("refine-goal-{goal_id}-jira.csv"),
-        content_type: "text/csv; charset=utf-8".to_string(),
-        goal_id: goal_id.to_string(),
-        commit_count: commits.len(),
-        csv,
-    })
+    Ok(values
+        .iter()
+        .map(|value| csv_cell(value))
+        .collect::<Vec<_>>()
+        .join(","))
 }
 
 fn jira_description(goal: &Value, commits: &[GitChange]) -> String {
@@ -401,6 +517,71 @@ mod tests {
         assert!(export.csv.contains("GOAL1 implement evidence export"));
         assert!(export.csv.contains("\"\"quotes\"\""));
         assert!(export.csv.ends_with("\r\n"));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bulk_jira_export_uses_shared_selection_and_stable_goal_order() {
+        let root = unique_temp_dir("jira-bulk-export");
+        let refine_dir = root.join(".refine");
+        let work_items = FileWorkItemService::new(&refine_dir);
+        for (id, name) in [
+            ("GOAL2", "Selected second"),
+            ("GOAL1", "Selected first"),
+            ("GOAL3", "Ignored Goal"),
+        ] {
+            work_items.create_goal_summary(name, Some(id)).unwrap();
+            work_items
+                .append_goal_round_summary(id, "Auditor", &format!("Implement {id}"))
+                .unwrap();
+        }
+
+        let service = FileGoalExportService::new(&refine_dir, &root);
+        let selected = service
+            .export_bulk_jira_csv(&BulkGoalSelection {
+                selected_ids: Some(vec![
+                    "GOAL2".to_string(),
+                    "GOAL1".to_string(),
+                    "GOAL2".to_string(),
+                ]),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(selected.filename, "refine-goals-jira.csv");
+        assert_eq!(selected.goal_ids, vec!["GOAL1", "GOAL2"]);
+        assert_eq!(selected.goal_count, 2);
+        assert_eq!(selected.csv.matches("Summary,Description").count(), 1);
+        assert!(
+            selected.csv.find("Selected first").unwrap()
+                < selected.csv.find("Selected second").unwrap()
+        );
+        assert!(!selected.csv.contains("Ignored Goal"));
+
+        let all_matching_except_one = service
+            .export_bulk_jira_csv(&BulkGoalSelection {
+                filter: crate::tools::product::work_items::BulkGoalFilter {
+                    q: Some("Selected".to_string()),
+                    ..Default::default()
+                },
+                exclude_ids: vec!["GOAL2".to_string()],
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(all_matching_except_one.goal_ids, vec!["GOAL1"]);
+        assert!(all_matching_except_one.csv.contains("Selected first"));
+        assert!(!all_matching_except_one.csv.contains("Selected second"));
+
+        let error = service
+            .export_bulk_jira_csv(&BulkGoalSelection {
+                selected_ids: Some(Vec::new()),
+                ..Default::default()
+            })
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Select at least one Goal to export for Jira"
+        );
 
         fs::remove_dir_all(root).unwrap();
     }

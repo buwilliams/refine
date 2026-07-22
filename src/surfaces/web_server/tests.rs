@@ -849,17 +849,31 @@ fn static_goal_detail_uses_shared_governance_review_state_helpers() {
 }
 
 #[test]
-fn static_goal_detail_renders_round_implementation_reports() {
+fn static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
     let goals_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
+    let goals_list = fs::read_to_string(static_root.join("js/features/goals-list.js")).unwrap();
+    let goals_bulk = fs::read_to_string(static_root.join("js/features/goals-bulk.js")).unwrap();
+    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
 
     assert!(goals_detail.contains("rnd.implementation_report"));
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report""#));
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report-body""#));
     assert!(goals_detail.contains("rnd.implementation_reported_at"));
-    assert!(goals_detail.contains(r#"data-testid="goal-action-export-jira""#));
-    assert!(goals_detail.contains("/export/jira"));
-    assert!(goals_detail.contains("new Blob([payload.csv]"));
+    assert!(!goals_detail.contains(r#"data-testid="goal-action-export-jira""#));
+    assert!(!goals_detail.contains("/export/jira"));
+    assert!(goals_list.contains(r#"data-testid="goals-bulk-export-jira""#));
+    assert!(goals_list.contains(r##"bindCommand("#bulk-export-jira", "goals.bulk.export_jira")"##));
+    assert!(goals_bulk.contains("function exportSelectedGoalsForJira"));
+    assert!(goals_bulk.contains(r#"api("POST", "/api/goals/export/jira""#));
+    assert!(goals_bulk.contains("..._selectionRequestFields()"));
+    assert!(goals_bulk.contains("waitForGoalsJiraExportOperation"));
+    assert!(goals_bulk.contains("GOALS_JIRA_EXPORT_OPERATION_KEY"));
+    assert!(goals_bulk.contains("/retry`"));
+    assert!(goals_list.contains("syncGoalsJiraExportOperation()"));
+    assert!(common.contains(r#"err.code = "operation_interrupted""#));
+    assert!(commands.contains(r#"id: "goals.bulk.export_jira""#));
 }
 
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
@@ -1829,41 +1843,152 @@ fn web_server_creates_and_shows_goal() {
 }
 
 #[test]
-fn web_server_exports_goal_delivery_evidence_for_jira() {
-    let temp_root = unique_temp_dir("http-goal-jira-export");
+fn web_server_exports_selected_goals_for_jira() {
+    let temp_root = unique_temp_dir("http-goals-jira-export");
     let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
     let service = FileWorkItemService::new(&refine_dir);
-    service
-        .create_goal_summary("Export delivery evidence", Some("GOAL1"))
-        .unwrap();
-    service
-        .append_goal_round_summary("GOAL1", "Auditor", "Implement the export")
-        .unwrap();
-    service
-        .update_latest_goal_round_implementation_report(
-            "GOAL1",
-            "Added Jira CSV export. cargo test passed.",
-        )
-        .unwrap();
+    for (id, name) in [
+        ("GOAL1", "Export first delivery"),
+        ("GOAL2", "Export second delivery"),
+        ("GOAL3", "Leave this Goal out"),
+    ] {
+        service.create_goal_summary(name, Some(id)).unwrap();
+        service
+            .append_goal_round_summary(id, "Auditor", &format!("Implement {id}"))
+            .unwrap();
+        service
+            .update_latest_goal_round_implementation_report(
+                id,
+                &format!("Added Jira evidence for {id}."),
+            )
+            .unwrap();
+    }
 
     let response = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/goals/GOAL1/export/jira".to_string(),
-        body: None,
+        method: "POST".to_string(),
+        path: "/api/goals/export/jira".to_string(),
+        body: Some(json!({"selected_ids": ["GOAL2", "GOAL1"]})),
     });
 
-    assert_eq!(response.status, 200);
-    assert_eq!(response.body["export"]["format"], "jira_csv");
-    assert_eq!(
-        response.body["export"]["filename"],
-        "refine-goal-GOAL1-jira.csv"
+    assert_eq!(response.status, 202);
+    assert_eq!(response.body["operation"]["owner"], "goals:jira-export");
+    assert_eq!(response.body["operation"]["status"], "running");
+    let operation_id = response.body["operation"]["id"].as_str().unwrap();
+    let operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        operation_id,
+        OperationState::Succeeded,
     );
-    let csv = response.body["export"]["csv"].as_str().unwrap();
+    assert_eq!(operation.progress["stage"], "complete");
+    assert_eq!(operation.progress["completed"], 2);
+    assert_eq!(operation.result["export"]["format"], "jira_csv");
+    assert_eq!(
+        operation.result["export"]["filename"],
+        "refine-goals-jira.csv"
+    );
+    assert_eq!(operation.result["export"]["goal_count"], 2);
+    assert_eq!(
+        operation.result["export"]["goal_ids"],
+        json!(["GOAL1", "GOAL2"])
+    );
+    let csv = operation.result["export"]["csv"].as_str().unwrap();
     assert!(csv.starts_with("Summary,Description,Work Type,Priority"));
-    assert!(csv.contains("Implement the export"));
-    assert!(csv.contains("Added Jira CSV export. cargo test passed."));
+    assert!(csv.contains("Added Jira evidence for GOAL1."));
+    assert!(csv.contains("Added Jira evidence for GOAL2."));
+    assert!(!csv.contains("Leave this Goal out"));
+
+    let empty = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/export/jira".to_string(),
+        body: Some(json!({"selected_ids": []})),
+    });
+    assert_eq!(empty.status, 202);
+    let empty_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        empty.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Failed,
+    );
+    assert_eq!(
+        empty_operation.error.unwrap()["message"],
+        "Select at least one Goal to export for Jira"
+    );
+
+    let (logs, _, _) = FileOperationRegistry::new(&runtime_root)
+        .page_logs(operation_id, 20, 0)
+        .unwrap();
+    assert!(
+        logs.iter()
+            .any(|entry| entry.message == "Jira CSV export completed")
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_cancels_and_recovers_durable_jira_exports() {
+    let temp_root = unique_temp_dir("http-goals-jira-export-lifecycle");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Recoverable export", Some("GOAL1"))
+        .unwrap();
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/export/jira".to_string(),
+        body: Some(json!({"selected_ids": ["GOAL1"]})),
+    });
+    assert_eq!(started.status, 202);
+    let operation_id = started.body["operation"]["id"].as_str().unwrap();
+    let cancelled = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/operations/{operation_id}/cancel"),
+        body: None,
+    });
+    assert_eq!(cancelled.status, 200);
+    assert_eq!(cancelled.body["operation"]["status"], "cancelled");
+    thread::sleep(Duration::from_millis(25));
+    assert_eq!(
+        FileOperationRegistry::new(&runtime_root)
+            .status(operation_id)
+            .unwrap()
+            .state,
+        OperationState::Cancelled
+    );
+
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let interrupted = registry
+        .register_with_request(
+            "goals:jira-export",
+            json!({
+                "refine_dir": refine_dir.clone(),
+                "target_root": temp_root.clone(),
+                "selection": {"selected_ids": ["GOAL1"], "exclude_ids": [], "filter": {}}
+            }),
+        )
+        .unwrap();
+    registry
+        .finish(&interrupted.id, OperationState::Interrupted)
+        .unwrap();
+    let recovered = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/goals/export/jira/{}/retry", interrupted.id),
+        body: Some(json!({})),
+    });
+    assert_eq!(recovered.status, 202, "{:#}", recovered.body);
+    let recovered_id = recovered.body["operation"]["id"].as_str().unwrap();
+    let recovered_operation =
+        wait_for_operation_status(&registry, recovered_id, OperationState::Succeeded);
+    assert_eq!(recovered_operation.result["export"]["goal_count"], 1);
+    assert_eq!(recovered_operation.request["recovery_of"], interrupted.id);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
