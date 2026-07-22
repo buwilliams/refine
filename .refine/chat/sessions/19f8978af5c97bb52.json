@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:37:01Z",
+  "updated_at": "2026-07-22T14:38:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1188,6 +1188,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "New steering has resolved the earlier architectural unknown: two scoped Goals now specify the strong shared-consistency path, with contract first and implementation second. I’m preserving that ordering explicitly—parking the Quality prototype again, stopping its orphan through Refine’s managed-process API, holding the implementation Goal in backlog, then resuming only the contract Goal."
+    },
+    {
+      "created_at": "2026-07-22T14:38:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784731080980-190",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Ordering is now durable in the feature itself (`feature_order` 1 then 2), so the implementation Goal remains queued without launching while the contract Goal runs. The contract agent is live in its isolated worktree; the Quality and autonomous-recovery prototypes remain preserved and inactive."
     }
   ],
   "queued_messages": [
