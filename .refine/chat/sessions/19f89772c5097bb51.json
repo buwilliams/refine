@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:26:22Z",
+  "updated_at": "2026-07-22T11:30:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -556,19 +556,31 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The interaction model is now unified in the shared toolbar code: every chat-capable tab uses the same docked composer, local ordered queue drain, prompt history, elapsed status, interrupt affordance, and inline artifact renderer. I’m wiring the remaining backend half now so Esc cancels only the active provider turn—without stopping the session, deleting the standalone worktree, or changing queued-message semantics."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f898f71ba97bb57",
-      "text": "Treat the Supervisor conversation as the end-to-end workflow control plane, not only a chat UI. When user intent is sufficient, infer and create the appropriate Feature and Goals directly. Continuously monitor workflow health across Goals, agents, processes, Git, Quality, Governance, queues, and stalls; resolve routine issues autonomously, including recovery Rounds for failed Goals. Auto-approve reviewed Goals when deterministic evidence and configured Quality and Governance establish readiness without product judgment. Ask only for ambiguity, product decisions, policy exceptions, new authority, or destructive action. Keep every action auditable and idempotent, with retry-loop limits.",
-      "created_at": "2026-07-22T11:21:47Z",
-      "updated_at": "2026-07-22T11:21:47Z"
+      "created_at": "2026-07-22T11:30:18Z",
+      "delivered": false,
+      "id": "evt-1784719818428-149",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    },
+    {
+      "created_at": "2026-07-22T11:30:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "process_supervisor"
+      },
+      "id": "evt-1784719818434-151",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Managed provider process exited after cancellation."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
-  "closed": false,
-  "interrupted": false,
-  "interruption_detail": null
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "stopped"
 }
