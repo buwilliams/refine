@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:48:25Z",
+  "updated_at": "2026-07-22T17:49:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -456,6 +456,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s 434-test serial gate is green and both production harnesses have completed; the agent is doing final scoped review before commit. Quality is updating the shared claim/context schema so retry timing is preserved durably."
+    },
+    {
+      "created_at": "2026-07-22T17:49:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742558567-135",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination candidate `ec0d336` is committed cleanly and has entered a fresh independent governance pass. Quality round 3 is still implementing its two scoped fixes."
     }
   ],
   "queued_messages": [
