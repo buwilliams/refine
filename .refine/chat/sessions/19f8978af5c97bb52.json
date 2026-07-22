@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:20:45Z",
+  "updated_at": "2026-07-22T16:24:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1452,6 +1452,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The repaired candidate reached final-gate shape: 427/427 serial library tests passed, along with formatting, diff hygiene, and all-target compilation. Focused evidence includes 38 workflow tests, 13 Git-sync tests, seven terminal-operation tests, and the thin web retry adapter. The agent is rerunning both production-shaped daemon harnesses against this exact final source before committing."
+    },
+    {
+      "created_at": "2026-07-22T16:24:02Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784737442799-238",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Independent governance is now reviewing the repaired candidate and its live evidence, not merely accepting the implementation report. It is tracing workflow persistence/migration, claim recovery, operation settlement, Git conflict semantics, and every remaining `WorkflowEngine` construction path against the contract before issuing a verdict."
     }
   ],
   "queued_messages": [
