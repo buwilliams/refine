@@ -136,9 +136,31 @@
       "reporter": "Codex",
       "rule_state": "failed",
       "updated": "2026-07-22T11:51:58Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:52:29Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate f996d058af151f388dcb90ea58db345c9d9af257 and remediate the two remaining governance findings. On the Goals browser surface, render the bulk Jira export as a visible supervised operation with status/progress, bounded log output or a link to the existing operation/process log view, explicit Cancel while running, and Hide/Dismiss only after terminal state; wire Cancel to the existing operation cancellation API and keep download available only after successful completion. Preserve bulk selection, deterministic CSV, shared export service, and button responsiveness. Replace or supplement cfg(test) thread shortcuts with focused integration coverage through the production managed-process substrate: launch an operation-associated child/helper process, cancel it through the public route/service and prove terminate_operation_processes ends it and leaves durable Cancelled state that completion cannot overwrite; simulate daemon/worker interruption by terminating the real associated process or restarting/reopening durable operation state rather than directly writing Interrupted, then verify restart-safe recovery/failure reporting and logs. Cover browser Cancel/Hide/log rendering and failure states, rerun focused operation/process/API/browser tests, formatting, and governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:52:29Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:51:58Z"
+  "updated": "2026-07-22T11:52:29Z"
 }
