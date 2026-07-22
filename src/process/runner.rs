@@ -47,6 +47,8 @@ struct JiraExportOperationRequest {
     selection: BulkGoalSelection,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     recovery_of: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry_identity: Option<String>,
 }
 
 impl FileRunnerWorkerService {
@@ -127,6 +129,7 @@ impl FileRunnerWorkerService {
             target_root: target_root.to_path_buf(),
             selection,
             recovery_of: None,
+            retry_identity: None,
         })
     }
 
@@ -140,21 +143,27 @@ impl FileRunnerWorkerService {
                 "Only interrupted Jira export operations can be recovered".to_string(),
             ));
         }
-        if let Some(existing) = registry.recover()?.into_iter().find(|operation| {
-            operation.owner == "goals:jira-export"
-                && operation.request.get("recovery_of").and_then(Value::as_str)
-                    == Some(operation_id)
-        }) {
-            return Ok(existing);
-        }
         let mut request = serde_json::from_value::<JiraExportOperationRequest>(interrupted.request)
             .map_err(|error| {
                 RefineError::Serialization(format!(
                     "failed to recover Jira export request: {error}"
                 ))
             })?;
+        let retry_identity = format!("goals:jira-export:retry:{operation_id}");
         request.recovery_of = Some(operation_id.to_string());
-        self.queue_jira_export_request(request)
+        request.retry_identity = Some(retry_identity.clone());
+        let registration = registry.find_or_register_replacement(
+            "goals:jira-export",
+            operation_id,
+            &retry_identity,
+            serde_json::to_value(&request).map_err(|error| {
+                RefineError::Serialization(format!("failed to encode Jira export request: {error}"))
+            })?,
+        )?;
+        if !registration.created {
+            return Ok(registration.operation);
+        }
+        self.start_jira_export_operation(&registry, registration.operation)
     }
 
     fn queue_jira_export_request(
@@ -168,6 +177,14 @@ impl FileRunnerWorkerService {
                 RefineError::Serialization(format!("failed to encode Jira export request: {error}"))
             })?,
         )?;
+        self.start_jira_export_operation(&registry, operation)
+    }
+
+    fn start_jira_export_operation(
+        &self,
+        registry: &FileOperationRegistry,
+        operation: OperationHandle,
+    ) -> RefineResult<OperationHandle> {
         registry.update_progress(
             &operation.id,
             json!({
@@ -187,7 +204,7 @@ impl FileRunnerWorkerService {
             })?;
             jira_export_worker_spec(&executable, &self.runtime_root, &operation.id)
         };
-        self.launch_jira_export_worker(&registry, &operation, spec)
+        self.launch_jira_export_worker(registry, &operation, spec)
     }
 
     fn launch_jira_export_worker(

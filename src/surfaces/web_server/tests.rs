@@ -17,6 +17,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -2153,6 +2154,170 @@ fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
         failure_logs
             .iter()
             .any(|entry| entry.message == "Operation failed")
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn concurrent_jira_retry_posts_share_one_durable_replacement_and_worker_after_restart() {
+    let temp_root = unique_temp_dir("http-goals-jira-export-concurrent-retry");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    FileWorkItemService::new(&refine_dir)
+        .create_goal_summary("Concurrent recoverable export", Some("GOAL1"))
+        .unwrap();
+
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let source = registry
+        .register_with_request(
+            "goals:jira-export",
+            json!({
+                "refine_dir": refine_dir,
+                "target_root": temp_root,
+                "selection": {"selected_ids": ["GOAL1"], "exclude_ids": [], "filter": {}}
+            }),
+        )
+        .unwrap();
+    registry
+        .append_log(
+            &source.id,
+            LogEntry {
+                datetime: String::new(),
+                severity: "info".to_string(),
+                category: "operation".to_string(),
+                message: "Source log retained across concurrent retry".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: None,
+                goal_id: None,
+            },
+        )
+        .unwrap();
+    registry.interrupt_active().unwrap();
+    let (source_logs_before, _, _) = registry.page_logs(&source.id, 20, 0).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let barrier = Arc::new(Barrier::new(3));
+    let callers = (0..2)
+        .map(|_| {
+            let server = server.clone();
+            let barrier = Arc::clone(&barrier);
+            let path = format!("/api/goals/export/jira/{}/retry", source.id);
+            thread::spawn(move || {
+                barrier.wait();
+                server.handle(ApiRequest {
+                    method: "POST".to_string(),
+                    path,
+                    body: Some(json!({})),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    barrier.wait();
+    let responses = callers
+        .into_iter()
+        .map(|caller| caller.join().unwrap())
+        .collect::<Vec<_>>();
+    assert!(
+        responses.iter().all(|response| response.status == 202),
+        "{responses:#?}"
+    );
+    let replacement_ids = responses
+        .iter()
+        .map(|response| {
+            response.body["operation"]["id"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(replacement_ids[0], replacement_ids[1]);
+    let replacement_id = &replacement_ids[0];
+    let retry_identity = format!("goals:jira-export:retry:{}", source.id);
+
+    let replacements = registry
+        .recover()
+        .unwrap()
+        .into_iter()
+        .filter(|operation| operation.request["recovery_of"] == source.id)
+        .collect::<Vec<_>>();
+    assert_eq!(replacements.len(), 1);
+    assert_eq!(replacements[0].id, *replacement_id);
+    assert_eq!(replacements[0].request["retry_identity"], retry_identity);
+
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let replacement_processes = supervisor
+        .list()
+        .unwrap()
+        .into_iter()
+        .filter(|process| {
+            process.details.as_deref().is_some_and(|details| {
+                serde_json::from_str::<serde_json::Value>(details)
+                    .ok()
+                    .and_then(|details| details["operation_id"].as_str().map(str::to_string))
+                    .as_deref()
+                    == Some(replacement_id.as_str())
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        replacement_processes.len(),
+        1,
+        "concurrent retries must launch exactly one managed Jira worker"
+    );
+    let replacement_pid = replacement_processes[0].pid.unwrap();
+    assert!(managed_pid_is_alive(replacement_pid).unwrap());
+
+    let replacement =
+        wait_for_operation_status(&registry, replacement_id, OperationState::Succeeded);
+    assert_eq!(replacement.result["export"]["goal_count"], 1);
+    assert_eq!(
+        registry
+            .recover()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation.request["recovery_of"] == source.id)
+            .filter(|operation| matches!(operation.state, OperationState::Succeeded))
+            .count(),
+        1
+    );
+    let (source_logs_after, _, _) = registry.page_logs(&source.id, 20, 0).unwrap();
+    assert_eq!(source_logs_after, source_logs_before);
+    assert!(
+        source_logs_after
+            .iter()
+            .any(|entry| entry.message == "Source log retained across concurrent retry")
+    );
+    wait_for_managed_pid_exit(replacement_pid);
+    assert!(!managed_pid_is_alive(replacement_pid).unwrap());
+
+    FileDaemonLifecycleService::new(RuntimeRoot {
+        root: temp_root.join("run"),
+    })
+    .restart(8080)
+    .unwrap();
+    let processes_before_replay = supervisor.list().unwrap();
+    let mut restarted_server = server_with_projection();
+    restarted_server.target_root = Some(temp_root.clone());
+    restarted_server.runtime_root = Some(runtime_root.clone());
+    let replay = restarted_server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/goals/export/jira/{}/retry", source.id),
+        body: Some(json!({})),
+    });
+    assert_eq!(replay.status, 202, "{:#}", replay.body);
+    assert_eq!(replay.body["operation"]["id"], *replacement_id);
+    assert_eq!(supervisor.list().unwrap(), processes_before_replay);
+    assert_eq!(
+        registry.status(replacement_id).unwrap().state,
+        OperationState::Succeeded
+    );
+    assert_eq!(
+        registry.page_logs(&source.id, 20, 0).unwrap().0,
+        source_logs_before
     );
 
     fs::remove_dir_all(temp_root).unwrap();

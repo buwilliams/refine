@@ -55,6 +55,12 @@ pub struct OperationHandle {
     pub error: Option<Value>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReplacementOperationRegistration {
+    pub operation: OperationHandle,
+    pub created: bool,
+}
+
 pub trait OperationRegistry {
     fn register(&self, owner: &str) -> RefineResult<OperationHandle>;
     fn status(&self, operation_id: &str) -> RefineResult<OperationHandle>;
@@ -329,6 +335,109 @@ impl FileOperationRegistry {
             operation_log_entry(&handle, "info", "Operation registered", None),
         )?;
         Ok(handle)
+    }
+
+    /// Atomically claims a durable replacement for an interrupted operation.
+    ///
+    /// The source id and retry identity are written into the replacement request while the
+    /// registry mutation lock is held. Concurrent callers, including callers in separate daemon
+    /// processes, therefore either create one replacement or recover that exact same record.
+    pub fn find_or_register_replacement(
+        &self,
+        owner: &str,
+        source_operation_id: &str,
+        retry_identity: &str,
+        mut request: Value,
+    ) -> RefineResult<ReplacementOperationRegistration> {
+        if retry_identity.trim().is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Replacement operation retry identity is required".to_string(),
+            ));
+        }
+
+        let lock = self.mutation_lock()?;
+        let source = self.status(source_operation_id)?;
+        if source.owner != owner || !matches!(source.state, OperationState::Interrupted) {
+            return Err(RefineError::Conflict(format!(
+                "Only interrupted {owner} operations can be recovered"
+            )));
+        }
+
+        let request_object = request.as_object_mut().ok_or_else(|| {
+            RefineError::InvalidInput(
+                "Replacement operation request must be a JSON object".to_string(),
+            )
+        })?;
+        request_object.insert("recovery_of".to_string(), json!(source_operation_id));
+        request_object.insert("retry_identity".to_string(), json!(retry_identity));
+
+        let mut legacy_replacement = None;
+        for mut operation in self.recover()? {
+            let operation_retry_identity = operation
+                .request
+                .get("retry_identity")
+                .and_then(Value::as_str);
+            let operation_source = operation.request.get("recovery_of").and_then(Value::as_str);
+
+            if operation_retry_identity == Some(retry_identity) {
+                if operation.owner != owner || operation_source != Some(source_operation_id) {
+                    return Err(RefineError::Conflict(format!(
+                        "Retry identity {retry_identity} is already assigned to another operation"
+                    )));
+                }
+                drop(lock);
+                return Ok(ReplacementOperationRegistration {
+                    operation,
+                    created: false,
+                });
+            }
+
+            // Round 6 replacements predate the explicit retry identity. Adopt that durable record
+            // instead of creating a duplicate after an upgrade or restart.
+            if operation.owner == owner
+                && operation_source == Some(source_operation_id)
+                && operation_retry_identity.is_none()
+            {
+                let operation_request = operation.request.as_object_mut().ok_or_else(|| {
+                    RefineError::Serialization(format!(
+                        "replacement operation {} request is not a JSON object",
+                        operation.id
+                    ))
+                })?;
+                operation_request.insert("retry_identity".to_string(), json!(retry_identity));
+                legacy_replacement = Some(operation);
+                break;
+            }
+        }
+
+        if let Some(operation) = legacy_replacement {
+            self.write(&operation)?;
+            drop(lock);
+            return Ok(ReplacementOperationRegistration {
+                operation,
+                created: false,
+            });
+        }
+
+        let operation = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&operation)?;
+        self.append_log(
+            &operation.id,
+            operation_log_entry(&operation, "info", "Operation registered", None),
+        )?;
+        drop(lock);
+        Ok(ReplacementOperationRegistration {
+            operation,
+            created: true,
+        })
     }
 
     pub fn append_log(&self, operation_id: &str, mut entry: LogEntry) -> RefineResult<LogEntry> {
@@ -846,6 +955,7 @@ fn now_timestamp() -> String {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+    use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::{Duration, Instant};
 
@@ -947,6 +1057,81 @@ mod tests {
             registry.status(&operation.id).unwrap().progress["completed"],
             499
         );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_atomically_finds_or_registers_one_durable_replacement() {
+        let temp_root = unique_temp_dir("operations-replacement-idempotency");
+        let runtime_root = temp_root.join("run/8080");
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let source = registry
+            .register_with_request(
+                "goals:jira-export",
+                json!({"selection": {"selected_ids": ["GOAL1"]}}),
+            )
+            .unwrap();
+        registry.interrupt_active().unwrap();
+
+        let retry_identity = format!("goals:jira-export:retry:{}", source.id);
+        let barrier = Arc::new(Barrier::new(3));
+        let callers = (0..2)
+            .map(|_| {
+                let registry = registry.clone();
+                let source_id = source.id.clone();
+                let retry_identity = retry_identity.clone();
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    registry
+                        .find_or_register_replacement(
+                            "goals:jira-export",
+                            &source_id,
+                            &retry_identity,
+                            json!({"selection": {"selected_ids": ["GOAL1"]}}),
+                        )
+                        .unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        barrier.wait();
+        let registrations = callers
+            .into_iter()
+            .map(|caller| caller.join().unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(registrations[0].operation.id, registrations[1].operation.id);
+        assert_eq!(
+            registrations
+                .iter()
+                .filter(|registration| registration.created)
+                .count(),
+            1
+        );
+        let replacement = &registrations[0].operation;
+        assert_eq!(replacement.request["recovery_of"], source.id);
+        assert_eq!(replacement.request["retry_identity"], retry_identity);
+        assert_eq!(
+            registry
+                .recover()
+                .unwrap()
+                .iter()
+                .filter(|operation| operation.request["recovery_of"] == source.id)
+                .count(),
+            1
+        );
+
+        let reopened = FileOperationRegistry::new(&runtime_root)
+            .find_or_register_replacement(
+                "goals:jira-export",
+                &source.id,
+                &retry_identity,
+                json!({"selection": {"selected_ids": ["GOAL1"]}}),
+            )
+            .unwrap();
+        assert!(!reopened.created);
+        assert_eq!(reopened.operation.id, replacement.id);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
