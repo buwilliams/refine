@@ -173,28 +173,91 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T15:47:45Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T16:26:22Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-4",
+        "failed_actions": [
+          {
+            "message": "The migration cannot import actual pre-change workflow records. Before this change, target_app_id was the target-root path; migrate_legacy_state only accepts records whose target_app_id equals the new app-<hash> identity. Existing claims and pause decisions are therefore silently left in runtime files while new durable target-app authority starts empty, with no explicit reconciliation plan.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "WorkflowEngine::retry acquires capacity and publishes the claim as Running with a new execution ID, but it launches no supervised process and execute_claimed_work only launches Claimed records. The retry API therefore reports a running execution that has no worker or process and retains its capacity lease indefinitely.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The added daemon-backed test does not run its cancellation race through the real workflow runner or provider process: it directly calls WorkflowEngine::claim/start_claim and constructs WorkflowContext in the test process. The full-workflow test remains a happy path, and no test exercises retry execution, allowing the durable Running-without-process defect to pass.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Found incompatible state migration, an unsupervised retry state, and insufficient production-path evidence.\",\"violations\":[{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"The migration cannot import actual pre-change workflow records. Before this change, target_app_id was the target-root path; migrate_legacy_state only accepts records whose target_app_id equals the new app-<hash> identity. Existing claims and pause decisions are therefore silently left in runtime files while new durable target-app authority starts empty, with no explicit reconciliation plan.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"WorkflowEngine::retry acquires capacity and publishes the claim as Running with a new execution ID, but it launches no supervised process and execute_claimed_work only launches Claimed records. The retry API therefore reports a running execution that has no worker or process and retains its capacity lease indefinitely.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The added daemon-backed test does not run its cancellation race through the real workflow runner or provider process: it directly calls WorkflowEngine::claim/start_claim and constructs WorkflowContext in the test process. The full-workflow test remains a happy path, and no test exercises retry execution, allowing the durable Running-without-process defect to pass.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Found incompatible state migration, an unsupervised retry state, and insufficient production-path evidence.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The migration cannot import actual pre-change workflow records. Before this change, target_app_id was the target-root path; migrate_legacy_state only accepts records whose target_app_id equals the new app-<hash> identity. Existing claims and pause decisions are therefore silently left in runtime files while new durable target-app authority starts empty, with no explicit reconciliation plan.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "WorkflowEngine::retry acquires capacity and publishes the claim as Running with a new execution ID, but it launches no supervised process and execute_claimed_work only launches Claimed records. The retry API therefore reports a running execution that has no worker or process and retains its capacity lease indefinitely.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The added daemon-backed test does not run its cancellation race through the real workflow runner or provider process: it directly calls WorkflowEngine::claim/start_claim and constructs WorkflowContext in the test process. The full-workflow test remains a happy path, and no test exercises retry execution, allowing the durable Running-without-process defect to pass.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-4"
+      },
+      "governance_message": "Found incompatible state migration, an unsupervised retry state, and insufficient production-path evidence.",
+      "governance_rule_actions": [
+        {
+          "message": "The migration cannot import actual pre-change workflow records. Before this change, target_app_id was the target-root path; migrate_legacy_state only accepts records whose target_app_id equals the new app-<hash> identity. Existing claims and pause decisions are therefore silently left in runtime files while new durable target-app authority starts empty, with no explicit reconciliation plan.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "WorkflowEngine::retry acquires capacity and publishes the claim as Running with a new execution ID, but it launches no supervised process and execute_claimed_work only launches Claimed records. The retry API therefore reports a running execution that has no worker or process and retains its capacity lease indefinitely.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The added daemon-backed test does not run its cancellation race through the real workflow runner or provider process: it directly calls WorkflowEngine::claim/start_claim and constructs WorkflowContext in the test process. The full-workflow test remains a happy path, and no test exercises retry execution, allowing the durable Running-without-process defect to pass.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Completed and committed as `19461ba` (`Complete shared workflow consistency`) on top of the preserved Round 2 candidate.\n\nWhat changed:\n\n- Moved workflow authority into durable target-app Refine state; runtime files are projections only. Migration requires stable target identity and never guesses ownership.\n- Added deterministic restart repair for Running claims whose Goals remain todo.\n- Unified operation settlement so evidence is durable before terminal state, including Jira exports.\n- Preserved Git conflicts across blind retries without advancing the failed baseline; unrelated authorities still converge, and supervisor state is explicitly non-authoritative.\n- Expanded the two-daemon harness for concurrent mutation, repeated conflict, explicit revision resolution, cancellation/late settlement, runtime switching, restart recovery, and log-write failure ordering.\n\nVerification:\n\n- `git diff --check` — passed\n- `cargo fmt --all -- --check` — passed\n- `cargo check --all-targets` — passed\n- `cargo test --lib --no-fail-fast -- --test-threads=1` — 427 passed, 0 failed\n- `cargo run --manifest-path xtask/Cargo.toml -- test-full-workflow` — 1 passed, 0 failed\n- `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync` — 1 passed, 0 failed\n- Final Git status — clean and reviewable",
       "implementation_reported_at": "2026-07-22T16:21:48Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve and build on the verified Round 2 candidate ba537ca rather than replacing it. Correct only the remaining shared-consistency gaps.\\n\\n1. Move authoritative workflow claims and decisions out of port-scoped runtime artifacts into durable target-app Refine state, with stable target-app ownership. Runtime files may remain only as rebuildable projections or process-local state. Provide a compatible migration that does not assign legacy claims to whichever app happens to be attached and does not silently fork or discard authority when runtime roots or ports change.\\n2. Make claiming and the Goal's todo-to-in-progress transition one recoverable commitment. A crash after marking a claim Running but before changing the Goal must not strand an unlaunchable claim; startup/reconciliation must deterministically repair every partial state.\\n3. Use one authoritative terminal-operation settlement path everywhere, including Jira export. Required completion/failure evidence must be durable before dependent terminal state; a log failure must not leave an operation durably successful.\\n4. Fix Git synchronization so a true same-authority conflict, especially two nodes changing the same Goal revision, remains a conflict on every blind/automatic retry until a new authoritative decision resolves it. A failed sync must not advance its baseline so unchanged stale local content becomes authoritative on the next pulse. Keep unrelated remote authorities converging despite a conflict, and treat explicitly derived non-authoritative projections such as supervisor-agent state as projections rather than workflow authority.\\n5. Add proportionate daemon-backed regression evidence for these operational risks: concurrent authoritative mutation; repeated same-Goal Git conflict without another local mutation; cancellation racing late provider settlement; crash/restart recovery of a partial claim; target-app or runtime-root switching; and write/log failure ordering. Keep the real full-workflow and two-daemon sync harnesses green.\\n\\nRetain Round 2's stable target identity, optimistic revisions, durable replacement, capacity draining, cancellation guard, evidence ordering, and unrelated-state convergence. Do not expand into Quality behavior, Supervisor behavior, UI work, or unrelated cleanup.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T16:21:48Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T16:26:22Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T16:21:49Z"
+  "updated": "2026-07-22T16:26:22Z"
 }
