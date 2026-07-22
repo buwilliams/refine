@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:08:05Z",
-  "updated_at": "2026-07-22T17:09:31Z",
+  "updated_at": "2026-07-22T17:09:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:08:05Z",
@@ -108,6 +108,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "stderr: 2026-07-22T17:09:31.493464Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5"
+    },
+    {
+      "created_at": "2026-07-22T17:09:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740191687-22",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "stderr: 2026-07-22T17:09:51.687305Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5"
     }
   ],
   "queued_messages": [
