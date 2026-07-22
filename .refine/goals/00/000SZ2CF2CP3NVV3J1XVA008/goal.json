@@ -1,0 +1,41 @@
+{
+  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
+  "branch_name": "refine/00000SZ2CF2CP3NVV3J1XVA008/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T11:21:22Z",
+  "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
+  "feature_order": null,
+  "id": "00000SZ2CF2CP3NVV3J1XVA008",
+  "name": "Rework Quality settings and evidence UX",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:21:23Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Rework Quality settings and Goal evidence UX for agent-first Quality. Remove the Quality gate section, QA enabled control, and target-app test command controls. Keep Quality timing and provide clear editors for business requirements, instructions, and an ordered plain-language test list. Explain Quality and Governance as two always-on validation layers, and show the Quality agent summary and per-test evidence on each Goal. Update shared API and CLI documentation, guide content, accessibility, responsive behavior, and regression coverage.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:21:23Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T11:21:24Z"
+}

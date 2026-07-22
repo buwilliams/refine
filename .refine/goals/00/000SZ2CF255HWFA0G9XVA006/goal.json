@@ -1,0 +1,41 @@
+{
+  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
+  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T11:21:22Z",
+  "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
+  "feature_order": null,
+  "id": "00000SZ2CF255HWFA0G9XVA006",
+  "name": "Model plain-language Quality tests",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:21:22Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Replace command-driven Quality configuration with a shared project Quality specification: business requirements, instructions, an ordered list of plain-language tests, and quality_timing. Quality is always active and an empty test list is a successful no-op. Remove quality_enabled and target-app test command configuration and their UI, API, and workflow dependencies while handling stored legacy fields safely. Keep one centralized model for every surface and update the Quality and QA intent documentation.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:21:22Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T11:21:23Z"
+}

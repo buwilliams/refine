@@ -1,0 +1,41 @@
+{
+  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
+  "branch_name": "refine/00000SZ2CF28DJN97511XVA007/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T11:21:22Z",
+  "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
+  "feature_order": null,
+  "id": "00000SZ2CF28DJN97511XVA007",
+  "name": "Run always-on agent Quality validation",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:21:22Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement Quality as an agent evaluation for every Goal candidate, parallel in concept to post-implementation governance but with separate evidence and verdict. Give the Quality agent Goal and Round intent, candidate and repository evidence, business requirements, instructions, and the plain-language test list. The agent determines how to run each test through shared supervised tools and returns structured per-test pass or fail evidence. Honor quality_timing; no tests passes without provider work. Preserve failures for recovery and cover no-op, pass, fail, provider or tool failure, and evidence persistence.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:21:22Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T11:21:23Z"
+}
