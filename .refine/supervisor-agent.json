@@ -6,8 +6,7 @@
   "queued_work": 4,
   "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
-  "session_id": "19f893818df4360",
-  "provider": "codex",
+  "session_id": null,
   "initialized": true,
   "goal_states": {
     "00000SZ1J1YD7KCM6JNJRB8000": "done",
@@ -40,8 +39,7 @@
     "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
     "workflow": "Workflow evaluation failed: Supervisor event polling can repeatedly duplicate System entries."
   },
-  "last_context_key": "goals=00000SZ29R2JNJR5RXPR1YW000:todo|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-22T10:06:22.573095934+00:00",
+  "updated_at": "2026-07-22T10:11:34.295466777+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
