@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T09:48:30Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ29T1KSK3KYJW81YW001",
+  "name": "Supervisor agent web UI tab, the events should be in the system tab, not in the",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T09:48:31Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Supervisor agent web UI tab, the events should be in the system tab, not in the supervisor tab, because it clutters the UI.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T09:48:31Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T09:48:31Z"
+}
