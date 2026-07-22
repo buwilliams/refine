@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:40:12Z",
+  "updated_at": "2026-07-22T17:41:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -360,6 +360,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality candidate `a40ab0e` is committed and has entered independent governance; coordination is still in implementation verification. Both remain unmerged and reviewable."
+    },
+    {
+      "created_at": "2026-07-22T17:41:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742067539-117",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s real two-daemon owner-loss, capacity-release, and synchronized push-race harnesses pass; format, diff, and all-target checks also pass. It is running the serial full library gate. Quality governance is auditing API/CLI/web ownership and retry semantics."
     }
   ],
   "queued_messages": [
