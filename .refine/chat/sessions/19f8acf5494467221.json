@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:36:22Z",
+  "updated_at": "2026-07-22T17:37:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -324,6 +324,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both targeted gates are green so far: coordination’s live-provider and same-record conflict checks pass; Quality’s retry test and clippy pass, followed by a full-suite rerun after its final evidence changes. No merge or approval is being attempted before governance."
+    },
+    {
+      "created_at": "2026-07-22T17:37:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741860990-111",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s new genuinely concurrent same-record push test is green, and it is moving into cleanup/final verification. Quality’s integration tests remain green; the agent is doing a final shared-service ownership audit before committing."
     }
   ],
   "queued_messages": [
