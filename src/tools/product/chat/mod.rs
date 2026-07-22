@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
+use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
@@ -249,6 +250,61 @@ impl FileChatService {
 
     pub fn stop(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
         self.interrupt(session_id, "stopped")
+    }
+
+    pub fn migrate_supervisor_provider(
+        &self,
+        session_id: &str,
+        configured_provider: &str,
+    ) -> RefineResult<Option<ChatSessionRecord>> {
+        let configured_provider = configured_provider.trim();
+        if configured_provider.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "configured agent_cli provider is required".to_string(),
+            ));
+        }
+        let existing = self.load_record(session_id)?;
+        if !matches!(existing.attachment, ChatAttachment::Supervisor) {
+            return Err(RefineError::InvalidInput(
+                "only Supervisor sessions can migrate configured providers".to_string(),
+            ));
+        }
+        if existing.provider == configured_provider {
+            return Ok(Some(existing));
+        }
+        if existing.in_flight
+            || existing.queue_dispatching
+            || self.session_has_active_operation(session_id)?
+            || self.session_has_managed_process(session_id)?
+        {
+            self.interrupt(
+                session_id,
+                &format!(
+                    "closed because configured agent_cli changed from {} to {configured_provider}",
+                    existing.provider
+                ),
+            )?;
+            return Ok(None);
+        }
+
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
+        let previous = std::mem::replace(&mut record.provider, configured_provider.to_string());
+        record.provider_session_id = None;
+        record.interrupted = false;
+        record.interruption_detail = None;
+        record.updated_at = now_timestamp();
+        record.transcript_events.push(chat_event(
+            "system",
+            &format!(
+                "Supervisor provider migrated from {previous} to {configured_provider}; provider-session resume state was reset."
+            ),
+            false,
+            None,
+            Some(json!({"source": "configured_agent_cli"})),
+        ));
+        self.write_record(&record)?;
+        Ok(Some(record))
     }
 
     pub fn start_standalone_with_options(
@@ -622,35 +678,57 @@ impl FileChatService {
         let operation = self.register_provider_operation(&record, "resume")?;
         let provider = HostAgentProviderService {
             path_override: self.provider_path_override(),
-            runtime_root: Some(self.runtime_root.clone()),
+            runtime_root: Some(self.runtime_root.join("agents")),
         };
         let provider_name = record.provider.clone();
-        let result =
-            provider.resume_detailed_with_output(&provider_name, &provider_session_id, |line| {
+        let result = provider.resume_detailed_with_output_and_metadata(
+            &provider_name,
+            &provider_session_id,
+            chat_process_metadata(&record),
+            |line| {
                 let _ = self.append_provider_activity_progress(session_id, &line);
-            });
+            },
+        );
         let _guard = self.acquire_session_lock(session_id)?;
         let mut latest = self.load_record(session_id)?;
         let mut provider_failure = None;
-        match result {
-            Ok(result) => {
-                self.apply_provider_success(&mut latest, result, "Provider session resumed.");
-                self.finish_provider_operation(
-                    &operation.id,
-                    OperationState::Succeeded,
-                    "Provider session resumed",
-                )?;
-            }
-            Err(error) => {
-                let detail =
-                    format!("Provider session resume failed; transcript preserved: {error}");
-                provider_failure = Some(detail.clone());
-                self.apply_provider_failure(&mut latest, detail);
-                self.finish_provider_operation(
-                    &operation.id,
-                    OperationState::Failed,
-                    "Provider session resume failed",
-                )?;
+        if latest.closed {
+            latest.in_flight = false;
+            latest.queue_dispatching = false;
+            latest.last_turn_started_at = None;
+            latest.transcript_events.push(chat_event(
+                "progress",
+                "Managed provider process exited after cancellation.",
+                true,
+                latest.provider_session_id.clone(),
+                Some(json!({"source": "process_supervisor"})),
+            ));
+            self.finish_provider_operation(
+                &operation.id,
+                OperationState::Cancelled,
+                "Provider session resume cancelled after managed process exit",
+            )?;
+        } else {
+            match result {
+                Ok(result) => {
+                    self.apply_provider_success(&mut latest, result, "Provider session resumed.");
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Succeeded,
+                        "Provider session resumed",
+                    )?;
+                }
+                Err(error) => {
+                    let detail =
+                        format!("Provider session resume failed; transcript preserved: {error}");
+                    provider_failure = Some(detail.clone());
+                    self.apply_provider_failure(&mut latest, detail);
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Failed,
+                        "Provider session resume failed",
+                    )?;
+                }
             }
         }
         latest.updated_at = now_timestamp();
@@ -876,6 +954,15 @@ impl FileChatService {
         }
         let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let policy = WorkflowEngine::with_target_root(&self.runtime_root, &target_root).policy()?;
+        if record.provider != policy.provider {
+            return Err(RefineError::Conflict(format!(
+                "Supervisor session provider {} does not match configured agent_cli {}; migrate the session before dispatch",
+                record.provider, policy.provider
+            )));
+        }
+        if self.other_supervisor_process_is_running(&record.id)? {
+            return Ok(None);
+        }
         let service = AgentCapacityService::new(&self.runtime_root);
         let owner_id = format!("supervisor:{}", record.id);
         let acquired = service.try_acquire(
@@ -938,6 +1025,72 @@ impl FileChatService {
                             | OperationState::Cancelling
                     )
             }))
+    }
+
+    fn managed_process_roots(&self) -> [PathBuf; 2] {
+        [self.runtime_root.join("agents"), self.runtime_root.clone()]
+    }
+
+    fn session_managed_processes(&self, session_id: &str) -> RefineResult<Vec<(PathBuf, String)>> {
+        let mut matches = Vec::new();
+        for root in self.managed_process_roots() {
+            for process in FileProcessSupervisor::new(&root).list()? {
+                let belongs_to_session = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                    .and_then(|details| {
+                        details
+                            .get("session_id")
+                            .and_then(Value::as_str)
+                            .map(|value| value == session_id)
+                    })
+                    .unwrap_or(false);
+                if belongs_to_session {
+                    matches.push((root.clone(), process.id));
+                }
+            }
+        }
+        Ok(matches)
+    }
+
+    fn session_has_managed_process(&self, session_id: &str) -> RefineResult<bool> {
+        Ok(!self.session_managed_processes(session_id)?.is_empty())
+    }
+
+    fn other_supervisor_process_is_running(&self, session_id: &str) -> RefineResult<bool> {
+        for root in self.managed_process_roots() {
+            for process in FileProcessSupervisor::new(root).list()? {
+                let details = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok());
+                let is_supervisor = details.as_ref().is_some_and(|details| {
+                    details.get("agent_role").and_then(Value::as_str) == Some("supervisor")
+                        || details.get("mode").and_then(Value::as_str) == Some("supervisor")
+                });
+                let is_current = details
+                    .as_ref()
+                    .and_then(|details| details.get("session_id"))
+                    .and_then(Value::as_str)
+                    == Some(session_id);
+                if is_supervisor && !is_current {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn request_session_process_termination(&self, session_id: &str) -> RefineResult<usize> {
+        let processes = self.session_managed_processes(session_id)?;
+        for (root, process_id) in &processes {
+            match FileProcessSupervisor::new(root).request_termination(process_id, "terminate") {
+                Ok(_) | Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(processes.len())
     }
 
     fn ensure_queue_dispatch(&self, record: &mut ChatSessionRecord) -> RefineResult<()> {
@@ -1022,7 +1175,7 @@ impl FileChatService {
             let operation = self.register_provider_operation(&record, "invoke")?;
             let provider = HostAgentProviderService {
                 path_override: self.provider_path_override(),
-                runtime_root: Some(self.runtime_root.clone()),
+                runtime_root: Some(self.runtime_root.join("agents")),
             };
             let result = provider.invoke_detailed_with_output(
                 ProviderInvocation {
@@ -1039,24 +1192,46 @@ impl FileChatService {
             let _guard = self.acquire_session_lock(session_id)?;
             let mut latest = self.load_record(session_id)?;
             let mut provider_failure = None;
-            match result {
-                Ok(result) => {
-                    self.apply_provider_success(&mut latest, result, "Provider turn completed.");
-                    self.finish_provider_operation(
-                        &operation.id,
-                        OperationState::Succeeded,
-                        "Provider turn completed",
-                    )?;
-                }
-                Err(error) => {
-                    let detail = format!("Provider turn failed: {error}");
-                    provider_failure = Some(detail.clone());
-                    self.apply_provider_failure(&mut latest, detail);
-                    self.finish_provider_operation(
-                        &operation.id,
-                        OperationState::Failed,
-                        "Provider turn failed",
-                    )?;
+            if latest.closed {
+                latest.in_flight = false;
+                latest.queue_dispatching = false;
+                latest.last_turn_started_at = None;
+                latest.transcript_events.push(chat_event(
+                    "progress",
+                    "Managed provider process exited after cancellation.",
+                    true,
+                    latest.provider_session_id.clone(),
+                    Some(json!({"source": "process_supervisor"})),
+                ));
+                self.finish_provider_operation(
+                    &operation.id,
+                    OperationState::Cancelled,
+                    "Provider turn cancelled after managed process exit",
+                )?;
+            } else {
+                match result {
+                    Ok(result) => {
+                        self.apply_provider_success(
+                            &mut latest,
+                            result,
+                            "Provider turn completed.",
+                        );
+                        self.finish_provider_operation(
+                            &operation.id,
+                            OperationState::Succeeded,
+                            "Provider turn completed",
+                        )?;
+                    }
+                    Err(error) => {
+                        let detail = format!("Provider turn failed: {error}");
+                        provider_failure = Some(detail.clone());
+                        self.apply_provider_failure(&mut latest, detail);
+                        self.finish_provider_operation(
+                            &operation.id,
+                            OperationState::Failed,
+                            "Provider turn failed",
+                        )?;
+                    }
                 }
             }
             latest.updated_at = now_timestamp();
@@ -1224,6 +1399,7 @@ impl ChatService for FileChatService {
     }
 
     fn interrupt(&self, session_id: &str, detail: &str) -> RefineResult<ChatSessionRecord> {
+        self.request_session_process_termination(session_id)?;
         let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         record.closed = true;
@@ -1960,6 +2136,9 @@ mod tests {
             crate::tools::host::project_layout::prepare_refine_dir(&temp_root).unwrap();
         write_fake_provider(&refine_dir, "smoke-ai", 2, "provider auth failed");
         let service = FileChatService::new(&refine_dir);
+        FileSettingsService::with_active_root(&refine_dir, &service.runtime_root)
+            .update(&json!({"agent_cli": "smoke-ai"}))
+            .unwrap();
         let session = service
             .start_with_options(
                 ChatAttachment::Supervisor,

@@ -6,6 +6,7 @@
 - **Process And Agent Are Distinct**: the supervisor process keeps Refine runtime work alive; the supervisor agent observes and explains workflow work within that process boundary.
 - **Ordinary CLI Agent**: the supervisor agent uses the configured `agent_cli` and the same provider, process supervision, limits, streaming, session resume, queue, cancellation, and failure handling as every other Refine agent.
 - **One Capacity Truth**: workflow and supervisor turns acquire atomic leases from the same global, node, provider, and target-app capacity policy at provider-launch time.
+- **One Provider Truth**: configured `agent_cli` controls session dispatch, capacity accounting, process evidence, and API state; provider-specific resume state is reset when configuration changes.
 - **Existing Backend Evidence**: workflow, process, Git-sync, projection, operation, and activity services remain authoritative; the supervisor projection does not recreate their rules.
 - **Conversation Reuses Chat**: automatic evidence, user prompts, and follow-ups share one ordinary chat session and transcript.
 - **Visible While Idle**: the capability remains discoverable and promptable when no Goal is active.
@@ -33,3 +34,5 @@ Stall evidence combines Goal state with the existing process registry and proces
 - `degraded`: a stall or runtime failure needs action.
 
 Daemon restarts rebuild the adapter state from existing evidence, retain the singleton supervisor conversation, recover interrupted chat turns through the normal chat service, and reclaim capacity leases whose holder process no longer exists. Success, provider failure, interruption, cancellation, closed sessions, and abandoned dispatch all release capacity without creating a second scheduler. A project lock, durable context key, and singleton session lookup prevent concurrent Goals or reconnects from launching duplicate supervisor turns.
+
+All Goal and Supervisor provider processes register under the runtime managed-agent process root. Stop and retry locate work by the structured session or execution metadata in that registry and request cross-platform termination through the Process capability. The registry remains authoritative until the child exits, and its capacity lease is not released during that stopping window. Legacy port-root records remain observable only for upgrade cleanup; new dispatch never creates them there.

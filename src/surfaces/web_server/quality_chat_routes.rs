@@ -40,20 +40,8 @@ impl InProcessWebServer {
                     .to_string(),
             ));
         }
-        let configured_provider =
-            self.settings_service(&refine_dir)
-                .load()
-                .ok()
-                .and_then(|settings| {
-                    settings
-                        .get("agent_cli")
-                        .and_then(Value::as_str)
-                        .map(str::to_string)
-                });
-        let provider = configured_provider;
         let chat = self.chat_service(&refine_dir);
-        match FileSupervisorAgentService::new(&refine_dir, runtime_root)
-            .ensure_chat_session(&chat, provider.as_deref())
+        match FileSupervisorAgentService::new(&refine_dir, runtime_root).ensure_chat_session(&chat)
         {
             Ok(session) => ApiResponse::json(
                 200,

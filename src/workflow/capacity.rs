@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::process::subprocess::managed_pid_is_alive;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::workflow::{WorkflowPolicy, now_timestamp};
 
@@ -60,7 +61,7 @@ impl AgentCapacityService {
     ) -> RefineResult<bool> {
         let _guard = self.acquire_lock()?;
         let mut state = self.load_state()?;
-        let pruned = prune_dead_leases(&mut state);
+        let pruned = prune_dead_leases(&mut state)?;
         if let Some(existing) = state
             .leases
             .iter()
@@ -96,7 +97,7 @@ impl AgentCapacityService {
         let mut state = self.load_state()?;
         let before = state.leases.len();
         state.leases.retain(|lease| lease.owner_id != owner_id);
-        let changed = prune_dead_leases(&mut state) || state.leases.len() != before;
+        let changed = prune_dead_leases(&mut state)? || state.leases.len() != before;
         if changed {
             self.write_state(&state)?;
         }
@@ -106,7 +107,7 @@ impl AgentCapacityService {
     pub fn snapshot(&self) -> RefineResult<AgentCapacityState> {
         let _guard = self.acquire_lock()?;
         let mut state = self.load_state()?;
-        if prune_dead_leases(&mut state) {
+        if prune_dead_leases(&mut state)? {
             self.write_state(&state)?;
         }
         Ok(state)
@@ -225,22 +226,16 @@ fn capacity_available(
             < policy.per_target_app_limit
 }
 
-fn prune_dead_leases(state: &mut AgentCapacityState) -> bool {
+fn prune_dead_leases(state: &mut AgentCapacityState) -> RefineResult<bool> {
     let before = state.leases.len();
-    state
-        .leases
-        .retain(|lease| process_is_alive(lease.holder_pid));
-    state.leases.len() != before
-}
-
-#[cfg(unix)]
-fn process_is_alive(pid: u32) -> bool {
-    Path::new(&format!("/proc/{pid}")).exists()
-}
-
-#[cfg(not(unix))]
-fn process_is_alive(_pid: u32) -> bool {
-    true
+    let mut live = Vec::with_capacity(state.leases.len());
+    for lease in state.leases.drain(..) {
+        if managed_pid_is_alive(lease.holder_pid)? {
+            live.push(lease);
+        }
+    }
+    state.leases = live;
+    Ok(state.leases.len() != before)
 }
 
 struct AgentCapacityLock {

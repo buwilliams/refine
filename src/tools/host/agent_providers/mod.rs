@@ -226,6 +226,24 @@ impl HostAgentProviderService {
     where
         F: FnMut(String),
     {
+        self.resume_detailed_with_output_and_metadata(
+            provider,
+            session_id,
+            Default::default(),
+            on_output,
+        )
+    }
+
+    pub fn resume_detailed_with_output_and_metadata<F>(
+        &self,
+        provider: &str,
+        session_id: &str,
+        process_metadata: Map<String, Value>,
+        on_output: F,
+    ) -> RefineResult<ProviderInvocationResult>
+    where
+        F: FnMut(String),
+    {
         let (spec, binary) = self.resolve_binary_for_provider(provider)?;
         if !spec.supports_resume {
             return Err(RefineError::InvalidInput(format!(
@@ -238,7 +256,7 @@ impl HostAgentProviderService {
             &args,
             None,
             spec.output_format,
-            Default::default(),
+            process_metadata,
             on_output,
         )
     }

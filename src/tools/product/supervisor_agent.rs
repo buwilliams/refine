@@ -194,13 +194,10 @@ impl FileSupervisorAgentService {
         })
     }
 
-    pub fn ensure_chat_session(
-        &self,
-        chat: &FileChatService,
-        provider: Option<&str>,
-    ) -> RefineResult<ChatSessionRecord> {
+    pub fn ensure_chat_session(&self, chat: &FileChatService) -> RefineResult<ChatSessionRecord> {
         let _guard = self.acquire_lock()?;
-        let (session, duplicates) = self.ensure_chat_session_locked(chat, provider)?;
+        let configured_provider = self.configured_provider();
+        let (session, duplicates) = self.ensure_chat_session_locked(chat, &configured_provider)?;
         for duplicate in duplicates {
             let _ = chat.interrupt(
                 &duplicate,
@@ -208,7 +205,9 @@ impl FileSupervisorAgentService {
             );
         }
         let mut state = self.snapshot()?;
-        if state.session_id.as_deref() != Some(&session.id) {
+        if state.session_id.as_deref() != Some(&session.id)
+            || state.provider.as_deref() != Some(&session.provider)
+        {
             state.session_id = Some(session.id.clone());
             state.provider = Some(session.provider.clone());
             push_event(
@@ -351,7 +350,7 @@ impl FileSupervisorAgentService {
                 state.session_id = Some(running_session_id);
             } else {
                 let (session, duplicates) =
-                    self.ensure_chat_session_locked(&chat, configured_provider.as_deref())?;
+                    self.ensure_chat_session_locked(&chat, &configured_provider)?;
                 for duplicate in duplicates {
                     let _ = chat.interrupt(
                         &duplicate,
@@ -431,7 +430,7 @@ impl FileSupervisorAgentService {
     fn ensure_chat_session_locked(
         &self,
         chat: &FileChatService,
-        provider: Option<&str>,
+        configured_provider: &str,
     ) -> RefineResult<(ChatSessionRecord, Vec<String>)> {
         let mut sessions = chat
             .list_sessions()?
@@ -442,10 +441,21 @@ impl FileSupervisorAgentService {
             .collect::<Vec<_>>();
         sessions.sort_by(|left, right| left.created_at.cmp(&right.created_at));
         let session = match sessions.first() {
-            Some(session) => session.clone(),
-            None => {
-                chat.start_with_options(ChatAttachment::Supervisor, provider, Some("supervisor"))?
+            Some(session) => {
+                match chat.migrate_supervisor_provider(&session.id, configured_provider)? {
+                    Some(session) => session,
+                    None => chat.start_with_options(
+                        ChatAttachment::Supervisor,
+                        Some(configured_provider),
+                        Some("supervisor"),
+                    )?,
+                }
             }
+            None => chat.start_with_options(
+                ChatAttachment::Supervisor,
+                Some(configured_provider),
+                Some("supervisor"),
+            )?,
         };
         let duplicates = sessions
             .into_iter()
@@ -487,7 +497,7 @@ impl FileSupervisorAgentService {
         Ok(evidence)
     }
 
-    fn configured_provider(&self) -> Option<String> {
+    fn configured_provider(&self) -> String {
         FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root)
             .load()
             .ok()
@@ -499,6 +509,7 @@ impl FileSupervisorAgentService {
                     .filter(|value| !value.is_empty())
                     .map(str::to_string)
             })
+            .unwrap_or_else(|| "claude".to_string())
     }
 
     fn configured_stall_seconds(&self) -> i64 {
@@ -840,10 +851,13 @@ fn push_event(
 mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::sync::{Arc, Barrier};
+    use std::time::Instant;
 
     use serde_json::json;
 
     use super::*;
+    use crate::workflow::WorkflowEngine;
+    use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
     fn test_service(name: &str) -> FileSupervisorAgentService {
         let root = std::env::temp_dir().join(format!(
@@ -913,6 +927,25 @@ mod tests {
         fs::set_permissions(&bin, permissions).unwrap();
     }
 
+    fn write_cancellable_smoke_provider(service: &FileSupervisorAgentService) -> PathBuf {
+        let bin = service.refine_dir.join("provider-bin/smoke-ai");
+        let marker = service.refine_dir.join("cancellable-provider.marker");
+        fs::create_dir_all(bin.parent().unwrap()).unwrap();
+        fs::write(
+            &bin,
+            format!(
+                "#!/usr/bin/env bash\ntrap 'printf terminated > \"{}\"; sleep 0.25; exit 143' TERM\nprintf started > \"{}\"\nwhile :; do :; done\n",
+                marker.display(),
+                marker.display()
+            ),
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&bin).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&bin, permissions).unwrap();
+        marker
+    }
+
     fn wait_for_session(service: &FileSupervisorAgentService) -> ChatSessionRecord {
         let chat = FileChatService::with_runtime_root(&service.refine_dir, &service.runtime_root);
         for _ in 0..200 {
@@ -970,6 +1003,124 @@ mod tests {
             before,
             "a no-op reconcile must not rewrite durable supervisor state"
         );
+    }
+
+    #[test]
+    fn durable_supervisor_session_migrates_to_configured_provider() {
+        let service = test_service("provider-migration");
+        let chat = FileChatService::with_runtime_root(&service.refine_dir, &service.runtime_root);
+        let mut legacy = chat
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("claude"),
+                Some("supervisor"),
+            )
+            .unwrap();
+        legacy.provider_session_id = Some("legacy-provider-session".to_string());
+        fs::write(
+            service
+                .refine_dir
+                .join("chat/sessions")
+                .join(format!("{}.json", legacy.id)),
+            serde_json::to_vec_pretty(&legacy).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = service.ensure_chat_session(&chat).unwrap();
+        assert_eq!(migrated.id, legacy.id);
+        assert_eq!(migrated.provider, "smoke-ai");
+        assert_eq!(migrated.provider_session_id, None);
+        assert!(migrated.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|text| text.contains("migrated from claude to smoke-ai"))
+        }));
+
+        FileSettingsService::with_active_root(&service.refine_dir, &service.runtime_root)
+            .update(&json!({"agent_cli": "codex"}))
+            .unwrap();
+        let reconfigured = service.ensure_chat_session(&chat).unwrap();
+        assert_eq!(reconfigured.id, legacy.id);
+        assert_eq!(reconfigured.provider, "codex");
+        assert_eq!(reconfigured.provider_session_id, None);
+    }
+
+    #[test]
+    fn stop_signals_managed_provider_and_holds_capacity_until_exit() {
+        let service = test_service("managed-stop");
+        FileSettingsService::with_active_root(&service.refine_dir, &service.runtime_root)
+            .update(&json!({
+                "parallel_run_cap": "1",
+                "parallel_per_node_cap": "1",
+                "parallel_per_provider_cap": "1",
+                "parallel_per_target_app_cap": "1"
+            }))
+            .unwrap();
+        let marker = write_cancellable_smoke_provider(&service);
+        write_goal(&service, "GOAL1", "todo", &Utc::now().to_rfc3339());
+        let state = service.reconcile().unwrap();
+        let session_id = state.session_id.unwrap();
+        let process_supervisor = FileProcessSupervisor::new(service.runtime_root.join("agents"));
+        for _ in 0..200 {
+            if marker.exists() && !process_supervisor.list().unwrap().is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(fs::read_to_string(&marker).unwrap(), "started");
+        assert_eq!(process_supervisor.list().unwrap().len(), 1);
+
+        let chat = FileChatService::with_runtime_root(&service.refine_dir, &service.runtime_root);
+        let started = Instant::now();
+        let stopped = chat.stop(&session_id).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(stopped.closed);
+        assert_eq!(stopped.interruption_detail.as_deref(), Some("stopped"));
+        assert_eq!(process_supervisor.list().unwrap().len(), 1);
+
+        let capacity = AgentCapacityService::new(&service.runtime_root);
+        assert_eq!(capacity.snapshot().unwrap().leases.len(), 1);
+        let policy = WorkflowEngine::with_target_root(
+            &service.runtime_root,
+            service.refine_dir.parent().unwrap(),
+        )
+        .policy()
+        .unwrap();
+        let workflow_request = AgentCapacityRequest {
+            owner_id: "workflow:test".to_string(),
+            role: "workflow".to_string(),
+            node_id: policy.active_node_id.clone(),
+            provider: policy.provider.clone(),
+            target_app_id: policy.target_app_id.clone(),
+        };
+        assert!(
+            !capacity
+                .try_acquire(&policy, workflow_request.clone())
+                .unwrap()
+        );
+
+        for _ in 0..300 {
+            if process_supervisor.list().unwrap().is_empty()
+                && capacity.snapshot().unwrap().leases.is_empty()
+            {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert!(process_supervisor.list().unwrap().is_empty());
+        assert!(capacity.snapshot().unwrap().leases.is_empty());
+        assert!(capacity.try_acquire(&policy, workflow_request).unwrap());
+        assert!(capacity.release("workflow:test").unwrap());
+        let completed = chat.read(&session_id).unwrap();
+        assert!(!completed.in_flight);
+        assert_eq!(completed.closed_reason.as_deref(), Some("stopped"));
+        assert!(
+            completed.progress_lines.iter().any(|line| {
+                line.contains("Managed provider process exited after cancellation")
+            })
+        );
+        assert_eq!(fs::read_to_string(&marker).unwrap(), "terminated");
     }
 
     #[test]

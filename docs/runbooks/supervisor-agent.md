@@ -18,11 +18,15 @@ Queued or active Goal work starts the configured CLI provider automatically. Ope
 
 Supervisor sessions always use the configured `agent_cli`; their API does not accept a provider override. Supervisor and Goal turns share all configured concurrency caps. At cap 1, supervisor input may visibly remain queued until the Goal turn releases capacity. At cap 2, both may run together only when the node, provider, and target-app caps also permit it.
 
+Changing `agent_cli` also migrates the durable Supervisor session before its next dispatch. An idle session keeps its transcript but resets provider-specific resume state. If the old provider is still running, Refine signals it through the managed-agent process registry, closes that session truthfully, and queues work on a configured-provider replacement only after the old process exits.
+
 Provider and authentication errors are shown as chat failures. Fix provider access through the normal agent configuration and authentication commands; do not treat those failures as workflow recovery.
 
 ## Recover
 
 Automatic recovery is deliberately narrow. On daemon or workflow-runner restart, the existing workflow engine restores the worker and marks interrupted Goals failed so they can be restarted later. The supervisor agent uses existing Refine operations; it does not own a parallel recovery engine. A lost or stalled Goal is reported but is not force-merged, reset, or deleted.
+
+The toolbar Stop action requests termination through the same cross-platform Process capability used by Goal agents. The request returns without waiting on the UI path, but the shared capacity lease remains occupied until the managed provider process is confirmed exited. A retry attempted during that stopping window remains blocked, preventing cap-1 overlap.
 
 For an actionable failed Goal, inspect its evidence and use the ordinary retry command for the failed stage. For example:
 

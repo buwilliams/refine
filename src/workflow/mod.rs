@@ -18,7 +18,7 @@ use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal}
 use crate::model::goal::GoalPriority;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
@@ -382,25 +382,35 @@ impl WorkflowEngine {
         Ok(goal_ids.len())
     }
 
-    fn signal_workflow_subprocesses(&self, execution_id: &str, signal: &str) -> RefineResult<()> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        for process in supervisor.list()? {
-            let matches_execution = process
-                .details
-                .as_deref()
-                .and_then(|details| serde_json::from_str::<Value>(details).ok())
-                .and_then(|details| {
-                    details
-                        .get("execution_id")
-                        .and_then(|value| value.as_str())
-                        .map(|value| value == execution_id)
-                })
-                .unwrap_or(false);
-            if matches_execution {
-                supervisor.signal(&process.id, signal)?;
+    fn signal_workflow_subprocesses(
+        &self,
+        execution_id: &str,
+        signal: &str,
+    ) -> RefineResult<usize> {
+        let mut signalled = 0;
+        // Current providers register under the managed-agent root. The legacy port root remains
+        // observable during migration so a daemon upgrade can still stop an older process.
+        for process_root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
+            let supervisor = FileProcessSupervisor::new(process_root);
+            for process in supervisor.list()? {
+                let matches_execution = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                    .and_then(|details| {
+                        details
+                            .get("execution_id")
+                            .and_then(|value| value.as_str())
+                            .map(|value| value == execution_id)
+                    })
+                    .unwrap_or(false);
+                if matches_execution {
+                    supervisor.request_termination(&process.id, signal)?;
+                    signalled += 1;
+                }
             }
         }
-        Ok(())
+        Ok(signalled)
     }
 
     fn ensure_automation_running(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
@@ -1180,7 +1190,7 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
-        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
@@ -1191,7 +1201,9 @@ impl WorkflowAutomation for WorkflowEngine {
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
             self.save_state(&mut state)?;
-            self.release_claim_capacity(&claim_id)?;
+            if signalled == 0 {
+                self.release_claim_capacity(&claim_id)?;
+            }
         }
         Ok(())
     }
@@ -1211,7 +1223,11 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim for execution {execution_id} was not found"
             )));
         };
-        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        if self.signal_workflow_subprocesses(execution_id, "terminate")? > 0 {
+            return Err(RefineError::Conflict(format!(
+                "execution {execution_id} is still stopping; retry after its managed agent process exits"
+            )));
+        }
         let request = Self::claim_capacity_request(&state.claims[claim_index]);
         if !self.capacity_service().try_acquire(&policy, request)? {
             return Err(RefineError::Conflict(
@@ -1616,6 +1632,7 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::subprocess::ManagedProcess;
     use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
     use crate::tools::product::nodes::FileNodeRegistryService;
@@ -2872,6 +2889,69 @@ mod tests {
         );
         assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn workflow_cancel_reaches_managed_agent_registry_before_retry() {
+        let temp_root = unique_temp_dir("automation-managed-cancel");
+        let runtime_root = temp_root.join("run/8080");
+        let automation = WorkflowEngine::new(&runtime_root);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        let execution_id = automation.start_claim(&claim_id).unwrap();
+        let agent_supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let mut child = Command::new("sleep").arg("30").spawn().unwrap();
+        agent_supervisor
+            .register(ManagedProcess {
+                id: "workflow-provider".to_string(),
+                owner: crate::process::subprocess::ProcessOwner::Agent,
+                pid: Some(child.id()),
+                state: "running".to_string(),
+                label: Some("sleep".to_string()),
+                details: Some(
+                    json!({
+                        "kind": "workflow",
+                        "execution_id": execution_id,
+                        "goal_id": "GOAL1"
+                    })
+                    .to_string(),
+                ),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        automation.cancel(&execution_id).unwrap();
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Cancelled
+        );
+        assert!(automation.retry(&execution_id).is_err());
+        for _ in 0..40 {
+            if child.try_wait().unwrap().is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        assert!(child.try_wait().unwrap().is_some());
+        assert!(
+            agent_supervisor
+                .recover_owner(crate::process::subprocess::ProcessOwner::Agent)
+                .unwrap()
+                .is_empty()
+        );
+
+        let retried_execution_id = automation.retry(&execution_id).unwrap();
+        assert_ne!(retried_execution_id, execution_id);
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Running
+        );
+        automation.release_claim_capacity(&claim_id).unwrap();
         fs::remove_dir_all(temp_root).unwrap();
     }
 
