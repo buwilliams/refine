@@ -122,28 +122,76 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:44:18Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T17:44:37Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF28DJN97511XVA007-round-2",
+        "failed_actions": [
+          {
+            "message": "QA retry creates a new claim that snapshots the current quality_timing instead of preserving the failed round's timing. Changing pre_merge to post_build before retry makes a successful retry advance directly from QA to review, skipping the required build.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Quality records candidate_commit but never verifies that the worktree HEAD and contents still match it before or after provider and command execution. A provider or command can modify the worktree and exit successfully, producing passing evidence for code different from the committed candidate; the tests verify process execution but not commit correlation.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Two governance violations remain in QA recovery and evidence integrity.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"QA retry creates a new claim that snapshots the current quality_timing instead of preserving the failed round's timing. Changing pre_merge to post_build before retry makes a successful retry advance directly from QA to review, skipping the required build.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Quality records candidate_commit but never verifies that the worktree HEAD and contents still match it before or after provider and command execution. A provider or command can modify the worktree and exit successfully, producing passing evidence for code different from the committed candidate; the tests verify process execution but not commit correlation.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Two governance violations remain in QA recovery and evidence integrity.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "QA retry creates a new claim that snapshots the current quality_timing instead of preserving the failed round's timing. Changing pre_merge to post_build before retry makes a successful retry advance directly from QA to review, skipping the required build.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Quality records candidate_commit but never verifies that the worktree HEAD and contents still match it before or after provider and command execution. A provider or command can modify the worktree and exit successfully, producing passing evidence for code different from the committed candidate; the tests verify process execution but not commit correlation.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF28DJN97511XVA007-round-2"
+      },
+      "governance_message": "Two governance violations remain in QA recovery and evidence integrity.",
+      "governance_rule_actions": [
+        {
+          "message": "QA retry creates a new claim that snapshots the current quality_timing instead of preserving the failed round's timing. Changing pre_merge to post_build before retry makes a successful retry advance directly from QA to review, skipping the required build.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Quality records candidate_commit but never verifies that the worktree HEAD and contents still match it before or after provider and command execution. A provider or command can modify the worktree and exit successfully, producing passing evidence for code different from the committed candidate; the tests verify process execution but not commit correlation.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Implemented and committed Goal `00000SZ2CF28DJN97511XVA007`; the worktree is clean and reviewable at `a40ab0e`.\n\nKey changes:\n\n- Composed shared Quality core `c1e9a9a` and preserved candidate `58d5b76` in branch ancestry.\n- Consolidated Quality around one settings file, service, prompt, operation path, and evidence contract.\n- Removed the duplicate Quality prompt and legacy command-override API semantics.\n- Added supervised per-test execution with observed process ID, exit status, stdout, and stderr correlation in [service.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF28DJN97511XVA007-round-2/src/tools/host/quality/service.rs:1437).\n- Added genuine capacity-governed QA retry that restores the preserved candidate and enters directly at QA in [workflow/mod.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF28DJN97511XVA007-round-2/src/workflow/mod.rs:1073).\n- Unified API and explicit-root CLI retry paths through that workflow capability.\n- Added parity, recovery, false-positive, provider/tool failure, cancellation, and evidence-persistence coverage.\n- Kept the UI-only sibling isolated; no invented merge was performed.\n\nVerification:\n\n- `cargo test --lib` — 433 passed, 0 failed.\n- `cargo test --test full_workflow -- --ignored --nocapture` — 1 passed, 0 failed.\n- QA preserved-candidate retry test — 1 passed.\n- False-positive supervised-execution test — 1 passed.\n- `node --test tests/web_*.test.js` — 31 passed, 0 failed.\n- `cargo clippy --lib --tests -- -D warnings` — exit 0.\n- `cargo fmt --all -- --check` — exit 0.\n- `git diff --check` — exit 0.\n- Final Git status — clean.\n\nCommits:\n\n- `6eaec18` — Compose shared Quality core\n- `20ddbd6` — Preserve Round 1 Quality candidate\n- `a40ab0e` — Remediate always-on Quality governance findings",
       "implementation_reported_at": "2026-07-22T17:39:46Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate 58d5b76c2f11f6eaba01f32af7086458ac076465 and remediate all four governance findings after the shared plain-language Quality core from sibling Goal 00000SZ2CF255HWFA0G9XVA006 has converged on main; inspect that landed implementation first and compose it instead of duplicating or replacing it. There must be one authoritative Quality settings model, service, agent evaluator, operation/process path, and evidence contract used by workflow, API, UI, CLI, MCP, and desktop; remove split node-settings versus quality/settings ownership and remove the legacy arbitrary-command API semantics rather than maintaining parallel pass rules. Make retry-quality truly re-enter the preserved candidate at QA through the workflow claim/behavior engine (not WorkflowTodo), with correct ownership, capacity, operation state, logs, cancellation, provider/tool failure, and recovery. Treat supervised Process outcomes as the evidence source: provider JSON may reference tool executions but cannot prove them by nonempty strings; correlate every test result with observed supervised execution/output and reject missing or fabricated evidence. Empty configured tests are the only successful no-provider no-op; an empty command is not a Quality pass path. Add focused cross-surface parity, QA retry/re-entry, supervised execution correlation, false-positive fixture, provider/tool failure, and evidence persistence tests. Coordinate with sibling Goal 00000SZ2CF2CP3NVV3J1XVA008 for UI-only composition, preserve isolated worktrees and serial review, and do not force or invent merges.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T17:39:46Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T17:44:37Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T17:39:47Z"
+  "updated": "2026-07-22T17:44:37Z"
 }
