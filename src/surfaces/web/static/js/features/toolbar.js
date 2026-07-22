@@ -11,6 +11,7 @@ const SYSTEM_TAB_ID = "system";
 const TERMINAL_TAB_ID = "terminal";
 const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
+const GOAL_LOG_TAIL_LIMIT = 200;
 const SYSTEM_LOG_FILTERS = [
   { status: "info", label: "Info" },
   { status: "start", label: "Started" },
@@ -153,7 +154,7 @@ function currentToolbarTab() {
 
 function currentChatTab() {
   const tab = currentToolbarTab();
-  if (!tab || tab.mode === "files" || tab.mode === "system" || tab.mode === "terminal") return null;
+  if (!tab || ["files", "system", "terminal", "goal_logs"].includes(tab.mode)) return null;
   return tab;
 }
 
@@ -227,6 +228,9 @@ function saveChatStateToStorage() {
         queuedMessages: normalizeQueuedMessages(t.queuedMessages),
         localQueuedMessages: normalizeQueuedMessages(t.localQueuedMessages),
         starting: !!t.starting,
+        logEntries: t.mode === "goal_logs"
+          ? normalizeGoalLogEntries(t.logEntries).slice(-GOAL_LOG_TAIL_LIMIT)
+          : undefined,
     };
   }
   try {
@@ -395,6 +399,36 @@ function openChatDock({ goalId = null, goalStatus = null } = {}) {
     const t = chatState.tabs[goalId];
     if (t && !t.sessionId) startGoalChatSession(t);
   }
+}
+
+function goalLogTabId(goalId) {
+  return `goal-logs:${goalId}`;
+}
+
+function openGoalLogTail({ goalId, goalName = "" } = {}) {
+  if (!goalId) return;
+  ensureStandaloneTab();
+  const tabId = goalLogTabId(goalId);
+  if (!chatState.tabs[tabId]) {
+    chatState.tabs[tabId] = {
+      goalId,
+      label: `Logs ${goalId.slice(0, 8)}…`,
+      mode: "goal_logs",
+      goalName,
+      sessionId: null,
+      logEntries: [],
+      logsLoaded: false,
+      logsLoading: false,
+      logsError: "",
+    };
+  } else if (goalName) {
+    chatState.tabs[tabId].goalName = goalName;
+  }
+  chatState.activeTabId = tabId;
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawToolbar();
+  loadGoalLogTail(chatState.tabs[tabId]);
 }
 
 async function renderGoalPlan() {
@@ -566,6 +600,7 @@ function drawToolbar() {
   const filesActive = active.mode === "files";
   const systemActive = active.mode === "system";
   const terminalActive = active.mode === "terminal";
+  const goalLogsActive = active.mode === "goal_logs";
   const hasSession = !!active.sessionId;
 
   const startLabel = active.goalId
@@ -578,7 +613,7 @@ function drawToolbar() {
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
-  const statusLine = chatStatusLine(active);
+  const statusLine = goalLogsActive ? "" : chatStatusLine(active);
 
   root.classList.toggle("open", !!chatState.open);
   root.classList.toggle("fullscreen", !!chatState.fullscreen);
@@ -625,23 +660,30 @@ function drawToolbar() {
           ? renderSystemPanel()
           : terminalActive
             ? renderTerminalPanel()
-            : renderChatPanel(active, {
-                toggleClass,
-                toggleLabel,
-                statusLine,
-                hasSession,
-              })}
+            : goalLogsActive
+              ? renderGoalLogPanel(active)
+              : renderChatPanel(active, {
+                  toggleClass,
+                  toggleLabel,
+                  statusLine,
+                  hasSession,
+                })}
     </div>
   `;
-  if (!filesActive && !systemActive && !terminalActive) applyPendingIndicator(active);
+  if (!filesActive && !systemActive && !terminalActive && !goalLogsActive) applyPendingIndicator(active);
   if (filesActive) bindFilesPanel(root);
   if (systemActive) bindSystemPanel(root);
   if (terminalActive) bindTerminalPanel(root);
+  if (goalLogsActive) bindGoalLogPanel(root, active);
 
-  if (chatState.open && !filesActive && !systemActive && !terminalActive) {
+  if (chatState.open && !filesActive && !systemActive && !terminalActive && !goalLogsActive) {
     const out = $("#chat-output");
     if (out) out.scrollTop = out.scrollHeight;
     if (active.goalId && !active.goalStatus) refreshGoalChatStatus(active.goalId);
+  }
+  if (chatState.open && goalLogsActive) {
+    const out = root.querySelector("#goal-log-tail");
+    if (out) out.scrollTop = out.scrollHeight;
   }
 
   $$(".toolbar-tab", root).forEach((el) => {
@@ -670,7 +712,7 @@ function drawToolbar() {
   });
   $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
-  if (!filesActive && !systemActive && !terminalActive) {
+  if (!filesActive && !systemActive && !terminalActive && !goalLogsActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft-goal")?.addEventListener("click", draftGoalFromPlan);
     $("#btn-plan-draft")?.addEventListener("click", draftGoalsFromPlan);
@@ -709,6 +751,9 @@ function drawToolbar() {
   if (terminalActive) {
     focusTerminalSoon();
   }
+  if (goalLogsActive && !active.logsLoaded && !active.logsLoading) {
+    loadGoalLogTail(active);
+  }
 }
 
 function drawChatDock() { drawToolbar(); }
@@ -717,11 +762,12 @@ function toolbarTabTitle(tab) {
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
   if (tab.mode === "terminal") return "Terminal";
+  if (tab.mode === "goal_logs") return `Live logs for Goal ${tab.goalId}`;
   return tab.goalId || "Standalone chat";
 }
 
 function toolbarTabHasSessionIndicator(tab) {
-  return !!(tab && (tab.sessionId || tab.starting) && !["files", "system", "terminal"].includes(tab.mode));
+  return !!(tab && (tab.sessionId || tab.starting) && !["files", "system", "terminal", "goal_logs"].includes(tab.mode));
 }
 
 function toolbarTabActivityClass(tab) {
@@ -917,6 +963,136 @@ function resizeChatInput(input) {
   const max = 120;
   const next = Math.min(max, Math.max(42, input.scrollHeight || 42));
   input.style.height = `${next}px`;
+}
+
+function normalizeGoalLogEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry) => entry && typeof entry === "object" && entry.message);
+}
+
+function goalLogEntryKey(entry) {
+  return String(entry?.id || [
+    entry?.datetime || "",
+    entry?.severity || "",
+    entry?.category || "",
+    entry?.actor || "",
+    entry?.message || "",
+  ].join("\u0000"));
+}
+
+function mergeGoalLogEntries(...groups) {
+  const merged = new Map();
+  for (const entry of groups.flatMap(normalizeGoalLogEntries)) {
+    merged.set(goalLogEntryKey(entry), entry);
+  }
+  return [...merged.values()]
+    .sort((left, right) => {
+      const byTime = String(left.datetime || "").localeCompare(String(right.datetime || ""));
+      return byTime || goalLogEntryKey(left).localeCompare(goalLogEntryKey(right));
+    })
+    .slice(-GOAL_LOG_TAIL_LIMIT);
+}
+
+async function loadGoalLogTail(tab, { redraw = true } = {}) {
+  if (!tab?.goalId || tab.logsLoading) return;
+  tab.logsLoading = true;
+  tab.logsError = "";
+  if (redraw && chatState.tabs[chatState.activeTabId] === tab) drawToolbar();
+  const params = new URLSearchParams({
+    goal_id: tab.goalId,
+    limit: String(GOAL_LOG_TAIL_LIMIT),
+    offset: "0",
+    sort: "datetime",
+    // Fetch the newest page, then mergeGoalLogEntries presents it oldest-first.
+    dir: "desc",
+  });
+  try {
+    const data = await api("GET", `/api/activity?${params}`);
+    // Preserve SSE entries that may arrive while the historical request is in flight.
+    tab.logEntries = mergeGoalLogEntries(data.activity, tab.logEntries);
+    tab.logsLoaded = true;
+  } catch (error) {
+    tab.logsError = error?.message || "Could not load Goal logs.";
+  } finally {
+    tab.logsLoading = false;
+    saveChatStateToStorage();
+    if (chatState.tabs[chatState.activeTabId] === tab) drawToolbar();
+  }
+}
+
+function handleGoalLogSseEvent(entry) {
+  const goalId = String(entry?.goal_id || "");
+  if (!goalId) return;
+  const tab = chatState.tabs[goalLogTabId(goalId)];
+  if (!tab || tab.mode !== "goal_logs") return;
+  const entries = normalizeGoalLogEntries(tab.logEntries);
+  const key = goalLogEntryKey(entry);
+  if (entries.some((candidate) => goalLogEntryKey(candidate) === key)) return;
+  tab.logEntries = mergeGoalLogEntries(entries, [entry]);
+  tab.logsLoaded = true;
+  saveChatStateToStorage();
+  if (chatState.open && chatState.activeTabId === goalLogTabId(goalId)) drawToolbar();
+}
+
+function renderGoalLogPanel(tab) {
+  const entries = normalizeGoalLogEntries(tab.logEntries);
+  const status = tab.logsLoading
+    ? "Loading…"
+    : tab.logsError
+      ? tab.logsError
+      : `${entries.length} recent ${entries.length === 1 ? "entry" : "entries"}`;
+  return `
+    <div class="goal-log-panel" data-testid="toolbar-goal-log-panel">
+      <div class="goal-log-header">
+        <span class="goal-log-live" aria-label="Live log tail"><span aria-hidden="true"></span>Live tail</span>
+        <a class="chat-goal-link"
+           href="#/goals/${encodeURIComponent(tab.goalId)}"
+           data-testid="goal-log-goal-link">
+          Goal ${htmlEscape(tab.goalId.slice(0, 10))}…
+        </a>
+        <a class="chat-goal-link"
+           href="#/logs?goal_id=${encodeURIComponent(tab.goalId)}"
+           data-testid="goal-log-full-link">Open full logs</a>
+        <span class="spacer"></span>
+        <span class="muted small" data-testid="goal-log-status">${htmlEscape(status)}</span>
+        <button class="secondary small" type="button" id="btn-goal-log-refresh"
+                data-testid="goal-log-refresh" ${tab.logsLoading ? "disabled" : ""}>Refresh</button>
+      </div>
+      <div class="goal-log-tail" id="goal-log-tail" role="log" aria-live="polite"
+           aria-label="Live logs for Goal ${htmlEscape(tab.goalId)}"
+           data-testid="goal-log-tail">
+        ${entries.length
+          ? entries.map(renderGoalLogLine).join("")
+          : `<div class="goal-log-empty" data-testid="goal-log-empty">${tab.logsError ? htmlEscape(tab.logsError) : "Waiting for Goal activity."}</div>`}
+      </div>
+    </div>`;
+}
+
+function renderGoalLogLine(entry) {
+  const severity = normalizeSystemLogStatus(entry.severity);
+  const details = entry.details == null
+    ? ""
+    : typeof entry.details === "string"
+      ? entry.details
+      : JSON.stringify(entry.details, null, 2);
+  return `
+    <div class="goal-log-line goal-log-${htmlEscape(severity)}" data-testid="goal-log-line">
+      <span class="goal-log-time">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
+      <span class="goal-log-severity">${htmlEscape(entry.severity || "info")}</span>
+      <span class="goal-log-category">${htmlEscape(entry.category || "activity")}</span>
+      <span class="goal-log-message">
+        ${htmlEscape(entry.message)}
+        ${details ? `<details><summary>Details</summary><pre>${htmlEscape(details)}</pre></details>` : ""}
+      </span>
+      <span class="goal-log-actor">${htmlEscape(entry.actor || "")}</span>
+    </div>`;
+}
+
+function bindGoalLogPanel(root, tab) {
+  root.querySelector("#btn-goal-log-refresh")?.addEventListener("click", () => {
+    tab.logsLoaded = false;
+    loadGoalLogTail(tab);
+  });
 }
 
 function recordSystemOperation(payload) {

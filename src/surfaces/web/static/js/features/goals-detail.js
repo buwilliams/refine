@@ -305,7 +305,7 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu" id="goal-action-menu">
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
-              <button class="nav-menu-item" type="button" id="btn-view-logs" data-testid="goal-action-view-logs">View Logs</button>
+              <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
               <button class="nav-menu-item" type="button" id="btn-export-jira" data-testid="goal-action-export-jira">Export for Jira</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
@@ -401,9 +401,9 @@ function drawGoalDetail(goal) {
   $("#btn-chat")?.addEventListener("click", () => {
     openChatDock({ goalId: goal.id, goalStatus: goal.status });
   });
-  $("#btn-view-logs")?.addEventListener("click", () => {
+  $("#btn-watch-logs")?.addEventListener("click", () => {
     closeGoalActionMenu();
-    location.hash = `#/logs?goal_id=${encodeURIComponent(goal.id)}`;
+    openGoalLogTail({ goalId: goal.id, goalName: goal.name });
   });
   $("#btn-export-jira")?.addEventListener("click", async () => {
     closeGoalActionMenu();
