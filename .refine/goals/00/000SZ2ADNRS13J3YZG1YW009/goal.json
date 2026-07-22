@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T10:09:57Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2ADNRS13J3YZG1YW009",
+  "name": "Refine config is set to 10 parallel agents, but I only see 3 'in-progress' and 3",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T10:09:57Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Refine config is set to 10 parallel agents, but I only see 3 'in-progress' and 3 in 'todo'. This may change by the time you look, so review the code to ensure that the logic is correct (priority, feature order) because something isn't working correctly. The 3 goals in 'todo': 2 of them are not part of the feature, and there are no higher-priority items in the queue, so they should have been picked up.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T10:09:57Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T10:09:57Z"
+}
