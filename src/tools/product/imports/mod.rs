@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -477,45 +478,16 @@ fn nonempty_option(value: &str) -> Option<&str> {
 }
 
 pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
-    let instruction = match purpose {
+    let template = match purpose {
         "plan" | "feature import" | "feature_spec" | "feature-spec" | "spec" => {
-            "Extract one product Feature and its Goals from this Plan or feature-spec source. Return only \
-             one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
-            \"drafts\":[{\"name\":\"...\",\"prompt\":\"...\",\"reporter\":\"\",\
-             \"priority\":\"low\",\"depends_on\":[]}],\"implementation_goals\":[{\"name\":\"...\",\"prompt\":\"...\",\
-             \"reporter\":\"\",\"priority\":\"medium\",\"depends_on\":[]}]}. The feature name and \
-             description must describe the user's \
-             product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
-             extraction, or how the plan was created. Draft every concrete implementation goal \
-             needed to build the feature, not only user-visible product behavior. Use architecture \
-             lenses such as durable state, logic and code organization, surfaces, integrations, \
-             performance, recovery, and verification only when they clarify the work; do not force \
-             categories that do not fit the domain. Preserve the plan's natural build order. Each \
-             Goal must be independently actionable from its prompt. Leave depends_on \
-             empty by default. Add depends_on only for real prerequisites where one Goal cannot be \
-             implemented safely before another, such as sorting or adding items to a list before \
-             the list exists."
+            PromptTemplate::ImportFeature
         }
-        "round" => {
-            "Draft Round data from this Goal chat transcript. Return only one actionable prompt."
-        }
-        "plan_goal" | "plan-goal" => {
-            "Extract exactly one implementation-ready Goal from this Plan transcript. Return only one \
-             JSON object with name, prompt, reporter, and priority. The Goal must be a coherent, \
-             independently actionable slice of the plan, with enough concrete behavior, constraints, \
-             implementation context, and verification expectations for an agent to complete it. Do not \
-             return a Feature, multiple Goals, dependencies, or planning commentary."
-        }
-        "standalone_goal" => {
-            "Draft one standalone Goal from this Standalone chat transcript. Return only one \
-             JSON object with name, prompt, reporter, and priority, or one actionable prompt."
-        }
-        _ => {
-            "Import these notes into Refine Goal drafts. Return only draft data, one draft per line, \
-             using prompt text or JSON objects with name, prompt, reporter, and priority."
-        }
+        "round" => PromptTemplate::ImportRound,
+        "plan_goal" | "plan-goal" => PromptTemplate::ImportPlanGoal,
+        "standalone_goal" => PromptTemplate::ImportStandaloneGoal,
+        _ => PromptTemplate::ImportNotes,
     };
-    format!("{instruction}\n\n{text}")
+    render(template, &[("text", text)])
 }
 
 pub fn parse_provider_import_result(
@@ -903,10 +875,10 @@ mod tests {
     fn plan_goal_extraction_prompt_requests_one_goal_without_a_feature() {
         let prompt = import_extraction_prompt("Plan transcript", "plan_goal");
 
-        assert!(prompt.contains("exactly one implementation-ready Goal"));
-        assert!(prompt.contains("independently actionable slice"));
-        assert!(prompt.contains("verification expectations"));
-        assert!(prompt.contains("Do not return a Feature, multiple Goals"));
+        assert!(prompt.contains("exactly one ambitious, independently actionable Goal"));
+        assert!(prompt.contains("implementation and verification context"));
+        assert!(prompt.contains("consequential unknowns"));
+        assert!(prompt.contains("do not return a Feature, multiple Goals"));
         assert!(prompt.ends_with("\n\nPlan transcript"));
     }
 

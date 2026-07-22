@@ -14,6 +14,7 @@ use crate::process::subprocess::{
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -1191,21 +1192,13 @@ fn convert_lifecycle_commands_to_instructions(config: &mut TargetAppGeneratedCon
 }
 
 fn command_backed_instruction(kind: &str, command: &str) -> String {
-    match kind {
-        "start" => format!(
-            "Start the target app. Use `{}` as the initial approach, but inspect the project and adapt if dependencies, ports, environment, or long-running process handling require it. Leave the app running in the background when appropriate, verify configured health checks when possible, and report the exact command and evidence.",
-            command.trim()
-        ),
-        "stop" => format!(
-            "Stop the target app. Use `{}` as the initial approach, but inspect the project and adapt if the process was started differently. Confirm the app is no longer reachable when possible and report the evidence.",
-            command.trim()
-        ),
-        "build" => format!(
-            "Build or rebuild the target app. Use `{}` as the initial approach, but inspect failures, install or repair project-local dependencies when safe, rerun the build as needed, and report exact blockers if the build cannot be completed.",
-            command.trim()
-        ),
-        _ => command.trim().to_string(),
-    }
+    let template = match kind {
+        "start" => PromptTemplate::TargetAppCommandStart,
+        "stop" => PromptTemplate::TargetAppCommandStop,
+        "build" => PromptTemplate::TargetAppCommandBuild,
+        _ => return command.trim().to_string(),
+    };
+    render(template, &[("command", command.trim())])
 }
 
 fn target_app_lifecycle_prompt(
@@ -1225,21 +1218,27 @@ fn target_app_lifecycle_prompt(
     let tcp_port = setting(settings, "target_app_tcp_check_port");
     let status_command = setting(settings, "target_app_status_command");
     let process_command = setting(settings, "target_app_process_check_command");
-    format!(
-        "You are operating the target application for Refine.\n\nAction: {kind}\nTarget root: {}\nWorking directory: {}\nEnvironment overrides JSON: {}\nHealth URL: {}\nTCP check: {} {}\nStatus command hint: {}\nProcess check hint: {}\n\nInstructions:\n{}\n\nUse the host tools available in the working directory. Prefer durable, project-appropriate fixes over a brittle one-liner. If you start a long-running process, make sure this turn can finish after the app is started. If the action cannot be completed, explain the blocker and the evidence.",
-        target_root.display(),
-        cwd.display(),
-        if env_json.trim().is_empty() {
-            "{}"
-        } else {
-            env_json.trim()
-        },
-        health_url,
-        tcp_host,
-        tcp_port,
-        status_command,
-        process_command,
-        instructions.trim()
+    let target_root = target_root.display().to_string();
+    let cwd = cwd.display().to_string();
+    let environment = if env_json.trim().is_empty() {
+        "{}"
+    } else {
+        env_json.trim()
+    };
+    render(
+        PromptTemplate::TargetAppLifecycle,
+        &[
+            ("kind", kind),
+            ("target_root", &target_root),
+            ("cwd", &cwd),
+            ("environment", environment),
+            ("health_url", &health_url),
+            ("tcp_host", &tcp_host),
+            ("tcp_port", &tcp_port),
+            ("status_command", &status_command),
+            ("process_command", &process_command),
+            ("instructions", instructions.trim()),
+        ],
     )
 }
 

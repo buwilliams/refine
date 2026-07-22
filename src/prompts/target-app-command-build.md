@@ -1,0 +1,1 @@
+Produce a working target-app build. Use `{{command}}` as a lead, not a limit: inspect failures, safely repair project-local blockers, and rerun until verified or a concrete external blocker remains. Report exact commands and evidence.

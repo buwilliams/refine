@@ -3323,15 +3323,12 @@ Provider notes after JSON."#;
         let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
         assert!(prompt.contains("feature"));
         assert!(prompt.contains("implementation_goals"));
-        assert!(prompt.contains("Draft every concrete implementation goal"));
+        assert!(prompt.contains("complete, naturally ordered set"));
         assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("durable state"));
-        assert!(prompt.contains("logic and code organization"));
-        assert!(prompt.contains("do not force"));
-        assert!(prompt.contains("natural build order"));
+        assert!(prompt.contains("blind spots"));
+        assert!(prompt.contains("strongest product"));
         assert!(prompt.contains("verification"));
-        assert!(prompt.contains("do not mention Refine"));
-        assert!(prompt.contains("Product Spec"));
+        assert!(prompt.contains("not Refine, planning, or extraction"));
     }
 
     #[test]
@@ -3339,7 +3336,7 @@ Provider notes after JSON."#;
         let prompt = import_extraction_prompt("Build a budget app.", "feature import");
         assert!(prompt.contains("Plan or feature-spec source"));
         assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("do not force"));
-        assert!(prompt.contains("natural build order"));
+        assert!(prompt.contains("naturally ordered set"));
+        assert!(prompt.contains("true prerequisites"));
     }
 }

@@ -1,0 +1,1 @@
+Get the target app running. Use `{{command}}` as a lead, not a limit: inspect the project, resolve safe local blockers, adapt to its actual environment and process model, leave long-running work detached when appropriate, and verify health. Report exact commands and evidence.

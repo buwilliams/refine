@@ -7,6 +7,7 @@
 - **Natural Work Order**: drafted work should follow the order implied by the plan, dependencies, and domain.
 - **Reviewable Decomposition**: plans should become Features and Goals only after users can inspect and adjust them.
 - **Loose Fundamentals**: good architecture gives agents a starting point without becoming a rule system.
+- **Map Meets Territory**: the initial request guides discovery, but the actual product, code, runtime, and user needs decide what the plan must address.
 
 ## Purpose
 
@@ -28,6 +29,8 @@ Planning should sit before durable work creation. It should help users and agent
 
 These are lenses, not mandatory headings. If a concern is irrelevant, temporary, collapsed into another concern, or premature, a good plan may omit it or mention the tradeoff briefly.
 
+Planning should actively find important unknowns instead of polishing assumptions. An agent may follow blind-spot paths through adjacent code and behavior, build a small prototype to test a risky idea, or interview the user when product intent cannot be inferred from available evidence. These strategies should narrow consequential uncertainty without turning every plan into a long questionnaire or research exercise.
+
 Draft Feature should convert the selected plan into ordinary Refine work. It should produce one Feature plus implementation-ready Goals in the plan's natural build order. When dependency order is clear, the drafts should reflect it. When the work is exploratory, visual, research-heavy, or prototype-oriented, the drafts should be the smallest useful implementation slices rather than forced architecture categories.
 
 Draft Goal should offer the narrower conversion boundary for a user who wants help shaping one independently actionable Goal rather than decomposing the plan into a Feature. It should extract exactly one reviewable Goal and must not create or imply a Feature.
@@ -44,4 +47,4 @@ Current implementation details that matter to intent:
 
 ## Future Direction
 
-Future planning should become less transcript-bound and more structured. Agents may propose questions, alternatives, tradeoffs, source evidence, dependency graphs, and implementation slices. They should still preserve the core posture: help the user think clearly, then turn selected intent into reviewable work without narrowing the user's design space.
+Future planning should become less transcript-bound and more structured. Agents may propose questions, alternatives, prototypes, source evidence, dependency graphs, and implementation slices. They should use improving model capabilities to widen the ambition of feasible work, including outcomes previously dismissed as too slow or expensive. They should still preserve the core posture: help the user think clearly, then turn selected intent into reviewable work without narrowing the user's design space.

@@ -16,6 +16,7 @@ use crate::process::supervisor::lifecycle::{current_launch_executable, current_l
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -109,22 +110,17 @@ fn dashboard_active_node(service: &FileNodeRegistryService) -> RefineResult<(Str
 }
 
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {
-    format!(
-        "Generate governance rules for this project. Return only concise rules, one per line, \
-         or JSON with a rules array.\n\nProduct:\n{product}\n\nConstitution:\n{constitution}"
+    render(
+        PromptTemplate::GovernanceGeneration,
+        &[("product", product), ("constitution", constitution)],
     )
 }
 
 fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
-    format!(
-        "Analyze this target app codebase and generate agent instructions for Refine target-app lifecycle work. \
-         Return only JSON with kind=target-app and fields start_instructions, stop_instructions, \
-         build_instructions, test_command, status_command, cwd, env, \
-         start_timeout_seconds, stop_timeout_seconds, build_timeout_seconds, \
-         test_timeout_seconds, status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
-         process_check_command, and notes. The start/stop/build fields are instructions for an agent, not shell commands. \
-         Test and status fields may remain commands because Refine uses them as deterministic checks.\n\nProject root: {}",
-        target_root.display()
+    let target_root = target_root.display().to_string();
+    render(
+        PromptTemplate::TargetAppGeneration,
+        &[("target_root", &target_root)],
     )
 }
 

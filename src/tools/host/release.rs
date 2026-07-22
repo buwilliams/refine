@@ -12,6 +12,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::product::work_items::FileWorkItemService;
 
@@ -1060,29 +1061,33 @@ fn release_goal_prompt(plan: &ReleasePlan) -> String {
         .collect::<Vec<_>>()
         .join("\n");
     let goals = plan.completed_goals.join("\n");
-    format!(
-        "Prepare the reviewable semantic release candidate described by this trusted ReleasePlan.\n\n\
-Current version: {}\nProposed version: {}\nProposed tag: {}\nPrevious tag: {}\n\
-Version-bearing files detected: {}\nDocumentation files detected: {}\n\n\
-Completed Goals:\n{}\n\nCommits since the prior release:\n{}\n\n\
-Analyze the completed Goals and commits. Update every applicable version-bearing file and lockfile, \
-write release notes, preserve established documentation formats, and update story, runbooks, migration, \
-or other affected documentation only where the actual changes require it. Identify breaking changes and \
-write migration guidance when needed. Run `cargo run --manifest-path xtask/Cargo.toml -- release-check` \
-and report deterministic command outcomes. Do not tag, push a tag, create a GitHub release, or publish externally. \
-Use this normal Goal worktree and leave the candidate ready for the standard review and approval workflow.",
-        plan.current_version,
-        plan.proposed_version,
-        plan.proposed_tag,
-        plan.previous_tag.as_deref().unwrap_or("none"),
-        plan.version_files.join(", "),
-        plan.documentation_files.join(", "),
-        if goals.is_empty() { "- None" } else { &goals },
-        if changes.is_empty() {
-            "- None"
-        } else {
-            &changes
-        },
+    let version_files = plan.version_files.join(", ");
+    let documentation_files = plan.documentation_files.join(", ");
+    render(
+        PromptTemplate::ReleaseGoal,
+        &[
+            ("current_version", &plan.current_version),
+            ("proposed_version", &plan.proposed_version),
+            ("proposed_tag", &plan.proposed_tag),
+            (
+                "previous_tag",
+                plan.previous_tag.as_deref().unwrap_or("none"),
+            ),
+            ("version_files", &version_files),
+            ("documentation_files", &documentation_files),
+            (
+                "completed_goals",
+                if goals.is_empty() { "- None" } else { &goals },
+            ),
+            (
+                "changes",
+                if changes.is_empty() {
+                    "- None"
+                } else {
+                    &changes
+                },
+            ),
+        ],
     )
 }
 
@@ -1459,7 +1464,7 @@ mod tests {
         assert!(prompt.contains("Current version: 1.0.0"));
         assert!(prompt.contains("Proposed version: 1.1.0"));
         assert!(prompt.contains("GOAL0: Reviewed work"));
-        assert!(prompt.contains("Do not tag, push a tag"));
+        assert!(prompt.contains("Do not tag, push, create a GitHub release"));
         assert!(!runtime.join("releases/worktrees").exists());
         assert!(host.calls.is_empty());
         let _ = fs::remove_dir_all(root);
