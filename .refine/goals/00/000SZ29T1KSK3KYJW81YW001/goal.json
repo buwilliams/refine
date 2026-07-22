@@ -69,28 +69,47 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:07:19Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:26:09Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found; the round-1 deduplication issue is corrected with focused full-window regression evidence.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found; the round-1 deduplication issue is corrected with focused full-window regression evidence.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-2"
+      },
+      "governance_message": "No Governance rule violations found; the round-1 deduplication issue is corrected with focused full-window regression evidence.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ29T1KSK3KYJW81YW001` is ready for review at commit `d2722c4`; the worktree is clean.\n\nAfter-action report:\n\n- Moved Supervisor events into the System tab and removed the cluttering Supervisor event stream.\n- Fixed repeated polling so an unchanged 80-event snapshot remains 80 entries instead of duplicating.\n- Added full-window browser regression coverage.\n\nVerification:\n\n- `cargo fmt --all -- --check` — exit 0.\n- `git diff --check` — exit 0.\n- Browser tests — exit 0; 9 passed, 0 failed.\n- Focused Rust contract — exit 0; 1 passed, 0 failed.\n- `cargo test --lib` — exit 101; 388 passed, 1 unrelated project-sync test failed transiently.\n- Isolated failing test rerun — exit 0; 1 passed, 0 failed.\n- Final `git status --porcelain` — empty.\n\nGoal agent usage: 84,529 tokens over 4m 11s.",
       "implementation_reported_at": "2026-07-22T10:24:21Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "The previous round was nearly successful but failed Governance with \"Supervisor event polling can repeatedly duplicate System entries.\" Correct the issue Governance is warning us about.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:26:11Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:24:21Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:26:11Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:24:22Z"
+  "updated": "2026-07-22T10:26:11Z"
 }
