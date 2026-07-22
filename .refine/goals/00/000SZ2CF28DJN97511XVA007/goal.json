@@ -1,7 +1,7 @@
 {
-  "base_commit": "6b9638ce18ebcfee70cf6cda7f785ca91c06fcc8",
-  "branch_name": "refine/00000SZ2CF28DJN97511XVA007/round-2",
-  "candidate_commit": "a40ab0eb28498a6cdfc68e6c4e1b675d269052bf",
+  "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
+  "branch_name": "refine/00000SZ2CF28DJN97511XVA007/round-3",
+  "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -189,9 +189,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T17:44:37Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T17:45:12Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate a40ab0eb28498a6cdfc68e6c4e1b675d269052bf and fix the two Round 2 governance violations while retaining one shared Quality service and supervised execution path. (1) QA retry must preserve the failed round/claim's original quality_timing and resume the exact remaining stage sequence; changing current settings between failure and retry must not let pre_merge work skip the required build or otherwise reinterpret the preserved candidate. Persist and test the retry timing/context as authoritative recovery evidence. (2) Correlate every Quality verdict with the committed candidate: before and after provider and supervised command execution, verify the isolated worktree HEAD equals candidate_commit and the index/worktree are clean. Any provider or command mutation, HEAD drift, or dirty state must fail Quality with explicit evidence and must not be accepted even when the process exits successfully. Add focused failure-path tests for timing changes and successful-but-mutating execution, plus full library/full-workflow, clippy, fmt, diff checks, and independent governance. Preserve the candidate worktree and do not reintroduce caller-supplied command semantics or competing settings ownership.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T17:45:12Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T17:44:37Z"
+  "updated": "2026-07-22T17:45:13Z"
 }
