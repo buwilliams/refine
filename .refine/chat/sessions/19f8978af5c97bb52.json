@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:47:48Z",
+  "updated_at": "2026-07-22T15:50:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1368,6 +1368,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance rejected the candidate on four concrete grounds, so I’m not merging it: workflow authority still lives under the port runtime root; a crash gap can leave a Running claim on a Todo Goal; Jira success can become durable before completion evidence; and the daemon-level tests don’t exercise the new failure/concurrency semantics. I’m preserving `ba537ca`, opening one bounded repair round for exactly those findings, and keeping the parked Supervisor/Quality work behind it."
+    },
+    {
+      "created_at": "2026-07-22T15:50:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784735438495-224",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 4 is running from the merged contract, with `ba537ca` preserved as a single candidate commit and applied only inside the repair worktree. The agent is auditing the exact five seams governance named—including repeated same-Goal Git conflicts—before editing, so the next evidence will distinguish a real architectural repair from another unit-test-only patch."
     }
   ],
   "queued_messages": [
