@@ -1,0 +1,10 @@
+{
+  "assignee": "Buddy Williams",
+  "created": "2026-07-22T11:19:46Z",
+  "description": "Quality is an always-on agent validation layer beside Governance. Projects define business requirements, instructions, and plain-language tests; for every Goal, a Quality agent determines and performs the relevant checks, records per-test evidence, and passes or fails the candidate. An empty test list is a successful no-op, while Quality timing remains configurable.",
+  "id": "00000SZ2CDKBK2EYNVXDXVA002",
+  "name": "Agent-first Quality validation",
+  "node_id": "default",
+  "reporter": "Buddy Williams",
+  "updated": "2026-07-22T11:19:46Z"
+}

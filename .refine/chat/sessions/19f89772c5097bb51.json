@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:18:44Z",
+  "updated_at": "2026-07-22T11:19:54Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -460,14 +460,66 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The updated static contract is green, and the old editor/header has no remaining production references. I also added an explicit accepted-message ID to the chat input response, which closes the duplicate-text race: two identical follow-ups can now reconcile independently instead of being matched heuristically. I’m doing one broader library pass now because that backend transcript change is shared by Standalone, Goal, Plan, and Supervisor chats."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f89867e0b97bb56",
-      "text": "Broaden this into one shared CLI-agent interaction model for Supervisor, attached chats, and Standalone. Keep input docked and accept submission at any time. During an active turn show Working with elapsed time and Esc to interrupt. Let Up and Down navigate queued and previously submitted prompts. Put submitted messages immediately into transcript order with a compact pending state and x removal before dispatch; do not use a separate queue panel. When the conversation contains enough intent, automatically surface the appropriate Feature or Goal draft inline without requiring a Draft Feature or Draft Goal click. Keep typing, rendering, scrolling, and keyboard controls fast and responsive. Reuse shared behavior across surfaces and preserve backend queue semantics and accessibility.",
-      "created_at": "2026-07-22T11:12:00Z",
-      "updated_at": "2026-07-22T11:13:25Z"
+      "created_at": "2026-07-22T11:19:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719190167-131",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Implemented in the standalone worktree.\n\n- Supervisor remains its permanent toolbar tab.\n- Queued input now appears immediately as ordinary transcript entries with compact Pending/Sent states and an × removal control.\n- Removed the separate queue editor and header.\n- Preserved wrapping and transcript ordering.\n- Added canonical message IDs so identical messages reconcile correctly.\n- Provider batching remains intact, while individual messages become canonical transcript events.\n- Pending-to-sent reconciliation updates the transcript without redrawing the toolbar or causing duplication.\n\nKey changes: [toolbar.js](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/surfaces/web/static/js/features/toolbar.js:1097), [toolbar.css](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/surfaces/web/static/css/toolbar.css:273), [chat backend](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
+    },
+    {
+      "created_at": "2026-07-22T11:19:50Z",
+      "delivered": false,
+      "id": "evt-1784719190296-133",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Implemented in the standalone worktree.\n\n- Supervisor remains its permanent toolbar tab.\n- Queued input now appears immediately as ordinary transcript entries with compact Pending/Sent states and an × removal control.\n- Removed the separate queue editor and header.\n- Preserved wrapping and transcript ordering.\n- Added canonical message IDs so identical messages reconcile correctly.\n- Provider batching remains intact, while individual messages become canonical transcript events.\n- Pending-to-sent reconciliation updates the transcript without redrawing the toolbar or causing duplication.\n\nKey changes: [toolbar.js](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/surfaces/web/static/js/features/toolbar.js:1097), [toolbar.css](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/surfaces/web/static/css/toolbar.css:273), [chat backend](/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/tools/product/chat/mod.rs:1151).\n\nVerification passed:\n\n- 396 Rust library tests\n- 18 browser JavaScript tests\n- `cargo fmt --all -- --check`\n- `git diff --check`\n\nChanges remain uncommitted in the standalone worktree."
+    },
+    {
+      "created_at": "2026-07-22T11:19:50Z",
+      "delivered": false,
+      "id": "evt-1784719190296-134",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T11:19:50Z",
+      "delivered": false,
+      "id": "evt-1784719190297-136",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "Broaden this into one shared CLI-agent interaction model for Supervisor, attached chats, and Standalone. Keep input docked and accept submission at any time. During an active turn show Working with elapsed time and Esc to interrupt. Let Up and Down navigate queued and previously submitted prompts. Put submitted messages immediately into transcript order with a compact pending state and x removal before dispatch; do not use a separate queue panel. When the conversation contains enough intent, automatically surface the appropriate Feature or Goal draft inline without requiring a Draft Feature or Draft Goal click. Keep typing, rendering, scrolling, and keyboard controls fast and responsive. Reuse shared behavior across surfaces and preserve backend queue semantics and accessibility."
+    },
+    {
+      "created_at": "2026-07-22T11:19:50Z",
+      "delivered": false,
+      "id": "evt-1784719190297-137",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T11:19:54Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719194796-139",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll trace the existing chat surfaces and shared backend queue path first, then prototype the interaction model at the narrowest shared boundary. I’ll treat docked input, transcript-native pending items, interruption/history keys, automatic inline drafts, responsiveness, and accessibility as explicit acceptance criteria."
     }
   ],
   "queue_dispatching": true,
