@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:31:48Z",
+  "updated_at": "2026-07-22T14:32:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1152,6 +1152,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A consequential anomaly just surfaced: the Quality-core Goal transitioned to `cancelled`, not review or failed, while its worker was finishing validation. I’m tracing the operation, claim, and activity records before deciding whether this is a legitimate cancellation or evidence corruption; I will not silently requeue it."
+    },
+    {
+      "created_at": "2026-07-22T14:32:56Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784730776640-182",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The cancellation was not user-authored: no browser/activity cancellation record exists, and the workflow later recorded a malformed provider-result failure while the Round 6 worktree remained intact with four uncommitted files. I’m using Refine’s normal retry path to reuse that preserved worktree; this avoids copying, stashing, or bypassing the workflow."
     }
   ],
   "queued_messages": [

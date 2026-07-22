@@ -1,5 +1,5 @@
 {
-  "base_commit": "657756564175c241ab966222bc3881207a889978",
+  "base_commit": "72fd4398a9dc2bf62d583b469e83b3d2e9218322",
   "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-6",
   "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
@@ -445,7 +445,7 @@
       "updated": "2026-07-22T13:36:54Z"
     }
   ],
-  "status": "cancelled",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T14:30:55Z"
+  "updated": "2026-07-22T14:32:58Z"
 }
