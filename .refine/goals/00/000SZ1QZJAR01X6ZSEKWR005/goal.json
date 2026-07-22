@@ -16,7 +16,7 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:25:24Z",
-      "governance_checked_at": "2026-07-22T00:46:03Z",
+      "governance_checked_at": "2026-07-22T00:54:07Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QZJAR01X6ZSEKWR005-round-1",
@@ -41,7 +41,7 @@
       "meta_rule_state": "passed",
       "product_state": "passed",
       "prompt": "When an agent is working on a Goal, the user should have the ability in the web surface to watch the logs in real-time. It should show up in the Toolbar, similar to how the goal Chat works but for logs, like a log tail.",
-      "quality_checked_at": "2026-07-22T00:46:06Z",
+      "quality_checked_at": "2026-07-22T00:54:08Z",
       "quality_details": {
         "diagnostics": [
           "Quality checks disabled."
@@ -51,10 +51,10 @@
       "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-22T00:52:13Z"
+      "updated": "2026-07-22T00:54:08Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T00:52:13Z"
+  "updated": "2026-07-22T00:54:08Z"
 }
