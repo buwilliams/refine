@@ -663,10 +663,15 @@ Requirements:
 Module: `tools::product::goal_exports`; path: `src/tools/product/goal_exports/`.
 
 Owns deterministic external evidence documents derived from durable Goal state
-and the target repository. Jira CSV export includes the Goal identity, request,
-round implementation reports, quality and governance results, notes, base and
-candidate commit anchors, and every commit in that range. CLI, HTTP, browser,
-desktop, and MCP adapters reuse this service.
+and the target repository. Jira CSV export includes one row per selected Goal
+with its identity, request, round implementation reports, quality and governance
+results, notes, base and candidate commit anchors, and every commit in that
+range. The browser passes the Goals screen's filter-scoped all-or-subset bulk
+selection; single-Goal CLI and MCP adapters reuse the same row renderer. Bulk
+exports run outside the HTTP handler as supervised runner processes backed by
+durable operations. They expose progress and logs, support cancellation and
+interruption recovery, persist the completed CSV, and resolve all unique Goal
+commit ranges from one batched commit graph instead of invoking Git per Goal.
 
 ### Workflow Engine
 

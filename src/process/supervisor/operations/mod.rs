@@ -2,14 +2,18 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+
+const RECOVERY_PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum OperationState {
@@ -42,6 +46,8 @@ pub struct OperationHandle {
     pub owner: String,
     pub state: OperationState,
     #[serde(default = "empty_object")]
+    pub request: Value,
+    #[serde(default = "empty_object")]
     pub progress: Value,
     #[serde(default = "empty_object")]
     pub result: Value,
@@ -49,11 +55,30 @@ pub struct OperationHandle {
     pub error: Option<Value>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReplacementOperationRegistration {
+    pub operation: OperationHandle,
+    pub created: bool,
+}
+
 pub trait OperationRegistry {
     fn register(&self, owner: &str) -> RefineResult<OperationHandle>;
     fn status(&self, operation_id: &str) -> RefineResult<OperationHandle>;
     fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle>;
     fn recover(&self) -> RefineResult<Vec<OperationHandle>>;
+}
+
+pub trait OperationProjectionRefresher {
+    fn refresh_operation_projection(&self) -> RefineResult<()>;
+}
+
+impl<F> OperationProjectionRefresher for F
+where
+    F: Fn() -> RefineResult<()>,
+{
+    fn refresh_operation_projection(&self) -> RefineResult<()> {
+        self()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +106,35 @@ impl FileOperationRegistry {
             .join(format!("{operation_id}.logs.jsonl"))
     }
 
+    fn mutation_lock(&self) -> RefineResult<fs::File> {
+        fs::create_dir_all(self.operations_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create operation registry {}: {error}",
+                self.operations_dir().display()
+            ))
+        })?;
+        let path = self.operations_dir().join(".mutations.lock");
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open operation mutation lock {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock operation registry {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(file)
+    }
+
     fn write(&self, handle: &OperationHandle) -> RefineResult<()> {
         fs::create_dir_all(self.operations_dir()).map_err(|error| {
             RefineError::Io(format!(
@@ -92,31 +146,298 @@ impl FileOperationRegistry {
         let encoded = serde_json::to_vec_pretty(handle).map_err(|error| {
             RefineError::Serialization(format!("failed to encode operation: {error}"))
         })?;
-        fs::write(&path, encoded).map_err(|error| {
+        let temp_path = path.with_extension(format!("json.{}.tmp", std::process::id()));
+        fs::write(&temp_path, encoded).map_err(|error| {
             RefineError::Io(format!(
-                "failed to write operation {}: {error}",
-                path.display()
+                "failed to write temporary operation {}: {error}",
+                temp_path.display()
             ))
-        })
+        })?;
+        if let Err(error) = replace_file(&temp_path, &path) {
+            let _ = fs::remove_file(&temp_path);
+            return Err(RefineError::Io(format!(
+                "failed to replace operation {}: {error}",
+                path.display()
+            )));
+        }
+        Ok(())
     }
 
     pub fn interrupt_active(&self) -> RefineResult<Vec<OperationHandle>> {
-        let mut interrupted = Vec::new();
-        for mut operation in self.recover()? {
-            if matches!(
-                operation.state,
-                OperationState::Pending | OperationState::Running | OperationState::Cancelling
-            ) {
-                operation.state = OperationState::Interrupted;
-                self.write(&operation)?;
-                self.append_log(
-                    &operation.id,
-                    operation_log_entry(&operation, "warning", "Operation interrupted", None),
-                )?;
-                interrupted.push(operation);
+        Ok(self
+            .recover_active_supervised()?
+            .into_iter()
+            .filter(|operation| matches!(operation.state, OperationState::Interrupted))
+            .collect())
+    }
+
+    /// Reconciles active operations during daemon startup. Every correlated managed process must
+    /// be confirmed dead before the operation becomes Interrupted and therefore publicly
+    /// retryable. If termination cannot be confirmed, the operation becomes a durable Failed
+    /// attention state while retaining its request, progress, result, and existing logs.
+    pub fn recover_active_supervised(&self) -> RefineResult<Vec<OperationHandle>> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        let processes = supervisor.list()?;
+        let mut recovered = Vec::new();
+
+        for operation in self.recover()? {
+            if !operation_active(&operation.state) {
+                continue;
+            }
+            let associated = processes
+                .iter()
+                .filter(|process| {
+                    process_operation_id(process).as_deref() == Some(operation.id.as_str())
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            match self.terminate_recovery_processes(&supervisor, &operation, &associated) {
+                Ok(()) => {
+                    if let Some(interrupted) = self.interrupt_if_active(&operation.id)? {
+                        recovered.push(interrupted);
+                    }
+                }
+                Err(error) => {
+                    if let Some(failed) =
+                        self.fail_recovery_if_active(&operation, &associated, &error)?
+                    {
+                        recovered.push(failed);
+                    }
+                }
             }
         }
-        Ok(interrupted)
+        Ok(recovered)
+    }
+
+    fn terminate_recovery_processes(
+        &self,
+        supervisor: &FileProcessSupervisor,
+        operation: &OperationHandle,
+        processes: &[ManagedProcess],
+    ) -> RefineResult<()> {
+        for process in processes {
+            self.append_log(
+                &operation.id,
+                operation_log_entry(
+                    operation,
+                    "warning",
+                    "Recovery terminating managed process",
+                    Some(crate::model::JsonObject::from_iter([
+                        ("process_id".to_string(), json!(process.id)),
+                        ("pid".to_string(), json!(process.pid)),
+                    ])),
+                ),
+            )?;
+            supervisor.terminate_and_confirm_exit(process, RECOVERY_PROCESS_EXIT_TIMEOUT)?;
+            self.append_log(
+                &operation.id,
+                operation_log_entry(
+                    operation,
+                    "info",
+                    "Recovery confirmed managed process exit",
+                    Some(crate::model::JsonObject::from_iter([
+                        ("process_id".to_string(), json!(process.id)),
+                        ("pid".to_string(), json!(process.pid)),
+                    ])),
+                ),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn interrupt_if_active(&self, operation_id: &str) -> RefineResult<Option<OperationHandle>> {
+        let lock = self.mutation_lock()?;
+        let mut operation = self.status(operation_id)?;
+        if !operation_active(&operation.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(None);
+        }
+        operation.state = OperationState::Interrupted;
+        operation.error = Some(json!({
+            "code": "operation_interrupted",
+            "message": "Daemon restarted before the operation completed."
+        }));
+        self.write(&operation)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &operation.id,
+            operation_log_entry(
+                &operation,
+                "warning",
+                "Operation interrupted",
+                Some(crate::model::JsonObject::from_iter([(
+                    "reason".to_string(),
+                    json!("daemon_restart"),
+                )])),
+            ),
+        )?;
+        Ok(Some(operation))
+    }
+
+    fn fail_recovery_if_active(
+        &self,
+        operation: &OperationHandle,
+        processes: &[ManagedProcess],
+        error: &RefineError,
+    ) -> RefineResult<Option<OperationHandle>> {
+        let lock = self.mutation_lock()?;
+        let mut current = self.status(&operation.id)?;
+        if !operation_active(&current.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(None);
+        }
+        current.state = OperationState::Failed;
+        current.error = Some(json!({
+            "code": "operation_recovery_process_termination_failed",
+            "message": error.to_string(),
+            "attention_required": true,
+            "retryable": false,
+            "processes": processes.iter().map(|process| json!({
+                "id": process.id,
+                "pid": process.pid
+            })).collect::<Vec<_>>(),
+            "previous_error": operation.error
+        }));
+        self.write(&current)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &current.id,
+            operation_log_entry(
+                &current,
+                "error",
+                "Recovery could not confirm managed process exit",
+                Some(crate::model::JsonObject::from_iter([
+                    ("error".to_string(), json!(error.to_string())),
+                    ("retryable".to_string(), json!(false)),
+                ])),
+            ),
+        )?;
+        Ok(Some(current))
+    }
+
+    pub fn register_with_request(
+        &self,
+        owner: &str,
+        request: Value,
+    ) -> RefineResult<OperationHandle> {
+        let handle = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "info", "Operation registered", None),
+        )?;
+        Ok(handle)
+    }
+
+    /// Atomically claims a durable replacement for an interrupted operation.
+    ///
+    /// The source id and retry identity are written into the replacement request while the
+    /// registry mutation lock is held. Concurrent callers, including callers in separate daemon
+    /// processes, therefore either create one replacement or recover that exact same record.
+    pub fn find_or_register_replacement(
+        &self,
+        owner: &str,
+        source_operation_id: &str,
+        retry_identity: &str,
+        mut request: Value,
+    ) -> RefineResult<ReplacementOperationRegistration> {
+        if retry_identity.trim().is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Replacement operation retry identity is required".to_string(),
+            ));
+        }
+
+        let lock = self.mutation_lock()?;
+        let source = self.status(source_operation_id)?;
+        if source.owner != owner || !matches!(source.state, OperationState::Interrupted) {
+            return Err(RefineError::Conflict(format!(
+                "Only interrupted {owner} operations can be recovered"
+            )));
+        }
+
+        let request_object = request.as_object_mut().ok_or_else(|| {
+            RefineError::InvalidInput(
+                "Replacement operation request must be a JSON object".to_string(),
+            )
+        })?;
+        request_object.insert("recovery_of".to_string(), json!(source_operation_id));
+        request_object.insert("retry_identity".to_string(), json!(retry_identity));
+
+        let mut legacy_replacement = None;
+        for mut operation in self.recover()? {
+            let operation_retry_identity = operation
+                .request
+                .get("retry_identity")
+                .and_then(Value::as_str);
+            let operation_source = operation.request.get("recovery_of").and_then(Value::as_str);
+
+            if operation_retry_identity == Some(retry_identity) {
+                if operation.owner != owner || operation_source != Some(source_operation_id) {
+                    return Err(RefineError::Conflict(format!(
+                        "Retry identity {retry_identity} is already assigned to another operation"
+                    )));
+                }
+                drop(lock);
+                return Ok(ReplacementOperationRegistration {
+                    operation,
+                    created: false,
+                });
+            }
+
+            // Round 6 replacements predate the explicit retry identity. Adopt that durable record
+            // instead of creating a duplicate after an upgrade or restart.
+            if operation.owner == owner
+                && operation_source == Some(source_operation_id)
+                && operation_retry_identity.is_none()
+            {
+                let operation_request = operation.request.as_object_mut().ok_or_else(|| {
+                    RefineError::Serialization(format!(
+                        "replacement operation {} request is not a JSON object",
+                        operation.id
+                    ))
+                })?;
+                operation_request.insert("retry_identity".to_string(), json!(retry_identity));
+                legacy_replacement = Some(operation);
+                break;
+            }
+        }
+
+        if let Some(operation) = legacy_replacement {
+            self.write(&operation)?;
+            drop(lock);
+            return Ok(ReplacementOperationRegistration {
+                operation,
+                created: false,
+            });
+        }
+
+        let operation = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&operation)?;
+        self.append_log(
+            &operation.id,
+            operation_log_entry(&operation, "info", "Operation registered", None),
+        )?;
+        drop(lock);
+        Ok(ReplacementOperationRegistration {
+            operation,
+            created: true,
+        })
     }
 
     pub fn append_log(&self, operation_id: &str, mut entry: LogEntry) -> RefineResult<LogEntry> {
@@ -222,6 +543,68 @@ impl FileOperationRegistry {
         Ok((page, has_more, total))
     }
 
+    /// Cancels an operation and all managed processes associated with it, then refreshes the
+    /// caller's projection of runtime state. Durable cancellation is written first so a worker
+    /// racing with termination cannot publish success over the user's cancellation.
+    ///
+    /// The projection refresher keeps projection construction independent of the operation
+    /// registry while this shared capability remains responsible for sequencing it and persisting
+    /// any failure evidence.
+    pub fn cancel_supervised(
+        &self,
+        operation_id: &str,
+        projection_refresher: &impl OperationProjectionRefresher,
+    ) -> RefineResult<OperationHandle> {
+        let operation = self.cancel(operation_id)?;
+
+        if let Err(error) = self.terminate_associated_processes(operation_id) {
+            self.persist_cancellation_failure(
+                operation_id,
+                "operation_process_termination_failed",
+                &error,
+            )?;
+            return Err(error);
+        }
+        if let Err(error) = projection_refresher.refresh_operation_projection() {
+            self.persist_cancellation_failure(
+                operation_id,
+                "operation_cancel_projection_refresh_failed",
+                &error,
+            )?;
+            return Err(error);
+        }
+
+        Ok(operation)
+    }
+
+    fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        for process in supervisor
+            .list()?
+            .iter()
+            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+        {
+            supervisor.request_termination(&process.id, "terminate")?;
+        }
+        Ok(())
+    }
+
+    fn persist_cancellation_failure(
+        &self,
+        operation_id: &str,
+        code: &str,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        self.fail_with_error(
+            operation_id,
+            json!({
+                "code": code,
+                "message": error.to_string()
+            }),
+        )?;
+        Ok(())
+    }
+
     pub fn finish(
         &self,
         operation_id: &str,
@@ -238,9 +621,15 @@ impl FileOperationRegistry {
                 "finished operations must use a terminal state".to_string(),
             ));
         }
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if terminal_recovery_state_is_authoritative(&handle.state, &state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = state;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation finished", None),
@@ -253,9 +642,41 @@ impl FileOperationRegistry {
         operation_id: &str,
         progress: Value,
     ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        // A restart-interrupted worker may still race with recovery after its process is
+        // terminated. Preserve the progress snapshot that was captured at interruption so the
+        // UI cannot regress to a misleading completed state. Other terminal operations retain
+        // their established progress-update behavior (for example, import cancellation records
+        // its final acknowledgement after cancellation wins the state race).
+        if matches!(handle.state, OperationState::Interrupted) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.progress = progress;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        Ok(handle)
+    }
+
+    pub fn succeed_with_result_and_progress(
+        &self,
+        operation_id: &str,
+        progress: Value,
+        result: Value,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if operation_terminal(&handle.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        handle.state = OperationState::Succeeded;
+        handle.progress = progress;
+        handle.result = result;
+        handle.error = None;
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         Ok(handle)
     }
 
@@ -270,11 +691,17 @@ impl FileOperationRegistry {
                 "result operations must finish as succeeded or failed".to_string(),
             ));
         }
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if terminal_recovery_state_is_authoritative(&handle.state, &state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = state;
         handle.result = result;
         handle.error = None;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation finished", None),
@@ -287,13 +714,33 @@ impl FileOperationRegistry {
         operation_id: &str,
         error: Value,
     ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
-        handle.state = OperationState::Failed;
-        handle.error = Some(error);
+        // Cancellation and restart interruption are authoritative terminal decisions. A worker or
+        // cleanup path may still discover a real failure after either wins the mutation lock.
+        let interrupted = matches!(handle.state, OperationState::Interrupted);
+        if !matches!(
+            handle.state,
+            OperationState::Cancelled | OperationState::Interrupted
+        ) {
+            handle.state = OperationState::Failed;
+        }
+        if !interrupted {
+            handle.error = Some(error.clone());
+        }
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
-            operation_log_entry(&handle, "error", "Operation failed", None),
+            operation_log_entry(
+                &handle,
+                "error",
+                "Operation failed",
+                Some(crate::model::JsonObject::from_iter([(
+                    "error".to_string(),
+                    error,
+                )])),
+            ),
         )?;
         Ok(handle)
     }
@@ -301,20 +748,7 @@ impl FileOperationRegistry {
 
 impl OperationRegistry for FileOperationRegistry {
     fn register(&self, owner: &str) -> RefineResult<OperationHandle> {
-        let handle = OperationHandle {
-            id: new_operation_id(),
-            owner: owner.to_string(),
-            state: OperationState::Running,
-            progress: empty_object(),
-            result: empty_object(),
-            error: None,
-        };
-        self.write(&handle)?;
-        self.append_log(
-            &handle.id,
-            operation_log_entry(&handle, "info", "Operation registered", None),
-        )?;
-        Ok(handle)
+        self.register_with_request(owner, empty_object())
     }
 
     fn status(&self, operation_id: &str) -> RefineResult<OperationHandle> {
@@ -337,9 +771,16 @@ impl OperationRegistry for FileOperationRegistry {
     }
 
     fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if operation_terminal(&handle.state) && !matches!(handle.state, OperationState::Interrupted)
+        {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = OperationState::Cancelled;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "warning", "Operation cancelled", None),
@@ -384,6 +825,84 @@ impl OperationRegistry for FileOperationRegistry {
         operations.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(operations)
     }
+}
+
+fn operation_terminal(state: &OperationState) -> bool {
+    matches!(
+        state,
+        OperationState::Succeeded
+            | OperationState::Failed
+            | OperationState::Cancelled
+            | OperationState::Interrupted
+    )
+}
+
+fn operation_active(state: &OperationState) -> bool {
+    matches!(
+        state,
+        OperationState::Pending | OperationState::Running | OperationState::Cancelling
+    )
+}
+
+#[cfg(not(windows))]
+fn replace_file(source: &std::path::Path, destination: &std::path::Path) -> std::io::Result<()> {
+    fs::rename(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_file(source: &std::path::Path, destination: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    unsafe extern "system" {
+        fn MoveFileExW(existing: *const u16, replacement: *const u16, flags: u32) -> i32;
+    }
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+    let source = source
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let destination = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let replaced = unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if replaced == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+fn terminal_recovery_state_is_authoritative(
+    current: &OperationState,
+    next: &OperationState,
+) -> bool {
+    matches!(
+        current,
+        OperationState::Cancelled | OperationState::Interrupted
+    ) && current != next
+}
+
+fn process_operation_id(process: &ManagedProcess) -> Option<String> {
+    process
+        .details
+        .as_deref()
+        .and_then(|details| serde_json::from_str::<Value>(details).ok())
+        .and_then(|details| {
+            details
+                .get("operation_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
 }
 
 fn new_operation_id() -> String {
@@ -435,6 +954,15 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use crate::process::subprocess::{
+        ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,
+        managed_pid_is_alive,
+    };
 
     #[test]
     fn file_operation_registry_registers_recovers_and_cancels_operations() {
@@ -454,12 +982,295 @@ mod tests {
             registry.status(&operation.id).unwrap().state,
             OperationState::Interrupted
         );
+        assert_eq!(
+            registry.status(&operation.id).unwrap().error.unwrap()["code"],
+            "operation_interrupted"
+        );
+        let late_completion = registry
+            .finish_with_result(
+                &operation.id,
+                OperationState::Succeeded,
+                json!({"result": "must not replace interruption"}),
+            )
+            .unwrap();
+        assert_eq!(late_completion.state, OperationState::Interrupted);
+        let late_failure = registry
+            .fail_with_error(
+                &operation.id,
+                json!({"code": "late_worker_failure", "message": "worker exited late"}),
+            )
+            .unwrap();
+        assert_eq!(late_failure.state, OperationState::Interrupted);
+        assert_eq!(late_failure.error.unwrap()["code"], "operation_interrupted");
+        let late_progress = registry
+            .update_progress(&operation.id, json!({"stage": "complete"}))
+            .unwrap();
+        assert_eq!(late_progress.state, OperationState::Interrupted);
+        assert_eq!(late_progress.progress, json!({}));
 
         let cancelled = registry.cancel(&operation.id).unwrap();
         assert_eq!(cancelled.state, OperationState::Cancelled);
         assert_eq!(cancelled.state.as_api_status(), "cancelled");
 
+        let recovery_failure = registry.register("import:persist").unwrap();
+        registry.cancel(&recovery_failure.id).unwrap();
+        let failed = registry
+            .fail_with_error(
+                &recovery_failure.id,
+                json!({
+                    "code": "projection_refresh_failed",
+                    "message": "cancel rollback could not refresh the projection"
+                }),
+            )
+            .unwrap();
+        assert_eq!(failed.state, OperationState::Cancelled);
+        assert_eq!(failed.error.unwrap()["code"], "projection_refresh_failed");
+        assert_eq!(
+            registry.status(&recovery_failure.id).unwrap().state,
+            OperationState::Cancelled
+        );
+        let (logs, _, _) = registry.page_logs(&recovery_failure.id, 20, 0).unwrap();
+        assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
+
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_state_replacement_never_exposes_partial_json() {
+        let temp_root = unique_temp_dir("operations-atomic-state");
+        let registry = FileOperationRegistry::new(temp_root.join("run/8080"));
+        let operation = registry.register("goals:jira-export").unwrap();
+        let reader_registry = registry.clone();
+        let operation_id = operation.id.clone();
+        let reader = thread::spawn(move || {
+            for _ in 0..500 {
+                reader_registry.status(&operation_id).unwrap();
+            }
+        });
+        for completed in 0..500 {
+            registry
+                .update_progress(&operation.id, json!({"completed": completed}))
+                .unwrap();
+        }
+        reader.join().unwrap();
+        assert_eq!(
+            registry.status(&operation.id).unwrap().progress["completed"],
+            499
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_atomically_finds_or_registers_one_durable_replacement() {
+        let temp_root = unique_temp_dir("operations-replacement-idempotency");
+        let runtime_root = temp_root.join("run/8080");
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let source = registry
+            .register_with_request(
+                "goals:jira-export",
+                json!({"selection": {"selected_ids": ["GOAL1"]}}),
+            )
+            .unwrap();
+        registry.interrupt_active().unwrap();
+
+        let retry_identity = format!("goals:jira-export:retry:{}", source.id);
+        let barrier = Arc::new(Barrier::new(3));
+        let callers = (0..2)
+            .map(|_| {
+                let registry = registry.clone();
+                let source_id = source.id.clone();
+                let retry_identity = retry_identity.clone();
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    registry
+                        .find_or_register_replacement(
+                            "goals:jira-export",
+                            &source_id,
+                            &retry_identity,
+                            json!({"selection": {"selected_ids": ["GOAL1"]}}),
+                        )
+                        .unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        barrier.wait();
+        let registrations = callers
+            .into_iter()
+            .map(|caller| caller.join().unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(registrations[0].operation.id, registrations[1].operation.id);
+        assert_eq!(
+            registrations
+                .iter()
+                .filter(|registration| registration.created)
+                .count(),
+            1
+        );
+        let replacement = &registrations[0].operation;
+        assert_eq!(replacement.request["recovery_of"], source.id);
+        assert_eq!(replacement.request["retry_identity"], retry_identity);
+        assert_eq!(
+            registry
+                .recover()
+                .unwrap()
+                .iter()
+                .filter(|operation| operation.request["recovery_of"] == source.id)
+                .count(),
+            1
+        );
+
+        let reopened = FileOperationRegistry::new(&runtime_root)
+            .find_or_register_replacement(
+                "goals:jira-export",
+                &source.id,
+                &retry_identity,
+                json!({"selection": {"selected_ids": ["GOAL1"]}}),
+            )
+            .unwrap();
+        assert!(!reopened.created);
+        assert_eq!(reopened.operation.id, replacement.id);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_supervised_cancel_terminates_process_and_refreshes_projection() {
+        let temp_root = unique_temp_dir("operations-supervised-cancel");
+        let runtime_root = temp_root.join("run/8080");
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let operation = registry.register("goals:jira-export").unwrap();
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let process = supervisor
+            .launch(operation_helper_process_spec(&operation.id))
+            .unwrap();
+        let pid = process.pid.unwrap();
+        assert!(managed_pid_is_alive(pid).unwrap());
+
+        let projection_refreshed = AtomicBool::new(false);
+        let projection_refresher = || {
+            projection_refreshed.store(true, AtomicOrdering::SeqCst);
+            Ok(())
+        };
+        let cancelled = registry
+            .cancel_supervised(&operation.id, &projection_refresher)
+            .unwrap();
+
+        assert_eq!(cancelled.state, OperationState::Cancelled);
+        assert!(projection_refreshed.load(AtomicOrdering::SeqCst));
+        wait_for_managed_pid_exit(pid);
+        assert!(!managed_pid_is_alive(pid).unwrap());
+        assert_eq!(
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Cancelled
+        );
+        let late_completion = registry
+            .finish_with_result(
+                &operation.id,
+                OperationState::Succeeded,
+                json!({"result": "must not replace cancellation"}),
+            )
+            .unwrap();
+        assert_eq!(late_completion.state, OperationState::Cancelled);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_supervised_cancel_persists_capability_failures() {
+        let temp_root = unique_temp_dir("operations-supervised-cancel-failures");
+
+        let termination_runtime_root = temp_root.join("run/termination");
+        let termination_registry = FileOperationRegistry::new(&termination_runtime_root);
+        let termination_operation = termination_registry.register("goals:jira-export").unwrap();
+        fs::write(
+            termination_runtime_root.join("processes"),
+            b"not a directory",
+        )
+        .unwrap();
+        let projection_refreshed = AtomicBool::new(false);
+        let projection_refresher = || {
+            projection_refreshed.store(true, AtomicOrdering::SeqCst);
+            Ok(())
+        };
+        let termination_error = termination_registry
+            .cancel_supervised(&termination_operation.id, &projection_refresher)
+            .unwrap_err();
+        assert!(termination_error.to_string().contains("process registry"));
+        assert!(!projection_refreshed.load(AtomicOrdering::SeqCst));
+        let termination_operation = termination_registry
+            .status(&termination_operation.id)
+            .unwrap();
+        assert_eq!(termination_operation.state, OperationState::Cancelled);
+        assert_eq!(
+            termination_operation.error.unwrap()["code"],
+            "operation_process_termination_failed"
+        );
+
+        let projection_runtime_root = temp_root.join("run/projection");
+        let projection_registry = FileOperationRegistry::new(&projection_runtime_root);
+        let projection_operation = projection_registry.register("goals:jira-export").unwrap();
+        let projection_refresher = || Err(RefineError::Io("projection refresh failed".to_string()));
+        let projection_error = projection_registry
+            .cancel_supervised(&projection_operation.id, &projection_refresher)
+            .unwrap_err();
+        assert_eq!(projection_error.to_string(), "projection refresh failed");
+        let projection_operation = projection_registry
+            .status(&projection_operation.id)
+            .unwrap();
+        assert_eq!(projection_operation.state, OperationState::Cancelled);
+        assert_eq!(
+            projection_operation.error.unwrap()["code"],
+            "operation_cancel_projection_refresh_failed"
+        );
+        let (logs, _, _) = projection_registry
+            .page_logs(&projection_operation.id, 20, 0)
+            .unwrap();
+        assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {
+        #[cfg(windows)]
+        let (command, args) = (
+            "cmd".to_string(),
+            vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()],
+        );
+        #[cfg(not(windows))]
+        let (command, args) = (
+            "sh".to_string(),
+            vec!["-c".to_string(), "while :; do sleep 1; done".to_string()],
+        );
+        ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command,
+            args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: Some(ProcessResourceLimits {
+                kill_on_parent_exit: true,
+                ..Default::default()
+            }),
+            authorization_command: Some("refine test operation helper".to_string()),
+            sensitive: false,
+            metadata: serde_json::from_value(json!({
+                "kind": "runner",
+                "worker_kind": "operation-capability-test-helper",
+                "operation_id": operation_id
+            }))
+            .unwrap(),
+        }
+    }
+
+    fn wait_for_managed_pid_exit(pid: u32) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while managed_pid_is_alive(pid).unwrap_or(false) && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

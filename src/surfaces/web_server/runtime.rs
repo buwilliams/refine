@@ -9,7 +9,7 @@ use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::config::FileSettingsService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
-    FileOperationRegistry, OperationRegistry, OperationState,
+    FileOperationRegistry, OperationProjectionRefresher, OperationRegistry, OperationState,
 };
 #[cfg(test)]
 use crate::tools::host::git_sync::FileGitSyncService;
@@ -51,6 +51,12 @@ struct RuntimePathFingerprint {
 static HOT_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, ProjectionSnapshot>>> = OnceLock::new();
 static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectionCacheEntry>>> =
     OnceLock::new();
+
+impl OperationProjectionRefresher for InProcessWebServer {
+    fn refresh_operation_projection(&self) -> RefineResult<()> {
+        self.current_projection_with_runtime().map(|_| ())
+    }
+}
 
 impl InProcessWebServer {
     #[cfg(test)]

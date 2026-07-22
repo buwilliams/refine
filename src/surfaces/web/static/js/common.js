@@ -441,6 +441,7 @@ async function waitForBackgroundOperation(operationOrId, {
   intervalMs = 750,
   timeoutMs = 10 * 60 * 1000,
   onProgress = null,
+  onStatus = null,
 } = {}) {
   const operationId = typeof operationOrId === "string" ? operationOrId : operationOrId?.id;
   if (!operationId) throw new Error("Background operation id missing");
@@ -449,6 +450,7 @@ async function waitForBackgroundOperation(operationOrId, {
   while (true) {
     const snap = await api("GET", `/api/operations/${operationId}`);
     const operation = snap.operation || {};
+    if (onStatus) await onStatus(operation);
     const progressKey = JSON.stringify(operation.progress || {});
     if (onProgress && progressKey !== lastProgress) {
       lastProgress = progressKey;
@@ -464,6 +466,11 @@ async function waitForBackgroundOperation(operationOrId, {
     if (operation.status === "cancelled") {
       const err = new Error("Background operation cancelled");
       err.code = "operation_cancelled";
+      throw err;
+    }
+    if (operation.status === "interrupted") {
+      const err = new Error("Background operation was interrupted and can be recovered");
+      err.code = "operation_interrupted";
       throw err;
     }
     if (Date.now() - started > timeoutMs) {

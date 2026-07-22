@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -227,13 +227,10 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        match FileOperationRegistry::new(runtime_root).cancel(operation_id) {
+        let registry = FileOperationRegistry::new(runtime_root);
+        match registry.cancel_supervised(operation_id, self) {
             Ok(operation) => {
-                let operation = operation_response(operation);
-                if let Err(error) = self.current_projection_with_runtime() {
-                    return error_response(error);
-                }
-                ApiResponse::json(200, json!({"operation": operation}))
+                ApiResponse::json(200, json!({"operation": operation_response(operation)}))
             }
             Err(error) => error_response(error),
         }

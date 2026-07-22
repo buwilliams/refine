@@ -13,6 +13,41 @@
   }
 }
 
+.goals-jira-export-operation {
+  margin: 14px 0;
+  padding: 14px 16px;
+}
+.goals-jira-export-heading,
+.goals-jira-export-progress,
+.goals-jira-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.goals-jira-export-heading {
+  justify-content: space-between;
+}
+.goals-jira-export-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.goals-jira-export-progress progress {
+  width: min(420px, 70vw);
+}
+.goals-jira-export-logs {
+  margin-top: 12px;
+}
+.goals-jira-export-logs > div {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.goals-jira-export-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 /* --- Goal actions ----------------------------------------------------- */
 .goal-action-group {
   display: inline-flex;

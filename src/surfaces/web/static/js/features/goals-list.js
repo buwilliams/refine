@@ -121,8 +121,9 @@ async function renderGoalsList() {
         <button class="secondary" id="goals-clear" data-testid="goals-clear-filters">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
-        <span class="muted small">Bulk update selected:</span>
+        <span class="muted small">Selected Goals:</span>
         <button class="secondary small" id="goal-select-page" data-testid="goals-select-page">Select page</button>
+        <button class="secondary small" id="bulk-export-jira" data-testid="goals-bulk-export-jira">Export for Jira</button>
         <button class="secondary small" id="bulk-set-status" data-testid="goals-bulk-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority" data-testid="goals-bulk-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter" data-testid="goals-bulk-reporter">Reporter…</button>
@@ -134,6 +135,10 @@ async function renderGoalsList() {
     </div>
       </div>
     </details>
+    <section id="goals-jira-export-operation"
+             class="card goals-jira-export-operation"
+             data-testid="goals-jira-export-operation"
+             hidden></section>
     <div id="goals-table" data-testid="goals-table"><p class="muted">Loading…</p></div>
   `;
   // In-view filter changes update the URL via replaceState (which does NOT
@@ -176,6 +181,7 @@ async function renderGoalsList() {
   });
   // The bulk-action buttons read the current filter from the hash at click
   // time, so they always reflect what the user can see.
+  bindCommand("#bulk-export-jira", "goals.bulk.export_jira");
   bindCommand("#bulk-set-priority", "goals.bulk.priority");
   bindCommand("#bulk-set-status", "goals.bulk.status");
   bindCommand("#bulk-set-reporter", "goals.bulk.reporter");
@@ -194,6 +200,7 @@ async function renderGoalsList() {
   });
 
   await refreshGoalsTable();
+  syncGoalsJiraExportOperation();
 }
 
 async function ensureGoalsNodeOptions() {

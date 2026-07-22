@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -226,6 +226,39 @@ impl FileProcessSupervisor {
             .map(pid_alive)
             .transpose()
             .map(|alive| alive.unwrap_or(false))
+    }
+
+    /// Terminates a managed process and does not return until its recorded PID is confirmed dead.
+    ///
+    /// Recovery callers must retain the process record until exit is known: removing registration
+    /// before that point would make an orphaned worker invisible and could allow overlapping work.
+    pub fn terminate_and_confirm_exit(
+        &self,
+        process: &ManagedProcess,
+        timeout: Duration,
+    ) -> RefineResult<()> {
+        if !Self::process_is_alive(process)? {
+            return Ok(());
+        }
+        if let Err(error) = self.request_termination(&process.id, "terminate") {
+            if !Self::process_is_alive(process)? {
+                return Ok(());
+            }
+            return Err(error);
+        }
+
+        let deadline = Instant::now() + timeout;
+        while Self::process_is_alive(process)? {
+            if Instant::now() >= deadline {
+                return Err(RefineError::Degraded(format!(
+                    "managed process {} did not exit within {} ms after termination",
+                    process.id,
+                    timeout.as_millis()
+                )));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        Ok(())
     }
 
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {

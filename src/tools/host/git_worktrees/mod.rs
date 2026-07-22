@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -83,6 +84,7 @@ pub trait GitWorktreeService {
 pub struct FileGitWorktreeService {
     pub root: PathBuf,
     pub runtime_root: Option<PathBuf>,
+    operation_id: Option<String>,
 }
 
 impl FileGitWorktreeService {
@@ -90,6 +92,7 @@ impl FileGitWorktreeService {
         Self {
             root: root.into(),
             runtime_root: None,
+            operation_id: None,
         }
     }
 
@@ -97,7 +100,13 @@ impl FileGitWorktreeService {
         Self {
             root: root.into(),
             runtime_root: Some(runtime_root.into()),
+            operation_id: None,
         }
+    }
+
+    pub fn with_operation_id(mut self, operation_id: impl Into<String>) -> Self {
+        self.operation_id = Some(operation_id.into());
+        self
     }
 
     pub fn audit_path(&self) -> RefineResult<PathBuf> {
@@ -132,21 +141,95 @@ impl FileGitWorktreeService {
     /// review candidates remain auditable before and after their branch is
     /// merged or cleaned up.
     pub fn changes_between(&self, base: &str, candidate: &str) -> RefineResult<Vec<GitChange>> {
-        validate_commitish(base)?;
-        validate_commitish(candidate)?;
-        let range = format!("{base}..{candidate}");
-        let output = self.git_output(&[
+        let key = (base.to_string(), candidate.to_string());
+        Ok(self
+            .changes_between_many(std::slice::from_ref(&key))?
+            .remove(&key)
+            .unwrap_or_default())
+    }
+
+    /// Resolve exact commit evidence for any number of Goal ranges with one Git history lookup.
+    ///
+    /// The returned map is keyed by `(base, candidate)`. Refine loads the parent graph for every
+    /// unique endpoint once, then computes each `base..candidate` reachability difference in
+    /// memory. This keeps bulk evidence export from spawning one `git log` process per Goal.
+    pub fn changes_between_many(
+        &self,
+        ranges: &[(String, String)],
+    ) -> RefineResult<BTreeMap<(String, String), Vec<GitChange>>> {
+        let ranges = ranges.iter().cloned().collect::<BTreeSet<_>>();
+        if ranges.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let mut endpoints = BTreeSet::new();
+        for (base, candidate) in &ranges {
+            validate_commitish(base)?;
+            validate_commitish(candidate)?;
+            endpoints.insert(base.clone());
+            endpoints.insert(candidate.clone());
+        }
+
+        let endpoint_names = endpoints.into_iter().collect::<Vec<_>>();
+        let resolve_input = endpoint_names
+            .iter()
+            .map(|endpoint| format!("{endpoint}^{{commit}}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let resolved_values = stdout(self.git_output_with_stdin(
+            &["cat-file", "--batch-check=%(objectname) %(objecttype)"],
+            &format!("{resolve_input}\n"),
+        )?)?
+        .lines()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.split_whitespace().collect::<Vec<_>>())
+        .map(|parts| match parts.as_slice() {
+            [commit, "commit"] => Ok((*commit).to_string()),
+            _ => Err(RefineError::Conflict(
+                "Git did not resolve a Goal commit-evidence endpoint to a commit".to_string(),
+            )),
+        })
+        .collect::<RefineResult<Vec<_>>>()?;
+        if resolved_values.len() != endpoint_names.len() {
+            return Err(RefineError::Conflict(
+                "Git did not resolve every Goal commit-evidence endpoint".to_string(),
+            ));
+        }
+        let resolved = endpoint_names
+            .iter()
+            .cloned()
+            .zip(resolved_values)
+            .collect::<BTreeMap<_, _>>();
+
+        let args = [
             "log",
-            "--reverse",
+            "--topo-order",
             "--date=iso-strict",
-            "--pretty=format:%H%x1f%cI%x1f%s%x1e",
-            &range,
-        ])?;
-        let text = stdout(output)?;
-        Ok(text
-            .split('\x1e')
-            .filter_map(parse_git_change)
-            .collect::<Vec<_>>())
+            "--pretty=format:%H%x1f%P%x1f%cI%x1f%s%x1e",
+            "--stdin",
+        ];
+        let revision_input = resolved.values().cloned().collect::<Vec<_>>().join("\n");
+        let graph = parse_git_change_graph(&stdout(
+            self.git_output_with_stdin(&args, &format!("{revision_input}\n"))?,
+        )?);
+
+        let mut result = BTreeMap::new();
+        for range in ranges {
+            let (base, candidate) = (&range.0, &range.1);
+            let base_ancestors = reachable_commits(&graph.nodes, &resolved[base]);
+            let candidate_ancestors = reachable_commits(&graph.nodes, &resolved[candidate]);
+            let mut commits = graph
+                .order
+                .iter()
+                .filter(|commit| {
+                    candidate_ancestors.contains(*commit) && !base_ancestors.contains(*commit)
+                })
+                .filter_map(|commit| graph.nodes.get(commit).map(|node| node.change.clone()))
+                .collect::<Vec<_>>();
+            commits.reverse();
+            result.insert(range, commits);
+        }
+        Ok(result)
     }
 
     pub fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
@@ -494,13 +577,31 @@ impl FileGitWorktreeService {
         }
     }
 
+    fn git_output_with_stdin(&self, args: &[&str], stdin: &str) -> RefineResult<HostCommandOutput> {
+        let output = self.git_raw_with_env_and_stdin(args, &[], Some(stdin))?;
+        if output.success {
+            Ok(output)
+        } else {
+            Err(RefineError::Conflict(trimmed_command_text(&output)))
+        }
+    }
+
     fn git_raw_with_env(
         &self,
         args: &[&str],
         env: &[(&str, &str)],
     ) -> RefineResult<HostCommandOutput> {
-        if is_read_only_git_command(args) {
-            return self.git_raw_untracked(args, env);
+        self.git_raw_with_env_and_stdin(args, env, None)
+    }
+
+    fn git_raw_with_env_and_stdin(
+        &self,
+        args: &[&str],
+        env: &[(&str, &str)],
+        stdin: Option<&str>,
+    ) -> RefineResult<HostCommandOutput> {
+        if self.operation_id.is_none() && is_read_only_git_command(args) {
+            return self.git_raw_untracked(args, env, stdin);
         }
         let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
         process_args.extend(args.iter().map(|arg| arg.to_string()));
@@ -514,11 +615,16 @@ impl FileGitWorktreeService {
                     .iter()
                     .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
                     .collect(),
-                stdin: None,
+                stdin: stdin.map(str::to_string),
                 limits: None,
                 authorization_command: Some(format!("git {}", args.join(" "))),
                 sensitive: false,
-                metadata: Default::default(),
+                metadata: serde_json::from_value(json!({
+                    "kind": "git",
+                    "git_command": args.first().copied().unwrap_or("git"),
+                    "operation_id": self.operation_id
+                }))
+                .unwrap_or_default(),
             },
         )?;
         Ok(HostCommandOutput {
@@ -532,14 +638,32 @@ impl FileGitWorktreeService {
         &self,
         args: &[&str],
         env: &[(&str, &str)],
+        stdin: Option<&str>,
     ) -> RefineResult<HostCommandOutput> {
-        let output = Command::new("git")
+        let mut command = Command::new("git");
+        command
             .arg("-C")
             .arg(&self.root)
             .args(args)
             .envs(env.iter().map(|(key, value)| (*key, *value)))
-            .output()
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        if stdin.is_some() {
+            command.stdin(std::process::Stdio::piped());
+        }
+        let mut child = command
+            .spawn()
             .map_err(|error| RefineError::Io(format!("failed to run git: {error}")))?;
+        if let Some(input) = stdin
+            && let Some(mut child_stdin) = child.stdin.take()
+        {
+            child_stdin
+                .write_all(input.as_bytes())
+                .map_err(|error| RefineError::Io(format!("failed to write Git input: {error}")))?;
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|error| RefineError::Io(format!("failed to read Git output: {error}")))?;
         Ok(HostCommandOutput {
             success: output.status.success(),
             stdout: output.stdout,
@@ -707,6 +831,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         let service = FileGitWorktreeService {
             root: self.root_for(path),
             runtime_root: self.runtime_root.clone(),
+            operation_id: self.operation_id.clone(),
         };
         let root = stdout(service.git_output(&["rev-parse", "--show-toplevel"])?)?
             .trim()
@@ -1076,9 +1201,80 @@ fn parse_git_change(raw: &str) -> Option<GitChange> {
     })
 }
 
+#[derive(Clone, Debug)]
+struct GitChangeGraphNode {
+    change: GitChange,
+    parents: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct GitChangeGraph {
+    nodes: BTreeMap<String, GitChangeGraphNode>,
+    order: Vec<String>,
+}
+
+fn parse_git_change_graph(output: &str) -> GitChangeGraph {
+    let mut graph = GitChangeGraph::default();
+    for raw in output.split('\x1e') {
+        let raw = raw.trim_matches(['\n', '\r']);
+        if raw.trim().is_empty() {
+            continue;
+        }
+        let mut parts = raw.splitn(4, '\x1f');
+        let Some(commit) = parts
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        let parents = parts
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let committed_time = parts.next().unwrap_or("").trim().to_string();
+        let subject = parts.next().unwrap_or("").trim().to_string();
+        graph.order.push(commit.to_string());
+        graph.nodes.insert(
+            commit.to_string(),
+            GitChangeGraphNode {
+                change: GitChange {
+                    commit: commit.to_string(),
+                    committed_time,
+                    subject,
+                    branch: None,
+                },
+                parents,
+            },
+        );
+    }
+    graph
+}
+
+fn reachable_commits(
+    graph: &BTreeMap<String, GitChangeGraphNode>,
+    start: &str,
+) -> BTreeSet<String> {
+    let mut reachable = BTreeSet::new();
+    let mut pending = vec![start.to_string()];
+    while let Some(commit) = pending.pop() {
+        if !reachable.insert(commit.clone()) {
+            continue;
+        }
+        if let Some(node) = graph.get(&commit) {
+            pending.extend(node.parents.iter().cloned());
+        }
+    }
+    reachable
+}
+
 fn validate_commitish(commit: &str) -> RefineResult<()> {
     let commit = commit.trim();
     if commit.is_empty()
+        || commit.starts_with('-')
+        || commit.contains("..")
         || !commit
             .chars()
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '/' | '.'))
@@ -1113,7 +1309,7 @@ fn is_read_only_git_command(args: &[&str]) -> bool {
         ["worktree", "list", "--porcelain"] => true,
         [command, ..] => matches!(
             *command,
-            "diff" | "log" | "rev-list" | "rev-parse" | "show" | "status"
+            "cat-file" | "diff" | "log" | "rev-list" | "rev-parse" | "show" | "status"
         ),
         [] => false,
     }
@@ -1150,6 +1346,50 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+
+    #[test]
+    fn changes_between_many_maps_multiple_ranges_from_one_commit_graph() {
+        let temp_root = unique_temp_dir("git-change-ranges");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        git(&repo, &["init"]).unwrap();
+        git(&repo, &["config", "user.email", "test@example.com"]).unwrap();
+        git(&repo, &["config", "user.name", "Test User"]).unwrap();
+        fs::write(repo.join("app.txt"), "base\n").unwrap();
+        git(&repo, &["add", "app.txt"]).unwrap();
+        git(&repo, &["commit", "-m", "base"]).unwrap();
+        let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+        fs::write(repo.join("app.txt"), "first\n").unwrap();
+        git(&repo, &["commit", "-am", "first delivery"]).unwrap();
+        let first = git_stdout(&repo, &["rev-parse", "HEAD"]);
+        fs::write(repo.join("app.txt"), "second\n").unwrap();
+        git(&repo, &["commit", "-am", "second delivery"]).unwrap();
+        let second = git_stdout(&repo, &["rev-parse", "HEAD"]);
+
+        let ranges = vec![
+            (base.clone(), first.clone()),
+            (first.clone(), second.clone()),
+            (base.clone(), second.clone()),
+            (base.clone(), second.clone()),
+        ];
+        let changes = FileGitWorktreeService::with_runtime_root(&repo, temp_root.join("runtime"))
+            .with_operation_id("OP-BATCH")
+            .changes_between_many(&ranges)
+            .unwrap();
+
+        assert_eq!(changes.len(), 3);
+        assert_eq!(changes[&(base.clone(), first.clone())].len(), 1);
+        assert_eq!(changes[&(first.clone(), second.clone())].len(), 1);
+        assert_eq!(
+            changes[&(base.clone(), second.clone())]
+                .iter()
+                .map(|change| change.subject.as_str())
+                .collect::<Vec<_>>(),
+            vec!["first delivery", "second delivery"]
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 
     #[test]
     fn file_git_worktree_service_lists_status_and_reverts_commits() {
