@@ -440,9 +440,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T17:29:07Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T17:29:51Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate bfdfc92f996d8a0f197cb740969eb42960ecf7f3 and fix the three Round 6 governance violations without introducing another recovery engine. (1) Make recovery continuously reconcile each Running claim against its exact supervised provider or settlement ownership, including owner/provider loss after another daemon is already attached; do not treat any workflow runner in the runtime as proof that a specific claim is live, and ensure stranded Goal, claim, and capacity state is recoverable. (2) On non-fast-forward durable-state push retry, re-read remote authoritative state and recompute semantic conflicts and conflict evidence before any rebase/publish; a clean Git rebase must not silently combine concurrent decisions on the same authoritative record. (3) Add proportional production-path tests for owner/provider loss while a second daemon remains attached and genuinely concurrent Node pushes that would otherwise cleanly rebase, proving explicit conflict review and no stranded capacity. Preserve the shared transaction, stable app identity, isolated worktrees, supervised processes, existing passing behavior, and the current candidate history. Run focused recovery/conflict tests, the serial library suite, full workflow, multi-instance sync, fmt, all-target check, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T17:29:51Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T17:29:07Z"
+  "updated": "2026-07-22T17:29:51Z"
 }
