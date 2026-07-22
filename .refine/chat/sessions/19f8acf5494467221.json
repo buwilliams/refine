@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:01:07Z",
+  "updated_at": "2026-07-22T18:02:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -612,6 +612,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality corrected the daemon fixture and is at format/clippy. Coordination identified a test configuration mismatch around per-Node capacity and has adjusted the distinct-Node fixture."
+    },
+    {
+      "created_at": "2026-07-22T18:02:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743325505-164",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s focused foreign-Node boundary test now passes; it is adding a distinct-Node ignored case to the production multi-instance harness. Quality is rerunning the full library gate after clippy passed."
     }
   ],
   "queued_messages": [
