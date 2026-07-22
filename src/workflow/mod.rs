@@ -42,6 +42,7 @@ use crate::workflow::promotion::BacklogPromotionService;
 
 pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 const AUTOMATION_CONCURRENCY_LIMIT_REACHED: &str = "automation concurrency limit reached";
+const ACTIVE_WORK_REPLENISH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -657,10 +658,17 @@ impl WorkflowEngine {
             let mut running = 0usize;
             let mut launch_order = 0usize;
             let mut launched_any = false;
+            let mut next_replenish = std::time::Instant::now();
 
             loop {
                 if launched_any && running == 0 {
                     break;
+                }
+                if scheduler_error.is_none() && std::time::Instant::now() >= next_replenish {
+                    if let Err(error) = self.promote() {
+                        scheduler_error = Some(error);
+                    }
+                    next_replenish = std::time::Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
                 }
                 if scheduler_error.is_none() {
                     let launchable = self.load_state().and_then(|state| {
@@ -723,6 +731,7 @@ impl WorkflowEngine {
                 match outcome_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                     Ok((order, claim_id, outcome)) => {
                         running -= 1;
+                        next_replenish = std::time::Instant::now();
                         match outcome {
                             Ok(result) => {
                                 if let Err(error) =
@@ -2505,6 +2514,174 @@ mod tests {
                 .iter()
                 .all(|claim| claim.state == WorkflowClaimState::Completed)
         );
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_replenishes_new_todo_goals_during_active_work() {
+        let temp_root = unique_temp_dir("automation-live-queue-replenish");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let marker_root = temp_root.join("parallel-markers");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&marker_root).unwrap();
+        fs::write(
+            target_root.join("app.py"),
+            "def health():\n    return 'ok'\n",
+        )
+        .unwrap();
+        git(
+            &target_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&target_root, &["add", "app.py"]).unwrap();
+        git(&target_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            format!(
+                "#!/bin/sh\n\
+                 marker_root='{}'\n\
+                 touch \"$marker_root/$(basename \"$PWD\")\"\n\
+                 attempt=0\n\
+                 while [ ! -f \"$marker_root/release\" ]; do\n\
+                   attempt=$((attempt + 1))\n\
+                   [ \"$attempt\" -ge 1500 ] && exit 42\n\
+                   sleep 0.01\n\
+                 done\n\
+                 printf '%s\\n' 'parallel agent completed' > agent.txt\n\
+                 printf '%s\\n' 'smoke-ai parallel goal-agent response'\n",
+                marker_root.display()
+            ),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_feature_summary("Ordered Feature", Some("FEAT1"), None, None, None)
+            .unwrap();
+        work_items
+            .create_goal_summary("First Feature Goal", Some("FEATURE_FIRST"))
+            .unwrap();
+        work_items
+            .append_goal_round_summary("FEATURE_FIRST", "Reporter", "Prompt")
+            .unwrap();
+        work_items
+            .transition_goal_status("FEATURE_FIRST", GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .assign_goal_to_feature("FEAT1", "FEATURE_FIRST")
+            .unwrap();
+        work_items
+            .order_goal_in_feature("FEAT1", "FEATURE_FIRST")
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "parallel_run_cap": 4,
+                "parallel_per_node_cap": 4,
+                "parallel_per_provider_cap": 4,
+                "parallel_per_target_app_cap": 4,
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        assert_eq!(automation.promote().unwrap(), 1);
+        let evaluation_automation = automation.clone();
+        let evaluation_thread =
+            std::thread::spawn(move || evaluation_automation.execute_claimed_work());
+
+        let initial_deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while fs::read_dir(&marker_root).unwrap().count() < 1
+            && std::time::Instant::now() < initial_deadline
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(fs::read_dir(&marker_root).unwrap().count(), 1);
+
+        for goal_id in ["STANDALONE_ONE", "STANDALONE_TWO", "FEATURE_SECOND"] {
+            work_items
+                .create_goal_summary(goal_id, Some(goal_id))
+                .unwrap();
+            work_items
+                .append_goal_round_summary(goal_id, "Reporter", "Prompt")
+                .unwrap();
+            work_items
+                .transition_goal_status(goal_id, GoalStatus::Todo)
+                .unwrap();
+        }
+        work_items
+            .assign_goal_to_feature("FEAT1", "FEATURE_SECOND")
+            .unwrap();
+        work_items
+            .order_goal_in_feature("FEAT1", "FEATURE_SECOND")
+            .unwrap();
+
+        let replenish_deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while fs::read_dir(&marker_root).unwrap().count() < 3
+            && std::time::Instant::now() < replenish_deadline
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let markers = fs::read_dir(&marker_root)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(markers.len(), 3);
+        assert!(
+            markers
+                .iter()
+                .any(|marker| marker.contains("STANDALONE_ONE"))
+        );
+        assert!(
+            markers
+                .iter()
+                .any(|marker| marker.contains("STANDALONE_TWO"))
+        );
+        assert!(
+            !markers
+                .iter()
+                .any(|marker| marker.contains("FEATURE_SECOND"))
+        );
+        assert_eq!(
+            work_items
+                .show_goal_summary("FEATURE_SECOND")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::Todo
+        );
+
+        fs::write(marker_root.join("release"), "release\n").unwrap();
+        let result = evaluation_thread.join().unwrap().unwrap();
+        for goal_id in ["FEATURE_FIRST", "STANDALONE_ONE", "STANDALONE_TWO"] {
+            assert!(result.iter().any(|step| step.goal_id == goal_id));
+        }
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {

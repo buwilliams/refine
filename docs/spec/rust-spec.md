@@ -684,8 +684,10 @@ Requirements:
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
-- Active workflow execution replenishes available agent slots when runtime
-  concurrency limits increase; current agents do not need to finish first.
+- Active workflow execution periodically discovers newly eligible queued Goals
+  and replenishes available agent slots without waiting for current agents to
+  finish, including when runtime concurrency limits increase. Replenishment
+  preserves priority and Feature-order eligibility constraints.
 - Workflow claims survive daemon restart or are reconciled safely.
 - Agents, QA, merge, governance, and target-app build are tools invoked by
   workflow behaviors.
