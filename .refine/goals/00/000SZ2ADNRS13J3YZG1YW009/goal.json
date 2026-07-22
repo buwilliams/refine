@@ -68,7 +68,7 @@
       "updated": "2026-07-22T10:31:39Z"
     },
     {
-      "assignee": "Refine supervisor",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-07-22T10:34:00Z",
       "governance_checked_at": "",
@@ -87,10 +87,10 @@
       "quality_state": "unclassified",
       "reporter": "Refine supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:34:00Z"
+      "updated": "2026-07-22T10:34:12Z"
     }
   ],
-  "status": "failed",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-22T10:34:00Z"
+  "updated": "2026-07-22T10:34:12Z"
 }
