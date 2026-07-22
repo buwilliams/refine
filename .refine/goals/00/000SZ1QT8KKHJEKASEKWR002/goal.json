@@ -14,26 +14,59 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T23:19:36Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T00:08:51Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1",
+        "failed_actions": [
+          {
+            "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
+            "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+            "rule_id": "rule-5"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Cross-surface verification is insufficient for the new source-promotion control.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.\",\"message\":\"The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.\"}]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "Cross-surface verification is insufficient for the new source-promotion control.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
+              "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+              "rule_id": "rule-5"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1"
+      },
+      "governance_message": "Cross-surface verification is insufficient for the new source-promotion control.",
+      "governance_rule_actions": [
+        {
+          "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
+          "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
+          "rule_id": "rule-5"
+        }
+      ],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "If the target app is a refine repo such that refine is being used to update refine, in this situation, the UI should have a refresh icon button on the main nav that is disabled or enabled if there is a new commit that the running refine could update to.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T23:19:36Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T00:08:52Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T00:05:59Z"
+  "updated": "2026-07-22T00:08:52Z"
 }

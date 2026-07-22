@@ -14,26 +14,45 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-21T23:20:28Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T00:08:50Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QV26A31TZF4EKWR003-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found; instant promotion uses the shared daemon route and WorkflowEngine with persisted-state regression coverage.\",\"violations\":[]}",
+        "rules_checked": 6,
+        "verdict": {
+          "message": "No Governance rule violations found; instant promotion uses the shared daemon route and WorkflowEngine with persisted-state regression coverage.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QV26A31TZF4EKWR003-round-1"
+      },
+      "governance_message": "No Governance rule violations found; instant promotion uses the shared daemon route and WorkflowEngine with persisted-state regression coverage.",
       "governance_rule_actions": [],
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "I changed the config to of auto-promote to instance, but when I created a new Goal, the item landed in the Backlog and stayed there, it wasn't auto-promoted even though it should have been.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T00:08:51Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-21T23:20:28Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T00:08:51Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T00:06:04Z"
+  "updated": "2026-07-22T00:08:51Z"
 }
