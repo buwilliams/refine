@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T09:59:14Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:28:15Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A3VTB16YZMNW1YW005-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found in the committed implementation.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found in the committed implementation.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A3VTB16YZMNW1YW005-round-1"
+      },
+      "governance_message": "No Governance rule violations found in the committed implementation.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2A3VTB16YZMNW1YW005` is complete and ready for review at commit `7f749ff4dcaf36f813a0d1c36b526a5f8e41c8e1`.\n\nAfter-action report:\n\n- Changed six intent documents to define concise centralized prompts, capability overhang, repository discovery, prototyping, user interviews, ambitious outcomes, and evidence-based governance.\n- Based the commit directly on both ordered prompt prerequisites.\n- Why: Refine’s documentation and governance now match its unhobbled agent behavior without changing live project state.\n\nExact verification:\n\n- Documentation contract check: exit `0`; all required concepts found and 21 prompt templates confirmed.\n- `cargo fmt --all -- --check`: exit `0`.\n- `git diff --check`: exit `0`.\n- Prompt tests: exit `0`; 4 passed.\n- `./r test unit`: exit `0`; 393 passed, 0 failed.\n- `cargo clippy --all-targets -- -D warnings`: exit `0`.\n- Final worktree: clean.\n\nGoal-agent usage: 118,321 tokens over 6m 25s.",
       "implementation_reported_at": "2026-07-22T10:26:44Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Incorporate the unhobbling of agents into documentation and governance for Refine:\n\n- All agent prompts live in src/prompts as markdown templates.\n- Unhobbling Agents: Understand how models work by recognizing their \"spiky\" intelligence, known as capability overhang. Latest models benefit from reduced system prompts.\n- Finding Your Unknowns: Bridge the gap between your \"map\" (the spec or prompt) and the \"territory\" (the actual codebase). Recommend strategies like \"blind spot paths,\" prototyping, and asking the model to interview you to uncover hidden requirements. This is a good use of the supervisor agent.\n- Being Unreasonable: Argue for abandoning standard trade-offs. Demand \"good, fast, and cheap\" results simultaneously\n- Aim for more ambitious work by leveraging the speed and capabilities of current agents.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:28:17Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:26:44Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:28:17Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:26:44Z"
+  "updated": "2026-07-22T10:28:17Z"
 }
