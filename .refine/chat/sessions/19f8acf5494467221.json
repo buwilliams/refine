@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:50:43Z",
+  "updated_at": "2026-07-22T18:53:44Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -948,6 +948,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s final audit found one last real race: cancellation could occur between consecutive recovery commands and miss admission of the next supervised process. The fix is an operation-scoped admission lock so cancellation either blocks launch or waits for durable registration and then terminates the process. Coordination’s production and focused tests remain green; two compound verification commands returned nonzero only because of formatting and Cargo’s single-filter syntax, after which the separate tests passed."
+    },
+    {
+      "created_at": "2026-07-22T18:53:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784746424109-225",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s broad matrix is green: 436 serial library tests, full workflow, and all three multi-instance cases, including live Node switch/provider loss. Quality’s cancellation-race test reached the intended conflict—second process admission was blocked—but the test incorrectly unwrapped that expected error; the agent is correcting the assertion and checking that cancellation is also persisted in Git audit evidence."
     }
   ],
   "queued_messages": [
