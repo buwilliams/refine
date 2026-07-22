@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:18:07Z",
+  "updated_at": "2026-07-22T18:20:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -732,6 +732,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s first compile exposed an ordinary code issue, which the agent corrected; the shared Quality unit suite now passes. Coordination is extending the existing coordination lock across active-Node activation and workflow mutation rather than relying on a pre-check, and it is correcting the Goal-transfer test so the asserted transfer actually occurs. No provider or authentication failure has appeared."
+    },
+    {
+      "created_at": "2026-07-22T18:20:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784744405460-186",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s corrected focused tests both pass, including the real two-daemon/distinct-Node path, and it is rerunning the full suite against the final lock semantics. Quality’s new production tests hit compile-only missing trait/type imports—not a runtime or provider failure—and the implementation path remains intact while those fixtures are corrected."
     }
   ],
   "queued_messages": [
