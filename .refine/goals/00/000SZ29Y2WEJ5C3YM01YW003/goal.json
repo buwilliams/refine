@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T09:52:55Z",
+  "feature_id": "00000SZ29W6KCGEGMCS81YW002",
+  "feature_order": 1,
+  "id": "00000SZ29Y2WEJ5C3YM01YW003",
+  "name": "Create src/prompts and move all agent prompts to src/prompts as Markdown templat",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T09:52:55Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Create src/prompts and move all agent prompts to src/prompts as Markdown template files instead of being hardcoded in the source code. Create a prompt engine to parse and load templates, substituting variables as needed.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T09:52:55Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T09:52:59Z"
+}
