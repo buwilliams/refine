@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "lifecycle": "observing",
+  "lifecycle": "idle",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 6,
-  "failed_work": 0,
+  "queued_work": 0,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8956ab3d4361",
   "provider": "codex",
@@ -28,23 +28,22 @@
     "00000SZ1T921F15X91MBZWE000": "done",
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
     "00000SZ1YFDPAG0NJ16FTTY000": "done",
-    "00000SZ29R2JNJR5RXPR1YW000": "review",
-    "00000SZ29T1KSK3KYJW81YW001": "todo",
-    "00000SZ29Y2WEJ5C3YM01YW003": "review",
-    "00000SZ2A1VDSHNRTNWM1YW004": "review",
-    "00000SZ2A3VTB16YZMNW1YW005": "todo",
+    "00000SZ29R2JNJR5RXPR1YW000": "done",
+    "00000SZ29T1KSK3KYJW81YW001": "review",
+    "00000SZ29Y2WEJ5C3YM01YW003": "done",
+    "00000SZ2A1VDSHNRTNWM1YW004": "done",
+    "00000SZ2A3VTB16YZMNW1YW005": "done",
     "00000SZ2A8GT1HPT5JXR1YW006": "review",
-    "00000SZ2A9V2FG1VXVDM1YW007": "review",
-    "00000SZ2AAFPEGY865YM1YW008": "todo",
-    "00000SZ2ADNRS13J3YZG1YW009": "todo",
-    "00000SZ2AEZ6VGKY6RCG1YW00A": "todo",
-    "00000SZ2AG11JHPZNR941YW00B": "todo"
+    "00000SZ2A9V2FG1VXVDM1YW007": "done",
+    "00000SZ2AAFPEGY865YM1YW008": "done",
+    "00000SZ2ADNRS13J3YZG1YW009": "failed",
+    "00000SZ2AEZ6VGKY6RCG1YW00A": "done",
+    "00000SZ2AG11JHPZNR941YW00B": "done"
   },
   "open_issues": {
     "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
   },
-  "last_context_key": "goals=00000SZ29T1KSK3KYJW81YW001:todo,00000SZ2A3VTB16YZMNW1YW005:todo,00000SZ2AAFPEGY865YM1YW008:todo,00000SZ2ADNRS13J3YZG1YW009:todo,00000SZ2AEZ6VGKY6RCG1YW00A:todo,00000SZ2AG11JHPZNR941YW00B:todo|live={}|quiet={}|issues=provider:Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
-  "updated_at": "2026-07-22T10:19:46.366722324+00:00",
+  "updated_at": "2026-07-22T10:31:41.459593669+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -286,6 +285,115 @@
       "status": "info",
       "message": "Goal 00000SZ2AG11JHPZNR941YW00B entered workflow state todo.",
       "created_at": "2026-07-22T10:19:46.365586592+00:00",
+      "goal_id": "00000SZ2AG11JHPZNR941YW00B",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:40.267252689+00:00-26",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: Implementation behavior is sound and tested, but the new active-queue replenishment semantics are not documented.",
+      "created_at": "2026-07-22T10:31:40.267252689+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277480031+00:00-27",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29R2JNJR5RXPR1YW000 changed from review to done.",
+      "created_at": "2026-07-22T10:31:41.277480031+00:00",
+      "goal_id": "00000SZ29R2JNJR5RXPR1YW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277487687+00:00-28",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29T1KSK3KYJW81YW001 changed from todo to review.",
+      "created_at": "2026-07-22T10:31:41.277487687+00:00",
+      "goal_id": "00000SZ29T1KSK3KYJW81YW001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277490115+00:00-29",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29Y2WEJ5C3YM01YW003 changed from review to done.",
+      "created_at": "2026-07-22T10:31:41.277490115+00:00",
+      "goal_id": "00000SZ29Y2WEJ5C3YM01YW003",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277492455+00:00-30",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A1VDSHNRTNWM1YW004 changed from review to done.",
+      "created_at": "2026-07-22T10:31:41.277492455+00:00",
+      "goal_id": "00000SZ2A1VDSHNRTNWM1YW004",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277494537+00:00-31",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A3VTB16YZMNW1YW005 changed from todo to done.",
+      "created_at": "2026-07-22T10:31:41.277494537+00:00",
+      "goal_id": "00000SZ2A3VTB16YZMNW1YW005",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277496814+00:00-32",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A9V2FG1VXVDM1YW007 changed from review to done.",
+      "created_at": "2026-07-22T10:31:41.277496814+00:00",
+      "goal_id": "00000SZ2A9V2FG1VXVDM1YW007",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277498892+00:00-33",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2AAFPEGY865YM1YW008 changed from todo to done.",
+      "created_at": "2026-07-22T10:31:41.277498892+00:00",
+      "goal_id": "00000SZ2AAFPEGY865YM1YW008",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277502415+00:00-34",
+      "kind": "observation",
+      "status": "error",
+      "message": "Goal 00000SZ2ADNRS13J3YZG1YW009 changed from todo to failed.",
+      "created_at": "2026-07-22T10:31:41.277502415+00:00",
+      "goal_id": "00000SZ2ADNRS13J3YZG1YW009",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277504722+00:00-35",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2AEZ6VGKY6RCG1YW00A changed from todo to done.",
+      "created_at": "2026-07-22T10:31:41.277504722+00:00",
+      "goal_id": "00000SZ2AEZ6VGKY6RCG1YW00A",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:31:41.277506812+00:00-36",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2AG11JHPZNR941YW00B changed from todo to done.",
+      "created_at": "2026-07-22T10:31:41.277506812+00:00",
       "goal_id": "00000SZ2AG11JHPZNR941YW00B",
       "actionable": false,
       "retryable": false
