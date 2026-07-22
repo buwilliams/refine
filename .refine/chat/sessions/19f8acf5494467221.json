@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:00:07Z",
+  "updated_at": "2026-07-22T18:01:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -600,6 +600,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both new gates found actionable implementation/test issues rather than provider failures: coordination’s foreign-Node mutation test failed, and Quality’s daemon workflow failed under the new integrity gate. Both agents are inspecting preserved evidence and correcting the shared paths; nothing has been merged."
+    },
+    {
+      "created_at": "2026-07-22T18:01:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743267718-162",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality corrected the daemon fixture and is at format/clippy. Coordination identified a test configuration mismatch around per-Node capacity and has adjusted the distinct-Node fixture."
     }
   ],
   "queued_messages": [
