@@ -168,6 +168,7 @@ impl FileGitSyncService {
         let setup = self.ensure_state_worktree(&remote, remote_exists, &live_refine)?;
         let state_root = setup.path;
         let state_refine = state_root.join(".refine");
+        let recovered_interrupted_sync = self.recover_interrupted_state_worktree(&state_root)?;
         let checked_out = durable_state_map(&state_refine)?;
         // A node seeing the state branch for the first time has no synchronized
         // baseline yet. Its absent local files are not deletions of records
@@ -188,6 +189,12 @@ impl FileGitSyncService {
                 "Git remote {remote} is not configured; Refine state was committed locally."
             )]
         };
+        if recovered_interrupted_sync {
+            details.push(
+                "Recovered an interrupted Refine state copy before reconciling current live state."
+                    .to_string(),
+            );
+        }
         if remote_exists {
             let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
             let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
@@ -295,6 +302,70 @@ impl FileGitSyncService {
             detail: nonempty_detail(details),
             deferred: concurrent_local_change,
         })
+    }
+
+    fn recover_interrupted_state_worktree(
+        &self,
+        state_root: &std::path::Path,
+    ) -> RefineResult<bool> {
+        let tracked_changes = self.git_at_stdout(
+            state_root,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        )?;
+        let untracked = self.git_at_stdout(
+            state_root,
+            &[
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                ".refine",
+            ],
+        )?;
+        if tracked_changes.is_empty() && untracked.is_empty() {
+            return Ok(false);
+        }
+
+        if !tracked_changes.is_empty() {
+            self.git_at_checked(
+                state_root,
+                &[
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    ".refine",
+                ],
+            )?;
+        }
+        if !untracked.is_empty() {
+            self.git_at_checked(state_root, &["clean", "-f", "-d", "-x", "--", ".refine"])?;
+        }
+
+        let remaining = self.git_at_stdout(
+            state_root,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        )?;
+        if !remaining.is_empty() {
+            return Err(RefineError::Conflict(format!(
+                "failed to recover interrupted Refine state synchronization: {remaining}"
+            )));
+        }
+        Ok(true)
     }
 
     fn fetch_remote(&self, remote: &str) -> RefineResult<()> {
@@ -1172,6 +1243,78 @@ mod tests {
         let refine_dir = refine_dir_for_target_root(&fixture.a).unwrap();
         assert!(refine_dir.join("goals/GOALA/goal.json").exists());
         assert!(refine_dir.join("goals/GOALB/goal.json").exists());
+    }
+
+    #[test]
+    fn sync_recovers_completed_state_copy_interrupted_before_commit() {
+        let fixture = SyncFixture::new("interrupted-copy-restart");
+        write_goal(&fixture.a, "GOALA");
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+
+        let live_goal = refine_dir_for_target_root(&fixture.a)
+            .unwrap()
+            .join("goals/GOALA/goal.json");
+        let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
+        let state_goal = state_worktree.join(".refine/goals/GOALA/goal.json");
+        fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"copied\"}\n").unwrap();
+        copy_state_file(&live_goal, &state_goal).unwrap();
+        assert_eq!(
+            git_stdout(&state_worktree, &["status", "--short"]),
+            "M .refine/goals/GOALA/goal.json"
+        );
+
+        write_goal(&fixture.b, "GOALB");
+        fixture.service(&fixture.b).sync().unwrap();
+        let remote_before_recovery =
+            git_stdout(&fixture.a, &["ls-remote", "origin", REFINE_STATE_REF])
+                .split_whitespace()
+                .next()
+                .unwrap()
+                .to_string();
+        fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n").unwrap();
+
+        let recovered = fixture.service(&fixture.a).sync().unwrap();
+
+        assert!(
+            recovered.committed && recovered.pulled && recovered.pushed,
+            "{recovered:?}"
+        );
+        assert!(
+            recovered
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("Recovered an interrupted Refine state copy")),
+            "{recovered:?}"
+        );
+        assert_eq!(git_stdout(&state_worktree, &["status", "--short"]), "");
+        assert_eq!(
+            fs::read_to_string(&live_goal).unwrap(),
+            "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n"
+        );
+        assert_eq!(
+            git_stdout(
+                &fixture.a,
+                &["show", "origin/refine/state:.refine/goals/GOALA/goal.json",],
+            ),
+            "{\"id\":\"GOALA\",\"status\":\"concurrent\"}"
+        );
+        assert!(
+            !git_stdout(
+                &fixture.a,
+                &["show", "origin/refine/state:.refine/goals/GOALB/goal.json",],
+            )
+            .is_empty()
+        );
+        git(
+            &fixture.a,
+            &[
+                "merge-base",
+                "--is-ancestor",
+                &remote_before_recovery,
+                "origin/refine/state",
+            ],
+        );
     }
 
     #[test]
