@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:20:14Z",
+  "updated_at": "2026-07-22T13:22:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -792,6 +792,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "No state transition yet, but the territory is active: both recovery and Quality workers emitted fresh edits within the last minute, and Jira’s Refine governance worker remains live. I’m continuing to wait on actual process and audit completion rather than interpreting unchanged timestamps as completion."
+    },
+    {
+      "created_at": "2026-07-22T13:22:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784726538400-122",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Jira candidate `f52967c…` failed Refine governance again. This is now the fifth round, so I’m not automatically launching a sixth: I’ll inspect whether the remaining finding is a small missed invariant or evidence that the Goal needs a broader product decision."
     }
   ],
   "queue_dispatching": true,
