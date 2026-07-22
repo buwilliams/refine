@@ -111,9 +111,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T11:43:06Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:44:18Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 58d5b76c2f11f6eaba01f32af7086458ac076465 and remediate all four governance findings after the shared plain-language Quality core from sibling Goal 00000SZ2CF255HWFA0G9XVA006 has converged on main; inspect that landed implementation first and compose it instead of duplicating or replacing it. There must be one authoritative Quality settings model, service, agent evaluator, operation/process path, and evidence contract used by workflow, API, UI, CLI, MCP, and desktop; remove split node-settings versus quality/settings ownership and remove the legacy arbitrary-command API semantics rather than maintaining parallel pass rules. Make retry-quality truly re-enter the preserved candidate at QA through the workflow claim/behavior engine (not WorkflowTodo), with correct ownership, capacity, operation state, logs, cancellation, provider/tool failure, and recovery. Treat supervised Process outcomes as the evidence source: provider JSON may reference tool executions but cannot prove them by nonempty strings; correlate every test result with observed supervised execution/output and reject missing or fabricated evidence. Empty configured tests are the only successful no-provider no-op; an empty command is not a Quality pass path. Add focused cross-surface parity, QA retry/re-entry, supervised execution correlation, false-positive fixture, provider/tool failure, and evidence persistence tests. Coordinate with sibling Goal 00000SZ2CF2CP3NVV3J1XVA008 for UI-only composition, preserve isolated worktrees and serial review, and do not force or invent merges.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:44:18Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:43:07Z"
+  "updated": "2026-07-22T11:44:18Z"
 }
