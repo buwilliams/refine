@@ -69,28 +69,76 @@
     },
     {
       "assignee": "Codex",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:15:47Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T11:51:58Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-2",
+        "failed_actions": [
+          {
+            "message": "The Goals browser surface starts and polls the Jira export but exposes no operation-log view or Cancel/Hide control; it only disables and relabels the Export button. Cancellation exists only through the generic API, contradicting the committed browser intent and integration spec that describe a visible, cancellable operation.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The cancellation/recovery test does not exercise the production supervised-process path: cfg(test) replaces process launch with a thread, cancellation therefore never verifies terminate_operation_processes or operation-associated process termination, and interruption is created by directly writing Interrupted state rather than simulating daemon/process interruption. The new process and recovery seams lack the required focused integration evidence.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"The supervised export exists, but browser cancellation and production-path verification are incomplete.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"The Goals browser surface starts and polls the Jira export but exposes no operation-log view or Cancel/Hide control; it only disables and relabels the Export button. Cancellation exists only through the generic API, contradicting the committed browser intent and integration spec that describe a visible, cancellable operation.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The cancellation/recovery test does not exercise the production supervised-process path: cfg(test) replaces process launch with a thread, cancellation therefore never verifies terminate_operation_processes or operation-associated process termination, and interruption is created by directly writing Interrupted state rather than simulating daemon/process interruption. The new process and recovery seams lack the required focused integration evidence.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "The supervised export exists, but browser cancellation and production-path verification are incomplete.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The Goals browser surface starts and polls the Jira export but exposes no operation-log view or Cancel/Hide control; it only disables and relabels the Export button. Cancellation exists only through the generic API, contradicting the committed browser intent and integration spec that describe a visible, cancellable operation.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The cancellation/recovery test does not exercise the production supervised-process path: cfg(test) replaces process launch with a thread, cancellation therefore never verifies terminate_operation_processes or operation-associated process termination, and interruption is created by directly writing Interrupted state rather than simulating daemon/process interruption. The new process and recovery seams lack the required focused integration evidence.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-2"
+      },
+      "governance_message": "The supervised export exists, but browser cancellation and production-path verification are incomplete.",
+      "governance_rule_actions": [
+        {
+          "message": "The Goals browser surface starts and polls the Jira export but exposes no operation-log view or Cancel/Hide control; it only disables and relabels the Export button. Cancellation exists only through the generic API, contradicting the committed browser intent and integration spec that describe a visible, cancellable operation.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The cancellation/recovery test does not exercise the production supervised-process path: cfg(test) replaces process launch with a thread, cancellation therefore never verifies terminate_operation_processes or operation-associated process termination, and interruption is created by directly writing Interrupted state rather than simulating daemon/process interruption. The new process and recovery seams lack the required focused integration evidence.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Goal `00000SZ2BGCG909VDSW41YW00D` Round 2 is complete and reviewable. No commit was created; 19 scoped files are modified and unstaged.\n\nWhat changed:\n\n- Bulk Jira export now immediately returns a durable `goals:jira-export` operation.\n- A supervised runner owns CSV generation, progress, logs, cancellation, failures, persisted results, and interruption recovery.\n- The UI follows the operation, survives reloads, retries interrupted exports, and downloads the completed CSV.\n- Commit evidence uses batched ref resolution and one supervised `git log --stdin`, eliminating per-Goal Git processes.\n- Selection semantics, deterministic ordering, and single-Goal CLI/MCP compatibility remain intact.\n- Added route completion/failure, cancellation/recovery, UI, and multi-range Git coverage.\n\nVerification:\n\n- Final governance review: **passed**, all 8 rules, zero violations.\n- `cargo test --lib --quiet`: **399 passed, 0 failed**.\n- `cargo clippy --lib -- -D warnings`: passed.\n- `cargo fmt --all -- --check`: passed.\n- Focused export, cancellation/recovery, UI, and commit-graph tests: passed.\n- JavaScript syntax checks: 5/5 passed.\n- `node --test tests/web_supervisor_toolbar.test.js`: 10 passed.\n- `git diff --check`: passed.\n\nOne intermediate full test run encountered an unrelated transient `Text file busy`; that exact test passed immediately when rerun, followed by the clean 399/399 full result.\n\nTracked execution: 31m 26s, 350,658 tokens.",
       "implementation_reported_at": "2026-07-22T11:48:21Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve the committed bulk Jira export behavior and fix the governance failure. Do not run an unbounded per-Goal Git loop in the HTTP request handler. Use Refine’s existing supervised process and durable operation path so the export has ownership, progress and logs, cancellation, failure reporting, and recovery; have the UI follow that operation and download the completed CSV. Batch or otherwise bound commit-evidence lookup instead of spawning one git log per Goal. Keep the shared export service, deterministic ordering, selection semantics, and single-Goal CLI/MCP compatibility. Add focused coverage for route responsiveness, operation completion, cancellation and failure, and commit lookup behavior, then rerun governance and relevant tests.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Codex",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T11:48:21Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T11:51:58Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:48:22Z"
+  "updated": "2026-07-22T11:51:58Z"
 }
