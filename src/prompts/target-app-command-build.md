@@ -1,0 +1,1 @@
+Build or rebuild the target app. Use `{{command}}` as the initial approach, but inspect failures, install or repair project-local dependencies when safe, rerun the build as needed, and report exact blockers if the build cannot be completed.

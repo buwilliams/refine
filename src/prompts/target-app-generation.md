@@ -1,0 +1,3 @@
+Analyze this target app codebase and generate agent instructions for Refine target-app lifecycle work. Return only JSON with kind=target-app and fields start_instructions, stop_instructions, build_instructions, test_command, status_command, cwd, env, start_timeout_seconds, stop_timeout_seconds, build_timeout_seconds, test_timeout_seconds, status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, process_check_command, and notes. The start/stop/build fields are instructions for an agent, not shell commands. Test and status fields may remain commands because Refine uses them as deterministic checks.
+
+Project root: {{target_root}}

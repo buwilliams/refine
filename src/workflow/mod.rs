@@ -21,6 +21,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::host::project_layout::prepare_refine_dir;
@@ -1397,22 +1398,19 @@ fn post_implementation_governance_prompt(
         .and_then(Value::as_str)
         .unwrap_or("");
     let rules_json = serde_json::to_string_pretty(rules).unwrap_or_else(|_| "[]".to_string());
-    format!(
-        "Post-implementation governance review for Goal {goal_id}, round {}.\n\
-         Inspect the current implementation worktree and determine whether the completed \
-         implementation violates any Governance rule. The implementation has already been \
-         committed on the current branch; inspect the repository and compare the branch changes \
-         when needed. Do not edit files.\n\n\
-         Worktree root: {worktree_path}\n\
-         Provider cwd: {}\n\n\
-         Return only JSON with this shape:\n\
-         {{\"status\":\"passed|failed\",\"message\":\"short human-readable result\",\
-         \"violations\":[{{\"rule_id\":\"...\",\"rule\":\"...\",\"message\":\"...\"}}]}}\n\n\
-         Product:\n{product}\n\n\
-         Constitution:\n{constitution}\n\n\
-         Governance rules:\n{rules_json}",
-        round_idx + 1,
-        provider_cwd.display()
+    let round_number = (round_idx + 1).to_string();
+    let provider_cwd = provider_cwd.display().to_string();
+    render(
+        PromptTemplate::PostImplementationGovernance,
+        &[
+            ("goal_id", goal_id),
+            ("round_number", &round_number),
+            ("worktree_path", worktree_path),
+            ("provider_cwd", &provider_cwd),
+            ("product", product),
+            ("constitution", constitution),
+            ("rules_json", &rules_json),
+        ],
     )
 }
 
@@ -1582,9 +1580,7 @@ fn governance_violation_message(message: &str) -> String {
 }
 
 fn goal_agent_prompt(goal_id: &str) -> String {
-    format!(
-        "Run the goal agent for ready Goal {goal_id}. Work on Goal {goal_id}, report deterministic command outcomes, and leave the Goal ready for review. End with a short after-action report in simple terms covering what changed, why it changed, and the exact verification outcomes."
-    )
+    render(PromptTemplate::GoalAgent, &[("goal_id", goal_id)])
 }
 
 fn json_object(value: serde_json::Value) -> JsonObject {

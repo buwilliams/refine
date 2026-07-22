@@ -15,6 +15,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptTemplate, render};
 use crate::tools::product::chat::{
     ChatAttachment, ChatService, ChatSessionRecord, FileChatService,
 };
@@ -759,14 +760,22 @@ fn supervision_prompt(
     processes: &ProcessEvidence,
     stalled: &BTreeMap<String, String>,
 ) -> String {
-    format!(
-        "Active Refine workflow work needs supervision. Stay with this active-work window until the queue is idle. Use existing Refine CLI/API tools and shared workflow, process, Git-sync, projection, operation, and activity evidence. Apply only bounded, safe, auditable in-scope fixes; report anything requiring user authority. Do not hide provider/auth failures, force merges, discard worktrees, or invent a second recovery engine. New system evidence and user steering will arrive as follow-ups in this same session.\n\nCurrent counts: {} active, {} queued, {} failed.\nGoal states: {:?}\nLive workflow-agent Goal IDs: {:?}\nActionable stall/loss evidence: {:?}",
-        state.active_work,
-        state.queued_work,
-        state.failed_work,
-        state.goal_states,
-        processes.live_goal_ids,
-        stalled,
+    let active_work = state.active_work.to_string();
+    let queued_work = state.queued_work.to_string();
+    let failed_work = state.failed_work.to_string();
+    let goal_states = format!("{:?}", state.goal_states);
+    let live_goal_ids = format!("{:?}", processes.live_goal_ids);
+    let stalled = format!("{stalled:?}");
+    render(
+        PromptTemplate::Supervisor,
+        &[
+            ("active_work", &active_work),
+            ("queued_work", &queued_work),
+            ("failed_work", &failed_work),
+            ("goal_states", &goal_states),
+            ("live_goal_ids", &live_goal_ids),
+            ("stalled", &stalled),
+        ],
     )
 }
 

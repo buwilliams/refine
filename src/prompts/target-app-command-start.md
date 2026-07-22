@@ -1,0 +1,1 @@
+Start the target app. Use `{{command}}` as the initial approach, but inspect the project and adapt if dependencies, ports, environment, or long-running process handling require it. Leave the app running in the background when appropriate, verify configured health checks when possible, and report the exact command and evidence.

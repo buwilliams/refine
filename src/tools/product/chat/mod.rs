@@ -18,6 +18,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
+use crate::prompts::{PromptEngine, PromptTemplate, render};
 use crate::tools::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
@@ -1484,9 +1485,15 @@ impl FileChatService {
             .unwrap_or_else(|error| {
                 format!("Attachment context could not be rebuilt from refine records: {error}")
             });
-        format!(
-            "Refine {mode} chat attached to {attachment}.\n\n{instructions}\n\nCurrent refine context:\n{context}\n\nUser message:\n{message}",
-            mode = record.mode
+        render(
+            PromptTemplate::Chat,
+            &[
+                ("mode", &record.mode),
+                ("attachment", &attachment),
+                ("instructions", instructions),
+                ("context", &context),
+                ("message", message),
+            ],
         )
     }
 
@@ -1557,32 +1564,14 @@ impl FileChatService {
 
 fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
     if record.mode.eq_ignore_ascii_case("plan") {
-        return "Plan Mode drafts the whole picture of the software. Respond with a product \
-                spec that defines the software purpose, audience, success criteria, constraints, \
-                major behavior, and the technical work required to build it. Use architecture \
-                lenses such as durable state, logic and code organization, surfaces, integrations, \
-                performance, recovery, and verification when they clarify the work, but do not \
-                force a fixed checklist or categories that do not fit the domain. Include enough \
-                concrete behavior, implementation tradeoffs, natural build order, and test or \
-                verification work that the Draft Feature or Draft Goal action can later extract \
-                implementation-ready work from the transcript. Do not reduce the \
-                answer to generic strategy, prioritization advice, or a single suggested next \
-                action.";
+        return PromptEngine::load(PromptTemplate::ChatPlan);
     }
-    match &record.attachment {
-        ChatAttachment::Goal(_) => {
-            "Discuss the attached Goal and focus on concrete changes, evidence, and next steps for that Goal."
-        }
-        ChatAttachment::Feature(_) => {
-            "Discuss the attached Feature and focus on its included Goals, workflow state, and delivery plan."
-        }
-        ChatAttachment::Supervisor => {
-            "Act as Refine's supervisor agent. Investigate workflow and runtime health, explain observations and bounded recovery options, and preserve existing confirmation and audit boundaries. Never silently expand destructive authority or disguise provider and authentication failures."
-        }
-        ChatAttachment::Standalone => {
-            "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Goal-ready behavior."
-        }
-    }
+    PromptEngine::load(match &record.attachment {
+        ChatAttachment::Goal(_) => PromptTemplate::ChatGoal,
+        ChatAttachment::Feature(_) => PromptTemplate::ChatFeature,
+        ChatAttachment::Supervisor => PromptTemplate::ChatSupervisor,
+        ChatAttachment::Standalone => PromptTemplate::ChatStandalone,
+    })
 }
 
 fn chat_event(

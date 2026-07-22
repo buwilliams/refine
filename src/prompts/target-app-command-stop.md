@@ -1,0 +1,1 @@
+Stop the target app. Use `{{command}}` as the initial approach, but inspect the project and adapt if the process was started differently. Confirm the app is no longer reachable when possible and report the evidence.
