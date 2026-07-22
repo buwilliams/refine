@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:19:53Z",
+  "updated_at": "2026-07-22T10:20:16Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -48,6 +48,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m taking over the active-work window from the supplied snapshot. I’ll first verify the live Refine status and the known provider-size failure, then keep polling and apply only recovery actions already supported by Refine’s auditable workflow path. I’ll surface any authority boundary instead of crossing it."
+    },
+    {
+      "created_at": "2026-07-22T10:20:16Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784715616394-19",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Live evidence is newer than the attached snapshot: the daemon and both workflow/Git-sync workers are running, and six managed goal-agent processes have launched successfully. That means the earlier `E2BIG` provider failure remains an auditable historical issue, but it is not currently preventing dispatch. I’m leaving those agents and their worktrees untouched while I inspect status through the running daemon."
     }
   ],
   "queue_dispatching": true,
