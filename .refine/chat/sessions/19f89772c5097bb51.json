@@ -151,7 +151,7 @@
     },
     {
       "created_at": "2026-07-22T11:02:08Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -163,7 +163,7 @@
     },
     {
       "created_at": "2026-07-22T11:02:26Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -175,7 +175,7 @@
     },
     {
       "created_at": "2026-07-22T11:02:26Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718146769-55",
       "progress": false,
       "provider_session_id": null,
@@ -184,7 +184,7 @@
     },
     {
       "created_at": "2026-07-22T11:02:26Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718146769-56",
       "progress": true,
       "provider_session_id": null,
