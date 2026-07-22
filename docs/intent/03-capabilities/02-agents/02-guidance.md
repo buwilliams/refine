@@ -2,7 +2,7 @@
 
 ## Key Ideas
 
-- **Context For Agents**: agents need durable guidance, not only prompts embedded in code or UI.
+- **Context For Agents**: agents need durable guidance in addition to concise, turn-specific prompts.
 - **Human Editable**: guidance should be understandable and maintainable by the people responsible for the project.
 - **Governance As Direction**: rules should shape work and review without reducing Refine to a permission system.
 - **Project Specific**: guidance should live near the target app so it reflects the actual product.
@@ -20,9 +20,9 @@ Guidance is a capability because Refine uses it to shape action. It should affec
 
 Guidance should sit between raw user instruction and automated action. It should be reusable by workflow, tools, quality, governance, import, surfaces, and agents.
 
-The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app lifecycle instructions, deterministic checks, and generated project rules. Those are implementation details, but they show the intended role: guidance is first-class target-app context that workflow and tools can reuse.
+The current implementation has explicit services and surfaces for settings, guidance, governance, reporters, quality settings, target-app lifecycle instructions, deterministic checks, and generated project rules. Internal agent prompts are Markdown templates under `src/prompts` and use one shared prompt engine. Those are implementation details, but they protect an important separation: prompt templates define the small reusable task frame, while guidance supplies durable target-app context that workflow and tools can reuse.
 
-Guidance should not become a wall of policy text that agents ignore. It should be specific, current, structured enough to retrieve, and close enough to the work that it changes outcomes.
+Guidance should not become a wall of policy text that agents ignore or a reason to expand every system prompt. It should be specific, current, structured enough to retrieve, and close enough to the work that it changes outcomes. Prompt changes should prefer less prescription when repository discovery, a prototype, or a focused user interview can close the gap more reliably.
 
 ## Future Direction
 

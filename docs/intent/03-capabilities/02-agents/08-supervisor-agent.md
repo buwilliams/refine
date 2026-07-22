@@ -15,6 +15,8 @@
 
 The supervisor agent exists so active Goal work does not require a person to keep a separate terminal or Codex conversation open just to notice failures. When queued or active work appears, Refine starts or resumes exactly one configured CLI-agent session and gives it current shared backend evidence plus Refine's existing CLI/API tools. New evidence and toolbar prompts enter that same queue and transcript.
 
+The supervisor is also the natural agent for finding unknowns across active work. It should compare the workflow map with process, Git, projection, operation, and activity evidence; follow blind-spot paths; and prototype bounded recovery when that is the fastest safe way to learn. It may interview the user in the shared conversation when product judgment or new authority is genuinely required, while continuing to resolve evidence-backed unknowns independently.
+
 ## Recovery Boundary
 
 The supervisor agent may invoke safe, idempotent operations already owned by Refine. The workflow engine remains responsible for moving interrupted Goals to `failed`, preserving the existing explicit-retry rule. The supervisor may identify lost or quiet work and point to an existing retry operation, but it does not implement its own repair rules.

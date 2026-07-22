@@ -11,6 +11,8 @@
 - **Leverage Existing Infrastructure**: instead of a centralized application, use all the same tools systems are already using: Rust, Git, flat files, AI agents, browser, and whatever else makes sense. Do not force people to adopt new infrastructure until a tipping point arrives if it does.
 - **Mitigation Greater Than Prevention**: instead of restricting capability, put in guardrails and safety checks to ensure systems that Refine works on maintain their purpose and functionality, but do not prevent bad actors because those same rules prevent novelty and breakthroughs. Provide unrestricted power tools to get work done, rely on mitigations for safety: Git-backed flat files, governance, quality checks.
 - **Agent Guidance**: since everything that can be automated by AI will be, we should provide "guidance" to the agents so that they have the necessary context of concerns to do their work effectively.
+- **Capability Overhang**: model intelligence is spiky, and new capabilities often arrive before products learn to use them. Keep agent prompts concise, test what current models can do, and remove scaffolding that limits stronger models without improving outcomes.
+- **Ambitious Outcomes**: do not preserve familiar trade-offs by default. Use agent speed and capability to pursue work that is good, fast, and cheap, then rely on evidence to show whether the result holds.
 
 ## System
 
@@ -65,7 +67,8 @@ The long-term direction is software composition at scale: workflow, persistence,
 - state is durable, inspectable, and owned by the user,
 - surfaces are conveniences over shared capability,
 - process execution is observable and recoverable,
-- safety comes from mitigation, auditability, Git, governance, and quality checks rather than capability denial.
+- safety comes from mitigation, auditability, Git, governance, and quality checks rather than capability denial,
+- prompts and workflow leave room for current agents to discover stronger solutions than the initial specification anticipated.
 
 ## Design Pressure
 

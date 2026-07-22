@@ -8,6 +8,7 @@
 - **Evidence Before Trust**: quality checks, logs, diffs, review, and activity should explain why work is ready.
 - **Reviewable Handoff**: agent work should move through review, merge, and Git worktree boundaries without losing context.
 - **Shared Capability**: browser, CLI, API, desktop, and agent-native surfaces should call the same agent behavior.
+- **Unhobbled By Default**: prompts should be concise enough to leave room for the spiky intelligence and capability overhang of current models.
 
 ## Purpose
 
@@ -44,6 +45,7 @@ The Agents capability should sit between Refine's intent and the outside world. 
 Current implementation details that matter to intent:
 
 - provider configuration is settings and diagnostics, not hardcoded behavior;
+- every internal agent prompt is a Markdown template under `src/prompts`, loaded through the shared prompt engine rather than embedded in consumer code;
 - agents should prefer installed local CLIs and host tools where possible;
 - chat and standalone sessions are agent behavior, not browser-only behavior;
 - import extraction and draft review should use shared work item persistence;
@@ -51,6 +53,10 @@ Current implementation details that matter to intent:
 - worktrees isolate agent output and preserve merge handoff.
 
 The Agents capability should remain powerful. Refine's safety posture is mitigation greater than prevention: use Git, logs, governance, quality checks, review, process visibility, and durable state to make powerful actions recoverable and accountable.
+
+An agent should treat a specification or prompt as a map and the repository, runtime, user need, and evidence as the territory. It should inspect before assuming, follow blind-spot paths, and prototype when a small experiment resolves uncertainty faster than more prose. When a consequential unknown belongs to the user, the agent should interview the user with focused questions. When the evidence is available, it should resolve the unknown itself.
+
+This posture is intentionally ambitious. Refine should not teach agents to accept the usual good-fast-cheap trade-off before they try. Current agents can search, implement, and verify quickly enough to pursue all three, while governance and review still require evidence for the result.
 
 ## Future Direction
 
