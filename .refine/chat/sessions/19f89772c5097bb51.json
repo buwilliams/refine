@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:05:47Z",
+  "updated_at": "2026-07-22T11:08:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -232,6 +232,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The layout fault is now concrete: the supervisor chat is wrapped in an extra container, so the shared flex rules no longer constrain its transcript. The entire toolbar body therefore becomes the overflow container. I also confirmed the health summary is rendered as a separate row above the chat status, which is exactly the extra vertical cost you suspected."
+    },
+    {
+      "created_at": "2026-07-22T11:08:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718490370-87",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The prototype now matches the intended ownership boundary: the dock body is fixed and non-scrolling, the supervisor conversation is a shrinkable flex column, and the transcript remains the growing scroll region. Health, lifecycle, work counts, observation timestamp, and session state now share one compact header row; narrower layouts hide only the low-priority process/timestamp labels. Targeted supervisor tests are passing."
     }
   ],
   "queued_messages": [
