@@ -6,7 +6,8 @@
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
-  "session_id": null,
+  "session_id": "19f893717023ee0",
+  "provider": "codex",
   "initialized": true,
   "goal_states": {
     "00000SZ1J1YD7KCM6JNJRB8000": "done",
@@ -29,6 +30,16 @@
     "00000SZ1YFDPAG0NJ16FTTY000": "done"
   },
   "open_issues": {},
-  "updated_at": "2026-07-22T03:32:01.253557204+00:00",
-  "events": []
+  "updated_at": "2026-07-22T09:45:16.803080666+00:00",
+  "events": [
+    {
+      "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
+      "kind": "observation",
+      "status": "info",
+      "message": "Supervisor CLI-agent session is available through shared chat.",
+      "created_at": "2026-07-22T09:45:16.803071525+00:00",
+      "actionable": false,
+      "retryable": false
+    }
+  ]
 }
