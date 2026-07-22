@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T10:57:16Z",
+  "updated_at": "2026-07-22T10:58:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -48,9 +48,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The repository itself is healthy and synchronized, but the live evidence has one inconsistency: both goals say “in progress” while the process summary reports zero implementation agents. I’m following that path now to tell whether work completed, stalled, or was orphaned during the runtime transition."
+    },
+    {
+      "created_at": "2026-07-22T10:58:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717883246-28",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "It’s going well. Live verification shows:\n\n- Two Codex implementation agents are actively running.\n- Jira export is being converted from per-Goal to bulk selected-Goals export; substantial code is written and tests are compiling/running.\n- Goal Follow Logs has its UX contract settled—tail/head ordering, live search, SSE updates, and safe link formatting—and implementation is underway.\n- Refine’s daemon and workflow runners are reachable.\n- `main` is clean and matches `origin/main`; earlier completed work is merged.\n- The earlier provider launch and state-sync failures have recovered. No current authentication or provider failure is visible.\n\nNothing needs your decision at the moment. The next meaningful checkpoint is when these agents commit their implementations and enter validation/review."
+    },
+    {
+      "created_at": "2026-07-22T10:58:03Z",
+      "delivered": false,
+      "id": "evt-1784717883443-30",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "It’s going well. Live verification shows:\n\n- Two Codex implementation agents are actively running.\n- Jira export is being converted from per-Goal to bulk selected-Goals export; substantial code is written and tests are compiling/running.\n- Goal Follow Logs has its UX contract settled—tail/head ordering, live search, SSE updates, and safe link formatting—and implementation is underway.\n- Refine’s daemon and workflow runners are reachable.\n- `main` is clean and matches `origin/main`; earlier completed work is merged.\n- The earlier provider launch and state-sync failures have recovered. No current authentication or provider failure is visible.\n\nNothing needs your decision at the moment. The next meaningful checkpoint is when these agents commit their implementations and enter validation/review."
+    },
+    {
+      "created_at": "2026-07-22T10:58:03Z",
+      "delivered": false,
+      "id": "evt-1784717883443-31",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
