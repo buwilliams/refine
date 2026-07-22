@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T14:34:08Z",
+  "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
+  "feature_order": null,
+  "id": "00000SZ2HZHQX2TXXQ7SXVA00D",
+  "name": "Implement shared cross-process workflow coordination",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T14:34:23Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement the shared workflow consistency and durable-evidence contract produced by the preceding ordered Goal. Reuse the existing Process, Workflow, operation registry, capacity, Goal/state, Git/worktree, and observability capabilities; do not add a second orchestration system or surface-specific control path. Establish one explicit cross-process coordination model that every authoritative workflow-state writer participates in, or equivalently version and revalidate all authoritative evidence so stale writers cannot resurrect or contradict terminal state. Preserve durable target-app ownership across app switches and detach, make operation, claim, process, capacity, Goal evidence, repository evidence, and logs converge under cancellation, recovery, restart, and late settlement, and define crash-safe persistence and failure recovery consistent with the contract. Include compatible migration for existing durable records. Exercise production-shaped multi-process paths with the real daemon/workflow runner and shared APIs, including concurrent mutation, cancellation, provider completion/failure, app switch, restart/crash, write/log failure, and capacity release; use the smallest focused evidence that proves the invariants. Keep UI, CLI, API, and MCP thin and semantically consistent. Treat the parked branches aafdc696 and c1e9a9a as prototypes and evidence only; do not silently merge their Supervisor- or Quality-specific behavior. After this foundation is reviewed and merged, those existing Goals will resume on top of it.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T14:34:23Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T14:34:23Z"
+}

@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:32:56Z",
+  "updated_at": "2026-07-22T14:33:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1164,6 +1164,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The cancellation was not user-authored: no browser/activity cancellation record exists, and the workflow later recorded a malformed provider-result failure while the Round 6 worktree remained intact with four uncommitted files. I’m using Refine’s normal retry path to reuse that preserved worktree; this avoids copying, stashing, or bypassing the workflow."
+    },
+    {
+      "created_at": "2026-07-22T14:33:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784730839426-184",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The territory explains the interruption: Refine’s global supervisor is now paused (`agents_paused=true`, `background_processes_stopped=true`) while one Codex subprocess is still alive outside the projected process list. I’m checking who/what issued the pause and the supported resume endpoint before changing it; I won’t bypass a deliberate operator pause."
     }
   ],
   "queued_messages": [

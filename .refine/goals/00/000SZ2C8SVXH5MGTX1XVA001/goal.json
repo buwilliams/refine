@@ -8,7 +8,15 @@
   "id": "00000SZ2C8SVXH5MGTX1XVA001",
   "name": "Let Supervisor recover failed Goals autonomously",
   "node_id": "default",
-  "notes": [],
+  "notes": [
+    {
+      "author": "Codex",
+      "body": "Parked by user decision pending Feature 00000SZ2HY4R5J9V6AM5XVA00A. Preserve Supervisor recovery candidate aafdc696 as a reviewable prototype. Resume with a new round only after Goal 00000SZ2HZHQX2TXXQ7SXVA00D is reviewed and merged, using the shared consistency and durability contract instead of introducing a Supervisor-specific transaction model.",
+      "created": "2026-07-22T14:34:46Z",
+      "id": "00000SZ2J04C5KE30WCDXVA00F",
+      "updated": "2026-07-22T14:34:46Z"
+    }
+  ],
   "priority": "low",
   "reporter": null,
   "rounds": [
@@ -340,5 +348,5 @@
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T13:34:16Z"
+  "updated": "2026-07-22T14:34:46Z"
 }

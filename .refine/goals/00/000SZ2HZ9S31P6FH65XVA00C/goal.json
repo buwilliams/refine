@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T14:33:52Z",
+  "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
+  "feature_order": null,
+  "id": "00000SZ2HZ9S31P6FH65XVA00C",
+  "name": "Define the shared workflow consistency contract",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T14:34:02Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Define the minimal Intent-level architecture contract for cross-process workflow consistency and durable evidence in Refine. Preserve the product, constitution, agent-first orchestration, and Foundation-Capabilities-Surfaces boundary. Make authoritative ownership and relationships explicit for Goals and rounds, workflow claims, operations, managed processes, capacity leases, target-app identity/root, Git branch/worktree evidence, and user-visible logs/evidence. Define the required transaction or optimistic-concurrency boundary, legal transition ordering, stale-write prevention, crash-durability expectations, failure and recovery semantics, compatibility/migration behavior, and thin-surface obligations. Reconcile only affected Intent documentation; do not broadly rewrite docs or prescribe incidental implementation machinery. Use the parked Supervisor recovery candidate aafdc696 and Quality candidate c1e9a9a only as evidence of the consistency gaps, not as implementations to merge. Produce a coherent contract the following implementation Goal can realize, with only proportional validation of the documentation or contract.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T14:34:02Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T14:34:02Z"
+}

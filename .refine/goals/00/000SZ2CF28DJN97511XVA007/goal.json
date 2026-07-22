@@ -8,7 +8,15 @@
   "id": "00000SZ2CF28DJN97511XVA007",
   "name": "Run always-on agent Quality validation",
   "node_id": "default",
-  "notes": [],
+  "notes": [
+    {
+      "author": "Codex",
+      "body": "Remain parked behind Quality core 00000SZ2CF255HWFA0G9XVA006 and shared consistency Feature 00000SZ2HY4R5J9V6AM5XVA00A; resume only after both foundations are merged.",
+      "created": "2026-07-22T14:34:47Z",
+      "id": "00000SZ2J04FBGF7BC5XXVA00G",
+      "updated": "2026-07-22T14:34:47Z"
+    }
+  ],
   "priority": "low",
   "reporter": "Buddy Williams",
   "rounds": [
@@ -137,5 +145,5 @@
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:44:18Z"
+  "updated": "2026-07-22T14:34:47Z"
 }

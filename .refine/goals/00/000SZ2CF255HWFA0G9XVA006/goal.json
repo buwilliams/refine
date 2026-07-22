@@ -8,7 +8,15 @@
   "id": "00000SZ2CF255HWFA0G9XVA006",
   "name": "Model plain-language Quality tests",
   "node_id": "default",
-  "notes": [],
+  "notes": [
+    {
+      "author": "Codex",
+      "body": "Parked by user decision pending Feature 00000SZ2HY4R5J9V6AM5XVA00A. Preserve Quality candidate c1e9a9a and its ancestor 019c382 as reviewable prototypes; do not merge the later uncommitted consistency-model experiment. Resume with a new round only after Goal 00000SZ2HZHQX2TXXQ7SXVA00D is reviewed and merged, rebasing the narrow Quality behavior on the shared foundation.",
+      "created": "2026-07-22T14:34:46Z",
+      "id": "00000SZ2J048X2N5YJTSXVA00E",
+      "updated": "2026-07-22T14:34:46Z"
+    }
+  ],
   "priority": "low",
   "reporter": "Buddy Williams",
   "rounds": [
@@ -445,7 +453,7 @@
       "updated": "2026-07-22T13:36:54Z"
     }
   ],
-  "status": "in-progress",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-07-22T14:32:58Z"
+  "updated": "2026-07-22T14:35:01Z"
 }
