@@ -16,59 +16,45 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:19:36Z",
-      "governance_checked_at": "2026-07-22T00:31:12Z",
+      "governance_checked_at": "2026-07-22T00:37:42Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1",
-        "failed_actions": [
-          {
-            "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
-            "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
-            "rule_id": "rule-4"
-          }
-        ],
+        "failed_actions": [],
         "governance_configured": true,
         "phase": "post_implementation",
         "provider": "codex",
-        "raw_output": "{\"status\":\"failed\",\"message\":\"The source-promotion API introduces an undocumented compatibility break.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.\",\"message\":\"POST /api/system/source/promote now rejects previously valid requests unless {\\\"confirmed\\\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.\"}]}",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found in the committed implementation.\",\"violations\":[]}",
         "rules_checked": 6,
         "verdict": {
-          "message": "The source-promotion API introduces an undocumented compatibility break.",
-          "status": "failed",
-          "violations": [
-            {
-              "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
-              "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
-              "rule_id": "rule-4"
-            }
-          ]
+          "message": "No Governance rule violations found in the committed implementation.",
+          "status": "passed",
+          "violations": []
         },
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1"
       },
-      "governance_message": "The source-promotion API introduces an undocumented compatibility break.",
-      "governance_rule_actions": [
-        {
-          "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
-          "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
-          "rule_id": "rule-4"
-        }
-      ],
+      "governance_message": "No Governance rule violations found in the committed implementation.",
+      "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ1QT8KKHJEKASEKWR002` is ready for review at commit `fbd78f9`.\n\nAfter-action report:\n\n- Preserved the Refine-only navigation refresh control and browser confirmation.\n- Restored backward compatibility for existing source-promotion API clients.\n- Added regression coverage and corrected the architecture documentation.\n- The worktree is clean.\n\nVerification outcomes:\n\n- Focused tests: 3 passed, 0 failed.\n- Full library suite: 353 passed, 0 failed.\n- `cargo fmt --all -- --check`: exit 0.\n- JavaScript syntax check: exit 0.\n- `cargo clippy --lib -- -D warnings`: exit 0.\n- `xtask check`: exit 0; API contract version 1 and 53 static assets confirmed.\n- `git diff --check`: exit 0.\n- One preliminary exact-name test exited 0 but selected 0 tests; corrected selectors ran the three tests above.\n\nGoal-agent usage: 74,052 tokens over approximately 3m56s.",
       "implementation_reported_at": "2026-07-22T00:35:57Z",
       "logs": [],
       "meta_rule_state": "passed",
       "product_state": "passed",
       "prompt": "If the target app is a refine repo such that refine is being used to update refine, in this situation, the UI should have a refresh icon button on the main nav that is disabled or enabled if there is a new commit that the running refine could update to.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T00:37:44Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "failed",
-      "updated": "2026-07-22T00:35:57Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T00:37:44Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T00:35:57Z"
+  "updated": "2026-07-22T00:37:44Z"
 }
