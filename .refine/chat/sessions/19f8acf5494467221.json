@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:35:28Z",
+  "updated_at": "2026-07-22T18:38:11Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -852,6 +852,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination has now exited implementation with candidate `ca98963a…` and entered Refine’s official `WorkflowImplementationGovernance` process. This is the authoritative review boundary; I’ll use its verdict, not the implementation agent’s self-review, before deciding whether normal approval is permitted. Quality’s focused promotion, mutation, restoration-failure, and retry tests currently pass."
+    },
+    {
+      "created_at": "2026-07-22T18:38:11Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745491309-206",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s corrected focused suite is green: 20 Quality tests, five operation-registry tests, primary-worktree refusal, mutation recovery/retry, failed restoration, promotion exclusion, and a simultaneous API/workflow acquisition race. It has entered the full serial library gate. Official coordination governance is still inspecting surface-to-core Node activation paths and shared-root consistency."
     }
   ],
   "queued_messages": [
