@@ -39,6 +39,7 @@ async function init() {
         // not fatal — likely fresh install with no reporters yet
       }
       initTargetAppToggle();
+      if (typeof initSourceUpdateNav === "function") initSourceUpdateNav();
       initSSE();
       if (typeof scheduleMainScreenPrefetch === "function") scheduleMainScreenPrefetch();
     }, 250);

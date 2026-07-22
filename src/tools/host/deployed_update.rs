@@ -416,14 +416,18 @@ pub fn discover_refine_checkout() -> RefineResult<PathBuf> {
     ))
 }
 
+pub fn is_refine_checkout(path: &Path) -> bool {
+    path.join(".git").exists()
+        && path.join("Cargo.toml").is_file()
+        && path.join("src/main.rs").is_file()
+        && path.join("scripts/install.sh").is_file()
+        && path.join("r").is_file()
+}
+
 fn find_checkout_from(start: &Path) -> Option<PathBuf> {
     let mut current = Some(start);
     while let Some(path) = current {
-        if path.join("Cargo.toml").is_file()
-            && path.join("src/main.rs").is_file()
-            && path.join("scripts/install.sh").is_file()
-            && path.join("r").is_file()
-        {
+        if is_refine_checkout(path) {
             return Some(path.to_path_buf());
         }
         current = path.parent();
@@ -464,6 +468,7 @@ fn push_failure(summary: &mut DeployedUpdateSummary, stage: &str, error: RefineE
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+    use std::fs;
 
     #[derive(Default)]
     struct FakeUpdateHost {
@@ -737,5 +742,25 @@ mod tests {
         assert_eq!(summary.failures[0].stage, "restart_ports");
         assert!(summary.rollback_possible);
         assert!(summary.restarted_ports.is_empty());
+    }
+
+    #[test]
+    fn refine_checkout_detection_requires_the_source_entrypoints() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-checkout-detection-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join("scripts")).unwrap();
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join("Cargo.toml"), "[package]\nname = \"refine\"\n").unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+        fs::write(root.join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+
+        assert!(!is_refine_checkout(&root));
+        fs::write(root.join("r"), "#!/bin/sh\n").unwrap();
+        assert!(is_refine_checkout(&root));
+
+        fs::remove_dir_all(root).unwrap();
     }
 }
