@@ -1579,8 +1579,121 @@ fn governance_violation_message(message: &str) -> String {
     }
 }
 
-fn goal_agent_prompt(goal_id: &str) -> String {
-    render(PromptTemplate::GoalAgent, &[("goal_id", goal_id)])
+fn goal_agent_prompt(goal_id: &str, goal: &Value, round_idx: usize) -> RefineResult<String> {
+    let goal_object = goal.as_object().ok_or_else(|| {
+        RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
+    })?;
+    let rounds = goal_object
+        .get("rounds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+    let current_round = rounds
+        .get(round_idx)
+        .filter(|round| round.is_object())
+        .ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} has no round {}", round_idx + 1))
+        })?;
+
+    let goal_context = selected_agent_context(
+        goal,
+        &[
+            "id",
+            "name",
+            "priority",
+            "reporter",
+            "assignee",
+            "feature_id",
+            "feature_order",
+            "node_id",
+            "notes",
+        ],
+    );
+    let previous_rounds = rounds[..round_idx]
+        .iter()
+        .enumerate()
+        .filter(|(_, round)| round.is_object())
+        .map(|(index, round)| round_agent_context(round, index))
+        .collect::<Vec<_>>();
+    let current_round = round_agent_context(current_round, round_idx);
+    let goal_context = serde_json::to_string_pretty(&goal_context).map_err(|error| {
+        RefineError::Serialization(format!("failed to encode Goal {goal_id} context: {error}"))
+    })?;
+    let previous_rounds = serde_json::to_string_pretty(&previous_rounds).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode Goal {goal_id} previous-round context: {error}"
+        ))
+    })?;
+    let current_round = serde_json::to_string_pretty(&current_round).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode Goal {goal_id} current-round context: {error}"
+        ))
+    })?;
+
+    Ok(render(
+        PromptTemplate::GoalAgent,
+        &[
+            ("goal_id", goal_id),
+            ("goal_context", &goal_context),
+            ("previous_rounds", &previous_rounds),
+            ("latest_round", &current_round),
+        ],
+    ))
+}
+
+fn round_agent_context(round: &Value, round_idx: usize) -> Value {
+    let mut context = selected_agent_context(
+        round,
+        &[
+            "reporter",
+            "assignee",
+            "prompt",
+            "guidance_decision",
+            "implementation_report",
+            "implementation_reported_at",
+            "rule_state",
+            "meta_rule_state",
+            "product_state",
+            "constitution_state",
+            "governance_message",
+            "governance_details",
+            "governance_checked_at",
+            "governance_rule_actions",
+            "quality_state",
+            "quality_message",
+            "quality_details",
+            "quality_checked_at",
+        ],
+    );
+    if let Some(context) = context.as_object_mut() {
+        context.insert("round".to_string(), Value::from(round_idx + 1));
+    }
+    context
+}
+
+fn selected_agent_context(value: &Value, keys: &[&str]) -> Value {
+    let mut context = JsonObject::new();
+    let Some(source) = value.as_object() else {
+        return Value::Object(context);
+    };
+    for key in keys {
+        let Some(value) = source.get(*key) else {
+            continue;
+        };
+        if agent_context_value_is_meaningful(value) {
+            context.insert((*key).to_string(), value.clone());
+        }
+    }
+    Value::Object(context)
+}
+
+fn agent_context_value_is_meaningful(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::String(value) => !value.trim().is_empty() && value != "unclassified",
+        Value::Array(values) => !values.is_empty(),
+        Value::Object(values) => !values.is_empty(),
+        Value::Bool(_) | Value::Number(_) => true,
+    }
 }
 
 fn json_object(value: serde_json::Value) -> JsonObject {
@@ -1635,6 +1748,53 @@ mod tests {
     use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
     use std::process::Command;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn goal_agent_prompt_uses_latest_round_with_goal_and_previous_round_context() {
+        let goal = json!({
+            "id": "GOAL1",
+            "name": "Keep the whole Goal visible",
+            "status": "in-progress",
+            "priority": "high",
+            "reporter": "Product",
+            "notes": [{"id": "NOTE1", "author": "Reviewer", "body": "Preserve compatibility."}],
+            "rounds": [
+                {
+                    "reporter": "Product",
+                    "assignee": "Agent One",
+                    "prompt": "Build the first version.",
+                    "implementation_report": "Added the initial implementation.",
+                    "quality_state": "passed",
+                    "quality_message": "Focused tests passed.",
+                    "logs": [{"message": "PREVIOUS LOGS MUST NOT ENTER THE PROMPT"}]
+                },
+                {
+                    "reporter": "Reviewer",
+                    "assignee": "Agent Two",
+                    "prompt": "Keep the implementation and add the missing edge case.",
+                    "logs": [{"message": "CURRENT LOGS MUST NOT ENTER THE PROMPT"}]
+                }
+            ]
+        });
+
+        let prompt = goal_agent_prompt("GOAL1", &goal, 1).unwrap();
+
+        assert!(prompt.contains("Keep the whole Goal visible"));
+        assert!(prompt.contains("Preserve compatibility."));
+        assert!(prompt.contains("Build the first version."));
+        assert!(prompt.contains("Added the initial implementation."));
+        assert!(prompt.contains("Focused tests passed."));
+        assert!(prompt.contains("Latest Round to implement:"));
+        assert!(prompt.contains("Keep the implementation and add the missing edge case."));
+        assert!(prompt.contains("if context conflicts with it, the latest Round wins"));
+        assert!(prompt.contains("strongest solution"));
+        assert!(!prompt.contains("PREVIOUS LOGS MUST NOT ENTER THE PROMPT"));
+        assert!(!prompt.contains("CURRENT LOGS MUST NOT ENTER THE PROMPT"));
+        assert!(
+            prompt.find("Build the first version.").unwrap()
+                < prompt.find("Latest Round to implement:").unwrap()
+        );
+    }
 
     #[test]
     fn file_automation_promotes_todo_goals_and_starts_executions() {

@@ -172,8 +172,16 @@ mod tests {
 
     #[test]
     fn renders_embedded_markdown_template_variables() {
-        let rendered =
-            PromptEngine::render(PromptTemplate::GoalAgent, &[("goal_id", "goal-123")]).unwrap();
+        let rendered = PromptEngine::render(
+            PromptTemplate::GoalAgent,
+            &[
+                ("goal_id", "goal-123"),
+                ("goal_context", "{}"),
+                ("previous_rounds", "[]"),
+                ("latest_round", "{\"round\":1}"),
+            ],
+        )
+        .unwrap();
 
         assert!(rendered.contains("ready Goal goal-123"));
         assert!(!rendered.contains("{{goal_id}}"));
@@ -188,7 +196,13 @@ mod tests {
         assert_eq!(
             PromptEngine::render(
                 PromptTemplate::GoalAgent,
-                &[("goal_id", "goal-123"), ("extra", "value")]
+                &[
+                    ("goal_id", "goal-123"),
+                    ("goal_context", "{}"),
+                    ("previous_rounds", "[]"),
+                    ("latest_round", "{\"round\":1}"),
+                    ("extra", "value"),
+                ]
             ),
             Err(PromptTemplateError::UnusedVariable("extra".to_string()))
         );
