@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:14:19Z",
+  "updated_at": "2026-07-22T16:16:23Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1428,6 +1428,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The daemon harness is doing useful work: successive failures have exposed real integration assumptions—async operation polling, initial per-node state convergence, legal manual transitions, and restart timing—rather than code compilation defects. The agent is correcting the harness and implementation at each authority boundary; the test is not being marked green by weakening the contract."
+    },
+    {
+      "created_at": "2026-07-22T16:16:23Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784736983474-234",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The expanded two-daemon harness now passes end to end. It proves repeated same-revision conflict remains a conflict across blind retries, unrelated records still converge, an explicit higher revision resolves the conflict, late publication loses to cancellation, log-write failure cannot publish success, and a partial claim recovers after restart under a new runtime root/port. The original full-workflow harness also remains green."
     }
   ],
   "queued_messages": [
