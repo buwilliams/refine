@@ -33,9 +33,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
       "updated": "2026-07-22T00:45:40Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T00:51:58Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement a first-class supervisor agent that serves the supervisory role currently requiring a human or external Codex session while Refine agents are active. Use “supervisor agent” consistently in product language, code-facing concepts, documentation, API fields, and the UI because it maps to Refine’s existing supervisor process model. Do not name this capability the “monitor agent.”\n\nThe supervisor agent must run outside the UI request path and remain active whenever Goal workflow work is active or queued. It should observe Goal transitions, agent/process health, runtime-worker reachability, Git/state synchronization, worktree/branch publication and merge progress, and UI/daemon health signals; detect actionable stalls, crashes, interrupted agents, provider failures, merge conflicts, and state-sync failures; apply only bounded, safe, auditable recoveries automatically; and expose durable, actionable state so users and other surfaces can understand what happened and retry. It must never freeze the UI, must not disguise provider/auth failures, must avoid destructive or unbounded repair, and must preserve the rule that an interrupted Goal enters error/failed state and can be restarted later. Provide settings and lifecycle behavior that avoid duplicate supervisor agents across restarts, make recovery idempotent, and stop or idle cleanly when no workflow work remains.\n\nAdd a persistent Supervisor tab to the existing web toolbar. The tab must remain discoverable even while the supervisor agent is idle and show live observations, current health/status, decisions, recovery attempts, outcomes, and actionable failures. It must reconnect safely after UI or daemon restart and must not depend on a Goal detail page being open. Implement the capability in shared backend services and durable state so UI, CLI, and API expose the same supervisor truth; keep the toolbar as a thin adapter.\n\nInclude proportional unit and integration coverage for active-work lifecycle, worker loss/restart, stalled work, safe recovery, unrecoverable failure, daemon restart/reconnect, concurrent Goals, duplicate-supervisor prevention, no-work idle behavior, toolbar persistence/live updates, and shared CLI/API/UI state, plus operator/user documentation and an intent/architecture update explaining the recovery boundary and relationship between the supervisor process and supervisor agent.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T00:51:58Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T00:51:40Z"
+  "updated": "2026-07-22T00:51:58Z"
 }
