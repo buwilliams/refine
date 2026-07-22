@@ -51,6 +51,13 @@
       "source": "manual",
       "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
       "updated": "2026-07-22T02:10:10Z"
+    },
+    {
+      "created": "2026-07-22T11:25:56Z",
+      "id": "rule-8",
+      "source": "manual",
+      "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+      "updated": "2026-07-22T11:25:56Z"
     }
   ]
 }
