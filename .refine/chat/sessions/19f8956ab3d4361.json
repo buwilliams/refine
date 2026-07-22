@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:22:50Z",
+  "updated_at": "2026-07-22T10:25:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -84,6 +84,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "All six leases remain live and their output files are advancing; several agents are already running focused tests. One goal-agent hit a test failure, but it is still actively investigating, so there is no stall or loss signal and no justification to retry or mutate workflow state yet."
+    },
+    {
+      "created_at": "2026-07-22T10:25:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784715938206-25",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Two goals have cleanly handed off from implementation to Refine’s governance stage, including the retry for duplicated supervisor events. Refine replaced the implementation subprocesses with governance subprocesses under the same workflow executions; leases remain intact, so I’m preserving the normal validation path."
     }
   ],
   "queue_dispatching": true,
