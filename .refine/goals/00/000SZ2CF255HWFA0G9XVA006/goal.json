@@ -129,28 +129,106 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:42:06Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T12:10:10Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-2",
+        "failed_actions": [
+          {
+            "message": "POST /api/quality/checks with goal_id evaluates the Goal candidate but only returns the result and appends generic project activity; workflow QA additionally persists quality_state, quality_message, quality_details, quality_checked_at, and a Goal-round log. The same Goal Quality capability therefore has different durable evidence semantics through the API and workflow surfaces.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "FileSettingsService::update calls load, whose returned map omits legacy Quality fields, and then replaces the active node's settings with that map. Any ordinary settings update performed before FileQualityService loads can therefore delete target_app_test_command(s), timeout, and timing fields before migration, leaving an empty successful-no-op Quality specification.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "WorkflowEngine::cancel terminates a Quality subprocess by execution_id but does not cancel its quality:* operation. The Quality runner consequently records the terminated provider as Failed, and the workflow worker subsequently overwrites the cancelled claim with Failed, producing conflicting terminal state for one cancellation.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "quality_timing is reread independently at every workflow transition instead of being fixed for the round. Changing it after implementation selected a path can deterministically skip QA (post_build selected first, then changed to pre_merge before build) or skip build (pre_merge selected first, then changed to post_build before QA completes); the focused workflow coverage does not verify this mutable-setting path.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Governance review found four committed violations.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"POST /api/quality/checks with goal_id evaluates the Goal candidate but only returns the result and appends generic project activity; workflow QA additionally persists quality_state, quality_message, quality_details, quality_checked_at, and a Goal-round log. The same Goal Quality capability therefore has different durable evidence semantics through the API and workflow surfaces.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"FileSettingsService::update calls load, whose returned map omits legacy Quality fields, and then replaces the active node's settings with that map. Any ordinary settings update performed before FileQualityService loads can therefore delete target_app_test_command(s), timeout, and timing fields before migration, leaving an empty successful-no-op Quality specification.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"WorkflowEngine::cancel terminates a Quality subprocess by execution_id but does not cancel its quality:* operation. The Quality runner consequently records the terminated provider as Failed, and the workflow worker subsequently overwrites the cancelled claim with Failed, producing conflicting terminal state for one cancellation.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"quality_timing is reread independently at every workflow transition instead of being fixed for the round. Changing it after implementation selected a path can deterministically skip QA (post_build selected first, then changed to pre_merge before build) or skip build (pre_merge selected first, then changed to post_build before QA completes); the focused workflow coverage does not verify this mutable-setting path.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Governance review found four committed violations.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "POST /api/quality/checks with goal_id evaluates the Goal candidate but only returns the result and appends generic project activity; workflow QA additionally persists quality_state, quality_message, quality_details, quality_checked_at, and a Goal-round log. The same Goal Quality capability therefore has different durable evidence semantics through the API and workflow surfaces.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "FileSettingsService::update calls load, whose returned map omits legacy Quality fields, and then replaces the active node's settings with that map. Any ordinary settings update performed before FileQualityService loads can therefore delete target_app_test_command(s), timeout, and timing fields before migration, leaving an empty successful-no-op Quality specification.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "WorkflowEngine::cancel terminates a Quality subprocess by execution_id but does not cancel its quality:* operation. The Quality runner consequently records the terminated provider as Failed, and the workflow worker subsequently overwrites the cancelled claim with Failed, producing conflicting terminal state for one cancellation.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "quality_timing is reread independently at every workflow transition instead of being fixed for the round. Changing it after implementation selected a path can deterministically skip QA (post_build selected first, then changed to pre_merge before build) or skip build (pre_merge selected first, then changed to post_build before QA completes); the focused workflow coverage does not verify this mutable-setting path.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-2"
+      },
+      "governance_message": "Governance review found four committed violations.",
+      "governance_rule_actions": [
+        {
+          "message": "POST /api/quality/checks with goal_id evaluates the Goal candidate but only returns the result and appends generic project activity; workflow QA additionally persists quality_state, quality_message, quality_details, quality_checked_at, and a Goal-round log. The same Goal Quality capability therefore has different durable evidence semantics through the API and workflow surfaces.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "FileSettingsService::update calls load, whose returned map omits legacy Quality fields, and then replaces the active node's settings with that map. Any ordinary settings update performed before FileQualityService loads can therefore delete target_app_test_command(s), timeout, and timing fields before migration, leaving an empty successful-no-op Quality specification.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "WorkflowEngine::cancel terminates a Quality subprocess by execution_id but does not cancel its quality:* operation. The Quality runner consequently records the terminated provider as Failed, and the workflow worker subsequently overwrites the cancelled claim with Failed, producing conflicting terminal state for one cancellation.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "quality_timing is reread independently at every workflow transition instead of being fixed for the round. Changing it after implementation selected a path can deterministically skip QA (post_build selected first, then changed to pre_merge before build) or skip build (pre_merge selected first, then changed to post_build before QA completes); the focused workflow coverage does not verify this mutable-setting path.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Goal `00000SZ2CF255HWFA0G9XVA006` is complete and reviewable. Worktree is clean.\n\nCommits:\n\n- `e5d7a1d` — preserved candidate `12f545b` with identical stable patch ID.\n- `6f6b6d5` — remediated all five governance findings.\n\nImplemented centralized Goal/project execution contexts, idempotent audited legacy-command migration, supervised Quality processes with cancellation-safe terminal state, strict ordered evidence validation, focused regression coverage, and corrected affected documentation.\n\nVerification:\n\n- `cargo test --lib` — 401 passed.\n- `cargo test --test full_workflow -- --ignored` — 1 passed.\n- Quality tests — 8 passed.\n- Target-app tests — 10 passed.\n- Workflow tests — 28 passed.\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- `cargo clippy --all-targets -- -D warnings` — passed.\n- JavaScript syntax and `git diff --check` — passed.",
       "implementation_reported_at": "2026-07-22T12:05:00Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate 12f545be6da42962a70ab9f0f058b42ff980c8ed and remediate all five governance findings without restoring command-driven Quality as the product model. Centralize Quality execution context resolution so POST /api/quality/checks with goal_id and workflow QA both resolve and evaluate the same isolated candidate worktree, while project-level checks explicitly use the target root. Add a compatible, idempotent migration or explicit auditable transition for legacy target_app_test_command(s): preserve enabled ordering and intent by converting stored commands into ordered plain-language Quality tests/instructions (including relevant timeout context), never silently replacing configured verification with an empty successful no-op. Run Quality through the supervised process substrate with durable ownership/logs/progress; provider/start errors must terminally fail the operation, cancellation must terminate/couple to the managed process, and completion must not overwrite cancelled state. Validate provider output structurally against the requested ordered tests: exact count/order/identity, explicit per-test status and evidence, no failed result under top-level ok, and reject missing/extra/duplicate/mismatched evidence. Update the two contradictory affected docs (target-app intent and rust integration feature index) plus only other directly affected references. Add focused tests for Goal-worktree/API parity, migration/idempotency, provider failure, cancellation race/recovery, malformed/mismatched output, and empty-test no-op, then rerun the prior full and formatting gates. Preserve local durable state, operation, authentication, and confirmation boundaries.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:05:00Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T12:10:10Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:05:00Z"
+  "updated": "2026-07-22T12:10:11Z"
 }
