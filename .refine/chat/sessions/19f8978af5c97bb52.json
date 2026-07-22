@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:41:57Z",
+  "updated_at": "2026-07-22T11:44:09Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -360,6 +360,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The plain-language Quality model candidate failed governance on five concrete boundaries: API checks used the primary root instead of the Goal worktree; legacy test commands would silently become a no-op; provider errors/cancellation could leave or overwrite operation state; output validation trusted an `ok` flag without matching per-test evidence; and two affected docs still described removed commands. I’m issuing a preservation round that addresses those exact semantics and migration risks."
+    },
+    {
+      "created_at": "2026-07-22T11:44:09Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720649537-50",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The always-on Quality candidate failed for duplicating the Quality capability across workflow/API/settings, for a broken `retry-quality` re-entry path, and for trusting provider self-reported tool strings instead of supervised execution evidence. Because its sibling plain-language Quality core is actively being corrected in round 2 and both touch the same architecture, I’m recording the recovery round now but intentionally not re-queuing it until the shared core lands; that avoids racing two overlapping implementations or forcing a merge."
     }
   ],
   "queue_dispatching": true,
