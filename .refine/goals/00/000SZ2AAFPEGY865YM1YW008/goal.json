@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:06:28Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:28:43Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AAFPEGY865YM1YW008-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Implementation complies with all Governance rules; it reuses the shared agent-provider and supervised-process capabilities and includes focused regression evidence.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "Implementation complies with all Governance rules; it reuses the shared agent-provider and supervised-process capabilities and includes focused regression evidence.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AAFPEGY865YM1YW008-round-1"
+      },
+      "governance_message": "Implementation complies with all Governance rules; it reuses the shared agent-provider and supervised-process capabilities and includes focused regression evidence.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2AAFPEGY865YM1YW008` is ready for review at commit `47d0daab918c21c5984649a6fb04c6164bce8b16`.\n\nAfter-action report:\n\n- Changed [agent_providers/mod.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AAFPEGY865YM1YW008-round-1/src/tools/host/agent_providers/mod.rs:188) so Codex prompts use stdin instead of oversized command-line arguments. Installed Codex help confirmed `-` is the supported stdin marker.\n- Added coverage for fresh and resumed Codex sessions using exact 1,048,576-byte prompts.\n- Focused regression: exit `0`; 1 passed, 0 failed.\n- `./r test unit` confirming run: exit `0`; 390 passed, 0 failed.\n- `cargo clippy --lib -- -D warnings`: exit `0`.\n- Formatting and Git whitespace checks: exit `0`.\n- One earlier suite run had a transient unrelated CSV-background test failure; it passed alone and in the confirming full run.\n- Worktree is clean. Goal run completed in about 7m 31s.",
       "implementation_reported_at": "2026-07-22T10:27:42Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Supervisor tab is failed with the message, \"Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)\" Fix.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:28:45Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:27:42Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:28:45Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:27:42Z"
+  "updated": "2026-07-22T10:28:45Z"
 }
