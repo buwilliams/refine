@@ -139,28 +139,61 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:52:29Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T12:29:23Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-3",
+        "failed_actions": [
+          {
+            "message": "src/surfaces/web_server/operation_routes.rs directly implements operation cancellation orchestration: it mutates durable operation state, enumerates and terminates associated managed processes, persists termination and projection-refresh failures, and refreshes the runtime projection. This process-lifecycle behavior belongs in a shared capability; keeping it in the HTTP handler makes cancellation semantics surface-specific rather than leaving the route as a thin adapter.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"The implementation leaves managed-process cancellation orchestration in the web surface.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"src/surfaces/web_server/operation_routes.rs directly implements operation cancellation orchestration: it mutates durable operation state, enumerates and terminates associated managed processes, persists termination and projection-refresh failures, and refreshes the runtime projection. This process-lifecycle behavior belongs in a shared capability; keeping it in the HTTP handler makes cancellation semantics surface-specific rather than leaving the route as a thin adapter.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "The implementation leaves managed-process cancellation orchestration in the web surface.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "src/surfaces/web_server/operation_routes.rs directly implements operation cancellation orchestration: it mutates durable operation state, enumerates and terminates associated managed processes, persists termination and projection-refresh failures, and refreshes the runtime projection. This process-lifecycle behavior belongs in a shared capability; keeping it in the HTTP handler makes cancellation semantics surface-specific rather than leaving the route as a thin adapter.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-3"
+      },
+      "governance_message": "The implementation leaves managed-process cancellation orchestration in the web surface.",
+      "governance_rule_actions": [
+        {
+          "message": "src/surfaces/web_server/operation_routes.rs directly implements operation cancellation orchestration: it mutates durable operation state, enumerates and terminates associated managed processes, persists termination and projection-refresh failures, and refreshes the runtime projection. This process-lifecycle behavior belongs in a shared capability; keeping it in the HTTP handler makes cancellation semantics surface-specific rather than leaving the route as a thin adapter.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        }
+      ],
       "implementation_report": "Goal `00000SZ2BGCG909VDSW41YW00D` Round 3 is complete and reviewable.\n\nWhat changed:\n\n- Added a visible Jira export operation card with status, progress, eight-entry bounded logs, active-only Cancel, terminal-only Hide/Dismiss, and success-only Download.\n- Made cancellation authoritative under races: late success or failure cannot replace `Cancelled`, while failure details remain persisted and logged.\n- Cancellation now reports process-enumeration, termination, and projection-refresh failures instead of discarding them.\n- Added production managed-process tests proving public-route cancellation kills the associated child, interruption recovery works, late completion/failure cannot overwrite cancellation, and termination failures remain inspectable.\n- Preserved candidate `f996d058…` exactly: original and rebased patches share patch ID `40fa264c412d07a25cae9526c21ee125f72f1a47`.\n\nVerification:\n\n- `cargo test --lib --quiet` — 399 passed, 0 failed.\n- Three focused operation/process/API tests — passed.\n- `cargo clippy --lib -- -D warnings` — passed.\n- `node --test tests/*.test.js` — 23 passed, 0 failed.\n- JavaScript syntax, `cargo fmt --all -- --check`, and `git diff --check` — passed.\n- Final governance audit — passed all 8 rules with zero violations.\n\nRound 3 remains as eight scoped review files: seven modified and one new browser test. No Round 3 commit was created. Tracked execution: 32m 33s.",
       "implementation_reported_at": "2026-07-22T12:25:45Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate f996d058af151f388dcb90ea58db345c9d9af257 and remediate the two remaining governance findings. On the Goals browser surface, render the bulk Jira export as a visible supervised operation with status/progress, bounded log output or a link to the existing operation/process log view, explicit Cancel while running, and Hide/Dismiss only after terminal state; wire Cancel to the existing operation cancellation API and keep download available only after successful completion. Preserve bulk selection, deterministic CSV, shared export service, and button responsiveness. Replace or supplement cfg(test) thread shortcuts with focused integration coverage through the production managed-process substrate: launch an operation-associated child/helper process, cancel it through the public route/service and prove terminate_operation_processes ends it and leaves durable Cancelled state that completion cannot overwrite; simulate daemon/worker interruption by terminating the real associated process or restarting/reopening durable operation state rather than directly writing Interrupted, then verify restart-safe recovery/failure reporting and logs. Cover browser Cancel/Hide/log rendering and failure states, rerun focused operation/process/API/browser tests, formatting, and governance.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:25:45Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T12:29:23Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:25:45Z"
+  "updated": "2026-07-22T12:29:23Z"
 }
