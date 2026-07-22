@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:29:01Z",
+  "updated_at": "2026-07-22T18:29:20Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -804,6 +804,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both implementation agents are in independent read-only review. One Quality review command was rejected because this installed CLI does not allow custom instructions with `review --uncommitted`; that command failure is visible and the agent switched to a read-only general review invocation. There is still no provider or authentication failure, and official Refine governance remains ahead of both candidates."
+    },
+    {
+      "created_at": "2026-07-22T18:29:20Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784744960656-198",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both read-only reviews failed, so neither candidate will advance.\n\n- Coordination: context logs/reports can still publish across an active-Node change, and foreign recovery silently returns `0` instead of an actionable ownership-transfer-required error.\n- Quality: the proposed hard reset/clean was not proven to target only the workflow-owned isolated worktree; retry restoration and claim ownership were not atomic; promotion bypassed the shared Quality ownership check; and tests staged ownership instead of racing acquisition.\n\nThe destructive-scope finding was caught before merge. I am preserving the boundary: no primary worktree reset/clean is authorized, and the remediation must prove the exact isolated worktree identity before any recovery."
     }
   ],
   "queued_messages": [
