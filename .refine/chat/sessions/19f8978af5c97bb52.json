@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:27:29Z",
+  "updated_at": "2026-07-22T16:31:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1476,6 +1476,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance correctly caught three remaining blind spots, so the Round 4 candidate stays unmerged: actual legacy records used canonical target paths rather than the new hashed app ID; `retry` could publish Running and retain capacity without launching a worker; and the cancellation evidence still bypassed the real provider process. Refine has already authored a tightly scoped Round 5 repair prompt. I’m requeueing that latest round through the normal workflow path."
+    },
+    {
+      "created_at": "2026-07-22T16:31:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784737878523-243",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 5 has converged on a smaller fix: prove legacy ownership from the old path-valued ID or canonical `target_root`; ambiguous active legacy authority blocks automation with an actionable conflict. Retry will create a linked durable `Claimed` commitment for the existing workflow runner, preserving the prior execution as history and acquiring no capacity until a real managed provider process launches."
     }
   ],
   "queued_messages": [
