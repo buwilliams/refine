@@ -1,0 +1,41 @@
+{
+  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
+  "branch_name": "refine/00000SZ2C8SVXH5MGTX1XVA001/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T11:14:32Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2C8SVXH5MGTX1XVA001",
+  "name": "Let Supervisor recover failed Goals autonomously",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:14:32Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Make Supervisor own routine workflow recovery. It should notice failed Goals, inspect Goal, runtime, and repository evidence, and, when a safe correction is clear under existing authority, append one recovery Round and return the Goal to Todo without user action. Escalate only product judgment, new authority, or destructive choices. Prevent duplicate or cyclic retries, respect workflow and governance boundaries, and record the evidence and action in the shared transcript and activity log. Verify automatic recovery and escalation cases.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:14:32Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T11:14:33Z"
+}
