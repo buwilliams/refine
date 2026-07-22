@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:29:40Z",
+  "updated_at": "2026-07-22T20:30:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -48,15 +48,57 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The failure is substantive, not a flaky test result: implementation completed and was committed, then post-implementation governance rejected it. I’m verifying the candidate is still preserved and extracting the exact eight findings into a concise diagnosis."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8b84d7759f6e90",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ2TPQM61AGWJW8XC4001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-22T20:29:26Z",
-      "updated_at": "2026-07-22T20:29:26Z",
-      "internal": true
+      "created_at": "2026-07-22T20:30:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752208152-14",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed Goal `00000SZ2TPQM61AGWJW8XC4001` completed implementation successfully, but post-implementation governance rejected it with eight substantive findings.\n\nThe implementation is preserved cleanly at commit `b04ac0c9` on its round-1 worktree. Its reported checks passed: formatting, compile checks, 414 library tests, the ignored full-workflow test, and `git diff --check`.\n\nGovernance found these problems:\n\n- API and workflow persist different Quality evidence.\n- Quality timing has conflicting sources of truth.\n- Existing target-app Quality commands lack migration, potentially becoming silent no-ops.\n- Provider/parsing failures can leave operations running and uncancellable.\n- Manual and workflow Quality checks can race on the same candidate.\n- Agent-reported commands aren’t tied to observed supervised executions.\n- Candidate commit and worktree integrity aren’t verified around evaluation.\n- Documentation and intent contracts still contradict the new behavior.\n\nThis was not cause"
+    },
+    {
+      "created_at": "2026-07-22T20:30:08Z",
+      "delivered": false,
+      "id": "evt-1784752208416-16",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "The failed Goal `00000SZ2TPQM61AGWJW8XC4001` completed implementation successfully, but post-implementation governance rejected it with eight substantive findings.\n\nThe implementation is preserved cleanly at commit `b04ac0c9` on its round-1 worktree. Its reported checks passed: formatting, compile checks, 414 library tests, the ignored full-workflow test, and `git diff --check`.\n\nGovernance found these problems:\n\n- API and workflow persist different Quality evidence.\n- Quality timing has conflicting sources of truth.\n- Existing target-app Quality commands lack migration, potentially becoming silent no-ops.\n- Provider/parsing failures can leave operations running and uncancellable.\n- Manual and workflow Quality checks can race on the same candidate.\n- Agent-reported commands aren’t tied to observed supervised executions.\n- Candidate commit and worktree integrity aren’t verified around evaluation.\n- Documentation and intent contracts still contradict the new behavior.\n\nThis was not caused by authentication or a provider outage. The queue is idle with no Goal worker active. Retrying unchanged would simply encounter the same governance gate; the appropriate recovery is a corrective implementation round. No merge, retry, or worktree removal was performed.\n\nEvidence: [Goal record](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/goal.json) and [audit log](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/logs.jsonl)."
+    },
+    {
+      "created_at": "2026-07-22T20:30:08Z",
+      "delivered": false,
+      "id": "evt-1784752208417-17",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T20:30:08Z",
+      "delivered": false,
+      "id": "evt-1784752208423-19",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T20:30:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752213531-21",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll inspect the failed goal’s durable record and current process/state evidence, keeping this read-only. I’ll distinguish a retryable implementation failure from infrastructure noise and only ask you to authorize an explicit retry if the evidence supports it."
     }
   ],
   "queue_dispatching": true,
