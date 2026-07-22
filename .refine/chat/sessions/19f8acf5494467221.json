@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:24:58Z",
+  "updated_at": "2026-07-22T18:27:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -780,6 +780,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The latest focused coordination tests pass after putting pause rollback under the shared lease and making owner loss originate from the real daemon/provider path. Quality’s full library run reached 438/439; the only failure was the repository-wide prompt-size invariant. The agent compacted labels without dropping required context, restored the exact 700-word limit, and is rerunning all 439 tests."
+    },
+    {
+      "created_at": "2026-07-22T18:27:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784744825910-194",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s serial suite is now 439/439 and its ignored daemon workflow is 1/1. Clippy reported six style-only nested-condition warnings; the equivalent collapse is applied, and clippy plus the focused Quality suite now pass. Coordination has a final candidate `f239f28b` with its complete matrix green and is in one last read-only review; neither candidate has crossed the approval boundary."
     }
   ],
   "queued_messages": [
