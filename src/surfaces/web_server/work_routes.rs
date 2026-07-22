@@ -3323,20 +3323,18 @@ Provider notes after JSON."#;
         let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
         assert!(prompt.contains("feature"));
         assert!(prompt.contains("implementation_goals"));
-        assert!(prompt.contains("complete, naturally ordered set"));
+        assert!(prompt.contains("independently reviewable Goals"));
         assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("blind spots"));
-        assert!(prompt.contains("strongest product"));
         assert!(prompt.contains("verification"));
-        assert!(prompt.contains("not Refine, planning, or extraction"));
+        assert!(prompt.contains("not Refine or this extraction"));
     }
 
     #[test]
     fn feature_spec_import_prompt_uses_architecture_lenses() {
         let prompt = import_extraction_prompt("Build a budget app.", "feature import");
-        assert!(prompt.contains("Plan or feature-spec source"));
+        assert!(prompt.contains("Plan or feature spec"));
         assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("naturally ordered set"));
-        assert!(prompt.contains("true prerequisites"));
+        assert!(prompt.contains("implementation order"));
+        assert!(prompt.contains("only for prerequisites"));
     }
 }

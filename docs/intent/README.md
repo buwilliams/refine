@@ -20,6 +20,7 @@
     - [Activity And Evidence](03-capabilities/02-agents/06-activity-evidence.md)
     - [Planning](03-capabilities/02-agents/07-planning.md)
     - [Supervisor Agent](03-capabilities/02-agents/08-supervisor-agent.md)
+    - [Agent-First Orchestration](03-capabilities/02-agents/09-agent-first-orchestration.md)
   - Workflow
     - [Overview](03-capabilities/03-workflow/00-overview.md)
     - [Backlog](03-capabilities/03-workflow/01-backlog.md)

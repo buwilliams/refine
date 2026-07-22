@@ -1,9 +1,9 @@
-Refine {{mode}} chat attached to {{attachment}}.
+{{mode}} chat for {{attachment}}.
 
 {{instructions}}
 
-Current refine context:
+Context:
 {{context}}
 
-User message:
+User:
 {{message}}

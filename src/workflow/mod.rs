@@ -1795,8 +1795,7 @@ mod tests {
         assert!(prompt.contains("Focused tests passed."));
         assert!(prompt.contains("Latest Round to implement:"));
         assert!(prompt.contains("Keep the implementation and add the missing edge case."));
-        assert!(prompt.contains("if context conflicts with it, the latest Round wins"));
-        assert!(prompt.contains("strongest solution"));
+        assert!(prompt.contains("If they conflict, the latest Round wins"));
         assert!(!prompt.contains("PREVIOUS LOGS MUST NOT ENTER THE PROMPT"));
         assert!(!prompt.contains("CURRENT LOGS MUST NOT ENTER THE PROMPT"));
         assert!(

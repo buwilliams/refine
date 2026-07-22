@@ -1959,7 +1959,7 @@ mod tests {
             .unwrap();
 
         let prompt = service.chat_prompt(&session, "What changed?");
-        assert!(prompt.contains("Current refine context"));
+        assert!(prompt.contains("Context:"));
         assert!(prompt.contains("\"id\": \"GOAL1\""));
         assert!(prompt.contains("\"name\": \"Checkout fails\""));
         assert!(prompt.contains("What changed?"));
@@ -1978,18 +1978,13 @@ mod tests {
             .unwrap();
 
         let prompt = service.chat_prompt(&session, "Plan authentication cleanup.");
-        assert!(prompt.contains("Co-design ambitious software"));
-        assert!(prompt.contains("map"));
-        assert!(prompt.contains("territory"));
-        assert!(prompt.contains("blind-spot paths"));
-        assert!(prompt.contains("prototype uncertain parts"));
-        assert!(prompt.contains("interview the user"));
-        assert!(prompt.contains("audience"));
+        assert!(prompt.contains("Co-design software from the user's intent"));
+        assert!(prompt.contains("material unknowns"));
+        assert!(prompt.contains("ask the user when necessary"));
         assert!(prompt.contains("constraints"));
         assert!(prompt.contains("architecture"));
-        assert!(prompt.contains("build order"));
+        assert!(prompt.contains("implementation order"));
         assert!(prompt.contains("verification"));
-        assert!(prompt.contains("good, fast, and cheap"));
         assert!(prompt.contains("reviewable Features or Goals"));
         assert!(prompt.contains("Plan authentication cleanup."));
 

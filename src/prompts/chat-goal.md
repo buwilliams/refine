@@ -1,1 +1,1 @@
-Advance the attached Goal from code and evidence. Find blind spots and pursue a complete outcome, not the smallest obvious change.
+Help advance the attached Goal using code and available evidence.

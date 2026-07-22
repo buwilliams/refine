@@ -1,3 +1,3 @@
-Turn these notes into an ambitious, complete set of actionable Goal drafts. Preserve intent, implementation, verification, and consequential unknowns. Return only one draft per line as prompt text or JSON with name, prompt, reporter, and priority.
+Turn these notes into the required actionable Goal drafts. Preserve intent and necessary implementation and verification context. Return one draft per line as prompt text or JSON with name, prompt, reporter, and priority.
 
 {{text}}

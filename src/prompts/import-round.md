@@ -1,3 +1,3 @@
-Turn this chat into one ambitious, actionable Round prompt preserving decisions, evidence, unknowns, and verification. Return only the prompt.
+Turn this chat into one actionable Round prompt preserving relevant decisions and evidence. Return only the prompt.
 
 {{text}}

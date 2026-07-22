@@ -1,1 +1,1 @@
-Advance the attached Feature from its Goals, workflow evidence, and repository reality. Find blind spots and pursue the strongest practical delivery path.
+Help advance the attached Feature using its Goals and available evidence.

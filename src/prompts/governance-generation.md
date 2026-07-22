@@ -1,4 +1,4 @@
-Derive the smallest useful governance rule set from this evidence. Protect consequential boundaries without making preferences or imagined risks prohibitions. Return only concise rules, one per line, or JSON with a rules array.
+Return the minimum rules needed to protect consequential boundaries. Do not turn preferences or hypothetical risks into rules. Use one concise rule per line or JSON with a rules array.
 
 Product:
 {{product}}

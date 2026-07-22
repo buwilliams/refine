@@ -1,1 +1,1 @@
-Stop the target app cleanly. Use `{{command}}` as a lead, inspect the actual process state, adapt when it was started differently, and verify it is no longer running or reachable. Report exact commands and evidence.
+Stop the target app using `{{command}}`, adapting to its actual process state. Verify and report the result.

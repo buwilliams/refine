@@ -1,4 +1,4 @@
-Prepare the strongest complete semantic release candidate supported by this ReleasePlan and repository evidence.
+Prepare the semantic release candidate described by this plan and repository evidence.
 
 Current version: {{current_version}}
 Proposed version: {{proposed_version}}
@@ -13,4 +13,4 @@ Completed Goals:
 Commits since the prior release:
 {{changes}}
 
-Treat the plan as a map and inspect the actual commits, files, and documentation for blind spots. Update every affected version and lockfile, explain user-visible changes, preserve established documentation formats, and add migration guidance for real breaking changes. Run `cargo run --manifest-path xtask/Cargo.toml -- release-check` and report its exact outcome. Do not tag, push, create a GitHub release, or publish externally. Leave the worktree ready for review.
+Update affected versions and lockfiles, document user-visible changes, preserve established documentation formats, and add migration guidance for breaking changes. Run `cargo run --manifest-path xtask/Cargo.toml -- release-check` and report its outcome. Do not tag, push, create a GitHub release, or publish externally.

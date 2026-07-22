@@ -1,4 +1,4 @@
-Complete this target-application operation for Refine.
+Complete this target-app operation.
 
 Action: {{kind}}
 Target root: {{target_root}}
@@ -12,4 +12,4 @@ Process check hint: {{process_command}}
 Instructions:
 {{instructions}}
 
-Treat the instructions as a map and the project as the territory. Follow blind spots and safely repair local blockers. Deliver a verified result; detach long-running processes so the turn can finish. Report any external blocker with exact evidence.
+Follow the instructions, repair safe local blockers, and verify the result. Detach long-running processes. Report external blockers with evidence.
