@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:38:46Z",
+  "updated_at": "2026-07-22T18:39:11Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -864,6 +864,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s corrected focused suite is green: 20 Quality tests, five operation-registry tests, primary-worktree refusal, mutation recovery/retry, failed restoration, promotion exclusion, and a simultaneous API/workflow acquisition race. It has entered the full serial library gate. Official coordination governance is still inspecting surface-to-core Node activation paths and shared-root consistency."
+    },
+    {
+      "created_at": "2026-07-22T18:39:11Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745551102-209",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Refine’s official coordination governance failed, and I’m preserving that authoritative result. The remaining defect is a live active-Node switch: an A-owned execution can be rejected after switching to B while recovery still sees its live runner and retained lease, stranding Goal/claim/capacity. The current tests never switch Nodes during a live provider run. I’m appending a narrow remediation round with that exact failure path and requeueing the isolated candidate; no approval or merge will occur."
     }
   ],
   "queued_messages": [
