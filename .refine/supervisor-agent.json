@@ -3,7 +3,7 @@
   "lifecycle": "observing",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 1,
+  "queued_work": 2,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f893818df4360",
@@ -28,13 +28,15 @@
     "00000SZ1T921F15X91MBZWE000": "done",
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
     "00000SZ1YFDPAG0NJ16FTTY000": "done",
-    "00000SZ29R2JNJR5RXPR1YW000": "todo"
+    "00000SZ29R2JNJR5RXPR1YW000": "review",
+    "00000SZ29T1KSK3KYJW81YW001": "todo",
+    "00000SZ29Y2WEJ5C3YM01YW003": "todo"
   },
   "open_issues": {
-    "provider": "Supervisor provider failure: Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+    "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
   },
   "last_context_key": "goals=00000SZ29R2JNJR5RXPR1YW000:todo|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-22T09:46:22.846231123+00:00",
+  "updated_at": "2026-07-22T09:53:23.134995080+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -91,6 +93,36 @@
       "created_at": "2026-07-22T09:46:22.846208447+00:00",
       "actionable": true,
       "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T09:53:23.134574639+00:00-7",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29R2JNJR5RXPR1YW000 changed from todo to review.",
+      "created_at": "2026-07-22T09:53:23.134574639+00:00",
+      "goal_id": "00000SZ29R2JNJR5RXPR1YW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:53:23.134582001+00:00-8",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29T1KSK3KYJW81YW001 entered workflow state todo.",
+      "created_at": "2026-07-22T09:53:23.134582001+00:00",
+      "goal_id": "00000SZ29T1KSK3KYJW81YW001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:53:23.134583739+00:00-9",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29Y2WEJ5C3YM01YW003 entered workflow state todo.",
+      "created_at": "2026-07-22T09:53:23.134583739+00:00",
+      "goal_id": "00000SZ29Y2WEJ5C3YM01YW003",
+      "actionable": false,
+      "retryable": false
     }
   ]
 }

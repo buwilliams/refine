@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T09:46:21Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T09:53:21Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29R2JNJR5RXPR1YW000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found; the surface-only change is scoped, consistent, and supported by passing focused integration tests.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found; the surface-only change is scoped, consistent, and supported by passing focused integration tests.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29R2JNJR5RXPR1YW000-round-1"
+      },
+      "governance_message": "No Governance rule violations found; the surface-only change is scoped, consistent, and supported by passing focused integration tests.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ29R2JNJR5RXPR1YW000` is implemented and ready for review in commit `6b25819518641c09cb3a914ac4f7a150c3ea4943`.\n\nAfter-action:\n\n- Changed [toolbar.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29R2JNJR5RXPR1YW000-round-1/src/surfaces/web/static/js/features/toolbar.js) so Standalone, Supervisor, Plan, and Goal Activity panels start collapsed. Explicit user expansion remains persisted.\n- Added regression coverage in [web_supervisor_toolbar.test.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29R2JNJR5RXPR1YW000-round-1/tests/web_supervisor_toolbar.test.js).\n- `cargo run --manifest-path xtask/Cargo.toml -- check` — exit `0`; browser tests `10/10` passed and all `53` static assets validated.\n- `node --test tests/web_supervisor_toolbar.test.js` — exit `0`; `8/8` passed.\n- `cargo fmt --all -- --check` — exit `0`.\n- `git diff --check` — exit `0`.\n- Worktree is clean on the round-1 branch.\n\nAgent run time: 5m 12s.",
       "implementation_reported_at": "2026-07-22T09:52:02Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "In the web UI, all toolbar tabs with an Activity panel should be collapsed by default.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T09:53:22Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T09:52:02Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T09:53:22Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T09:52:03Z"
+  "updated": "2026-07-22T09:53:23Z"
 }
