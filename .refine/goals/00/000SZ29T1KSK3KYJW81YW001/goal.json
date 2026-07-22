@@ -14,28 +14,61 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T09:48:31Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T10:01:55Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-1",
+        "failed_actions": [
+          {
+            "message": "The focused test covers only two events, but the client processes 80 while deduplication searches only the last 20. Re-polling an unchanged 80-event snapshot adds all 80 again, crowding out trustworthy failure and recovery history without integration evidence for the supported event window.",
+            "rule": "Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Supervisor event polling can repeatedly duplicate System entries.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.\",\"message\":\"The focused test covers only two events, but the client processes 80 while deduplication searches only the last 20. Re-polling an unchanged 80-event snapshot adds all 80 again, crowding out trustworthy failure and recovery history without integration evidence for the supported event window.\"}]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "Supervisor event polling can repeatedly duplicate System entries.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The focused test covers only two events, but the client processes 80 while deduplication searches only the last 20. Re-polling an unchanged 80-event snapshot adds all 80 again, crowding out trustworthy failure and recovery history without integration evidence for the supported event window.",
+              "rule": "Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-1"
+      },
+      "governance_message": "Supervisor event polling can repeatedly duplicate System entries.",
+      "governance_rule_actions": [
+        {
+          "message": "The focused test covers only two events, but the client processes 80 while deduplication searches only the last 20. Re-polling an unchanged 80-event snapshot adds all 80 again, crowding out trustworthy failure and recovery history without integration evidence for the supported event window.",
+          "rule": "Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Goal `00000SZ29T1KSK3KYJW81YW001` is ready for review at commit `2f740eb`.\n\nAfter-action report:\n\n- Changed [toolbar.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-1/src/surfaces/web/static/js/features/toolbar.js:868) so Supervisor retains health and chat, while its deduplicated events appear in System operations.\n- Removed obsolete Supervisor event styling and updated tests and toolbar intent documentation.\n- Reason: the event stream cluttered the Supervisor conversation.\n\nVerification:\n\n- `cargo test --lib` — exit 0; 389 passed, 0 failed.\n- Focused Rust contract — exit 0; 1 passed.\n- Combined browser tests — exit 0; 8 passed.\n- Final Supervisor browser test — exit 0; 6 passed.\n- `cargo fmt --all -- --check` — exit 0.\n- `git diff --check` — exit 0.\n- One initial malformed Rust test invocation exited 2 because the repository’s suite gate rejected the filter; the corrected `--lib` invocation passed.\n- Worktree is clean after the scoped commit.\n\nGoal run usage: 125,356 tokens over 6 minutes.",
       "implementation_reported_at": "2026-07-22T09:59:45Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Supervisor agent web UI tab, the events should be in the system tab, not in the supervisor tab, because it clutters the UI.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T09:59:45Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T10:01:55Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T09:59:45Z"
+  "updated": "2026-07-22T10:01:56Z"
 }
