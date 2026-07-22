@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:50:38Z",
+  "updated_at": "2026-07-22T15:55:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1380,6 +1380,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 4 is running from the merged contract, with `ba537ca` preserved as a single candidate commit and applied only inside the repair worktree. The agent is auditing the exact five seams governance named—including repeated same-Goal Git conflicts—before editing, so the next evidence will distinguish a real architectural repair from another unit-test-only patch."
+    },
+    {
+      "created_at": "2026-07-22T15:55:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784735733909-226",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The repair is now changing the shared authorities rather than layering around them: target-app durable state, recoverable claim/Goal commitment, one terminal-operation settlement path, and Git conflict baseline handling. No merge or destructive cleanup has occurred; the rejected candidate remains preserved and the live daemon continues running the repair through its normal supervised process."
     }
   ],
   "queued_messages": [
