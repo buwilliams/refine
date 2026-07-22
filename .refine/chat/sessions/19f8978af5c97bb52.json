@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:27:14Z",
+  "updated_at": "2026-07-22T11:28:17Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -276,6 +276,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first candidate correctly failed governance; I’m not hiding or overriding it. The two concrete findings are: workflow/editability policy was hard-coded in the browser despite broader shared capability semantics, and the “browser coverage” only inspected source text without exercising the DOM interaction/failure paths. Before issuing a retry, I’m checking the already-running singleton supervisor transcript so I don’t duplicate or race its auditable recovery."
+    },
+    {
+      "created_at": "2026-07-22T11:28:17Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719697888-36",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The singleton transcript confirms no competing recovery is being issued. I’m using Refine’s own round/state APIs to preserve the failed candidate and create an auditable round focused exactly on the two governance findings; this is a retry, not an override or forced merge."
     }
   ],
   "queue_dispatching": true,
