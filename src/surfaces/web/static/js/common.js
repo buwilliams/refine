@@ -1799,14 +1799,6 @@ function initSSE() {
       }
     } catch {}
   });
-  sseSource.addEventListener("chat_event", (e) => {
-    try {
-      const payload = JSON.parse(e.data || "{}");
-      if (typeof handleChatSseEvent === "function") {
-        handleChatSseEvent(payload);
-      }
-    } catch {}
-  });
   sseSource.onerror = () => {
     const now = Date.now();
     if (now - sseLastErrorNoticeAt > 30000) {

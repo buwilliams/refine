@@ -288,28 +288,6 @@ registerCommand({
 });
 
 registerCommand({
-  id: "plan.draft_goal",
-  title: "Draft Goal from plan",
-  group: "AI",
-  aliases: ["draft-goal", "draft-plan-goal"],
-  visible: () => !!chatState?.tabs?.plan,
-  enabled: () => planHasAgentResponse(chatState.tabs.plan),
-  disabledMessage: "Wait for the agent to respond before drafting a Goal.",
-  run: () => draftGoalFromPlan(),
-});
-
-registerCommand({
-  id: "plan.draft",
-  title: "Draft Feature from plan",
-  group: "AI",
-  aliases: ["draft-plan", "draft-goals"],
-  visible: () => !!chatState?.tabs?.plan,
-  enabled: () => planHasAgentResponse(chatState.tabs.plan),
-  disabledMessage: "Wait for the agent to respond before drafting a Feature.",
-  run: () => draftGoalsFromPlan(),
-});
-
-registerCommand({
   id: "toolbar.toggle",
   title: "Toggle Toolbar",
   group: "Toolbar",

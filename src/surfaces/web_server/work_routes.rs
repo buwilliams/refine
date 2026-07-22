@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
@@ -13,6 +15,7 @@ use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
+use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -72,6 +75,197 @@ struct ImportDuplicateActions {
     moved_to_backlog: usize,
     move_noop: usize,
     updated_original: usize,
+}
+
+fn terminal_profile_prompt(
+    server: &InProcessWebServer,
+    profile: &str,
+    goal_id: Option<&str>,
+    feature_id: Option<&str>,
+    supplemental_prompt: Option<&str>,
+) -> Result<String, RefineError> {
+    let template = match profile {
+        "supervisor" => PromptTemplate::ChatSupervisor,
+        "plan" => PromptTemplate::ChatPlan,
+        "goal" => PromptTemplate::ChatGoal,
+        "standalone" => PromptTemplate::ChatStandalone,
+        _ => {
+            return Err(RefineError::InvalidInput(format!(
+                "terminal profile {profile} does not launch an agent"
+            )));
+        }
+    };
+    let mut sections = vec![PromptEngine::load(template).trim().to_string()];
+    let projection = server.current_projection()?;
+    if let Some(goal_id) = goal_id {
+        let goal = projection
+            .goals
+            .get(goal_id)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} was not found")))?;
+        let context = serde_json::to_string_pretty(&json!({
+            "id": goal.goal.id,
+            "name": goal.goal.name,
+            "status": goal.goal.status,
+            "priority": goal.goal.priority,
+            "reporter": goal.goal.reporter,
+            "assignee": goal.goal.assignee,
+            "round_count": goal.goal.round_count,
+            "feature_id": goal.goal.feature_id,
+            "node_id": goal.goal.node_id,
+            "updated": goal.goal.updated,
+        }))
+        .map_err(|error| {
+            RefineError::Serialization(format!("failed to encode Goal context: {error}"))
+        })?;
+        sections.push(format!("Attached Refine Goal context:\n{context}"));
+    }
+    if let Some(feature_id) = feature_id {
+        let feature = projection
+            .features
+            .get(feature_id)
+            .ok_or_else(|| RefineError::NotFound(format!("Feature {feature_id} was not found")))?;
+        let context = serde_json::to_string_pretty(&json!({
+            "id": feature.feature.id,
+            "name": feature.feature.name,
+            "description": feature.feature.description,
+            "status": feature.status,
+            "goal_ids": feature.goal_ids,
+            "updated": feature.feature.updated,
+        }))
+        .map_err(|error| {
+            RefineError::Serialization(format!("failed to encode Feature context: {error}"))
+        })?;
+        sections.push(format!("Attached Refine Feature context:\n{context}"));
+    }
+    if profile == "supervisor" {
+        sections.push(
+            "Use Refine's CLI and repository evidence to monitor the targeted app. Investigate and fix actionable workflow issues within existing authority, and verify completed work."
+                .to_string(),
+        );
+    } else if profile == "plan" {
+        sections.push(
+            "Use Refine's CLI when the user asks you to persist the resulting Feature or Goals."
+                .to_string(),
+        );
+    } else if profile == "goal" {
+        sections.push(
+            "Use Refine's CLI and repository evidence to inspect and advance the attached Goal."
+                .to_string(),
+        );
+    }
+    if let Some(prompt) = supplemental_prompt {
+        sections.push(format!("User-provided starting context:\n{prompt}"));
+    }
+    Ok(sections.join("\n\n"))
+}
+
+fn create_terminal_standalone_worktree(
+    target_root: &Path,
+    runtime_root: &Path,
+) -> Result<Value, RefineError> {
+    let worktree_id = Uuid::new_v4().to_string();
+    let branch = format!("refine/standalone/{worktree_id}");
+    let git = FileGitWorktreeService::with_runtime_root(target_root, runtime_root);
+    let target = git
+        .git_path("refine-standalone-worktrees")?
+        .join(&worktree_id);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create standalone worktree directory {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let path = with_repository_git_lock(target_root, || git.ensure_worktree(&branch, &target))?;
+    Ok(json!({"branch": branch, "path": path}))
+}
+
+fn resume_terminal_standalone_worktree(
+    target_root: &Path,
+    runtime_root: &Path,
+    worktree: &Value,
+) -> Result<Value, RefineError> {
+    let branch = worktree
+        .get("branch")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| value.starts_with("refine/standalone/"))
+        .ok_or_else(|| {
+            RefineError::InvalidInput(
+                "standalone worktree branch must be owned by Refine".to_string(),
+            )
+        })?;
+    let requested = worktree
+        .get("path")
+        .and_then(Value::as_str)
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            RefineError::InvalidInput("standalone worktree path is required".to_string())
+        })?;
+    let git = FileGitWorktreeService::with_runtime_root(target_root, runtime_root);
+    let allowed_root = git.git_path("refine-standalone-worktrees")?;
+    let canonical = requested.canonicalize().map_err(|error| {
+        RefineError::NotFound(format!(
+            "standalone worktree {} is not available: {error}",
+            requested.display()
+        ))
+    })?;
+    let canonical_allowed_root = allowed_root.canonicalize().map_err(|error| {
+        RefineError::NotFound(format!(
+            "standalone worktree root {} is not available: {error}",
+            allowed_root.display()
+        ))
+    })?;
+    if !canonical.starts_with(&canonical_allowed_root) {
+        return Err(RefineError::InvalidInput(format!(
+            "standalone worktree {} is outside Refine's worktree root",
+            canonical.display()
+        )));
+    }
+    let status = git.inspect(canonical.to_str().ok_or_else(|| {
+        RefineError::InvalidInput("standalone worktree path is not valid UTF-8".to_string())
+    })?)?;
+    let inspected_root = PathBuf::from(&status.root)
+        .canonicalize()
+        .map_err(|error| {
+            RefineError::NotFound(format!(
+                "standalone worktree root {} is not available: {error}",
+                status.root
+            ))
+        })?;
+    if inspected_root != canonical {
+        return Err(RefineError::InvalidInput(format!(
+            "standalone worktree path {} is not the worktree root",
+            canonical.display()
+        )));
+    }
+    if status.branch.as_deref() != Some(branch) {
+        return Err(RefineError::InvalidInput(format!(
+            "standalone worktree {} is checked out on {}, not {branch}",
+            canonical.display(),
+            status.branch.as_deref().unwrap_or("a detached HEAD")
+        )));
+    }
+    Ok(json!({"branch": branch, "path": canonical.display().to_string()}))
+}
+
+fn cleanup_failed_terminal_worktree(target_root: &Path, worktree: &Value) {
+    let Some(path) = worktree.get("path").and_then(Value::as_str) else {
+        return;
+    };
+    let Some(branch) = worktree.get("branch").and_then(Value::as_str) else {
+        return;
+    };
+    let git = FileGitWorktreeService::new(target_root);
+    let path = PathBuf::from(path);
+    let _ = with_repository_git_lock(target_root, || {
+        if path.exists() {
+            git.remove_worktree(&path, true)?;
+        }
+        let _ = git.delete_branch(branch, true);
+        Ok(())
+    });
 }
 
 impl ImportDuplicateActions {
@@ -2338,6 +2532,9 @@ impl InProcessWebServer {
         let Some(target_root) = self.target_root() else {
             return target_root_unavailable("start terminal session");
         };
+        let Some(runtime_root) = self.runtime_root.clone() else {
+            return runtime_root_unavailable("start managed terminal sessions");
+        };
         let body = request.body.unwrap_or_else(|| json!({}));
         let cols = body
             .get("cols")
@@ -2349,9 +2546,140 @@ impl InProcessWebServer {
             .and_then(Value::as_u64)
             .and_then(|value| u16::try_from(value).ok())
             .unwrap_or(0);
-        match terminal_session_start_response(&target_root, cols, rows) {
+        let profile = body
+            .get("profile")
+            .and_then(Value::as_str)
+            .unwrap_or("terminal")
+            .trim()
+            .to_lowercase();
+        if !matches!(
+            profile.as_str(),
+            "terminal" | "supervisor" | "plan" | "goal" | "standalone"
+        ) {
+            return error_response(RefineError::InvalidInput(format!(
+                "unknown terminal profile {profile}"
+            )));
+        }
+
+        let refine_dir = match self.current_refine_dir() {
+            Ok(Some(path)) => path,
+            Ok(None) => return target_root_unavailable("start managed terminal sessions"),
+            Err(error) => return error_response(error),
+        };
+        let goal_id = body
+            .get("goal_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let feature_id = body
+            .get("feature_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let supplemental_prompt = body
+            .get("initial_prompt")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+
+        let mut cwd = target_root.clone();
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("profile".to_string(), json!(&profile));
+        if let Some(goal_id) = &goal_id {
+            metadata.insert("goal_id".to_string(), json!(goal_id));
+        }
+        if let Some(feature_id) = &feature_id {
+            metadata.insert("feature_id".to_string(), json!(feature_id));
+        }
+
+        let (worktree, worktree_created) = if profile == "standalone" {
+            let requested_worktree = body.get("worktree").filter(|value| value.is_object());
+            let result = match requested_worktree {
+                Some(worktree) => {
+                    resume_terminal_standalone_worktree(&target_root, &runtime_root, worktree)
+                }
+                None => create_terminal_standalone_worktree(&target_root, &runtime_root),
+            };
+            match result {
+                Ok(worktree) => {
+                    cwd = PathBuf::from(&worktree["path"].as_str().unwrap_or_default());
+                    metadata.insert("worktree".to_string(), worktree.clone());
+                    (Some(worktree), requested_worktree.is_none())
+                }
+                Err(error) => return error_response(error),
+            }
+        } else {
+            (None, false)
+        };
+
+        let launch = if profile == "terminal" {
+            TerminalLaunchSpec {
+                runtime_root: runtime_root.clone(),
+                cwd,
+                profile: profile.clone(),
+                provider: None,
+                command: default_interactive_shell(),
+                args: vec!["-i".to_string()],
+                metadata,
+            }
+        } else {
+            let provider = self
+                .settings_service(&refine_dir)
+                .load()
+                .ok()
+                .and_then(|settings| {
+                    settings
+                        .get("agent_cli")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
+                .unwrap_or_else(|| "claude".to_string());
+            let prompt = match terminal_profile_prompt(
+                self,
+                &profile,
+                goal_id.as_deref(),
+                feature_id.as_deref(),
+                supplemental_prompt,
+            ) {
+                Ok(prompt) => prompt,
+                Err(error) => {
+                    if worktree_created && let Some(worktree) = worktree.as_ref() {
+                        cleanup_failed_terminal_worktree(&target_root, worktree);
+                    }
+                    return error_response(error);
+                }
+            };
+            let provider_service = HostAgentProviderService::with_runtime_root(&runtime_root);
+            let command = match provider_service.interactive_command(&provider, &prompt) {
+                Ok(command) => command,
+                Err(error) => {
+                    if worktree_created && let Some(worktree) = worktree.as_ref() {
+                        cleanup_failed_terminal_worktree(&target_root, worktree);
+                    }
+                    return error_response(error);
+                }
+            };
+            TerminalLaunchSpec {
+                runtime_root: runtime_root.clone(),
+                cwd,
+                profile: profile.clone(),
+                provider: Some(provider),
+                command: command.binary,
+                args: command.args,
+                metadata,
+            }
+        };
+
+        match terminal_session_start_response(launch, cols, rows) {
             Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
+            Err(error) => {
+                if worktree_created && let Some(worktree) = worktree.as_ref() {
+                    cleanup_failed_terminal_worktree(&target_root, worktree);
+                }
+                error_response(error)
+            }
         }
     }
 

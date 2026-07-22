@@ -1,37 +1,28 @@
-# Chat
+# Browser Agent Interaction
 
 ## Key Ideas
 
-- **Contextual Conversation**: chat should attach to work when work exists.
-- **Durable Sessions**: messages, output, interruptions, and recovery should not depend on a single browser moment.
-- **Goal-Aware Priming**: Goal chat should provide enough context for agents to help with that work.
-- **Toolbar Native**: chat belongs in the persistent dock so it can support any main surface.
-- **Transcript To Work**: useful chat should be able to become structured Refine work where appropriate.
-- **Planning As Exploration**: Plan Mode should help users find the shape of an idea before work is created.
+- **Harness Native**: the browser embeds real terminal sessions running the configured agent CLI instead of maintaining a custom chat transcript and input protocol.
+- **Context Through Launch**: Supervisor, Plan Mode, Goal, and Standalone inject concise role and work context when the native agent starts.
+- **One Terminal Primitive**: agent profiles reuse the same PTY, streaming, resize, and managed-process implementation as the plain Terminal tab.
+- **Durable Work Outside Conversation**: Goals, Features, rounds, logs, governance, and workflow remain Refine state; a terminal transcript is not product truth.
+- **Explicit Lifecycle**: users start, stop, and restart every browser agent session.
 
 ## Purpose
 
-The Chat surface exists to let users collaborate with agents while staying inside Refine's product model. Chat can help clarify work, draft rounds, inspect failures, discuss implementation, and convert vague intent into concrete Goals.
+The browser agent surface lets users work with frontier agent harnesses without leaving Refine's orchestration context. Refine supplies the target app, role, Goal or Feature context, and isolated worktree where appropriate. The native CLI owns conversation UX, tools, approvals, and provider-specific capabilities.
 
-Chat should not replace durable work state. It should support it.
+This removes Refine's former custom browser chat UI from Supervisor, Plan Mode, Goal, and Standalone tabs. The backend chat capability may still support automated workflow or non-browser adapters, but it does not define the toolbar interaction model.
 
 ## Expected Role
 
-Chat should support standalone sessions, Plan Mode, and Goal-attached sessions. Goal chat should know which Goal it is helping with and should preserve the user's place in the broader UI. Plan Mode should help users explore purpose, audience, constraints, success criteria, major behavior, and relevant architecture concerns without forcing a fixed template.
+- Supervisor starts a configured agent prepared to observe and help with the active Refine workflow.
+- Plan Mode starts a configured agent prepared to explore a feature or Goal plan and use Refine's CLI to persist selected work.
+- Goal starts a configured agent with fresh durable Goal or Feature context.
+- Standalone starts a configured agent inside an isolated, reusable worktree.
 
-Current implementation details that matter to intent:
-
-- toolbar state holds one permanent standalone tab plus one tab per opened Goal chat;
-- Plan Mode uses the toolbar chat surface and can later be drafted into either one standalone Goal or a Feature with Goals;
-- chat sessions have server-side identifiers and output queues;
-- Goal chat eligibility depends on shared Goal status semantics;
-- session recovery should handle daemon restarts and interrupted turns;
-- standalone chat has its own worktree and handoff behavior, documented separately.
-
-Chat should stay connected to Refine's durable model: Goals, rounds, logs, guidance, governance, and workflow state.
+Browser persistence is limited to what is needed to reconnect the terminal: its managed process/session identity, profile metadata, provider, working directory, and standalone worktree. Refine does not parse a native harness transcript to infer durable work. The agent or user creates and changes Refine work through the existing CLI, API, or product surfaces.
 
 ## Future Direction
 
-Future chat should become more structured and less transcript-bound. Agents may summarize, propose actions, draft Goals, attach evidence, and route conversation into workflow automatically.
-
-As AI improves, chat may become one of several agent interaction modes rather than the center of the system.
+New agent harness features should normally arrive through the configured CLI rather than by adding parallel browser controls. Refine's browser work should focus on fleet visibility, context routing, safe process lifecycle, worktree ownership, and durable workflow handoff.

@@ -357,6 +357,11 @@ impl InProcessWebServer {
             .and_then(|body| body.get("signal"))
             .and_then(|signal| signal.as_str())
             .unwrap_or("terminate");
+        match terminal_stop_process_response(process_id) {
+            Ok(Some(value)) => return ApiResponse::json(200, value),
+            Ok(None) => {}
+            Err(error) => return error_response(error),
+        }
         match FileProcessStatusService::new(runtime_root).stop(process_id, signal) {
             Ok(process) => {
                 ApiResponse::json(200, json!({"stopped": true, "process": process.api_json()}))

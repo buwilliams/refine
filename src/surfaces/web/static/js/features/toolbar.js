@@ -1,15 +1,14 @@
 // ---- Toolbar ----------------------------------------------------------------
 
-// chatState holds one tab per chat: the permanent "standalone" tab plus one
-// per Goal that the user opened via Open Chat. Each tab carries its own
-// session id, accumulated output, and closed-reason. Only the active tab is
-// polled; output for other tabs accumulates server-side in the runner's
-// per-session deque until the user switches to that tab.
+// chatState is the persisted toolbar layout retained for storage compatibility.
+// Agent-facing tabs are managed terminal launch profiles; each has an independent
+// PTY session while Files, System, and Goal Logs keep their specialized panels.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const SYSTEM_TAB_ID = "system";
 const SUPERVISOR_TAB_ID = "supervisor";
 const TERMINAL_TAB_ID = "terminal";
+const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "supervisor", "plan", "goal", "standalone"]);
 const STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID, SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
@@ -21,16 +20,12 @@ const SYSTEM_LOG_FILTERS = [
   { status: "complete", label: "Completed" },
   { status: "error", label: "Errors" },
 ];
-const GOAL_CHAT_ROUND_STATUSES = new Set([
-  "backlog", "todo", "review", "done", "failed", "cancelled",
-]);
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
 const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
 const TERMINAL_OUTPUT_MAX_CHARS = 50_000;
-const CHAT_ACTIVITY_PULSE_MS = 1800;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
@@ -40,7 +35,6 @@ const chatState = {
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
-  focusInputUntil: 0,
 };
 const systemOperationState = {
   messages: [],
@@ -72,32 +66,62 @@ const filesState = {
   loading: false,
   error: "",
 };
-const terminalState = {
-  sessionId: "",
-  cwd: "",
-  display: "",
-  term: null,
-  cursor: 0,
-  inputBuffer: "",
-  inputFlushTimer: null,
-  inputSendPromise: Promise.resolve(),
-  lastSeq: 0,
-  loading: false,
-  connected: false,
-  exited: false,
-  error: "",
-};
-let terminalEventSource = null;
+const terminalStates = new Map();
+
+function toolbarTabUsesTerminal(tab) {
+  return !!tab && INTERACTIVE_TERMINAL_MODES.has(tab.mode);
+}
+
+function normalizeInteractiveTerminalTab(tab) {
+  if (!toolbarTabUsesTerminal(tab)) return tab;
+  // Session ids persisted by the retired custom chat backend are not PTY session ids.
+  if (tab.sessionId && !tab.processId) tab.sessionId = null;
+  tab.processId = tab.processId || null;
+  tab.provider = tab.provider || null;
+  tab.cwd = tab.cwd || "";
+  tab.exited = !!tab.exited;
+  tab.initialPrompt = String(tab.initialPrompt || "");
+  return tab;
+}
+
+function terminalStateFor(tabId = chatState.activeTabId) {
+  const tab = normalizeInteractiveTerminalTab(chatState.tabs[tabId]);
+  if (!tab) return null;
+  let terminal = terminalStates.get(tabId);
+  if (!terminal) {
+    terminal = {
+      tabId,
+      sessionId: tab.sessionId || "",
+      processId: tab.processId || "",
+      cwd: tab.cwd || "",
+      display: "",
+      term: null,
+      inputBuffer: "",
+      inputFlushTimer: null,
+      resizeTimer: null,
+      inputSendPromise: Promise.resolve(),
+      lastSeq: 0,
+      lastCols: 0,
+      lastRows: 0,
+      loading: false,
+      connected: !!tab.sessionId && !tab.exited,
+      exited: !!tab.exited,
+      error: "",
+      eventSource: null,
+    };
+    terminalStates.set(tabId, terminal);
+  }
+  return terminal;
+}
 
 function ensureStandaloneTab() {
   if (!chatState.tabs.standalone) {
     chatState.tabs.standalone = {
       goalId: null, label: "Standalone", mode: "standalone",
-      sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: false,
+      sessionId: null,
     };
   }
-  ensureChatTabQueueState(chatState.tabs.standalone);
+  normalizeInteractiveTerminalTab(chatState.tabs.standalone);
   ensureSupervisorTab();
   ensureFilesTab();
   ensureSystemTab();
@@ -109,49 +133,45 @@ function ensureSupervisorTab() {
   if (!chatState.tabs[SUPERVISOR_TAB_ID]) {
     chatState.tabs[SUPERVISOR_TAB_ID] = {
       goalId: null, label: "Supervisor", mode: "supervisor",
-      sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: false,
+      sessionId: null,
     };
   }
-  ensureChatTabQueueState(chatState.tabs[SUPERVISOR_TAB_ID]);
+  normalizeInteractiveTerminalTab(chatState.tabs[SUPERVISOR_TAB_ID]);
 }
 
 function ensureFilesTab() {
   if (!chatState.tabs[FILES_TAB_ID]) {
     chatState.tabs[FILES_TAB_ID] = {
       goalId: null, label: "Files", mode: "files",
-      sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+      sessionId: null,
     };
   }
-  ensureChatTabQueueState(chatState.tabs[FILES_TAB_ID]);
 }
 
 function ensureSystemTab() {
   if (!chatState.tabs[SYSTEM_TAB_ID]) {
     chatState.tabs[SYSTEM_TAB_ID] = {
       goalId: null, label: "System", mode: "system",
-      sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+      sessionId: null,
     };
   }
-  ensureChatTabQueueState(chatState.tabs[SYSTEM_TAB_ID]);
 }
 
 function ensureTerminalTab() {
   if (!chatState.tabs[TERMINAL_TAB_ID]) {
     chatState.tabs[TERMINAL_TAB_ID] = {
       goalId: null, label: "Terminal", mode: "terminal",
-      sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+      sessionId: null,
     };
   }
-  ensureChatTabQueueState(chatState.tabs[TERMINAL_TAB_ID]);
+  normalizeInteractiveTerminalTab(chatState.tabs[TERMINAL_TAB_ID]);
 }
 
 function reorderStandardToolbarTabs() {
   const existing = chatState.tabs || {};
-  for (const tab of Object.values(existing)) ensureChatTabQueueState(tab);
+  for (const tab of Object.values(existing)) {
+    normalizeInteractiveTerminalTab(tab);
+  }
   const ordered = {};
   for (const id of STANDARD_TOOLBAR_TAB_ORDER) {
     if (existing[id]) ordered[id] = existing[id];
@@ -169,38 +189,7 @@ function currentToolbarTab() {
     chatState.activeTabId = "standalone";
     tab = chatState.tabs.standalone;
   }
-  return ensureChatTabQueueState(tab);
-}
-
-function currentChatTab() {
-  const tab = currentToolbarTab();
-  if (!tab || ["files", "system", "terminal", "goal_logs"].includes(tab.mode)) return null;
   return tab;
-}
-
-function ensureChatTabQueueState(tab) {
-  if (!tab) return tab;
-  tab.queuedMessages = normalizeQueuedMessages(tab.queuedMessages);
-  tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages);
-  tab.inputDraft = String(tab.inputDraft || "");
-  tab.starting = !!tab.starting;
-  tab.sending = !!tab.sending;
-  tab.sentUserInput = !!tab.sentUserInput;
-  return tab;
-}
-
-function normalizeQueuedMessages(messages) {
-  if (!Array.isArray(messages)) return [];
-  return messages
-    .filter((message) => message?.internal !== true)
-    .map((message) => ({
-      id: String(message?.id || newLocalQueuedMessageId()),
-      text: String(message?.text || ""),
-      created_at: String(message?.created_at || new Date().toISOString()),
-      updated_at: String(message?.updated_at || message?.created_at || new Date().toISOString()),
-      local: !!message?.local,
-    }))
-    .filter((message) => message.text.trim());
 }
 
 function loadChatStateFromStorage() {
@@ -231,9 +220,7 @@ function loadChatStateFromStorage() {
 }
 
 function saveChatStateToStorage() {
-  // We persist sessionIds too: the runner can keep them alive across page
-  // navigations. On a stale id the next read returns alive=false and we
-  // clear it.
+  // Persist live PTY ids so a page reload can reattach to the daemon session.
   const tabs = {};
   for (const [id, t] of Object.entries(chatState.tabs)) {
       tabs[id] = {
@@ -241,16 +228,12 @@ function saveChatStateToStorage() {
         mode: t.mode || (t.goalId ? "goal" : id === "plan" ? "plan" : "standalone"),
         goalStatus: t.goalStatus || "",
         sessionId: t.sessionId,
-        output: (t.output || "").slice(-50_000),
-        progress: (t.progress || "").slice(-20_000),
-        showProgress: t.showProgress === true,
-        closedReason: t.closedReason,
-        agentResponded: !!t.agentResponded,
-        sentUserInput: !!t.sentUserInput,
-        inputDraft: String(t.inputDraft || "").slice(-50_000),
-        queuedMessages: normalizeQueuedMessages(t.queuedMessages),
-        localQueuedMessages: normalizeQueuedMessages(t.localQueuedMessages),
-        starting: !!t.starting,
+        processId: t.processId || null,
+        provider: t.provider || null,
+        cwd: t.cwd || "",
+        worktree: t.worktree || null,
+        exited: !!t.exited,
+        initialPrompt: String(t.initialPrompt || "").slice(-50_000),
         logEntries: t.mode === "goal_logs"
           ? normalizeGoalLogEntries(t.logEntries).slice(-GOAL_LOG_TAIL_LIMIT)
           : undefined,
@@ -289,9 +272,6 @@ function initToolbar() {
   drawToolbar();
   observeToolbarSize();
   observeTopbarHeight();
-  loadSupervisorAgentState();
-  if (supervisorAgentState.timer) clearInterval(supervisorAgentState.timer);
-  supervisorAgentState.timer = setInterval(loadSupervisorAgentState, 5000);
 }
 
 function initChatDock() { initToolbar(); }
@@ -334,29 +314,21 @@ function resetFilesState() {
 }
 
 function resetTerminalState() {
-  if (terminalEventSource) {
-    terminalEventSource.close();
-    terminalEventSource = null;
+  const stops = [];
+  for (const terminal of terminalStates.values()) {
+    if (terminal.sessionId && terminal.connected) {
+      stops.push(
+        api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/stop`)
+          .catch(() => undefined),
+      );
+    }
+    terminal.eventSource?.close();
+    terminal.term?.dispose();
+    if (terminal.inputFlushTimer) clearTimeout(terminal.inputFlushTimer);
+    if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
   }
-  terminalState.sessionId = "";
-  terminalState.cwd = "";
-  terminalState.display = "";
-  if (terminalState.term) {
-    terminalState.term.dispose();
-    terminalState.term = null;
-  }
-  terminalState.cursor = 0;
-  terminalState.inputBuffer = "";
-  if (terminalState.inputFlushTimer) {
-    clearTimeout(terminalState.inputFlushTimer);
-    terminalState.inputFlushTimer = null;
-  }
-  terminalState.inputSendPromise = Promise.resolve();
-  terminalState.lastSeq = 0;
-  terminalState.loading = false;
-  terminalState.connected = false;
-  terminalState.exited = false;
-  terminalState.error = "";
+  terminalStates.clear();
+  if (stops.length) Promise.allSettled(stops).then(refreshProcessesTabForChatChange);
 }
 
 // Publish the topbar's actual height as --topbar-height on <html> so the
@@ -399,11 +371,8 @@ function observeToolbarSize() {
 
 function observeChatDockSize() { observeToolbarSize(); }
 
-// Opens the dock and (optionally) ensures a tab for a specific goal is active.
-// Wired up by the "Open Chat" button on the goal detail page and by any
-// surviving `#/chat?goal=...` deep links. For goal tabs with no live session,
-// kicks off a chat session immediately so the runner can inject the Goal
-// context into the provider session before the user types.
+// Opens the dock and (optionally) ensures a terminal launch profile for a Goal.
+// The user explicitly starts the configured agent from the tab.
 function openChatDock({ goalId = null, goalStatus = null } = {}) {
   ensureStandaloneTab();
   if (goalId) {
@@ -413,22 +382,17 @@ function openChatDock({ goalId = null, goalStatus = null } = {}) {
         label: `Goal ${goalId.slice(0, 8)}…`,
         mode: "goal",
         goalStatus: goalStatus || "",
-        sessionId: null, output: "", progress: "", showProgress: false,
-        closedReason: null, agentResponded: false, sentUserInput: false,
-        queuedMessages: [], localQueuedMessages: [], starting: false,
+        sessionId: null,
       };
     } else if (goalStatus) {
       chatState.tabs[goalId].goalStatus = goalStatus;
     }
+    normalizeInteractiveTerminalTab(chatState.tabs[goalId]);
     chatState.activeTabId = goalId;
   }
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
-  if (goalId) {
-    const t = chatState.tabs[goalId];
-    if (t && !t.sessionId) startGoalChatSession(t);
-  }
 }
 
 function openToolbarTab(tabId) {
@@ -485,17 +449,9 @@ function ensurePlanTab() {
       label: "Plan",
       mode: "plan",
       sessionId: null,
-      output: "",
-      progress: "",
-      showProgress: false,
-      closedReason: null,
-      agentResponded: false,
-      sentUserInput: false,
-      queuedMessages: [],
-      localQueuedMessages: [],
-      starting: false,
     };
   }
+  normalizeInteractiveTerminalTab(chatState.tabs.plan);
 }
 
 async function openPlanChatDock(options = {}) {
@@ -508,127 +464,11 @@ async function openPlanChatDock(options = {}) {
   saveChatStateToStorage();
   drawToolbar();
   const t = chatState.tabs.plan;
-  if (t && !t.sessionId) {
-    startPlanChatSession(t);
-  }
   if (initialPrompt.trim()) {
-    queueChatTextForTab(t, initialPrompt);
+    t.initialPrompt = initialPrompt.trim();
     saveChatStateToStorage();
     drawToolbar();
-    if (t?.sessionId) flushLocalQueuedMessages(t);
   }
-}
-
-async function startPlanChatSession(tab) {
-  if (!tab || tab.starting || tab.sessionId) return;
-  tab.starting = true;
-  saveChatStateToStorage();
-  applyPendingIndicator(tab);
-  try {
-    const r = await api("POST", "/api/chat/start", { purpose: "plan" });
-    tab.sessionId = r.session_id;
-    tab.closedReason = null;
-    tab.mode = "plan";
-    tab.progress = "";
-    tab.showProgress = false;
-    tab.starting = false;
-    saveChatStateToStorage();
-    refreshProcessesTabForChatChange();
-    await flushLocalQueuedMessages(tab);
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  } catch (e) {
-    tab.starting = false;
-    saveChatStateToStorage();
-    applyPendingIndicator(tab);
-    toast("Could not start plan: " + e.message, "error");
-  }
-}
-
-async function startGoalChatSession(tab) {
-  if (!tab || tab.starting || tab.sessionId) return;
-  tab.starting = true;
-  saveChatStateToStorage();
-  applyPendingIndicator(tab);
-  try {
-    const r = await api("POST", "/api/chat/start", { goal_id: tab.goalId });
-    tab.sessionId = r.session_id;
-    tab.closedReason = null;
-    tab.progress = "";
-    tab.showProgress = false;
-    tab.starting = false;
-    saveChatStateToStorage();
-    refreshProcessesTabForChatChange();
-    await flushLocalQueuedMessages(tab);
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  } catch (e) {
-    tab.starting = false;
-    saveChatStateToStorage();
-    applyPendingIndicator(tab);
-    toast("Could not start chat: " + e.message, "error");
-  }
-}
-
-async function startStandaloneChatSession(tab) {
-  if (!tab || tab.starting || tab.sessionId) return;
-  tab.starting = true;
-  saveChatStateToStorage();
-  applyPendingIndicator(tab);
-  try {
-    const r = await api("POST", "/api/chat/start", {});
-    tab.sessionId = r.session_id;
-    tab.worktree = r.worktree || null;
-    tab.closedReason = null;
-    tab.progress = "";
-    tab.showProgress = false;
-    tab.starting = false;
-    saveChatStateToStorage();
-    refreshProcessesTabForChatChange();
-    await flushLocalQueuedMessages(tab);
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  } catch (e) {
-    tab.starting = false;
-    saveChatStateToStorage();
-    applyPendingIndicator(tab);
-    toast("Could not start chat: " + e.message, "error");
-  }
-}
-
-async function startSupervisorChatSession(tab) {
-  if (!tab || tab.starting || tab.sessionId) return;
-  tab.starting = true;
-  saveChatStateToStorage();
-  applyPendingIndicator(tab);
-  try {
-    const r = await api("POST", "/api/supervisor-agent/session", {});
-    tab.sessionId = r.session_id;
-    tab.closedReason = null;
-    tab.mode = "supervisor";
-    tab.progress = "";
-    tab.showProgress = false;
-    tab.starting = false;
-    saveChatStateToStorage();
-    refreshProcessesTabForChatChange();
-    await flushLocalQueuedMessages(tab);
-    await loadSupervisorAgentState();
-    drawToolbar();
-  } catch (e) {
-    tab.starting = false;
-    tab.closedReason = e.message;
-    saveChatStateToStorage();
-    applyPendingIndicator(tab);
-    toast("Could not start supervisor conversation: " + e.message, "error");
-  }
-}
-
-async function ensureChatSession(tab) {
-  if (!tab || tab.sessionId || tab.starting) return;
-  if (tab.mode === "supervisor") await startSupervisorChatSession(tab);
-  else if (tab.mode === "plan") await startPlanChatSession(tab);
-  else if (tab.goalId) await startGoalChatSession(tab);
-  else await startStandaloneChatSession(tab);
 }
 
 function toggleToolbar() {
@@ -659,70 +499,17 @@ function toggleToolbarFullscreen() {
 
 function toggleChatFullscreen() { toggleToolbarFullscreen(); }
 
-function updateChatInputDraft(input) {
-  if (!input) return;
-  const tabId = String(input.dataset?.chatTabId || chatState.activeTabId || "");
-  const tab = chatState.tabs[tabId];
-  if (tab) tab.inputDraft = String(input.value || "");
-}
-
-function captureToolbarChatInputState(root) {
-  const input = root?.querySelector?.("#chat-input");
-  if (!input) return null;
-  updateChatInputDraft(input);
-  const tabId = String(input.dataset?.chatTabId || "");
-  return {
-    tabId,
-    focused: document.activeElement === input,
-    selectionStart: Number.isInteger(input.selectionStart) ? input.selectionStart : null,
-    selectionEnd: Number.isInteger(input.selectionEnd) ? input.selectionEnd : null,
-    selectionDirection: String(input.selectionDirection || "none"),
-    scrollTop: Number(input.scrollTop || 0),
-  };
-}
-
-function restoreToolbarChatInputState(snapshot, activeTabId) {
-  if (!chatState.open || !snapshot?.focused || snapshot.tabId !== activeTabId) return false;
-  const input = $("#chat-input");
-  if (!input || input.disabled) return false;
-  input.focus();
-  if (typeof input.setSelectionRange === "function"
-      && snapshot.selectionStart !== null
-      && snapshot.selectionEnd !== null) {
-    input.setSelectionRange(
-      snapshot.selectionStart,
-      snapshot.selectionEnd,
-      snapshot.selectionDirection,
-    );
-  }
-  input.scrollTop = snapshot.scrollTop;
-  return true;
-}
-
 function drawToolbar() {
   const root = $("#toolbar-dock");
   if (!root) return;
-  const inputRenderState = captureToolbarChatInputState(root);
   ensureStandaloneTab();
   const active = currentToolbarTab();
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
   const filesActive = active.mode === "files";
   const systemActive = active.mode === "system";
-  const terminalActive = active.mode === "terminal";
+  const terminalActive = toolbarTabUsesTerminal(active);
   const goalLogsActive = active.mode === "goal_logs";
-  const supervisorActive = active.mode === "supervisor";
-  const hasSession = !!active.sessionId;
-
-  const startLabel = active.goalId
-    ? `Start attached to Goal ${active.goalId.slice(0, 10)}…`
-    : active.mode === "plan"
-      ? "Start plan"
-    : "Start standalone";
-  const toggleLabel = hasSession
-    ? (active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
-    : startLabel;
-  const toggleClass = hasSession ? "danger" : "";
 
   root.classList.toggle("open", !!chatState.open);
   root.classList.toggle("fullscreen", !!chatState.fullscreen);
@@ -760,7 +547,7 @@ function drawToolbar() {
               aria-label="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}"
               title="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}">▾</button>
     </div>
-    <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}${supervisorActive ? " supervisor-toolbar-body" : ""}"
+    <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}"
          data-testid="toolbar-body"
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       ${filesActive
@@ -768,34 +555,17 @@ function drawToolbar() {
         : systemActive
           ? renderSystemPanel()
           : terminalActive
-            ? renderTerminalPanel()
+            ? renderTerminalPanel(active)
             : goalLogsActive
               ? renderGoalLogPanel(active)
-            : supervisorActive
-              ? renderSupervisorPanel(active, {
-                  toggleClass,
-                  toggleLabel,
-                  hasSession,
-                  showSessionToggle: false,
-                })
-              : renderChatPanel(active, {
-                  toggleClass,
-                  toggleLabel,
-                  hasSession,
-                })}
+              : `<div class="muted">This legacy toolbar tab is no longer available. Open its Terminal profile instead.</div>`}
     </div>
   `;
-  if (!filesActive && !systemActive && !terminalActive && !goalLogsActive) applyPendingIndicator(active);
   if (filesActive) bindFilesPanel(root);
   if (systemActive) bindSystemPanel(root);
-  if (terminalActive) bindTerminalPanel(root);
+  if (terminalActive) bindTerminalPanel(root, active);
   if (goalLogsActive) bindGoalLogPanel(root, active);
 
-  if (chatState.open && !filesActive && !systemActive && !terminalActive && !goalLogsActive) {
-    const scroller = chatTranscriptScroller(active, root);
-    if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    if (active.goalId && !active.goalStatus) refreshGoalChatStatus(active.goalId);
-  }
   if (chatState.open && goalLogsActive) {
     const out = root.querySelector("#goal-log-tail");
     if (out) scrollGoalLogEdge(active, out);
@@ -827,40 +597,14 @@ function drawToolbar() {
   });
   $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
-  if (!filesActive && !systemActive && !terminalActive && !goalLogsActive) {
-    $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
-    $("#btn-plan-draft-goal")?.addEventListener("click", draftGoalFromPlan);
-    $("#btn-plan-draft")?.addEventListener("click", draftGoalsFromPlan);
-    $("#btn-standalone-draft-goal")?.addEventListener("click", draftGoalFromStandaloneChat);
-    $("#btn-standalone-submit-merge")?.addEventListener("click", submitStandaloneChatForMerge);
-    $("#btn-goal-round-extract")?.addEventListener("click", extractRoundFromGoalChat);
-    $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
-    $("#chat-activity-toggle")?.addEventListener("click", toggleChatProgress);
-    $("#chat-input")?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendChatLine();
-      }
-    });
-    $("#btn-chat-send")?.addEventListener("click", sendChatLine);
-    $("#chat-input")?.addEventListener("input", (e) => {
-      updateChatInputDraft(e.currentTarget);
-      resizeChatInput(e.currentTarget);
-    });
-    resizeChatInput($("#chat-input"));
-    const inputRestored = restoreToolbarChatInputState(inputRenderState, activeId);
-    if (!inputRestored && shouldKeepChatInputFocused()) focusChatInputSoon();
-  }
 
   wireToolbarResize(root);
   if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
     loadFilesDirectory("", { expand: true, redraw: true });
   }
-  if (terminalActive && !terminalState.loading && !terminalState.sessionId && !terminalState.error) {
-    startTerminalSession();
-  }
   if (terminalActive) {
-    focusTerminalSoon();
+    connectTerminalEvents(active);
+    focusTerminalSoon(active);
   }
   if (goalLogsActive && !active.logsLoaded && !active.logsLoading) {
     loadGoalLogTail(active);
@@ -870,133 +614,42 @@ function drawToolbar() {
 function drawChatDock() { drawToolbar(); }
 
 function toolbarTabTitle(tab) {
-  if (tab.mode === "supervisor") return "Supervisor agent health and conversation";
+  if (tab.mode === "supervisor") return "Supervisor agent terminal";
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
-  if (tab.mode === "terminal") return "Terminal";
+  if (toolbarTabUsesTerminal(tab)) return `${tab.label} terminal`;
   if (tab.mode === "goal_logs") return `Live logs for Goal ${tab.goalId}`;
-  return tab.goalId || "Standalone chat";
+  return tab.goalId || tab.label || "Toolbar";
 }
 
 function toolbarTabHasSessionIndicator(tab) {
-  return !!(tab && (tab.sessionId || tab.starting) && !["files", "system", "terminal", "goal_logs"].includes(tab.mode));
+  return toolbarTabUsesTerminal(tab) && !!(tab.sessionId && !tab.exited);
 }
 
 function toolbarTabActivityClass(tab) {
-  if (!toolbarTabHasSessionIndicator(tab)) return "";
-  return chatActivityIsPulsing(tab) ? "toolbar-tab-working" : "toolbar-tab-ready";
+  return toolbarTabHasSessionIndicator(tab) ? "toolbar-tab-ready" : "";
 }
 
 function toolbarTabSessionDot(tab) {
   if (!toolbarTabHasSessionIndicator(tab)) return "";
-  const title = chatActivityIsPulsing(tab) ? "agent working" : "active session";
-  return ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="${title}"></span>`;
-}
-
-function syncToolbarTabActivityIndicators() {
-  const root = $("#toolbar-dock");
-  if (!root) return;
-  $$(".toolbar-tab", root).forEach((el) => {
-    const tab = chatState.tabs[el.dataset.tabId || ""];
-    const stateClass = toolbarTabActivityClass(tab);
-    const hasIndicator = toolbarTabHasSessionIndicator(tab);
-    el.classList.toggle("toolbar-tab-working", stateClass === "toolbar-tab-working");
-    el.classList.toggle("toolbar-tab-ready", stateClass === "toolbar-tab-ready");
-    let dot = el.querySelector(".toolbar-tab-dot");
-    if (!hasIndicator) {
-      dot?.remove();
-      return;
-    }
-    if (!dot) {
-      dot = document.createElement("span");
-      dot.className = "toolbar-tab-dot";
-      dot.dataset.testid = "toolbar-tab-dot";
-      el.insertBefore(dot, el.querySelector(".toolbar-tab-close"));
-    }
-    if (dot) {
-      dot.title = chatActivityIsPulsing(tab) ? "agent working" : "active session";
-    }
-  });
-}
-
-function renderSupervisorPanel(active, chatOptions) {
-  return `
-    <section class="supervisor-agent-panel" data-testid="toolbar-supervisor-panel">
-      ${renderSupervisorAgentStatus()}
-    </section>
-    <div class="supervisor-agent-conversation" data-testid="supervisor-agent-conversation">
-      ${renderChatPanel(active, chatOptions)}
-    </div>`;
-}
-
-function renderSupervisorAgentStatus() {
-  const state = supervisorAgentState.snapshot;
-  const health = String(state?.health || (supervisorAgentState.error ? "unavailable" : "unknown"));
-  const lifecycle = String(state?.lifecycle || (supervisorAgentState.loading ? "loading" : "unknown"));
-  return `
-    <div class="supervisor-agent-summary" data-testid="supervisor-agent-summary">
-      <span class="supervisor-agent-health supervisor-agent-health-${htmlEscape(health)}"
-            data-testid="supervisor-agent-health">${htmlEscape(health)}</span>
-      <strong data-testid="supervisor-agent-lifecycle">${htmlEscape(lifecycle)}</strong>
-      <span>${Number(state?.active_work || 0)} active</span>
-      <span>${Number(state?.queued_work || 0)} queued</span>
-      <span>${Number(state?.failed_work || 0)} failed</span>
-      <span class="muted small">${htmlEscape(state?.supervisor_process || "daemon-supervised workflow runner")}</span>
-      <span class="spacer"></span>
-      <span class="muted small" title="${htmlEscape(state?.updated_at || "")}">${htmlEscape(supervisorAgentUpdatedLabel(state?.updated_at))}</span>
-    </div>
-    ${supervisorAgentState.error ? `
-      <div class="supervisor-agent-error" data-testid="supervisor-agent-error">
-        ${htmlEscape(supervisorAgentState.error)}
-      </div>` : ""}`;
-}
-
-function refreshSupervisorAgentStatus() {
-  const root = $("#toolbar-dock");
-  const panel = root?.querySelector('[data-testid="toolbar-supervisor-panel"]');
-  if (!panel) return false;
-  panel.innerHTML = renderSupervisorAgentStatus();
-  return true;
-}
-
-function supervisorAgentUpdatedLabel(updatedAt) {
-  if (!updatedAt) return "Not observed yet";
-  const parsed = new Date(updatedAt);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return `Updated ${parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  return ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="active session"></span>`;
 }
 
 async function loadSupervisorAgentState() {
   if (supervisorAgentState.loading || !state.project?.attached) return;
   supervisorAgentState.loading = true;
-  let conversationChanged = false;
   try {
     const response = await api("GET", "/api/supervisor-agent");
     const snapshot = response?.supervisor_agent || null;
     supervisorAgentState.snapshot = snapshot;
     recordSupervisorAgentEvents(snapshot?.events);
     supervisorAgentState.error = "";
-    ensureSupervisorTab();
-    const tab = chatState.tabs[SUPERVISOR_TAB_ID];
-    const serverSessionId = String(snapshot?.session_id || "");
-    if (serverSessionId && tab.sessionId !== serverSessionId) {
-      tab.sessionId = serverSessionId;
-      tab.closedReason = null;
-      saveChatStateToStorage();
-      conversationChanged = true;
-    } else if (!serverSessionId && tab.sessionId && !tab.starting && !tab.pending) {
-      tab.sessionId = null;
-      saveChatStateToStorage();
-      conversationChanged = true;
-    }
   } catch (error) {
     supervisorAgentState.error = error.message || String(error);
   } finally {
     supervisorAgentState.loading = false;
   }
-  if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) {
-    if (conversationChanged || !refreshSupervisorAgentStatus()) drawToolbar();
-  } else if (chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
+  if (chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
     drawToolbar();
   }
 }
@@ -1019,202 +672,6 @@ function recordSupervisorAgentEvents(events) {
       details,
     }, false);
   }
-}
-
-function renderChatPanel(active, {
-  toggleClass,
-  toggleLabel,
-  showSessionToggle = true,
-}) {
-  const inputPlaceholder = chatInputPlaceholder(active);
-  const queuedMessages = allQueuedMessages(active);
-  const standaloneWorktreePath = active.mode === "standalone" && active.worktree?.path
-    ? String(active.worktree.path)
-    : "";
-  return `
-      <div class="actions" style="margin-bottom:10px">
-        ${showSessionToggle ? `
-          <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>` : ""}
-        ${active.mode === "plan" ? `
-          <button id="btn-plan-draft-goal" class="secondary" data-testid="plan-draft-goal"
-                  ${planHasAgentResponse(active) ? "" : "disabled"}>
-            Draft Goal
-          </button>
-          <button id="btn-plan-draft" class="secondary" data-testid="plan-draft"
-                  ${planHasAgentResponse(active) ? "" : "disabled"}>
-            Draft Feature
-          </button>` : ""}
-        ${active.mode === "standalone" ? `
-          <button id="btn-standalone-draft-goal" class="secondary" data-testid="standalone-draft-goal"
-                  ${standaloneChatCanDraftGoal(active) ? "" : "disabled"}>
-            Draft Goal
-          </button>
-          <button id="btn-standalone-submit-merge" class="secondary" data-testid="standalone-submit-merge"
-                  ${standaloneChatCanSubmitReadyMerge(active) ? "" : "disabled"}>
-            Submit Worktree
-          </button>` : ""}
-        ${active.goalId ? `
-          <button id="btn-goal-round-extract" class="secondary" data-testid="goal-draft-round"
-                  ${goalChatCanExtractRound(active) ? "" : "disabled"}>
-            Draft Round
-          </button>` : ""}
-        <button id="btn-chat-clear" class="secondary" data-testid="chat-clear"
-                ${(active.output || active.progress || active.sessionId || queuedMessages.length) ? "" : "disabled"}>
-          Clear history
-        </button>
-        ${active.goalId ? `
-          <a id="chat-goal-link" class="chat-goal-link"
-             data-testid="chat-goal-link"
-             href="#/goals/${encodeURIComponent(active.goalId)}"
-             title="Open Goal ${htmlEscape(active.goalId)}">
-            Goal ${htmlEscape(active.goalId.slice(0, 10))}…
-          </a>` : ""}
-        <span class="spacer"></span>
-      </div>
-      ${standaloneWorktreePath ? `
-        <div class="muted small" style="margin:-4px 0 8px" data-testid="standalone-worktree-path">
-          Worktree: <code>${htmlEscape(standaloneWorktreePath)}</code>
-        </div>` : ""}
-      <div class="chat-output-box">
-        <div id="chat-output" class="chat-output" data-testid="chat-output">${renderChatOutput(active)}</div>
-      </div>
-      <div class="actions" style="margin-top:8px">
-        <div class="chat-input-wrap">
-          <textarea id="chat-input"
-                    data-testid="chat-input"
-                    data-chat-tab-id="${htmlEscape(chatState.activeTabId)}"
-                    rows="2"
-                    placeholder="${htmlEscape(inputPlaceholder)}">${htmlEscape(active.inputDraft || "")}</textarea>
-        </div>
-        <button id="btn-chat-send" class="primary" data-testid="chat-send" ${active.sending ? "disabled" : ""}>Send</button>
-      </div>
-    `;
-}
-
-function renderChatOutput(tab) {
-  const queuedMessages = allQueuedMessages(tab);
-  const transcript = tab?.mode === "plan"
-    && !String(tab.output || "").trim()
-    && !queuedMessages.length
-    ? mdToHtml("What do you want to design together?")
-    : mdToHtml(visibleChatTranscript(tab));
-  return transcript
-    + renderPendingChatMessages(queuedMessages)
-    + renderInlineChatActivity(tab)
-    + renderChatContentStatus(tab);
-}
-
-function visibleChatTranscript(tab) {
-  const output = String(tab?.output || "");
-  if (tab?.mode !== "supervisor") return output;
-  const lines = output.split(/\r?\n/);
-  const visible = [];
-  let internalContext = false;
-  for (const line of lines) {
-    const normalized = line.replace(/^>\s*/, "");
-    const startsInternalContext = normalized.startsWith(
-      "Supervise until the queue is idle using the evidence and Refine's tools.",
-    ) || normalized.startsWith("The workflow evidence changed.");
-    if (startsInternalContext) {
-      if (visible.at(-1)?.replace(/^>\s*/, "").match(/^Message \d+:$/)) visible.pop();
-      internalContext = true;
-      continue;
-    }
-    if (internalContext) {
-      if (normalized.startsWith("Actionable stall/loss evidence:")) internalContext = false;
-      continue;
-    }
-    visible.push(line);
-  }
-  return visible.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-
-function chatTranscriptScroller(tab, root = document) {
-  return tab?.mode === "supervisor"
-    ? root.querySelector(".chat-output-box")
-    : root.querySelector("#chat-output");
-}
-
-function allQueuedMessages(tab) {
-  return [
-    ...normalizeQueuedMessages(tab?.localQueuedMessages).map((message) => ({ ...message, local: true })),
-    ...normalizeQueuedMessages(tab?.queuedMessages).map((message) => ({ ...message, local: false })),
-  ];
-}
-
-function renderPendingChatMessages(messages) {
-  if (!messages.length) return "";
-  return `
-    <div class="chat-pending-messages" data-testid="chat-pending-messages">
-      ${messages.map((message) => `
-        <blockquote class="chat-pending-message" data-testid="chat-pending-message">
-          <div class="chat-pending-message-text">${mdToHtml(message.text)}</div>
-          <div class="chat-pending-message-status muted small" role="status">
-            <span class="chat-pending-dot" aria-hidden="true"></span>
-            <span>Pending</span>
-          </div>
-        </blockquote>`).join("")}
-    </div>`;
-}
-
-function renderInlineChatActivity(tab) {
-  const progressText = tab?.progress || "";
-  const hasActivity = !!(tab?.sessionId || progressText);
-  if (!hasActivity) return "";
-  const showProgress = tab?.showProgress === true;
-  const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
-  return `
-    <div class="chat-inline-activity" data-testid="chat-inline-activity">
-      <button type="button"
-              id="chat-activity-toggle"
-              class="chat-activity-toggle"
-              data-testid="chat-activity-toggle"
-              aria-expanded="${showProgress ? "true" : "false"}"
-              title="${htmlEscape(progressToggleLabel)}">
-        <span id="chat-activity-label" data-testid="chat-activity-label">${htmlEscape(chatActivityLabel(tab))}</span>
-        <span class="chat-activity-chevron" aria-hidden="true">
-          ${toolbarIcon(showProgress ? "collapse" : "expand")}
-        </span>
-      </button>
-      <div id="chat-progress-panel" class="chat-progress-panel" data-testid="chat-progress-panel" ${showProgress ? "" : "hidden"}>
-        <div id="chat-progress" class="chat-progress" data-testid="chat-progress">${renderChatProgress(progressText)}</div>
-      </div>
-    </div>`;
-}
-
-function renderChatContentStatus(tab) {
-  return `
-    <div id="chat-status"
-         class="chat-content-status muted small${chatActivityIsPulsing(tab) ? " chat-status-working" : ""}"
-         data-testid="chat-status">
-      ${chatActivityIsPulsing(tab) ? `
-        <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>` : ""}
-      <span>${htmlEscape(chatStatusLine(tab))}</span>
-    </div>`;
-}
-
-function renderChatProgress(text) {
-  const lines = String(text || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(-80);
-  if (!lines.length) {
-    return `<div class="chat-progress-empty">Waiting for activity.</div>`;
-  }
-  return lines.map((line) => `
-    <div class="chat-progress-line">${htmlEscape(line)}</div>
-  `).join("");
-}
-
-function resizeChatInput(input) {
-  if (!input) return;
-  input.style.height = "auto";
-  const max = 120;
-  const next = Math.min(max, Math.max(42, input.scrollHeight || 42));
-  input.style.height = `${next}px`;
 }
 
 function normalizeGoalLogEntries(entries) {
@@ -1683,20 +1140,35 @@ function toolbarIcon(name) {
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
 }
 
-function renderTerminalPanel() {
-  const status = terminalState.loading
-    ? "Starting shell..."
-    : terminalState.error
-      ? terminalState.error
-      : terminalState.exited
-        ? "Shell exited."
-        : terminalState.connected
-          ? terminalState.cwd || "Shell active."
-          : "Connecting...";
+function renderTerminalPanel(tab) {
+  const terminal = terminalStateFor(chatState.activeTabId);
+  const role = tab.mode === "terminal" ? "shell" : `${tab.label} agent`;
+  const status = terminal?.loading
+    ? `Starting ${role}...`
+    : terminal?.error
+      ? terminal.error
+      : terminal?.exited
+        ? `${role} exited.`
+        : terminal?.connected
+          ? terminal.cwd || `${role} active.`
+          : `${role} stopped.`;
+  const action = terminal?.loading
+    ? `<button type="button" class="secondary" data-terminal-action disabled>Starting…</button>`
+    : terminal?.connected
+      ? `<button type="button" class="danger" data-terminal-action="stop" data-testid="terminal-stop">Stop</button>`
+      : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${terminal?.exited ? "Restart" : "Start"}</button>`;
+  const provider = tab.provider ? ` · ${htmlEscape(tab.provider)}` : "";
+  const worktree = tab.worktree?.path
+    ? `<span class="muted small" data-testid="terminal-worktree"> · Worktree: <code>${htmlEscape(tab.worktree.path)}</code></span>`
+    : "";
   return `
     <div class="terminal-panel" data-testid="toolbar-terminal-panel">
       <div class="terminal-titlebar">
         <span class="muted small" data-testid="terminal-status">${htmlEscape(status)}</span>
+        <span class="muted small" data-testid="terminal-profile">${htmlEscape(tab.label)}${provider}</span>
+        ${worktree}
+        <span class="spacer"></span>
+        ${action}
       </div>
       <div class="terminal-output"
            data-testid="terminal-output"
@@ -1707,90 +1179,160 @@ function renderTerminalPanel() {
     </div>`;
 }
 
-function bindTerminalPanel(root) {
+function bindTerminalPanel(root, tab) {
   const output = root.querySelector(".terminal-output");
   output?.addEventListener("focus", () => output.classList.add("focused"));
   output?.addEventListener("blur", () => output.classList.remove("focused"));
-  ensureTerminalRenderer(output);
+  ensureTerminalRenderer(output, tab);
+  root.querySelector('[data-terminal-action="start"]')?.addEventListener("click", () => startTerminalSession(tab));
+  root.querySelector('[data-terminal-action="stop"]')?.addEventListener("click", () => stopTerminalSession(tab));
 }
 
-async function startTerminalSession() {
-  terminalState.loading = true;
-  terminalState.error = "";
+async function startTerminalSession(tab = currentToolbarTab()) {
+  if (!toolbarTabUsesTerminal(tab)) return;
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
+  const terminal = terminalStateFor(tabId);
+  if (!terminal || terminal.loading || terminal.connected) return;
+  terminal.loading = true;
+  terminal.error = "";
   drawToolbar();
   try {
     const size = terminalSize();
-    const result = await api("POST", "/api/terminal/session", size);
-    terminalState.sessionId = result.id || "";
-    terminalState.cwd = result.cwd || "";
-    terminalState.connected = !!terminalState.sessionId;
-    terminalState.exited = false;
-    terminalState.lastSeq = 0;
-    connectTerminalEvents();
-    terminalState.loading = false;
+    const result = await api("POST", "/api/terminal/session", {
+      ...size,
+      profile: tab.mode,
+      goal_id: tab.goalId || undefined,
+      feature_id: tab.featureId || undefined,
+      initial_prompt: tab.initialPrompt || undefined,
+      worktree: tab.mode === "standalone" ? tab.worktree || undefined : undefined,
+    });
+    terminal.eventSource?.close();
+    terminal.term?.dispose();
+    terminal.term = null;
+    terminal.display = "";
+    terminal.sessionId = result.id || "";
+    terminal.processId = result.process_id || "";
+    terminal.cwd = result.cwd || "";
+    terminal.connected = !!terminal.sessionId;
+    terminal.exited = false;
+    terminal.lastSeq = 0;
+    terminal.lastCols = size.cols;
+    terminal.lastRows = size.rows;
+    terminal.loading = false;
+    tab.sessionId = terminal.sessionId;
+    tab.processId = terminal.processId;
+    tab.cwd = terminal.cwd;
+    tab.provider = result.provider || null;
+    tab.worktree = result.worktree || null;
+    tab.exited = false;
+    saveChatStateToStorage();
+    connectTerminalEvents(tab);
+    refreshProcessesTabForChatChange();
     drawToolbar();
-    focusTerminalSoon();
+    focusTerminalSoon(tab);
   } catch (e) {
-    terminalState.loading = false;
-    terminalState.error = e.message || String(e);
+    terminal.loading = false;
+    terminal.error = e.message || String(e);
     drawToolbar();
   }
 }
 
-function connectTerminalEvents() {
-  if (terminalEventSource) terminalEventSource.close();
-  if (!terminalState.sessionId) return;
-  terminalEventSource = new EventSource(`/api/terminal/${encodeURIComponent(terminalState.sessionId)}/events`);
-  terminalEventSource.addEventListener("terminal_output", handleTerminalEvent);
-  terminalEventSource.addEventListener("terminal_error", (event) => {
-    handleTerminalEvent(event);
-    terminalState.error = "Terminal stream error.";
+async function stopTerminalSession(tab = currentToolbarTab()) {
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
+  const terminal = terminalStateFor(tabId);
+  if (!terminal?.sessionId || terminal.loading) return;
+  terminal.loading = true;
+  terminal.error = "";
+  drawToolbar();
+  try {
+    await api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/stop`);
+    terminal.connected = false;
+    terminal.exited = true;
+    terminal.loading = false;
+    if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
+    terminal.resizeTimer = null;
+    terminal.eventSource?.close();
+    terminal.eventSource = null;
+    tab.exited = true;
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
     drawToolbar();
-  });
-  terminalEventSource.addEventListener("terminal_exit", (event) => {
-    handleTerminalEvent(event);
-    terminalState.exited = true;
-    terminalState.connected = false;
-    if (terminalEventSource) {
-      terminalEventSource.close();
-      terminalEventSource = null;
-    }
+  } catch (e) {
+    terminal.loading = false;
+    terminal.error = e.message || String(e);
     drawToolbar();
+  }
+}
+
+function connectTerminalEvents(tab = currentToolbarTab()) {
+  if (!toolbarTabUsesTerminal(tab)) return;
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
+  const terminal = terminalStateFor(tabId);
+  if (!terminal?.sessionId || terminal.exited || terminal.eventSource) return;
+  const source = new EventSource(`/api/terminal/${encodeURIComponent(terminal.sessionId)}/events`);
+  terminal.eventSource = source;
+  source.addEventListener("terminal_output", (event) => handleTerminalEvent(event, terminal));
+  source.addEventListener("terminal_error", (event) => {
+    handleTerminalEvent(event, terminal);
+    terminal.error = "Terminal stream error.";
+    if (chatState.activeTabId === tabId) drawToolbar();
   });
-  terminalEventSource.onerror = () => {
-    if (!terminalState.exited) {
-      terminalState.error = "Terminal connection lost.";
-      drawToolbar();
+  source.addEventListener("terminal_exit", (event) => {
+    handleTerminalEvent(event, terminal);
+    terminal.exited = true;
+    terminal.connected = false;
+    if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
+    terminal.resizeTimer = null;
+    terminal.eventSource?.close();
+    terminal.eventSource = null;
+    tab.exited = true;
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
+    if (chatState.activeTabId === tabId) drawToolbar();
+  });
+  source.onerror = () => {
+    if (!terminal.exited) {
+      terminal.error = "Terminal connection lost. Restart the session to continue.";
+      terminal.connected = false;
+      terminal.exited = true;
+      terminal.eventSource?.close();
+      terminal.eventSource = null;
+      tab.exited = true;
+      saveChatStateToStorage();
+      if (chatState.activeTabId === tabId) drawToolbar();
     }
   };
 }
 
-function handleTerminalEvent(event) {
+function handleTerminalEvent(event, terminal = terminalStateFor()) {
+  if (!terminal) return;
   try {
     const payload = JSON.parse(event.data || "{}");
     const seq = Number(payload.seq || 0);
-    if (seq && seq <= terminalState.lastSeq) return;
-    if (seq) terminalState.lastSeq = seq;
-    terminalReceiveOutput(payload.data || "");
+    if (seq && seq <= terminal.lastSeq) return;
+    if (seq) terminal.lastSeq = seq;
+    terminalReceiveOutput(payload.data || "", terminal);
   } catch {
-    terminalReceiveOutput(event.data || "");
+    terminalReceiveOutput(event.data || "", terminal);
   }
 }
 
 function handleTerminalKeydown(e) {
-  if (!terminalState.sessionId || terminalState.exited) return;
+  const terminal = terminalStateFor();
+  if (!terminal?.sessionId || terminal.exited) return;
   const data = terminalKeyData(e);
   if (data == null) return;
   e.preventDefault();
-  queueTerminalInput(data);
+  queueTerminalInput(data, terminal);
 }
 
 function handleTerminalPaste(e) {
-  if (!terminalState.sessionId || terminalState.exited) return;
+  const terminal = terminalStateFor();
+  if (!terminal?.sessionId || terminal.exited) return;
   const text = e.clipboardData?.getData("text/plain") || "";
   if (!text) return;
   e.preventDefault();
-  queueTerminalInput(text.replace(/\r?\n/g, "\r"));
+  queueTerminalInput(text.replace(/\r?\n/g, "\r"), terminal);
 }
 
 function terminalKeyData(e) {
@@ -1819,55 +1361,62 @@ function terminalKeyData(e) {
   return null;
 }
 
-function queueTerminalInput(data) {
-  terminalState.inputBuffer += data;
-  if (terminalState.inputFlushTimer) return;
-  terminalState.inputFlushTimer = setTimeout(flushTerminalInput, 12);
+function queueTerminalInput(data, terminal = terminalStateFor()) {
+  if (!terminal) return;
+  terminal.inputBuffer += data;
+  if (terminal.inputFlushTimer) return;
+  terminal.inputFlushTimer = setTimeout(() => flushTerminalInput(terminal), 12);
 }
 
-function flushTerminalInput() {
-  const data = terminalState.inputBuffer;
-  terminalState.inputBuffer = "";
-  terminalState.inputFlushTimer = null;
-  if (!data || !terminalState.sessionId) return;
-  const sessionId = terminalState.sessionId;
-  terminalState.inputSendPromise = terminalState.inputSendPromise
+function flushTerminalInput(terminal = terminalStateFor()) {
+  if (!terminal) return;
+  const data = terminal.inputBuffer;
+  terminal.inputBuffer = "";
+  terminal.inputFlushTimer = null;
+  if (!data || !terminal.sessionId) return;
+  const sessionId = terminal.sessionId;
+  terminal.inputSendPromise = terminal.inputSendPromise
     .catch(() => undefined)
     .then(async () => {
       try {
         await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/input`, { data });
       } catch (e) {
-        terminalState.error = e.message || String(e);
+        terminal.error = e.message || String(e);
         drawToolbar();
       }
     });
 }
 
-function terminalReceiveOutput(text) {
+function terminalReceiveOutput(text, terminal = terminalStateFor()) {
+  if (!terminal) return;
   if (text) {
-    terminalState.display = `${terminalState.display || ""}${text}`;
-    if (terminalState.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
-      terminalState.display = terminalState.display.slice(-TERMINAL_OUTPUT_MAX_CHARS);
+    terminal.display = `${terminal.display || ""}${text}`;
+    if (terminal.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
+      terminal.display = terminal.display.slice(-TERMINAL_OUTPUT_MAX_CHARS);
     }
   }
-  if (terminalState.term) {
-    terminalState.term.write(text || "");
+  if (terminal.term) {
+    terminal.term.write(text || "");
   }
-  scrollTerminalOutputToEnd();
+  scrollTerminalOutputToEnd(terminal);
 }
 
-function ensureTerminalRenderer(output) {
+function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   if (!output || !window.Terminal) return;
-  if (terminalState.term?.element) {
-    if (!output.contains(terminalState.term.element)) {
-      output.replaceChildren(terminalState.term.element);
+  const terminal = terminalStateFor(
+    Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId,
+  );
+  if (!terminal) return;
+  if (terminal.term?.element) {
+    if (!output.contains(terminal.term.element)) {
+      output.replaceChildren(terminal.term.element);
     }
-    resizeTerminalRenderer(output);
+    resizeTerminalRenderer(output, terminal);
     return;
   }
-  if (terminalState.term) {
-    terminalState.term.dispose();
-    terminalState.term = null;
+  if (terminal.term) {
+    terminal.term.dispose();
+    terminal.term = null;
   }
   const size = terminalSize(output);
   const term = new window.Terminal({
@@ -1903,89 +1452,42 @@ function ensureTerminalRenderer(output) {
     },
   });
   term.open(output);
-  if (terminalState.display) term.write(terminalState.display);
-  term.onData((data) => queueTerminalInput(data));
-  terminalState.term = term;
-  resizeTerminalRenderer(output);
+  if (terminal.display) term.write(terminal.display);
+  term.onData((data) => queueTerminalInput(data, terminal));
+  terminal.term = term;
+  resizeTerminalRenderer(output, terminal);
 }
 
-function resizeTerminalRenderer(output = document.querySelector(".terminal-output")) {
-  if (!terminalState.term || typeof terminalState.term.resize !== "function") return;
+function resizeTerminalRenderer(
+  output = document.querySelector(".terminal-output"),
+  terminal = terminalStateFor(),
+) {
+  if (!terminal?.term || typeof terminal.term.resize !== "function") return;
   const size = terminalSize(output);
   try {
-    terminalState.term.resize(size.cols, size.rows);
+    terminal.term.resize(size.cols, size.rows);
   } catch {}
+  scheduleTerminalResize(terminal, size);
 }
 
-function terminalApplyOutput(text) {
-  for (let index = 0; index < text.length; index += 1) {
-    const ch = text[index];
-    if (ch === "\x1b") {
-      const consumed = terminalApplyEscape(text.slice(index));
-      if (consumed > 0) {
-        index += consumed - 1;
-        continue;
-      }
+function scheduleTerminalResize(terminal, size) {
+  if (!terminal?.connected || !terminal.sessionId) return;
+  if (terminal.lastCols === size.cols && terminal.lastRows === size.rows) return;
+  terminal.lastCols = size.cols;
+  terminal.lastRows = size.rows;
+  if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
+  terminal.resizeTimer = setTimeout(async () => {
+    terminal.resizeTimer = null;
+    try {
+      await api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/resize`, {
+        cols: terminal.lastCols,
+        rows: terminal.lastRows,
+      });
+    } catch (error) {
+      terminal.error = error.message || String(error);
+      if (chatState.activeTabId === terminal.tabId) drawToolbar();
     }
-    if (ch === "\r") {
-      terminalState.cursor = terminalLineStart();
-    } else if (ch === "\n") {
-      terminalInsert("\n");
-    } else if (ch === "\b" || ch === "\x7f") {
-      terminalBackspace();
-    } else if (ch >= " " || ch === "\t") {
-      terminalInsert(ch);
-    }
-  }
-  if (terminalState.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
-    const excess = terminalState.display.length - TERMINAL_OUTPUT_MAX_CHARS;
-    terminalState.display = terminalState.display.slice(excess);
-    terminalState.cursor = Math.max(0, terminalState.cursor - excess);
-  }
-}
-
-function terminalApplyEscape(text) {
-  const match = /^\x1b\[(\??[0-9;]*)([A-Za-z~])/.exec(text);
-  if (!match) return 0;
-  const params = match[1] || "";
-  const final = match[2];
-  const first = parseInt(params.replace(/^\?/, "").split(";")[0] || "1", 10) || 1;
-  if (final === "K") {
-    const end = terminalLineEnd();
-    terminalState.display = terminalState.display.slice(0, terminalState.cursor) + terminalState.display.slice(end);
-  } else if (final === "G") {
-    terminalState.cursor = Math.min(terminalLineStart() + Math.max(0, first - 1), terminalLineEnd());
-  } else if (final === "C") {
-    terminalState.cursor = Math.min(terminalState.cursor + first, terminalLineEnd());
-  } else if (final === "D") {
-    terminalState.cursor = Math.max(terminalState.cursor - first, terminalLineStart());
-  }
-  return match[0].length;
-}
-
-function terminalInsert(ch) {
-  const before = terminalState.display.slice(0, terminalState.cursor);
-  const after = terminalState.display.slice(terminalState.cursor);
-  terminalState.display = before + ch + after;
-  terminalState.cursor += ch.length;
-}
-
-function terminalBackspace() {
-  const start = terminalLineStart();
-  if (terminalState.cursor <= start) return;
-  terminalState.display =
-    terminalState.display.slice(0, terminalState.cursor - 1) +
-    terminalState.display.slice(terminalState.cursor);
-  terminalState.cursor -= 1;
-}
-
-function terminalLineStart() {
-  return terminalState.display.lastIndexOf("\n", Math.max(0, terminalState.cursor - 1)) + 1;
-}
-
-function terminalLineEnd() {
-  const next = terminalState.display.indexOf("\n", terminalState.cursor);
-  return next === -1 ? terminalState.display.length : next;
+  }, 80);
 }
 
 function terminalSize(output = document.querySelector(".terminal-output")) {
@@ -1999,23 +1501,27 @@ function terminalSize(output = document.querySelector(".terminal-output")) {
   };
 }
 
-function focusTerminalSoon() {
-  requestAnimationFrame(() => {
+function focusTerminalSoon(tab = currentToolbarTab()) {
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
+  const terminal = terminalStateFor(tabId);
+  const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
+  schedule(() => {
     const output = document.querySelector(".terminal-output");
-    if (terminalState.term) {
-      terminalState.term.focus();
+    if (terminal?.term) {
+      terminal.term.focus();
     } else if (output && document.activeElement !== output) {
       output.focus({ preventScroll: true });
     }
   });
 }
 
-function scrollTerminalOutputToEnd() {
-  if (terminalState.term && typeof terminalState.term.scrollToBottom === "function") {
-    terminalState.term.scrollToBottom();
+function scrollTerminalOutputToEnd(terminal = terminalStateFor()) {
+  if (terminal?.term && typeof terminal.term.scrollToBottom === "function") {
+    terminal.term.scrollToBottom();
     return;
   }
-  requestAnimationFrame(() => {
+  const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
+  schedule(() => {
     const output = document.querySelector(".terminal-output");
     if (output) output.scrollTop = output.scrollHeight;
   });
@@ -2868,6 +2374,7 @@ function wireToolbarResize(root) {
       const next = clampToolbarBodyHeight(startH + (startY - ev.clientY));
       body.style.height = next + "px";
       chatState.bodyHeight = next;
+      if (toolbarTabUsesTerminal(currentToolbarTab())) resizeTerminalRenderer();
     }
     function onUp(ev) {
       handle.removeEventListener("pointermove", onMove);
@@ -2895,166 +2402,6 @@ function refreshProcessesTabForChatChange() {
   refreshSettings().catch(() => {});
 }
 
-function applyPendingIndicator(tab) {
-  const toggle = $("#chat-activity-toggle");
-  const label = $("#chat-activity-label");
-  const input = $("#chat-input");
-  const send = $("#btn-chat-send");
-  const status = $("#chat-status");
-  if (toggle) {
-    toggle.hidden = !tab || !(tab.sessionId || tab.progress);
-    toggle.setAttribute("aria-expanded", tab?.showProgress === true ? "true" : "false");
-    toggle.title = tab?.showProgress === true ? "Collapse activity" : "Expand activity";
-  }
-  if (label) label.textContent = chatActivityLabel(tab);
-  if (input) {
-    input.disabled = !tab;
-    input.placeholder = chatInputPlaceholder(tab);
-  }
-  if (send) send.disabled = !tab || !!tab.sending;
-  if (status && tab) {
-    status.classList.toggle("chat-status-working", chatActivityIsPulsing(tab));
-    status.innerHTML = `${chatActivityIsPulsing(tab) ? `
-      <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
-        <span></span><span></span><span></span>
-      </span>` : ""}<span>${htmlEscape(chatStatusLine(tab))}</span>`;
-  }
-  syncToolbarTabActivityIndicators();
-  syncChatActionButtons(tab);
-}
-
-function markChatActivityPulse(tab) {
-  if (!tab) return;
-  tab.activityPulseUntil = Date.now() + CHAT_ACTIVITY_PULSE_MS;
-}
-
-function chatActivityIsPulsing(tab) {
-  return !!(tab?.pending || tab?.starting);
-}
-
-function chatActivityLabel(tab) {
-  if (tab?.starting) return "Starting session";
-  if (tab?.pending) return "Agent working";
-  return "Activity panel";
-}
-
-function chatStatusLine(tab) {
-  if (!tab?.sessionId) {
-    if (tab?.mode === "supervisor") {
-      if (tab?.starting) return "Opening supervisor conversation.";
-      if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
-      return "Supervisor is idle.";
-    }
-    if (tab?.starting) return "Starting session.";
-    if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
-    return "No active session.";
-  }
-  if (tab.closedReason) return `Session ${tab.sessionId} ended — ${tab.closedReason}.`;
-  if (tab.pending) return `Agent working in session ${tab.sessionId}.`;
-  if (tab.sending) return `Sending message to session ${tab.sessionId}.`;
-  return `Session ${tab.sessionId} active.`;
-}
-
-function chatInputPlaceholder(_tab) {
-  return "Type and press Enter.";
-}
-
-function syncChatActionButtons(tab) {
-  syncPlanDraftButton(tab);
-  syncStandaloneDraftGoalButton(tab);
-  syncStandaloneSubmitMergeButton(tab);
-  syncGoalRoundExtractButton(tab);
-}
-
-function syncPlanDraftButton(tab) {
-  if (!tab || tab.mode !== "plan") return;
-  [$("#btn-plan-draft-goal"), $("#btn-plan-draft")].forEach((btn) => {
-    if (btn) btn.disabled = !planHasAgentResponse(tab);
-  });
-}
-
-function syncStandaloneDraftGoalButton(tab) {
-  const btn = $("#btn-standalone-draft-goal");
-  if (!btn || !tab || tab.mode !== "standalone") return;
-  btn.disabled = !standaloneChatCanDraftGoal(tab);
-}
-
-function syncStandaloneSubmitMergeButton(tab) {
-  const btn = $("#btn-standalone-submit-merge");
-  if (!btn || !tab || tab.mode !== "standalone") return;
-  btn.disabled = !standaloneChatCanSubmitReadyMerge(tab);
-}
-
-function syncGoalRoundExtractButton(tab) {
-  const btn = $("#btn-goal-round-extract");
-  if (!btn || !tab || !tab.goalId) return;
-  btn.disabled = !goalChatCanExtractRound(tab);
-}
-
-function handleChatSseEvent(payload) {
-  const sessionId = String(payload?.session_id || "");
-  if (!sessionId) return;
-  const tab = Object.values(chatState.tabs)
-    .find((candidate) => candidate?.sessionId === sessionId);
-  if (!tab) return;
-  const event = payload?.event && typeof payload.event === "object" ? payload.event : {};
-  const eventId = String(event.id || "");
-  if (eventId) {
-    tab.seenSseEventIds = Array.isArray(tab.seenSseEventIds) ? tab.seenSseEventIds : [];
-    if (tab.seenSseEventIds.includes(eventId)) return;
-    tab.seenSseEventIds.push(eventId);
-    tab.seenSseEventIds = tab.seenSseEventIds.slice(-200);
-  }
-
-  const wasPending = !!tab.pending;
-  const payloadInFlight = payload.in_flight === true;
-  if (payloadInFlight) {
-    tab.pending = true;
-  } else if (chatSseEventCanClearPending(event)) {
-    tab.pending = false;
-  }
-  if (payload.closed === true) {
-    tab.closedReason = event.text || "session ended";
-    tab.sessionId = null;
-    tab.pending = false;
-  }
-
-  let changed = false;
-  if (event.progress === true) {
-    changed = appendChatProgressLines(tab, [event.text]) || changed;
-  } else {
-    const line = chatLineFromSseEvent(event);
-    if (line) {
-      if (event.role === "assistant") tab.agentResponded = true;
-      if (event.role === "user") {
-        tab.sentUserInput = true;
-        tab.queuedMessages = [];
-        tab.localQueuedMessages = [];
-      }
-      changed = appendChatOutputLines(tab, [line]) || changed;
-    }
-  }
-
-  if (changed) markChatActivityPulse(tab);
-  saveChatStateToStorage();
-  if (wasPending !== tab.pending) refreshProcessesTabForChatChange();
-  syncToolbarTabActivityIndicators();
-  if (chatState.tabs[chatState.activeTabId] === tab) {
-    if (payload.closed === true || event.role === "user") {
-      drawToolbar();
-    } else {
-      renderActiveChatTranscript(tab);
-      applyPendingIndicator(tab);
-      syncChatActionButtons(tab);
-    }
-  }
-}
-
-function chatSseEventCanClearPending(event) {
-  const role = String(event?.role || "");
-  return role === "assistant" || role === "system";
-}
-
 function switchChatTab(tabId) {
   if (!chatState.tabs[tabId]) return;
   chatState.activeTabId = tabId;
@@ -3063,899 +2410,21 @@ function switchChatTab(tabId) {
 }
 
 async function closeChatTab(tabId) {
-  if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID) return;
+  if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID || tabId === TERMINAL_TAB_ID) return;
   const t = chatState.tabs[tabId];
   if (!t) return;
   if (t.sessionId) {
-    try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+    try {
+      await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
+    } catch {}
     refreshProcessesTabForChatChange();
   }
+  const terminal = terminalStates.get(tabId);
+  terminal?.eventSource?.close();
+  terminal?.term?.dispose();
+  terminalStates.delete(tabId);
   delete chatState.tabs[tabId];
   if (chatState.activeTabId === tabId) chatState.activeTabId = "standalone";
   saveChatStateToStorage();
   drawChat();
-}
-
-async function clearActiveChat() {
-  const t = currentChatTab();
-  if (!t) return;
-  if (!t.output && !t.progress && !t.sessionId && !allQueuedMessages(t).length) return;
-  const btn = $("#btn-chat-clear");
-  const ok = await modalConfirm(
-    "Clear this chat's history? Any active session will be stopped and " +
-    "the transcript wiped. Starting again gives the agent a fresh conversation.",
-    { title: "Clear chat history", okLabel: "Clear", danger: true,
-      cancelLabel: "Keep history" },
-  );
-  if (!ok) return;
-  await withButtonBusy(btn, "Clearing…", async () => {
-    if (t.sessionId) {
-      try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
-      refreshProcessesTabForChatChange();
-    }
-    t.sessionId = null;
-    t.worktree = null;
-    t.output = "";
-    t.progress = "";
-    t.showProgress = false;
-    t.closedReason = null;
-    t.pending = false;
-    t.inputDraft = "";
-    t.queuedMessages = [];
-    t.localQueuedMessages = [];
-    t.starting = false;
-    t.agentResponded = false;
-    t.sentUserInput = false;
-    saveChatStateToStorage();
-    drawChat();
-  });
-}
-
-async function toggleActiveChat() {
-  const t = currentChatTab();
-  if (!t) return;
-  const btn = $("#btn-chat-toggle");
-  if (t.sessionId) {
-    await withButtonBusy(btn, "Stopping…", async () => {
-      const sessionId = t.sessionId;
-      try {
-        const stopped = await api("POST", `/api/chat/${sessionId}/stop`);
-        t.sessionId = null;
-        t.worktree = null;
-        t.pending = false;
-        t.closedReason = stopped?.closed_reason || "stopped by user";
-        if (t.mode === "supervisor") supervisorAgentState.error = "";
-      } catch (error) {
-        const message = `Could not stop session ${sessionId}: ${error.message || error}. Retry Stop or inspect System logs.`;
-        if (t.mode === "supervisor") supervisorAgentState.error = message;
-        toast(message, "error");
-      }
-      saveChatStateToStorage();
-      refreshProcessesTabForChatChange();
-      drawChat();
-    });
-    return;
-  }
-  await withButtonBusy(btn, "Starting…", async () => {
-    await ensureChatSession(t);
-  });
-}
-
-function toggleChatProgress() {
-  const t = chatState.tabs[chatState.activeTabId];
-  if (!t) return;
-  t.showProgress = t.showProgress !== true;
-  saveChatStateToStorage();
-  drawChat();
-}
-
-function planTranscriptText(tab) {
-  return (tab?.output || "")
-    .split(/\r?\n/)
-    .filter((line) => !line.startsWith("[refine]") && !line.trim().startsWith(">"))
-    .join("\n")
-    .trim();
-}
-
-function standaloneChatTranscriptText(tab) {
-  const lines = String(tab?.output || "")
-    .split(/\r?\n/)
-    .filter((line) => !line.startsWith("[refine]"));
-  if (!chatLinesIncludeAgentResponse(lines)) return "";
-  return lines.join("\n").trim();
-}
-
-function chatLinesIncludeAgentResponse(lines) {
-  return (lines || []).some((line) => {
-    const text = String(line || "").trim();
-    return text && !text.startsWith("[refine]");
-  });
-}
-
-function planHasAgentResponse(tab) {
-  if (!tab) return false;
-  if (tab.mode === "plan" && !tab.sentUserInput) return false;
-  if (tab.agentResponded) return true;
-  return (tab.output || "")
-    .split(/\r?\n/)
-    .some((line) => {
-      const text = line.trim();
-      return text && !text.startsWith("[refine]") && !text.startsWith(">");
-    });
-}
-
-function standaloneChatCanDraftGoal(tab) {
-  return !!(
-    tab
-    && tab.mode === "standalone"
-    && !tab.pending
-    && standaloneChatTranscriptText(tab)
-  );
-}
-
-function standaloneChatCanSubmitReadyMerge(tab) {
-  return !!(
-    tab
-    && tab.mode === "standalone"
-    && tab.sessionId
-    && tab.worktree?.path
-    && !tab.pending
-  );
-}
-
-function goalChatCanExtractRound(tab) {
-  return !!(
-    tab
-    && tab.goalId
-    && GOAL_CHAT_ROUND_STATUSES.has(tab.goalStatus || "")
-    && !tab.pending
-    && goalChatTranscriptText(tab)
-  );
-}
-
-function goalChatTranscriptText(tab) {
-  const lines = String(tab?.output || "")
-    .split(/\r?\n/)
-    .filter((line) => !line.startsWith("[refine]"));
-  if (!chatLinesIncludeAgentResponse(lines)) return "";
-  return lines.join("\n").trim();
-}
-
-async function draftGoalsFromPlan() {
-  const t = chatState.tabs.plan;
-  if (!t) return;
-  const transcript = planTranscriptText(t);
-  if (!planHasAgentResponse(t) || !transcript) {
-    toast("Wait for the agent to respond before drafting a Feature.", "error");
-    return;
-  }
-  if (
-    typeof extractPlanDraftsInBackground !== "function" ||
-    typeof openPlanDraftModalFromResult !== "function"
-  ) {
-    toast("Plan drafting is unavailable.", "error");
-    return;
-  }
-  toast("Extracting Plan Feature and Goals in the background.", "info");
-  recordUiNotice("Plan Draft extraction started", {
-    kind: "info",
-    source: "background-operation",
-  });
-  minimizeToolbar();
-  try {
-    const result = await extractPlanDraftsInBackground(transcript, {
-      chat_session_id: t.sessionId || "",
-    });
-    await openPlanDraftModalFromResult(transcript, result);
-  } catch (error) {
-    await showActionError(error, "Plan Draft extraction failed");
-  }
-}
-
-async function draftGoalFromPlan() {
-  const t = chatState.tabs.plan;
-  if (!t) return;
-  const transcript = planTranscriptText(t);
-  if (!planHasAgentResponse(t) || !transcript) {
-    toast("Wait for the agent to respond before drafting a Goal.", "error");
-    return;
-  }
-  if (!state.lastReporter) {
-    toast("Pick a reporter in the top-right selector", "error");
-    return;
-  }
-  if (typeof extractImportDrafts !== "function") {
-    toast("Goal drafting is unavailable.", "error");
-    return;
-  }
-  openGoalDraftModalFromText(transcript, {
-    purpose: "plan_goal",
-    sourceTabId: "plan",
-    testIdPrefix: "plan-goal-draft",
-    description: "Review the drafted Goal before saving it as standalone work from this Plan.",
-    completionSource: "Plan",
-    chatSessionId: t.sessionId || "",
-  });
-  minimizeToolbar();
-}
-
-async function draftGoalFromStandaloneChat() {
-  const t = chatState.tabs.standalone;
-  if (!t) return;
-  const transcript = standaloneChatTranscriptText(t);
-  if (!transcript) {
-    toast("Wait for the agent to respond before drafting a Goal.", "error");
-    return;
-  }
-  if (!state.lastReporter) {
-    toast("Pick a reporter in the top-right selector", "error");
-    return;
-  }
-  if (typeof extractImportDrafts !== "function") {
-    toast("Goal drafting is unavailable.", "error");
-    return;
-  }
-  openGoalDraftModalFromText(transcript);
-  minimizeToolbar();
-}
-
-async function submitStandaloneChatForMerge() {
-  const t = chatState.tabs.standalone;
-  if (!standaloneChatCanSubmitReadyMerge(t)) {
-    toast("Start a standalone session and wait for active work to finish.", "error");
-    return;
-  }
-  if (!state.lastReporter) {
-    toast("Pick a reporter in the top-right selector", "error");
-    return;
-  }
-  openStandaloneReadyMergeModal(t);
-  minimizeToolbar();
-}
-
-function openGoalDraftModalFromText(transcript, options = {}) {
-  const purpose = options.purpose || "standalone_goal";
-  const sourceTabId = options.sourceTabId || "standalone";
-  const testIdPrefix = options.testIdPrefix || "standalone-goal-draft";
-  const description = options.description || "Review the drafted Goal before saving it as standalone work.";
-  const completionSource = options.completionSource || "standalone chat";
-  const chatSessionId = options.chatSessionId || "";
-  const root = document.createElement("div");
-  root.className = "modal-backdrop";
-  root.innerHTML = `
-    <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="${testIdPrefix}-modal"
-         aria-labelledby="${testIdPrefix}-title">
-      <div class="modal-title" id="${testIdPrefix}-title">Draft Goal</div>
-      <div class="modal-body" style="max-height:72vh;overflow:auto">
-        <div class="muted small" style="margin-bottom:8px">
-          ${htmlEscape(description)}
-        </div>
-        <div data-goal-draft-body data-testid="${testIdPrefix}-body"></div>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="${testIdPrefix}-cancel">Cancel</button>
-        <button data-save-goal-draft data-testid="${testIdPrefix}-submit" disabled>Create Goal</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(root);
-  let closed = false;
-  const abort = new AbortController();
-  function close() {
-    if (closed) return;
-    closed = true;
-    abort.abort();
-    document.removeEventListener("keydown", onKey, true);
-    root.remove();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
-  }
-  document.addEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => {
-    if (e.target === root) close();
-  });
-  root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("[data-goal-draft-body]");
-  const saveButton = root.querySelector("[data-save-goal-draft]");
-  loadGoalDraft({
-    transcript,
-    root,
-    bodyRoot,
-    saveButton,
-    close,
-    signal: abort.signal,
-    purpose,
-    sourceTabId,
-    testIdPrefix,
-    completionSource,
-    chatSessionId,
-  }).catch((e) => {
-    if (e.name === "AbortError") return;
-    if (bodyRoot) {
-      bodyRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message || "Goal drafting failed")}</p>`;
-    }
-  });
-}
-
-async function loadGoalDraft({
-  transcript,
-  root,
-  bodyRoot,
-  saveButton,
-  close,
-  signal,
-  purpose,
-  sourceTabId,
-  testIdPrefix,
-  completionSource,
-  chatSessionId,
-}) {
-  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, {
-    purpose,
-    ...(chatSessionId ? { chat_session_id: chatSessionId } : {}),
-  });
-  if (signal.aborted) return;
-  const draft = (drafts || []).find((item) => {
-    return String(item?.prompt || item?.name || "").trim();
-  });
-  if (!draft) {
-    bodyRoot.innerHTML = `<p class="muted">No Goal draft extracted.</p>`;
-    return;
-  }
-  const reporter = state.lastReporter || draft.reporter || "";
-  bodyRoot.innerHTML = `
-    ${(drafts || []).length > 1
-      ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
-      : ""}
-    <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form data-goal-draft-form class="round-form">
-      <div class="form-row">
-        <label>Prompt</label>
-        <textarea name="prompt" data-testid="${testIdPrefix}-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
-      </div>
-      <div class="form-row">
-        <label>Priority</label>
-        <select name="priority" data-testid="${testIdPrefix}-priority">
-          ${["low", "medium", "high"].map((priority) => `
-            <option value="${priority}" ${(draft.priority || "low") === priority ? "selected" : ""}>${priority[0].toUpperCase()}${priority.slice(1)}</option>
-          `).join("")}
-        </select>
-      </div>
-    </form>
-  `;
-  saveButton.disabled = false;
-  saveButton.addEventListener("click", async () => {
-    const form = root.querySelector("[data-goal-draft-form]");
-    if (!form) return;
-    const fd = new FormData(form);
-    const nextReporter = String(state.lastReporter || reporter || "").trim();
-    const prompt = String(fd.get("prompt") || "").trim();
-    const priority = String(fd.get("priority") || "low").trim() || "low";
-    if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!prompt) return toast("Provide a prompt", "error");
-    await withButtonBusy(saveButton, "Creating…", async () => {
-      try {
-        const r = await api("POST", "/api/goals", {
-          reporter: nextReporter,
-          prompt,
-          priority,
-        });
-        const goalId = r?.goal?.id || "";
-        const tab = chatState.tabs[sourceTabId];
-        if (tab) {
-          tab.output = `${tab.output || ""}\n[refine] Drafted this ${completionSource} into Goal ${goalId || "new"}.\n`;
-          saveChatStateToStorage();
-          drawChat();
-        }
-        toast("Goal created", "info");
-        close();
-        if (goalId) location.hash = "#/goals/" + encodeURIComponent(goalId);
-      } catch (err) {
-        await showActionError(err, "Could not create drafted Goal");
-      }
-    });
-  });
-}
-
-function openStandaloneReadyMergeModal(tab) {
-  const transcript = standaloneChatTranscriptText(tab);
-  const root = document.createElement("div");
-  root.className = "modal-backdrop";
-  root.innerHTML = `
-    <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="standalone-ready-merge-modal"
-         aria-labelledby="standalone-ready-merge-title">
-      <div class="modal-title" id="standalone-ready-merge-title">Submit Worktree</div>
-      <div class="modal-body" style="max-height:72vh;overflow:auto">
-        <div class="muted small" style="margin-bottom:8px">
-          Review the Goal details before handing the standalone worktree to the merge workflow.
-        </div>
-        <div class="muted small" style="margin-bottom:8px">
-          Worktree: <code data-testid="standalone-ready-merge-worktree">${htmlEscape(tab.worktree?.path || "")}</code>
-        </div>
-        <div id="standalone-ready-merge-body" data-testid="standalone-ready-merge-body"></div>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="standalone-ready-merge-cancel">Cancel</button>
-        <button id="btn-submit-standalone-ready-merge" data-testid="standalone-ready-merge-submit" disabled>Submit</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(root);
-  let closed = false;
-  const abort = new AbortController();
-  function close() {
-    if (closed) return;
-    closed = true;
-    abort.abort();
-    document.removeEventListener("keydown", onKey, true);
-    root.remove();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
-  }
-  document.addEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => {
-    if (e.target === root) close();
-  });
-  root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("#standalone-ready-merge-body");
-  const submitButton = root.querySelector("#btn-submit-standalone-ready-merge");
-  loadStandaloneReadyMergeDraft({
-    tab,
-    transcript,
-    root,
-    bodyRoot,
-    submitButton,
-    close,
-    signal: abort.signal,
-  }).catch((e) => {
-    if (e.name === "AbortError") return;
-    renderStandaloneReadyMergeForm({ draft: {}, tab, root, bodyRoot, submitButton, close });
-  });
-}
-
-async function loadStandaloneReadyMergeDraft({ tab, transcript, root, bodyRoot, submitButton, close, signal }) {
-  let draft = {};
-  if (transcript && typeof extractImportDrafts === "function") {
-    const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_goal" });
-    if (signal.aborted) return;
-    draft = (drafts || []).find((item) => {
-      return String(item?.prompt || item?.name || "").trim();
-    }) || {};
-  }
-  renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButton, close });
-}
-
-function renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButton, close }) {
-  const reporter = state.lastReporter || draft.reporter || "";
-  bodyRoot.innerHTML = `
-    <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form id="standalone-ready-merge-form" class="round-form">
-      <div class="form-row">
-        <label>Prompt</label>
-        <textarea name="prompt" data-testid="standalone-ready-merge-prompt">${htmlEscape(draft.prompt || draft.name || "")}</textarea>
-      </div>
-      <div class="form-row">
-        <label>Priority</label>
-        <select name="priority" data-testid="standalone-ready-merge-priority">
-          ${["low", "medium", "high"].map((priority) => `
-            <option value="${priority}" ${(draft.priority || "low") === priority ? "selected" : ""}>${priority[0].toUpperCase()}${priority.slice(1)}</option>
-          `).join("")}
-        </select>
-      </div>
-    </form>
-  `;
-  submitButton.disabled = false;
-  submitButton.addEventListener("click", async () => {
-    const form = root.querySelector("#standalone-ready-merge-form");
-    if (!form) return;
-    const fd = new FormData(form);
-    const nextReporter = String(state.lastReporter || reporter || "").trim();
-    const prompt = String(fd.get("prompt") || "").trim();
-    const priority = String(fd.get("priority") || "low").trim() || "low";
-    if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!prompt) return toast("Provide a prompt", "error");
-    await withButtonBusy(submitButton, "Submitting…", async () => {
-      try {
-        const r = await api("POST", `/api/chat/${tab.sessionId}/submit-ready-merge`, {
-          reporter: nextReporter,
-          prompt,
-          priority,
-        });
-        const goalId = r?.goal?.id || "";
-        tab.sessionId = null;
-        tab.pending = false;
-        tab.closedReason = "submitted for ready-merge";
-        tab.worktree = r?.worktree || tab.worktree || null;
-        if (tab.worktree && goalId) tab.worktree.submitted_goal_id = goalId;
-        tab.output = `${tab.output || ""}\n[refine] Submitted standalone worktree as ready-merge Goal ${goalId || "new"}.\n`;
-        saveChatStateToStorage();
-        refreshProcessesTabForChatChange();
-        drawChat();
-        toast("Goal submitted for merge", "info");
-        close();
-        if (goalId) location.hash = "#/goals/" + encodeURIComponent(goalId);
-      } catch (err) {
-        await showActionError(err, "Could not submit standalone worktree");
-      }
-    });
-  });
-}
-
-async function extractRoundFromGoalChat() {
-  const tab = chatState.tabs[chatState.activeTabId];
-  if (!tab || !tab.goalId) return;
-  if (!tab.goalStatus) {
-    await refreshGoalChatStatus(tab.goalId, { redraw: false });
-  }
-  if (!GOAL_CHAT_ROUND_STATUSES.has(tab.goalStatus || "")) {
-    toast(
-      `Cannot draft a round while the Goal is ${tab.goalStatus || "unknown"}.`,
-      "error",
-    );
-    syncGoalRoundExtractButton(tab);
-    return;
-  }
-  const transcript = goalChatTranscriptText(tab);
-  if (!transcript) {
-    toast("Wait for the agent to respond before extracting a round.", "error");
-    return;
-  }
-  if (typeof extractImportDrafts !== "function") {
-    toast("Round extraction is unavailable.", "error");
-    return;
-  }
-  if (!state.lastReporter) {
-    toast("Pick a reporter in the top-right selector", "error");
-    return;
-  }
-  openGoalRoundExtractModal(tab.goalId, transcript);
-  minimizeToolbar();
-}
-
-function openGoalRoundExtractModal(goalId, transcript) {
-  const root = document.createElement("div");
-  root.className = "modal-backdrop";
-  root.innerHTML = `
-    <div class="modal import-modal" role="dialog" aria-modal="true"
-         data-testid="goal-round-extract-modal"
-         aria-labelledby="goal-round-extract-title">
-      <div class="modal-title" id="goal-round-extract-title">Extract round</div>
-      <div class="modal-body" style="max-height:72vh;overflow:auto">
-        <div class="muted small" style="margin-bottom:8px">
-          Review the extracted round before adding it to this Goal.
-        </div>
-        <div id="goal-round-extract-body" data-testid="goal-round-extract-body"></div>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary" data-cancel data-testid="goal-round-extract-cancel">Cancel</button>
-        <button id="btn-add-extracted-round" data-testid="goal-round-extract-submit" disabled>Add round</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(root);
-  let closed = false;
-  const abort = new AbortController();
-  function close() {
-    if (closed) return;
-    closed = true;
-    abort.abort();
-    document.removeEventListener("keydown", onKey, true);
-    root.remove();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
-  }
-  document.addEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => {
-    if (e.target === root) close();
-  });
-  root.querySelector("[data-cancel]").addEventListener("click", close);
-  const bodyRoot = root.querySelector("#goal-round-extract-body");
-  const addButton = root.querySelector("#btn-add-extracted-round");
-  loadExtractedRoundDraft({
-    goalId,
-    transcript,
-    root,
-    bodyRoot,
-    addButton,
-    close,
-    signal: abort.signal,
-  }).catch(async (e) => {
-    if (e.name === "AbortError") return;
-    if (bodyRoot) {
-      bodyRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message || "Round extraction failed")}</p>`;
-    }
-  });
-}
-
-async function loadExtractedRoundDraft({ goalId, transcript, root, bodyRoot, addButton, close, signal }) {
-  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "round" });
-  if (signal.aborted) return;
-  const draft = (drafts || []).find((item) => {
-    return String(item?.prompt || "").trim();
-  });
-  if (!draft) {
-    bodyRoot.innerHTML = `<p class="muted">No round draft extracted.</p>`;
-    return;
-  }
-  const reporter = state.lastReporter || "";
-  bodyRoot.innerHTML = `
-    ${(drafts || []).length > 1
-      ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
-      : ""}
-    <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
-    <form id="goal-round-extract-form" class="round-form">
-      <div class="form-row">
-        <label>Prompt</label>
-        <textarea name="prompt" data-testid="goal-round-extract-prompt">${htmlEscape(draft.prompt || "")}</textarea>
-      </div>
-    </form>
-  `;
-  addButton.disabled = false;
-  addButton.addEventListener("click", async () => {
-    const form = root.querySelector("#goal-round-extract-form");
-    if (!form) return;
-    const fd = new FormData(form);
-    const nextReporter = String(state.lastReporter || "").trim();
-    const prompt = String(fd.get("prompt") || "").trim();
-    if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
-    if (!prompt) return toast("Provide a prompt", "error");
-    await withButtonBusy(addButton, "Adding…", async () => {
-      try {
-        await api("POST", `/api/goals/${goalId}/rounds`, {
-          reporter: nextReporter,
-          prompt,
-        });
-        const tab = chatState.tabs[goalId];
-        if (tab) {
-          tab.goalStatus = "todo";
-          tab.output = `${tab.output || ""}\n[refine] Extracted this chat into a new Goal round.\n`;
-          saveChatStateToStorage();
-          drawChat();
-        }
-        toast("New round submitted", "info");
-        close();
-        if (state.currentGoal === goalId && typeof loadGoalDetail === "function") {
-          await loadGoalDetail(goalId);
-        }
-      } catch (err) {
-        await showActionError(err, "Could not add extracted round");
-      }
-    });
-  });
-}
-
-async function refreshGoalChatStatus(goalId, { redraw = true } = {}) {
-  const tab = chatState.tabs[goalId];
-  if (!tab || tab.goalStatusLoading) return;
-  tab.goalStatusLoading = true;
-  try {
-    const { goal } = await api("GET", "/api/goals/" + encodeURIComponent(goalId));
-    if (goal?.status) tab.goalStatus = goal.status;
-  } catch {
-    if (!tab.goalStatus) tab.goalStatus = "unknown";
-  } finally {
-    tab.goalStatusLoading = false;
-    saveChatStateToStorage();
-    if (redraw && chatState.activeTabId === goalId) drawToolbar();
-  }
-}
-
-function appendChatOutputLines(tab, lines) {
-  if (!tab || !Array.isArray(lines) || !lines.length) return false;
-  const now = Date.now();
-  const recent = Array.isArray(tab.recentOutputLines)
-    ? tab.recentOutputLines.filter((entry) => now - Number(entry?.at || 0) < 5000)
-    : [];
-  const existingOutputLines = new Set(
-    String(tab.output || "")
-      .split(/\n/)
-      .filter((line) => line.trim())
-      .slice(-100),
-  );
-  const next = [];
-  for (const line of lines) {
-    const text = String(line ?? "");
-    if (text.trim() && existingOutputLines.has(text)) continue;
-    if (recent.some((entry) => entry?.text === text)) continue;
-    next.push(text);
-    recent.push({ text, at: now });
-    if (text.trim()) existingOutputLines.add(text);
-  }
-  tab.recentOutputLines = recent.slice(-100);
-  if (!next.length) return false;
-  tab.output = (tab.output || "") + next.join("\n") + "\n";
-  return true;
-}
-
-function appendChatProgressLines(tab, lines) {
-  if (!tab || !Array.isArray(lines) || !lines.length) return false;
-  const existingProgressLines = new Set(
-    String(tab.progress || "")
-      .split(/\n/)
-      .filter((line) => line.trim())
-      .slice(-100),
-  );
-  const next = [];
-  for (const line of lines) {
-    const text = String(line ?? "");
-    if (!text.trim()) continue;
-    if (existingProgressLines.has(text)) continue;
-    next.push(text);
-    existingProgressLines.add(text);
-  }
-  if (!next.length) return false;
-  tab.progress = (tab.progress || "") + next.join("\n") + "\n";
-  return true;
-}
-
-function chatLineFromSseEvent(event) {
-  const text = String(event?.text || "");
-  if (!text.trim()) return "";
-  const role = String(event?.role || "");
-  if (role === "user") return `> ${text}`;
-  if (role === "assistant" || role === "system") return text;
-  return text;
-}
-
-function renderActiveChatTranscript(tab) {
-  if (!tab || chatState.tabs[chatState.activeTabId] !== tab) return;
-  const out = $("#chat-output");
-  if (out) {
-    const scroller = chatTranscriptScroller(tab);
-    const atBottom = !scroller
-      || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 50;
-    out.innerHTML = renderChatOutput(tab);
-    if (atBottom && scroller) scroller.scrollTop = scroller.scrollHeight;
-  }
-  const progress = $("#chat-progress");
-  if (progress) {
-    const atBottom = progress.scrollHeight - progress.scrollTop - progress.clientHeight < 50;
-    progress.innerHTML = renderChatProgress(tab.progress || "");
-    if (atBottom) progress.scrollTop = progress.scrollHeight;
-  }
-}
-
-async function sendChatLine() {
-  const t = currentChatTab();
-  if (!t) return;
-  if (t.sending) return;
-  const input = $("#chat-input");
-  const text = input.value;
-  if (!text.trim()) return;
-  t.inputDraft = "";
-  input.value = "";
-  resizeChatInput(input);
-  requestChatInputFocus();
-  await sendChatText(text, t);
-  requestChatInputFocus();
-}
-
-function requestChatInputFocus() {
-  chatState.focusInputUntil = Date.now() + 3000;
-  focusChatInputSoon();
-}
-
-function shouldKeepChatInputFocused() {
-  return Date.now() < (chatState.focusInputUntil || 0);
-}
-
-function focusChatInputSoon() {
-  setTimeout(() => {
-    const input = $("#chat-input");
-    if (!input || input.disabled) return;
-    input.focus();
-    const end = input.value.length;
-    if (typeof input.setSelectionRange === "function") {
-      input.setSelectionRange(end, end);
-    }
-  }, 0);
-}
-
-async function sendChatText(text, tab = currentChatTab()) {
-  const t = tab;
-  if (!t) return;
-  text = String(text || "");
-  if (!text.trim()) return;
-  if (t.sending) return;
-  t.sending = true;
-  saveChatStateToStorage();
-  drawToolbar();
-  try {
-    await sendChatTextUnlocked(t, text);
-  } finally {
-    t.sending = false;
-    saveChatStateToStorage();
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  }
-}
-
-async function sendChatTextUnlocked(t, text) {
-  if (!t.sessionId) {
-    queueChatTextForTab(t, text);
-    await ensureChatSession(t);
-    saveChatStateToStorage();
-    drawToolbar();
-    requestChatInputFocus();
-    return;
-  }
-  if (normalizeQueuedMessages(t.localQueuedMessages).length) {
-    queueChatTextForTab(t, text);
-    await flushLocalQueuedMessages(t);
-    return;
-  }
-  await queueChatTextOnServer(t, text);
-}
-
-function queueChatTextForTab(tab, text) {
-  if (!tab) return;
-  const trimmed = String(text || "").trim();
-  if (!trimmed) return;
-  ensureChatTabQueueState(tab);
-  tab.localQueuedMessages.push({
-    id: newLocalQueuedMessageId(),
-    text: trimmed,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    local: true,
-  });
-}
-
-function newLocalQueuedMessageId() {
-  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-async function flushLocalQueuedMessages(tab) {
-  if (!tab?.sessionId) return;
-  ensureChatTabQueueState(tab);
-  if (!tab.localQueuedMessages.length) return;
-  const messages = tab.localQueuedMessages.slice();
-  const text = messages.length === 1
-    ? messages[0].text
-    : messages.map((message, idx) => `Message ${idx + 1}:\n${message.text}`).join("\n\n");
-  tab.localQueuedMessages = [];
-  saveChatStateToStorage();
-  drawToolbar();
-  if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  await queueChatTextOnServer(tab, text);
-}
-
-async function queueChatTextOnServer(tab, text) {
-  if (!tab?.sessionId) return;
-  try {
-    tab.pending = true;
-    saveChatStateToStorage();
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-    const r = await api("POST", `/api/chat/${tab.sessionId}/input`, { text });
-    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
-    tab.pending = r.in_flight === undefined ? true : !!r.in_flight;
-    tab.closedReason = null;
-    tab.sentUserInput = true;
-    saveChatStateToStorage();
-    refreshProcessesTabForChatChange();
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-  } catch (e) {
-    queueChatTextForTab(tab, text);
-    tab.pending = false;
-    saveChatStateToStorage();
-    drawToolbar();
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
-    toast("Could not send: " + e.message, "error");
-  }
 }

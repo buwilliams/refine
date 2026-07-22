@@ -132,8 +132,13 @@ impl ManagedProcess {
         {
             for key in [
                 "goal_id",
+                "feature_id",
                 "session_id",
                 "mode",
+                "profile",
+                "role",
+                "provider",
+                "worktree",
                 "round_idx",
                 "worker_kind",
                 "operation_id",
@@ -147,7 +152,9 @@ impl ManagedProcess {
             {
                 object.insert("kind".to_string(), json!(kind));
             }
-            if details.get("session_id").is_some() {
+            if details.get("kind").and_then(Value::as_str) == Some("interactive_session") {
+                object.insert("kind".to_string(), json!("interactive_session"));
+            } else if details.get("session_id").is_some() {
                 object.insert("kind".to_string(), json!("chat"));
             }
         }
@@ -457,6 +464,12 @@ impl FileProcessSupervisor {
         }
         self.write_process(&process)?;
         Ok(process)
+    }
+
+    /// Apply the same pause and host-command authorization gates used by ordinary managed
+    /// processes before an interactive PTY process is spawned by a surface adapter.
+    pub fn validate_interactive_launch(&self, spec: &ManagedProcessSpec) -> RefineResult<()> {
+        self.validate_launch(spec)
     }
 
     pub fn run_to_completion(

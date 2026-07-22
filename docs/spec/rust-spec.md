@@ -824,6 +824,15 @@ Owns abstractions for: start, resume, stream, attach to Goal or Feature, persist
 Requirements:
 
 - Chat sessions use shared provider adapters.
+- The browser does not recreate provider conversation UX. Its Terminal,
+  Supervisor, Plan, Goal, and Standalone profiles use the shared PTY terminal
+  implementation; agent profiles launch the configured native CLI with concise
+  role and durable-work context.
+- Browser terminal profiles have explicit Start/Stop/Restart lifecycle, register
+  in the ordinary daemon process registry, and remain independently observable
+  and stoppable from the Processes surface.
+- Standalone browser sessions run in a Refine-owned Git worktree. Stop preserves
+  the worktree, and restart validates and reuses the recorded path and branch.
 - Goal-attached chat and standalone chat have explicit storage and resumption
   semantics.
 - Long-running provider priming or resume steps are observable.

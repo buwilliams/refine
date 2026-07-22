@@ -2,21 +2,22 @@
 
 ## Key Ideas
 
-- **One Shared Supervisor Truth**: the daemon, CLI, API, and toolbar read the same small durable lifecycle, health, observation, and failure projection.
+- **One Shared Supervisor Truth**: the daemon, CLI, API, and System surface read the same small durable lifecycle, health, observation, and failure projection.
 - **Process And Agent Are Distinct**: the supervisor process keeps Refine runtime work alive; the supervisor agent observes and explains workflow work within that process boundary.
 - **Ordinary CLI Agent**: the supervisor agent uses the configured `agent_cli` and the same provider, process supervision, limits, streaming, session resume, queue, cancellation, and failure handling as every other Refine agent.
 - **One Capacity Truth**: workflow and supervisor turns acquire atomic leases from the same global, node, provider, and target-app capacity policy at provider-launch time.
 - **One Provider Truth**: configured `agent_cli` controls session dispatch, capacity accounting, process evidence, and API state; provider-specific resume state is reset when configuration changes.
 - **Existing Backend Evidence**: workflow, process, Git-sync, projection, operation, and activity services remain authoritative; the supervisor projection does not recreate their rules.
-- **Conversation Reuses Chat**: automatic evidence, user prompts, and follow-ups share one ordinary chat session and transcript.
-- **Visible While Idle**: the capability remains discoverable and promptable when no Goal is active.
-- **No Manual Lifecycle Controls**: the toolbar does not offer Start or Stop because the shared capability is always observing workflow work or waiting idle.
+- **Automation Reuses Backend Chat**: automatic evidence and automated follow-ups may share the durable backend chat capability without requiring a browser chat UI.
+- **Toolbar Session Is Distinct**: the Supervisor toolbar tab is a user-started native agent terminal with monitoring context, not a renderer or lifecycle control for the automated supervisor session.
 
 ## Purpose
 
-The supervisor agent exists so active Goal work does not require a person to keep a separate terminal or Codex conversation open just to notice failures. When queued or active work appears, Refine starts or resumes exactly one configured CLI-agent session and gives it current shared backend evidence plus Refine's existing CLI/API tools. New evidence and toolbar prompts enter the same provider queue, but automatic evidence is internal context rather than a user-visible transcript message.
+The automated supervisor agent exists so active Goal work does not require a person to keep a separate terminal or agent conversation open just to notice failures. When queued or active work appears, Refine starts or resumes exactly one configured CLI-agent session and gives it current shared backend evidence plus Refine's existing CLI/API tools. Automatic evidence stays in that backend automation session.
 
-The supervisor is also the natural agent for finding unknowns across active work. It should compare the workflow map with process, Git, projection, operation, and activity evidence; follow blind-spot paths; and prototype bounded recovery when that is the fastest safe way to learn. It may interview the user in the shared conversation when product judgment or new authority is genuinely required, while continuing to resolve evidence-backed unknowns independently.
+The user-controlled Supervisor toolbar profile launches a separate configured agent in the target app checkout with a concise prompt to monitor, investigate, fix, and verify the workflow using Refine's CLI and repository evidence. It is registered in the ordinary process manager and has explicit Start, Stop, and Restart controls. The native harness owns its conversation and approval UX.
+
+Both forms are natural agents for finding unknowns across active work. They should compare the workflow map with process, Git, projection, operation, and activity evidence; follow blind-spot paths; and prototype bounded recovery when that is the fastest safe way to learn. Product judgment and new authority remain user decisions.
 
 ## Recovery Boundary
 
@@ -36,6 +37,6 @@ Stall evidence combines Goal state with the existing process registry and proces
 - `attention`: failed work is visible and can be retried deliberately.
 - `degraded`: a stall or runtime failure needs action.
 
-Daemon restarts rebuild the adapter state from existing evidence, retain the singleton supervisor conversation, recover interrupted chat turns through the normal chat service, and reclaim capacity leases whose holder process no longer exists. Success, provider failure, interruption, cancellation, closed sessions, and abandoned dispatch all release capacity without creating a second scheduler. A project lock, durable context key, singleton session lookup, and one replaceable internal context entry prevent concurrent Goals or reconnects from launching duplicate turns or flooding the queue.
+Daemon restarts rebuild the automated adapter state from existing evidence, retain its singleton backend session, recover interrupted turns through the normal chat service, and reclaim capacity leases whose holder process no longer exists. Success, provider failure, interruption, cancellation, closed sessions, and abandoned dispatch all release capacity without creating a second scheduler. A project lock, durable context key, singleton session lookup, and one replaceable internal context entry prevent concurrent Goals or reconnects from launching duplicate automated turns or flooding the queue. Browser Supervisor terminals instead reattach by their PTY session identifier when still live and become restartable when the process has exited.
 
-All Goal and Supervisor provider processes register under the runtime managed-agent process root. Stop and retry locate work by the structured session or execution metadata in that registry and request cross-platform termination through the Process capability. The registry remains authoritative until the child exits, and its capacity lease is not released during that stopping window. Legacy port-root records remain observable only for upgrade cleanup; new dispatch never creates them there.
+All Goal, automated Supervisor, and interactive Supervisor terminal processes register under the runtime managed-process root with structured role, provider, session, Goal or Feature, and worktree metadata as applicable. Stop and retry locate work through that registry and request cross-platform termination through the Process capability. The registry remains authoritative until the child exits. Legacy port-root records remain observable only for upgrade cleanup; new dispatch never creates them there.

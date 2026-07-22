@@ -5,18 +5,9 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 class FakeClassList {
-  constructor() {
-    this.values = new Set();
-  }
-
-  add(...names) {
-    names.forEach((name) => this.values.add(name));
-  }
-
-  remove(...names) {
-    names.forEach((name) => this.values.delete(name));
-  }
-
+  constructor() { this.values = new Set(); }
+  add(...names) { names.forEach((name) => this.values.add(name)); }
+  remove(...names) { names.forEach((name) => this.values.delete(name)); }
   toggle(name, force) {
     const enabled = force === undefined ? !this.values.has(name) : !!force;
     if (enabled) this.values.add(name);
@@ -29,146 +20,55 @@ class FakeElement {
   constructor() {
     this.classList = new FakeClassList();
     this.dataset = {};
-    this.disabled = false;
-    this.hidden = false;
-    this._innerHTML = "";
-    this.innerHTMLWrites = 0;
-    this.textContent = "";
-    this.value = "";
     this.style = {};
-    this.clientHeight = 0;
+    this.listeners = new Map();
+    this._innerHTML = "";
+    this.clientWidth = 1000;
+    this.clientHeight = 400;
     this.scrollHeight = 0;
     this.scrollTop = 0;
-    this.selectionStart = 0;
-    this.selectionEnd = 0;
-    this.selectionDirection = "none";
-    this.listeners = new Map();
   }
-
   get innerHTML() { return this._innerHTML; }
-  set innerHTML(value) {
-    this._innerHTML = String(value);
-    this.innerHTMLWrites += 1;
-  }
-
-  addEventListener(type, listener) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(listener);
-  }
-  emit(type, event = {}) {
-    for (const listener of this.listeners.get(type) || []) {
-      listener({ target: this, currentTarget: this, ...event });
-    }
-  }
-  appendChild() {}
+  set innerHTML(value) { this._innerHTML = String(value); }
+  addEventListener(type, listener) { this.listeners.set(type, listener); }
   focus() {}
-  insertBefore() {}
   querySelector() { return null; }
   querySelectorAll() { return []; }
-  remove() {}
-  setAttribute(name, value) { this[name] = String(value); }
-  setSelectionRange(start, end, direction = "none") {
-    this.selectionStart = start;
-    this.selectionEnd = end;
-    this.selectionDirection = direction;
-  }
 }
 
 class FakeEventSource {
-  static latest = null;
-
+  static instances = [];
   constructor(url) {
     this.url = url;
     this.listeners = new Map();
-    FakeEventSource.latest = this;
+    this.closed = false;
+    FakeEventSource.instances.push(this);
   }
-
-  addEventListener(name, listener) {
-    this.listeners.set(name, listener);
-  }
-
-  close() {}
-
-  emit(name, payload) {
-    this.listeners.get(name)?.({ data: JSON.stringify(payload) });
-  }
+  addEventListener(name, listener) { this.listeners.set(name, listener); }
+  close() { this.closed = true; }
+  emit(name, payload) { this.listeners.get(name)?.({ data: JSON.stringify(payload) }); }
 }
 
 function browserRuntime(storage = new Map()) {
+  FakeEventSource.instances = [];
   const toolbar = new FakeElement();
-  const toggleButton = new FakeElement();
-  const supervisorPanel = new FakeElement();
-  const toolbarBody = new FakeElement();
-  const chatOutputBox = new FakeElement();
-  const chatOutput = new FakeElement();
-  const toasts = [];
-  const busyLabels = [];
-  let chatInput = null;
-  let document;
-  const body = {
-    appendChild(element) {
-      toasts.push(element);
-    },
-  };
-  document = {
-    body,
-    activeElement: body,
+  const terminalOutput = new FakeElement();
+  const document = {
+    activeElement: null,
+    body: { appendChild() {} },
     documentElement: { style: { setProperty() {} } },
     addEventListener() {},
     createElement() { return new FakeElement(); },
     getElementById() { return null; },
     querySelector(selector) {
       if (selector === "#toolbar-dock") return toolbar;
-      if (selector === "#btn-chat-toggle") return toggleButton;
-      if (selector === "#chat-output") return toolbar.querySelector(selector);
-      if (selector === ".chat-output-box") return toolbar.querySelector(selector);
-      if (selector === "#chat-input") return toolbar.querySelector(selector);
+      if (selector === ".terminal-output" && toolbar.innerHTML.includes("terminal-output")) return terminalOutput;
       return null;
     },
     querySelectorAll() { return []; },
   };
-  Object.defineProperty(toolbar, "innerHTML", {
-    get() { return toolbar._innerHTML; },
-    set(value) {
-      const previousInput = chatInput;
-      toolbar._innerHTML = String(value);
-      toolbar.innerHTMLWrites += 1;
-      if (document.activeElement === previousInput) document.activeElement = body;
-      const match = toolbar._innerHTML.match(/<textarea id="chat-input"([\s\S]*?)>([\s\S]*?)<\/textarea>/);
-      chatInput = match ? new FakeElement() : null;
-      if (chatInput) {
-        const tabId = match[1].match(/data-chat-tab-id="([^"]*)"/)?.[1] || "";
-        chatInput.dataset.chatTabId = tabId;
-        chatInput.value = match[2]
-          .replaceAll("&lt;", "<")
-          .replaceAll("&gt;", ">")
-          .replaceAll("&quot;", '"')
-          .replaceAll("&#39;", "'")
-          .replaceAll("&amp;", "&");
-        chatInput.selectionStart = chatInput.value.length;
-        chatInput.selectionEnd = chatInput.value.length;
-        chatInput.focus = () => { document.activeElement = chatInput; };
-      }
-    },
-  });
   toolbar.querySelector = (selector) => {
-    if (
-      selector === '[data-testid="toolbar-supervisor-panel"]'
-      && toolbar.innerHTML.includes('data-testid="toolbar-supervisor-panel"')
-    ) return supervisorPanel;
-    if (
-      selector === '[data-testid="toolbar-body"]'
-      && toolbar.innerHTML.includes('data-testid="toolbar-body"')
-    ) return toolbarBody;
-    if (
-      selector === ".chat-output-box"
-      && toolbar.innerHTML.includes('class="chat-output-box"')
-    ) return chatOutputBox;
-    if (
-      selector === "#chat-output"
-      && toolbar.innerHTML.includes('id="chat-output"')
-    ) return chatOutput;
-    if (selector === "#chat-input" && chatInput) return chatInput;
+    if (selector === ".terminal-output" && toolbar.innerHTML.includes("terminal-output")) return terminalOutput;
     return null;
   };
   const context = vm.createContext({
@@ -180,724 +80,237 @@ function browserRuntime(storage = new Map()) {
     console,
     document,
     fetch: async () => ({ ok: true, json: async () => ({}) }),
+    getComputedStyle: () => ({ fontSize: "13", lineHeight: "18" }),
     location: { hash: "#/dashboard", pathname: "/" },
     localStorage: {
       getItem(key) { return storage.get(key) ?? null; },
       setItem(key, value) { storage.set(key, String(value)); },
     },
+    requestAnimationFrame(callback) { callback(); },
     setInterval() { return 1; },
     setTimeout,
     window: {
       addEventListener() {},
       CSS: { escape: (value) => String(value) },
+      getComputedStyle: () => ({ fontSize: "13", lineHeight: "18" }),
       innerHeight: 800,
     },
-    withButtonBusy: async (button, label, action) => {
-      busyLabels.push(label);
-      const previous = button?.textContent || "";
-      if (button) {
-        button.disabled = true;
-        button.textContent = label;
-      }
-      try {
-        return await action();
-      } finally {
-        if (button) {
-          button.disabled = false;
-          button.textContent = previous;
-        }
-      }
-    },
+    withButtonBusy: async (_button, _label, action) => action(),
   });
   const staticRoot = path.join(__dirname, "../src/surfaces/web/static/js");
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(`
-    globalThis.supervisorToolbarTest = {
-      activate() {
-        openToolbarTab(SUPERVISOR_TAB_ID);
-      },
-      activateTab(tabId) {
+    globalThis.toolbarTerminalTest = {
+      activate(tabId) {
+        ensureStandaloneTab();
+        if (tabId === "plan") ensurePlanTab();
         chatState.activeTabId = tabId;
         chatState.open = true;
-      },
-      activateSystem() {
-        ensureStandaloneTab();
-        chatState.activeTabId = SYSTEM_TAB_ID;
-        chatState.open = true;
+        drawToolbar();
       },
       draw: drawToolbar,
-      emitChat: handleChatSseEvent,
       ensurePlan: ensurePlanTab,
-      initSSE,
-      load: loadSupervisorAgentState,
       openGoal(goalId) { openChatDock({ goalId }); },
+      openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       restore: loadChatStateFromStorage,
+      reset: resetChatForProjectSwitch,
       save: saveChatStateToStorage,
-      send: sendChatText,
-      supervisorTab() { return chatState.tabs[SUPERVISOR_TAB_ID]; },
-      tab(tabId) { return chatState.tabs[tabId]; },
-      systemMessageCount() { return systemOperationState.messages.length; },
-      tabIds() { return Object.keys(chatState.tabs); },
-      toggleActivity: toggleChatProgress,
-      setApi(nextApi) { api = nextApi; },
-      chatInput() { return document.querySelector("#chat-input"); },
-      typeDraft(value, { start = value.length, end = start, direction = "none", scrollTop = 0 } = {}) {
-        const input = document.querySelector("#chat-input");
-        input.value = value;
-        input.setSelectionRange(start, end, direction);
-        input.scrollTop = scrollTop;
-        input.focus();
-        input.emit("input");
+      start(tabId) {
+        chatState.activeTabId = tabId;
+        return startTerminalSession(chatState.tabs[tabId]);
       },
-      activeElement() { return document.activeElement; },
-      setAttached(attached = true) { state.project = { attached }; },
-      setRoute(route) { state.currentRoute = route; },
+      stop(tabId) {
+        chatState.activeTabId = tabId;
+        return stopTerminalSession(chatState.tabs[tabId]);
+      },
+      tab(tabId) { return chatState.tabs[tabId]; },
+      terminal(tabId) {
+        const value = terminalStateFor(tabId);
+        return {
+          sessionId: value?.sessionId,
+          processId: value?.processId,
+          connected: value?.connected,
+          exited: value?.exited,
+          display: value?.display,
+        };
+      },
+      tabIds() { return Object.keys(chatState.tabs); },
+      setApi(nextApi) { api = nextApi; },
     };
   `, context);
   return {
-    busyLabels,
-    elements: { chatOutput, chatOutputBox, toolbarBody },
-    html: () => toolbar.innerHTML + supervisorPanel.innerHTML,
-    runtime: context.supervisorToolbarTest,
-    supervisorStatusHtml: () => supervisorPanel.innerHTML,
-    toolbarRenderCount: () => toolbar.innerHTMLWrites,
-    toasts,
+    events: () => [...FakeEventSource.instances],
+    html: () => toolbar.innerHTML,
+    runtime: context.toolbarTerminalTest,
   };
 }
 
-function snapshot(overrides = {}) {
-  return {
-    lifecycle: "idle",
-    health: "healthy",
-    active_work: 0,
-    queued_work: 0,
-    failed_work: 0,
-    supervisor_process: "daemon-supervised workflow runner",
-    updated_at: "2026-07-21T22:00:00Z",
-    events: [],
-    session_id: null,
-    ...overrides,
-  };
-}
-
-function queuedMessage(id, text) {
-  return {
-    id,
-    text,
-    created_at: "2026-07-21T22:00:00Z",
-    updated_at: "2026-07-21T22:00:00Z",
-  };
-}
-
-test("Supervisor stays discoverable and prompt-ready while idle without an event stream", () => {
+test("Supervisor, Plan, Goal, and Standalone render the shared terminal surface", async () => {
   const browser = browserRuntime();
-  browser.runtime.activate();
-  browser.runtime.draw();
-
-  assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
-  assert.match(browser.html(), /data-testid="toolbar-tab-supervisor"/);
-  assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
-  assert.match(browser.html(), /Supervisor is idle/);
-  assert.match(browser.html(), /placeholder="Type and press Enter\."/);
-  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
-  assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
-  assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
-});
-
-test("toolbar redraw preserves the active prompt draft, focus, caret, and scroll", () => {
-  const storage = new Map();
-  const browser = browserRuntime(storage);
-  browser.runtime.activate();
-  browser.runtime.draw();
-  const originalInput = browser.runtime.chatInput();
-  const draft = "Keep this <draft> while status updates";
-  browser.runtime.typeDraft(draft, {
-    start: 5,
-    end: 12,
-    direction: "forward",
-    scrollTop: 17,
-  });
-
-  Object.assign(browser.runtime.supervisorTab(), {
-    sessionId: "supervisor-shared",
-    pending: true,
-    progress: "New agent activity arrived",
-  });
-  browser.runtime.draw();
-
-  const replacementInput = browser.runtime.chatInput();
-  assert.notEqual(replacementInput, originalInput, "the toolbar replaced its DOM input");
-  assert.equal(replacementInput.value, draft);
-  assert.equal(browser.runtime.activeElement(), replacementInput);
-  assert.equal(replacementInput.selectionStart, 5);
-  assert.equal(replacementInput.selectionEnd, 12);
-  assert.equal(replacementInput.selectionDirection, "forward");
-  assert.equal(replacementInput.scrollTop, 17);
-
-  browser.runtime.save();
-  const restored = browserRuntime(storage);
-  restored.runtime.restore();
-  restored.runtime.activate();
-  restored.runtime.draw();
-  assert.equal(restored.runtime.chatInput().value, draft);
-});
-
-test("Supervisor transcript hides internal evidence prompts and keeps agent responses", () => {
-  const browser = browserRuntime();
-  browser.runtime.activate();
-  Object.assign(browser.runtime.supervisorTab(), {
-    output: [
-      "> Message 1:",
-      "Supervise until the queue is idle using the evidence and Refine's tools.",
-      "",
-      "Current counts: 0 active, 0 queued, 1 failed.",
-      'Goal states: {"OLD": "done", "FAILED": "failed"}',
-      "Live workflow-agent Goal IDs: {}",
-      "Actionable stall/loss evidence: {}",
-      "",
-      "Message 2:",
-      "The workflow evidence changed. Supervise only work that is actionable now.",
-      "Current counts: 0 active, 0 queued, 1 failed.",
-      'Non-terminal Goal states: {"FAILED": "failed"}',
-      "Live workflow-agent Goal IDs: {}",
-      "Actionable stall/loss evidence: {}",
-      "",
-      "The failed Goal needs user review; no automatic retry was attempted.",
-    ].join("\n"),
-  });
-  browser.runtime.draw();
-
-  const html = browser.html();
-  assert.match(html, /The failed Goal needs user review/);
-  assert.doesNotMatch(html, /Supervise until the queue is idle/);
-  assert.doesNotMatch(html, /The workflow evidence changed/);
-  assert.doesNotMatch(html, /Goal states:/);
-  assert.doesNotMatch(html, /Message [12]:/);
-});
-
-test("overflowing Supervisor transcript scrolls chat-output-box instead of its enclosing toolbar body", () => {
-  const browser = browserRuntime();
-  const transcript = Array.from(
-    { length: 80 },
-    (_, index) => `Supervisor transcript line ${index + 1}`,
-  ).join("\n\n");
-  browser.runtime.activate();
-  Object.assign(browser.runtime.supervisorTab(), { output: transcript });
-
-  const { chatOutput, chatOutputBox, toolbarBody } = browser.elements;
-  chatOutputBox.clientHeight = 240;
-  chatOutputBox.scrollHeight = 1_200;
-  chatOutput.scrollTop = 0;
-  toolbarBody.scrollTop = 0;
-  browser.runtime.draw();
-
-  assert.match(browser.html(), /class="toolbar-dock-body supervisor-toolbar-body"/);
-  assert.ok(chatOutputBox.scrollHeight > chatOutputBox.clientHeight);
-  assert.equal(chatOutputBox.scrollTop, chatOutputBox.scrollHeight);
-  assert.equal(chatOutput.scrollTop, 0);
-  assert.equal(toolbarBody.scrollTop, 0);
-
-  const stylesheet = fs.readFileSync(
-    path.join(__dirname, "../src/surfaces/web/static/css/toolbar.css"),
-    "utf8",
-  );
-  assert.match(
-    stylesheet,
-    /\.toolbar-dock-body\.supervisor-toolbar-body\s*\{[^}]*overflow-y:\s*hidden;/s,
-  );
-  assert.match(
-    stylesheet,
-    /\.supervisor-toolbar-body \.chat-output-box\s*\{[^}]*overflow-y:\s*auto;/s,
-  );
-});
-
-test("every chat-capable toolbar tab defaults Activity to collapsed", () => {
-  const browser = browserRuntime();
-  browser.runtime.activate();
-  browser.runtime.ensurePlan();
-  browser.runtime.setApi(async (_method, requestPath) => requestPath.startsWith("/api/goals/")
-    ? { goal: { status: "todo" } }
-    : { session_id: "goal-session" });
+  await browser.runtime.openPlan("Design a retry queue");
   browser.runtime.openGoal("GOAL1");
 
-  for (const tabId of ["standalone", "supervisor", "plan", "GOAL1"]) {
-    assert.equal(browser.runtime.tab(tabId).showProgress, false, `${tabId} Activity default`);
-  }
-
-  Object.assign(browser.runtime.supervisorTab(), {
-    sessionId: "supervisor-shared",
-    progress: "Observed active Goal work",
-  });
-  browser.runtime.activateTab("supervisor");
-  browser.runtime.draw();
-
-  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="false"/);
-  assert.match(browser.html(), /data-testid="chat-progress-panel" hidden/);
-
-  browser.runtime.toggleActivity();
-  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="true"/);
-  assert.doesNotMatch(browser.html(), /data-testid="chat-progress-panel" hidden/);
-});
-
-test("pending messages and collapsed activity render inline across every chat tab", () => {
-  const browser = browserRuntime();
-  browser.runtime.activate();
-  browser.runtime.ensurePlan();
-  browser.runtime.setApi(async (_method, requestPath) => requestPath.startsWith("/api/goals/")
-    ? { goal: { status: "todo" } }
-    : { session_id: "goal-session" });
-  browser.runtime.openGoal("GOAL1");
-
-  for (const tabId of ["standalone", "supervisor", "plan", "GOAL1"]) {
-    Object.assign(browser.runtime.tab(tabId), {
-      sessionId: `${tabId}-session`,
-      progress: `Activity for ${tabId}`,
-      showProgress: false,
-      queuedMessages: [queuedMessage(`${tabId}-pending`, `Pending prompt for ${tabId}`)],
-    });
-    browser.runtime.activateTab(tabId);
-    browser.runtime.draw();
-    const html = browser.html();
-    const outputIndex = html.indexOf('data-testid="chat-output"');
-    const pendingIndex = html.indexOf('data-testid="chat-pending-message"');
-    const activityIndex = html.indexOf('data-testid="chat-inline-activity"');
-    const statusIndex = html.indexOf('data-testid="chat-status"');
-
-    assert.ok(outputIndex >= 0 && pendingIndex > outputIndex, `${tabId} pending prompt belongs to transcript`);
-    assert.ok(activityIndex > pendingIndex, `${tabId} activity follows pending prompts inline`);
-    assert.ok(statusIndex > activityIndex, `${tabId} status belongs to transcript`);
-    assert.ok(html.includes(`Pending prompt for ${tabId}`));
-    assert.ok(html.includes("chat-pending-message-status muted small"));
-    assert.ok(html.includes("<span>Pending</span>"));
-    assert.ok(html.includes('aria-expanded="false"'), `${tabId} activity is collapsed`);
-    assert.ok(html.includes('placeholder="Type and press Enter."'));
-    assert.ok(!html.includes('data-testid="chat-queue-text"'));
-    assert.ok(!html.includes('data-testid="chat-queue-save"'));
-    assert.ok(!html.includes('data-testid="chat-queue-remove"'));
-    assert.ok(!html.includes("chat-input-pending-dots"));
-    assert.ok(!html.includes("chat-input-waiting"));
+  for (const tabId of ["supervisor", "plan", "GOAL1", "standalone", "terminal"]) {
+    browser.runtime.activate(tabId);
+    assert.match(browser.html(), /data-testid="toolbar-terminal-panel"/);
+    assert.match(browser.html(), /data-testid="terminal-start"/);
+    assert.doesNotMatch(browser.html(), /id="chat-input"/);
+    assert.doesNotMatch(browser.html(), /data-testid="toolbar-supervisor-panel"/);
   }
 });
 
-test("restored toolbar state defaults Activity collapsed and preserves explicit expansion", () => {
-  const storage = new Map([["refine_chat_tabs", JSON.stringify({
-    tabs: {
-      standalone: {
-        goalId: null,
-        label: "Standalone",
-        mode: "standalone",
-        sessionId: "standalone-session",
-        output: "",
-        progress: "Agent working",
-      },
-    },
-    activeTabId: "standalone",
-    open: true,
-  })]]);
-  const browser = browserRuntime(storage);
-
-  browser.runtime.restore();
-  browser.runtime.activateTab("standalone");
-  browser.runtime.draw();
-
-  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="false"/);
-  assert.match(browser.html(), /data-testid="chat-progress-panel" hidden/);
-
-  browser.runtime.toggleActivity();
-  const restoredExpanded = browserRuntime(storage);
-  restoredExpanded.runtime.restore();
-  restoredExpanded.runtime.activateTab("standalone");
-  restoredExpanded.runtime.draw();
-
-  assert.match(restoredExpanded.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="true"/);
-  assert.doesNotMatch(restoredExpanded.html(), /data-testid="chat-progress-panel" hidden/);
-});
-
-test("navigation reinitialization restores the singleton session and transcript", async () => {
-  const storage = new Map();
-  const first = browserRuntime(storage);
-  first.runtime.activate();
-  Object.assign(first.runtime.supervisorTab(), {
-    sessionId: "supervisor-shared",
-    output: "> investigate queue\nSupervisor: queue is healthy",
-    progress: "Observed active Goal work",
-  });
-  first.runtime.save();
-
+test("each terminal profile sends its launch context and keeps an independent managed session", async () => {
+  const browser = browserRuntime();
   const requests = [];
-  const restored = browserRuntime(storage);
-  restored.runtime.setAttached();
-  restored.runtime.restore();
-  restored.runtime.activate();
-  restored.runtime.setApi(async (method, requestPath) => {
-    requests.push([method, requestPath]);
-    return { supervisor_agent: snapshot({ session_id: "supervisor-shared" }) };
-  });
-  await restored.runtime.load();
-  restored.runtime.draw();
-
-  assert.equal(restored.runtime.supervisorTab().sessionId, "supervisor-shared");
-  assert.match(restored.html(), /investigate queue/);
-  assert.match(restored.html(), /queue is healthy/);
-  assert.match(restored.html(), /Observed active Goal work/);
-  assert.doesNotMatch(restored.html(), /data-testid="chat-toggle"/);
-  assert.deepEqual(requests, [["GET", "/api/supervisor-agent"]]);
-  assert.equal(restored.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
-});
-
-test("polling and SSE reconnect route deduplicated supervisor events to System", async () => {
-  const browser = browserRuntime();
-  browser.runtime.setAttached();
-  browser.runtime.setRoute("dashboard");
-  browser.runtime.activate();
-  const delayedEvent = {
-    id: "supervisor-delayed",
-    kind: "observation",
-    status: "running",
-    message: "Worker heartbeat delayed",
-    goal_id: "00000000000000000000000001",
-    created_at: "2026-07-21T22:00:01Z",
-  };
-  const responses = [
-    snapshot({
-      lifecycle: "supervising",
-      health: "degraded",
-      active_work: 1,
-      session_id: "supervisor-shared",
-      events: [delayedEvent],
-    }),
-    snapshot({
-      lifecycle: "idle",
-      health: "healthy",
-      session_id: "supervisor-shared",
-      events: [delayedEvent, {
-        id: "supervisor-recovered",
-        kind: "recovery",
-        status: "completed",
-        message: "Worker heartbeat recovered",
-        created_at: "2026-07-21T22:00:02Z",
-      }],
-    }),
-  ];
-  const requests = [];
-  browser.runtime.setApi(async (method, requestPath) => {
-    requests.push([method, requestPath]);
-    return { supervisor_agent: responses.shift() };
-  });
-
-  await browser.runtime.load();
-  browser.runtime.draw();
-  assert.match(browser.html(), /supervisor-agent-health-degraded/);
-  assert.match(browser.html(), /supervising/);
-  assert.doesNotMatch(browser.html(), /Worker heartbeat delayed/);
-  assert.equal(browser.runtime.systemMessageCount(), 1);
-
-  browser.runtime.activateSystem();
-  browser.runtime.draw();
-  assert.match(browser.html(), /data-testid="toolbar-system-panel"/);
-  assert.match(browser.html(), /Worker heartbeat delayed/);
-  assert.match(browser.html(), /supervisor/);
-  assert.match(browser.html(), /00000000000000000000000001/);
-
-  browser.runtime.activate();
-  browser.runtime.initSSE();
-  assert.equal(FakeEventSource.latest.url, "/api/sse");
-  FakeEventSource.latest.emit("chat_event", {
-    session_id: "supervisor-shared",
-    in_flight: false,
-    closed: false,
-    event: {
-      id: "assistant-reconnect-1",
-      role: "assistant",
-      text: "Conversation refreshed after reconnect",
-    },
-  });
-  browser.runtime.draw();
-  assert.match(browser.html(), /Conversation refreshed after reconnect/);
-
-  await browser.runtime.load();
-  browser.runtime.activate();
-  browser.runtime.draw();
-  assert.match(browser.html(), /supervisor-agent-health-healthy/);
-  assert.doesNotMatch(browser.html(), /Worker heartbeat recovered/);
-  assert.equal(browser.runtime.systemMessageCount(), 2);
-  browser.runtime.activateSystem();
-  browser.runtime.draw();
-  assert.match(browser.html(), /Worker heartbeat delayed/);
-  assert.match(browser.html(), /Worker heartbeat recovered/);
-  assert.equal(browser.runtime.supervisorTab().sessionId, "supervisor-shared");
-  assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
-  assert.deepEqual(requests, [
-    ["GET", "/api/supervisor-agent"],
-    ["GET", "/api/supervisor-agent"],
-  ]);
-});
-
-test("polling refreshes supervisor status without replacing the prompt and routes events to System", async () => {
-  const browser = browserRuntime();
-  browser.runtime.setAttached();
-  browser.runtime.activate();
-  browser.runtime.draw();
-  const toolbarRenderCount = browser.toolbarRenderCount();
-  browser.runtime.setApi(async () => ({
-    supervisor_agent: snapshot({
-      lifecycle: "supervising",
-      active_work: 1,
-      events: [{
-        kind: "observation",
-        status: "running",
-        message: "Queue observation refreshed",
-        created_at: "2026-07-21T22:00:01Z",
-      }],
-    }),
-  }));
-
-  await browser.runtime.load();
-
-  assert.equal(browser.toolbarRenderCount(), toolbarRenderCount);
-  assert.match(browser.supervisorStatusHtml(), /supervising/);
-  assert.doesNotMatch(browser.supervisorStatusHtml(), /Queue observation refreshed/);
-  assert.equal(browser.runtime.systemMessageCount(), 1);
-  browser.runtime.activateSystem();
-  browser.runtime.draw();
-  assert.match(browser.html(), /Queue observation refreshed/);
-});
-
-test("status SSE keeps a long-running Supervisor toolbar current through Goal terminal states", async () => {
-  const browser = browserRuntime();
-  browser.runtime.setAttached();
-  browser.runtime.activate();
-  browser.runtime.draw();
-  const sessionId = "supervisor-long-running";
-  const transitions = [
-    ["in-progress", 1, 0, "observing", "healthy"],
-    ["failed", 0, 1, "idle", "attention"],
-    ["review", 0, 0, "idle", "healthy"],
-    ["done", 0, 0, "idle", "healthy"],
-  ];
-  const responses = transitions.map(([status, active, failed, lifecycle, health], index) => snapshot({
-    lifecycle,
-    health,
-    active_work: active,
-    failed_work: failed,
-    session_id: sessionId,
-    updated_at: `2026-07-22T22:00:0${index}Z`,
-    goal_states: { GOAL1: status },
-    events: transitions.slice(0, index + 1).map(([observedStatus], eventIndex) => ({
-      id: `goal-transition-${eventIndex}`,
-      kind: "observation",
-      status: observedStatus === "failed" ? "error" : "info",
-      message: `Goal GOAL1 entered workflow state ${observedStatus}.`,
-      goal_id: "GOAL1",
-      created_at: `2026-07-22T22:00:0${eventIndex}Z`,
-    })),
-  }));
-  const requests = [];
-  browser.runtime.setApi(async (method, requestPath) => {
-    requests.push([method, requestPath]);
-    return { supervisor_agent: responses.shift() };
-  });
-
-  await browser.runtime.load();
-  assert.match(browser.html(), /1 active/);
-  assert.match(browser.html(), /observing/);
-  browser.runtime.initSSE();
-  FakeEventSource.latest.emit("status_change", { status_counts: { "in-progress": 1 } });
-
-  for (const [status, active, failed, lifecycle, health] of transitions.slice(1)) {
-    FakeEventSource.latest.emit("status_change", { status_counts: { [status]: 1 } });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.match(browser.supervisorStatusHtml(), new RegExp(`${active} active`));
-    assert.match(browser.supervisorStatusHtml(), new RegExp(`${failed} failed`));
-    assert.match(browser.supervisorStatusHtml(), new RegExp(lifecycle));
-    assert.match(browser.supervisorStatusHtml(), new RegExp(`health-${health}`));
-    assert.equal(browser.runtime.supervisorTab().sessionId, sessionId);
-  }
-
-  assert.equal(browser.runtime.systemMessageCount(), 4);
-  assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
-  assert.deepEqual(requests, Array.from({ length: 4 }, () => ["GET", "/api/supervisor-agent"]));
-});
-
-test("polling an unchanged full supervisor event window does not duplicate System entries", async () => {
-  const browser = browserRuntime();
-  browser.runtime.setAttached();
-  const eventStart = Date.parse("2026-07-21T22:00:00Z");
-  const events = Array.from({ length: 80 }, (_, index) => ({
-    id: `supervisor-event-${index}`,
-    kind: index === 79 ? "recovery" : "observation",
-    status: index === 79 ? "completed" : "running",
-    message: `Supervisor event ${index}`,
-    created_at: new Date(eventStart + index * 1000).toISOString(),
-  }));
-  browser.runtime.setApi(async () => ({ supervisor_agent: snapshot({ events }) }));
-
-  await browser.runtime.load();
-  assert.equal(browser.runtime.systemMessageCount(), 80);
-
-  await browser.runtime.load();
-  assert.equal(browser.runtime.systemMessageCount(), 80);
-});
-
-test("initial prompts and active-work follow-ups share chat APIs and render every outcome", async () => {
-  const browser = browserRuntime();
-  browser.runtime.setAttached();
-  browser.runtime.activate();
-  const requests = [];
-  let inputCount = 0;
-  const events = [
-    ["queued", "queued", "Investigation queued"],
-    ["decision", "running", "Investigation running"],
-    ["recovery", "completed", "Bounded recovery completed"],
-    ["failure", "failed", "Worker restart failed"],
-    ["provider", "blocked", "Provider authentication required"],
-  ].map(([kind, status, message], index) => ({
-    kind,
-    status,
-    message,
-    retryable: status === "failed" || status === "blocked",
-    created_at: `2026-07-21T22:00:0${index}Z`,
-  }));
+  let sequence = 0;
   browser.runtime.setApi(async (method, requestPath, body) => {
     requests.push({ method, path: requestPath, body });
-    if (requestPath === "/api/supervisor-agent/session") {
-      return { session_id: "supervisor-shared" };
-    }
-    if (requestPath === "/api/supervisor-agent") {
-      return {
-        supervisor_agent: snapshot({
-          lifecycle: "supervising",
-          health: "degraded",
-          active_work: 1,
-          queued_work: 1,
-          failed_work: 1,
-          session_id: "supervisor-shared",
-          events,
-        }),
-      };
-    }
-    if (requestPath === "/api/chat/supervisor-shared/input") {
-      inputCount += 1;
-      return {
-        in_flight: true,
-        queued_messages: inputCount === 1
-          ? [queuedMessage("q1", "Investigate the delayed worker")]
-          : [
-              queuedMessage("q1", "Investigate the delayed worker"),
-              queuedMessage("q2", "Check its latest heartbeat"),
-            ],
-      };
-    }
-    throw new Error(`unexpected request ${method} ${requestPath}`);
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    sequence += 1;
+    const resumedWorktree = body.worktree || null;
+    return {
+      id: `session-${sequence}`,
+      process_id: `interactive-${sequence}`,
+      cwd: resumedWorktree?.path || (body.profile === "standalone" ? `/tmp/worktree-${sequence}` : "/repo"),
+      profile: body.profile,
+      provider: body.profile === "terminal" ? null : "codex",
+      worktree: resumedWorktree || (body.profile === "standalone"
+        ? { branch: `refine/standalone/${sequence}`, path: `/tmp/worktree-${sequence}` }
+        : null),
+    };
   });
 
-  await browser.runtime.send("Investigate the delayed worker", browser.runtime.supervisorTab());
-  await browser.runtime.send("Check its latest heartbeat", browser.runtime.supervisorTab());
-
-  const inputs = requests.filter((request) => request.path.endsWith("/input"));
-  assert.deepEqual(inputs.map((request) => request.path), [
-    "/api/chat/supervisor-shared/input",
-    "/api/chat/supervisor-shared/input",
-  ]);
-  assert.deepEqual(inputs.map((request) => request.body.text), [
-    "Investigate the delayed worker",
-    "Check its latest heartbeat",
-  ]);
-  assert.equal(
-    requests.filter((request) => request.path === "/api/supervisor-agent/session").length,
-    1,
-  );
-  assert.match(browser.html(), /data-testid="chat-pending-messages"/);
-  assert.match(browser.html(), /Investigate the delayed worker[\s\S]*Pending/);
-  assert.doesNotMatch(browser.html(), /data-testid="chat-queue-(?:text|save|remove)"/);
-  assert.match(browser.html(), /Agent working in session supervisor-shared/);
-  assert.doesNotMatch(browser.html(), /Provider authentication required/);
-
-  browser.runtime.activateSystem();
-  browser.runtime.draw();
-  for (const status of ["queued", "running", "completed", "failed", "blocked"]) {
-    assert.match(browser.html(), new RegExp(`data-system-log-status="${status}"`));
+  await browser.runtime.openPlan("Design a retry queue");
+  browser.runtime.openGoal("GOAL1");
+  for (const tabId of ["terminal", "supervisor", "plan", "GOAL1", "standalone"]) {
+    await browser.runtime.start(tabId);
   }
-  assert.match(browser.html(), /Provider authentication required/);
-  assert.match(browser.html(), /retryable/);
 
-  browser.runtime.activate();
-  browser.runtime.draw();
+  const starts = requests.filter((request) => request.path === "/api/terminal/session");
+  assert.deepEqual(starts.map((request) => request.body.profile), [
+    "terminal", "supervisor", "plan", "goal", "standalone",
+  ]);
+  assert.equal(starts.find((request) => request.body.profile === "goal").body.goal_id, "GOAL1");
+  assert.equal(starts.find((request) => request.body.profile === "plan").body.initial_prompt, "Design a retry queue");
+  assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");
+  assert.equal(browser.runtime.terminal("supervisor").processId, "interactive-2");
+  assert.equal(browser.runtime.terminal("GOAL1").processId, "interactive-4");
 
-  browser.runtime.emitChat({
-    session_id: "supervisor-shared",
-    in_flight: false,
-    closed: false,
-    event: {
-      id: "assistant-complete-1",
-      role: "assistant",
-      text: "Investigation completed without destructive recovery",
-    },
-  });
-  browser.runtime.draw();
-  assert.match(browser.html(), /Investigation completed without destructive recovery/);
-  assert.match(browser.html(), /Session supervisor-shared active/);
-
-  browser.runtime.emitChat({
-    session_id: "supervisor-shared",
-    in_flight: false,
-    closed: true,
-    event: {
-      id: "provider-auth-1",
-      role: "system",
-      text: "Provider authentication blocked; sign in and retry",
-    },
-  });
-  assert.match(browser.html(), /Session ended — Provider authentication blocked; sign in and retry/);
-  assert.match(browser.html(), /Provider authentication blocked; sign in and retry/);
+  await browser.runtime.stop("standalone");
+  await browser.runtime.start("standalone");
+  const restarted = requests.filter((request) => request.path === "/api/terminal/session").at(-1);
+  assert.equal(restarted.body.worktree.path, "/tmp/worktree-5");
+  assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");
 });
 
-test("a pending refresh does not block the toolbar or require a Goal page", async () => {
+test("Start, Stop, and Restart use terminal lifecycle routes", async () => {
   const browser = browserRuntime();
-  browser.runtime.setAttached();
-  browser.runtime.setRoute("dashboard");
-  browser.runtime.activate();
-  let resolveRefresh;
-  browser.runtime.setApi(() => new Promise((resolve) => {
-    resolveRefresh = resolve;
+  const requests = [];
+  let sequence = 0;
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    if (requestPath === "/api/terminal/session") {
+      sequence += 1;
+      return {
+        id: `supervisor-${sequence}`,
+        process_id: `interactive-supervisor-${sequence}`,
+        cwd: "/repo",
+        profile: "supervisor",
+        provider: "claude",
+      };
+    }
+    return { ok: true };
+  });
+
+  await browser.runtime.start("supervisor");
+  assert.equal(browser.runtime.terminal("supervisor").connected, true);
+  await browser.runtime.stop("supervisor");
+  assert.equal(browser.runtime.terminal("supervisor").exited, true);
+  browser.runtime.activate("supervisor");
+  assert.match(browser.html(), />Restart</);
+  await browser.runtime.start("supervisor");
+  assert.equal(browser.runtime.terminal("supervisor").sessionId, "supervisor-2");
+  assert.deepEqual(requests.map((request) => request[1]), [
+    "/api/terminal/session",
+    "/api/terminal/supervisor-1/stop",
+    "/api/terminal/session",
+  ]);
+});
+
+test("terminal output and exit events remain scoped to their tab", async () => {
+  const browser = browserRuntime();
+  let sequence = 0;
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    sequence += 1;
+    return {
+      id: `session-${sequence}`,
+      process_id: `interactive-${sequence}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: body.profile === "terminal" ? null : "codex",
+    };
+  });
+  await browser.runtime.start("terminal");
+  await browser.runtime.start("supervisor");
+  const [terminalEvents, supervisorEvents] = browser.events();
+  terminalEvents.emit("terminal_output", { seq: 1, data: "shell output" });
+  supervisorEvents.emit("terminal_output", { seq: 1, data: "agent output" });
+  supervisorEvents.emit("terminal_exit", { seq: 2, data: "exit 0" });
+
+  assert.equal(browser.runtime.terminal("terminal").display, "shell output");
+  assert.equal(browser.runtime.terminal("supervisor").display, "agent outputexit 0");
+  assert.equal(browser.runtime.terminal("terminal").connected, true);
+  assert.equal(browser.runtime.terminal("supervisor").exited, true);
+});
+
+test("stored custom-chat ids are discarded while managed terminal ids reattach", () => {
+  const storage = new Map();
+  storage.set("refine_chat_tabs", JSON.stringify({
+    tabs: {
+      supervisor: { label: "Supervisor", mode: "supervisor", sessionId: "legacy-chat" },
+      terminal: {
+        label: "Terminal",
+        mode: "terminal",
+        sessionId: "managed-terminal",
+        processId: "interactive-managed",
+        cwd: "/repo",
+      },
+    },
+    activeTabId: "supervisor",
+    open: true,
   }));
-
-  let settled = false;
-  const refresh = browser.runtime.load().then(() => { settled = true; });
-  await Promise.resolve();
-  assert.equal(settled, false);
-  browser.runtime.draw();
-  assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
-  assert.match(browser.html(), /loading/);
-
-  resolveRefresh({
-    supervisor_agent: snapshot({
-      lifecycle: "supervising",
-      health: "healthy",
-      active_work: 1,
-    }),
-  });
-  await refresh;
-  assert.match(browser.html(), /supervising/);
-  assert.doesNotMatch(browser.html(), /Goal [A-Z0-9]/);
+  const browser = browserRuntime(storage);
+  browser.runtime.restore();
+  assert.equal(browser.runtime.tab("supervisor").sessionId, null);
+  assert.equal(browser.runtime.tab("terminal").sessionId, "managed-terminal");
+  assert.equal(browser.runtime.terminal("terminal").connected, true);
 });
 
-test("Supervisor never offers manual Start or Stop controls", () => {
+test("switching projects stops live terminal profiles before clearing the toolbar", async () => {
   const browser = browserRuntime();
-  browser.runtime.activate();
-  browser.runtime.draw();
-
-  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
-  assert.doesNotMatch(browser.html(), /Start supervisor conversation/);
-
-  Object.assign(browser.runtime.supervisorTab(), {
-    sessionId: "supervisor-shared",
-    pending: true,
+  const requests = [];
+  let sequence = 0;
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    sequence += 1;
+    return {
+      id: `session-${sequence}`,
+      process_id: `interactive-${sequence}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: body.profile === "terminal" ? null : "codex",
+    };
   });
-  browser.runtime.draw();
+  await browser.runtime.start("terminal");
+  await browser.runtime.start("supervisor");
+  browser.runtime.reset();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(browser.html(), /Agent working in session supervisor-shared/);
-  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
-  assert.doesNotMatch(browser.html(), /Stop supervisor conversation/);
+  assert.deepEqual(
+    requests.filter((request) => request[1].endsWith("/stop")).map((request) => request[1]).sort(),
+    ["/api/terminal/session-1/stop", "/api/terminal/session-2/stop"],
+  );
 });

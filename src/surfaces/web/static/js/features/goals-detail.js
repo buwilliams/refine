@@ -301,7 +301,7 @@ function drawGoalDetail(goal) {
         ${backBtn}
         ${forwardBtn}
         <div class="goal-action-group">
-          <button class="goal-action-primary" id="btn-chat" data-testid="goal-open-chat">Open Chat</button>
+          <button class="goal-action-primary" id="btn-chat" data-testid="goal-open-chat">Open Agent</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu">
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">

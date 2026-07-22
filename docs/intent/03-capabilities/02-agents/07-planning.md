@@ -37,14 +37,14 @@ Draft Goal should offer the narrower conversion boundary for a user who wants he
 
 Current implementation details that matter to intent:
 
-- Plan Mode is a chat mode that drafts product and implementation intent;
-- Draft Feature extracts a Feature and Goals from a Plan transcript through shared import extraction;
-- Draft Goal extracts exactly one standalone Goal through the same shared import-extraction capability;
-- browser, CLI, HTTP API, and MCP adapters all expose Plan-to-Goal drafting without persisting before review;
+- browser Plan Mode is a managed terminal that launches the configured native agent harness with planning context and an optional starting prompt;
+- the planning agent uses the ordinary Refine CLI or API to create a Feature and naturally ordered Goals when the user chooses to persist the plan;
+- Refine does not parse the native harness transcript or maintain browser-only Draft Goal and Draft Feature controls;
+- CLI, HTTP API, MCP, and import surfaces may still expose structured drafting and review-before-persist where that interaction model is useful;
 - Plan and spec-like extraction should use architecture-aware drafting;
 - simple CSV, issue-list, and direct import flows should remain direct and not become planning exercises;
 - review-before-persist should remain the boundary before creating durable work.
 
 ## Future Direction
 
-Future planning should become less transcript-bound and more structured. Agents may propose questions, alternatives, prototypes, source evidence, dependency graphs, and implementation slices. They should use improving model capabilities to widen the ambition of feasible work, including outcomes previously dismissed as too slow or expensive. They should still preserve the core posture: help the user think clearly, then turn selected intent into reviewable work without narrowing the user's design space.
+Future planning should improve the context and workflow tools available to native agent harnesses rather than recreating their interaction UX. Agents may propose questions, alternatives, prototypes, source evidence, dependency graphs, and implementation slices. They should use improving model capabilities to widen the ambition of feasible work, including outcomes previously dismissed as too slow or expensive. They should still preserve the core posture: help the user think clearly, then turn selected intent into reviewable work without narrowing the user's design space.

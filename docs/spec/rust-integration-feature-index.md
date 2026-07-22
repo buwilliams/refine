@@ -146,7 +146,7 @@ Nav: Command Palette
 	Commands
 		Nav: Dashboard, Goals, Changes, Logs, node/settings surfaces & tabs
 		Create: New Goal, Import
-		AI: Plan (make a plan), Draft Goal from plan, Draft Feature from plan, Generate target-app config with AI
+		AI: Plan (open the managed Plan terminal), Generate target-app config with AI
 		Toolbar: Toggle Toolbar, Maximize Toolbar, Files open, Files search
 		Goals: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
 		Changes: clear filters
@@ -172,7 +172,10 @@ Nav: Toolbar (bottom dock)
 		Toggle full-screen (fills viewport below topbar, implies open)
 		Resize (drag handle, 120px–85vh), persists height
 		Persists tabs/active tab/open/height/fullscreen across reload & project switch reset
-	Persistent Tabs (order: System, Files, Terminal, Standalone) + dynamic Goal chat / Goal log / Plan tabs
+	Persistent Tabs (order: Supervisor, System, Files, Terminal, Standalone) + dynamic Goal terminal / Goal log / Plan terminal tabs
+		Supervisor terminal
+			Start/Stop/Restart the configured agent CLI in the target app checkout with workflow-monitoring context
+			Managed process metadata includes profile, role, provider, and terminal session id
 		System
 			Recent system operations log (time, message, color by status)
 			Filters: All, Info, Started, Queued, Completed, Errors (persisted)
@@ -184,31 +187,32 @@ Nav: Toolbar (bottom dock)
 			Content panel: status line, Copy contents
 				Image preview (lightbox); text preview with line numbers + syntax highlighting; non-previewable message
 				Scroll-to-load more (128KB chunks)
-		Standalone chat (default, no Goal)
-			Session: Start/Stop standalone, status line (no session / active / ended — reason)
-			Output (Markdown, auto-scroll), read-only pending user messages, docked session status
-			Inline Activity disclosure (collapsed by default; expand for last lines and busy state)
-			Input (always prompt-ready; draft/focus/caret survive redraws; Enter send, Shift+Enter newline), Send
-			Clear history (confirmation: Clear / Keep history)
-		Goal chat (opened via Open Chat on a Goal)
+		Terminal
+			Start/Stop/Restart a standard interactive shell with no agent launched
+		Standalone terminal (default, no Goal)
+			Start/Stop/Restart the configured agent CLI in a Refine-owned Git worktree
+			Stopping preserves the worktree; restart validates and reuses the same branch and path
+		Goal terminal (opened via Open Agent on a Goal)
 			Tab labeled "Goal {id}…", link to goal, Close tab
-			Goal status tracked; same chat input/output/pending-message/inline-activity behavior as standalone
-			Draft Round (extract): enabled when agent responded, status valid, not busy
-				Extract round modal: review prompt (editable), reporter, Add round / Cancel, Escape close
+			Configured agent CLI receives fresh durable Goal context at launch
+			Uses the same PTY input, output, resize, and lifecycle behavior as every terminal profile
 		Goal log tail (opened via Watch Logs on a Goal)
 			Tab labeled "Logs {id}…"; live indicator, Goal link, Open full logs, Refresh, Close tab
 			Loads the newest 200 Goal activity entries, defaults to chronological Tail order, and appends deduplicated Goal logs from SSE
 			Compact text stream shows time, severity, category, actor, safely formatted message links/actions, and expandable details
 			Search filters the recent trail; Head shows newest first and Tail shows newest last; empty/loading/error states remain visible
-		Plan chat / Plan Mode (toolbar tab, mode "plan")
-			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
-			Same chat input/output/pending-message/inline-activity behavior
-			Draft Goal: enabled when agent responded → extracts exactly one standalone Goal for review, minimizes toolbar
-			Draft Feature: enabled when agent responded → opens Plan draft modal, minimizes toolbar
-		Tab management: active-session dot, activity pulse, close (non-standard tabs), reorder
+		Plan terminal / Plan Mode (toolbar tab, profile "plan")
+			Tab labeled "Plan"; Start/Stop/Restart; optional initial prompt
+			Configured agent CLI receives planning and Refine CLI persistence guidance at launch
+		Shared terminal behavior
+			One xterm renderer and PTY API for Terminal, Supervisor, Plan, Goal, and Standalone profiles
+			Each session registers as `interactive_session` in the daemon process registry and appears in Processes
+			Terminal output uses per-session SSE; input and resize use the terminal API
+			Session/process/provider/cwd/worktree state is tab-specific and reload can reattach to a live session
+		Tab management: active-session dot, close (non-standard tabs), reorder
 Modals
 	Goal Modal (#/goals/:id)
-		Header: name, status pill, priority pill, workflow back/forward buttons, Open Chat
+		Header: name, status pill, priority pill, workflow back/forward buttons, Open Agent
 		Metadata: goal ID, created, updated, node owner, branch
 		Feature association: Feature link + order, or "Standalone"
 		Banners: failure (error from logs), governance (warn/error)
@@ -304,13 +308,13 @@ Implementation Internals (for e2e testing)
 		Screen-data GET cache TTL 5000ms (SCREEN_DATA_CACHE_TTL_MS); pass {cache:false} to bypass; invalidated on every SSE event
 		Background prefetch: delay 2000ms after navigation, 50ms between requests, 30000ms per-screen cooldown
 	Polling / timers
-		Chat output poll: setInterval(pollChat, 800) — only the active chat tab (not Files/System); reads GET /api/chat/:id/read
+		Terminal output is event-driven per live session; no toolbar chat polling
 		Running-cell elapsed tickers: 1000ms (process/subprocess elapsed)
 		Dashboard refresh timeout: 6000ms
 		Toast auto-dismiss: 4000ms
 		Path-preview refresh: 120ms
 	localStorage keys
-		refine_chat_tabs (CHAT_TABS_STORAGE_KEY) — toolbar tabs, activeTabId, open, bodyHeight, fullscreen, per-tab output(last 50k)/progress(last 20k)/session/queue
+		refine_chat_tabs (legacy storage-key name retained for compatibility) — toolbar tabs, activeTabId, open, bodyHeight, fullscreen, and per-tab terminal session/process/provider/cwd/worktree state
 		refine_system_tab / refine_node_tab / refine_project_tab — last active settings tab per surface
 		refine_guide_state / refine_guide_checklist / refine_guide_width — guide panel mode, checklist status, panel width
 		refine_last_reporter — global reporter selection
@@ -321,7 +325,7 @@ Implementation Internals (for e2e testing)
 		Import draft page size 25 (IMPORT_DRAFT_PAGE_SIZE); Feature-modal goals page size 25
 		System operation log limit 250 (SYSTEM_OPERATION_LOG_LIMIT), 5s dedupe window
 		Files: tree max depth 3, max 200 entries/dir, search max 20 results, search debounce 250ms, text chunk 128000 bytes (scroll-to-load)
-		Chat activity pulse 1800ms; chat output persisted last 50000 chars, progress last 20000 chars
+		Terminal scrollback is maintained by each xterm instance while the page is open; the backend event backlog supports live-session reattachment
 		List search debounce ~120ms (status_change keeps keystroke alive via table-only refresh)
 		Guide panel width clamp 280–560px (GUIDE_MAX_WIDTH 560)
 		Toolbar dock height clamp 120px–85vh (default 20vh)
@@ -338,15 +342,17 @@ Implementation Internals (for e2e testing)
 		cancelled → ← Todo (back: todo)
 		Status enum: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
 		Priority enum: low, medium, high
-	Chat sessions
-		POST /api/chat/start with body { purpose:"plan" } (Plan tab) | { goal_id } (Goal chat) | {} (Standalone)
-		Send POST /api/chat/:id/input; read GET /api/chat/:id/read (lines, progress_lines, queued_messages, in_flight, alive, closed_reason); stop POST /api/chat/:id/stop; queue edit/delete PATCH/DELETE /api/chat/:id/queue/:msgId
-		in_flight authoritative for "agent busy"; alive=false closes session and sets closed_reason
+	Interactive terminal sessions
+		POST /api/terminal/session with body { profile:"terminal"|"supervisor"|"plan"|"goal"|"standalone", goal_id?, feature_id?, initial_prompt?, worktree?, cols?, rows? }
+		GET /api/terminal/:id/events streams terminal_output, terminal_error, and terminal_exit events; POST /api/terminal/:id/input sends bytes; POST /api/terminal/:id/resize changes PTY size; POST /api/terminal/:id/stop terminates it
+		Start response includes terminal id, managed process id, profile, provider, cwd, and optional worktree; the process can also be stopped through POST /api/processes/:process_id/stop
+	Backend chat sessions
+		/api/chat remains a backend capability for workflow automation and non-browser adapters; toolbar agent profiles do not use it as their interaction renderer
 	Key element IDs / selectors
 		Topbar: brand[data-route=dashboard], nav a[data-route=dashboard|features|goals|changes|logs], #nav-context-menu, #global-reporter, #target-app-indicator, #agent-status-indicator, #btn-command-palette, #btn-refine-issue, #btn-new-goal, #nav-create-menu, #btn-new-feature, #btn-plan, #btn-import; #active-node-label
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab], #goal-log-tail, #btn-goal-log-refresh
-		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, [data-testid=chat-pending-messages], [data-testid=chat-inline-activity], #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
+		Terminal profiles: [data-testid=toolbar-terminal-panel], [data-testid=terminal-start], [data-testid=terminal-stop], [data-testid=terminal-status], [data-testid=terminal-profile], [data-testid=terminal-worktree], [data-testid=terminal-output]
 		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
 		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), #bulk-export-jira, table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist

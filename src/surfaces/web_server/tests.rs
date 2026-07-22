@@ -708,21 +708,17 @@ fn static_import_modal_exposes_feature_import_surface() {
 }
 
 #[test]
-fn static_plan_chat_shows_initial_design_prompt() {
+fn static_plan_mode_uses_managed_terminal_with_initial_context() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
-    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
 
-    assert!(toolbar.contains("function renderChatOutput"));
-    assert!(toolbar.contains("What do you want to design together?"));
-    assert!(toolbar.contains("renderChatOutput(active)"));
-    assert!(toolbar.contains("renderChatOutput(tab)"));
-    assert!(toolbar.contains(r#"data-testid="plan-draft-goal""#));
-    assert!(toolbar.contains("async function draftGoalFromPlan"));
-    assert!(toolbar.contains(r#"purpose: "plan_goal""#));
-    assert!(toolbar.contains(r#"testIdPrefix: "plan-goal-draft""#));
-    assert!(commands.contains(r#"id: "plan.draft_goal""#));
-    assert!(commands.contains(r#"title: "Draft Goal from plan""#));
+    assert!(toolbar.contains("INTERACTIVE_TERMINAL_MODES"));
+    assert!(toolbar.contains(r#"profile: tab.mode"#));
+    assert!(toolbar.contains(r#"initial_prompt: tab.initialPrompt"#));
+    assert!(toolbar.contains(r#"data-testid="terminal-start""#));
+    assert!(toolbar.contains(r#"data-testid="terminal-stop""#));
+    assert!(!toolbar.contains("renderChatPanel"));
+    assert!(!toolbar.contains("/api/chat/start"));
 }
 
 #[test]
@@ -746,22 +742,24 @@ fn static_goal_log_tail_uses_toolbar_and_shared_sse_activity() {
 }
 
 #[test]
-fn static_toolbar_keeps_supervisor_agent_visible_and_uses_shared_chat() {
+fn static_toolbar_keeps_supervisor_visible_and_uses_shared_managed_terminal() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
     let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
 
     assert!(toolbar.contains(r#"label: "Supervisor", mode: "supervisor""#));
     assert!(toolbar.contains("STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID"));
-    assert!(toolbar.contains(r#"api("GET", "/api/supervisor-agent")"#));
-    assert!(toolbar.contains(r#"api("POST", "/api/supervisor-agent/session"#));
-    assert!(toolbar.contains("renderChatPanel(active, chatOptions)"));
+    assert!(toolbar.contains(r#"api("POST", "/api/terminal/session"#));
+    assert!(toolbar.contains("toolbarTabUsesTerminal(active)"));
+    assert!(toolbar.contains("renderTerminalPanel(active)"));
     assert!(toolbar.contains("recordSupervisorAgentEvents(snapshot?.events)"));
     assert!(toolbar.contains(r#"category: "supervisor""#));
-    assert!(!toolbar.contains(r#"data-testid="supervisor-agent-events""#));
-    assert!(toolbar.contains(r#"data-testid="supervisor-agent-conversation""#));
-    assert!(toolbar_css.contains(".supervisor-agent-summary"));
-    assert!(!toolbar_css.contains(".supervisor-agent-events"));
+    assert!(!toolbar.contains("renderSupervisorPanel"));
+    assert!(!toolbar.contains("renderChatPanel"));
+    assert!(!toolbar.contains(r#"data-testid="supervisor-agent-conversation""#));
+    assert!(!toolbar_css.contains(".supervisor-agent-summary"));
+    assert!(!toolbar_css.contains(".chat-input-wrap"));
+    assert!(toolbar_css.contains(".terminal-panel"));
 }
 
 #[test]
@@ -4840,15 +4838,34 @@ fn web_server_runs_interactive_terminal_session() {
 
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(temp_root.join("run/8080"));
 
     let start = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/terminal/session".to_string(),
         body: Some(json!({"cols": 80, "rows": 20})),
     });
-    assert_eq!(start.status, 200);
+    assert_eq!(start.status, 200, "{}", start.body);
     assert_eq!(start.body["cwd"], temp_root.display().to_string());
+    assert_eq!(start.body["profile"], "terminal");
+    assert!(
+        start.body["process_id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("interactive-"))
+    );
     let session_id = start.body["id"].as_str().unwrap().to_string();
+    let process_id = start.body["process_id"].as_str().unwrap();
+    let managed = FileProcessSupervisor::new(server.runtime_root.as_ref().unwrap())
+        .list()
+        .unwrap();
+    assert!(managed.iter().any(|process| process.id == process_id));
+
+    let resize = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/resize"),
+        body: Some(json!({"cols": 120, "rows": 36})),
+    });
+    assert_eq!(resize.status, 200, "{}", resize.body);
 
     let input = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4881,6 +4898,39 @@ fn web_server_runs_interactive_terminal_session() {
         body: None,
     });
     assert_eq!(stop.status, 200);
+
+    let second = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"cols": 80, "rows": 20})),
+    });
+    assert_eq!(second.status, 200, "{}", second.body);
+    let second_process_id = second.body["process_id"].as_str().unwrap().to_string();
+    let process_stop = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/processes/{second_process_id}/stop"),
+        body: Some(json!({"signal": "terminate"})),
+    });
+    assert_eq!(process_stop.status, 200, "{}", process_stop.body);
+    assert_eq!(process_stop.body["process"]["kind"], "interactive_session");
+    for _ in 0..40 {
+        if !FileProcessSupervisor::new(server.runtime_root.as_ref().unwrap())
+            .list()
+            .unwrap()
+            .iter()
+            .any(|process| process.id == second_process_id)
+        {
+            break;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    assert!(
+        !FileProcessSupervisor::new(server.runtime_root.as_ref().unwrap())
+            .list()
+            .unwrap()
+            .iter()
+            .any(|process| process.id == second_process_id)
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

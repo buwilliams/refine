@@ -42,6 +42,14 @@ pub struct ProviderInvocationResult {
     pub raw_output: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct InteractiveProviderCommand {
+    pub provider: String,
+    pub display_name: String,
+    pub binary: String,
+    pub args: Vec<String>,
+}
+
 pub trait AgentProviderService {
     fn detect(&self) -> RefineResult<Vec<ProviderCapability>>;
     fn configure(&self, provider: &str) -> RefineResult<()>;
@@ -175,6 +183,25 @@ impl HostAgentProviderService {
             )));
         };
         Ok((spec, path))
+    }
+
+    /// Resolve the configured provider into its native interactive CLI invocation.
+    ///
+    /// Interactive toolbar sessions deliberately do not use the JSON/print modes used by
+    /// workflow automation. The provider owns its conversation UX while Refine owns the PTY,
+    /// working directory, process lifecycle, and initial orchestration context.
+    pub fn interactive_command(
+        &self,
+        provider: &str,
+        prompt: &str,
+    ) -> RefineResult<InteractiveProviderCommand> {
+        let (spec, binary) = self.resolve_binary_for_provider(provider)?;
+        Ok(InteractiveProviderCommand {
+            provider: provider.to_string(),
+            display_name: spec.display_name.to_string(),
+            args: spec.interactive_args(prompt),
+            binary,
+        })
     }
 
     pub fn invoke_detailed(
@@ -485,6 +512,20 @@ impl ProviderSpec {
             }
             "smoke-ai" => vec![binary_path.to_string(), prompt.to_string()],
             _ => vec![binary_path.to_string(), prompt.to_string()],
+        }
+    }
+
+    fn interactive_args(&self, prompt: &str) -> Vec<String> {
+        if prompt.trim().is_empty() {
+            return Vec::new();
+        }
+        match self.name {
+            // Claude Code and Codex accept an initial interactive prompt positionally.
+            "claude" | "codex" | "smoke-ai" => vec![prompt.to_string()],
+            // Gemini and Copilot distinguish an initial interactive prompt from their
+            // non-interactive print modes with `-i`.
+            "gemini" | "copilot" => vec!["-i".to_string(), prompt.to_string()],
+            _ => vec![prompt.to_string()],
         }
     }
 
@@ -936,6 +977,43 @@ mod tests {
             .find(|provider| provider.name == "claude")
             .unwrap();
         assert!(!claude.installed);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn interactive_provider_commands_keep_the_native_cli_conversation_mode() {
+        let temp_root = unique_temp_dir("interactive-provider-command");
+        let bin_dir = temp_root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        for binary in ["claude", "codex", "gemini", "copilot", "smoke-ai"] {
+            let path = bin_dir.join(binary);
+            fs::write(&path, "#!/bin/sh\n").unwrap();
+            make_executable(&path);
+        }
+        let service = HostAgentProviderService {
+            path_override: Some(bin_dir.display().to_string()),
+            ..HostAgentProviderService::default()
+        };
+
+        for provider in ["claude", "codex", "smoke-ai"] {
+            let command = service
+                .interactive_command(provider, "initial context")
+                .unwrap();
+            assert_eq!(command.args, ["initial context"]);
+            assert!(
+                !command
+                    .args
+                    .iter()
+                    .any(|arg| { matches!(arg.as_str(), "--print" | "exec" | "-p" | "--prompt") })
+            );
+        }
+        for provider in ["gemini", "copilot"] {
+            let command = service
+                .interactive_command(provider, "initial context")
+                .unwrap();
+            assert_eq!(command.args, ["-i", "initial context"]);
+        }
 
         fs::remove_dir_all(temp_root).unwrap();
     }
