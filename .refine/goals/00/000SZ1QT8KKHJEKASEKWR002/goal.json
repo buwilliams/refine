@@ -16,41 +16,41 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:19:36Z",
-      "governance_checked_at": "2026-07-22T00:08:51Z",
+      "governance_checked_at": "2026-07-22T00:31:12Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1",
         "failed_actions": [
           {
-            "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
-            "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
-            "rule_id": "rule-5"
+            "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
+            "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
+            "rule_id": "rule-4"
           }
         ],
         "governance_configured": true,
         "phase": "post_implementation",
         "provider": "codex",
-        "raw_output": "{\"status\":\"failed\",\"message\":\"Cross-surface verification is insufficient for the new source-promotion control.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.\",\"message\":\"The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.\"}]}",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"The source-promotion API introduces an undocumented compatibility break.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.\",\"message\":\"POST /api/system/source/promote now rejects previously valid requests unless {\\\"confirmed\\\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.\"}]}",
         "rules_checked": 6,
         "verdict": {
-          "message": "Cross-surface verification is insufficient for the new source-promotion control.",
+          "message": "The source-promotion API introduces an undocumented compatibility break.",
           "status": "failed",
           "violations": [
             {
-              "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
-              "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
-              "rule_id": "rule-5"
+              "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
+              "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
+              "rule_id": "rule-4"
             }
           ]
         },
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1"
       },
-      "governance_message": "Cross-surface verification is insufficient for the new source-promotion control.",
+      "governance_message": "The source-promotion API introduces an undocumented compatibility break.",
       "governance_rule_actions": [
         {
-          "message": "The browser/API daemon-replacement affordance is covered only by static source-text assertions and a checkout-detection unit test. No integration test verifies the API response drives visibility and disabled states or that confirmation, promotion, failure, and reconnect behavior work end to end.",
-          "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
-          "rule_id": "rule-5"
+          "message": "POST /api/system/source/promote now rejects previously valid requests unless {\"confirmed\":true} is supplied, while API contract version 1 remains unchanged. The spec mentions the browser marker but does not identify the breaking change, migration requirement for API or agent clients, or operator impact.",
+          "rule": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
+          "rule_id": "rule-4"
         }
       ],
       "implementation_report": "Goal `00000SZ1QT8KKHJEKASEKWR002` is implemented and ready for review at commit `4ee0945`.\n\nAfter-action report:\n\n- Changed source-update visibility and enabled-state decisions to come from the shared API capability.\n- Added explicit API confirmation before promotion can be queued.\n- Added integration coverage for available, blocked, updating, failed/retry, reconnect, and hidden states.\n- Updated the architecture specification.\n- Reason: the previous implementation failed governance due to insufficient cross-surface recovery testing.\n\nExact verification:\n\n- Focused integration tests: 3 passed, 0 failed.\n- `cargo test --lib -- --test-threads=1`: 353 passed, 0 failed.\n- `cargo fmt --all -- --check`: exit 0.\n- JavaScript `node --check`: exit 0.\n- `cargo clippy --lib -- -D warnings`: exit 0.\n- `xtask check`: exit 0; 53 static assets present.\n- `git diff --check`: exit 0.\n- Final worktree: clean.\n\nOne intermediate format check exited 1; formatting was applied and all final checks passed.\n\nGoal-agent usage: 219,445 tokens over approximately 10m23s.",
@@ -65,10 +65,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "failed",
-      "updated": "2026-07-22T00:27:02Z"
+      "updated": "2026-07-22T00:31:12Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T00:27:02Z"
+  "updated": "2026-07-22T00:31:12Z"
 }
