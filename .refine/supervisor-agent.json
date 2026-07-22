@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "observing",
-  "health": "degraded",
+  "health": "healthy",
   "active_work": 0,
   "queued_work": 2,
   "failed_work": 0,
@@ -43,11 +43,9 @@
     "00000SZ2BGCG909VDSW41YW00D": "todo",
     "00000SZ2BK8ZEHQYBFB41YW00E": "todo"
   },
-  "open_issues": {
-    "state_sync": "Refine state synchronization failed: background process launch is stopped"
-  },
+  "open_issues": {},
   "last_context_key": "goals=00000SZ2BGCG909VDSW41YW00D:todo,00000SZ2BK8ZEHQYBFB41YW00E:todo|live={}|quiet={}|issues=state_sync:Refine state synchronization failed: background process launch is stopped",
-  "updated_at": "2026-07-22T10:54:06.981596155+00:00",
+  "updated_at": "2026-07-22T10:54:14.104965379+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -527,6 +525,15 @@
       "message": "Goal 00000SZ2BK8ZEHQYBFB41YW00E entered workflow state todo.",
       "created_at": "2026-07-22T10:54:06.980853284+00:00",
       "goal_id": "00000SZ2BK8ZEHQYBFB41YW00E",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:54:14.104958575+00:00-50",
+      "kind": "recovery",
+      "status": "complete",
+      "message": "Refine state synchronization: state synchronized and projection refreshed",
+      "created_at": "2026-07-22T10:54:14.104958575+00:00",
       "actionable": false,
       "retryable": false
     }

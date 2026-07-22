@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:54:06Z",
-  "updated_at": "2026-07-22T10:54:06Z",
+  "updated_at": "2026-07-22T10:54:16Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:54:06Z",
@@ -24,6 +24,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T10:54:16Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717656188-6",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m taking over the supervisor loop now. I’ll first reconcile the two queued goal IDs against live workflow, process, Git, projection, and activity evidence, then use only Refine’s auditable recovery paths and keep watching until the queue is genuinely idle. I’ll surface any provider/authentication failure unchanged and stop for your decision if recovery would cross a confirmation boundary."
     }
   ],
   "queue_dispatching": true,
