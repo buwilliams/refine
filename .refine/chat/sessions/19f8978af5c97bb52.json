@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:29:25Z",
+  "updated_at": "2026-07-22T11:32:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -300,6 +300,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The failed Feature-authoring Goal is now in round 2 with the governance evidence embedded in its prompt, and the prior worktree/candidate remains intact. Refine also completed the pending Logs review while maintaining six active slots. All six workflow processes currently show forward activity; one is in the full library test gate and the others are editing or mapping their scoped paths."
+    },
+    {
+      "created_at": "2026-07-22T11:32:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719965128-40",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The queue remains healthy: the autonomous-recovery Goal has produced candidate `ebfeec18…` and is in governance, while the other five active agents continue emitting fresh repository/test activity. No provider/authentication errors or lost claims are present, so I’m leaving healthy work untouched and reserving intervention for explicit governance or execution failures."
     }
   ],
   "queue_dispatching": true,
