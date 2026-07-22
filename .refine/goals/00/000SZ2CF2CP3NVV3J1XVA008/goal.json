@@ -126,9 +126,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T11:50:31Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:51:23Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate a0f1c58eacf61b1d28c2a15e9f78da30f0cc7caa, but do not reimplement Quality core. After sibling Goal 00000SZ2CF255HWFA0G9XVA006 converges on main and Goal 00000SZ2CF28DJN97511XVA007 establishes the one shared evaluator/retry/evidence path, rebase or compose this Goal as a thin UX/documentation change on those authoritative capabilities. Remove competing workflow evaluators, parsers, FileQualityService command semantics, caller-supplied command checks, and split Node versus quality/settings ownership from this branch; UI/API/CLI/desktop/MCP must read and invoke the shared model/service only. Preserve and explicitly migrate legacy quality_timing (including post_build) into the one authoritative local durable settings record without silently defaulting. Keep retry-quality and supervised execution/evidence semantics owned by the shared core, and add only the cross-surface UX/evidence presentation tests needed here: requirements/instructions/ordered tests editors, timing, always-on Quality plus Governance explanation, Goal summary/per-test evidence, accessibility, responsive layout, and API/CLI documentation parity. Verify this branch does not accept non-JSON prose or self-reported evidence and does not expose arbitrary command or empty-command success paths, but reuse core tests instead of cloning them. Preserve isolated worktrees and serial review; do not force merges.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:51:23Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:50:31Z"
+  "updated": "2026-07-22T11:51:23Z"
 }
