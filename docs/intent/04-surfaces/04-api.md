@@ -22,6 +22,8 @@ Those groups are useful because they map surfaces onto shared behavior. They sho
 
 Plan-to-Goal drafting uses the shared `/import/extract` route with purpose `plan_goal`; it returns exactly one unpersisted Goal draft so browser, CLI, and agent adapters can preserve their own explicit review boundary.
 
+Goal evidence export uses `GET /work/goals/{id}/export/jira`. It returns the Jira CSV, filename, content type, and commit count from one shared export service so browser downloads, CLI output, desktop, and agent callers receive identical evidence.
+
 The API should remain local-first. It should be secure by context, constrained by local daemon ownership, and careful about which operations mutate target state.
 
 ## Future Direction

@@ -260,6 +260,17 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
+    /// Export a Jira-importable CSV containing the Goal's SOC 2 delivery evidence.
+    Export {
+        /// Goal id.
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+        /// Write the CSV to a file instead of standard output.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Edit a Goal's metadata (name and/or priority). Only valid while the Goal's status allows editing.
     Edit {
         /// Goal id.

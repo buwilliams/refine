@@ -199,6 +199,16 @@ pub fn tool_catalog() -> Vec<McpTool> {
             },
         },
         McpTool {
+            name: "refine_export_goal_jira",
+            description: "Export a Goal's SOC 2 delivery evidence as Jira-importable CSV, including implementation reports and commits.",
+            input_schema: goal_id_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/work/goals/{goal_id}/export/jira",
+                path_params: &["goal_id"],
+            },
+        },
+        McpTool {
             name: "refine_draft_goal",
             description: "Draft exactly one implementation-ready Goal from a Plan transcript for review. This does not persist the Goal.",
             input_schema: plan_goal_draft_schema,
