@@ -1,0 +1,13 @@
+{
+  "migrated_at": "2026-07-22T12:24:12Z",
+  "sources": [
+    {
+      "enabled_commands": [],
+      "quality_timing": "pre_merge",
+      "quality_was_enabled": false,
+      "source": "node:default",
+      "timeout_seconds": 600
+    }
+  ],
+  "version": 1
+}
