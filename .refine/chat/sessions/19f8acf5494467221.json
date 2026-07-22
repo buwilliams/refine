@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:17:51Z",
+  "updated_at": "2026-07-22T17:18:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -156,6 +156,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Two goals have cleared implementation, governance, and Quality and are now in `review`; three remain active. I’m auditing the review evidence and Refine’s normal transition commands before approving anything—`review` is not being treated as an automatic merge authorization."
+    },
+    {
+      "created_at": "2026-07-22T17:18:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740680372-81",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The scrollbar goal was approved through Refine’s normal non-force path: its candidate merged cleanly, pushed to `origin/main`, and its worktree was cleaned only after merge. One separate goal—autonomous failed-Goal recovery—has now failed its validation and is explicitly visible as retryable; I’m inspecting that failure before deciding whether an evidence-backed retry is appropriate. The no-op Quality UX review remains unapproved because its own report says its prerequisites are not yet on `main`."
     }
   ],
   "queued_messages": [
