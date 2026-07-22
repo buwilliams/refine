@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:04:19Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:12:43Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A8GT1HPT5JXR1YW006-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Implementation respects the Governance rules and includes focused verification for the shared workflow prompt change.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "Implementation respects the Governance rules and includes focused verification for the shared workflow prompt change.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A8GT1HPT5JXR1YW006-round-1"
+      },
+      "governance_message": "Implementation respects the Governance rules and includes focused verification for the shared workflow prompt change.",
       "governance_rule_actions": [],
       "implementation_report": "Implemented Goal `00000SZ2A8GT1HPT5JXR1YW006`, ready for Refine’s review handoff.\n\n- Changed the workflow agent prompt to include Goal metadata, notes, prior-round prompts/results, and the latest Round.\n- The latest Round is explicitly authoritative when prior context conflicts.\n- Runtime logs are excluded to prevent unnecessary prompt growth.\n- Added regression coverage across two modified files.\n\nVerification:\n\n- Focused regression: exit 0 — 1 passed.\n- Workflow suite: exit 0 — 27 passed, 0 failed.\n- `cargo clippy --lib -- -D warnings`: exit 0.\n- Formatting and diff checks: exit 0.\n- One initial generic Cargo filter exited 2 because Refine’s custom test harness interpreted the test name as a suite flag; the corrected library-only command passed.\n\nGoal tracking completed in 4m 52s using 107,396 tokens.",
       "implementation_reported_at": "2026-07-22T10:11:35Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Agents work on the latest Round, but they should have context from the Goal and previous rounds.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:12:44Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:11:35Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:12:44Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:11:35Z"
+  "updated": "2026-07-22T10:12:45Z"
 }
