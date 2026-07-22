@@ -369,28 +369,61 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T12:58:47Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T13:36:17Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-5",
+        "failed_actions": [
+          {
+            "message": "POST /api/operations/{id}/cancel delegates a workflow-owned Quality operation to QualityOperationRunner::cancel, which cancels the operation and process but not its workflow claim. The resulting cancellation propagates as an error from WorkflowQa, and execute_claimed_work unconditionally marks the still-Running claim Failed. A single cancellation therefore leaves the operation and Goal Quality evidence Cancelled while the correlated workflow claim is Failed.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Governance review found one committed cancellation-state violation.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"POST /api/operations/{id}/cancel delegates a workflow-owned Quality operation to QualityOperationRunner::cancel, which cancels the operation and process but not its workflow claim. The resulting cancellation propagates as an error from WorkflowQa, and execute_claimed_work unconditionally marks the still-Running claim Failed. A single cancellation therefore leaves the operation and Goal Quality evidence Cancelled while the correlated workflow claim is Failed.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Governance review found one committed cancellation-state violation.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "POST /api/operations/{id}/cancel delegates a workflow-owned Quality operation to QualityOperationRunner::cancel, which cancels the operation and process but not its workflow claim. The resulting cancellation propagates as an error from WorkflowQa, and execute_claimed_work unconditionally marks the still-Running claim Failed. A single cancellation therefore leaves the operation and Goal Quality evidence Cancelled while the correlated workflow claim is Failed.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-5"
+      },
+      "governance_message": "Governance review found one committed cancellation-state violation.",
+      "governance_rule_actions": [
+        {
+          "message": "POST /api/operations/{id}/cancel delegates a workflow-owned Quality operation to QualityOperationRunner::cancel, which cancels the operation and process but not its workflow claim. The resulting cancellation propagates as an error from WorkflowQa, and execute_claimed_work unconditionally marks the still-Running claim Failed. A single cancellation therefore leaves the operation and Goal Quality evidence Cancelled while the correlated workflow claim is Failed.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
       "implementation_report": "Goal `00000SZ2CF255HWFA0G9XVA006` is complete and reviewable.\n\nCommit: `019c38286de0d4088f5c4dda096e1031bc8d4d73` — `Close Quality cancellation race windows`  \nPreserved candidate: `d13adee7b63d5173f2af9e666b16cb09cf26884c`  \nWorktree: clean\n\nChanged:\n\n- Quality now treats the authoritative terminal operation record as the race result; cancelled, interrupted, or failed operations cannot persist passing evidence or advance workflow.\n- Workflow cancellation reconciles correlated Quality operations before changing claims, including late success, failure, and interruption.\n- Operation registration and cancellation are correlated across the startup race.\n- Failed Quality results retain structured diagnostics and operation IDs in Goal evidence.\n- Added deterministic barriers and regressions for every identified race.\n\nVerification:\n\n- Focused race and evidence tests: passed.\n- `cargo test --all-targets --no-fail-fast`: 410 passed, 0 failed.\n- `cargo fmt --all -- --check`: passed.\n- `cargo clippy --all-targets -- -D warnings`: passed.\n- `git diff --check`: passed.\n- Independent governance audit: passed, no violations.\n- Candidate ancestry check: passed.\n\nGoal tracking usage: 439,176 tokens over 32m 36s.",
       "implementation_reported_at": "2026-07-22T13:31:50Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate d13adee7b63d5173f2af9e666b16cb09cf26884c and fix the two independent Rule 4 race violations from Round 4. First, QualityOperationRunner must treat the authoritative OperationRecord returned by finish_with_result as the result of the race: if it is Cancelled, Interrupted, or Failed, do not return success, persist passing Goal evidence, or advance workflow; propagate the matching terminal outcome while preserving logs/error/result. Add a deterministic barrier race where cancellation wins between the pre-finish check and finish_with_result, proving no passing evidence or workflow advancement. Second, WorkflowEngine::cancel must reconcile the correlated Quality operation before terminalizing the claim. If the operation is already Failed or Interrupted, preserve that terminal operation and transition/correct the claim to the corresponding failed/interrupted outcome rather than Cancelled; only when the correlated operation is genuinely active may both operation and claim become Cancelled atomically. Add a deterministic race where the operation becomes Failed or Interrupted before the worker updates a Running claim, then cancellation arrives, proving operation and claim converge consistently and terminal protection does not freeze a contradiction. Retain all prior shared Quality architecture, settings migration, timing snapshot, restart recovery, evidence persistence, capacity/process cleanup, docs, and API/workflow parity. Run focused barrier races, all-target tests, fmt, clippy, diff integrity, and independent governance.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T13:31:50Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T13:36:17Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T13:31:50Z"
+  "updated": "2026-07-22T13:36:17Z"
 }
