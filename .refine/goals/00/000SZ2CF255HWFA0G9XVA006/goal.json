@@ -1,7 +1,7 @@
 {
-  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
-  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-1",
-  "candidate_commit": "12f545be6da42962a70ab9f0f058b42ff980c8ed",
+  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
+  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-2",
+  "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -126,9 +126,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T11:41:24Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:42:06Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 12f545be6da42962a70ab9f0f058b42ff980c8ed and remediate all five governance findings without restoring command-driven Quality as the product model. Centralize Quality execution context resolution so POST /api/quality/checks with goal_id and workflow QA both resolve and evaluate the same isolated candidate worktree, while project-level checks explicitly use the target root. Add a compatible, idempotent migration or explicit auditable transition for legacy target_app_test_command(s): preserve enabled ordering and intent by converting stored commands into ordered plain-language Quality tests/instructions (including relevant timeout context), never silently replacing configured verification with an empty successful no-op. Run Quality through the supervised process substrate with durable ownership/logs/progress; provider/start errors must terminally fail the operation, cancellation must terminate/couple to the managed process, and completion must not overwrite cancelled state. Validate provider output structurally against the requested ordered tests: exact count/order/identity, explicit per-test status and evidence, no failed result under top-level ok, and reject missing/extra/duplicate/mismatched evidence. Update the two contradictory affected docs (target-app intent and rust integration feature index) plus only other directly affected references. Add focused tests for Goal-worktree/API parity, migration/idempotency, provider failure, cancellation race/recovery, malformed/mismatched output, and empty-test no-op, then rerun the prior full and formatting gates. Preserve local durable state, operation, authentication, and confirmation boundaries.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:42:06Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T11:41:24Z"
+  "updated": "2026-07-22T11:42:12Z"
 }
