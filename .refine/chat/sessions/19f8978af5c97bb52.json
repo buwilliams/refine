@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:34:41Z",
+  "updated_at": "2026-07-22T13:36:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -876,6 +876,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Autonomous recovery is now parked `failed` because the remaining issue is consequential: strict atomicity would require coordinating Goal, activity, operation, process, Git, and worktree writers under one evidence transaction (and adding isolated-worktree/branch state to the dossier). That is an architectural consistency-model decision, not a safe narrow patch, so I will not requeue it without your choice. I’ll finish supervising the still-active Jira and Quality rounds to idle."
+    },
+    {
+      "created_at": "2026-07-22T13:36:02Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784727362048-136",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Jira round 6 submitted candidate `95aebcb…` and entered Refine governance. Only two workflow processes remain, both independent governance audits; there are no implementation workers or queued executable Goals behind them."
     }
   ],
   "queue_dispatching": true,
