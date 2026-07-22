@@ -2023,20 +2023,33 @@ fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
     let interrupted = registry
         .register_with_request("goals:jira-export", request)
         .unwrap();
+    registry
+        .append_log(
+            &interrupted.id,
+            LogEntry {
+                datetime: String::new(),
+                severity: "info".to_string(),
+                category: "operation".to_string(),
+                message: "Jira export worker acquired durable ownership".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: None,
+                goal_id: None,
+            },
+        )
+        .unwrap();
     let interrupted_process = supervisor
         .launch(operation_helper_process_spec(&interrupted.id))
         .unwrap();
     let interrupted_pid = interrupted_process.pid.unwrap();
     assert!(managed_pid_is_alive(interrupted_pid).unwrap());
-    supervisor
-        .request_termination(&interrupted_process.id, "terminate")
-        .unwrap();
-    wait_for_managed_pid_exit(interrupted_pid);
 
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: temp_root.join("run"),
     });
-    let recovery_status = lifecycle.recover(8080).unwrap();
+    let recovery_status = lifecycle.restart(8080).unwrap();
+    wait_for_managed_pid_exit(interrupted_pid);
+    assert!(!managed_pid_is_alive(interrupted_pid).unwrap());
     assert!(
         recovery_status
             .degraded_integrations
@@ -2046,30 +2059,74 @@ fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
         registry.status(&interrupted.id).unwrap().state,
         OperationState::Interrupted
     );
+    assert_eq!(
+        registry.status(&interrupted.id).unwrap().error.unwrap()["code"],
+        "operation_interrupted"
+    );
     let (interruption_logs, _, _) = registry.page_logs(&interrupted.id, 20, 0).unwrap();
     assert!(
         interruption_logs
             .iter()
             .any(|entry| entry.message == "Operation interrupted")
     );
+    assert!(
+        interruption_logs
+            .iter()
+            .any(|entry| { entry.message == "Jira export worker acquired durable ownership" })
+    );
 
-    let recovered = server.handle(ApiRequest {
+    let recovered_response = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/goals/export/jira/{}/retry", interrupted.id),
         body: Some(json!({})),
     });
-    assert_eq!(recovered.status, 202, "{:#}", recovered.body);
-    let recovered_id = recovered.body["operation"]["id"].as_str().unwrap();
+    assert_eq!(
+        recovered_response.status, 202,
+        "{:#}",
+        recovered_response.body
+    );
+    let recovered_id = recovered_response.body["operation"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let recovered_process = supervisor
+        .list()
+        .unwrap()
+        .into_iter()
+        .find(|process| {
+            process.details.as_deref().is_some_and(|details| {
+                serde_json::from_str::<serde_json::Value>(details)
+                    .ok()
+                    .and_then(|details| details["operation_id"].as_str().map(str::to_string))
+                    .as_deref()
+                    == Some(recovered_id.as_str())
+            })
+        })
+        .expect("retry should launch an operation-associated managed worker");
+    let recovered_pid = recovered_process.pid.unwrap();
+    assert!(managed_pid_is_alive(recovered_pid).unwrap());
     let recovered_operation =
-        wait_for_operation_status(&registry, recovered_id, OperationState::Succeeded);
-    assert_eq!(recovered_operation.result["export"]["goal_count"], 1);
+        wait_for_operation_status(&registry, &recovered_id, OperationState::Succeeded);
     assert_eq!(recovered_operation.request["recovery_of"], interrupted.id);
-    let (recovered_logs, _, _) = registry.page_logs(recovered_id, 20, 0).unwrap();
+    assert_eq!(recovered_operation.result["export"]["goal_count"], 1);
+    let (recovered_logs, _, _) = registry.page_logs(&recovered_id, 20, 0).unwrap();
     assert!(
         recovered_logs
             .iter()
             .any(|entry| entry.message == "Jira CSV export completed")
     );
+    let (original_logs, _, _) = registry.page_logs(&interrupted.id, 20, 0).unwrap();
+    assert_eq!(
+        original_logs
+            .iter()
+            .map(|entry| entry.message.as_str())
+            .collect::<Vec<_>>(),
+        interruption_logs
+            .iter()
+            .map(|entry| entry.message.as_str())
+            .collect::<Vec<_>>()
+    );
+    wait_for_managed_pid_exit(recovered_pid);
 
     let failure_runtime_root = temp_root.join("run/cancel-failure");
     let failure_registry = FileOperationRegistry::new(&failure_runtime_root);

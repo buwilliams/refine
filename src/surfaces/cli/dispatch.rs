@@ -1876,7 +1876,7 @@ fn run_website(
     Ok(())
 }
 
-fn run_system_start(
+pub(super) fn run_system_start(
     port: u16,
     bind_address: std::net::IpAddr,
     cache_dir: Option<PathBuf>,

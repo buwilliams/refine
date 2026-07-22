@@ -307,9 +307,7 @@ fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) {
 
 impl DaemonLifecycleService for FileDaemonLifecycleService {
     fn start(&self, port: u16) -> RefineResult<DaemonStatus> {
-        let status = running_status(port);
-        self.write_status(&status)?;
-        Ok(status)
+        self.recover(port)
     }
 
     fn stop(&self, port: u16) -> RefineResult<DaemonStatus> {

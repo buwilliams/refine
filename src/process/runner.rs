@@ -179,33 +179,34 @@ impl FileRunnerWorkerService {
         )?;
         let operation = registry.status(&operation.id)?;
         #[cfg(test)]
-        {
-            let runtime_root = self.runtime_root.clone();
-            let operation_id = operation.id.clone();
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(10));
-                let _ = run_jira_export_operation(&runtime_root, &operation_id);
-            });
-            return Ok(operation);
-        }
+        let spec = jira_export_test_worker_spec(&self.runtime_root, &operation.id)?;
         #[cfg(not(test))]
-        {
+        let spec = {
             let executable = std::env::current_exe().map_err(|error| {
                 RefineError::Io(format!("failed to locate runner executable: {error}"))
             })?;
-            let spec = jira_export_worker_spec(&executable, &self.runtime_root, &operation.id);
-            match FileProcessSupervisor::new(&self.runtime_root).launch(spec) {
-                Ok(_) => registry.status(&operation.id),
-                Err(error) => {
-                    let _ = registry.fail_with_error(
-                        &operation.id,
-                        json!({
-                            "code": "runner_launch_failed",
-                            "message": error.to_string()
-                        }),
-                    );
-                    Err(error)
-                }
+            jira_export_worker_spec(&executable, &self.runtime_root, &operation.id)
+        };
+        self.launch_jira_export_worker(&registry, &operation, spec)
+    }
+
+    fn launch_jira_export_worker(
+        &self,
+        registry: &FileOperationRegistry,
+        operation: &OperationHandle,
+        spec: ManagedProcessSpec,
+    ) -> RefineResult<OperationHandle> {
+        match FileProcessSupervisor::new(&self.runtime_root).launch(spec) {
+            Ok(_) => registry.status(&operation.id),
+            Err(error) => {
+                let _ = registry.fail_with_error(
+                    &operation.id,
+                    json!({
+                        "code": "runner_launch_failed",
+                        "message": error.to_string()
+                    }),
+                );
+                Err(error)
             }
         }
     }
@@ -453,7 +454,10 @@ fn run_jira_export_operation(runtime_root: &Path, operation_id: &str) -> RefineR
             "Operation {operation_id} is not a Jira export"
         )));
     }
-    if matches!(operation.state, OperationState::Cancelled) {
+    if matches!(
+        operation.state,
+        OperationState::Cancelled | OperationState::Interrupted
+    ) {
         return Ok(());
     }
     let request = match serde_json::from_value::<JiraExportOperationRequest>(operation.request) {
@@ -511,8 +515,7 @@ fn run_jira_export_operation(runtime_root: &Path, operation_id: &str) -> RefineR
 
     match result {
         Ok(export) => {
-            ensure_jira_export_active(&registry, operation_id)?;
-            registry.update_progress(
+            let completion = registry.succeed_with_result_and_progress(
                 operation_id,
                 json!({
                     "stage": "complete",
@@ -520,7 +523,11 @@ fn run_jira_export_operation(runtime_root: &Path, operation_id: &str) -> RefineR
                     "completed": export.goal_count,
                     "total": export.goal_count
                 }),
+                json!({"http_status": 200, "export": export}),
             )?;
+            if !matches!(completion.state, OperationState::Succeeded) {
+                return Ok(());
+            }
             append_jira_export_log(
                 &registry,
                 operation_id,
@@ -532,14 +539,9 @@ fn run_jira_export_operation(runtime_root: &Path, operation_id: &str) -> RefineR
                     "filename": export.filename
                 }),
             )?;
-            registry.finish_with_result(
-                operation_id,
-                OperationState::Succeeded,
-                json!({"http_status": 200, "export": export}),
-            )?;
             Ok(())
         }
-        Err(_error) if jira_export_cancelled(&registry, operation_id) => Ok(()),
+        Err(_error) if jira_export_stopped(&registry, operation_id) => Ok(()),
         Err(error) => {
             let _ = append_jira_export_log(
                 &registry,
@@ -564,18 +566,23 @@ fn ensure_jira_export_active(
     registry: &FileOperationRegistry,
     operation_id: &str,
 ) -> RefineResult<()> {
-    if jira_export_cancelled(registry, operation_id) {
+    if jira_export_stopped(registry, operation_id) {
         return Err(RefineError::Conflict(
-            "Jira export operation was cancelled".to_string(),
+            "Jira export operation is no longer active".to_string(),
         ));
     }
     Ok(())
 }
 
-fn jira_export_cancelled(registry: &FileOperationRegistry, operation_id: &str) -> bool {
+fn jira_export_stopped(registry: &FileOperationRegistry, operation_id: &str) -> bool {
     registry
         .status(operation_id)
-        .map(|operation| matches!(operation.state, OperationState::Cancelled))
+        .map(|operation| {
+            matches!(
+                operation.state,
+                OperationState::Cancelled | OperationState::Interrupted
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -682,13 +689,51 @@ fn jira_export_worker_spec(
     runtime_root: &Path,
     operation_id: &str,
 ) -> ManagedProcessSpec {
-    runner_worker_spec(
+    let mut spec = runner_worker_spec(
         executable,
         runtime_root,
         JIRA_EXPORT_RUNNER,
         None,
         Some(operation_id),
-    )
+    );
+    // The HTTP worker thread that queues this process is intentionally short-lived. The daemon's
+    // process supervisor owns termination, so the Jira worker must not inherit thread-lifetime
+    // parent-death behavior.
+    if let Some(limits) = &mut spec.limits {
+        limits.kill_on_parent_exit = false;
+    }
+    spec
+}
+
+#[cfg(test)]
+fn jira_export_test_worker_spec(
+    runtime_root: &Path,
+    operation_id: &str,
+) -> RefineResult<ManagedProcessSpec> {
+    let executable = std::env::current_exe().map_err(|error| {
+        RefineError::Io(format!("failed to locate Jira export test worker: {error}"))
+    })?;
+    let mut spec = jira_export_worker_spec(&executable, runtime_root, operation_id);
+    spec.args = vec![
+        "--exact".to_string(),
+        "surfaces::cli::tests::jira_export_worker_cli_process_helper".to_string(),
+        "--nocapture".to_string(),
+    ];
+    spec.env = vec![
+        (
+            "REFINE_TEST_JIRA_RUNTIME_ROOT".to_string(),
+            runtime_root.display().to_string(),
+        ),
+        (
+            "REFINE_TEST_JIRA_OPERATION_ID".to_string(),
+            operation_id.to_string(),
+        ),
+        (
+            "REFINE_TEST_JIRA_WORKER_DELAY_MS".to_string(),
+            "500".to_string(),
+        ),
+    ];
+    Ok(spec)
 }
 
 fn runner_worker_spec(
@@ -823,5 +868,12 @@ mod tests {
         assert_eq!(jira_spec.metadata["worker_kind"], JIRA_EXPORT_RUNNER);
         assert_eq!(jira_spec.metadata["operation_id"], "OP2");
         assert!(!jira_spec.args.iter().any(|arg| arg == "--target-root"));
+        assert_eq!(
+            jira_spec
+                .limits
+                .as_ref()
+                .map(|limits| limits.kill_on_parent_exit),
+            Some(false)
+        );
     }
 }

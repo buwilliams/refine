@@ -138,12 +138,21 @@ impl FileOperationRegistry {
         let encoded = serde_json::to_vec_pretty(handle).map_err(|error| {
             RefineError::Serialization(format!("failed to encode operation: {error}"))
         })?;
-        fs::write(&path, encoded).map_err(|error| {
+        let temp_path = path.with_extension(format!("json.{}.tmp", std::process::id()));
+        fs::write(&temp_path, encoded).map_err(|error| {
             RefineError::Io(format!(
-                "failed to write operation {}: {error}",
-                path.display()
+                "failed to write temporary operation {}: {error}",
+                temp_path.display()
             ))
-        })
+        })?;
+        if let Err(error) = replace_file(&temp_path, &path) {
+            let _ = fs::remove_file(&temp_path);
+            return Err(RefineError::Io(format!(
+                "failed to replace operation {}: {error}",
+                path.display()
+            )));
+        }
+        Ok(())
     }
 
     pub fn interrupt_active(&self) -> RefineResult<Vec<OperationHandle>> {
@@ -163,11 +172,23 @@ impl FileOperationRegistry {
                     continue;
                 }
                 operation.state = OperationState::Interrupted;
+                operation.error = Some(json!({
+                    "code": "operation_interrupted",
+                    "message": "Daemon restarted before the operation completed."
+                }));
                 self.write(&operation)?;
                 FileExt::unlock(&lock).ok();
                 self.append_log(
                     &operation.id,
-                    operation_log_entry(&operation, "warning", "Operation interrupted", None),
+                    operation_log_entry(
+                        &operation,
+                        "warning",
+                        "Operation interrupted",
+                        Some(crate::model::JsonObject::from_iter([(
+                            "reason".to_string(),
+                            json!("daemon_restart"),
+                        )])),
+                    ),
                 )?;
                 interrupted.push(operation);
             }
@@ -380,7 +401,7 @@ impl FileOperationRegistry {
         }
         let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
-        if completion_would_overwrite_cancellation(&handle.state, &state) {
+        if terminal_recovery_state_is_authoritative(&handle.state, &state) {
             FileExt::unlock(&lock).ok();
             return Ok(handle);
         }
@@ -401,7 +422,37 @@ impl FileOperationRegistry {
     ) -> RefineResult<OperationHandle> {
         let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        // A restart-interrupted worker may still race with recovery after its process is
+        // terminated. Preserve the progress snapshot that was captured at interruption so the
+        // UI cannot regress to a misleading completed state. Other terminal operations retain
+        // their established progress-update behavior (for example, import cancellation records
+        // its final acknowledgement after cancellation wins the state race).
+        if matches!(handle.state, OperationState::Interrupted) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.progress = progress;
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        Ok(handle)
+    }
+
+    pub fn succeed_with_result_and_progress(
+        &self,
+        operation_id: &str,
+        progress: Value,
+        result: Value,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if operation_terminal(&handle.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        handle.state = OperationState::Succeeded;
+        handle.progress = progress;
+        handle.result = result;
+        handle.error = None;
         self.write(&handle)?;
         FileExt::unlock(&lock).ok();
         Ok(handle)
@@ -420,7 +471,7 @@ impl FileOperationRegistry {
         }
         let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
-        if completion_would_overwrite_cancellation(&handle.state, &state) {
+        if terminal_recovery_state_is_authoritative(&handle.state, &state) {
             FileExt::unlock(&lock).ok();
             return Ok(handle);
         }
@@ -443,18 +494,31 @@ impl FileOperationRegistry {
     ) -> RefineResult<OperationHandle> {
         let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
-        // Cancellation is the user's authoritative terminal decision. A worker or cleanup path
-        // may still discover a real failure after cancellation wins the mutation lock; retain
-        // that evidence without rewriting the durable terminal state.
-        if !matches!(handle.state, OperationState::Cancelled) {
+        // Cancellation and restart interruption are authoritative terminal decisions. A worker or
+        // cleanup path may still discover a real failure after either wins the mutation lock.
+        let interrupted = matches!(handle.state, OperationState::Interrupted);
+        if !matches!(
+            handle.state,
+            OperationState::Cancelled | OperationState::Interrupted
+        ) {
             handle.state = OperationState::Failed;
         }
-        handle.error = Some(error);
+        if !interrupted {
+            handle.error = Some(error.clone());
+        }
         self.write(&handle)?;
         FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
-            operation_log_entry(&handle, "error", "Operation failed", None),
+            operation_log_entry(
+                &handle,
+                "error",
+                "Operation failed",
+                Some(crate::model::JsonObject::from_iter([(
+                    "error".to_string(),
+                    error,
+                )])),
+            ),
         )?;
         Ok(handle)
     }
@@ -551,11 +615,52 @@ fn operation_terminal(state: &OperationState) -> bool {
     )
 }
 
-fn completion_would_overwrite_cancellation(
+#[cfg(not(windows))]
+fn replace_file(source: &std::path::Path, destination: &std::path::Path) -> std::io::Result<()> {
+    fs::rename(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_file(source: &std::path::Path, destination: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    unsafe extern "system" {
+        fn MoveFileExW(existing: *const u16, replacement: *const u16, flags: u32) -> i32;
+    }
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+    let source = source
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let destination = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let replaced = unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if replaced == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+fn terminal_recovery_state_is_authoritative(
     current: &OperationState,
     next: &OperationState,
 ) -> bool {
-    matches!(current, OperationState::Cancelled) && !matches!(next, OperationState::Cancelled)
+    matches!(
+        current,
+        OperationState::Cancelled | OperationState::Interrupted
+    ) && current != next
 }
 
 fn process_operation_id(process: &ManagedProcess) -> Option<String> {
@@ -647,6 +752,31 @@ mod tests {
             registry.status(&operation.id).unwrap().state,
             OperationState::Interrupted
         );
+        assert_eq!(
+            registry.status(&operation.id).unwrap().error.unwrap()["code"],
+            "operation_interrupted"
+        );
+        let late_completion = registry
+            .finish_with_result(
+                &operation.id,
+                OperationState::Succeeded,
+                json!({"result": "must not replace interruption"}),
+            )
+            .unwrap();
+        assert_eq!(late_completion.state, OperationState::Interrupted);
+        let late_failure = registry
+            .fail_with_error(
+                &operation.id,
+                json!({"code": "late_worker_failure", "message": "worker exited late"}),
+            )
+            .unwrap();
+        assert_eq!(late_failure.state, OperationState::Interrupted);
+        assert_eq!(late_failure.error.unwrap()["code"], "operation_interrupted");
+        let late_progress = registry
+            .update_progress(&operation.id, json!({"stage": "complete"}))
+            .unwrap();
+        assert_eq!(late_progress.state, OperationState::Interrupted);
+        assert_eq!(late_progress.progress, json!({}));
 
         let cancelled = registry.cancel(&operation.id).unwrap();
         assert_eq!(cancelled.state, OperationState::Cancelled);
@@ -671,6 +801,32 @@ mod tests {
         );
         let (logs, _, _) = registry.page_logs(&recovery_failure.id, 20, 0).unwrap();
         assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_state_replacement_never_exposes_partial_json() {
+        let temp_root = unique_temp_dir("operations-atomic-state");
+        let registry = FileOperationRegistry::new(temp_root.join("run/8080"));
+        let operation = registry.register("goals:jira-export").unwrap();
+        let reader_registry = registry.clone();
+        let operation_id = operation.id.clone();
+        let reader = thread::spawn(move || {
+            for _ in 0..500 {
+                reader_registry.status(&operation_id).unwrap();
+            }
+        });
+        for completed in 0..500 {
+            registry
+                .update_progress(&operation.id, json!({"completed": completed}))
+                .unwrap();
+        }
+        reader.join().unwrap();
+        assert_eq!(
+            registry.status(&operation.id).unwrap().progress["completed"],
+            499
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

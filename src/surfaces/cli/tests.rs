@@ -1,18 +1,24 @@
 use super::dispatch::{
-    absolute_cli_path, dispatch, explicit_target_root_path, plan_goal_draft_body,
+    absolute_cli_path, dispatch, explicit_target_root_path, plan_goal_draft_body, run_system_start,
     system_ps_response, system_status_response,
 };
 use super::*;
+use crate::model::log::LogEntry;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+    ProcessSupervisor, managed_pid_is_alive,
 };
 use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::activity::ActivityService;
 use crate::tools::observability::activity::FileActivityService;
 use crate::tools::product::project_state::PROJECTION_SNAPSHOT_FILE;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::tools::product::work_items::FileWorkItemService;
 use clap::Parser;
 use std::fs;
 use std::io::{Read, Write};
@@ -40,6 +46,34 @@ fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
         },
     };
     assert_eq!(explicit_target_root_path(&default_daemon_command), None);
+}
+
+#[test]
+fn jira_export_worker_cli_process_helper() {
+    let (Ok(runtime_root), Ok(operation_id)) = (
+        std::env::var("REFINE_TEST_JIRA_RUNTIME_ROOT"),
+        std::env::var("REFINE_TEST_JIRA_OPERATION_ID"),
+    ) else {
+        return;
+    };
+    let delay = std::env::var("REFINE_TEST_JIRA_WORKER_DELAY_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0);
+    thread::sleep(std::time::Duration::from_millis(delay));
+    let cli = Cli::try_parse_from([
+        "refine",
+        "system",
+        "runner-worker",
+        "--kind",
+        "jira-export",
+        "--port-runtime-root",
+        &runtime_root,
+        "--operation-id",
+        &operation_id,
+    ])
+    .unwrap();
+    dispatch(cli).unwrap();
 }
 
 #[test]
@@ -774,6 +808,214 @@ fn system_status_reports_current_version_and_running_ports() {
     assert!(status["ports"][0].get("process_summary").is_none());
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn system_start_recovers_jira_export_and_public_retry_launches_supervised_worker() {
+    let temp_root = unique_temp_dir("cli-system-start-jira-recovery");
+    let runtime_root = temp_root.join("run");
+    let target_root = temp_root.join("app");
+    fs::create_dir_all(&target_root).unwrap();
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    FileWorkItemService::new(&refine_dir)
+        .create_goal_summary("Restart-safe Jira export", Some("GOAL1"))
+        .unwrap();
+
+    let port_probe = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let port = port_probe.local_addr().unwrap().port();
+    drop(port_probe);
+    let port_runtime_root = RuntimeRoot {
+        root: runtime_root.clone(),
+    }
+    .port_root(port);
+    let registry = FileOperationRegistry::new(&port_runtime_root);
+    let interrupted = registry
+        .register_with_request(
+            "goals:jira-export",
+            serde_json::json!({
+                "refine_dir": refine_dir,
+                "target_root": target_root,
+                "selection": {"selected_ids": ["GOAL1"], "exclude_ids": [], "filter": {}}
+            }),
+        )
+        .unwrap();
+    registry
+        .append_log(
+            &interrupted.id,
+            LogEntry {
+                datetime: String::new(),
+                severity: "info".to_string(),
+                category: "operation".to_string(),
+                message: "Durable log before production restart".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: None,
+                goal_id: None,
+            },
+        )
+        .unwrap();
+    let supervisor = FileProcessSupervisor::new(&port_runtime_root);
+    let worker = supervisor
+        .launch(cli_operation_helper_process_spec(&interrupted.id))
+        .unwrap();
+    let worker_pid = worker.pid.unwrap();
+    assert!(managed_pid_is_alive(worker_pid).unwrap());
+
+    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
+        root: runtime_root.clone(),
+    });
+    lifecycle.stop(port).unwrap();
+    wait_for_cli_managed_pid_exit(worker_pid);
+    assert!(!managed_pid_is_alive(worker_pid).unwrap());
+    assert_eq!(
+        registry.status(&interrupted.id).unwrap().state,
+        OperationState::Running
+    );
+
+    let start_runtime_root = runtime_root.clone();
+    let server = thread::spawn(move || {
+        run_system_start(
+            port,
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            None,
+            None,
+            start_runtime_root,
+            true,
+            true,
+        )
+    });
+    let interrupted_after_start =
+        wait_for_cli_operation_state(&registry, &interrupted.id, OperationState::Interrupted);
+    assert_eq!(
+        interrupted_after_start.error.unwrap()["code"],
+        "operation_interrupted"
+    );
+
+    let mut stream = connect_to_cli_test_daemon(port);
+    let retry_path = format!("/api/goals/export/jira/{}/retry", interrupted.id);
+    let request = format!(
+        "POST {retry_path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
+    );
+    stream.write_all(request.as_bytes()).unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    server.join().unwrap().unwrap();
+    assert!(response.starts_with("HTTP/1.1 202"), "{response}");
+    let response_body = response.split("\r\n\r\n").nth(1).unwrap();
+    let response_body: serde_json::Value = serde_json::from_str(response_body).unwrap();
+    let recovered_id = response_body["operation"]["id"].as_str().unwrap();
+    let recovered_process = supervisor
+        .list()
+        .unwrap()
+        .into_iter()
+        .find(|process| {
+            process.details.as_deref().is_some_and(|details| {
+                serde_json::from_str::<serde_json::Value>(details)
+                    .ok()
+                    .and_then(|details| details["operation_id"].as_str().map(str::to_string))
+                    .as_deref()
+                    == Some(recovered_id)
+            })
+        })
+        .expect("public retry should launch an operation-associated managed process");
+    assert!(managed_pid_is_alive(recovered_process.pid.unwrap()).unwrap());
+    let recovered =
+        wait_for_cli_operation_state(&registry, recovered_id, OperationState::Succeeded);
+    assert_eq!(recovered.request["recovery_of"], interrupted.id);
+    assert_eq!(recovered.result["export"]["goal_count"], 1);
+    let (original_logs, _, _) = registry.page_logs(&interrupted.id, 20, 0).unwrap();
+    assert!(
+        original_logs
+            .iter()
+            .any(|entry| entry.message == "Durable log before production restart")
+    );
+    assert!(
+        original_logs
+            .iter()
+            .any(|entry| entry.message == "Operation interrupted")
+    );
+    let (recovered_logs, _, _) = registry.page_logs(recovered_id, 20, 0).unwrap();
+    assert!(
+        recovered_logs
+            .iter()
+            .any(|entry| entry.message == "Jira CSV export completed")
+    );
+    wait_for_cli_managed_pid_exit(recovered_process.pid.unwrap());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+fn cli_operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {
+    #[cfg(windows)]
+    let (command, args) = (
+        "cmd".to_string(),
+        vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()],
+    );
+    #[cfg(not(windows))]
+    let (command, args) = (
+        "sh".to_string(),
+        vec!["-c".to_string(), "while :; do sleep 1; done".to_string()],
+    );
+    ManagedProcessSpec {
+        owner: ProcessOwner::Runner,
+        command,
+        args,
+        cwd: None,
+        env: Vec::new(),
+        stdin: None,
+        limits: Some(ProcessResourceLimits {
+            kill_on_parent_exit: true,
+            ..Default::default()
+        }),
+        authorization_command: Some("refine test restart helper".to_string()),
+        sensitive: false,
+        metadata: serde_json::from_value(serde_json::json!({
+            "kind": "runner",
+            "worker_kind": "jira-export-test-helper",
+            "operation_id": operation_id
+        }))
+        .unwrap(),
+    }
+}
+
+fn wait_for_cli_managed_pid_exit(pid: u32) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while managed_pid_is_alive(pid).unwrap_or(false) && std::time::Instant::now() < deadline {
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+fn wait_for_cli_operation_state(
+    registry: &FileOperationRegistry,
+    operation_id: &str,
+    expected: OperationState,
+) -> crate::process::supervisor::operations::OperationHandle {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let operation = registry.status(operation_id).unwrap();
+        if operation.state == expected {
+            return operation;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "operation {operation_id} remained {:?}",
+            operation.state
+        );
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+fn connect_to_cli_test_daemon(port: u16) -> std::net::TcpStream {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, port)) {
+            Ok(stream) => return stream,
+            Err(_) if std::time::Instant::now() < deadline => {
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(error) => panic!("test daemon on port {port} did not start: {error}"),
+        }
+    }
 }
 
 #[test]
