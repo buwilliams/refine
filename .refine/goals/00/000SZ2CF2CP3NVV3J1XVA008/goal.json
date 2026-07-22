@@ -14,28 +14,121 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:21:23Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T11:50:31Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-1",
+        "failed_actions": [
+          {
+            "message": "Quality has competing implementations and ownership: workflow contains the new provider-backed evaluator and output parser, while FileQualityService retains command-based evaluation. Its settings are also split between quality/settings.json for requirements/tests and active-Node settings for timing.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "The authoritative timing field moved from quality/settings.json to Node settings without migration or a transition plan. Existing legacy state with timing set to post_build is explicitly loaded as pre_merge, silently changing persisted behavior.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "Quality recovery is nonfunctional: retry-quality only changes a failed Goal to qa, automation promotes only todo Goals, and even an explicit claim always begins with WorkflowTodo. The preserved candidate therefore cannot re-enter QA through the advertised recovery path.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Quality pass evidence is not correlated with supervised check execution. Non-JSON provider prose is accepted as a passing test, and JSON evidence is trusted as an arbitrary nonempty string. The full-workflow fixture consequently passes Quality without executing or observing a test operation.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          },
+          {
+            "message": "Quality does not have consistent cross-surface semantics: workflow always invokes an installed agent, but POST /api/quality/checks still executes a caller-supplied shell command through the legacy runner and reports an empty command as a successful Quality result.",
+            "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+            "rule_id": "rule-8"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Five concrete governance violations found.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"Quality has competing implementations and ownership: workflow contains the new provider-backed evaluator and output parser, while FileQualityService retains command-based evaluation. Its settings are also split between quality/settings.json for requirements/tests and active-Node settings for timing.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"The authoritative timing field moved from quality/settings.json to Node settings without migration or a transition plan. Existing legacy state with timing set to post_build is explicitly loaded as pre_merge, silently changing persisted behavior.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Quality recovery is nonfunctional: retry-quality only changes a failed Goal to qa, automation promotes only todo Goals, and even an explicit claim always begins with WorkflowTodo. The preserved candidate therefore cannot re-enter QA through the advertised recovery path.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Quality pass evidence is not correlated with supervised check execution. Non-JSON provider prose is accepted as a passing test, and JSON evidence is trusted as an arbitrary nonempty string. The full-workflow fixture consequently passes Quality without executing or observing a test operation.\"},{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"Quality does not have consistent cross-surface semantics: workflow always invokes an installed agent, but POST /api/quality/checks still executes a caller-supplied shell command through the legacy runner and reports an empty command as a successful Quality result.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Five concrete governance violations found.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Quality has competing implementations and ownership: workflow contains the new provider-backed evaluator and output parser, while FileQualityService retains command-based evaluation. Its settings are also split between quality/settings.json for requirements/tests and active-Node settings for timing.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "The authoritative timing field moved from quality/settings.json to Node settings without migration or a transition plan. Existing legacy state with timing set to post_build is explicitly loaded as pre_merge, silently changing persisted behavior.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "Quality recovery is nonfunctional: retry-quality only changes a failed Goal to qa, automation promotes only todo Goals, and even an explicit claim always begins with WorkflowTodo. The preserved candidate therefore cannot re-enter QA through the advertised recovery path.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Quality pass evidence is not correlated with supervised check execution. Non-JSON provider prose is accepted as a passing test, and JSON evidence is trusted as an arbitrary nonempty string. The full-workflow fixture consequently passes Quality without executing or observing a test operation.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            },
+            {
+              "message": "Quality does not have consistent cross-surface semantics: workflow always invokes an installed agent, but POST /api/quality/checks still executes a caller-supplied shell command through the legacy runner and reports an empty command as a successful Quality result.",
+              "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "rule_id": "rule-8"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-1"
+      },
+      "governance_message": "Five concrete governance violations found.",
+      "governance_rule_actions": [
+        {
+          "message": "Quality has competing implementations and ownership: workflow contains the new provider-backed evaluator and output parser, while FileQualityService retains command-based evaluation. Its settings are also split between quality/settings.json for requirements/tests and active-Node settings for timing.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "The authoritative timing field moved from quality/settings.json to Node settings without migration or a transition plan. Existing legacy state with timing set to post_build is explicitly loaded as pre_merge, silently changing persisted behavior.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "Quality recovery is nonfunctional: retry-quality only changes a failed Goal to qa, automation promotes only todo Goals, and even an explicit claim always begins with WorkflowTodo. The preserved candidate therefore cannot re-enter QA through the advertised recovery path.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Quality pass evidence is not correlated with supervised check execution. Non-JSON provider prose is accepted as a passing test, and JSON evidence is trusted as an arbitrary nonempty string. The full-workflow fixture consequently passes Quality without executing or observing a test operation.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        },
+        {
+          "message": "Quality does not have consistent cross-surface semantics: workflow always invokes an installed agent, but POST /api/quality/checks still executes a caller-supplied shell command through the legacy runner and reports an empty command as a successful Quality result.",
+          "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+          "rule_id": "rule-8"
+        }
+      ],
       "implementation_report": "Implemented Goal `00000SZ2CF2CP3NVV3J1XVA008` and left the worktree reviewable.\n\nKey changes:\n\n- Replaced optional command-gated QA with an always-on Quality agent.\n- Made Quality timing affect the actual pre-build/post-build workflow order.\n- Added business requirements, instructions, and an accessible ordered plain-language test editor.\n- Removed QA enable and target-app test-command controls.\n- Added Quality agent summaries and structured per-test evidence to Goal details and CLI output.\n- Updated API, CLI, Guide, intent, and Rust specification documentation.\n- Preserved legacy settings readability while rejecting the removed `enabled` API field.\n- Added responsive and accessibility coverage.\n\nVerification:\n\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- `cargo test --lib` — 399 passed, 0 failed.\n- `node --test tests/*.test.js` — 19 passed, 0 failed.\n- `cargo test --test full_workflow -- --ignored --nocapture` — 1 passed, including persisted per-test evidence.\n- `cargo run --manifest-path xtask/Cargo.toml -- cli-reference` — regenerated CLI documentation successfully.\n- `git diff --check` — clean.",
       "implementation_reported_at": "2026-07-22T11:46:45Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Rework Quality settings and Goal evidence UX for agent-first Quality. Remove the Quality gate section, QA enabled control, and target-app test command controls. Keep Quality timing and provide clear editors for business requirements, instructions, and an ordered plain-language test list. Explain Quality and Governance as two always-on validation layers, and show the Quality agent summary and per-test evidence on each Goal. Update shared API and CLI documentation, guide content, accessibility, responsive behavior, and regression coverage.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T11:46:45Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T11:50:31Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:46:45Z"
+  "updated": "2026-07-22T11:50:31Z"
 }
