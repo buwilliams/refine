@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:49:18Z",
+  "updated_at": "2026-07-22T17:50:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -468,6 +468,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination candidate `ec0d336` is committed cleanly and has entered a fresh independent governance pass. Quality round 3 is still implementing its two scoped fixes."
+    },
+    {
+      "created_at": "2026-07-22T17:50:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742615777-137",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination governance is actively inspecting the new Git conflict and recovery state transitions. Quality has begun applying the timing and candidate-integrity changes in the shared service/claim path."
     }
   ],
   "queued_messages": [
