@@ -66,9 +66,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T10:31:39Z"
+    },
+    {
+      "assignee": "Refine supervisor",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T10:34:00Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recovery round for the post-implementation governance failure on round 1. Preserve and reconcile the tested active-queue replenishment behavior from candidate 7b7bba99122d5ff2c4413c14d1ee398ef4d503e6 against current main, then update the affected Workflow Engine intent documentation so it explicitly covers periodic discovery of newly eligible queued Goals during active execution, including priority and Feature-order constraints. Re-run focused scheduler tests, cargo fmt --all -- --check, cargo clippy --lib --tests -- -D warnings, cargo test, and git diff --check. Keep all changes in the Refine-managed Goal branch and leave the Goal for governance, quality, and user review.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine supervisor",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T10:34:00Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T10:31:40Z"
+  "updated": "2026-07-22T10:34:00Z"
 }
