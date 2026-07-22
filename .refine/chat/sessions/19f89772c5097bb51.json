@@ -13,7 +13,7 @@
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717779959-10",
       "progress": false,
       "provider_session_id": null,
@@ -22,7 +22,7 @@
     },
     {
       "created_at": "2026-07-22T10:56:19Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717779959-11",
       "progress": true,
       "provider_session_id": null,
@@ -31,7 +31,7 @@
     },
     {
       "created_at": "2026-07-22T10:56:24Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -43,7 +43,7 @@
     },
     {
       "created_at": "2026-07-22T10:56:47Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -55,7 +55,7 @@
     },
     {
       "created_at": "2026-07-22T10:58:28Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -67,7 +67,7 @@
     },
     {
       "created_at": "2026-07-22T11:00:32Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -79,7 +79,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:04Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -91,7 +91,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:04Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718064818-40",
       "progress": false,
       "provider_session_id": null,
@@ -100,7 +100,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:04Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718064818-41",
       "progress": true,
       "provider_session_id": null,
@@ -109,7 +109,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:04Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718064818-43",
       "progress": false,
       "provider_session_id": null,
@@ -118,7 +118,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:04Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718064818-44",
       "progress": true,
       "provider_session_id": null,
@@ -127,7 +127,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:09Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -139,7 +139,7 @@
     },
     {
       "created_at": "2026-07-22T11:01:39Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
