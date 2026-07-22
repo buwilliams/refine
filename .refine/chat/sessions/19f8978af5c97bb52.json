@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:59:22Z",
+  "updated_at": "2026-07-22T17:03:46Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1548,6 +1548,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance rejected Round 5 on four deeper concurrency defects, so it remains unmerged: Goal revision is not revalidated with the workflow decision; a second runtime can fail work still owned by a live provider; unequal concurrent revisions can be mistaken for causal ordering; and the daemon test did not run two workflow runners simultaneously. These are concrete territory findings, not style objections. I’m waiting for Refine’s bounded follow-up round and will keep the parked work behind it."
+    },
+    {
+      "created_at": "2026-07-22T17:03:46Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784739826653-256",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 6 is modifying only the four validated boundaries: keeping Goal validation and claim persistence in one coordinated commitment; consulting cross-runtime managed-process evidence before recovery; replacing revision-magnitude conflict inference with explicit observed-conflict evidence; and honoring configured Git remotes for stable app identity. No new scheduler or surface-specific control path is being introduced."
     }
   ],
   "queued_messages": [
