@@ -330,9 +330,10 @@ Properties:
   `round_count`, `created`, `updated`, `branch_name`, `node_id`,
   `feature_id`, `feature_order`, and `json_path`.
 - `GoalNote`: `id`, `author`, `body`, `created`, and `updated`.
-- `GoalRound`: `reporter`, `prompt`, `created`, `updated`, optional
-  `guidance_decision`, and derived `logs` when a response hydrates sidecar
-  round logs.
+- `GoalRound`: `reporter`, optional `assignee`, `prompt`, `created`, `updated`,
+  optional `guidance_decision`, `implementation_report`,
+  `implementation_reported_at`, `governance`, and `quality`, plus derived
+  `logs` when a response hydrates sidecar round logs.
 - `RoundGovernance`: `rule_state`, `meta_rule_state`, `product_state`,
   `constitution_state`, `governance_message`, `governance_details`,
   `governance_checked_at`, and `governance_rule_actions`.
