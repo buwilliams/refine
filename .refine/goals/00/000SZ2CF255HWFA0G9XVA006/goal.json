@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-4",
-  "candidate_commit": "d13adee7b63d5173f2af9e666b16cb09cf26884c",
+  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-5",
+  "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -366,9 +366,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:58:14Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:58:47Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate d13adee7b63d5173f2af9e666b16cb09cf26884c and fix the two independent Rule 4 race violations from Round 4. First, QualityOperationRunner must treat the authoritative OperationRecord returned by finish_with_result as the result of the race: if it is Cancelled, Interrupted, or Failed, do not return success, persist passing Goal evidence, or advance workflow; propagate the matching terminal outcome while preserving logs/error/result. Add a deterministic barrier race where cancellation wins between the pre-finish check and finish_with_result, proving no passing evidence or workflow advancement. Second, WorkflowEngine::cancel must reconcile the correlated Quality operation before terminalizing the claim. If the operation is already Failed or Interrupted, preserve that terminal operation and transition/correct the claim to the corresponding failed/interrupted outcome rather than Cancelled; only when the correlated operation is genuinely active may both operation and claim become Cancelled atomically. Add a deterministic race where the operation becomes Failed or Interrupted before the worker updates a Running claim, then cancellation arrives, proving operation and claim converge consistently and terminal protection does not freeze a contradiction. Retain all prior shared Quality architecture, settings migration, timing snapshot, restart recovery, evidence persistence, capacity/process cleanup, docs, and API/workflow parity. Run focused barrier races, all-target tests, fmt, clippy, diff integrity, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:58:47Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:58:15Z"
+  "updated": "2026-07-22T12:58:47Z"
 }
