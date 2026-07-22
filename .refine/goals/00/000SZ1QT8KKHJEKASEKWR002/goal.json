@@ -16,7 +16,7 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:19:36Z",
-      "governance_checked_at": "2026-07-22T00:37:42Z",
+      "governance_checked_at": "2026-07-22T00:44:38Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QT8KKHJEKASEKWR002-round-1",
@@ -41,7 +41,7 @@
       "meta_rule_state": "passed",
       "product_state": "passed",
       "prompt": "If the target app is a refine repo such that refine is being used to update refine, in this situation, the UI should have a refresh icon button on the main nav that is disabled or enabled if there is a new commit that the running refine could update to.",
-      "quality_checked_at": "2026-07-22T00:37:44Z",
+      "quality_checked_at": "2026-07-22T00:44:42Z",
       "quality_details": {
         "diagnostics": [
           "Quality checks disabled."
@@ -51,10 +51,10 @@
       "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-22T00:42:55Z"
+      "updated": "2026-07-22T00:44:42Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T00:42:55Z"
+  "updated": "2026-07-22T00:44:42Z"
 }
