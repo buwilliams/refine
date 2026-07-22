@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:13:25Z",
+  "updated_at": "2026-07-22T11:15:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -424,6 +424,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "stderr: 2026-07-22T11:12:38.053914Z ERROR codex_core::tools::router: error=apply_patch verification failed: Failed to find expected lines in /home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51/src/surfaces/web/static/js/features/toolbar.js:"
+    },
+    {
+      "created_at": "2026-07-22T11:15:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718940675-125",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The prototype now uses one canonical message identity end to end: each queued input remains individually recorded even when the provider receives a batch. In the browser, optimistic local input appears immediately inside the transcript, server-queued input stays removable, dispatching input becomes a compact “Sent” entry, and the matching user event replaces it without redrawing the toolbar shell. I’m at the verification pass now, including the race where dispatch wins before the POST response returns."
     }
   ],
   "queued_messages": [
