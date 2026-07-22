@@ -226,9 +226,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:10:10Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:11:01Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 6f6b6d57e3cd175155193b70d2f0d1f1330fc005 and remediate the four remaining governance findings. Route Goal-scoped POST /api/quality/checks and workflow QA through one shared evaluation-and-persist capability that writes identical latest-round quality_state, quality_message, quality_details, quality_checked_at, and Goal-round activity/log evidence before returning the surface response; project-only checks may remain project evidence but must be explicit. Make legacy Quality migration happen before any FileSettingsService load/update can omit or overwrite target_app_test_command(s), timeout, or timing: preserve unknown/legacy keys until the idempotent migration commits the authoritative quality/settings record and migration marker, and test an unrelated settings update as the first post-upgrade action. Couple WorkflowEngine cancellation to both the managed Quality process and its quality:* durable operation, with one terminal precedence rule so Cancelled cannot be overwritten by provider failure or claim completion. Snapshot quality_timing into the round/claim when the workflow path is selected and use that immutable value through QA/build/merge; later settings changes affect only future rounds. Add API/workflow evidence parity, first-update migration, cancel-versus-provider race, restart recovery, and timing-mutation path tests, then rerun the prior full Quality/workflow/browser/format/clippy gates.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:11:01Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:10:11Z"
+  "updated": "2026-07-22T12:11:01Z"
 }
