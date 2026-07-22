@@ -168,6 +168,7 @@ impl FileGitSyncService {
         let setup = self.ensure_state_worktree(&remote, remote_exists, &live_refine)?;
         let state_root = setup.path;
         let state_refine = state_root.join(".refine");
+        let recovered_interrupted_sync = self.recover_interrupted_state_worktree(&state_root)?;
         let checked_out = durable_state_map(&state_refine)?;
         // A node seeing the state branch for the first time has no synchronized
         // baseline yet. Its absent local files are not deletions of records
@@ -188,6 +189,12 @@ impl FileGitSyncService {
                 "Git remote {remote} is not configured; Refine state was committed locally."
             )]
         };
+        if recovered_interrupted_sync {
+            details.push(
+                "Recovered an interrupted Refine state copy before reconciling current live state."
+                    .to_string(),
+            );
+        }
         if remote_exists {
             let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
             let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
@@ -200,6 +207,17 @@ impl FileGitSyncService {
             }
         }
 
+        let tracked_transient = self
+            .git_at_stdout(&state_root, &["ls-files", "--", ".refine"])?
+            .lines()
+            .filter_map(|path| path.strip_prefix(".refine/"))
+            .map(PathBuf::from)
+            .filter(|path| is_transient_refine_path(path))
+            .collect::<BTreeSet<_>>();
+        let removed_transient = remove_transient_state_files(&state_refine)?
+            .into_iter()
+            .filter(|path| tracked_transient.contains(path))
+            .collect::<Vec<_>>();
         let remote_state = durable_state_map(&state_refine)?;
         let conflicts = state_conflicts(&base, &local, &remote_state);
         if !conflicts.is_empty() {
@@ -211,7 +229,12 @@ impl FileGitSyncService {
         apply_local_state_delta(&live_refine, &state_refine, &base, &local)?;
 
         let updated = durable_state_map(&state_refine)?;
-        let changed = state_change_status(&remote_state, &updated);
+        let mut changed = state_change_status(&remote_state, &updated);
+        changed.extend(
+            removed_transient
+                .into_iter()
+                .map(|path| format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))),
+        );
         let delta_committed = !changed.is_empty();
         let committed = setup.created || delta_committed;
         let mut commit = if delta_committed {
@@ -279,6 +302,70 @@ impl FileGitSyncService {
             detail: nonempty_detail(details),
             deferred: concurrent_local_change,
         })
+    }
+
+    fn recover_interrupted_state_worktree(
+        &self,
+        state_root: &std::path::Path,
+    ) -> RefineResult<bool> {
+        let tracked_changes = self.git_at_stdout(
+            state_root,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        )?;
+        let untracked = self.git_at_stdout(
+            state_root,
+            &[
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                ".refine",
+            ],
+        )?;
+        if tracked_changes.is_empty() && untracked.is_empty() {
+            return Ok(false);
+        }
+
+        if !tracked_changes.is_empty() {
+            self.git_at_checked(
+                state_root,
+                &[
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    ".refine",
+                ],
+            )?;
+        }
+        if !untracked.is_empty() {
+            self.git_at_checked(state_root, &["clean", "-f", "-d", "-x", "--", ".refine"])?;
+        }
+
+        let remaining = self.git_at_stdout(
+            state_root,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        )?;
+        if !remaining.is_empty() {
+            return Err(RefineError::Conflict(format!(
+                "failed to recover interrupted Refine state synchronization: {remaining}"
+            )));
+        }
+        Ok(true)
     }
 
     fn fetch_remote(&self, remote: &str) -> RefineResult<()> {
@@ -747,13 +834,14 @@ fn copy_state_file(source: &std::path::Path, destination: &std::path::Path) -> R
         std::process::id(),
         STATE_COPY_COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
-    fs::copy(source, &temp).map_err(|error| {
-        RefineError::Io(format!(
+    if let Err(error) = fs::copy(source, &temp) {
+        let _ = fs::remove_file(&temp);
+        return Err(RefineError::Io(format!(
             "failed to copy Refine state {} to {}: {error}",
             source.display(),
             temp.display()
-        ))
-    })?;
+        )));
+    }
     fs::rename(&temp, destination).map_err(|error| {
         let _ = fs::remove_file(&temp);
         RefineError::Io(format!(
@@ -959,7 +1047,7 @@ fn collect_durable_state_files(
         })?;
         let path = entry.path();
         let relative = path.strip_prefix(root).unwrap_or(&path);
-        if is_runtime_only_refine_path(relative) {
+        if is_runtime_only_refine_path(relative) || is_transient_refine_path(relative) {
             continue;
         }
         let file_type = entry.file_type().map_err(|error| {
@@ -975,6 +1063,72 @@ fn collect_durable_state_files(
         }
     }
     Ok(())
+}
+
+fn remove_transient_state_files(root: &std::path::Path) -> RefineResult<Vec<PathBuf>> {
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut removed = Vec::new();
+    remove_transient_state_files_from(root, root, &mut removed)?;
+    Ok(removed)
+}
+
+fn remove_transient_state_files_from(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    removed: &mut Vec<PathBuf>,
+) -> RefineResult<()> {
+    for entry in fs::read_dir(current).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to inspect synchronized Refine state {}: {error}",
+            current.display()
+        ))
+    })? {
+        let entry = entry.map_err(|error| {
+            RefineError::Io(format!(
+                "failed to inspect synchronized Refine state entry: {error}"
+            ))
+        })?;
+        let path = entry.path();
+        let relative = path.strip_prefix(root).unwrap_or(&path);
+        if is_transient_refine_path(relative) {
+            match fs::remove_file(&path) {
+                Ok(()) => removed.push(relative.to_path_buf()),
+                Err(error) if error.kind() == ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove transient Refine state {}: {error}",
+                        path.display()
+                    )));
+                }
+            }
+            continue;
+        }
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) if error.kind() == ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect synchronized Refine state {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        if file_type.is_dir() {
+            remove_transient_state_files_from(root, &path, removed)?;
+        }
+    }
+    Ok(())
+}
+
+fn is_transient_refine_path(path: &std::path::Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    file_name.ends_with(".lock")
+        || file_name.ends_with(".tmp")
+        || file_name.starts_with(".refine-sync-")
 }
 
 fn is_runtime_only_refine_path(path: &std::path::Path) -> bool {
@@ -1092,6 +1246,78 @@ mod tests {
     }
 
     #[test]
+    fn sync_recovers_completed_state_copy_interrupted_before_commit() {
+        let fixture = SyncFixture::new("interrupted-copy-restart");
+        write_goal(&fixture.a, "GOALA");
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+
+        let live_goal = refine_dir_for_target_root(&fixture.a)
+            .unwrap()
+            .join("goals/GOALA/goal.json");
+        let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
+        let state_goal = state_worktree.join(".refine/goals/GOALA/goal.json");
+        fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"copied\"}\n").unwrap();
+        copy_state_file(&live_goal, &state_goal).unwrap();
+        assert_eq!(
+            git_stdout(&state_worktree, &["status", "--short"]),
+            "M .refine/goals/GOALA/goal.json"
+        );
+
+        write_goal(&fixture.b, "GOALB");
+        fixture.service(&fixture.b).sync().unwrap();
+        let remote_before_recovery =
+            git_stdout(&fixture.a, &["ls-remote", "origin", REFINE_STATE_REF])
+                .split_whitespace()
+                .next()
+                .unwrap()
+                .to_string();
+        fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n").unwrap();
+
+        let recovered = fixture.service(&fixture.a).sync().unwrap();
+
+        assert!(
+            recovered.committed && recovered.pulled && recovered.pushed,
+            "{recovered:?}"
+        );
+        assert!(
+            recovered
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("Recovered an interrupted Refine state copy")),
+            "{recovered:?}"
+        );
+        assert_eq!(git_stdout(&state_worktree, &["status", "--short"]), "");
+        assert_eq!(
+            fs::read_to_string(&live_goal).unwrap(),
+            "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n"
+        );
+        assert_eq!(
+            git_stdout(
+                &fixture.a,
+                &["show", "origin/refine/state:.refine/goals/GOALA/goal.json",],
+            ),
+            "{\"id\":\"GOALA\",\"status\":\"concurrent\"}"
+        );
+        assert!(
+            !git_stdout(
+                &fixture.a,
+                &["show", "origin/refine/state:.refine/goals/GOALB/goal.json",],
+            )
+            .is_empty()
+        );
+        git(
+            &fixture.a,
+            &[
+                "merge-base",
+                "--is-ancestor",
+                &remote_before_recovery,
+                "origin/refine/state",
+            ],
+        );
+    }
+
+    #[test]
     fn sync_skips_noop_commits_and_summarizes_batches() {
         let fixture = SyncFixture::new("batch");
         write_goal(&fixture.a, "GOALA");
@@ -1148,6 +1374,96 @@ mod tests {
             ),
             "Sync Refine state: 2 goals"
         );
+    }
+
+    #[test]
+    fn durable_state_ignores_transient_lock_temp_and_copy_files() {
+        let root = unique_temp_dir("transient-state");
+        let sessions = root.join("chat/sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::write(sessions.join("session.json"), "{}\n").unwrap();
+        fs::write(sessions.join(".session.lock"), "").unwrap();
+        fs::write(sessions.join("session.json.interrupted.tmp"), "partial\n").unwrap();
+        fs::write(sessions.join(".refine-sync-123-0"), "partial\n").unwrap();
+        fs::write(root.join("supervisor-agent.lock"), "").unwrap();
+
+        let state = durable_state_map(&root).unwrap();
+
+        assert_eq!(
+            state.keys().cloned().collect::<Vec<_>>(),
+            vec![PathBuf::from("chat/sessions/session.json")]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sync_does_not_publish_transient_state_artifacts() {
+        let fixture = SyncFixture::new("transient-artifacts");
+        write_goal(&fixture.a, "GOALA");
+        let refine_dir = refine_dir_for_target_root(&fixture.a).unwrap();
+        let sessions = refine_dir.join("chat/sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::write(sessions.join(".session.lock"), "").unwrap();
+        fs::write(sessions.join("session.json.interrupted.tmp"), "partial\n").unwrap();
+        fs::write(sessions.join(".refine-sync-123-0"), "partial\n").unwrap();
+
+        let result = fixture.service(&fixture.a).sync().unwrap();
+
+        assert!(result.committed && result.pushed, "{result:?}");
+        assert_eq!(
+            git_stdout(
+                &fixture.a,
+                &["ls-tree", "-r", "--name-only", REFINE_STATE_BRANCH]
+            ),
+            ".refine/goals/GOALA/goal.json"
+        );
+    }
+
+    #[test]
+    fn sync_removes_transient_artifacts_already_on_state_branch() {
+        let fixture = SyncFixture::new("stale-transient-artifacts");
+        write_goal(&fixture.a, "GOALA");
+        fixture.service(&fixture.a).sync().unwrap();
+        let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
+        let stale = state_worktree.join(".refine/chat/sessions/.session.lock");
+        fs::create_dir_all(stale.parent().unwrap()).unwrap();
+        fs::write(&stale, "stale\n").unwrap();
+        git(&state_worktree, &["add", "-f", ".refine"]);
+        git(
+            &state_worktree,
+            &["commit", "-q", "-m", "publish stale lock"],
+        );
+        git(
+            &state_worktree,
+            &["push", "-q", "origin", REFINE_STATE_BRANCH],
+        );
+
+        let result = fixture.service(&fixture.a).sync().unwrap();
+
+        assert!(result.committed && result.pushed, "{result:?}");
+        assert!(!stale.exists());
+        assert_eq!(
+            git_stdout(
+                &fixture.a,
+                &["ls-tree", "-r", "--name-only", REFINE_STATE_BRANCH]
+            ),
+            ".refine/goals/GOALA/goal.json"
+        );
+    }
+
+    #[test]
+    fn failed_state_copy_removes_its_partial_temp_file() {
+        let root = unique_temp_dir("failed-copy-cleanup");
+        let source = root.join("source-directory");
+        let destination = root.join("destination/state.json");
+        fs::create_dir_all(&source).unwrap();
+
+        assert!(copy_state_file(&source, &destination).is_err());
+        assert_eq!(
+            fs::read_dir(destination.parent().unwrap()).unwrap().count(),
+            0
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
