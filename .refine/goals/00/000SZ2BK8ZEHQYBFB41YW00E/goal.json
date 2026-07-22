@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:51:01Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T11:04:53Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BK8ZEHQYBFB41YW00E-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Committed implementation complies with all governance rules; focused browser and static-asset checks pass.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "Committed implementation complies with all governance rules; focused browser and static-asset checks pass.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BK8ZEHQYBFB41YW00E-round-1"
+      },
+      "governance_message": "Committed implementation complies with all governance rules; focused browser and static-asset checks pass.",
       "governance_rule_actions": [],
       "implementation_report": "Goal 00000SZ2BK8ZEHQYBFB41YW00E is implemented and reviewable as a four-file working-tree diff.\n\n- Replaced the table-like Goal log rows with a dense text stream in [toolbar.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BK8ZEHQYBFB41YW00E-round-1/src/surfaces/web/static/js/features/toolbar.js:1261) and [toolbar.css](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BK8ZEHQYBFB41YW00E-round-1/src/surfaces/web/static/css/toolbar.css:655).\n- Added immediate search across messages, metadata, details, and actions.\n- Added persistent Head/Newest-first and Tail/Newest-last ordering; Tail remains the default and follows SSE updates.\n- Rendered safe Markdown links and validated activity link actions while escaping raw HTML and rejecting unsafe protocols.\n- SSE updates now refresh the stream in place, preserving search focus.\n- Added focused coverage and updated the integration index.\n\nVerification:\n\n- `cargo fmt --all -- --check` — exit 0.\n- `cargo run --manifest-path xtask/Cargo.toml -- test-browser` — 19 passed, 0 failed.\n- `cargo run --manifest-path xtask/Cargo.toml -- check-static-assets` — 53 files found; assets present.\n- `git diff --check` — exit 0.\n- Final scope: four intended modified files; no unrelated changes.",
       "implementation_reported_at": "2026-07-22T11:03:48Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "The Goal Follow Logs UI is table-based, but it looks bad for log output in UX. Typically, a log trail is a stream of text (HTML-formatted to support links, etc.). All the white space and layout are overkill. It should be a heading/tailing (change order) log with search.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T11:04:54Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T11:03:48Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T11:04:54Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T11:03:48Z"
+  "updated": "2026-07-22T11:04:55Z"
 }

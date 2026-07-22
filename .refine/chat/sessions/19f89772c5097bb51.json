@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:02:26Z",
+  "updated_at": "2026-07-22T11:05:04Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -190,8 +190,39 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T11:04:58Z",
+      "delivered": false,
+      "id": "evt-1784718298737-62",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "The supervisor tab should not have a scrollbar on the window that affects the areas outside the content that grows. I think the default size doesn't account for the extra controls in the supervisor tab (health status), which should be collapsed onto the same line as the session info anyway. My main goal is that the supervisor tab has a scrollbar only in the content-that-grows area."
+    },
+    {
+      "created_at": "2026-07-22T11:04:58Z",
+      "delivered": false,
+      "id": "evt-1784718298737-63",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T11:05:04Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718304403-65",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll trace the supervisor tab’s layout and sizing from the named symptom, then prototype the smallest structural fix that keeps only the growing content scrollable. I’ll also verify the default window-size assumptions and targeted UI behavior before handing it back."
     }
   ],
+  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,

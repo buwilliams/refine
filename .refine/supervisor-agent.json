@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "lifecycle": "observing",
-  "health": "healthy",
+  "lifecycle": "idle",
+  "health": "attention",
   "active_work": 0,
-  "queued_work": 2,
-  "failed_work": 0,
+  "queued_work": 0,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8978af5c97bb52",
   "provider": "codex",
@@ -40,11 +40,11 @@
     "00000SZ2AEZ6VGKY6RCG1YW00A": "done",
     "00000SZ2AG11JHPZNR941YW00B": "done",
     "00000SZ2B6AMS3D1A9N41YW00C": "done",
-    "00000SZ2BGCG909VDSW41YW00D": "todo",
-    "00000SZ2BK8ZEHQYBFB41YW00E": "todo"
+    "00000SZ2BGCG909VDSW41YW00D": "failed",
+    "00000SZ2BK8ZEHQYBFB41YW00E": "review"
   },
   "open_issues": {},
-  "updated_at": "2026-07-22T10:56:55.645111267+00:00",
+  "updated_at": "2026-07-22T11:04:56.163846535+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -533,6 +533,44 @@
       "status": "complete",
       "message": "Refine state synchronization: state synchronized and projection refreshed",
       "created_at": "2026-07-22T10:54:14.104958575+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T11:04:55.059977503+00:00-51",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: The bulk Jira export bypasses required supervision for potentially long-running Git work.",
+      "created_at": "2026-07-22T11:04:55.059977503+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T11:04:56.065521411+00:00-52",
+      "kind": "observation",
+      "status": "error",
+      "message": "Goal 00000SZ2BGCG909VDSW41YW00D changed from todo to failed.",
+      "created_at": "2026-07-22T11:04:56.065521411+00:00",
+      "goal_id": "00000SZ2BGCG909VDSW41YW00D",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T11:04:56.065526077+00:00-53",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2BK8ZEHQYBFB41YW00E changed from todo to review.",
+      "created_at": "2026-07-22T11:04:56.065526077+00:00",
+      "goal_id": "00000SZ2BK8ZEHQYBFB41YW00E",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T11:04:56.065528814+00:00-54",
+      "kind": "observation",
+      "status": "complete",
+      "message": "Workflow queue is idle; no further automatic supervisor turns will start.",
+      "created_at": "2026-07-22T11:04:56.065528814+00:00",
       "actionable": false,
       "retryable": false
     }
