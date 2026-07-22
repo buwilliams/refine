@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:48:13Z",
+  "updated_at": "2026-07-22T10:48:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -192,6 +192,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The scheduler recovery passed its second governance check and is now in review, with the missing intent documentation added through the normal Goal round. The command-palette Goal is the only remaining active work; no provider, authentication, process-loss, or quality failure is present."
+    },
+    {
+      "created_at": "2026-07-22T10:48:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717325899-46",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Another user Goal entered the window: move Jira export from per-Goal to bulk selection. The command-palette Goal completed to review, and the singleton runner claimed the new Goal at the batch boundary. I’m extending the same supervision window until this new work also settles."
     }
   ],
   "queued_messages": [
