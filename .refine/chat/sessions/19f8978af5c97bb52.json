@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:17:18Z",
+  "updated_at": "2026-07-22T12:19:42Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -492,6 +492,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new live-status Goal is correctly reusing supervisor reconciliation/chat/SSE rather than adding another monitor. The three recovery rounds are still active with fresh output; Jira’s agent also ran a read-only governance precheck inside its worktree before continuing, which is why that turn is longer, but the provider completed that nested check rather than hanging."
+    },
+    {
+      "created_at": "2026-07-22T12:19:42Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784722782539-72",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m resuming from the live workflow boundary: four implementation rounds were active, one shared-core Quality follow-up was deliberately staged but not requeued, and its UX successor remains parked behind it. I’ll reconcile process files against Goal state first, then advance only the dependency-safe recoveries."
     }
   ],
   "queue_dispatching": true,
