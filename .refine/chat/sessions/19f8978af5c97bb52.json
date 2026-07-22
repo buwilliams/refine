@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:54:26Z",
+  "updated_at": "2026-07-22T12:57:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -672,6 +672,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality round 4 produced candidate `d13adee…`; its own focused Rule 4 audit passed, and Refine has now started the authoritative independent governance phase. The original two governance defects are covered by 333 lines of execution-aware cancellation/restart changes plus focused tests; acceptance still depends on Refine’s gate."
+    },
+    {
+      "created_at": "2026-07-22T12:57:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784725033503-102",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Jira’s read-only pre-audit caught two issues before candidate submission: late worker completion could overwrite `Interrupted`, and the test used a worker-spec seam rather than proving the public retry and production restart path. The worker is correcting those inside the same round, which is exactly the cheap blind-spot prototype we wanted; Refine’s final gate has not been asked to accept it yet."
     }
   ],
   "queue_dispatching": true,
