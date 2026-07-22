@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:41:58Z",
+  "updated_at": "2026-07-22T16:45:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1500,6 +1500,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The real-provider race test is now reaching the managed process and exposing the right edges: capacity release is asynchronous with process drain, and canceling a running Goal must go through the workflow execution endpoint—not an illegal manual Goal transition. The agent is correcting the test to use the actual cancellation authority and to wait for lease release evidence rather than assuming synchronous teardown."
+    },
+    {
+      "created_at": "2026-07-22T16:45:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784738715383-247",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The Round 5 daemon harness now proves the full lifecycle: a real managed provider starts, cancellation wins despite a trapped late success, retry writes evidence and rolls the interrupted Goal back through the shared recovery capability, the scheduler launches a new managed provider, the new claim reaches Completed, and capacity drains. Final serial and production-shaped gates are running now."
     }
   ],
   "queued_messages": [
