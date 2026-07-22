@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:05:05Z",
+  "updated_at": "2026-07-22T16:14:19Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1416,6 +1416,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new evidence is being added at the daemon integration layer, not just as mocks: ambiguous legacy migration, partial-claim restart, terminal success with log failure, concurrent mutation/conflict repetition, cancellation versus late settlement, and app/runtime switching. This expands the test surface only where governance found risk; unrelated Quality, Supervisor, and UI code remains parked."
+    },
+    {
+      "created_at": "2026-07-22T16:14:19Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784736859352-232",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The daemon harness is doing useful work: successive failures have exposed real integration assumptions—async operation polling, initial per-node state convergence, legal manual transitions, and restart timing—rather than code compilation defects. The agent is correcting the harness and implementation at each authority boundary; the test is not being marked green by weakening the contract."
     }
   ],
   "queued_messages": [
