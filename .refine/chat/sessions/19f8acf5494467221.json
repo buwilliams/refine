@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:43:29Z",
+  "updated_at": "2026-07-22T17:44:26Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -396,6 +396,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A supplemental independent review caught an additional coordination crash window where `Goal=Failed` could persist before the claim became `Interrupted`; the active agent is fixing it before committing. Quality governance found no repository-evidence path under the searched ownership area (the search exited 1 for no matches) and is continuing its test audit."
+    },
+    {
+      "created_at": "2026-07-22T17:44:26Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742266783-123",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The newly found crash window now has a passing regression that repairs a terminal Goal with a stranded running claim. Coordination is rerunning the complete serial gate; Quality governance is checking docs/intent provenance and cross-surface parity."
     }
   ],
   "queued_messages": [
