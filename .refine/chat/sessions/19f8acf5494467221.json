@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:13:15Z",
+  "updated_at": "2026-07-22T17:13:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -120,6 +120,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The latest evidence supersedes the earlier failed-count snapshot: the three retryable goals are queued as `todo`, while two workflow agents are live. I’m now checking the durable goal records, agent/process leases, and audit tail directly; I won’t infer health merely from the aggregate counts."
+    },
+    {
+      "created_at": "2026-07-22T17:13:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740412095-71",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Refine has already replenished capacity: all three queued retries were claimed, so there are now five live workflow agents and zero queued work. The worker processes and their five goal-specific worktrees are present; no stall/loss evidence is visible yet. I’m continuing through review, merge, and cleanup rather than treating “claimed” as completion."
     }
   ],
   "queued_messages": [
