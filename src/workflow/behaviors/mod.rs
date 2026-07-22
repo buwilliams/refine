@@ -10,7 +10,7 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
+    FileQualityService, POST_BUILD, QualityCheckResult, QualityOperationRunner,
 };
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
@@ -266,12 +266,8 @@ impl WorkflowBehavior for WorkflowQa {
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let quality = match run_workflow_quality(ctx) {
             Ok(result) => result,
-            Err(error) => {
-                record_quality_error(ctx, &error)?;
-                return fail(ctx, "quality", error);
-            }
+            Err(error) => return fail(ctx, "quality", error),
         };
-        record_quality(ctx, &quality)?;
         if !quality.ok {
             return fail(
                 ctx,
@@ -282,10 +278,15 @@ impl WorkflowBehavior for WorkflowQa {
                 ),
             );
         }
-        ctx.request_transition(GoalStatus::Qa, GoalStatus::Review)?;
+        let next = if quality_timing(ctx)? == POST_BUILD {
+            GoalStatus::Review
+        } else {
+            GoalStatus::Build
+        };
+        ctx.request_transition(GoalStatus::Qa, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Qa,
-            to: GoalStatus::Review,
+            to: next,
             reason: "Quality checks passed".to_string(),
         })
     }
@@ -303,10 +304,15 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             &format!("Prepared implementation candidate {branch} for validation"),
             Some(json_object(json!({"branch": branch}))),
         )?;
-        ctx.request_transition(GoalStatus::ReadyMerge, GoalStatus::Build)?;
+        let next = if quality_timing(ctx)? == POST_BUILD {
+            GoalStatus::Build
+        } else {
+            GoalStatus::Qa
+        };
+        ctx.request_transition(GoalStatus::ReadyMerge, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::ReadyMerge,
-            to: GoalStatus::Build,
+            to: next,
             reason: "Implementation candidate is ready for validation".to_string(),
         })
     }
@@ -341,10 +347,15 @@ impl WorkflowBehavior for WorkflowBuild {
             "Target app build passed",
             Some(json_object(json!({"target_app": &build}))),
         )?;
-        ctx.request_transition(GoalStatus::Build, GoalStatus::Qa)?;
+        let next = if quality_timing(ctx)? == POST_BUILD {
+            GoalStatus::Qa
+        } else {
+            GoalStatus::Review
+        };
+        ctx.request_transition(GoalStatus::Build, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Build,
-            to: GoalStatus::Qa,
+            to: next,
             reason: "Target app build passed".to_string(),
         })
     }
@@ -403,52 +414,19 @@ impl WorkflowBehavior for WorkflowCancelled {
 }
 
 fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
-    FileQualityService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root).run_checks(
-        QualityCheckRequest {
-            owner_id: ctx.goal_id.clone(),
-            provider: ctx.provider.clone(),
-            cwd: ctx.require_agent_cwd()?.display().to_string(),
-            process_metadata: ctx.workflow_process_metadata("qa", "WorkflowQa"),
-        },
-    )
+    QualityOperationRunner::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root)
+        .run_goal_checks(
+            &ctx.goal_id,
+            &ctx.provider,
+            ctx.workflow_process_metadata("qa", "WorkflowQa"),
+        )
+        .map(|operation| operation.result)
 }
 
-fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> RefineResult<()> {
-    let message = result.summary.as_str();
-    ctx.work_items.update_latest_goal_round_evaluation_summary(
-        &ctx.goal_id,
-        &json!({
-            "quality_state": if result.ok { "passed" } else { "failed" },
-            "quality_message": message,
-            "quality_details": {
-                "results": result.results,
-                "diagnostics": result.diagnostics
-            },
-            "quality_checked_at": now_timestamp()
-        }),
-    )?;
-    ctx.log(
-        "quality",
-        message,
-        Some(json_object(json!({
-            "ok": result.ok,
-            "results": result.results,
-            "diagnostics": result.diagnostics
-        }))),
-    )
-}
-
-fn record_quality_error(ctx: &WorkflowContext<'_>, error: &RefineError) -> RefineResult<()> {
-    ctx.work_items.update_latest_goal_round_evaluation_summary(
-        &ctx.goal_id,
-        &json!({
-            "quality_state": "failed",
-            "quality_message": "Quality checks failed.",
-            "quality_details": {"error": error.to_string()},
-            "quality_checked_at": now_timestamp()
-        }),
-    )?;
-    Ok(())
+fn quality_timing(ctx: &WorkflowContext<'_>) -> RefineResult<String> {
+    FileQualityService::new(ctx.refine_dir())
+        .load_settings()
+        .map(|settings| settings.timing)
 }
 
 fn evaluate_workflow_governance(

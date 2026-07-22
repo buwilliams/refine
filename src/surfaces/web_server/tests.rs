@@ -5736,13 +5736,32 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 #[test]
 fn web_server_manages_quality_settings_and_checks() {
     let temp_root = unique_temp_dir("http-quality");
-    let refine_dir = temp_root.join(".refine");
+    let app_root = temp_root.join("app");
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
-    fs::create_dir_all(&temp_root).unwrap();
+    init_git_app(&app_root);
+    git(&app_root, &["branch", "-m", "refine/GOAL1/round-1"]).unwrap();
+    let candidate_commit = git_stdout(&app_root, &["rev-parse", "HEAD"]);
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Quality candidate", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "test", "Verify candidate")
+        .unwrap();
+    work_items
+        .update_goal_git_refs(
+            "GOAL1",
+            "refine/GOAL1/round-1",
+            "main",
+            &candidate_commit,
+            Some(&candidate_commit),
+        )
+        .unwrap();
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"summary\":\"Dashboard Quality passed.\",\"results\":[{\"test\":\"Dashboard loads for a signed-in user.\",\"status\":\"passed\",\"evidence\":\"Focused browser check passed\",\"command\":\"npm test\"}]}'\n",
+        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"summary\":\"Dashboard Quality planned.\",\"results\":[{\"test\":\"Dashboard loads for a signed-in user.\",\"status\":\"passed\",\"evidence\":\"Focused browser check planned\",\"command\":\"printf dashboard-ok\"}]}'\n",
     )
     .unwrap();
     #[cfg(unix)]
@@ -5758,7 +5777,7 @@ fn web_server_manages_quality_settings_and_checks() {
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
     let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.target_root = Some(app_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let app_settings = server.handle(ApiRequest {
@@ -5808,22 +5827,45 @@ fn web_server_manages_quality_settings_and_checks() {
     let checks = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/quality/checks".to_string(),
-        body: Some(json!({
-            "owner_id": "GOAL1"
-        })),
+        body: Some(json!({"goal_id": "GOAL1"})),
     });
-    assert_eq!(checks.status, 200);
+    assert_eq!(checks.status, 202);
     assert_eq!(checks.body["ok"], true);
-    assert_eq!(checks.body["result"]["owner_id"], "GOAL1");
-    assert_eq!(checks.body["operation"]["owner"], "quality:GOAL1");
-    assert_eq!(checks.body["operation"]["status"], "complete");
-    assert_eq!(
-        checks.body["result"]["summary"],
-        "Dashboard Quality passed."
+    assert!(
+        checks.body["operation"]["owner"]
+            .as_str()
+            .unwrap()
+            .starts_with("quality:GOAL1:")
     );
+    assert_eq!(checks.body["operation"]["status"], "running");
+    let quality_operation_id = checks.body["operation"]["id"].as_str().unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = (0..200)
+        .find_map(|_| {
+            let operation = registry.status(quality_operation_id).unwrap();
+            if matches!(
+                operation.state,
+                OperationState::Succeeded | OperationState::Failed
+            ) {
+                Some(operation)
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                None
+            }
+        })
+        .expect("Quality operation did not settle");
+    assert_eq!(operation.state, OperationState::Succeeded);
+    assert_eq!(operation.result["owner_id"], "GOAL1");
     assert_eq!(
-        checks.body["result"]["results"][0]["test"],
+        operation.result["results"][0]["test"],
         "Dashboard loads for a signed-in user."
+    );
+    assert!(operation.result["results"][0]["process_id"].is_string());
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["rounds"][0]["quality_state"], "passed");
+    assert_eq!(
+        detail["rounds"][0]["quality_details"]["results"],
+        operation.result["results"]
     );
     let command_override = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -5837,7 +5879,6 @@ fn web_server_manages_quality_settings_and_checks() {
             .unwrap_or("")
             .contains("plain-text tests")
     );
-    let quality_operation_id = checks.body["operation"]["id"].as_str().unwrap();
     let quality_operation_logs = FileOperationRegistry::new(&runtime_root)
         .page_logs(quality_operation_id, 10, 0)
         .unwrap()

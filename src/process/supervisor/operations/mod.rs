@@ -184,6 +184,9 @@ impl FileOperationRegistry {
             if !operation_active(&operation.state) {
                 continue;
             }
+            let Some(operation) = self.begin_recovery(&operation.id)? else {
+                continue;
+            };
             let associated = processes
                 .iter()
                 .filter(|process| {
@@ -207,6 +210,28 @@ impl FileOperationRegistry {
             }
         }
         Ok(recovered)
+    }
+
+    fn begin_recovery(&self, operation_id: &str) -> RefineResult<Option<OperationHandle>> {
+        let lock = self.mutation_lock()?;
+        let mut operation = self.status(operation_id)?;
+        if !operation_active(&operation.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(None);
+        }
+        operation.state = OperationState::Cancelling;
+        self.write(&operation)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            operation_id,
+            operation_log_entry(
+                &operation,
+                "warning",
+                "Operation restart recovery started",
+                None,
+            ),
+        )?;
+        Ok(Some(operation))
     }
 
     fn terminate_recovery_processes(
@@ -330,6 +355,46 @@ impl FileOperationRegistry {
             error: None,
         };
         self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "info", "Operation registered", None),
+        )?;
+        Ok(handle)
+    }
+
+    /// Atomically registers one active operation for an ownership key.
+    ///
+    /// Quality uses a Goal-and-candidate ownership key so manual and workflow callers cannot
+    /// evaluate or mutate the same candidate concurrently. The operation registry mutation lock
+    /// makes the exclusion effective across threads and daemon processes.
+    pub fn register_exclusive_with_request(
+        &self,
+        owner: &str,
+        request: Value,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        if let Some(active) = self
+            .recover()?
+            .into_iter()
+            .find(|operation| operation.owner == owner && operation_active(&operation.state))
+        {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {} already owns {owner}",
+                active.id
+            )));
+        }
+        let handle = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation registered", None),
@@ -718,14 +783,17 @@ impl FileOperationRegistry {
         let mut handle = self.status(operation_id)?;
         // Cancellation and restart interruption are authoritative terminal decisions. A worker or
         // cleanup path may still discover a real failure after either wins the mutation lock.
-        let interrupted = matches!(handle.state, OperationState::Interrupted);
+        let recovery_owned = matches!(
+            handle.state,
+            OperationState::Cancelling | OperationState::Interrupted
+        );
         if !matches!(
             handle.state,
-            OperationState::Cancelled | OperationState::Interrupted
+            OperationState::Cancelling | OperationState::Cancelled | OperationState::Interrupted
         ) {
             handle.state = OperationState::Failed;
         }
-        if !interrupted {
+        if !recovery_owned {
             handle.error = Some(error.clone());
         }
         self.write(&handle)?;
@@ -888,7 +956,7 @@ fn terminal_recovery_state_is_authoritative(
 ) -> bool {
     matches!(
         current,
-        OperationState::Cancelled | OperationState::Interrupted
+        OperationState::Cancelling | OperationState::Cancelled | OperationState::Interrupted
     ) && current != next
 }
 
@@ -958,6 +1026,28 @@ mod tests {
     use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn exclusive_operation_registration_serializes_one_owner() {
+        let temp_root = unique_temp_dir("operations-exclusive-owner");
+        let registry = FileOperationRegistry::new(&temp_root);
+        let first = registry
+            .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "workflow"}))
+            .unwrap();
+        let conflict = registry
+            .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "manual"}))
+            .unwrap_err();
+        assert!(conflict.to_string().contains(&first.id));
+        registry
+            .finish(&first.id, OperationState::Succeeded)
+            .unwrap();
+        assert!(
+            registry
+                .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "manual"}))
+                .is_ok()
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 
     use crate::process::subprocess::{
         ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,

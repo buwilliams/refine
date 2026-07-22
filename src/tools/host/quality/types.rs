@@ -14,6 +14,9 @@ pub struct QualitySettings {
     pub business_requirements: String,
     pub instructions: String,
     pub tests: Vec<String>,
+    /// Commands imported from the formerly authoritative target-app QA settings. They remain
+    /// enforced until a user explicitly replaces them with plain-text Quality tests.
+    pub legacy_commands: Vec<String>,
     pub enabled: String,
     pub timing: String,
     pub configured: bool,

@@ -3,10 +3,8 @@ use serde_json::{Value, json};
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::ConfigService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityOperationRunner, QualityService,
-    QualitySettingsPatch,
+    FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
@@ -66,13 +64,8 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| self.settings_service(refine_dir).load().ok())
-            .and_then(|settings| {
-                settings
-                    .get("quality_timing")
-                    .and_then(|value| value.as_str())
-                    .map(str::to_string)
-            })
+            .and_then(|refine_dir| FileQualityService::new(refine_dir).load_settings().ok())
+            .map(|settings| settings.timing)
             .unwrap_or_else(|| "pre_merge".to_string())
     }
 
@@ -229,14 +222,16 @@ impl InProcessWebServer {
                     .to_string(),
             ));
         }
-        let owner_id = body
-            .get("owner_id")
-            .or_else(|| body.get("goal_id"))
-            .or_else(|| body.get("feature_id"))
+        let Some(goal_id) = body
+            .get("goal_id")
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
-            .unwrap_or("app")
-            .to_string();
+            .map(str::trim)
+        else {
+            return error_response(RefineError::InvalidInput(
+                "goal_id is required for Quality evaluation".to_string(),
+            ));
+        };
         let settings = match self.settings_service(&refine_dir).load() {
             Ok(settings) => settings,
             Err(error) => return error_response(error),
@@ -251,63 +246,21 @@ impl InProcessWebServer {
             Ok(None) => return target_root_unavailable("run quality checks"),
             Err(error) => return error_response(error),
         };
-        let cwd = if let Some(goal_id) = body
-            .get("goal_id")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|goal_id| !goal_id.is_empty())
+        let metadata = serde_json::Map::from_iter([
+            ("kind".to_string(), json!("quality")),
+            ("source".to_string(), json!("manual")),
+            ("goal_id".to_string(), json!(goal_id)),
+        ]);
+        match QualityOperationRunner::new(&refine_dir, runtime_root, target_root)
+            .start_goal_checks(goal_id, &provider, metadata)
         {
-            let goal = match self
-                .work_item_service(&refine_dir)
-                .show_goal_summary(goal_id)
-            {
-                Ok(goal) => goal,
-                Err(error) => return error_response(error),
-            };
-            let Some(branch) = goal.goal.branch_name else {
-                return error_response(RefineError::Conflict(format!(
-                    "Goal {goal_id} has no candidate branch for Quality evaluation"
-                )));
-            };
-            match FileGitWorktreeService::with_runtime_root(&target_root, runtime_root)
-                .existing_worktree_for_branch(&branch)
-            {
-                Ok(Some(path)) => path,
-                Ok(None) => {
-                    return error_response(RefineError::Conflict(format!(
-                        "Goal {goal_id} candidate worktree was not found"
-                    )));
-                }
-                Err(error) => return error_response(error),
-            }
-        } else {
-            target_root
-        };
-        match QualityOperationRunner::new(&refine_dir, runtime_root).run_checks(
-            QualityCheckRequest {
-                owner_id,
-                provider,
-                cwd: cwd.display().to_string(),
-                process_metadata: Default::default(),
-            },
-        ) {
-            Ok(operation_result) => {
-                append_quality_activity(
-                    &refine_dir,
-                    format!(
-                        "Quality checks completed for {}",
-                        operation_result.result.owner_id
-                    ),
-                );
-                ApiResponse::json(
-                    200,
-                    json!({
-                        "ok": operation_result.result.ok,
-                        "result": operation_result.result,
-                        "operation": operation_response(operation_result.operation)
-                    }),
-                )
-            }
+            Ok(operation) => ApiResponse::json(
+                202,
+                json!({
+                    "ok": true,
+                    "operation": operation_response(operation)
+                }),
+            ),
             Err(error) => error_response(error),
         }
     }

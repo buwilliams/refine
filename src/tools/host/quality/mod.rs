@@ -7,6 +7,6 @@ mod types;
 pub(crate) use service::parse_quality_provider_output;
 pub use service::{
     FileQualityService, QualityCheckRequest, QualityCheckResult, QualityOperationResult,
-    QualityOperationRunner, QualityService,
+    QualityOperationRunner, QualityService, QualityTestResult,
 };
 pub use types::*;
