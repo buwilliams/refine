@@ -279,18 +279,18 @@
       "assignee": "Buddy",
       "constitution_state": "passed",
       "created": "2026-07-22T12:45:04Z",
-      "governance_checked_at": "2026-07-22T13:34:16Z",
+      "governance_checked_at": "2026-07-22T17:17:49Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C8SVXH5MGTX1XVA001-round-4",
         "failed_actions": [
           {
-            "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so the implementation still records or applies a decision against stale evidence. The added tests mutate evidence before submission and do not exercise this remaining in-transaction race.",
+            "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so a decision can still be recorded or applied against stale evidence. The tests mutate evidence before submission and do not exercise this in-transaction race.",
             "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
             "rule_id": "rule-6"
           },
           {
-            "message": "The canonical repository dossier does not contain the failed Goal's isolated worktree status or resolve its preserved branch ref. It records only the branch name, candidate commit resolution, target-branch resolution, and primary target-worktree status. Changes to the failed Goal worktree or preserved branch can therefore leave the fingerprint unchanged, and the repository-staleness test covers only a commit in the target repository.",
+            "message": "The canonical repository dossier omits the failed Goal's isolated worktree status and does not resolve its preserved branch ref. Changes to that worktree or branch can therefore leave the fingerprint unchanged, while the repository-staleness test covers only a commit in the primary target repository.",
             "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
             "rule_id": "rule-6"
           }
@@ -298,19 +298,19 @@
         "governance_configured": true,
         "phase": "post_implementation",
         "provider": "codex",
-        "raw_output": "{\"status\":\"failed\",\"message\":\"Two recovery-evidence integrity violations remain.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so the implementation still records or applies a decision against stale evidence. The added tests mutate evidence before submission and do not exercise this remaining in-transaction race.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The canonical repository dossier does not contain the failed Goal's isolated worktree status or resolve its preserved branch ref. It records only the branch name, candidate commit resolution, target-branch resolution, and primary target-worktree status. Changes to the failed Goal worktree or preserved branch can therefore leave the fingerprint unchanged, and the repository-staleness test covers only a commit in the target repository.\"}]}",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Two recovery-evidence integrity violations remain.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so a decision can still be recorded or applied against stale evidence. The tests mutate evidence before submission and do not exercise this in-transaction race.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The canonical repository dossier omits the failed Goal's isolated worktree status and does not resolve its preserved branch ref. Changes to that worktree or branch can therefore leave the fingerprint unchanged, while the repository-staleness test covers only a commit in the primary target repository.\"}]}",
         "rules_checked": 8,
         "verdict": {
           "message": "Two recovery-evidence integrity violations remain.",
           "status": "failed",
           "violations": [
             {
-              "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so the implementation still records or applies a decision against stale evidence. The added tests mutate evidence before submission and do not exercise this remaining in-transaction race.",
+              "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so a decision can still be recorded or applied against stale evidence. The tests mutate evidence before submission and do not exercise this in-transaction race.",
               "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
               "rule_id": "rule-6"
             },
             {
-              "message": "The canonical repository dossier does not contain the failed Goal's isolated worktree status or resolve its preserved branch ref. It records only the branch name, candidate commit resolution, target-branch resolution, and primary target-worktree status. Changes to the failed Goal worktree or preserved branch can therefore leave the fingerprint unchanged, and the repository-staleness test covers only a commit in the target repository.",
+              "message": "The canonical repository dossier omits the failed Goal's isolated worktree status and does not resolve its preserved branch ref. Changes to that worktree or branch can therefore leave the fingerprint unchanged, while the repository-staleness test covers only a commit in the primary target repository.",
               "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
               "rule_id": "rule-6"
             }
@@ -321,12 +321,12 @@
       "governance_message": "Two recovery-evidence integrity violations remain.",
       "governance_rule_actions": [
         {
-          "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so the implementation still records or applies a decision against stale evidence. The added tests mutate evidence before submission and do not exercise this remaining in-transaction race.",
+          "message": "The shared workflow transaction does not cover the Goal, activity, operation, managed-process, or Git writers whose data forms the dossier. Those writers can change evidence after submit_recovery_decision rebuilds the fingerprint but before it journals or projects the decision, so a decision can still be recorded or applied against stale evidence. The tests mutate evidence before submission and do not exercise this in-transaction race.",
           "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
           "rule_id": "rule-6"
         },
         {
-          "message": "The canonical repository dossier does not contain the failed Goal's isolated worktree status or resolve its preserved branch ref. It records only the branch name, candidate commit resolution, target-branch resolution, and primary target-worktree status. Changes to the failed Goal worktree or preserved branch can therefore leave the fingerprint unchanged, and the repository-staleness test covers only a commit in the target repository.",
+          "message": "The canonical repository dossier omits the failed Goal's isolated worktree status and does not resolve its preserved branch ref. Changes to that worktree or branch can therefore leave the fingerprint unchanged, while the repository-staleness test covers only a commit in the primary target repository.",
           "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
           "rule_id": "rule-6"
         }
@@ -343,10 +343,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy",
       "rule_state": "failed",
-      "updated": "2026-07-22T17:16:41Z"
+      "updated": "2026-07-22T17:17:49Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T17:16:41Z"
+  "updated": "2026-07-22T17:17:49Z"
 }
