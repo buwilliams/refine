@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:10:36Z",
+  "updated_at": "2026-07-22T12:13:37Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -468,6 +468,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Two core candidates failed again, but with narrower, actionable races rather than the original architecture. Supervisor recovery still needs one lock shared with workflow claim mutations, ownership validation before side effects, and a full evidence-plus-decision idempotency fingerprint. Quality core needs API/workflow evidence parity, migration-before-any-settings-write, coupled claim/operation cancellation, and a per-round timing snapshot. I’m issuing one more preservation round for each."
+    },
+    {
+      "created_at": "2026-07-22T12:13:37Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784722417021-68",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A new Goal arrived through live replenishment: “Keep Supervisor status live during active turns.” I’m adding it to the territory rather than freezing the initial queue snapshot. The earlier inline-authoring Goal remains safely in review; review is not being auto-approved across a confirmation boundary merely to make counts look clean."
     }
   ],
   "queue_dispatching": true,
