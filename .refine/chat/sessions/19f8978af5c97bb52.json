@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T10:57:00Z",
+  "updated_at": "2026-07-22T10:57:16Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -36,6 +36,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m checking the live workflow, the two queued goals, runtime health, and repository state so I can separate real progress from stale supervisor events."
+    },
+    {
+      "created_at": "2026-07-22T10:57:16Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717836924-26",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The repository itself is healthy and synchronized, but the live evidence has one inconsistency: both goals say “in progress” while the process summary reports zero implementation agents. I’m following that path now to tell whether work completed, stalled, or was orphaned during the runtime transition."
     }
   ],
   "queue_dispatching": true,
