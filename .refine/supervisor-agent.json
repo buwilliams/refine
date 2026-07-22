@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "idle",
-  "health": "attention",
+  "health": "degraded",
   "active_work": 0,
   "queued_work": 0,
   "failed_work": 1,
@@ -54,8 +54,10 @@
     "00000SZ2SWWPEJZZHS4CXC4000": "cancelled",
     "00000SZ2TPQM61AGWJW8XC4001": "failed"
   },
-  "open_issues": {},
-  "updated_at": "2026-07-22T21:20:21.896814676+00:00",
+  "open_issues": {
+    "state_sync": "Refine state synchronization failed: failed to read Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock: No such file or directory (os error 2)"
+  },
+  "updated_at": "2026-07-22T21:23:22.501615828+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
