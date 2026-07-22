@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:53:50Z",
+  "updated_at": "2026-07-22T17:54:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -516,6 +516,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality compiles cleanly after moving the helper to the correct engine implementation and is adding the two regression fixtures. Coordination governance is now checking Node identity/ownership semantics against the multi-instance harness."
+    },
+    {
+      "created_at": "2026-07-22T17:54:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742848675-146",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination governance found one remaining distributed-ownership defect: Node B can select or reconcile Node A’s claim because scheduling/recovery lacks an active-Node filter; the current two-daemon test uses the same default Node and misses it. I’m preserving `ec0d336`, adding a narrowly scoped distinct-Node round, and requeueing it through Refine."
     }
   ],
   "queued_messages": [
