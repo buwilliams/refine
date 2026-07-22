@@ -1,0 +1,41 @@
+{
+  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
+  "branch_name": "refine/00000SZ2DY74HKB75CMHXVA009/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T12:12:52Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2DY74HKB75CMHXVA009",
+  "name": "Keep Supervisor status live during active turns",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:12:53Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Keep the Supervisor status API and toolbar synchronized with live workflow truth while the singleton provider turn remains active. /api/supervisor-agent must continuously reflect current Goal states, active, queued, failed, health, lifecycle, recent decisions, and updated_at rather than retaining only the snapshot that launched the turn. Reuse the existing Supervisor reconciliation, shared chat session, projection, and SSE event path; do not add another monitor, state engine, or duplicate provider turn. The summary and transcript must agree through Goal transitions and daemon recovery. Add regression coverage with a deliberately long-running Supervisor turn while Goals enter in-progress, failed, review, and done, asserting that API and UI state update promptly without restarting the provider or duplicating events.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:12:53Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T12:12:54Z"
+}
