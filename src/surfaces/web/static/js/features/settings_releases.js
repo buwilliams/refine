@@ -244,7 +244,7 @@ async function queueSourcePromotionFromUi() {
     "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
   );
   if (!confirmed) return null;
-  return api("POST", "/api/system/source/promote", { confirmed: true });
+  return api("POST", "/api/system/source/promote", {});
 }
 
 async function promoteSourceFromNav() {

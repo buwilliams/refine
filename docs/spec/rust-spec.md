@@ -540,8 +540,8 @@ same source-status response and promotion endpoint as the detailed Refine (dev)
 surface: it is disabled while current or blocked and enabled only for a safe
 fetched update. The source-status API returns that affordance presentation from
 the shared source-promotion capability so the browser does not independently
-reinterpret readiness. The promotion endpoint also requires the browser's
-explicit confirmation marker before it can queue the restart-safe handoff.
+reinterpret readiness. The browser requires confirmation before it invokes the
+existing, backward-compatible promotion API.
 
 The promotion handoff runs as an external helper that outlives the initiating
 HTTP request. It persists atomic stage state under the port runtime root,

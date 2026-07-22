@@ -151,7 +151,7 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST" && request.path == "/system/source/promote" {
-            return self.handle_source_promote(request);
+            return self.handle_source_promote();
         }
 
         if request.method == "GET" && request.path == "/system/releases" {

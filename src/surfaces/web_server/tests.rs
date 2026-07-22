@@ -406,7 +406,8 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
     assert!(releases.contains("const sourceUpdate = result.source_update || {}"));
     assert!(releases.contains("button.disabled = sourceUpdate.enabled !== true"));
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
-    assert!(releases.contains(r#"api("POST", "/api/system/source/promote", { confirmed: true })"#));
+    assert!(releases.contains("const confirmed = window.confirm("));
+    assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
     assert!(init.contains("initSourceUpdateNav()"));
 }
 
@@ -529,30 +530,22 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
 }
 
 #[test]
-fn source_promotion_api_requires_explicit_confirmation_before_queueing() {
+fn source_promotion_api_preserves_unconfirmed_request_compatibility() {
     let server = server_with_projection();
-    for body in [None, Some(json!({})), Some(json!({"confirmed": false}))] {
+    for body in [
+        None,
+        Some(json!({})),
+        Some(json!({"confirmed": false})),
+        Some(json!({"confirmed": true})),
+    ] {
         let response = server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/system/source/promote".to_string(),
             body,
         });
-        assert_eq!(response.status, 400);
-        assert_eq!(response.body["error"]["code"], "invalid_input");
-        assert!(
-            response.body["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("explicit confirmation")
-        );
+        assert_eq!(response.status, 503);
+        assert_eq!(response.body["error"]["code"], "runtime_root_unavailable");
     }
-    let confirmed = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/system/source/promote".to_string(),
-        body: Some(json!({"confirmed": true})),
-    });
-    assert_eq!(confirmed.status, 503);
-    assert_eq!(confirmed.body["error"]["code"], "runtime_root_unavailable");
 }
 
 #[test]

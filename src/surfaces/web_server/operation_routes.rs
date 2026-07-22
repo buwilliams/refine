@@ -517,18 +517,7 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_source_promote(&self, request: ApiRequest) -> ApiResponse {
-        if request
-            .body
-            .as_ref()
-            .and_then(|body| body.get("confirmed"))
-            .and_then(serde_json::Value::as_bool)
-            != Some(true)
-        {
-            return error_response(RefineError::InvalidInput(
-                "source promotion requires explicit confirmation".to_string(),
-            ));
-        }
+    pub(super) fn handle_source_promote(&self) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("promote source checkout");
         };
