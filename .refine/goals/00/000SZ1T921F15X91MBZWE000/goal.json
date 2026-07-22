@@ -6,10 +6,10 @@
   "feature_id": null,
   "feature_order": null,
   "id": "00000SZ1T921F15X91MBZWE000",
-  "name": "Implement a first-class workflow monitor agent that serves the supervisory role",
+  "name": "Implement a first-class supervisor agent with persistent toolbar visibility",
   "node_id": "default",
   "notes": [],
-  "priority": "high",
+  "priority": "low",
   "reporter": "Buddy Williams",
   "rounds": [
     {
@@ -37,5 +37,5 @@
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T00:51:08Z"
+  "updated": "2026-07-22T00:51:40Z"
 }
