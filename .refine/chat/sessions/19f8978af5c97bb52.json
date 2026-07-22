@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:07:58Z",
+  "updated_at": "2026-07-22T14:10:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1056,6 +1056,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s targeted gate found three concrete failures: terminal Failed/Interrupted operations gained an incorrect extra “Operation cancelled” log; the registry interruption test saw the same pollution; and the prompt-contract word budget rose to 706. The worker is correcting those before rerunning—none are being hidden as “unrelated.”"
+    },
+    {
+      "created_at": "2026-07-22T14:10:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784729459707-166",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality corrected the cancellation-log regression and verified the background-import rollback path, then returned to the full all-target gate. This is now the only live workflow process."
     }
   ],
   "queue_dispatching": true,
