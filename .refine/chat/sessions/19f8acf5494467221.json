@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:21:33Z",
+  "updated_at": "2026-07-22T18:23:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -756,6 +756,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality now has the requested focused evidence green: mutation → supervised restoration → successful retry, failed restoration, full delegated prompt context, concurrent API/workflow ownership, and retry-queue integrity. Coordination’s entire executable matrix is green after the atomicity fix, and its amended commit is in a second read-only review before Refine’s own official governance stage."
+    },
+    {
+      "created_at": "2026-07-22T18:23:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784744585952-190",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s second review still failed, so it remains blocked from approval. The remaining findings are: pause rollback is outside the coordination lease; the ownerless-claim test manufactures state through service calls instead of daemon scheduling; and the daemon test proves cancellation but not a Review transition or an explicit reviewed transfer/recovery boundary. These are evidence and atomicity failures, not hidden; the candidate stays isolated for another correction."
     }
   ],
   "queued_messages": [
