@@ -14,28 +14,166 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T19:39:05Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T20:02:13Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-1",
+        "failed_actions": [
+          {
+            "message": "Goal-scoped POST /api/quality/checks returns operation output and generic activity, while workflow QA also persists the Goal round's Quality state, details, timestamp, and log. The same Quality capability therefore has inconsistent durable evidence semantics across surfaces.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Quality timing has no authoritative behavior: /api/quality writes quality/settings.json, the dashboard reads the separate legacy quality_timing setting, and workflow always runs Build then QA without consulting either value.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Existing enabled target-app Quality commands are not migrated or covered by a transition plan. After upgrade, tests defaults to an empty list and the former enforced QA becomes a silent successful no-op.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "QualityOperationRunner registers an operation and propagates provider or parsing errors without finishing it, leaving it running until restart recovery. It also does not attach the operation_id to the supervised agent process, so operation cancellation cannot terminate that process, and the synchronous endpoint withholds the operation identifier until completion.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Manual Goal Quality checks and workflow QA can evaluate the same candidate worktree concurrently without a shared claim, capacity reservation, or per-Goal/worktree lock, allowing agent execution and evidence updates to race.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "Per-test commands and evidence are accepted solely from agent-authored JSON and are not correlated with observed supervised executions. The committed success fixture demonstrates the false-positive path by claiming an npm/browser check passed without executing it.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          },
+          {
+            "message": "Quality never verifies the candidate commit, HEAD, index, or worktree cleanliness before and after agent evaluation. An agent can modify the candidate and still produce passing evidence for content different from the committed Goal candidate, with no recovery path.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          },
+          {
+            "message": "Affected contracts remain contradictory: the Target App intent still says Quality uses target-app test settings, rust-spec still defines enabled target-app commands as workflow QA, and the integration index still conditions QA on a target-app test command.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Eight committed governance violations found.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"Goal-scoped POST /api/quality/checks returns operation output and generic activity, while workflow QA also persists the Goal round's Quality state, details, timestamp, and log. The same Quality capability therefore has inconsistent durable evidence semantics across surfaces.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"Quality timing has no authoritative behavior: /api/quality writes quality/settings.json, the dashboard reads the separate legacy quality_timing setting, and workflow always runs Build then QA without consulting either value.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"Existing enabled target-app Quality commands are not migrated or covered by a transition plan. After upgrade, tests defaults to an empty list and the former enforced QA becomes a silent successful no-op.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"QualityOperationRunner registers an operation and propagates provider or parsing errors without finishing it, leaving it running until restart recovery. It also does not attach the operation_id to the supervised agent process, so operation cancellation cannot terminate that process, and the synchronous endpoint withholds the operation identifier until completion.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Manual Goal Quality checks and workflow QA can evaluate the same candidate worktree concurrently without a shared claim, capacity reservation, or per-Goal/worktree lock, allowing agent execution and evidence updates to race.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Per-test commands and evidence are accepted solely from agent-authored JSON and are not correlated with observed supervised executions. The committed success fixture demonstrates the false-positive path by claiming an npm/browser check passed without executing it.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Quality never verifies the candidate commit, HEAD, index, or worktree cleanliness before and after agent evaluation. An agent can modify the candidate and still produce passing evidence for content different from the committed Goal candidate, with no recovery path.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Affected contracts remain contradictory: the Target App intent still says Quality uses target-app test settings, rust-spec still defines enabled target-app commands as workflow QA, and the integration index still conditions QA on a target-app test command.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Eight committed governance violations found.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Goal-scoped POST /api/quality/checks returns operation output and generic activity, while workflow QA also persists the Goal round's Quality state, details, timestamp, and log. The same Quality capability therefore has inconsistent durable evidence semantics across surfaces.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Quality timing has no authoritative behavior: /api/quality writes quality/settings.json, the dashboard reads the separate legacy quality_timing setting, and workflow always runs Build then QA without consulting either value.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Existing enabled target-app Quality commands are not migrated or covered by a transition plan. After upgrade, tests defaults to an empty list and the former enforced QA becomes a silent successful no-op.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "QualityOperationRunner registers an operation and propagates provider or parsing errors without finishing it, leaving it running until restart recovery. It also does not attach the operation_id to the supervised agent process, so operation cancellation cannot terminate that process, and the synchronous endpoint withholds the operation identifier until completion.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Manual Goal Quality checks and workflow QA can evaluate the same candidate worktree concurrently without a shared claim, capacity reservation, or per-Goal/worktree lock, allowing agent execution and evidence updates to race.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "Per-test commands and evidence are accepted solely from agent-authored JSON and are not correlated with observed supervised executions. The committed success fixture demonstrates the false-positive path by claiming an npm/browser check passed without executing it.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            },
+            {
+              "message": "Quality never verifies the candidate commit, HEAD, index, or worktree cleanliness before and after agent evaluation. An agent can modify the candidate and still produce passing evidence for content different from the committed Goal candidate, with no recovery path.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            },
+            {
+              "message": "Affected contracts remain contradictory: the Target App intent still says Quality uses target-app test settings, rust-spec still defines enabled target-app commands as workflow QA, and the integration index still conditions QA on a target-app test command.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-1"
+      },
+      "governance_message": "Eight committed governance violations found.",
+      "governance_rule_actions": [
+        {
+          "message": "Goal-scoped POST /api/quality/checks returns operation output and generic activity, while workflow QA also persists the Goal round's Quality state, details, timestamp, and log. The same Quality capability therefore has inconsistent durable evidence semantics across surfaces.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Quality timing has no authoritative behavior: /api/quality writes quality/settings.json, the dashboard reads the separate legacy quality_timing setting, and workflow always runs Build then QA without consulting either value.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Existing enabled target-app Quality commands are not migrated or covered by a transition plan. After upgrade, tests defaults to an empty list and the former enforced QA becomes a silent successful no-op.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "QualityOperationRunner registers an operation and propagates provider or parsing errors without finishing it, leaving it running until restart recovery. It also does not attach the operation_id to the supervised agent process, so operation cancellation cannot terminate that process, and the synchronous endpoint withholds the operation identifier until completion.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Manual Goal Quality checks and workflow QA can evaluate the same candidate worktree concurrently without a shared claim, capacity reservation, or per-Goal/worktree lock, allowing agent execution and evidence updates to race.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "Per-test commands and evidence are accepted solely from agent-authored JSON and are not correlated with observed supervised executions. The committed success fixture demonstrates the false-positive path by claiming an npm/browser check passed without executing it.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        },
+        {
+          "message": "Quality never verifies the candidate commit, HEAD, index, or worktree cleanliness before and after agent evaluation. An agent can modify the candidate and still produce passing evidence for content different from the committed Goal candidate, with no recovery path.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        },
+        {
+          "message": "Affected contracts remain contradictory: the Target App intent still says Quality uses target-app test settings, rust-spec still defines enabled target-app commands as workflow QA, and the integration index still conditions QA on a target-app test command.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Implemented Goal `00000SZ2TPQM61AGWJW8XC4001` and left the worktree reviewable.\n\nWhat changed:\n\n- Quality now stores separate plain-text tests and evaluates every Goal candidate through the configured agent.\n- The agent chooses how to verify each test and must return one pass/fail result with evidence per test.\n- Missing, duplicate, invalid, or evidence-free results fail Quality. Empty test lists are recorded as successful no-ops.\n- Legacy `quality_enabled` can no longer disable candidate evaluation.\n- Workflow and API share the same Quality service; command overrides are rejected and Goal checks resolve the candidate worktree.\n- Quality evidence is persisted on the Goal round, and failures preserve the candidate.\n- Settings UI and documentation now distinguish agent-evaluated Quality tests from target-app command tests.\n\nKey files: [quality service](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-1/src/tools/host/quality/service.rs), [workflow integration](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-1/src/workflow/behaviors/mod.rs), [agent prompt](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-1/src/prompts/post-implementation-quality.md).\n\nVerification:\n\n- `cargo fmt --all -- --check` — passed\n- `cargo check --all-targets --quiet` — passed\n- `cargo test --lib --quiet` — 414 passed, 0 failed\n- `cargo test --test full_workflow -- --ignored --nocapture` — 1 passed, 0 failed\n- `git diff --check` — passed",
       "implementation_reported_at": "2026-07-22T19:57:12Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Implement Quality as an agent evaluation for every Goal candidate, parallel in concept to post-implementation governance but with separate plain-text tests. The agent determines how to run each test with pass/fail.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T19:57:12Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T20:02:13Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T19:57:12Z"
+  "updated": "2026-07-22T20:02:13Z"
 }
