@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T20:04:05Z",
+  "updated_at": "2026-07-22T20:11:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -1695,10 +1695,19 @@
       "provider_session_id": null,
       "role": "system",
       "text": "Provider turn failed: Error: turn/start: turn/start failed: Input exceeds the maximum length of 1048576 characters. (code -32602), data: {\"input_error_code\":\"input_too_large\",\"max_chars\":1048576,\"actual_chars\":2418538}"
+    },
+    {
+      "created_at": "2026-07-22T20:11:25Z",
+      "delivered": false,
+      "id": "evt-1784751085267-0",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Daemon restarted before the provider turn completed."
     }
   ],
   "importable_artifacts": [],
   "closed": false,
   "interrupted": true,
-  "interruption_detail": "Provider turn failed: Error: turn/start: turn/start failed: Input exceeds the maximum length of 1048576 characters. (code -32602), data: {\"input_error_code\":\"input_too_large\",\"max_chars\":1048576,\"actual_chars\":2418538}"
+  "interruption_detail": "Daemon restarted before the provider turn completed."
 }
