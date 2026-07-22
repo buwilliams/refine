@@ -1,7 +1,7 @@
 {
   "base_commit": "64565963c310241ff8755a6a48e6c58a23bc497d",
   "branch_name": "refine/00000SZ29T1KSK3KYJW81YW001/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "d2722c4aaa7510553ba8f1dab5540ab1dd38a203",
   "created": "2026-07-22T09:48:30Z",
   "feature_id": null,
   "feature_order": null,
@@ -75,8 +75,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal `00000SZ29T1KSK3KYJW81YW001` is ready for review at commit `d2722c4`; the worktree is clean.\n\nAfter-action report:\n\n- Moved Supervisor events into the System tab and removed the cluttering Supervisor event stream.\n- Fixed repeated polling so an unchanged 80-event snapshot remains 80 entries instead of duplicating.\n- Added full-window browser regression coverage.\n\nVerification:\n\n- `cargo fmt --all -- --check` — exit 0.\n- `git diff --check` — exit 0.\n- Browser tests — exit 0; 9 passed, 0 failed.\n- Focused Rust contract — exit 0; 1 passed, 0 failed.\n- `cargo test --lib` — exit 101; 388 passed, 1 unrelated project-sync test failed transiently.\n- Isolated failing test rerun — exit 0; 1 passed, 0 failed.\n- Final `git status --porcelain` — empty.\n\nGoal agent usage: 84,529 tokens over 4m 11s.",
+      "implementation_reported_at": "2026-07-22T10:24:21Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -87,10 +87,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:07:19Z"
+      "updated": "2026-07-22T10:24:21Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T10:19:48Z"
+  "updated": "2026-07-22T10:24:22Z"
 }
