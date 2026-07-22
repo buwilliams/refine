@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:23:30Z",
+  "updated_at": "2026-07-22T11:24:27Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -252,6 +252,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The implementation agent completed cleanly and committed candidate `5a9e63f4ad7090a17847866fae05ac9e0f21e010`; the worktree is clean. Browser-wide tests, formatting, diff checks, and targeted Feature membership/order service tests are green. I’m now following the workflow’s governance/review/merge phases and will verify projection and Git convergence after the candidate leaves the implementation worktree."
+    },
+    {
+      "created_at": "2026-07-22T11:24:27Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719467199-32",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A consequential blind spot appeared after implementation: active-queue replenishment has started additional Goals, including a new Goal and a retry of the previously failed bulk-Jira Goal. That behavior matches the recently added replenishment semantics, so the original queue is no longer the whole territory. I’m enumerating the new claims and their live processes before treating the completed candidate’s delayed state transition as a stall."
     }
   ],
   "queue_dispatching": true,
