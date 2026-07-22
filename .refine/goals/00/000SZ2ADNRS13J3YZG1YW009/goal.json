@@ -69,28 +69,47 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:34:00Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:46:43Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2ADNRS13J3YZG1YW009-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found in the committed implementation.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found in the committed implementation.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2ADNRS13J3YZG1YW009-round-2"
+      },
+      "governance_message": "No Governance rule violations found in the committed implementation.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2ADNRS13J3YZG1YW009` is ready for governance, quality, and user review on commit `b688c14c318e8f736c8dc27dd49f10b4ae7cf0ab`.\n\nAfter-action report:\n\n- Changed [src/workflow/mod.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2ADNRS13J3YZG1YW009-round-2/src/workflow/mod.rs:658) so active workflows periodically discover eligible queued Goals and fill available capacity.\n- Preserved priority and Feature-order constraints with a regression test.\n- Updated the [Workflow intent](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2ADNRS13J3YZG1YW009-round-2/docs/intent/03-capabilities/03-workflow/00-overview.md:42) and [Rust contract](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2ADNRS13J3YZG1YW009-round-2/docs/spec/rust-spec.md:687), resolving round 1’s governance failure.\n- Candidate and committed source patch IDs match exactly: `1ae5efdcecd26d21b979aa77dc261f7db0519765`.\n\nVerification outcomes:\n\n- New regression: exit `0`; 1 passed, 0 failed.\n- Four related scheduler tests: each exited `0`; 4 passed total, 0 failed.\n- `cargo fmt --all -- --check`: exit `0`.\n- `cargo clippy --lib --tests -- -D warnings`: exit `0`.\n- `cargo test`: exit `0`; 395 passed, 0 failed.\n- `git diff --check`: exit `0`.\n- Final `git status --porcelain=v1`: empty; worktree clean.\n- One initial unscoped targeted command exited `2` after its unit test passed because the custom integration harness rejects name filters; the corrected `cargo test --lib … -- --exact` exited `0`.\n\nIn simple terms: Refine no longer waits for the current agent batch to finish before noticing newly queued work, and the behavior is now explicitly documented.\n\nGoal-agent usage: 93,964 tokens over 4m 26s.",
       "implementation_reported_at": "2026-07-22T10:45:15Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recovery round for the post-implementation governance failure on round 1. Preserve and reconcile the tested active-queue replenishment behavior from candidate 7b7bba99122d5ff2c4413c14d1ee398ef4d503e6 against current main, then update the affected Workflow Engine intent documentation so it explicitly covers periodic discovery of newly eligible queued Goals during active execution, including priority and Feature-order constraints. Re-run focused scheduler tests, cargo fmt --all -- --check, cargo clippy --lib --tests -- -D warnings, cargo test, and git diff --check. Keep all changes in the Refine-managed Goal branch and leave the Goal for governance, quality, and user review.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:46:44Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Refine supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:45:15Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:46:44Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:45:15Z"
+  "updated": "2026-07-22T10:46:45Z"
 }
