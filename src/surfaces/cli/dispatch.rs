@@ -34,6 +34,7 @@ use crate::tools::observability::activity::{ActivityQuery, ActivityService, File
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
+use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::imports::FileImportService;
 use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::next_actions::FileNextActionsService;
@@ -1169,6 +1170,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Goal {
             action:
+                GoalAction::Export {
+                    id,
+                    target_root: Some(target_root),
+                    output,
+                },
+        } => {
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let export =
+                FileGoalExportService::new(refine_dir, &target_root).export_jira_csv(&id)?;
+            write_goal_export(&export.csv, &export.filename, output.as_deref())
+        }
+        Commands::Goal {
+            action:
                 GoalAction::Edit {
                     id,
                     target_root: Some(target_root),
@@ -2191,6 +2205,32 @@ fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
             id,
             target_root: None,
         } => daemon_json("GET", &format!("/work/goals/{}", path_segment(&id)), None)?,
+        GoalAction::Export {
+            id,
+            target_root: None,
+            output,
+        } => {
+            let response = daemon_json(
+                "GET",
+                &format!("/work/goals/{}/export/jira", path_segment(&id)),
+                None,
+            )?;
+            let export = response.get("export").ok_or_else(|| {
+                RefineError::Serialization(
+                    "Goal Jira export response is missing export".to_string(),
+                )
+            })?;
+            let csv = export.get("csv").and_then(Value::as_str).ok_or_else(|| {
+                RefineError::Serialization(
+                    "Goal Jira export response is missing CSV content".to_string(),
+                )
+            })?;
+            let filename = export
+                .get("filename")
+                .and_then(Value::as_str)
+                .unwrap_or("refine-goal-jira.csv");
+            return write_goal_export(csv, filename, output.as_deref());
+        }
         GoalAction::Edit {
             id,
             target_root: None,
@@ -3127,6 +3167,25 @@ fn print_json(value: &serde_json::Value) {
     println!("{}", serde_json::to_string_pretty(value).unwrap());
 }
 
+fn write_goal_export(csv: &str, filename: &str, output: Option<&Path>) -> RefineResult<()> {
+    let Some(output) = output else {
+        print!("{csv}");
+        return Ok(());
+    };
+    fs::write(output, csv).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to write Jira export {}: {error}",
+            output.display()
+        ))
+    })?;
+    print_json(&json!({
+        "exported": true,
+        "filename": filename,
+        "path": output.display().to_string()
+    }));
+    Ok(())
+}
+
 fn path_segment(value: &str) -> String {
     let mut escaped = String::new();
     for byte in value.as_bytes() {
@@ -3266,6 +3325,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::Draft { target_root, .. }
             | GoalAction::List { target_root }
             | GoalAction::Show { target_root, .. }
+            | GoalAction::Export { target_root, .. }
             | GoalAction::Edit { target_root, .. }
             | GoalAction::Note { target_root, .. }
             | GoalAction::NoteEdit { target_root, .. }

@@ -51,9 +51,26 @@ fn tools_list_exposes_the_catalog() {
     assert!(names.contains(&"refine_system_status"));
     assert!(names.contains(&"refine_list_goals"));
     assert!(names.contains(&"refine_draft_goal"));
+    assert!(names.contains(&"refine_export_goal_jira"));
     assert!(names.contains(&"refine_request"));
     // Every advertised tool must carry an input schema.
     assert!(tools.iter().all(|tool| tool["inputSchema"].is_object()));
+}
+
+#[test]
+fn jira_goal_export_tool_maps_to_shared_export_route() {
+    let response = call(json!({
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "tools/call",
+        "params": {
+            "name": "refine_export_goal_jira",
+            "arguments": {"goal_id": "GOAL1"},
+        },
+    }));
+    let echoed = &response["result"]["structuredContent"];
+    assert_eq!(echoed["method"], "GET");
+    assert_eq!(echoed["path"], "/work/goals/GOAL1/export/jira");
 }
 
 #[test]

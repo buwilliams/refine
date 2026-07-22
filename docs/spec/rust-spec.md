@@ -649,6 +649,16 @@ Requirements:
 - State transitions are validated centrally.
 - Node or machine ownership is enforced before mutation or workflow claims.
 
+### Goal Exports
+
+Module: `tools::product::goal_exports`; path: `src/tools/product/goal_exports/`.
+
+Owns deterministic external evidence documents derived from durable Goal state
+and the target repository. Jira CSV export includes the Goal identity, request,
+round implementation reports, quality and governance results, notes, base and
+candidate commit anchors, and every commit in that range. CLI, HTTP, browser,
+desktop, and MCP adapters reuse this service.
+
 ### Workflow Engine
 
 Module: `workflow`; path: `src/workflow/`.

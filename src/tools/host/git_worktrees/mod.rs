@@ -126,6 +126,29 @@ impl FileGitWorktreeService {
             .collect::<Vec<_>>())
     }
 
+    /// Return every commit introduced between two exact commit anchors.
+    ///
+    /// Goal evidence exports use this instead of the current branch history so
+    /// review candidates remain auditable before and after their branch is
+    /// merged or cleaned up.
+    pub fn changes_between(&self, base: &str, candidate: &str) -> RefineResult<Vec<GitChange>> {
+        validate_commitish(base)?;
+        validate_commitish(candidate)?;
+        let range = format!("{base}..{candidate}");
+        let output = self.git_output(&[
+            "log",
+            "--reverse",
+            "--date=iso-strict",
+            "--pretty=format:%H%x1f%cI%x1f%s%x1e",
+            &range,
+        ])?;
+        let text = stdout(output)?;
+        Ok(text
+            .split('\x1e')
+            .filter_map(parse_git_change)
+            .collect::<Vec<_>>())
+    }
+
     pub fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
         if remote.trim().is_empty() {
             return Ok(false);
