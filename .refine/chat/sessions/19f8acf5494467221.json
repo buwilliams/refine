@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:43:17Z",
+  "updated_at": "2026-07-22T18:45:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -900,6 +900,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination is narrowing authority correctly: mutable active-Node selection still governs UI/API decisions, while an exact running commitment—claim, execution, decision version, Node, and owning runtime—retains only its publication/settlement authority. Recovery is being limited to ownerless commitments from the same runtime after a switch, without granting authority over another runtime’s claims. Quality is implementing supervised, cancellable restoration and authoritative workflow-policy lookup."
+    },
+    {
+      "created_at": "2026-07-22T18:45:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745938041-217",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The new coordination failure-path test did its job: exact claim authority was retained inside workflow context, but the shared work-item service still rejected publication because its Goal-level check reread Node B. The agent is now composing exact execution authority through that existing service boundary rather than bypassing it. This is an ordinary focused-test failure, not a provider failure or a stranded live run."
     }
   ],
   "queued_messages": [
