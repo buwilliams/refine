@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:36:50Z",
+  "updated_at": "2026-07-22T11:41:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -336,6 +336,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 2 of inline authoring now passes its new focused shared-capability/API tests. Two Quality-related agents hit non-terminal verification failures (one clippy run and one targeted command chain) and are still active, inspecting/fixing them; these are visible provider/tool outcomes, not being treated as successes. The Jira recovery and supervisor-recovery round 2 also continue with fresh changes."
+    },
+    {
+      "created_at": "2026-07-22T11:41:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720468924-46",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Three candidates are now under governance (plain-language Quality tests, always-on Quality validation, and the supervisor-recovery candidate’s earlier round history), while the remaining implementation rounds continue. The failed test commands were followed by green focused reruns where applicable; all live process logs have updated within the last minute, so there is still no stall/loss condition."
     }
   ],
   "queue_dispatching": true,
