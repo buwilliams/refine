@@ -5182,6 +5182,10 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root);
+    server
+        .settings_service(&refine_dir)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
 
     let state = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -5192,19 +5196,33 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
     assert_eq!(state.body["supervisor_agent"]["lifecycle"], "idle");
     assert_eq!(state.body["supervisor_agent"]["health"], "healthy");
 
-    let first = server.handle(ApiRequest {
+    let override_attempt = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/supervisor-agent/session".to_string(),
         body: Some(json!({"provider": "smoke-ai"})),
+    });
+    assert_eq!(override_attempt.status, 400);
+    assert!(
+        override_attempt.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("configured agent_cli provider")
+    );
+
+    let first = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/supervisor-agent/session".to_string(),
+        body: Some(json!({})),
     });
     let second = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/supervisor-agent/session".to_string(),
-        body: Some(json!({"provider": "smoke-ai"})),
+        body: Some(json!({})),
     });
     assert_eq!((first.status, second.status), (200, 200));
     assert_eq!(first.body["session_id"], second.body["session_id"]);
     assert_eq!(first.body["mode"], "supervisor");
+    assert_eq!(first.body["provider"], "smoke-ai");
 
     let restored = server.handle(ApiRequest {
         method: "GET".to_string(),

@@ -25,6 +25,8 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::WorkflowEngine;
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -585,6 +587,11 @@ impl FileChatService {
     }
 
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
+        let capacity = self
+            .try_turn_capacity(&self.load_record(session_id)?)?
+            .ok_or_else(|| {
+                RefineError::Conflict("automation concurrency limit reached".to_string())
+            })?;
         let (record, provider_session_id) = {
             let _guard = self.acquire_session_lock(session_id)?;
             let mut record = self.load_record(session_id)?;
@@ -650,6 +657,7 @@ impl FileChatService {
         self.write_record(&latest)?;
         drop(_guard);
         self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
+        drop(capacity);
         Ok(latest)
     }
 
@@ -859,6 +867,33 @@ impl FileChatService {
         FileOperationRegistry::new(&self.runtime_root)
     }
 
+    fn try_turn_capacity(
+        &self,
+        record: &ChatSessionRecord,
+    ) -> RefineResult<Option<ChatCapacityPermit>> {
+        if !matches!(record.attachment, ChatAttachment::Supervisor) {
+            return Ok(Some(ChatCapacityPermit::unlimited()));
+        }
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
+        let policy = WorkflowEngine::with_target_root(&self.runtime_root, &target_root).policy()?;
+        let service = AgentCapacityService::new(&self.runtime_root);
+        let owner_id = format!("supervisor:{}", record.id);
+        let acquired = service.try_acquire(
+            &policy,
+            AgentCapacityRequest {
+                owner_id: owner_id.clone(),
+                role: "supervisor".to_string(),
+                node_id: policy.active_node_id.clone(),
+                provider: policy.provider.clone(),
+                target_app_id: policy.target_app_id.clone(),
+            },
+        )?;
+        Ok(acquired.then(|| ChatCapacityPermit {
+            service: Some(service),
+            owner_id,
+        }))
+    }
+
     fn register_provider_operation(
         &self,
         record: &ChatSessionRecord,
@@ -926,6 +961,26 @@ impl FileChatService {
 
     fn dispatch_queued_messages(&self, session_id: &str) -> RefineResult<()> {
         loop {
+            let capacity = loop {
+                let record = {
+                    let _guard = self.acquire_session_lock(session_id)?;
+                    let mut record = self.load_record(session_id)?;
+                    if record.closed || record.queued_messages.is_empty() {
+                        record.queue_dispatching = false;
+                        record.in_flight = false;
+                        record.last_turn_started_at = None;
+                        record.updated_at = now_timestamp();
+                        self.write_record(&record)?;
+                        return Ok(());
+                    }
+                    record
+                };
+                if let Some(permit) = self.try_turn_capacity(&record)? {
+                    break permit;
+                }
+                self.append_capacity_wait_progress(session_id)?;
+                thread::sleep(Duration::from_millis(100));
+            };
             let (record, message) = {
                 let _guard = self.acquire_session_lock(session_id)?;
                 let mut record = self.load_record(session_id)?;
@@ -1008,7 +1063,29 @@ impl FileChatService {
             self.write_record(&latest)?;
             drop(_guard);
             self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
+            drop(capacity);
         }
+    }
+
+    fn append_capacity_wait_progress(&self, session_id: &str) -> RefineResult<()> {
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
+        let message = "Queued; waiting for shared agent capacity.";
+        let already_reported = record.transcript_events.iter().rev().take(10).any(|event| {
+            event_bool(event, "progress") && event_text(event).as_deref() == Some(message)
+        });
+        if !already_reported {
+            record.transcript_events.push(chat_event(
+                "progress",
+                message,
+                true,
+                record.provider_session_id.clone(),
+                Some(json!({"source": "agent_capacity"})),
+            ));
+            record.updated_at = now_timestamp();
+            self.write_record(&record)?;
+        }
+        Ok(())
     }
 
     fn mark_dispatch_failure(&self, session_id: &str, detail: &str) -> RefineResult<()> {
@@ -1078,6 +1155,28 @@ impl FileChatService {
 
 struct ChatSessionLock {
     path: PathBuf,
+}
+
+struct ChatCapacityPermit {
+    service: Option<AgentCapacityService>,
+    owner_id: String,
+}
+
+impl ChatCapacityPermit {
+    fn unlimited() -> Self {
+        Self {
+            service: None,
+            owner_id: String::new(),
+        }
+    }
+}
+
+impl Drop for ChatCapacityPermit {
+    fn drop(&mut self) {
+        if let Some(service) = &self.service {
+            let _ = service.release(&self.owner_id);
+        }
+    }
 }
 
 impl Drop for ChatSessionLock {
@@ -1564,6 +1663,7 @@ mod tests {
 
     use super::*;
     use crate::tools::product::work_items::FileWorkItemService;
+    use crate::workflow::{WorkflowAutomation, WorkflowClaimState};
 
     #[test]
     fn file_chat_service_persists_session_transcript_and_stop() {
@@ -1856,7 +1956,8 @@ mod tests {
     fn supervisor_chat_provider_failure_is_shared_with_supervisor_state() {
         let temp_root = unique_temp_dir("supervisor-chat-failure");
         init_git_app(&temp_root);
-        let refine_dir = temp_root.join(".refine");
+        let refine_dir =
+            crate::tools::host::project_layout::prepare_refine_dir(&temp_root).unwrap();
         write_fake_provider(&refine_dir, "smoke-ai", 2, "provider auth failed");
         let service = FileChatService::new(&refine_dir);
         let session = service
@@ -1883,6 +1984,126 @@ mod tests {
                 && event.message.contains("provider auth failed")
                 && event.actionable
         }));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn supervisor_and_workflow_share_capacity_and_preserve_the_queue() {
+        let temp_root = unique_temp_dir("supervisor-workflow-capacity");
+        let refine_dir = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        write_fake_provider(&refine_dir, "smoke-ai", 0, "shared capacity response");
+        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "parallel_run_cap": "1",
+                "parallel_per_node_cap": "1",
+                "parallel_per_provider_cap": "1",
+                "parallel_per_target_app_cap": "1"
+            }))
+            .unwrap();
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Capacity one", Some("GOAL1"))
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        let workflow = WorkflowEngine::with_target_root(&runtime_root, &temp_root);
+        let claim = workflow.claim("GOAL1").unwrap();
+        let execution = workflow.start_claim(&claim).unwrap();
+
+        let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
+        let supervisor = chat
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+        chat.append_user_message(&supervisor.id, "wait durably")
+            .unwrap();
+        let waiting = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            !record.queued_messages.is_empty()
+                && record.transcript_events.iter().any(|event| {
+                    event
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| text.contains("waiting for shared agent capacity"))
+                })
+        });
+        assert_eq!(waiting.queued_messages.len(), 1);
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .iter()
+                .all(|lease| lease.role == "workflow")
+        );
+
+        workflow.cancel(&execution).unwrap();
+        let completed = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            record.queued_messages.is_empty()
+                && !record.queue_dispatching
+                && record.transcript_events.iter().any(|event| {
+                    event
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| text.contains("shared capacity response"))
+                })
+        });
+        assert!(completed.queued_messages.is_empty());
+
+        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+            .update(&json!({
+                "parallel_run_cap": "2",
+                "parallel_per_node_cap": "2",
+                "parallel_per_provider_cap": "2",
+                "parallel_per_target_app_cap": "2"
+            }))
+            .unwrap();
+        work_items
+            .create_goal_summary("Capacity two", Some("GOAL2"))
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL2", GoalStatus::Todo)
+            .unwrap();
+        let claim = workflow.claim("GOAL2").unwrap();
+        let execution = workflow.start_claim(&claim).unwrap();
+        chat.append_user_message(&supervisor.id, "run concurrently")
+            .unwrap();
+        let concurrent = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            record.transcript_events.iter().any(|event| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| text.contains("shared capacity response"))
+            }) && record.queued_messages.is_empty()
+                && !record.queue_dispatching
+        });
+        assert!(concurrent.queued_messages.is_empty());
+        assert_eq!(
+            workflow
+                .load_state()
+                .unwrap()
+                .claims
+                .iter()
+                .find(|claim| claim.goal_id == "GOAL2")
+                .unwrap()
+                .state,
+            WorkflowClaimState::Running
+        );
+        workflow.cancel(&execution).unwrap();
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

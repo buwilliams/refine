@@ -16,6 +16,8 @@ Read `lifecycle`, `health`, the active/queued/failed counts, and the newest even
 
 Queued or active Goal work starts the configured CLI provider automatically. Open the persistent Supervisor toolbar tab to see that same session and send steering. System evidence and user follow-ups sent during a provider turn share the normal chat queue. Navigation or a UI reconnect restores the same session and transcript.
 
+Supervisor sessions always use the configured `agent_cli`; their API does not accept a provider override. Supervisor and Goal turns share all configured concurrency caps. At cap 1, supervisor input may visibly remain queued until the Goal turn releases capacity. At cap 2, both may run together only when the node, provider, and target-app caps also permit it.
+
 Provider and authentication errors are shown as chat failures. Fix provider access through the normal agent configuration and authentication commands; do not treat those failures as workflow recovery.
 
 ## Recover

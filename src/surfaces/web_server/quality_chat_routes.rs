@@ -34,10 +34,12 @@ impl InProcessWebServer {
             return runtime_root_unavailable("start supervisor agent conversation");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let requested_provider = body
-            .get("provider")
-            .and_then(Value::as_str)
-            .map(str::to_string);
+        if body.get("provider").is_some() {
+            return error_response(RefineError::InvalidInput(
+                "Supervisor sessions use the configured agent_cli provider; provider overrides are not accepted"
+                    .to_string(),
+            ));
+        }
         let configured_provider =
             self.settings_service(&refine_dir)
                 .load()
@@ -48,7 +50,7 @@ impl InProcessWebServer {
                         .and_then(Value::as_str)
                         .map(str::to_string)
                 });
-        let provider = requested_provider.or_else(|| effective_chat_provider(configured_provider));
+        let provider = configured_provider;
         let chat = self.chat_service(&refine_dir);
         match FileSupervisorAgentService::new(&refine_dir, runtime_root)
             .ensure_chat_session(&chat, provider.as_deref())

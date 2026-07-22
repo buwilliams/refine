@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 pub mod behavior;
 pub mod behaviors;
+pub mod capacity;
 pub mod context;
 pub mod promotion;
 
@@ -34,6 +35,7 @@ use crate::workflow::behaviors::{
     WorkflowBuild, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge, WorkflowReview,
     WorkflowTodo,
 };
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::promotion::BacklogPromotionService;
 
@@ -170,6 +172,25 @@ impl WorkflowEngine {
 
     pub fn state_path(&self) -> PathBuf {
         self.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)
+    }
+
+    fn capacity_service(&self) -> AgentCapacityService {
+        AgentCapacityService::new(&self.runtime_root)
+    }
+
+    fn claim_capacity_request(claim: &WorkflowClaim) -> AgentCapacityRequest {
+        AgentCapacityRequest {
+            owner_id: format!("workflow:{}", claim.claim_id),
+            role: "workflow".to_string(),
+            node_id: claim.node_id.clone(),
+            provider: claim.provider.clone(),
+            target_app_id: claim.target_app_id.clone(),
+        }
+    }
+
+    fn release_claim_capacity(&self, claim_id: &str) -> RefineResult<bool> {
+        self.capacity_service()
+            .release(&format!("workflow:{claim_id}"))
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
@@ -471,18 +492,6 @@ impl WorkflowEngine {
             && load.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
             && load.by_target_app.get(target_app_id).copied().unwrap_or(0)
                 < policy.per_target_app_limit
-    }
-
-    fn capacity_available_excluding(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-        node_id: &str,
-        provider: &str,
-        target_app_id: &str,
-        excluded_index: usize,
-    ) -> bool {
-        let load = Self::claim_load_excluding(state, policy, Some(excluded_index));
-        Self::capacity_available_for_load(&load, policy, node_id, provider, target_app_id)
     }
 
     fn record_claim_load(load: &mut ClaimLoad, claim: &WorkflowClaim) {
@@ -886,13 +895,22 @@ impl WorkflowEngine {
         };
         claim.state = claim_state;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)
+        let terminal = !matches!(
+            claim.state,
+            WorkflowClaimState::Claimed | WorkflowClaimState::Running
+        );
+        self.save_state(&mut state)?;
+        if terminal {
+            self.release_claim_capacity(claim_id)?;
+        }
+        Ok(())
     }
 
     fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
         let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
+        let mut released_claim_ids = Vec::new();
         let now = now_timestamp();
         for claim in &mut state.claims {
             if goal_ids.contains(&claim.goal_id)
@@ -903,11 +921,15 @@ impl WorkflowEngine {
             {
                 claim.state = WorkflowClaimState::Interrupted;
                 claim.updated_at = now.clone();
+                released_claim_ids.push(claim.claim_id.clone());
                 changed = true;
             }
         }
         if changed {
             self.save_state(&mut state)?;
+            for claim_id in released_claim_ids {
+                self.release_claim_capacity(&claim_id)?;
+            }
         }
         Ok(())
     }
@@ -1101,18 +1123,6 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim {claim_id} is not claimed"
             )));
         }
-        let running_load = Self::running_claim_load(&state, &policy);
-        if !Self::capacity_available_for_load(
-            &running_load,
-            &policy,
-            &claim.node_id,
-            &claim.provider,
-            &claim.target_app_id,
-        ) {
-            return Err(RefineError::Conflict(
-                AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
-            ));
-        }
         if let Some(refine_dir) = self.refine_dir()? {
             let snapshot = self.projection_snapshot(&refine_dir)?;
             let goal = snapshot.goals.get(&claim.goal_id).ok_or_else(|| {
@@ -1135,12 +1145,24 @@ impl WorkflowAutomation for WorkflowEngine {
                 )));
             }
         }
+        let capacity_request = Self::claim_capacity_request(&state.claims[claim_index]);
+        if !self
+            .capacity_service()
+            .try_acquire(&policy, capacity_request)?
+        {
+            return Err(RefineError::Conflict(
+                AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
+            ));
+        }
         let execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
         claim.execution_id = Some(execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
+        if let Err(error) = self.save_state(&mut state) {
+            let _ = self.release_claim_capacity(claim_id);
+            return Err(error);
+        }
         Ok(execution_id)
     }
 
@@ -1165,9 +1187,11 @@ impl WorkflowAutomation for WorkflowEngine {
             .iter_mut()
             .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
         {
+            let claim_id = claim.claim_id.clone();
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
             self.save_state(&mut state)?;
+            self.release_claim_capacity(&claim_id)?;
         }
         Ok(())
     }
@@ -1187,28 +1211,23 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim for execution {execution_id} was not found"
             )));
         };
-        let node_id = state.claims[claim_index].node_id.clone();
-        let provider = state.claims[claim_index].provider.clone();
-        let target_app_id = state.claims[claim_index].target_app_id.clone();
-        if !Self::capacity_available_excluding(
-            &state,
-            &policy,
-            &node_id,
-            &provider,
-            &target_app_id,
-            claim_index,
-        ) {
+        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let request = Self::claim_capacity_request(&state.claims[claim_index]);
+        if !self.capacity_service().try_acquire(&policy, request)? {
             return Err(RefineError::Conflict(
                 AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
             ));
         }
-        self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let retried_execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
+        let claim_id = claim.claim_id.clone();
         claim.execution_id = Some(retried_execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
+        if let Err(error) = self.save_state(&mut state) {
+            let _ = self.release_claim_capacity(&claim_id);
+            return Err(error);
+        }
         Ok(retried_execution_id)
     }
 }
