@@ -657,12 +657,13 @@ button.chat-activity-toggle:hover:not(:disabled) {
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  gap: 7px;
 }
 .goal-log-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 8px;
 }
 .goal-log-live {
   display: inline-flex;
@@ -679,45 +680,110 @@ button.chat-activity-toggle:hover:not(:disabled) {
   background: currentColor;
   box-shadow: 0 0 0 3px var(--success-bg);
 }
+.goal-log-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.goal-log-search {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 160px;
+  max-width: 520px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--color-text-muted);
+}
+.goal-log-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+.goal-log-search svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+.goal-log-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+.goal-log-order {
+  display: inline-flex;
+  margin-left: auto;
+}
+.goal-log-order button {
+  border-radius: 0;
+}
+.goal-log-order button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.goal-log-order button:last-child {
+  margin-left: -1px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.goal-log-order button.active {
+  position: relative;
+  z-index: 1;
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
 .goal-log-tail {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--card);
-  box-shadow: var(--shadow-sm);
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .goal-log-line {
-  display: grid;
-  grid-template-columns: 84px 58px minmax(80px, 120px) minmax(240px, 1fr) minmax(70px, 110px);
-  gap: 8px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--color-border-subtle);
+  display: block;
+  min-height: 18px;
+  padding: 1px 6px;
   color: var(--color-text-muted);
+  white-space: normal;
 }
-.goal-log-line:last-child { border-bottom: 0; }
+.goal-log-line:hover { background: var(--color-surface-muted); }
 .goal-log-time,
 .goal-log-severity,
 .goal-log-category,
-.goal-log-actor { white-space: nowrap; }
+.goal-log-actor {
+  margin-right: 5px;
+  white-space: nowrap;
+}
 .goal-log-category,
 .goal-log-actor {
-  overflow: hidden;
   color: var(--muted);
-  text-overflow: ellipsis;
 }
 .goal-log-message {
-  min-width: 0;
   color: var(--fg);
   white-space: pre-wrap;
   word-break: break-word;
 }
-.goal-log-message details { margin-top: 3px; }
+.goal-log-message a { overflow-wrap: anywhere; }
+.goal-log-actions { white-space: normal; }
+.goal-log-action { margin-left: 4px; }
+.goal-log-message details {
+  margin: 2px 0 2px 84px;
+}
 .goal-log-message summary {
   color: var(--accent);
   cursor: pointer;
@@ -740,11 +806,9 @@ button.chat-activity-toggle:hover:not(:disabled) {
 }
 
 @media (max-width: 800px) {
-  .goal-log-header { flex-wrap: wrap; }
-  .goal-log-line {
-    grid-template-columns: 78px 52px minmax(70px, 100px) minmax(180px, 1fr);
-  }
-  .goal-log-actor { display: none; }
+  .goal-log-controls { flex-wrap: wrap; }
+  .goal-log-search { max-width: none; }
+  .goal-log-message details { margin-left: 0; }
 }
 
 /* --- Terminal tab ----------------------------------------------------- */

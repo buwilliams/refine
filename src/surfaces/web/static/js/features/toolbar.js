@@ -13,6 +13,7 @@ const TERMINAL_TAB_ID = "terminal";
 const STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID, SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
+const GOAL_LOG_DEFAULT_ORDER = "tail";
 const SYSTEM_LOG_FILTERS = [
   { status: "info", label: "Info" },
   { status: "start", label: "Started" },
@@ -250,6 +251,8 @@ function saveChatStateToStorage() {
         logEntries: t.mode === "goal_logs"
           ? normalizeGoalLogEntries(t.logEntries).slice(-GOAL_LOG_TAIL_LIMIT)
           : undefined,
+        logQuery: t.mode === "goal_logs" ? String(t.logQuery || "") : undefined,
+        logOrder: t.mode === "goal_logs" ? normalizeGoalLogOrder(t.logOrder) : undefined,
     };
   }
   try {
@@ -450,6 +453,8 @@ function openGoalLogTail({ goalId, goalName = "" } = {}) {
       goalName,
       sessionId: null,
       logEntries: [],
+      logQuery: "",
+      logOrder: GOAL_LOG_DEFAULT_ORDER,
       logsLoaded: false,
       logsLoading: false,
       logsError: "",
@@ -753,7 +758,7 @@ function drawToolbar() {
   }
   if (chatState.open && goalLogsActive) {
     const out = root.querySelector("#goal-log-tail");
-    if (out) out.scrollTop = out.scrollHeight;
+    if (out) scrollGoalLogEdge(active, out);
   }
 
   $$(".toolbar-tab", root).forEach((el) => {
@@ -1150,6 +1155,42 @@ function normalizeGoalLogEntries(entries) {
   return entries.filter((entry) => entry && typeof entry === "object" && entry.message);
 }
 
+function normalizeGoalLogOrder(order) {
+  return order === "head" ? "head" : GOAL_LOG_DEFAULT_ORDER;
+}
+
+function goalLogDetailsText(details) {
+  if (details == null) return "";
+  if (typeof details === "string") return details;
+  try {
+    return JSON.stringify(details, null, 2);
+  } catch (_) {
+    return String(details);
+  }
+}
+
+function goalLogSearchText(entry) {
+  const actions = Array.isArray(entry?.actions)
+    ? entry.actions.flatMap((action) => [action?.label, action?.href, action?.command])
+    : [];
+  return [
+    entry?.datetime,
+    entry?.severity,
+    entry?.category,
+    entry?.actor,
+    entry?.message,
+    goalLogDetailsText(entry?.details),
+    ...actions,
+  ].filter(Boolean).join("\n").toLocaleLowerCase();
+}
+
+function visibleGoalLogEntries(tab) {
+  const query = String(tab?.logQuery || "").trim().toLocaleLowerCase();
+  const entries = normalizeGoalLogEntries(tab?.logEntries)
+    .filter((entry) => !query || goalLogSearchText(entry).includes(query));
+  return normalizeGoalLogOrder(tab?.logOrder) === "head" ? entries.reverse() : entries;
+}
+
 function goalLogEntryKey(entry) {
   return String(entry?.id || [
     entry?.datetime || "",
@@ -1211,20 +1252,19 @@ function handleGoalLogSseEvent(entry) {
   tab.logEntries = mergeGoalLogEntries(entries, [entry]);
   tab.logsLoaded = true;
   saveChatStateToStorage();
-  if (chatState.open && chatState.activeTabId === goalLogTabId(goalId)) drawToolbar();
+  if (chatState.open && chatState.activeTabId === goalLogTabId(goalId)) {
+    const root = $("#toolbar-dock");
+    if (!updateGoalLogPanel(root, tab)) drawToolbar();
+  }
 }
 
 function renderGoalLogPanel(tab) {
-  const entries = normalizeGoalLogEntries(tab.logEntries);
-  const status = tab.logsLoading
-    ? "Loading…"
-    : tab.logsError
-      ? tab.logsError
-      : `${entries.length} recent ${entries.length === 1 ? "entry" : "entries"}`;
+  const order = normalizeGoalLogOrder(tab.logOrder);
+  const query = String(tab.logQuery || "");
   return `
     <div class="goal-log-panel" data-testid="toolbar-goal-log-panel">
       <div class="goal-log-header">
-        <span class="goal-log-live" aria-label="Live log tail"><span aria-hidden="true"></span>Live tail</span>
+        <span class="goal-log-live" aria-label="Following live Goal logs"><span aria-hidden="true"></span>Following</span>
         <a class="chat-goal-link"
            href="#/goals/${encodeURIComponent(tab.goalId)}"
            data-testid="goal-log-goal-link">
@@ -1234,44 +1274,139 @@ function renderGoalLogPanel(tab) {
            href="#/logs?goal_id=${encodeURIComponent(tab.goalId)}"
            data-testid="goal-log-full-link">Open full logs</a>
         <span class="spacer"></span>
-        <span class="muted small" data-testid="goal-log-status">${htmlEscape(status)}</span>
+        <span class="muted small" data-testid="goal-log-status">${htmlEscape(goalLogStatus(tab))}</span>
         <button class="secondary small" type="button" id="btn-goal-log-refresh"
                 data-testid="goal-log-refresh" ${tab.logsLoading ? "disabled" : ""}>Refresh</button>
+      </div>
+      <div class="goal-log-controls">
+        <label class="goal-log-search" for="goal-log-search">
+          <span aria-hidden="true">${toolbarIcon("search")}</span>
+          <input type="search" id="goal-log-search" value="${htmlEscape(query)}"
+                 autocomplete="off" placeholder="Search this trail"
+                 data-testid="goal-log-search" aria-label="Search Goal logs">
+        </label>
+        <button class="secondary small goal-log-clear" type="button" id="btn-goal-log-clear"
+                data-testid="goal-log-search-clear" ${query ? "" : "disabled"}>Clear</button>
+        <div class="goal-log-order" role="group" aria-label="Log stream order">
+          <button class="secondary small ${order === "head" ? "active" : ""}" type="button"
+                  data-goal-log-order="head" data-testid="goal-log-order-head"
+                  aria-pressed="${order === "head"}" title="Newest entries first">Head</button>
+          <button class="secondary small ${order === "tail" ? "active" : ""}" type="button"
+                  data-goal-log-order="tail" data-testid="goal-log-order-tail"
+                  aria-pressed="${order === "tail"}" title="Newest entries last">Tail</button>
+        </div>
       </div>
       <div class="goal-log-tail" id="goal-log-tail" role="log" aria-live="polite"
            aria-label="Live logs for Goal ${htmlEscape(tab.goalId)}"
            data-testid="goal-log-tail">
-        ${entries.length
-          ? entries.map(renderGoalLogLine).join("")
-          : `<div class="goal-log-empty" data-testid="goal-log-empty">${tab.logsError ? htmlEscape(tab.logsError) : "Waiting for Goal activity."}</div>`}
+        <div id="goal-log-lines">${renderGoalLogLines(tab)}</div>
       </div>
     </div>`;
 }
 
+function goalLogStatus(tab) {
+  if (tab.logsLoading) return "Loading…";
+  if (tab.logsError) return tab.logsError;
+  const total = normalizeGoalLogEntries(tab.logEntries).length;
+  const visible = visibleGoalLogEntries(tab).length;
+  return String(tab.logQuery || "").trim()
+    ? `${visible} of ${total} matching ${total === 1 ? "entry" : "entries"}`
+    : `${total} recent ${total === 1 ? "entry" : "entries"}`;
+}
+
+function renderGoalLogLines(tab) {
+  const entries = visibleGoalLogEntries(tab);
+  if (entries.length) return entries.map(renderGoalLogLine).join("");
+  if (tab.logsError) {
+    return `<div class="goal-log-empty" data-testid="goal-log-empty">${htmlEscape(tab.logsError)}</div>`;
+  }
+  const query = String(tab.logQuery || "").trim();
+  return `<div class="goal-log-empty" data-testid="goal-log-empty">${query
+    ? `No recent logs match “${htmlEscape(query)}”.`
+    : "Waiting for Goal activity."}</div>`;
+}
+
 function renderGoalLogLine(entry) {
   const severity = normalizeSystemLogStatus(entry.severity);
-  const details = entry.details == null
-    ? ""
-    : typeof entry.details === "string"
-      ? entry.details
-      : JSON.stringify(entry.details, null, 2);
+  const details = goalLogDetailsText(entry.details);
+  const actor = String(entry.actor || "").trim();
   return `
     <div class="goal-log-line goal-log-${htmlEscape(severity)}" data-testid="goal-log-line">
       <span class="goal-log-time">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
-      <span class="goal-log-severity">${htmlEscape(entry.severity || "info")}</span>
-      <span class="goal-log-category">${htmlEscape(entry.category || "activity")}</span>
+      <span class="goal-log-severity">[${htmlEscape(entry.severity || "info")}]</span>
+      <span class="goal-log-category">[${htmlEscape(entry.category || "activity")}]</span>
+      ${actor ? `<span class="goal-log-actor">[${htmlEscape(actor)}]</span>` : ""}
       <span class="goal-log-message">
-        ${htmlEscape(entry.message)}
+        ${mdInline(String(entry.message || ""))}${renderGoalLogActions(entry.actions)}
         ${details ? `<details><summary>Details</summary><pre>${htmlEscape(details)}</pre></details>` : ""}
       </span>
-      <span class="goal-log-actor">${htmlEscape(entry.actor || "")}</span>
     </div>`;
+}
+
+function renderGoalLogActions(actions) {
+  if (!Array.isArray(actions)) return "";
+  const links = actions.flatMap((action) => {
+    if (action?.type !== "link") return [];
+    const href = String(action.href || "").trim();
+    if (!/^(https?:|mailto:|#\/|\/(?!\/))/i.test(href)) return [];
+    const external = /^(https?:|mailto:)/i.test(href);
+    return [`<a class="goal-log-action" href="${htmlEscape(href)}"${external
+      ? ' target="_blank" rel="noopener noreferrer"'
+      : ""}>${htmlEscape(action.label || href)}</a>`];
+  });
+  return links.length ? ` <span class="goal-log-actions">${links.join(" ")}</span>` : "";
+}
+
+function scrollGoalLogEdge(tab, element) {
+  if (!element) return;
+  element.scrollTop = normalizeGoalLogOrder(tab?.logOrder) === "head" ? 0 : element.scrollHeight;
+}
+
+function updateGoalLogPanel(root, tab) {
+  if (!root) return false;
+  const lines = root.querySelector("#goal-log-lines");
+  const status = root.querySelector('[data-testid="goal-log-status"]');
+  if (!lines || !status) return false;
+  lines.innerHTML = renderGoalLogLines(tab);
+  status.textContent = goalLogStatus(tab);
+  scrollGoalLogEdge(tab, root.querySelector("#goal-log-tail"));
+  return true;
 }
 
 function bindGoalLogPanel(root, tab) {
   root.querySelector("#btn-goal-log-refresh")?.addEventListener("click", () => {
     tab.logsLoaded = false;
     loadGoalLogTail(tab);
+  });
+  const search = root.querySelector("#goal-log-search");
+  const clear = root.querySelector("#btn-goal-log-clear");
+  search?.addEventListener("input", (event) => {
+    tab.logQuery = event.currentTarget.value;
+    if (clear) clear.disabled = !tab.logQuery;
+    updateGoalLogPanel(root, tab);
+    saveChatStateToStorage();
+  });
+  clear?.addEventListener("click", () => {
+    tab.logQuery = "";
+    if (search) {
+      search.value = "";
+      search.focus();
+    }
+    clear.disabled = true;
+    updateGoalLogPanel(root, tab);
+    saveChatStateToStorage();
+  });
+  root.querySelectorAll("[data-goal-log-order]").forEach((button) => {
+    button.addEventListener("click", () => {
+      tab.logOrder = normalizeGoalLogOrder(button.dataset.goalLogOrder);
+      root.querySelectorAll("[data-goal-log-order]").forEach((candidate) => {
+        const active = candidate.dataset.goalLogOrder === tab.logOrder;
+        candidate.classList.toggle("active", active);
+        candidate.setAttribute("aria-pressed", String(active));
+      });
+      updateGoalLogPanel(root, tab);
+      saveChatStateToStorage();
+    });
   });
 }
 

@@ -58,6 +58,11 @@ function browserRuntime() {
       goalLogTabId,
       initSSE,
       loadGoalLogTail,
+      renderGoalLogLine,
+      renderGoalLogPanel,
+      saveGoalLogState: saveChatStateToStorage,
+      storedGoalLogState() { return JSON.parse(localStorage.getItem(CHAT_TABS_STORAGE_KEY)); },
+      visibleGoalLogEntries,
       setApi(nextApi) { api = nextApi; },
     };
   `, context);
@@ -81,6 +86,8 @@ function installGoalLogTab(runtime) {
     goalId: "GOAL1",
     mode: "goal_logs",
     logEntries: [],
+    logQuery: "",
+    logOrder: "tail",
     logsLoaded: false,
     logsLoading: false,
     logsError: "",
@@ -125,4 +132,73 @@ test("the first Goal SSE log reaches the toolbar and replayed entries stay dedup
     Array.from(tab.logEntries, (entry) => entry.message),
     ["Goal log 001", "Goal log 002"],
   );
+});
+
+test("Goal log search covers trail content and Head/Tail changes visible order", () => {
+  const runtime = browserRuntime();
+  const tab = installGoalLogTab(runtime);
+  const first = goalLog(1);
+  const second = {
+    ...goalLog(2),
+    severity: "warn",
+    details: { reason: "Needle in details" },
+    actions: [{ type: "link", label: "Review needle", href: "#/goals/GOAL1" }],
+  };
+  tab.logEntries = [first, second];
+
+  assert.deepEqual(
+    Array.from(runtime.visibleGoalLogEntries(tab), (entry) => entry.message),
+    ["Goal log 001", "Goal log 002"],
+  );
+
+  tab.logOrder = "head";
+  assert.deepEqual(
+    Array.from(runtime.visibleGoalLogEntries(tab), (entry) => entry.message),
+    ["Goal log 002", "Goal log 001"],
+  );
+
+  tab.logQuery = "needle";
+  assert.deepEqual(
+    Array.from(runtime.visibleGoalLogEntries(tab), (entry) => entry.message),
+    ["Goal log 002"],
+  );
+});
+
+test("Goal log stream renders safe formatted messages and validated action links", () => {
+  const runtime = browserRuntime();
+  const tab = installGoalLogTab(runtime);
+  const entry = {
+    ...goalLog(1),
+    message: "Read [the docs](https://example.com/docs) <script>alert(1)</script>",
+    actions: [
+      { type: "link", label: "Open Goal", href: "#/goals/GOAL1" },
+      { type: "link", label: "Unsafe", href: "javascript:alert(1)" },
+    ],
+  };
+  tab.logEntries = [entry];
+
+  const line = runtime.renderGoalLogLine(entry);
+  assert.match(line, /href="https:\/\/example\.com\/docs"/);
+  assert.match(line, /href="#\/goals\/GOAL1"/);
+  assert.doesNotMatch(line, /href="javascript:/);
+  assert.match(line, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+
+  const panel = runtime.renderGoalLogPanel(tab);
+  assert.match(panel, /data-testid="goal-log-search"/);
+  assert.match(panel, /data-testid="goal-log-order-head"/);
+  assert.match(panel, /data-testid="goal-log-order-tail"/);
+  assert.match(panel, /aria-pressed="true" title="Newest entries last">Tail/);
+});
+
+test("Goal log search and stream order persist with the toolbar tab", () => {
+  const runtime = browserRuntime();
+  const tab = installGoalLogTab(runtime);
+  tab.logQuery = "agent failure";
+  tab.logOrder = "head";
+
+  runtime.saveGoalLogState();
+
+  const saved = runtime.storedGoalLogState().tabs[runtime.goalLogTabId("GOAL1")];
+  assert.equal(saved.logQuery, "agent failure");
+  assert.equal(saved.logOrder, "head");
 });
