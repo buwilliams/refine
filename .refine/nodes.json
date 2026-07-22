@@ -4,7 +4,7 @@
       "id": "default",
       "display_name": "Default",
       "created_at": "2026-07-21T19:57:32Z",
-      "updated_at": "2026-07-22T00:39:23Z",
+      "updated_at": "2026-07-22T00:40:38Z",
       "settings": {
         "agent_cli": "codex",
         "agent_hard_cap_seconds": "7200",

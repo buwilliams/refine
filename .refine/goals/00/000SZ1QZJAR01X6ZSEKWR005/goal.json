@@ -1,7 +1,7 @@
 {
-  "base_commit": "891c7276999f3c0be6c82d119681c6a3501290e6",
+  "base_commit": "cec00213260746ef218043b4d90533b20731d3f4",
   "branch_name": "refine/00000SZ1QZJAR01X6ZSEKWR005/round-1",
-  "candidate_commit": "89d4f1d57da57ee1ff8069c23b1a09ababede6bf",
+  "candidate_commit": null,
   "created": "2026-07-21T23:25:24Z",
   "feature_id": null,
   "feature_order": null,
@@ -54,7 +54,7 @@
       "updated": "2026-07-22T00:39:11Z"
     }
   ],
-  "status": "review",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T00:39:11Z"
+  "updated": "2026-07-22T00:40:39Z"
 }
