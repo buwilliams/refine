@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:35:00Z",
+  "updated_at": "2026-07-22T17:36:22Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -312,6 +312,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination has isolated the lost-owner defect to exact claim/lease evidence and is running the first targeted recovery test after patching. Quality is tightening test evidence after its green integration run; both remain under the managed workflow processes."
+    },
+    {
+      "created_at": "2026-07-22T17:36:22Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741782740-109",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both targeted gates are green so far: coordination’s live-provider and same-record conflict checks pass; Quality’s retry test and clippy pass, followed by a full-suite rerun after its final evidence changes. No merge or approval is being attempted before governance."
     }
   ],
   "queued_messages": [
