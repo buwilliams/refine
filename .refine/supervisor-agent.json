@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "idle",
-  "health": "degraded",
+  "health": "attention",
   "active_work": 0,
   "queued_work": 0,
   "failed_work": 1,
@@ -54,11 +54,9 @@
     "00000SZ2SWWPEJZZHS4CXC4000": "cancelled",
     "00000SZ2TPQM61AGWJW8XC4001": "failed"
   },
-  "open_issues": {
-    "state_sync": "Refine state synchronization failed: failed to copy Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock to /home/buddy/projects/refine-next/.git/refine-state-worktree/.refine/.refine-sync-653032-5172: No such file or directory (os error 2)"
-  },
-  "last_context_key": "goals=00000SZ2TPQM61AGWJW8XC4001:failed|live={}|quiet={}|issues=state_sync:Refine state synchronization failed: failed to copy Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock to /home/buddy/projects/refine-next/.git/refine-state-worktree/.refine/.refine-sync-653032-5172: No such file or directory (os error 2)",
-  "updated_at": "2026-07-22T20:36:47.286365314+00:00",
+  "open_issues": {},
+  "last_context_key": "goals=00000SZ2TPQM61AGWJW8XC4001:failed|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-22T20:37:16.548844658+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
