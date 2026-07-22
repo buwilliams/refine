@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:57:35Z",
+  "updated_at": "2026-07-22T17:58:35Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -564,6 +564,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s remaining cancellation regression is failing because its helper process cannot see fixture Goal `GOAL-CANCEL`, so the managed Quality process never starts; the agent is correcting the test’s shared-state setup. Coordination compiles across all targets with the Node filters applied."
+    },
+    {
+      "created_at": "2026-07-22T17:58:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743115523-156",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality has corrected the fixture visibility and restarted the full 435-test library gate. Coordination’s Node ownership changes remain compile-clean and are being paired with a distinct-Node daemon test."
     }
   ],
   "queued_messages": [
