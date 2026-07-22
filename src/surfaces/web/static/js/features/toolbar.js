@@ -718,7 +718,7 @@ function drawToolbar() {
               aria-label="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}"
               title="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}">▾</button>
     </div>
-    <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}"
+    <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}${supervisorActive ? " supervisor-toolbar-body" : ""}"
          data-testid="toolbar-body"
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       ${filesActive
@@ -752,8 +752,8 @@ function drawToolbar() {
   if (goalLogsActive) bindGoalLogPanel(root, active);
 
   if (chatState.open && !filesActive && !systemActive && !terminalActive && !goalLogsActive) {
-    const out = $("#chat-output");
-    if (out) out.scrollTop = out.scrollHeight;
+    const scroller = chatTranscriptScroller(active, root);
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
     if (active.goalId && !active.goalStatus) refreshGoalChatStatus(active.goalId);
   }
   if (chatState.open && goalLogsActive) {
@@ -1097,6 +1097,12 @@ function renderChatOutput(tab) {
     return mdToHtml("What do you want to design together?");
   }
   return mdToHtml(tab?.output || "");
+}
+
+function chatTranscriptScroller(tab, root = document) {
+  return tab?.mode === "supervisor"
+    ? root.querySelector(".chat-output-box")
+    : root.querySelector("#chat-output");
 }
 
 function allQueuedMessages(tab) {
@@ -3759,9 +3765,11 @@ function renderActiveChatTranscript(tab) {
   if (!tab || chatState.tabs[chatState.activeTabId] !== tab) return;
   const out = $("#chat-output");
   if (out) {
-    const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 50;
+    const scroller = chatTranscriptScroller(tab);
+    const atBottom = !scroller
+      || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 50;
     out.innerHTML = renderChatOutput(tab);
-    if (atBottom) out.scrollTop = out.scrollHeight;
+    if (atBottom && scroller) scroller.scrollTop = scroller.scrollHeight;
   }
   const progress = $("#chat-progress");
   if (progress) {
