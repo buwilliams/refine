@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:22:27Z",
+  "updated_at": "2026-07-22T13:25:37Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -816,6 +816,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The remaining Jira defect is concrete and bounded, not a policy choice: abrupt daemon recovery marks the operation `Interrupted` but can leave the old `kill_on_parent_exit=false` worker alive, allowing retry to overlap it. I’m authorizing one narrow sixth round to terminate and verify the orphan before retry; no broader design change is needed."
+    },
+    {
+      "created_at": "2026-07-22T13:25:37Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784726737375-126",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Autonomous recovery has passed its 33-test Supervisor slice plus clippy and is in a final bounded audit. Quality is still closing audit-directed edits. Jira has confirmed the orphan overlap in code and is changing shared recovery sequencing so retryability is published only after worker exit; failed termination becomes durable non-retryable failure."
     }
   ],
   "queue_dispatching": true,
