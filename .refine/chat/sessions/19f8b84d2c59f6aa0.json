@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:38:32Z",
+  "updated_at": "2026-07-22T20:38:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -288,6 +288,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll verify the current durable goal and live-worker evidence, then intervene only if it shows an actionable stall, loss, or a decision boundary. I won’t retry, cancel, merge, or alter state based solely on the earlier transient failures."
+    },
+    {
+      "created_at": "2026-07-22T20:38:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752731114-63",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The latest evidence supersedes the brief failed state: Goal `00000SZ2TPQM61AGWJW8XC4001` is in round 2, its durable status was refreshed to `in-progress`, and a live Codex worker is attached to the round-2 worktree. There is no current stall/loss signal, so I’m leaving the worker and repository untouched."
     }
   ],
   "importable_artifacts": [],
