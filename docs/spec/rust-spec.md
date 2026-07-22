@@ -665,6 +665,8 @@ Requirements:
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
+- Active workflow execution replenishes available agent slots when runtime
+  concurrency limits increase; current agents do not need to finish first.
 - Workflow claims survive daemon restart or are reconciled safely.
 - Agents, QA, merge, governance, and target-app build are tools invoked by
   workflow behaviors.

@@ -629,73 +629,115 @@ impl WorkflowEngine {
     pub fn execute_claimed_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
         let state = self.load_state()?;
         self.ensure_automation_running(&state)?;
-        let policy = self.policy()?;
-        let claim_ids = Self::launchable_claim_ids(&state, &policy);
-        let mut prepared = Vec::with_capacity(claim_ids.len());
-        let mut first_error = None;
-        for claim_id in claim_ids {
-            let preparation = match self.start_claim(&claim_id) {
-                Ok(execution_id) => self.prepare_started_claim(&claim_id, &execution_id),
-                Err(RefineError::Conflict(message))
-                    if message == AUTOMATION_CONCURRENCY_LIMIT_REACHED =>
-                {
-                    continue;
-                }
-                Err(error) => Err(error),
-            };
-            match preparation {
-                Ok(ctx) => prepared.push((claim_id, ctx)),
-                Err(error) => {
-                    let _ = self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
-                    if first_error.is_none() {
-                        first_error = Some(error);
-                    }
-                }
-            }
-        }
-
         let mut results = Vec::new();
+        let mut errors = Vec::new();
+        let mut scheduler_error = None;
         std::thread::scope(|scope| {
-            let handles = prepared
-                .into_iter()
-                .map(|(claim_id, ctx)| {
-                    (
-                        claim_id,
-                        scope.spawn(move || self.execute_prepared_claim(ctx)),
-                    )
-                })
-                .collect::<Vec<_>>();
-            for (claim_id, handle) in handles {
-                let outcome = handle.join().unwrap_or_else(|_| {
-                    Err(RefineError::Conflict(format!(
-                        "workflow worker panicked for claim {claim_id}"
-                    )))
-                });
-                match outcome {
-                    Ok(result) => {
-                        if let Err(error) =
-                            self.mark_claim_state(&claim_id, WorkflowClaimState::Completed)
-                        {
-                            if first_error.is_none() {
-                                first_error = Some(error);
+            let (outcome_tx, outcome_rx) = std::sync::mpsc::channel();
+            let mut running = 0usize;
+            let mut launch_order = 0usize;
+            let mut launched_any = false;
+
+            loop {
+                if launched_any && running == 0 {
+                    break;
+                }
+                if scheduler_error.is_none() {
+                    let launchable = self.load_state().and_then(|state| {
+                        self.policy()
+                            .map(|policy| Self::launchable_claim_ids(&state, &policy))
+                    });
+                    match launchable {
+                        Ok(claim_ids) => {
+                            for claim_id in claim_ids {
+                                let order = launch_order;
+                                launch_order += 1;
+                                let preparation = match self.start_claim(&claim_id) {
+                                    Ok(execution_id) => {
+                                        self.prepare_started_claim(&claim_id, &execution_id)
+                                    }
+                                    Err(RefineError::Conflict(message))
+                                        if message == AUTOMATION_CONCURRENCY_LIMIT_REACHED =>
+                                    {
+                                        continue;
+                                    }
+                                    Err(error) => Err(error),
+                                };
+                                match preparation {
+                                    Ok(ctx) => {
+                                        running += 1;
+                                        launched_any = true;
+                                        let outcome_tx = outcome_tx.clone();
+                                        scope.spawn(move || {
+                                            let outcome = std::panic::catch_unwind(
+                                                std::panic::AssertUnwindSafe(|| {
+                                                    self.execute_prepared_claim(ctx)
+                                                }),
+                                            )
+                                            .unwrap_or_else(|_| {
+                                                Err(RefineError::Conflict(format!(
+                                                    "workflow worker panicked for claim {claim_id}"
+                                                )))
+                                            });
+                                            let _ = outcome_tx.send((order, claim_id, outcome));
+                                        });
+                                    }
+                                    Err(error) => {
+                                        let _ = self.mark_claim_state(
+                                            &claim_id,
+                                            WorkflowClaimState::Failed,
+                                        );
+                                        errors.push((order, error));
+                                    }
+                                }
                             }
-                        } else {
-                            results.push(result);
+                        }
+                        Err(error) => scheduler_error = Some(error),
+                    }
+                }
+
+                if running == 0 {
+                    break;
+                }
+
+                match outcome_rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                    Ok((order, claim_id, outcome)) => {
+                        running -= 1;
+                        match outcome {
+                            Ok(result) => {
+                                if let Err(error) =
+                                    self.mark_claim_state(&claim_id, WorkflowClaimState::Completed)
+                                {
+                                    errors.push((order, error));
+                                } else {
+                                    results.push((order, result));
+                                }
+                            }
+                            Err(error) => {
+                                let _ =
+                                    self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
+                                errors.push((order, error));
+                            }
                         }
                     }
-                    Err(error) => {
-                        let _ = self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
-                        if first_error.is_none() {
-                            first_error = Some(error);
-                        }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        scheduler_error = Some(RefineError::Conflict(
+                            "workflow worker result channel disconnected".to_string(),
+                        ));
                     }
                 }
             }
         });
-        if let Some(error) = first_error {
+        errors.sort_by_key(|(order, _)| *order);
+        if let Some((_, error)) = errors.into_iter().next() {
             return Err(error);
         }
-        Ok(results)
+        if let Some(error) = scheduler_error {
+            return Err(error);
+        }
+        results.sort_by_key(|(order, _)| *order);
+        Ok(results.into_iter().map(|(_, result)| result).collect())
     }
 
     fn prepare_started_claim<'a>(
@@ -2136,8 +2178,8 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_executes_eligible_claims_in_parallel() {
-        let temp_root = unique_temp_dir("automation-parallel-execution");
+    fn file_automation_replenishes_running_agents_when_concurrency_cap_increases() {
+        let temp_root = unique_temp_dir("automation-live-concurrency-increase");
         let target_root = temp_root.join("target");
         let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
@@ -2164,9 +2206,9 @@ mod tests {
                  marker_root='{}'\n\
                  touch \"$marker_root/$(basename \"$PWD\")\"\n\
                  attempt=0\n\
-                 while [ \"$(find \"$marker_root\" -type f | wc -l)\" -lt 2 ]; do\n\
+                 while [ ! -f \"$marker_root/release\" ]; do\n\
                    attempt=$((attempt + 1))\n\
-                   [ \"$attempt\" -ge 500 ] && exit 42\n\
+                   [ \"$attempt\" -ge 1500 ] && exit 42\n\
                    sleep 0.01\n\
                  done\n\
                  printf '%s\\n' 'parallel agent completed' > agent.txt\n\
@@ -2190,7 +2232,7 @@ mod tests {
             std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
         }
         let work_items = FileWorkItemService::new(&refine_dir);
-        for goal_id in ["GOAL1", "GOAL2"] {
+        for goal_id in ["GOAL1", "GOAL2", "GOAL3", "GOAL4"] {
             work_items
                 .create_goal_summary(goal_id, Some(goal_id))
                 .unwrap();
@@ -2213,17 +2255,51 @@ mod tests {
             .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-        let result = automation.evaluate_workflow().unwrap();
+        assert_eq!(automation.promote().unwrap(), 2);
+        let evaluation_automation = automation.clone();
+        let evaluation_thread =
+            std::thread::spawn(move || evaluation_automation.execute_claimed_work());
+
+        let initial_deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while fs::read_dir(&marker_root).unwrap().count() < 2
+            && std::time::Instant::now() < initial_deadline
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(fs::read_dir(&marker_root).unwrap().count(), 2);
+
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "parallel_run_cap": 4,
+                "parallel_per_node_cap": 4,
+                "parallel_per_provider_cap": 4,
+                "parallel_per_target_app_cap": 4
+            }))
+            .unwrap();
+        assert_eq!(automation.apply_runtime_settings().unwrap(), 2);
+
+        let expansion_deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while fs::read_dir(&marker_root).unwrap().count() < 4
+            && std::time::Instant::now() < expansion_deadline
+        {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let expanded_before_release = fs::read_dir(&marker_root).unwrap().count() == 4;
+        fs::write(marker_root.join("release"), "release\n").unwrap();
+
+        let result = evaluation_thread.join().unwrap().unwrap();
+        assert!(
+            expanded_before_release,
+            "raising the cap did not start the additional agents while the first batch was running"
+        );
         assert_eq!(
             result
-                .steps
                 .iter()
                 .map(|step| step.goal_id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["GOAL1", "GOAL2"]
+            vec!["GOAL1", "GOAL2", "GOAL3", "GOAL4"]
         );
-        assert_eq!(fs::read_dir(&marker_root).unwrap().count(), 2);
-        for goal_id in ["GOAL1", "GOAL2"] {
+        for goal_id in ["GOAL1", "GOAL2", "GOAL3", "GOAL4"] {
             assert_eq!(
                 work_items.show_goal_summary(goal_id).unwrap().goal.status,
                 GoalStatus::Review
