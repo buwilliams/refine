@@ -33,6 +33,7 @@
     - [Done](03-capabilities/03-workflow/08-done.md)
     - [Failed](03-capabilities/03-workflow/09-failed.md)
     - [Cancelled](03-capabilities/03-workflow/10-cancelled.md)
+    - [Shared Workflow Consistency Contract](03-capabilities/03-workflow/11-consistency-contract.md)
 - Surfaces
   - [Surface Principles](04-surfaces/01-surface-principles.md)
   - [CLI](04-surfaces/02-cli.md)

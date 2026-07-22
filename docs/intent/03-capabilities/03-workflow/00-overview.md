@@ -6,6 +6,7 @@
 - **Goal Lifecycle**: work advances through explicit states from backlog to done or cancelled.
 - **Agents As Tools**: agents participate in workflow steps; they do not own the meaning of workflow.
 - **Shared Semantics**: CLI, browser, API, and agent surfaces should use the same workflow rules.
+- **Shared Consistency**: cross-process mutations use one coordination boundary so state, execution, and evidence cannot contradict one another.
 - **Recoverable Progress**: claims, executions, failures, retries, and pauses should be visible and resumable.
 
 ## Purpose
@@ -45,6 +46,8 @@ Current implementation details that matter to intent:
 - Review is a meaningful boundary: a Goal in review can unblock later ordered Feature work.
 
 Workflow should not be reimplemented in page-local JavaScript, one-off CLI commands, or provider-specific scripts. Those surfaces should call the shared capability.
+
+The [Shared Workflow Consistency Contract](11-consistency-contract.md) defines the authority, identity, evidence, conflict, durability, recovery, and thin-surface invariants shared by every workflow state.
 
 ## Future Direction
 
