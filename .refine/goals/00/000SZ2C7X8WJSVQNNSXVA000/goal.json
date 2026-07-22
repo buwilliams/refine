@@ -81,9 +81,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T11:26:27Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:28:24Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 5a9e63f4ad7090a17847866fae05ac9e0f21e010 and remediate the post-implementation governance failure. Move editable-status decisions and the compound create/edit/round/order behavior out of feature-goal-inline.js into the shared work-item capability and API so browser, CLI, API, desktop, and agent surfaces use the same semantics; keep the Feature UI a thin adapter and explicitly align review-state editing with the shared Goal operation policy rather than hard-coding a narrower browser rule. Add proportional behavioral browser coverage that binds the real composer interaction in a DOM/browser harness and exercises create, inline edit, prerequisite placement, duplicate and validation errors, provider/API failure recovery, Ctrl/Cmd+Enter, Escape/reset, refresh/pagination behavior, and both desktop and narrow layouts. Preserve existing backend behavior, ordering, dependencies, keyboard accessibility, the prior scoped UI work, and all audit/confirmation boundaries. Run focused shared-service/API tests plus actual interaction coverage and the browser/format gates.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:28:24Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:26:28Z"
+  "updated": "2026-07-22T11:28:24Z"
 }
