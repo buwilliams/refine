@@ -21,6 +21,7 @@ use crate::tools::observability::activity::{ActivityService, FileActivityService
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::FileChatService;
+use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::imports::{
     FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
     import_extraction_prompt, order_feature_dependency_drafts, parse_provider_import_result,
@@ -500,6 +501,33 @@ impl InProcessWebServer {
             .collect()
     }
 
+    pub(super) fn handle_goal_jira_export(&self, request: ApiRequest) -> ApiResponse {
+        let Some(goal_id) = request
+            .path
+            .strip_prefix("/work/goals/")
+            .and_then(|path| path.strip_suffix("/export/jira"))
+            .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
+        else {
+            return goal_id_required();
+        };
+        let refine_dir = require_refine_dir!(self, "export Goal evidence for Jira");
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("export Goal evidence for Jira"),
+            Err(error) => return error_response(error),
+        };
+        let service = match &self.runtime_root {
+            Some(runtime_root) => {
+                FileGoalExportService::with_runtime_root(refine_dir, target_root, runtime_root)
+            }
+            None => FileGoalExportService::new(refine_dir, target_root),
+        };
+        match service.export_jira_csv(goal_id) {
+            Ok(export) => ApiResponse::json(200, json!({"export": export})),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn handle_goal_transition(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "mutate work items");
         let Some(goal_id) = request
@@ -805,6 +833,13 @@ impl InProcessWebServer {
                 Ok(updated) => goal = updated,
                 Err(error) => return error_response(error),
             }
+        }
+        if let Err(error) = self.promote_backlog_after_mutation() {
+            return error_response(error);
+        }
+        match service.show_goal_summary(&goal.goal.id) {
+            Ok(updated) => goal = updated,
+            Err(error) => return error_response(error),
         }
 
         match self.refresh_projection_cache_after_mutation() {
@@ -2934,7 +2969,7 @@ impl InProcessWebServer {
         }
         let mut promoted = 0;
         if failures.is_empty() {
-            match self.promote_backlog_after_import() {
+            match self.promote_backlog_after_mutation() {
                 Ok(count) => promoted = count,
                 Err(error) => failures.push(json!({
                     "index": 0,
@@ -3017,7 +3052,7 @@ impl InProcessWebServer {
         Ok(())
     }
 
-    fn promote_backlog_after_import(&self) -> Result<usize, RefineError> {
+    fn promote_backlog_after_mutation(&self) -> Result<usize, RefineError> {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(0);
         };
@@ -3098,7 +3133,7 @@ impl InProcessWebServer {
         };
         let mut promoted = 0;
         if failures.is_empty() {
-            match self.promote_backlog_after_import() {
+            match self.promote_backlog_after_mutation() {
                 Ok(count) => promoted = count,
                 Err(error) => failures.push(json!({
                     "index": 0,

@@ -475,7 +475,12 @@ async function waitForBackgroundOperation(operationOrId, {
 
 async function resolveBackgroundOperationResponse(response, message = "") {
   if (!response?.operation) return response;
-  if (message) toast(message, "info");
+  if (message) {
+    toast(message, "info", {
+      source: "background-operation",
+      details: { operation_id: response.operation.id },
+    });
+  }
   const result = await waitForBackgroundOperation(response.operation);
   if (result.http_status && result.http_status >= 400) {
     const raw = result.error || {};
@@ -487,13 +492,13 @@ async function resolveBackgroundOperationResponse(response, message = "") {
   return result;
 }
 
-function toast(message, kind = "info") {
+function toast(message, kind = "info", { source = "toast", details = null } = {}) {
   if (kind === "error") {
     if (!isDuplicateApiErrorToast(message)) {
-      recordUiError(message, { source: "toast" });
+      recordUiError(message, { source, ...(details ? { details } : {}) });
     }
   } else {
-    recordUiNotice(message, { kind, source: "toast" });
+    recordUiNotice(message, { kind, source, details });
   }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
@@ -1673,6 +1678,16 @@ function sseEventChanged(key, event) {
   return true;
 }
 
+function activitySystemOperationDetails(entry) {
+  const details = entry?.details && typeof entry.details === "object" && !Array.isArray(entry.details)
+    ? { ...entry.details }
+    : {};
+  if (entry?.id) details.activity_id = entry.id;
+  if (entry?.goal_id) details.goal_id = entry.goal_id;
+  if (entry?.actor) details.actor = entry.actor;
+  return Object.keys(details).length ? details : null;
+}
+
 function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
@@ -1687,6 +1702,7 @@ function initSSE() {
           status: entry.severity || "info",
           category: entry.category || "activity",
           timestamp: entry.datetime,
+          details: activitySystemOperationDetails(entry),
         });
       }
     } catch {}

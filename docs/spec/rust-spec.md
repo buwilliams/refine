@@ -330,9 +330,10 @@ Properties:
   `round_count`, `created`, `updated`, `branch_name`, `node_id`,
   `feature_id`, `feature_order`, and `json_path`.
 - `GoalNote`: `id`, `author`, `body`, `created`, and `updated`.
-- `GoalRound`: `reporter`, `prompt`, `created`, `updated`, optional
-  `guidance_decision`, and derived `logs` when a response hydrates sidecar
-  round logs.
+- `GoalRound`: `reporter`, optional `assignee`, `prompt`, `created`, `updated`,
+  optional `guidance_decision`, `implementation_report`,
+  `implementation_reported_at`, `governance`, and `quality`, plus derived
+  `logs` when a response hydrates sidecar round logs.
 - `RoundGovernance`: `rule_state`, `meta_rule_state`, `product_state`,
   `constitution_state`, `governance_message`, `governance_details`,
   `governance_checked_at`, and `governance_rule_actions`.
@@ -657,6 +658,16 @@ Requirements:
 - State transitions are validated centrally.
 - Node or machine ownership is enforced before mutation or workflow claims.
 
+### Goal Exports
+
+Module: `tools::product::goal_exports`; path: `src/tools/product/goal_exports/`.
+
+Owns deterministic external evidence documents derived from durable Goal state
+and the target repository. Jira CSV export includes the Goal identity, request,
+round implementation reports, quality and governance results, notes, base and
+candidate commit anchors, and every commit in that range. CLI, HTTP, browser,
+desktop, and MCP adapters reuse this service.
+
 ### Workflow Engine
 
 Module: `workflow`; path: `src/workflow/`.
@@ -673,6 +684,8 @@ Requirements:
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
+- Active workflow execution replenishes available agent slots when runtime
+  concurrency limits increase; current agents do not need to finish first.
 - Workflow claims survive daemon restart or are reconciled safely.
 - Agents, QA, merge, governance, and target-app build are tools invoked by
   workflow behaviors.

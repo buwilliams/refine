@@ -306,6 +306,7 @@ function drawGoalDetail(goal) {
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
               <button class="nav-menu-item" type="button" id="btn-view-logs" data-testid="goal-action-view-logs">View Logs</button>
+              <button class="nav-menu-item" type="button" id="btn-export-jira" data-testid="goal-action-export-jira">Export for Jira</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
               <button class="nav-menu-item" type="button" id="btn-rename" data-testid="goal-action-rename">Rename</button>
@@ -403,6 +404,29 @@ function drawGoalDetail(goal) {
   $("#btn-view-logs")?.addEventListener("click", () => {
     closeGoalActionMenu();
     location.hash = `#/logs?goal_id=${encodeURIComponent(goal.id)}`;
+  });
+  $("#btn-export-jira")?.addEventListener("click", async () => {
+    closeGoalActionMenu();
+    const button = $("#btn-export-jira");
+    await withButtonBusy(button, "Exporting…", async () => {
+      try {
+        const response = await api("GET", `/api/goals/${encodeURIComponent(goal.id)}/export/jira`);
+        const payload = response.export;
+        if (!payload?.csv) throw new Error("Jira export did not return CSV content");
+        const blob = new Blob([payload.csv], { type: payload.content_type || "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = payload.filename || `refine-goal-${goal.id}-jira.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        toast("Jira CSV exported", "success");
+      } catch (error) {
+        await showActionError(error);
+      }
+    });
   });
 
   // Workflow back / forward buttons. Forward from `review` calls the
@@ -771,6 +795,18 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
         <dl class="pair">
           <dt>prompt</dt><dd data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "").replace(/\n/g, "<br>")}</dd>
         </dl>
+        ${rnd.implementation_report ? `
+          <div class="card implementation-report" data-testid="goal-implementation-report" style="margin-top:12px">
+            <div class="row" style="align-items:center;gap:8px">
+              <h4 style="margin:0">Implementation report</h4>
+              <span class="muted small">what changed, why, and verification</span>
+              <span class="spacer"></span>
+              ${rnd.implementation_reported_at
+                ? `<span class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(rnd.implementation_reported_at)}</span>`
+                : ""}
+            </div>
+            <div data-testid="goal-implementation-report-body" style="margin-top:8px;white-space:pre-wrap">${htmlEscape(rnd.implementation_report)}</div>
+          </div>` : ""}
       </div>
     </details>
   `;

@@ -64,6 +64,16 @@ function renderSettingsQualityProjectSections(quality) {
 
 function renderSettingsQualityTab(quality, settings = {}) {
   return `
+    <section class="settings-section" data-testid="quality-explanation">
+      <h3>How Quality works</h3>
+      <p class="muted small" style="margin-bottom:0">
+        When QA is enabled, Refine runs the target-app test commands on the Goal candidate.
+        Passing checks advance the Goal to review; failing checks preserve the candidate
+        for recovery and stop the workflow. Changes save automatically for subsequent QA
+        runs and do not start a run now.
+      </p>
+    </section>
+
     ${renderSettingsQualityNodeSections(quality, settings)}
     ${renderSettingsQualityProjectSections(quality)}`;
 }

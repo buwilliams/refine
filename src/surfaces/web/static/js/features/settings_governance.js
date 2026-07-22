@@ -75,6 +75,16 @@ function addGovernanceRuleRow(text = "") {
 
 function renderSettingsGovernanceTab(gov) {
   return `
+    <section class="settings-section" data-testid="governance-explanation">
+      <h3>How Governance works</h3>
+      <p class="muted small" style="margin-bottom:0">
+        After implementation, Governance inspects the Goal candidate against these Rules,
+        using Product and Constitution as context. A rule violation stops the Goal before
+        build and review; with no rules, the Goal continues. Changes save automatically
+        for subsequent checks and do not start a check now.
+      </p>
+    </section>
+
     ${renderSettingsMarkdownField({
       id: "s-governance-product",
       title: "Product",

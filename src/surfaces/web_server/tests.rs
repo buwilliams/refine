@@ -549,6 +549,23 @@ fn source_promotion_api_preserves_unconfirmed_request_compatibility() {
 }
 
 #[test]
+fn static_project_settings_explain_governance_and_quality_effects() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let governance =
+        fs::read_to_string(static_root.join("js/features/settings_governance.js")).unwrap();
+    let quality = fs::read_to_string(static_root.join("js/features/settings_quality.js")).unwrap();
+
+    assert!(governance.contains(r#"data-testid="governance-explanation""#));
+    assert!(governance.contains("A rule violation stops the Goal before"));
+    assert!(governance.contains("do not start a check now"));
+
+    assert!(quality.contains(r#"data-testid="quality-explanation""#));
+    assert!(quality.contains("Passing checks advance the Goal to review"));
+    assert!(quality.contains("preserve the candidate"));
+    assert!(quality.contains("do not start a run now"));
+}
+
+#[test]
 fn static_releases_surface_separates_prepare_from_confirmed_publish() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
@@ -704,6 +721,35 @@ fn static_plan_chat_shows_initial_design_prompt() {
 }
 
 #[test]
+fn static_system_log_exposes_sources_and_diagnostic_details() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
+    let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+    let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
+
+    assert!(common.contains("if (details) payload.details = details"));
+    assert!(common.contains(r#"details: { operation_id: response.operation.id }"#));
+    assert!(common.contains("function activitySystemOperationDetails"));
+    assert!(common.contains("details.activity_id = entry.id"));
+    assert!(common.contains("details.goal_id = entry.goal_id"));
+    assert!(common.contains("details: activitySystemOperationDetails(entry)"));
+    assert!(commands.contains(r#"details: { operation_id: operationId }"#));
+    assert!(commands.contains(r#"details: { operation_id: response.operation.id }"#));
+    assert!(toolbar.contains("details: payload?.details ?? null"));
+    assert!(toolbar.contains("function systemOperationDetailEntries"));
+    assert!(toolbar.contains(r#"data-testid="system-log-status""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-category""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-details""#));
+    assert!(toolbar.contains(r#"data-testid="system-log-detail""#));
+    assert!(toolbar.contains("existing.category !== item.category"));
+    assert!(toolbar.contains("formatSystemOperationDetails(existing.details) !== itemDetails"));
+    assert!(toolbar_css.contains(".system-log-status"));
+    assert!(toolbar_css.contains(".system-log-category"));
+    assert!(toolbar_css.contains(".system-log-detail dd"));
+}
+
+#[test]
 fn static_work_item_tables_use_shared_readable_name_layout() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common_css = fs::read_to_string(static_root.join("css/common.css")).unwrap();
@@ -760,6 +806,20 @@ fn static_goal_detail_uses_shared_governance_review_state_helpers() {
     assert!(goals_detail.contains("reviewStateClass(states.constitution)"));
     assert!(!goals_detail.contains(r#"product_state === "pass""#));
     assert!(!goals_detail.contains(r#"constitution_state === "pass""#));
+}
+
+#[test]
+fn static_goal_detail_renders_round_implementation_reports() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let goals_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
+
+    assert!(goals_detail.contains("rnd.implementation_report"));
+    assert!(goals_detail.contains(r#"data-testid="goal-implementation-report""#));
+    assert!(goals_detail.contains(r#"data-testid="goal-implementation-report-body""#));
+    assert!(goals_detail.contains("rnd.implementation_reported_at"));
+    assert!(goals_detail.contains(r#"data-testid="goal-action-export-jira""#));
+    assert!(goals_detail.contains("/export/jira"));
+    assert!(goals_detail.contains("new Blob([payload.csv]"));
 }
 
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
@@ -991,6 +1051,42 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
     assert_eq!(
         detail.body["goal"]["rounds"][0]["prompt"],
         "Pressing pause should freeze the board and show a paused state."
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_instantly_promotes_new_goal_when_configured() {
+    let temp_root = unique_temp_dir("http-goal-create-instant-promote");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+        .update(&json!({"backlog_promote_after_seconds": "0"}))
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "id": "GOAL1",
+            "name": "Instantly promoted Goal"
+        })),
+    });
+
+    assert_eq!(created.status, 201);
+    assert_eq!(created.body["goal"]["status"], "todo");
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Todo
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -1665,6 +1761,46 @@ fn web_server_creates_and_shows_goal() {
     });
     assert_eq!(show.status, 200);
     assert_eq!(show.body["goal"]["name"], "Created by API");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_exports_goal_delivery_evidence_for_jira() {
+    let temp_root = unique_temp_dir("http-goal-jira-export");
+    let refine_dir = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Export delivery evidence", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Auditor", "Implement the export")
+        .unwrap();
+    service
+        .update_latest_goal_round_implementation_report(
+            "GOAL1",
+            "Added Jira CSV export. cargo test passed.",
+        )
+        .unwrap();
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/goals/GOAL1/export/jira".to_string(),
+        body: None,
+    });
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["export"]["format"], "jira_csv");
+    assert_eq!(
+        response.body["export"]["filename"],
+        "refine-goal-GOAL1-jira.csv"
+    );
+    let csv = response.body["export"]["csv"].as_str().unwrap();
+    assert!(csv.starts_with("Summary,Description,Work Type,Priority"));
+    assert!(csv.contains("Implement the export"));
+    assert!(csv.contains("Added Jira CSV export. cargo test passed."));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
