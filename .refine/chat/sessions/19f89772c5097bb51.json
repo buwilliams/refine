@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:12:38Z",
+  "updated_at": "2026-07-22T11:13:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -429,9 +429,9 @@
   "queued_messages": [
     {
       "id": "qm-19f89867e0b97bb56",
-      "text": "Broaden this into one shared CLI-agent interaction model for Supervisor, attached chats, and Standalone. Keep input docked and accept submission at any time. During an active turn show Working with elapsed time and Esc to interrupt. Let Up and Down navigate queued and previously submitted prompts. Put submitted messages immediately into transcript order with a compact pending state and x removal before dispatch; do not use a separate queue panel. Keep typing, rendering, scrolling, and keyboard controls fast and responsive. Reuse shared behavior across surfaces and preserve backend queue semantics and accessibility.",
+      "text": "Broaden this into one shared CLI-agent interaction model for Supervisor, attached chats, and Standalone. Keep input docked and accept submission at any time. During an active turn show Working with elapsed time and Esc to interrupt. Let Up and Down navigate queued and previously submitted prompts. Put submitted messages immediately into transcript order with a compact pending state and x removal before dispatch; do not use a separate queue panel. When the conversation contains enough intent, automatically surface the appropriate Feature or Goal draft inline without requiring a Draft Feature or Draft Goal click. Keep typing, rendering, scrolling, and keyboard controls fast and responsive. Reuse shared behavior across surfaces and preserve backend queue semantics and accessibility.",
       "created_at": "2026-07-22T11:12:00Z",
-      "updated_at": "2026-07-22T11:12:00Z"
+      "updated_at": "2026-07-22T11:13:25Z"
     }
   ],
   "queue_dispatching": true,
