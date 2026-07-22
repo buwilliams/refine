@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:31:51Z",
+  "updated_at": "2026-07-22T12:35:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -576,6 +576,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The dependency-safe path is holding: Quality core candidate `6afbef6…` is now under Refine governance, autonomous recovery has reached full formatting/clippy after its focused workflow and supervisor tests passed, and Jira round 4 is tracing the existing process supervisor to relocate orchestration rather than introduce machinery."
+    },
+    {
+      "created_at": "2026-07-22T12:35:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784723703092-86",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The independent Quality-core governance gate found another territory/map mismatch and failed candidate `6afbef6…`. I’m pulling its exact rule evidence now; the downstream Quality Goals remain parked, so this failure has not propagated into overlapping work."
     }
   ],
   "queue_dispatching": true,
