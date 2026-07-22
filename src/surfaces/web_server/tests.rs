@@ -741,6 +741,23 @@ fn static_goal_log_tail_uses_toolbar_and_shared_sse_activity() {
 }
 
 #[test]
+fn static_toolbar_keeps_supervisor_agent_visible_and_uses_shared_chat() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+    let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
+
+    assert!(toolbar.contains(r#"label: "Supervisor", mode: "supervisor""#));
+    assert!(toolbar.contains("STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID"));
+    assert!(toolbar.contains(r#"api("GET", "/api/supervisor-agent")"#));
+    assert!(toolbar.contains(r#"api("POST", "/api/supervisor-agent/session"#));
+    assert!(toolbar.contains("renderChatPanel(active, chatOptions)"));
+    assert!(toolbar.contains(r#"data-testid="supervisor-agent-events""#));
+    assert!(toolbar.contains(r#"data-testid="supervisor-agent-conversation""#));
+    assert!(toolbar_css.contains(".supervisor-agent-summary"));
+    assert!(toolbar_css.contains(".supervisor-agent-events"));
+}
+
+#[test]
 fn static_system_log_exposes_sources_and_diagnostic_details() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let common = fs::read_to_string(static_root.join("js/common.js")).unwrap();
@@ -5153,6 +5170,52 @@ fn web_server_manages_quality_settings_and_checks() {
     });
     assert_eq!(listed.status, 200);
     assert!(listed.body.get("regressions").is_none());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_shares_supervisor_state_and_singleton_chat_session() {
+    let temp_root = unique_temp_dir("http-supervisor-agent");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+
+    let state = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/supervisor-agent".to_string(),
+        body: None,
+    });
+    assert_eq!(state.status, 200);
+    assert_eq!(state.body["supervisor_agent"]["lifecycle"], "idle");
+    assert_eq!(state.body["supervisor_agent"]["health"], "healthy");
+
+    let first = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/supervisor-agent/session".to_string(),
+        body: Some(json!({"provider": "smoke-ai"})),
+    });
+    let second = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/supervisor-agent/session".to_string(),
+        body: Some(json!({"provider": "smoke-ai"})),
+    });
+    assert_eq!((first.status, second.status), (200, 200));
+    assert_eq!(first.body["session_id"], second.body["session_id"]);
+    assert_eq!(first.body["mode"], "supervisor");
+
+    let restored = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/supervisor-agent".to_string(),
+        body: None,
+    });
+    assert_eq!(
+        restored.body["supervisor_agent"]["session_id"],
+        first.body["session_id"]
+    );
+    assert!(refine_dir.join("supervisor-agent.json").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

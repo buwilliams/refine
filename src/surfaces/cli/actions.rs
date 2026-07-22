@@ -952,6 +952,8 @@ pub enum LogAction {
 
 #[derive(Debug, Subcommand)]
 pub enum AgentAction {
+    /// Show the shared supervisor agent lifecycle, health, and recovery evidence.
+    Supervisor,
     /// Detect which agent provider CLIs are installed and available on this host.
     Detect,
     /// Configure an agent provider so workflows can invoke it.

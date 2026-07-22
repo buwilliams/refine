@@ -31,6 +31,8 @@ Runbooks:
   the agent-operated schema migration.
 - [Migrate a Refine v2 project to v4](v2-to-v4-migration-runbook.md) — move
   legacy durable state into the v4 layout and isolated state branch.
+- [Operate the supervisor agent](supervisor-agent.md) — inspect shared workflow
+  health, steer investigation, and apply only explicit bounded retries.
 
 Conventions: commands are shown as `refine …`; inside a source checkout use
 `./r …`, which is the same surface. All cluster/fleet commands accept

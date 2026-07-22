@@ -1,8 +1,9 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,7 @@ use crate::tools::product::work_items::FileWorkItemService;
 pub enum ChatAttachment {
     Goal(String),
     Feature(String),
+    Supervisor,
     Standalone,
 }
 
@@ -162,6 +164,7 @@ impl FileChatService {
         let attachment_mode = match &attachment {
             ChatAttachment::Goal(_) => "goal",
             ChatAttachment::Feature(_) => "feature",
+            ChatAttachment::Supervisor => "supervisor",
             ChatAttachment::Standalone => "standalone",
         };
         let record = ChatSessionRecord {
@@ -188,6 +191,7 @@ impl FileChatService {
     }
 
     pub fn read(&self, session_id: &str) -> RefineResult<ChatReadResult> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let lines = unread_lines(&record);
         let progress_lines = unread_progress(&record);
@@ -507,6 +511,42 @@ impl FileChatService {
         self.sessions_dir().join(format!("{session_id}.json"))
     }
 
+    fn acquire_session_lock(&self, session_id: &str) -> RefineResult<ChatSessionLock> {
+        validate_session_id(session_id)?;
+        fs::create_dir_all(self.sessions_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create chat sessions directory {}: {error}",
+                self.sessions_dir().display()
+            ))
+        })?;
+        let path = self.sessions_dir().join(format!(".{session_id}.lock"));
+        for _ in 0..500 {
+            match OpenOptions::new().write(true).create_new(true).open(&path) {
+                Ok(_) => return Ok(ChatSessionLock { path }),
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                    let stale = fs::metadata(&path)
+                        .and_then(|metadata| metadata.modified())
+                        .ok()
+                        .and_then(|modified| modified.elapsed().ok())
+                        .is_some_and(|age| age > Duration::from_secs(30));
+                    if stale {
+                        let _ = fs::remove_file(&path);
+                        continue;
+                    }
+                    thread::sleep(Duration::from_millis(2));
+                }
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to lock chat session {session_id}: {error}"
+                    )));
+                }
+            }
+        }
+        Err(RefineError::Conflict(format!(
+            "Chat session {session_id} is busy; retry shortly"
+        )))
+    }
+
     fn create_standalone_worktree(&self, session_id: &str) -> RefineResult<ChatSessionWorktree> {
         let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let branch = format!("refine/standalone/{session_id}");
@@ -545,28 +585,32 @@ impl FileChatService {
     }
 
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
-        let mut record = self.load_record(session_id)?;
-        if record.closed {
-            return Err(RefineError::Conflict(format!(
-                "Chat session {session_id} is closed"
-            )));
-        }
-        let Some(provider_session_id) = record.provider_session_id.clone() else {
-            return Err(RefineError::InvalidInput(format!(
-                "Chat session {session_id} does not have a provider session id"
-            )));
+        let (record, provider_session_id) = {
+            let _guard = self.acquire_session_lock(session_id)?;
+            let mut record = self.load_record(session_id)?;
+            if record.closed {
+                return Err(RefineError::Conflict(format!(
+                    "Chat session {session_id} is closed"
+                )));
+            }
+            let Some(provider_session_id) = record.provider_session_id.clone() else {
+                return Err(RefineError::InvalidInput(format!(
+                    "Chat session {session_id} does not have a provider session id"
+                )));
+            };
+            record.in_flight = true;
+            record.last_turn_started_at = Some(now_timestamp());
+            record.updated_at = now_timestamp();
+            record.transcript_events.push(chat_event(
+                "progress",
+                "Resuming provider session.",
+                true,
+                Some(provider_session_id.clone()),
+                None,
+            ));
+            self.write_record(&record)?;
+            (record, provider_session_id)
         };
-        record.in_flight = true;
-        record.last_turn_started_at = Some(now_timestamp());
-        record.updated_at = now_timestamp();
-        record.transcript_events.push(chat_event(
-            "progress",
-            "Resuming provider session.",
-            true,
-            Some(provider_session_id.clone()),
-            None,
-        ));
-        self.write_record(&record)?;
 
         let operation = self.register_provider_operation(&record, "resume")?;
         let provider = HostAgentProviderService {
@@ -574,11 +618,16 @@ impl FileChatService {
             runtime_root: Some(self.runtime_root.clone()),
         };
         let provider_name = record.provider.clone();
-        match provider.resume_detailed_with_output(&provider_name, &provider_session_id, |line| {
-            let _ = self.append_provider_activity_progress(&mut record, &line);
-        }) {
+        let result =
+            provider.resume_detailed_with_output(&provider_name, &provider_session_id, |line| {
+                let _ = self.append_provider_activity_progress(session_id, &line);
+            });
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut latest = self.load_record(session_id)?;
+        let mut provider_failure = None;
+        match result {
             Ok(result) => {
-                self.apply_provider_success(&mut record, result, "Provider session resumed.");
+                self.apply_provider_success(&mut latest, result, "Provider session resumed.");
                 self.finish_provider_operation(
                     &operation.id,
                     OperationState::Succeeded,
@@ -588,7 +637,8 @@ impl FileChatService {
             Err(error) => {
                 let detail =
                     format!("Provider session resume failed; transcript preserved: {error}");
-                self.apply_provider_failure(&mut record, detail);
+                provider_failure = Some(detail.clone());
+                self.apply_provider_failure(&mut latest, detail);
                 self.finish_provider_operation(
                     &operation.id,
                     OperationState::Failed,
@@ -596,9 +646,11 @@ impl FileChatService {
                 )?;
             }
         }
-        record.updated_at = now_timestamp();
-        self.write_record(&record)?;
-        Ok(record)
+        latest.updated_at = now_timestamp();
+        self.write_record(&latest)?;
+        drop(_guard);
+        self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
+        Ok(latest)
     }
 
     pub fn recover_interrupted_turns(&self, detail: &str) -> RefineResult<Vec<ChatSessionRecord>> {
@@ -732,18 +784,44 @@ impl FileChatService {
         record.in_flight = false;
         record.last_turn_started_at = None;
         record.interrupted = true;
-        record.interruption_detail = Some(detail);
+        record.interruption_detail = Some(detail.clone());
     }
 
-    fn append_provider_activity_progress(
+    fn record_supervisor_provider_outcome(
         &self,
-        record: &mut ChatSessionRecord,
-        line: &str,
-    ) -> RefineResult<()> {
+        record: &ChatSessionRecord,
+        failure: Option<&str>,
+    ) {
+        if !matches!(record.attachment, ChatAttachment::Supervisor) {
+            return;
+        }
+        let service = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+            &self.refine_dir,
+            &self.runtime_root,
+        );
+        if let Some(detail) = failure {
+            let _ = service.record_failure(
+                "provider",
+                format!("Supervisor provider failure: {detail}"),
+                true,
+            );
+        } else {
+            let _ = service.record_recovery(
+                "provider",
+                "Supervisor provider turn",
+                "completed and preserved in the shared transcript",
+                true,
+            );
+        }
+    }
+
+    fn append_provider_activity_progress(&self, session_id: &str, line: &str) -> RefineResult<()> {
         let text = line.trim();
         if text.is_empty() {
             return Ok(());
         }
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
         let duplicate = record.transcript_events.iter().rev().take(20).any(|event| {
             event_bool(event, "progress") && event_text(event).as_deref() == Some(text)
         });
@@ -758,7 +836,7 @@ impl FileChatService {
             Some(json!({"source": "provider_output"})),
         ));
         record.updated_at = now_timestamp();
-        self.write_record(record)
+        self.write_record(&record)
     }
 
     fn mark_record_interrupted(&self, record: &mut ChatSessionRecord, detail: &str) {
@@ -848,67 +926,67 @@ impl FileChatService {
 
     fn dispatch_queued_messages(&self, session_id: &str) -> RefineResult<()> {
         loop {
-            let mut record = self.load_record(session_id)?;
-            if record.closed {
-                record.queue_dispatching = false;
-                record.in_flight = false;
-                record.last_turn_started_at = None;
+            let (record, message) = {
+                let _guard = self.acquire_session_lock(session_id)?;
+                let mut record = self.load_record(session_id)?;
+                if record.closed || record.queued_messages.is_empty() {
+                    record.queue_dispatching = false;
+                    record.in_flight = false;
+                    record.last_turn_started_at = None;
+                    record.updated_at = now_timestamp();
+                    self.write_record(&record)?;
+                    return Ok(());
+                }
+                let queued = std::mem::take(&mut record.queued_messages);
+                let message = combined_queued_message(&queued);
+                record.transcript_events.push(chat_event(
+                    "user",
+                    &message,
+                    false,
+                    record.provider_session_id.clone(),
+                    None,
+                ));
+                record.transcript_events.push(chat_event(
+                    "progress",
+                    &format!(
+                        "Sent {} queued message{} to the provider.",
+                        queued.len(),
+                        if queued.len() == 1 { "" } else { "s" }
+                    ),
+                    true,
+                    record.provider_session_id.clone(),
+                    None,
+                ));
+                record.in_flight = true;
+                record.last_turn_started_at = Some(now_timestamp());
                 record.updated_at = now_timestamp();
                 self.write_record(&record)?;
-                return Ok(());
-            }
-            if record.queued_messages.is_empty() {
-                record.queue_dispatching = false;
-                record.in_flight = false;
-                record.last_turn_started_at = None;
-                record.updated_at = now_timestamp();
-                self.write_record(&record)?;
-                return Ok(());
-            }
-            let queued = std::mem::take(&mut record.queued_messages);
-            let message = combined_queued_message(&queued);
-            record.transcript_events.push(chat_event(
-                "user",
-                &message,
-                false,
-                record.provider_session_id.clone(),
-                None,
-            ));
-            record.transcript_events.push(chat_event(
-                "progress",
-                &format!(
-                    "Sent {} queued message{} to the provider.",
-                    queued.len(),
-                    if queued.len() == 1 { "" } else { "s" }
-                ),
-                true,
-                record.provider_session_id.clone(),
-                None,
-            ));
-            record.in_flight = true;
-            record.last_turn_started_at = Some(now_timestamp());
-            record.updated_at = now_timestamp();
-            self.write_record(&record)?;
+                (record, message)
+            };
 
             let operation = self.register_provider_operation(&record, "invoke")?;
             let provider = HostAgentProviderService {
                 path_override: self.provider_path_override(),
                 runtime_root: Some(self.runtime_root.clone()),
             };
-            match provider.invoke_detailed_with_output(
+            let result = provider.invoke_detailed_with_output(
                 ProviderInvocation {
                     provider: record.provider.clone(),
                     prompt: self.chat_prompt(&record, &message),
                     session_id: record.provider_session_id.clone(),
                     cwd: Some(self.chat_cwd(&record).display().to_string()),
-                    process_metadata: Default::default(),
+                    process_metadata: chat_process_metadata(&record),
                 },
                 |line| {
-                    let _ = self.append_provider_activity_progress(&mut record, &line);
+                    let _ = self.append_provider_activity_progress(session_id, &line);
                 },
-            ) {
+            );
+            let _guard = self.acquire_session_lock(session_id)?;
+            let mut latest = self.load_record(session_id)?;
+            let mut provider_failure = None;
+            match result {
                 Ok(result) => {
-                    self.apply_provider_success(&mut record, result, "Provider turn completed.");
+                    self.apply_provider_success(&mut latest, result, "Provider turn completed.");
                     self.finish_provider_operation(
                         &operation.id,
                         OperationState::Succeeded,
@@ -916,10 +994,9 @@ impl FileChatService {
                     )?;
                 }
                 Err(error) => {
-                    self.apply_provider_failure(
-                        &mut record,
-                        format!("Provider turn failed: {error}"),
-                    );
+                    let detail = format!("Provider turn failed: {error}");
+                    provider_failure = Some(detail.clone());
+                    self.apply_provider_failure(&mut latest, detail);
                     self.finish_provider_operation(
                         &operation.id,
                         OperationState::Failed,
@@ -927,12 +1004,15 @@ impl FileChatService {
                     )?;
                 }
             }
-            record.updated_at = now_timestamp();
-            self.write_record(&record)?;
+            latest.updated_at = now_timestamp();
+            self.write_record(&latest)?;
+            drop(_guard);
+            self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
         }
     }
 
     fn mark_dispatch_failure(&self, session_id: &str, detail: &str) -> RefineResult<()> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         record.queue_dispatching = false;
         record.in_flight = false;
@@ -952,6 +1032,7 @@ impl FileChatService {
         message_id: &str,
         text: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let text = text.trim();
         if text.is_empty() {
@@ -978,6 +1059,7 @@ impl FileChatService {
         session_id: &str,
         message_id: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let before = record.queued_messages.len();
         record
@@ -991,6 +1073,16 @@ impl FileChatService {
         record.updated_at = now_timestamp();
         self.write_record(&record)?;
         Ok(record)
+    }
+}
+
+struct ChatSessionLock {
+    path: PathBuf,
+}
+
+impl Drop for ChatSessionLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
     }
 }
 
@@ -1008,6 +1100,7 @@ impl ChatService for FileChatService {
         session_id: &str,
         message: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         if record.closed {
             return Err(RefineError::Conflict(format!(
@@ -1032,6 +1125,7 @@ impl ChatService for FileChatService {
     }
 
     fn interrupt(&self, session_id: &str, detail: &str) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         record.closed = true;
         record.interrupted = true;
@@ -1106,6 +1200,7 @@ impl FileChatService {
         let attachment = match &record.attachment {
             ChatAttachment::Goal(id) => format!("Goal {id}"),
             ChatAttachment::Feature(id) => format!("Feature {id}"),
+            ChatAttachment::Supervisor => "supervisor agent".to_string(),
             ChatAttachment::Standalone => "standalone chat".to_string(),
         };
         let instructions = chat_mode_instructions(record);
@@ -1155,6 +1250,19 @@ impl FileChatService {
                     "updated": &feature.feature.updated
                 }))
             }
+            ChatAttachment::Supervisor => {
+                let supervisor =
+                    crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+                        &self.refine_dir,
+                        &self.runtime_root,
+                    )
+                    .snapshot()?;
+                serde_json::to_string_pretty(&json!({
+                    "type": "supervisor",
+                    "supervisor_agent": supervisor,
+                    "workflow": snapshot.runtime,
+                }))
+            }
             ChatAttachment::Standalone => {
                 let mut context = json!({
                     "type": "standalone",
@@ -1193,6 +1301,9 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
         ChatAttachment::Feature(_) => {
             "Discuss the attached Feature and focus on its included Goals, workflow state, and delivery plan."
         }
+        ChatAttachment::Supervisor => {
+            "Act as Refine's supervisor agent. Investigate workflow and runtime health, explain observations and bounded recovery options, and preserve existing confirmation and audit boundaries. Never silently expand destructive authority or disguise provider and authentication failures."
+        }
         ChatAttachment::Standalone => {
             "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Goal-ready behavior."
         }
@@ -1219,6 +1330,17 @@ fn chat_event(
         value["extra"] = extra;
     }
     value.as_object().cloned().unwrap_or_default()
+}
+
+fn chat_process_metadata(record: &ChatSessionRecord) -> JsonObject {
+    let mut metadata = JsonObject::new();
+    metadata.insert("kind".to_string(), json!("chat"));
+    metadata.insert("session_id".to_string(), json!(record.id));
+    metadata.insert("mode".to_string(), json!(record.mode));
+    if matches!(record.attachment, ChatAttachment::Supervisor) {
+        metadata.insert("agent_role".to_string(), json!("supervisor"));
+    }
+    metadata
 }
 
 fn event_text(event: &JsonObject) -> Option<String> {
@@ -1471,12 +1593,6 @@ mod tests {
             streamed
                 .lines
                 .iter()
-                .any(|line| line.contains("What should I test?"))
-        );
-        assert!(
-            streamed
-                .lines
-                .iter()
                 .any(|line| line.contains("provider says hello"))
                 || streamed
                     .progress_lines
@@ -1493,6 +1609,12 @@ mod tests {
         });
         let read = service.read(&session.id).unwrap();
         assert!(read.alive);
+        assert!(record.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|line| line.contains("What should I test?"))
+        }));
         assert!(record.transcript_events.iter().any(|event| {
             event
                 .get("text")
@@ -1535,19 +1657,22 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("streamed activity line"))
         );
-        let completed = wait_for_chat_read(&service, &session.id, |read| {
-            !read.in_flight
-                && read
-                    .lines
-                    .iter()
-                    .any(|line| line.contains("final response line"))
+        let completed = wait_for_chat_read(&service, &session.id, |read| !read.in_flight);
+        assert!(!completed.in_flight);
+        let record = wait_for_chat_record(&service, &session.id, |record| {
+            record.transcript_events.iter().any(|event| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|line| line.contains("final response line"))
+            })
         });
-        assert!(
-            completed
-                .lines
-                .iter()
-                .any(|line| line.contains("final response line"))
-        );
+        assert!(record.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|line| line.contains("final response line"))
+        }));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1723,6 +1848,41 @@ mod tests {
                 .unwrap_or("")
                 .contains("provider failed")
         );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn supervisor_chat_provider_failure_is_shared_with_supervisor_state() {
+        let temp_root = unique_temp_dir("supervisor-chat-failure");
+        init_git_app(&temp_root);
+        let refine_dir = temp_root.join(".refine");
+        write_fake_provider(&refine_dir, "smoke-ai", 2, "provider auth failed");
+        let service = FileChatService::new(&refine_dir);
+        let session = service
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+
+        service
+            .append_user_message(&session.id, "investigate")
+            .unwrap();
+        wait_for_chat_record(&service, &session.id, |record| record.interrupted);
+        let state = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+            &refine_dir,
+            &service.runtime_root,
+        )
+        .snapshot()
+        .unwrap();
+        assert_eq!(state.health, "degraded");
+        assert!(state.events.iter().any(|event| {
+            event.kind == "failure"
+                && event.message.contains("provider auth failed")
+                && event.actionable
+        }));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

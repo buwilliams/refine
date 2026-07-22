@@ -9,11 +9,63 @@ use crate::tools::host::quality::{
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
+use crate::tools::product::supervisor_agent::FileSupervisorAgentService;
 
 use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
+    pub(super) fn handle_supervisor_agent_get(&self) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "load supervisor agent state");
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("load supervisor agent state");
+        };
+        let service = FileSupervisorAgentService::new(&refine_dir, runtime_root);
+        let result = service.reconcile_chat_session(&self.chat_service(&refine_dir));
+        match result {
+            Ok(state) => ApiResponse::json(200, json!({"ok": true, "supervisor_agent": state})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_supervisor_agent_session(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "start supervisor agent conversation");
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("start supervisor agent conversation");
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let requested_provider = body
+            .get("provider")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let configured_provider =
+            self.settings_service(&refine_dir)
+                .load()
+                .ok()
+                .and_then(|settings| {
+                    settings
+                        .get("agent_cli")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                });
+        let provider = requested_provider.or_else(|| effective_chat_provider(configured_provider));
+        let chat = self.chat_service(&refine_dir);
+        match FileSupervisorAgentService::new(&refine_dir, runtime_root)
+            .ensure_chat_session(&chat, provider.as_deref())
+        {
+            Ok(session) => ApiResponse::json(
+                200,
+                json!({
+                    "ok": true,
+                    "session_id": session.id,
+                    "provider": session.provider,
+                    "mode": session.mode
+                }),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn quality_timing_setting(&self) -> String {
         self.current_refine_dir()
             .ok()

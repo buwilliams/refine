@@ -58,6 +58,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "provider configuration, auth, diagnostics",
     },
     ApiRouteGroup {
+        prefix: "/supervisor-agent",
+        capability: "durable workflow supervision state, recovery evidence, and conversation",
+    },
+    ApiRouteGroup {
         prefix: "/operations",
         capability: "operation status, logs, cancel",
     },
