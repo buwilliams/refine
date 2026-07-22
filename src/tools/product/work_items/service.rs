@@ -1850,6 +1850,47 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
+    pub fn update_latest_goal_round_implementation_report(
+        &self,
+        goal_id: &str,
+        report: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let report = report.trim();
+        if report.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "implementation report cannot be empty".to_string(),
+            ));
+        }
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        let rounds = object
+            .get_mut("rounds")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+        let latest = rounds
+            .iter_mut()
+            .rev()
+            .find_map(Value::as_object_mut)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+        let now = now_timestamp();
+        latest.insert(
+            "implementation_report".to_string(),
+            Value::String(report.to_string()),
+        );
+        latest.insert(
+            "implementation_reported_at".to_string(),
+            Value::String(now.clone()),
+        );
+        latest.insert("updated".to_string(), Value::String(now.clone()));
+        object.insert("updated".to_string(), Value::String(now));
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
+    }
+
     pub fn delete_goal_record(&self, goal_id: &str) -> RefineResult<()> {
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
@@ -2430,6 +2471,8 @@ fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     round.insert("created".to_string(), Value::String(now.clone()));
     round.insert("updated".to_string(), Value::String(now));
     round.insert("logs".to_string(), Value::Array(Vec::new()));
+    round.insert("implementation_report".to_string(), Value::Null);
+    round.insert("implementation_reported_at".to_string(), Value::Null);
     round.insert(
         "rule_state".to_string(),
         Value::String("unclassified".to_string()),

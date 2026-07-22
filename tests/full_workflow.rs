@@ -75,6 +75,14 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     assert_eq!(goal["goal"]["candidate_commit"], candidate_commit);
     assert_eq!(latest["quality_state"], "passed", "{goal:#}");
     assert_eq!(latest["rule_state"], "passed", "{goal:#}");
+    assert_eq!(
+        latest["implementation_report"], "full workflow provider completed",
+        "{goal:#}"
+    );
+    assert!(
+        latest["implementation_reported_at"].as_str().is_some(),
+        "{goal:#}"
+    );
 
     let approve = fixture.run_refine(&["goal", "approve", &goal_id]);
     fixture.assert_success("approve reviewed goal", &approve);

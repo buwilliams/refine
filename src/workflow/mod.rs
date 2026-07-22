@@ -1506,7 +1506,7 @@ fn governance_violation_message(message: &str) -> String {
 
 fn goal_agent_prompt(goal_id: &str) -> String {
     format!(
-        "Run the goal agent for ready Goal {goal_id}. Work on Goal {goal_id}, report deterministic command outcomes, and leave the Goal ready for review."
+        "Run the goal agent for ready Goal {goal_id}. Work on Goal {goal_id}, report deterministic command outcomes, and leave the Goal ready for review. End with a short after-action report in simple terms covering what changed, why it changed, and the exact verification outcomes."
     )
 }
 

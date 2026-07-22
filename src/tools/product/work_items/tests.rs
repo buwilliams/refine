@@ -125,6 +125,46 @@ fn file_work_item_service_appends_and_edits_latest_round() {
 }
 
 #[test]
+fn file_work_item_service_records_latest_round_implementation_report() {
+    let temp_root = unique_temp_dir("work-item-implementation-report");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Reported Goal", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Implement it")
+        .unwrap();
+
+    service
+        .update_latest_goal_round_implementation_report(
+            "GOAL1",
+            "  Changed the Goal detail so reviewers can see why.\nVerification: cargo test passed.  ",
+        )
+        .unwrap();
+
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let round = &detail["rounds"][0];
+    assert_eq!(
+        round["implementation_report"],
+        "Changed the Goal detail so reviewers can see why.\nVerification: cargo test passed."
+    );
+    assert!(
+        round["implementation_reported_at"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("20") && value.ends_with('Z')),
+        "{detail:#}"
+    );
+    assert!(
+        service
+            .update_latest_goal_round_implementation_report("GOAL1", "   ")
+            .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_work_item_service_creates_features_and_updates_goal_membership() {
     let temp_root = unique_temp_dir("work-item-feature");
     let refine_dir = temp_root.join(".refine");
