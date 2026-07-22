@@ -274,6 +274,12 @@
   align-items: center;
   justify-content: center;
 }
+.feature-goal-edit-btn {
+  min-width: 44px;
+}
+.feature-goal-dependency {
+  margin-top: 2px;
+}
 .feature-goal-icon-btn svg {
   width: 16px;
   height: 16px;

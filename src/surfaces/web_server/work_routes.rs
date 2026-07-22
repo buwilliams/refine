@@ -33,65 +33,13 @@ use crate::tools::product::project_state::{
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::tools::product::work_items::{
-    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FileWorkItemService,
+    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FeatureGoalAuthoringRequest,
+    FileWorkItemService, GoalAuthoringRequest,
 };
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
-
-fn derive_goal_name(prompt: &str) -> Option<String> {
-    let source = prompt.trim();
-    if source.is_empty() {
-        return None;
-    }
-    let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut name = collapsed.chars().take(80).collect::<String>();
-    if collapsed.chars().count() > 80 {
-        name = name
-            .trim_end_matches(|ch: char| !ch.is_alphanumeric())
-            .to_string();
-    }
-    (!name.trim().is_empty()).then(|| name.trim().to_string())
-}
-
-fn latest_round_duplicate_match(
-    service: &FileWorkItemService,
-    prompt: &str,
-) -> Result<Option<Value>, RefineError> {
-    if prompt.is_empty() {
-        return Ok(None);
-    }
-    for goal in service.list_goal_summaries()? {
-        if goal.goal.round_count == 0 {
-            continue;
-        }
-        let detail = service.show_goal_detail(&goal.goal.id)?;
-        let Some(round) = detail
-            .get("rounds")
-            .and_then(Value::as_array)
-            .and_then(|rounds| rounds.last())
-        else {
-            continue;
-        };
-        let round_prompt = round
-            .get("prompt")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-        if round_prompt == prompt {
-            return Ok(Some(json!({
-                "id": goal.goal.id,
-                "name": goal.goal.name,
-                "status": goal.goal.status,
-                "node_id": goal.goal.node_id,
-                "node_display_name": goal.node_display_name,
-                "prompt": round_prompt
-            })));
-        }
-    }
-    Ok(None)
-}
 
 fn import_extraction_text(
     refine_dir: &Path,
@@ -146,21 +94,13 @@ fn persist_import_draft_with_duplicate_decision(
     let decision = draft.duplicate_decision.trim();
     if !decision.is_empty()
         && decision != "original"
-        && let Some(duplicate) = latest_round_duplicate_match(service, draft.prompt.trim())?
+        && let Some(duplicate) = service.latest_round_duplicate(draft.prompt.trim())?
     {
-        let duplicate_id = duplicate
-            .get("id")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string();
+        let duplicate_id = duplicate.id;
         match decision {
             "duplicate" => return Ok(None),
             "move_original_to_backlog" => {
-                let from = duplicate
-                    .get("status")
-                    .and_then(Value::as_str)
-                    .unwrap_or("backlog");
-                if from == "backlog" || duplicate_id.is_empty() {
+                if duplicate.status == GoalStatus::Backlog || duplicate_id.is_empty() {
                     actions.move_noop += 1;
                 } else if service
                     .transition_goal_status(&duplicate_id, GoalStatus::Backlog)
@@ -310,7 +250,7 @@ fn import_extraction_response(
 
 fn feature_detail_response_from_goals(
     feature: &crate::tools::product::project_state::FeatureSummaryProjection,
-    goals: Vec<crate::model::goal::GoalIndexProjection>,
+    goals: Vec<Value>,
 ) -> Value {
     let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
@@ -647,200 +587,76 @@ impl InProcessWebServer {
     pub(super) fn handle_goal_create(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "create work items");
         let body = request.body.as_ref();
-        let prompt = body
-            .and_then(|body| body.get("prompt"))
-            .and_then(|prompt| prompt.as_str())
-            .unwrap_or("")
-            .trim();
-        let Some(name) = body
-            .and_then(|body| body.get("name"))
-            .and_then(|name| name.as_str())
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(str::to_string)
-            .or_else(|| derive_goal_name(prompt))
-        else {
+        let service = self.work_item_service(refine_dir);
+        let field = |name| {
+            body.and_then(|body| body.get(name))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
+        let result = match service.author_goal(GoalAuthoringRequest {
+            id: field("id"),
+            name: field("name"),
+            prompt: field("prompt").unwrap_or_default(),
+            reporter: field("reporter").unwrap_or_default(),
+            assignee: field("assignee"),
+            priority: field("priority").unwrap_or_else(|| "low".to_string()),
+            feature_id: field("feature_id"),
+            duplicate_decision: field("duplicate_decision").unwrap_or_default(),
+            ..GoalAuthoringRequest::default()
+        }) {
+            Ok(result) => result,
+            Err(RefineError::InvalidInput(message)) if message == "Goal name is required" => {
+                return ApiResponse::json(
+                    400,
+                    json!({
+                        "error": {
+                            "code": "invalid_name",
+                            "message": "body.name or body.prompt is required"
+                        }
+                    }),
+                );
+            }
+            Err(error) => return error_response(error),
+        };
+        if result.requires_duplicate_decision {
             return ApiResponse::json(
-                400,
+                409,
                 json!({
                     "error": {
-                        "code": "invalid_name",
-                        "message": "body.name or body.prompt is required"
+                        "code": "duplicate_goal",
+                        "message": "Possible duplicate Goal",
+                        "duplicate": { "match": result.duplicate }
                     }
                 }),
             );
-        };
-        let id = body
-            .and_then(|body| body.get("id"))
-            .and_then(|id| id.as_str());
-        let reporter = body
-            .and_then(|body| body.get("reporter"))
-            .and_then(|reporter| reporter.as_str())
-            .unwrap_or("")
-            .trim();
-        let assignee = body
-            .and_then(|body| body.get("assignee"))
-            .and_then(|assignee| assignee.as_str())
-            .map(str::trim)
-            .filter(|assignee| !assignee.is_empty())
-            .unwrap_or(reporter);
-        let priority = body
-            .and_then(|body| body.get("priority"))
-            .and_then(|priority| priority.as_str())
-            .unwrap_or("low")
-            .trim();
-        let feature_id = body
-            .and_then(|body| body.get("feature_id"))
-            .and_then(|feature_id| feature_id.as_str())
-            .map(str::trim)
-            .filter(|feature_id| !feature_id.is_empty());
-        let duplicate_decision = body
-            .and_then(|body| body.get("duplicate_decision"))
-            .and_then(|decision| decision.as_str())
-            .unwrap_or("")
-            .trim();
-        if !matches!(priority, "low" | "medium" | "high") {
-            return error_response(RefineError::InvalidInput(
-                "priority must be one of low, medium, or high".to_string(),
-            ));
         }
-
-        let service = self.work_item_service(refine_dir);
-        let duplicate = if id.is_none() {
-            match latest_round_duplicate_match(&service, prompt) {
-                Ok(duplicate) => duplicate,
-                Err(error) => return error_response(error),
-            }
-        } else {
-            None
-        };
-        if let Some(duplicate) = duplicate {
-            let duplicate_id = duplicate
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_string();
-            match duplicate_decision {
-                "" => {
-                    return ApiResponse::json(
-                        409,
-                        json!({
-                            "error": {
-                                "code": "duplicate_goal",
-                                "message": "Possible duplicate Goal",
-                                "duplicate": {
-                                    "match": duplicate
-                                }
-                            }
-                        }),
-                    );
+        if !result.created {
+            let mut response = json!({
+                "created": false,
+                "duplicate_action": result.duplicate_action,
+                "duplicate": { "match": result.duplicate }
+            });
+            if let Some(move_result) = result.move_result {
+                let mut move_value = json!(move_result);
+                if move_value.get("reason").is_some_and(Value::is_null) {
+                    move_value.as_object_mut().unwrap().remove("reason");
                 }
-                "duplicate" => {
-                    return ApiResponse::json(
-                        200,
-                        json!({
-                            "created": false,
-                            "duplicate_action": "duplicate",
-                            "duplicate": {
-                                "match": duplicate
-                            }
-                        }),
-                    );
-                }
-                "move_original_to_backlog" => {
-                    let from = duplicate
-                        .get("status")
-                        .and_then(Value::as_str)
-                        .unwrap_or("backlog")
-                        .to_string();
-                    let mut move_result = json!({
-                        "moved": false,
-                        "from": from,
-                        "to": "backlog",
-                        "reason": "already_backlog"
-                    });
-                    if from != "backlog" && !duplicate_id.is_empty() {
-                        match service.transition_goal_status(&duplicate_id, GoalStatus::Backlog) {
-                            Ok(_) => {
-                                move_result = json!({
-                                    "moved": true,
-                                    "from": from,
-                                    "to": "backlog"
-                                });
-                            }
-                            Err(_) => {
-                                move_result = json!({
-                                    "moved": false,
-                                    "from": from,
-                                    "to": "backlog",
-                                    "reason": "protected_status"
-                                });
-                            }
-                        }
-                    }
-                    return ApiResponse::json(
-                        200,
-                        json!({
-                            "created": false,
-                            "duplicate_action": "move_original_to_backlog",
-                            "duplicate": {
-                                "match": duplicate
-                            },
-                            "move": move_result
-                        }),
-                    );
-                }
-                "original" => {}
-                other => {
-                    return error_response(RefineError::InvalidInput(format!(
-                        "unknown duplicate_decision: {other}"
-                    )));
-                }
+                response["move"] = move_value;
             }
-        }
-        let mut goal = match service.create_goal_summary(&name, id) {
-            Ok(goal) => goal,
-            Err(error) => return error_response(error),
-        };
-        if priority != "low" || !reporter.is_empty() {
-            match service.update_goal_metadata_summary(
-                &goal.goal.id,
-                None,
-                (priority != "low").then_some(priority),
-                (!reporter.is_empty()).then_some(reporter),
-                None,
-            ) {
-                Ok(updated) => goal = updated,
-                Err(error) => return error_response(error),
-            }
-        }
-        if !reporter.is_empty() && !prompt.is_empty() {
-            match service.append_goal_round_summary_with_assignee(
-                &goal.goal.id,
-                reporter,
-                (!assignee.is_empty()).then_some(assignee),
-                prompt,
-            ) {
-                Ok(updated) => goal = updated,
-                Err(error) => return error_response(error),
-            }
-        }
-        if let Some(feature_id) = feature_id {
-            if let Err(error) = service.assign_goal_to_feature(feature_id, &goal.goal.id) {
-                return error_response(error);
-            }
-            match service.show_goal_summary(&goal.goal.id) {
-                Ok(updated) => goal = updated,
-                Err(error) => return error_response(error),
-            }
+            return ApiResponse::json(200, response);
         }
         if let Err(error) = self.promote_backlog_after_mutation() {
             return error_response(error);
         }
-        match service.show_goal_summary(&goal.goal.id) {
-            Ok(updated) => goal = updated,
+        let goal_id = result
+            .goal
+            .as_ref()
+            .map(|goal| goal.id.as_str())
+            .unwrap_or("");
+        let goal = match service.show_goal_summary(goal_id) {
+            Ok(updated) => updated,
             Err(error) => return error_response(error),
-        }
+        };
 
         match self.refresh_projection_cache_after_mutation() {
             Ok(()) => ApiResponse::json(201, json!({"goal": goal.goal})),
@@ -1504,10 +1320,15 @@ impl InProcessWebServer {
                     .goal_ids
                     .iter()
                     .filter_map(|goal_id| {
-                        service
-                            .show_goal_summary(goal_id)
-                            .ok()
-                            .map(|goal| goal.goal)
+                        let goal = service.show_goal_summary(goal_id).ok()?;
+                        let capability =
+                            FileWorkItemService::feature_goal_authoring_capability(&goal);
+                        let mut value = serde_json::to_value(goal.goal).ok()?;
+                        value.as_object_mut()?.insert(
+                            "feature_authoring".to_string(),
+                            serde_json::to_value(capability).ok()?,
+                        );
+                        Some(value)
                     })
                     .collect::<Vec<_>>();
                 let feature_detail = feature_detail_response_from_goals(&feature, goals);
@@ -1522,6 +1343,64 @@ impl InProcessWebServer {
             }
             Err(error) => error_response(error),
         }
+    }
+
+    pub(super) fn handle_feature_goal_author(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "author Feature Goals");
+        let Some(feature_id) = request
+            .path
+            .strip_prefix("/work/features/")
+            .and_then(|path| path.strip_suffix("/goals/author"))
+            .filter(|feature_id| !feature_id.is_empty() && !feature_id.contains('/'))
+        else {
+            return feature_id_required();
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let authoring = match serde_json::from_value::<FeatureGoalAuthoringRequest>(body) {
+            Ok(authoring) => authoring,
+            Err(error) => {
+                return error_response(RefineError::InvalidInput(format!(
+                    "invalid Feature Goal authoring body: {error}"
+                )));
+            }
+        };
+        let result = match self
+            .work_item_service(refine_dir)
+            .author_feature_goal(feature_id, authoring)
+        {
+            Ok(result) => result,
+            Err(error) => return error_response(error),
+        };
+        if result.requires_duplicate_decision {
+            return ApiResponse::json(
+                409,
+                json!({
+                    "error": {
+                        "code": "duplicate_goal",
+                        "message": "Possible duplicate Goal",
+                        "duplicate": { "match": result.duplicate }
+                    }
+                }),
+            );
+        }
+        if result.created
+            && let Err(error) = self.promote_backlog_after_mutation()
+        {
+            return error_response(error);
+        }
+        if let Err(error) = self.refresh_projection_cache_after_mutation() {
+            return error_response(error);
+        }
+        ApiResponse::json(
+            if result.created { 201 } else { 200 },
+            json!({
+                "created": result.created,
+                "goal": result.goal,
+                "duplicate_action": result.duplicate_action,
+                "duplicate": result.duplicate.map(|duplicate| json!({"match": duplicate})),
+                "move": result.move_result
+            }),
+        )
     }
 
     pub(super) fn handle_feature_add_goal(&self, request: ApiRequest) -> ApiResponse {

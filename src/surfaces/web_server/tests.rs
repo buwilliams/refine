@@ -1067,6 +1067,7 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
         path: "/api/goals".to_string(),
         body: Some(json!({
             "reporter": "Alice",
+            "assignee": "Bob",
             "prompt": "Pressing pause should freeze the board and show a paused state.",
             "priority": "high"
         })),
@@ -1080,6 +1081,7 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
     );
     assert_eq!(created.body["goal"]["priority"], "high");
     assert_eq!(created.body["goal"]["reporter"], "Alice");
+    assert_eq!(created.body["goal"]["assignee"], "Bob");
     assert_eq!(created.body["goal"]["round_count"], 1);
 
     let detail = server.handle(ApiRequest {
@@ -1092,6 +1094,7 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
         detail.body["goal"]["rounds"][0]["prompt"],
         "Pressing pause should freeze the board and show a paused state."
     );
+    assert_eq!(detail.body["goal"]["rounds"][0]["assignee"], "Bob");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1176,6 +1179,26 @@ fn web_server_handles_new_goal_duplicate_decisions() {
     assert_eq!(ignored.status, 200);
     assert_eq!(ignored.body["created"], false);
     assert_eq!(ignored.body["duplicate_action"], "duplicate");
+
+    FileWorkItemService::new(&refine_dir)
+        .transition_goal_status(&original_id, GoalStatus::Todo)
+        .unwrap();
+    let moved = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "reporter": "Alice",
+            "prompt": "Duplicate target state",
+            "duplicate_decision": "move_original_to_backlog"
+        })),
+    });
+    assert_eq!(moved.status, 200);
+    assert_eq!(moved.body["created"], false);
+    assert_eq!(moved.body["duplicate_action"], "move_original_to_backlog");
+    assert_eq!(
+        moved.body["move"],
+        json!({"moved": true, "from": "todo", "to": "backlog"})
+    );
 
     let imported = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2212,6 +2235,132 @@ fn web_server_creates_features_and_updates_membership() {
     });
     assert_eq!(remove_goal.status, 200);
     assert_eq!(remove_goal.body["goal_ids"], json!([]));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_feature_goal_authoring_is_one_policy_driven_api_operation() {
+    let temp_root = unique_temp_dir("http-feature-goal-authoring");
+    let refine_dir = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    assert_eq!(
+        server
+            .handle(ApiRequest {
+                method: "POST".to_string(),
+                path: "/api/features".to_string(),
+                body: Some(json!({"id": "FEA1", "name": "Feature One"})),
+            })
+            .status,
+        201
+    );
+
+    let first = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/goals/author".to_string(),
+        body: Some(json!({
+            "name": "Foundation",
+            "prompt": "Build the foundation",
+            "reporter": "Buddy",
+            "priority": "low",
+            "placement": "first"
+        })),
+    });
+    assert_eq!(first.status, 201, "{:#}", first.body);
+    let first_id = first.body["goal"]["id"].as_str().unwrap().to_string();
+    assert_eq!(first.body["goal"]["feature_order"], 1);
+
+    let second = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/goals/author".to_string(),
+        body: Some(json!({
+            "name": "Feature UI",
+            "prompt": "Bind the inline composer",
+            "reporter": "Buddy",
+            "priority": "high",
+            "placement": {"after": first_id}
+        })),
+    });
+    assert_eq!(second.status, 201, "{:#}", second.body);
+    let second_id = second.body["goal"]["id"].as_str().unwrap().to_string();
+    assert_eq!(second.body["goal"]["feature_order"], 2);
+
+    let duplicate = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/goals/author".to_string(),
+        body: Some(json!({
+            "prompt": "Bind the inline composer",
+            "reporter": "Buddy",
+            "priority": "low",
+            "placement": "unordered"
+        })),
+    });
+    assert_eq!(duplicate.status, 409);
+    assert_eq!(duplicate.body["error"]["code"], "duplicate_goal");
+    assert_eq!(
+        duplicate.body["error"]["duplicate"]["match"]["id"],
+        second_id
+    );
+
+    let goal_path = refine_dir
+        .join("goals")
+        .join(&second_id[..2])
+        .join(&second_id[2..])
+        .join("goal.json");
+    let mut review_goal: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
+    review_goal["status"] = json!("review");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&review_goal).unwrap()).unwrap();
+
+    let shown = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/features/FEA1".to_string(),
+        body: None,
+    });
+    let review = shown.body["feature"]["goals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|goal| goal["id"] == second_id)
+        .unwrap();
+    assert_eq!(review["feature_authoring"]["editable"], true);
+
+    let edited = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/goals/author".to_string(),
+        body: Some(json!({
+            "goal_id": second_id,
+            "name": "Reviewed UI",
+            "prompt": "Revise while the Goal is in review",
+            "reporter": "Buddy",
+            "priority": "medium",
+            "placement": "first"
+        })),
+    });
+    assert_eq!(edited.status, 200, "{:#}", edited.body);
+    assert_eq!(edited.body["goal"]["status"], "review");
+    assert_eq!(edited.body["goal"]["feature_order"], 1);
+    assert_eq!(edited.body["goal"]["name"], "Reviewed UI");
+
+    let invalid = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/features/FEA1/goals/author".to_string(),
+        body: Some(json!({
+            "prompt": "Invalid placement",
+            "reporter": "Buddy",
+            "priority": "low",
+            "placement": {"after": "MISSING"}
+        })),
+    });
+    assert_eq!(invalid.status, 400);
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .list_goal_summaries()
+            .unwrap()
+            .len(),
+        2
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

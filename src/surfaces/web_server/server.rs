@@ -659,6 +659,13 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
+            && request.path.ends_with("/goals/author")
+        {
+            return self.handle_feature_goal_author(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/features/")
             && request.path.ends_with("/goals")
         {
             return self.handle_feature_add_goal(request);

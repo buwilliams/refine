@@ -297,6 +297,414 @@ impl FileWorkItemService {
         Ok(snapshot.goals.into_values().collect())
     }
 
+    pub fn feature_goal_authoring_capability(
+        goal: &GoalSummaryProjection,
+    ) -> FeatureGoalAuthoringCapability {
+        let operations = [
+            GoalOperation::EditMetadata,
+            if goal.goal.round_count == 0 {
+                GoalOperation::SubmitNewRound
+            } else {
+                GoalOperation::EditLatestRound
+            },
+            GoalOperation::ReorderInFeature,
+        ];
+        let denied = operations
+            .iter()
+            .map(|operation| goal_operation_allowed(&goal.goal.status, operation))
+            .find(|decision| !decision.allowed);
+        FeatureGoalAuthoringCapability {
+            editable: denied.is_none(),
+            reason: denied.and_then(|decision| decision.reason),
+        }
+    }
+
+    pub fn author_feature_goal(
+        &self,
+        feature_id: &str,
+        request: FeatureGoalAuthoringRequest,
+    ) -> RefineResult<FeatureGoalAuthoringResult> {
+        self.author_goal_with_context(
+            GoalAuthoringRequest {
+                goal_id: request.goal_id,
+                name: request.name,
+                prompt: request.prompt,
+                reporter: request.reporter,
+                assignee: request.assignee,
+                priority: request.priority,
+                feature_id: Some(feature_id.to_string()),
+                placement: request.placement,
+                duplicate_decision: request.duplicate_decision,
+                ..GoalAuthoringRequest::default()
+            },
+            true,
+        )
+    }
+
+    pub fn author_goal(&self, request: GoalAuthoringRequest) -> RefineResult<GoalAuthoringResult> {
+        self.author_goal_with_context(request, false)
+    }
+
+    fn author_goal_with_context(
+        &self,
+        request: GoalAuthoringRequest,
+        feature_inline: bool,
+    ) -> RefineResult<GoalAuthoringResult> {
+        let goal_id = request
+            .goal_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let id = request
+            .id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if goal_id.is_some() && id.is_some() {
+            return Err(RefineError::InvalidInput(
+                "id cannot be supplied when editing a Goal".to_string(),
+            ));
+        }
+        let prompt = request.prompt.trim();
+        let resolved_name = request
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .or_else(|| derive_goal_name(prompt));
+        if goal_id.is_none() && resolved_name.is_none() {
+            return Err(RefineError::InvalidInput(
+                "Goal name is required".to_string(),
+            ));
+        }
+        let feature_id = request
+            .feature_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if let Some(feature_id) = feature_id {
+            let feature = self.show_feature_summary(feature_id)?;
+            self.ensure_feature_owned(&feature)?;
+        }
+
+        let reporter = Self::validate_goal_reporter(&request.reporter)?;
+        if feature_inline && (reporter.is_empty() || prompt.is_empty()) {
+            return Err(RefineError::InvalidInput(
+                "reporter and prompt are required".to_string(),
+            ));
+        }
+        let priority = request.priority.trim();
+        if GoalPriority::parse_wire(priority).is_none() {
+            return Err(RefineError::InvalidInput(
+                "priority must be one of low, medium, or high".to_string(),
+            ));
+        }
+        let assignee = request
+            .assignee
+            .as_deref()
+            .map(Self::validate_goal_assignee)
+            .transpose()?
+            .filter(|value| !value.is_empty());
+
+        let current = goal_id
+            .map(|goal_id| self.show_goal_summary(goal_id))
+            .transpose()?;
+        if let Some(current) = &current {
+            self.ensure_goal_owned(current)?;
+            if current.goal.feature_id.as_deref() != feature_id {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {} is not assigned to Feature {}",
+                    current.goal.id,
+                    feature_id.unwrap_or("")
+                )));
+            }
+            let capability = Self::feature_goal_authoring_capability(current);
+            if !capability.editable {
+                return Err(RefineError::InvalidInput(capability.reason.unwrap_or_else(
+                    || "Goal cannot be authored in its current status".to_string(),
+                )));
+            }
+            if request
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .is_none()
+            {
+                return Err(RefineError::InvalidInput(
+                    "Goal name is required when editing".to_string(),
+                ));
+            }
+        }
+        if let Some(feature_id) = feature_id {
+            self.validate_feature_goal_placement(feature_id, goal_id, &request.placement)?;
+        } else if !matches!(request.placement, FeatureGoalPlacement::Unordered) {
+            return Err(RefineError::InvalidInput(
+                "Goal placement requires a Feature".to_string(),
+            ));
+        }
+
+        if current.is_none()
+            && id.is_none()
+            && let Some(duplicate) = self.latest_round_duplicate(prompt)?
+        {
+            match request.duplicate_decision.trim() {
+                "" => {
+                    return Ok(GoalAuthoringResult {
+                        created: false,
+                        goal: None,
+                        duplicate_action: None,
+                        duplicate: Some(duplicate),
+                        move_result: None,
+                        requires_duplicate_decision: true,
+                    });
+                }
+                "duplicate" => {
+                    return Ok(GoalAuthoringResult {
+                        created: false,
+                        goal: None,
+                        duplicate_action: Some("duplicate".to_string()),
+                        duplicate: Some(duplicate),
+                        move_result: None,
+                        requires_duplicate_decision: false,
+                    });
+                }
+                "move_original_to_backlog" => {
+                    let from = duplicate.status.clone();
+                    let move_result = if from == GoalStatus::Backlog {
+                        GoalAuthoringDuplicateMove {
+                            moved: false,
+                            from,
+                            to: GoalStatus::Backlog,
+                            reason: Some("already_backlog".to_string()),
+                        }
+                    } else if self
+                        .transition_goal_status(&duplicate.id, GoalStatus::Backlog)
+                        .is_ok()
+                    {
+                        GoalAuthoringDuplicateMove {
+                            moved: true,
+                            from,
+                            to: GoalStatus::Backlog,
+                            reason: None,
+                        }
+                    } else {
+                        GoalAuthoringDuplicateMove {
+                            moved: false,
+                            from,
+                            to: GoalStatus::Backlog,
+                            reason: Some("protected_status".to_string()),
+                        }
+                    };
+                    return Ok(GoalAuthoringResult {
+                        created: false,
+                        goal: None,
+                        duplicate_action: Some("move_original_to_backlog".to_string()),
+                        duplicate: Some(duplicate),
+                        move_result: Some(move_result),
+                        requires_duplicate_decision: false,
+                    });
+                }
+                "original" => {}
+                other => {
+                    return Err(RefineError::InvalidInput(format!(
+                        "unknown duplicate_decision: {other}"
+                    )));
+                }
+            }
+        }
+
+        let saved = if let Some(current) = current {
+            let goal_id = current.goal.id.clone();
+            self.update_goal_metadata_summary(
+                &goal_id,
+                request.name.as_deref(),
+                Some(priority),
+                Some(reporter),
+                None,
+            )?;
+            let assignee = assignee
+                .or(current.goal.assignee.as_deref())
+                .unwrap_or(reporter);
+            if current.goal.round_count == 0 {
+                self.append_goal_round_summary_with_assignee(
+                    &goal_id,
+                    reporter,
+                    Some(assignee),
+                    prompt,
+                )?;
+            } else {
+                self.edit_latest_goal_round_summary(
+                    &goal_id,
+                    Some(reporter),
+                    Some(assignee),
+                    Some(prompt),
+                )?;
+            }
+            if let Some(feature_id) = feature_id {
+                self.apply_feature_goal_placement(feature_id, &goal_id, &request.placement)?;
+            }
+            self.show_goal_summary(&goal_id)?.goal
+        } else {
+            let name = resolved_name
+                .ok_or_else(|| RefineError::InvalidInput("Goal name is required".to_string()))?;
+            let goal = self.create_goal_summary(&name, id)?;
+            self.update_goal_metadata_summary(
+                &goal.goal.id,
+                None,
+                (priority != "low").then_some(priority),
+                Some(reporter),
+                None,
+            )?;
+            if !reporter.is_empty() && !prompt.is_empty() {
+                self.append_goal_round_summary_with_assignee(
+                    &goal.goal.id,
+                    reporter,
+                    Some(assignee.unwrap_or(reporter)),
+                    prompt,
+                )?;
+            }
+            if let Some(feature_id) = feature_id {
+                self.assign_goal_to_feature(feature_id, &goal.goal.id)?;
+                self.apply_feature_goal_placement(feature_id, &goal.goal.id, &request.placement)?;
+            }
+            self.show_goal_summary(&goal.goal.id)?.goal
+        };
+
+        Ok(GoalAuthoringResult {
+            created: goal_id.is_none(),
+            goal: Some(saved),
+            duplicate_action: None,
+            duplicate: None,
+            move_result: None,
+            requires_duplicate_decision: false,
+        })
+    }
+
+    pub fn latest_round_duplicate(
+        &self,
+        prompt: &str,
+    ) -> RefineResult<Option<GoalAuthoringDuplicate>> {
+        if prompt.is_empty() {
+            return Ok(None);
+        }
+        for goal in self.list_goal_summaries()? {
+            if goal.goal.round_count == 0 {
+                continue;
+            }
+            let detail = self.show_goal_detail(&goal.goal.id)?;
+            let Some(round_prompt) = detail
+                .get("rounds")
+                .and_then(Value::as_array)
+                .and_then(|rounds| rounds.last())
+                .and_then(|round| round.get("prompt"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+            else {
+                continue;
+            };
+            if round_prompt == prompt {
+                return Ok(Some(GoalAuthoringDuplicate {
+                    id: goal.goal.id,
+                    name: goal.goal.name,
+                    status: goal.goal.status,
+                    node_id: goal.goal.node_id,
+                    node_display_name: goal.node_display_name,
+                    prompt: round_prompt.to_string(),
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    fn validate_feature_goal_placement(
+        &self,
+        feature_id: &str,
+        goal_id: Option<&str>,
+        placement: &FeatureGoalPlacement,
+    ) -> RefineResult<()> {
+        let FeatureGoalPlacement::After(prerequisite_id) = placement else {
+            return Ok(());
+        };
+        let prerequisite_id = prerequisite_id.trim();
+        if prerequisite_id.is_empty() || goal_id == Some(prerequisite_id) {
+            return Err(RefineError::InvalidInput(
+                "placement prerequisite must name a different Goal".to_string(),
+            ));
+        }
+        let prerequisite = self.show_goal_summary(prerequisite_id).map_err(|_| {
+            RefineError::InvalidInput(format!(
+                "placement prerequisite {prerequisite_id} is not ordered in Feature {feature_id}"
+            ))
+        })?;
+        if prerequisite.goal.feature_id.as_deref() != Some(feature_id)
+            || !is_ordered_feature_goal(prerequisite.goal.feature_order)
+        {
+            return Err(RefineError::InvalidInput(format!(
+                "placement prerequisite {prerequisite_id} is not ordered in Feature {feature_id}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn apply_feature_goal_placement(
+        &self,
+        feature_id: &str,
+        goal_id: &str,
+        placement: &FeatureGoalPlacement,
+    ) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        match placement {
+            FeatureGoalPlacement::Unordered => {
+                if is_ordered_feature_goal(current.goal.feature_order) {
+                    self.unorder_goal_in_feature(feature_id, goal_id)?;
+                }
+            }
+            FeatureGoalPlacement::First => {
+                if !is_ordered_feature_goal(current.goal.feature_order) {
+                    self.order_goal_in_feature(feature_id, goal_id)?;
+                }
+                self.reorder_goal_in_feature(feature_id, goal_id, 1)?;
+            }
+            FeatureGoalPlacement::After(prerequisite_id) => {
+                if !is_ordered_feature_goal(current.goal.feature_order) {
+                    self.order_goal_in_feature(feature_id, goal_id)?;
+                }
+                let feature = self.show_feature_summary(feature_id)?;
+                let mut ordered_ids = feature
+                    .goal_ids
+                    .iter()
+                    .filter(|candidate_id| {
+                        self.show_goal_summary(candidate_id)
+                            .ok()
+                            .is_some_and(|goal| is_ordered_feature_goal(goal.goal.feature_order))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let source_index = ordered_ids
+                    .iter()
+                    .position(|candidate_id| candidate_id == goal_id)
+                    .ok_or_else(|| {
+                        RefineError::NotFound(format!(
+                            "Goal {goal_id} was not found in Feature {feature_id} order"
+                        ))
+                    })?;
+                ordered_ids.remove(source_index);
+                let target_index = ordered_ids
+                    .iter()
+                    .position(|candidate_id| candidate_id == prerequisite_id.trim())
+                    .ok_or_else(|| {
+                        RefineError::InvalidInput(format!(
+                            "placement prerequisite {prerequisite_id} is not ordered in Feature {feature_id}"
+                        ))
+                    })?;
+                self.reorder_goal_in_feature(feature_id, goal_id, target_index as i64 + 2)?;
+            }
+        }
+        Ok(())
+    }
+
     fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
         let node_id = node_id.unwrap_or("default");
         self.node_registry_service()
@@ -2219,6 +2627,17 @@ impl FileWorkItemService {
 
 fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+fn derive_goal_name(prompt: &str) -> Option<String> {
+    let collapsed = prompt.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut name = collapsed.chars().take(80).collect::<String>();
+    if collapsed.chars().count() > 80 {
+        name = name
+            .trim_end_matches(|ch: char| !ch.is_alphanumeric())
+            .to_string();
+    }
+    (!name.trim().is_empty()).then(|| name.trim().to_string())
 }
 
 fn bulk_goal_matches_filter(goal: &GoalSummaryProjection, filter: &BulkGoalFilter) -> bool {
