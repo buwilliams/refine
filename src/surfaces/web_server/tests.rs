@@ -403,11 +403,156 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
 
     assert!(index.contains(r#"data-testid="nav-source-update""#));
     assert!(index.contains("hidden disabled"));
-    assert!(releases.contains("result.target_app_is_refine === true"));
-    assert!(releases.contains("button.disabled = !ready"));
+    assert!(releases.contains("const sourceUpdate = result.source_update || {}"));
+    assert!(releases.contains("button.disabled = sourceUpdate.enabled !== true"));
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
-    assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
+    assert!(releases.contains(r#"api("POST", "/api/system/source/promote", { confirmed: true })"#));
     assert!(init.contains("initSourceUpdateNav()"));
+}
+
+#[test]
+fn source_update_status_integration_drives_browser_states_across_reconnect() {
+    use crate::tools::host::source_promotion::{
+        SOURCE_PROMOTION_STATE_FILE, SourcePromotionOperation,
+    };
+
+    let temp_root = unique_temp_dir("source-update-status-integration");
+    let runtime_root = temp_root.join("run/8080");
+    let (seed, target_root) = seeded_remote_clone(&temp_root);
+    fs::create_dir_all(target_root.join("src")).unwrap();
+    fs::create_dir_all(target_root.join("scripts")).unwrap();
+    fs::write(
+        target_root.join("Cargo.toml"),
+        "[package]\nname = \"refine\"\n",
+    )
+    .unwrap();
+    fs::write(target_root.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs::write(target_root.join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+    fs::write(target_root.join("r"), "#!/bin/sh\n").unwrap();
+    git(&target_root, &["add", "."]).unwrap();
+    git(
+        &target_root,
+        &["commit", "-m", "add Refine source entrypoints"],
+    )
+    .unwrap();
+    git(&target_root, &["push", "origin", "main"]).unwrap();
+    git(&seed, &["pull", "--ff-only"]).unwrap();
+    fs::write(seed.join("remote.txt"), "new source\n").unwrap();
+    git(&seed, &["add", "remote.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "new source commit"]).unwrap();
+    git(&seed, &["push", "origin", "main"]).unwrap();
+
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    supervisor.set_agents_paused(true).unwrap();
+    supervisor.set_background_processes_stopped(true).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(target_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let available = server.handle_source_status_for_checkout(true, target_root.clone());
+    assert_eq!(available.status, 200);
+    assert_eq!(available.body["target_app_is_refine"], true);
+    assert_eq!(available.body["source_update"]["visible"], true);
+    assert_eq!(available.body["source_update"]["enabled"], true);
+    assert_eq!(available.body["source_update"]["state"], "available");
+    let current_commit = available.body["source"]["current_commit"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let available_commit = available.body["source"]["available_commit"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    fs::write(target_root.join("dirty.txt"), "leave untouched\n").unwrap();
+    let blocked = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(blocked.status, 200);
+    assert_eq!(blocked.body["source_update"]["visible"], true);
+    assert_eq!(blocked.body["source_update"]["enabled"], false);
+    assert_eq!(blocked.body["source_update"]["state"], "blocked");
+    fs::remove_file(target_root.join("dirty.txt")).unwrap();
+
+    let mut operation = SourcePromotionOperation {
+        id: "source-test".to_string(),
+        status: "running".to_string(),
+        stage: "restart_daemon".to_string(),
+        message: "Source activated; restarting Refine".to_string(),
+        checkout_path: target_root.display().to_string(),
+        from_commit: current_commit,
+        to_commit: available_commit,
+        started_at: "2026-07-21T00:00:00Z".to_string(),
+        updated_at: "2026-07-21T00:00:01Z".to_string(),
+        error: None,
+        rollback_attempted: false,
+        rollback_succeeded: None,
+        recovery: None,
+    };
+    fs::write(
+        runtime_root.join(SOURCE_PROMOTION_STATE_FILE),
+        serde_json::to_vec_pretty(&operation).unwrap(),
+    )
+    .unwrap();
+    let reconnecting = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(reconnecting.status, 200);
+    assert_eq!(reconnecting.body["source_update"]["enabled"], false);
+    assert_eq!(reconnecting.body["source_update"]["state"], "updating");
+    assert_eq!(
+        reconnecting.body["source_update"]["title"],
+        "Source activated; restarting Refine"
+    );
+
+    operation.status = "failed".to_string();
+    operation.stage = "restart_daemon".to_string();
+    operation.message = "Source promotion failed during restart_daemon".to_string();
+    operation.error = Some("restart failed".to_string());
+    operation.recovery = Some("Refine was restored; inspect and retry".to_string());
+    fs::write(
+        runtime_root.join(SOURCE_PROMOTION_STATE_FILE),
+        serde_json::to_vec_pretty(&operation).unwrap(),
+    )
+    .unwrap();
+    let failed = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(failed.status, 200);
+    assert_eq!(failed.body["source"]["operation"]["status"], "failed");
+    assert_eq!(failed.body["source_update"]["enabled"], true);
+    assert_eq!(failed.body["source_update"]["state"], "available");
+
+    server.target_root = Some(temp_root.join("not-refine"));
+    let hidden = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(hidden.status, 200);
+    assert_eq!(hidden.body["target_app_is_refine"], false);
+    assert_eq!(hidden.body["source_update"]["visible"], false);
+    assert_eq!(hidden.body["source_update"]["enabled"], false);
+    assert_eq!(hidden.body["source_update"]["state"], "hidden");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn source_promotion_api_requires_explicit_confirmation_before_queueing() {
+    let server = server_with_projection();
+    for body in [None, Some(json!({})), Some(json!({"confirmed": false}))] {
+        let response = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/system/source/promote".to_string(),
+            body,
+        });
+        assert_eq!(response.status, 400);
+        assert_eq!(response.body["error"]["code"], "invalid_input");
+        assert!(
+            response.body["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("explicit confirmation")
+        );
+    }
+    let confirmed = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/system/source/promote".to_string(),
+        body: Some(json!({"confirmed": true})),
+    });
+    assert_eq!(confirmed.status, 503);
+    assert_eq!(confirmed.body["error"]["code"], "runtime_root_unavailable");
 }
 
 #[test]

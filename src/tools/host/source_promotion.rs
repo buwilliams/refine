@@ -36,6 +36,15 @@ pub struct SourcePromotionSnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SourcePromotionAffordance {
+    pub visible: bool,
+    pub enabled: bool,
+    pub state: String,
+    pub update_available: bool,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SourcePromotionOperation {
     pub id: String,
     pub status: String,
@@ -75,6 +84,85 @@ impl SourcePromotionOperation {
             recovery: None,
         }
     }
+}
+
+pub fn source_promotion_affordance(
+    target_app_is_refine: bool,
+    source: &SourcePromotionSnapshot,
+) -> SourcePromotionAffordance {
+    if !target_app_is_refine {
+        return SourcePromotionAffordance {
+            visible: false,
+            enabled: false,
+            state: "hidden".to_string(),
+            update_available: source.update_available,
+            title: "Refine source update is unavailable for this target app".to_string(),
+        };
+    }
+
+    if let Some(operation) = source
+        .operation
+        .as_ref()
+        .filter(|operation| matches!(operation.status.as_str(), "queued" | "running"))
+    {
+        return SourcePromotionAffordance {
+            visible: true,
+            enabled: false,
+            state: "updating".to_string(),
+            update_available: source.update_available,
+            title: if operation.message.is_empty() {
+                format!("Refine source promotion is {}", operation.status)
+            } else {
+                operation.message.clone()
+            },
+        };
+    }
+
+    if !source.update_available {
+        return SourcePromotionAffordance {
+            visible: true,
+            enabled: false,
+            state: "current".to_string(),
+            update_available: false,
+            title: format!(
+                "Running Refine source is current at {}",
+                short_commit(&source.current_commit)
+            ),
+        };
+    }
+
+    let mut blockers = Vec::new();
+    if !source.clean {
+        blockers.push("checkout has uncommitted changes".to_string());
+    }
+    if !source.fast_forward {
+        blockers.push("upstream is not a fast-forward".to_string());
+    }
+    blockers.extend(source.active_work.iter().cloned());
+    if !blockers.is_empty() {
+        return SourcePromotionAffordance {
+            visible: true,
+            enabled: false,
+            state: "blocked".to_string(),
+            update_available: true,
+            title: format!("Refine source update unavailable: {}", blockers.join("; ")),
+        };
+    }
+
+    SourcePromotionAffordance {
+        visible: true,
+        enabled: true,
+        state: "available".to_string(),
+        update_available: true,
+        title: format!(
+            "Update running Refine to {}",
+            short_commit(&source.available_commit)
+        ),
+    }
+}
+
+fn short_commit(commit: &str) -> &str {
+    commit.get(..commit.len().min(12)).unwrap_or(commit)
 }
 
 pub trait SourcePromotionHost {
@@ -1121,8 +1209,53 @@ mod tests {
                 .iter()
                 .all(|item| !item.starts_with("source promotion "))
         );
+        let reconnected = FileSourcePromotionService::new(&root, root.join("runtime/8080"), 8080)
+            .load_operation()
+            .unwrap()
+            .unwrap();
+        assert_eq!(reconnected, failed);
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn source_promotion_affordance_covers_target_readiness_and_persisted_operations() {
+        let mut source = test_snapshot(Path::new("/refine"));
+
+        let hidden = source_promotion_affordance(false, &source);
+        assert!(!hidden.visible);
+        assert!(!hidden.enabled);
+        assert_eq!(hidden.state, "hidden");
+
+        let available = source_promotion_affordance(true, &source);
+        assert!(available.visible);
+        assert!(available.enabled);
+        assert_eq!(available.state, "available");
+        assert!(available.title.contains("bbb"));
+
+        source.clean = false;
+        let blocked = source_promotion_affordance(true, &source);
+        assert!(!blocked.enabled);
+        assert_eq!(blocked.state, "blocked");
+        assert!(blocked.title.contains("uncommitted changes"));
+
+        source.clean = true;
+        source.operation = Some(operation());
+        let updating = source_promotion_affordance(true, &source);
+        assert!(!updating.enabled);
+        assert_eq!(updating.state, "updating");
+
+        source.operation.as_mut().unwrap().status = "failed".to_string();
+        let retryable = source_promotion_affordance(true, &source);
+        assert!(retryable.enabled);
+        assert_eq!(retryable.state, "available");
+
+        source.operation = None;
+        source.update_available = false;
+        source.available_commit = source.current_commit.clone();
+        let current = source_promotion_affordance(true, &source);
+        assert!(!current.enabled);
+        assert_eq!(current.state, "current");
     }
 
     #[test]

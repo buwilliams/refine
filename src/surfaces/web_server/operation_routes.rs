@@ -14,7 +14,9 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_checkout};
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
-use crate::tools::host::source_promotion::FileSourcePromotionService;
+use crate::tools::host::source_promotion::{
+    FileSourcePromotionService, SourcePromotionSnapshot, source_promotion_affordance,
+};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
@@ -490,35 +492,43 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_source_status(&self, fetch: bool) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        if self.runtime_root.is_none() {
             return runtime_root_unavailable("inspect source promotion status");
-        };
+        }
         let checkout = match discover_refine_checkout() {
             Ok(checkout) => checkout,
             Err(error) => return error_response(error),
         };
+        self.handle_source_status_for_checkout(fetch, checkout)
+    }
+
+    pub(super) fn handle_source_status_for_checkout(
+        &self,
+        fetch: bool,
+        checkout: std::path::PathBuf,
+    ) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("inspect source promotion status");
+        };
         let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
         match service.inspect(fetch) {
-            Ok(source) => {
-                let target_app_is_refine = self
-                    .current_target_root()
-                    .ok()
-                    .flatten()
-                    .as_deref()
-                    .is_some_and(is_refine_checkout);
-                ApiResponse::json(
-                    200,
-                    json!({
-                        "source": source,
-                        "target_app_is_refine": target_app_is_refine
-                    }),
-                )
-            }
+            Ok(source) => ApiResponse::json(200, self.source_status_body(source)),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_source_promote(&self) -> ApiResponse {
+    pub(super) fn handle_source_promote(&self, request: ApiRequest) -> ApiResponse {
+        if request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("confirmed"))
+            .and_then(serde_json::Value::as_bool)
+            != Some(true)
+        {
+            return error_response(RefineError::InvalidInput(
+                "source promotion requires explicit confirmation".to_string(),
+            ));
+        }
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("promote source checkout");
         };
@@ -531,6 +541,21 @@ impl InProcessWebServer {
             Ok(operation) => ApiResponse::json(202, json!({"operation": operation})),
             Err(error) => error_response(error),
         }
+    }
+
+    pub(super) fn source_status_body(&self, source: SourcePromotionSnapshot) -> serde_json::Value {
+        let target_app_is_refine = self
+            .current_target_root()
+            .ok()
+            .flatten()
+            .as_deref()
+            .is_some_and(is_refine_checkout);
+        let source_update = source_promotion_affordance(target_app_is_refine, &source);
+        json!({
+            "source": source,
+            "source_update": source_update,
+            "target_app_is_refine": target_app_is_refine
+        })
     }
 
     pub(super) fn handle_install_rollback(&self) -> ApiResponse {

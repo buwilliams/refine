@@ -149,7 +149,8 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
 function applySourceUpdateNavStatus(result = {}) {
   const button = document.getElementById("btn-source-update");
   if (!button) return;
-  _sourceUpdateNavTargetIsRefine = result.target_app_is_refine === true && hasAttachedProject();
+  const sourceUpdate = result.source_update || {};
+  _sourceUpdateNavTargetIsRefine = sourceUpdate.visible === true && hasAttachedProject();
   _sourceUpdateNavSnapshot = result.source || null;
   button.hidden = !_sourceUpdateNavTargetIsRefine;
   if (button.hidden) {
@@ -159,27 +160,13 @@ function applySourceUpdateNavStatus(result = {}) {
     return;
   }
 
-  const source = _sourceUpdateNavSnapshot || {};
-  const operation = sourcePromotionActiveOperation(source);
-  const ready = sourcePromotionIsReady(source);
-  const blockers = sourcePromotionBlockers(source);
-  button.disabled = !ready;
-  button.dataset.updateAvailable = source.update_available ? "true" : "false";
-  if (operation) {
-    button.dataset.state = "updating";
-    button.title = operation.message || `Refine source promotion is ${operation.status}`;
+  button.disabled = sourceUpdate.enabled !== true;
+  button.dataset.updateAvailable = sourceUpdate.update_available ? "true" : "false";
+  button.dataset.state = sourceUpdate.state || "unavailable";
+  button.title = sourceUpdate.title || "Refine source update status is unavailable";
+  if (sourceUpdate.state === "updating") {
     startSourceUpdateNavPolling();
-  } else if (ready) {
-    button.dataset.state = "available";
-    button.title = `Update running Refine to ${shortSourceCommit(source.available_commit)}`;
-    stopSourceUpdateNavPolling();
-  } else if (source.update_available) {
-    button.dataset.state = "blocked";
-    button.title = `Refine source update unavailable: ${blockers.join("; ")}`;
-    stopSourceUpdateNavPolling();
   } else {
-    button.dataset.state = "current";
-    button.title = `Running Refine source is current at ${shortSourceCommit(source.current_commit)}`;
     stopSourceUpdateNavPolling();
   }
   button.setAttribute("aria-label", button.title);
@@ -257,20 +244,21 @@ async function queueSourcePromotionFromUi() {
     "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
   );
   if (!confirmed) return null;
-  return api("POST", "/api/system/source/promote", {});
+  return api("POST", "/api/system/source/promote", { confirmed: true });
 }
 
 async function promoteSourceFromNav() {
   const button = document.getElementById("btn-source-update");
   const current = await refreshSourceUpdateNav({ fetchRemote: true });
-  if (!current || !sourcePromotionIsReady(current.source || {})) return;
+  if (!current || current.source_update?.enabled !== true) return;
   try {
     const result = await queueSourcePromotionFromUi();
     if (!result) return;
-    applySourceUpdateNavStatus({
-      target_app_is_refine: true,
-      source: { ...(current.source || {}), operation: result.operation },
-    });
+    button.disabled = true;
+    button.dataset.state = "updating";
+    button.title = result.operation?.message || "Source promotion queued";
+    button.setAttribute("aria-label", button.title);
+    startSourceUpdateNavPolling();
     toast("Source promotion queued; Refine will reconnect after restart", "info");
   } catch (error) {
     toast(error.message || "Source promotion could not start", "error");
