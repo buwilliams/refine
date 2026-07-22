@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:07:35Z",
+  "updated_at": "2026-07-22T13:10:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -732,6 +732,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality has reached the full all-target gate after its focused cancellation races. Jira’s nested audit child has exited, but its parent has not emitted a follow-up for about five minutes; I’m giving the provider a short grace window because the managed process is still alive. If activity remains absent, I’ll classify it as a stall from process/activity evidence rather than pretending the Goal state is sufficient."
+    },
+    {
+      "created_at": "2026-07-22T13:10:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784725829864-112",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Two accepted reviews have now crossed the workflow’s own confirmation boundary without intervention: inline Feature Goal authoring and live Supervisor status are `done`. Main and `origin/main` are aligned at `6577565…`. I did not merge them; Refine’s normal review workflow did."
     }
   ],
   "queue_dispatching": true,
