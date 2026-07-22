@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:52:22Z",
+  "updated_at": "2026-07-22T11:54:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -420,6 +420,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Jira export recovery cleared the original long-running HTTP violation but failed two narrower checks: the Goals UI still lacks visible logs and Cancel/Hide controls, and tests bypass the real managed-process termination/recovery path. I’m issuing round 3 to finish the supervised browser experience and verify real operation-associated process cancellation/interruption."
+    },
+    {
+      "created_at": "2026-07-22T11:54:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784721298951-60",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Four active recovery rounds remain and all are still moving: Jira is adding the production-path operation evidence, inline authoring is compiling the shared create/dedup refactor, supervisor recovery is revising its agent/claim transaction path, and Quality core is implementing migration and supervised evidence handling. No new queue items have been injected."
     }
   ],
   "queue_dispatching": true,
