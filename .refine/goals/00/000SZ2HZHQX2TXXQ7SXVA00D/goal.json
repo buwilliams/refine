@@ -1,7 +1,7 @@
 {
   "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
-  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-7",
-  "candidate_commit": "ec0d33687de3c1919464a404a6829e803e671646",
+  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-8",
+  "candidate_commit": null,
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -510,9 +510,31 @@
       "reporter": "Codex",
       "rule_state": "failed",
       "updated": "2026-07-22T17:53:49Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T17:54:16Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate ec0d33687de3c1919464a404a6829e803e671646 and fix the remaining Round 7 off-node ownership violation without weakening the shared coordination model. Restrict scheduling, start, recovery reconciliation, interruption repair, retry commitment handling, and any failure settlement so a daemon mutates only claims owned by its active Node unless an explicit reviewed transfer/recovery protocol authorizes otherwise. Node B must never select Node A's Claimed record, turn it Failed after start_claim rejects ownership, release its capacity, or rewrite its recovery evidence. Add a daemon-backed production-path test with two distinct active Nodes sharing synchronized workflow state: prove each Node schedules/reconciles only its own claims, preserves the other Node's live and ownerless claims, and requires explicit ownership transfer/review before cross-Node recovery. Retain the existing same-Node owner-loss, crash repair, concurrent semantic-conflict, capacity-release, and migration behavior. Run focused distinct-Node tests, serial library, full workflow, multi-instance sync, fmt, all-target checks, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T17:54:16Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T17:53:49Z"
+  "updated": "2026-07-22T17:54:17Z"
 }
