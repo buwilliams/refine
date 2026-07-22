@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:33:43Z",
+  "updated_at": "2026-07-22T20:34:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -171,6 +171,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll inspect the failed goal’s durable evidence and the Refine workflow commands, then add a narrowly scoped remediation round and return it to `todo` without touching cancelled work or forcing any integration."
+    },
+    {
+      "created_at": "2026-07-22T20:34:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752443749-38",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed goal has one committed candidate and eight explicit governance findings. I’m treating those findings as the scope for round 2; the cancelled goals remain untouched. Next I’m checking the supported state-transition command so the update goes through Refine’s authoritative service rather than editing JSON directly."
     }
   ],
   "queued_messages": [
