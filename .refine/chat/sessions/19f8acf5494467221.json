@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:46:07Z",
+  "updated_at": "2026-07-22T17:47:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -432,6 +432,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s new ownerless-terminal test exposed an invalid test setup transition (`Todo→Cancelled/Failed`), not a provider or production failure; the agent is correcting the fixture. Quality round 3 cleanly merged its preserved candidate into the fresh isolated branch and is implementing only the two governance fixes."
+    },
+    {
+      "created_at": "2026-07-22T17:47:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742450075-131",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s corrected ownerless-terminal fixture passes and the full serial gate is still running. Quality has located existing Git cleanliness helpers and is wiring candidate/head/dirty checks into the shared Quality service rather than adding surface-specific logic."
     }
   ],
   "queued_messages": [
