@@ -52,10 +52,11 @@
     "00000SZ2HZHQX2TXXQ7SXVA00D": "todo"
   },
   "open_issues": {
+    "state_sync": "Refine state synchronization failed: background process launch is stopped",
     "workflow": "Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_8\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"for f in /home/buddy/projects/refine-next/.git/refine-live-state/goals/*/*/goal.json; do jq -r '[.created,.id,.name,.status] | @tsv' \\\\\\\"\\\"'$f\\\"; done | sort | tail -40\\nrg -n \\\"consistency\\\" /home/buddy/projects/refine-next/.git/refine-live-state/goals -g goal.json | head -80'\",\"aggregated_output\":\"2026-07-21T19:58:16Z\\t00000SZ1J1YD7KCM6JNJRB8000\\tWhen I tried to change the model I get an error "
   },
   "last_context_key": "goals=00000SZ2HZ9S31P6FH65XVA00C:todo,00000SZ2HZHQX2TXXQ7SXVA00D:todo|live={}|quiet={}|issues=workflow:Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_8\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"for f in /home/buddy/projects/refine-next/.git/refine-live-state/goals/*/*/goal.json; do jq -r '[.created,.id,.name,.status] | @tsv' \\\\\\\"\\\"'$f\\\"; done | sort | tail -40\\nrg -n \\\"consistency\\\" /home/buddy/projects/refine-next/.git/refine-live-state/goals -g goal.json | head -80'\",\"aggregated_output\":\"2026-07-21T19:58:16Z\\t00000SZ1J1YD7KCM6JNJRB8000\\tWhen I tried to change the model I get an error ",
-  "updated_at": "2026-07-22T14:35:55.225895582+00:00",
+  "updated_at": "2026-07-22T14:36:23.916773036+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",

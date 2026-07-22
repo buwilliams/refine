@@ -4,7 +4,7 @@
   "candidate_commit": null,
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
-  "feature_order": null,
+  "feature_order": 2,
   "id": "00000SZ2HZHQX2TXXQ7SXVA00D",
   "name": "Implement shared cross-process workflow coordination",
   "node_id": "default",
@@ -35,7 +35,7 @@
       "updated": "2026-07-22T14:34:23Z"
     }
   ],
-  "status": "in-progress",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-07-22T14:35:55Z"
+  "updated": "2026-07-22T14:36:38Z"
 }
