@@ -1,7 +1,7 @@
 {
   "base_commit": "64565963c310241ff8755a6a48e6c58a23bc497d",
   "branch_name": "refine/00000SZ2AG11JHPZNR941YW00B/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "cb646512f14409092081e104eba08a132db2f0ac",
   "created": "2026-07-22T10:12:31Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal `00000SZ2AG11JHPZNR941YW00B` is ready for review at commit `cb64651`. The worktree is clean.\n\nAfter-action report:\n\n- Changed: Removed Start/Stop controls from the Supervisor conversation, clarified idle messaging, updated tests and intent docs.\n- Why: The Supervisor is continuously observing or idle; users should not manage its lifecycle manually.\n- Verification:\n  - `node --test tests/web_supervisor_toolbar.test.js` — exit `0`, 6 passed.\n  - `node --test tests/*.test.js` — exit `0`, 8 passed.\n  - `./r test unit` — exit `0`, 389 passed.\n  - `cargo fmt --all -- --check` — exit `0`.\n  - `git diff --check` — exit `0`.\n\nElapsed agent time: 6m 8s.",
+      "implementation_reported_at": "2026-07-22T10:26:23Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,10 +32,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:12:31Z"
+      "updated": "2026-07-22T10:26:23Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T10:19:50Z"
+  "updated": "2026-07-22T10:26:23Z"
 }

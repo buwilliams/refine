@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:11:22Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:26:19Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AEZ6VGKY6RCG1YW00A-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"The focused surface-only modal sizing change is responsive, tested, and does not violate any Governance rule.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "The focused surface-only modal sizing change is responsive, tested, and does not violate any Governance rule.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AEZ6VGKY6RCG1YW00A-round-1"
+      },
+      "governance_message": "The focused surface-only modal sizing change is responsive, tested, and does not violate any Governance rule.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2AEZ6VGKY6RCG1YW00A` is ready for review at commit `eeb703bc01dc248cf3ea6dc03cb405bfe2aaf73a`.\n\nAfter-action report:\n\n- Changed the New Goal modal to use 60% of desktop viewport width, with a taller prompt editor and responsive mobile sizing.\n- Added a browser contract test to protect the new layout.\n- Reason: longer prompt templates can now be read and edited without constant scrolling.\n- `node --test tests/*.test.js`: passed, `9/9`.\n- `cargo test --lib --bins -- --test-threads=1`: passed, `389/389`; binary target `0/0`.\n- `cargo fmt --all -- --check`: passed.\n- Static assets: passed, `53` files found.\n- `git diff --check`: passed.\n- Final worktree: clean on the goal branch.\n\nGoal-agent runtime: approximately 5 minutes 16 seconds.",
       "implementation_reported_at": "2026-07-22T10:25:24Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Make the new goal model larger, say 60% of the viewport, so that the prompt textbox can be larger so that the user can read a longer template they are writing without needing to scroll once it is beyond 1-2 sentences.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:26:21Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:25:24Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:26:21Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:25:24Z"
+  "updated": "2026-07-22T10:26:21Z"
 }
