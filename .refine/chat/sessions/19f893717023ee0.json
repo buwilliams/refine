@@ -5,10 +5,20 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T09:45:16Z",
-  "updated_at": "2026-07-22T09:45:16Z",
-  "transcript_events": [],
+  "updated_at": "2026-07-22T09:45:25Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-22T09:45:25Z",
+      "delivered": false,
+      "id": "evt-1784713525316-1",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    }
+  ],
   "importable_artifacts": [],
-  "closed": false,
-  "interrupted": false,
-  "interruption_detail": null
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "stopped"
 }
