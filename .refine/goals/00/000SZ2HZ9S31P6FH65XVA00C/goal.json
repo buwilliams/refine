@@ -55,28 +55,47 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T14:48:00Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T14:54:00Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZ9S31P6FH65XVA00C-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"The committed documentation-only contract complies with all eight governance rules; no violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "The committed documentation-only contract complies with all eight governance rules; no violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZ9S31P6FH65XVA00C-round-2"
+      },
+      "governance_message": "The committed documentation-only contract complies with all eight governance rules; no violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2HZ9S31P6FH65XVA00C` is complete and reviewable at commit `f43026b`.\n\nThe [consistency contract](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZ9S31P6FH65XVA00C-round-2/docs/intent/03-capabilities/03-workflow/11-consistency-contract.md) was reduced from 118 to 48 lines. It retains the seven durable invariants and implementation freedom while removing lifecycle recipes, response states, migration procedures, and six redundant cross-link edits. Only the Workflow overview and Intent navigation were reconciled.\n\nVerification:\n\n- `git diff HEAD^ HEAD --check`: exit 0\n- Intent relative links: 60 checked, 0 broken\n- Required contract concepts: 8/8 present\n- Commit scope: 3 files, all under `docs/intent`\n- Parked candidates `aafdc696` and `c1e9a9a`: not merged\n- Worktree: clean\n- Code tests: not run; documentation-only change",
       "implementation_reported_at": "2026-07-22T14:52:30Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Revise the current Intent candidate into the smallest coherent architecture contract. Preserve only the durable invariants needed to prevent the observed governance and workflow violations: one shared cross-process coordination boundary; narrow authoritative ownership connected by stable identities; evidence durable before the state it proves; stale mutations conflict instead of overwriting newer decisions; acknowledged decisions are crash-repairable; agents retain adaptable judgment while Refine coordinates deterministic integrity; and every surface remains a thin adapter. Remove incident-shaped or implementation-prescriptive guidance such as step-by-step start, success, failure, cancellation, release, request/response, or migration recipes; avoid fixing exact field sets, response states, algorithms, or ordering mechanics where the invariant is enough. Keep the authority relationships only at the granularity necessary to preserve Foundation-Capabilities-Surfaces and target-app, Goal/round, claim, process/operation/capacity, Git, and evidence boundaries. Prefer one compact contract page with only the minimum navigation or overview reconciliation; remove broad cross-link edits that merely repeat the contract. Leave the following implementation Goal freedom to choose serialization, optimistic concurrency, journaling, or another design that satisfies the invariants. Continue to treat aafdc696 and c1e9a9a only as evidence. Documentation only; run proportional link and diff checks.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T14:54:02Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T14:52:30Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T14:54:02Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T14:52:30Z"
+  "updated": "2026-07-22T14:54:02Z"
 }
