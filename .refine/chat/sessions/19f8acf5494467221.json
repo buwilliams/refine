@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:55:11Z",
+  "updated_at": "2026-07-22T17:56:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -540,6 +540,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s first multi-filter test invocation was syntactically invalid (exit 2); the same retry/context regressions pass when run as valid individual filters. Coordination round 8 is auditing all scheduler/reconciler Node checks against the preserved candidate before editing."
+    },
+    {
+      "created_at": "2026-07-22T17:56:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742988180-152",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s focused behavior is correct, but the first full library run exposed six older fixtures that lacked the newly required candidate/failed-round evidence; the agent is updating those fixtures and race tests. Coordination round 8 remains active and unreviewed."
     }
   ],
   "queued_messages": [
