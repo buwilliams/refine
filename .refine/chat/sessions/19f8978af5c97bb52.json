@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:32:28Z",
+  "updated_at": "2026-07-22T15:33:11Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1308,6 +1308,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The shared consistency implementation is still the critical path. I’m resuming at its two remaining full-suite regressions, then I’ll follow the resulting workflow transitions and only resume the parked recovery/Quality Goals after this foundation is actually merged."
+    },
+    {
+      "created_at": "2026-07-22T15:33:11Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784734391635-213",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The implementation cleared its full serial library suite: 421/421 tests passed, plus all-target compilation. The two earlier regressions now pass in isolation; the agent is running the daemon-level restart and multi-instance harnesses from the final code before it submits a candidate."
     }
   ],
   "queued_messages": [
