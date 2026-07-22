@@ -439,6 +439,62 @@ test("polling refreshes supervisor status without replacing the prompt and route
   assert.match(browser.html(), /Queue observation refreshed/);
 });
 
+test("status SSE keeps a long-running Supervisor toolbar current through Goal terminal states", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setAttached();
+  browser.runtime.activate();
+  browser.runtime.draw();
+  const sessionId = "supervisor-long-running";
+  const transitions = [
+    ["in-progress", 1, 0, "observing", "healthy"],
+    ["failed", 0, 1, "idle", "attention"],
+    ["review", 0, 0, "idle", "healthy"],
+    ["done", 0, 0, "idle", "healthy"],
+  ];
+  const responses = transitions.map(([status, active, failed, lifecycle, health], index) => snapshot({
+    lifecycle,
+    health,
+    active_work: active,
+    failed_work: failed,
+    session_id: sessionId,
+    updated_at: `2026-07-22T22:00:0${index}Z`,
+    goal_states: { GOAL1: status },
+    events: transitions.slice(0, index + 1).map(([observedStatus], eventIndex) => ({
+      id: `goal-transition-${eventIndex}`,
+      kind: "observation",
+      status: observedStatus === "failed" ? "error" : "info",
+      message: `Goal GOAL1 entered workflow state ${observedStatus}.`,
+      goal_id: "GOAL1",
+      created_at: `2026-07-22T22:00:0${eventIndex}Z`,
+    })),
+  }));
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath) => {
+    requests.push([method, requestPath]);
+    return { supervisor_agent: responses.shift() };
+  });
+
+  await browser.runtime.load();
+  assert.match(browser.html(), /1 active/);
+  assert.match(browser.html(), /observing/);
+  browser.runtime.initSSE();
+  FakeEventSource.latest.emit("status_change", { status_counts: { "in-progress": 1 } });
+
+  for (const [status, active, failed, lifecycle, health] of transitions.slice(1)) {
+    FakeEventSource.latest.emit("status_change", { status_counts: { [status]: 1 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.match(browser.supervisorStatusHtml(), new RegExp(`${active} active`));
+    assert.match(browser.supervisorStatusHtml(), new RegExp(`${failed} failed`));
+    assert.match(browser.supervisorStatusHtml(), new RegExp(lifecycle));
+    assert.match(browser.supervisorStatusHtml(), new RegExp(`health-${health}`));
+    assert.equal(browser.runtime.supervisorTab().sessionId, sessionId);
+  }
+
+  assert.equal(browser.runtime.systemMessageCount(), 4);
+  assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
+  assert.deepEqual(requests, Array.from({ length: 4 }, () => ["GET", "/api/supervisor-agent"]));
+});
+
 test("polling an unchanged full supervisor event window does not duplicate System entries", async () => {
   const browser = browserRuntime();
   browser.runtime.setAttached();
