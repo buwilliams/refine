@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:26:12Z",
+  "updated_at": "2026-07-22T17:27:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -216,6 +216,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Shared coordination has completed implementation and committed candidate `bfdfc92`; Refine is now advancing it into independent governance/validation. The Quality goal is still resolving a focused retry-path regression. I will not retry the parked recovery goal until the coordination candidate is actually reviewed and merged."
+    },
+    {
+      "created_at": "2026-07-22T17:27:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741258749-91",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s retry-path regression is now green after correcting runtime-root error handling; the agent is auditing removal of legacy command/settings paths before broader verification. Shared coordination remains in independent governance review."
     }
   ],
   "queued_messages": [
