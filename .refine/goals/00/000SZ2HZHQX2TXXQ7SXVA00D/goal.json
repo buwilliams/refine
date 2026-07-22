@@ -255,9 +255,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T16:26:22Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T16:26:53Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve and build on Round 4 candidate 19461ba; do not replace its verified shared-consistency work. Correct only the three governance findings and the adjacent authority edge. First, migrate actual pre-change workflow records whose legacy target_app_id or target_root canonical path proves ownership by the currently attached target root, rewriting that ownership to the stable app ID. If ownership cannot be proven and a legacy record contains any active Claimed or Running claim or unresolved pause decision, do not create empty competing authority or permit automation: preserve the record and return an actionable reconciliation conflict. Add regression evidence for both path-owned migration across runtime roots and ambiguous active legacy state refusing to fork. Second, make retry a launchable supervised workflow commitment. It must not publish Running, acquire lasting capacity, or return success unless a managed worker is actually launched; use the existing scheduler and process substrate, with deterministic recovery across crash or launch failure. Third, exercise cancellation versus late provider settlement and retry through the real daemon, workflow runner, and provider process rather than direct in-process WorkflowEngine or WorkflowContext calls. Prove the retry API causes provider work to resume under a managed process, reaches a terminal state, and releases capacity. Preserve all Round 4 tests and the full-workflow and two-daemon harnesses. Do not expand into Quality, Supervisor, UI, or unrelated cleanup.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T16:26:53Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T16:26:22Z"
+  "updated": "2026-07-22T16:26:53Z"
 }
