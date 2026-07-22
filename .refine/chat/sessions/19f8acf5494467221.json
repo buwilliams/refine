@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:45:38Z",
+  "updated_at": "2026-07-22T18:47:49Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -912,6 +912,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new coordination failure-path test did its job: exact claim authority was retained inside workflow context, but the shared work-item service still rejected publication because its Goal-level check reread Node B. The agent is now composing exact execution authority through that existing service boundary rather than bypassing it. This is an ordinary focused-test failure, not a provider failure or a stranded live run."
+    },
+    {
+      "created_at": "2026-07-22T18:47:49Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784746069571-219",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality now has 22 focused tests green, including current shared-policy resolution, supervised recovery evidence, and cancellation terminating the correlated Git process; clippy also passes. Coordination is extending exact execution authority through the shared work-item service itself so reports and state transitions remain centralized instead of gaining a surface-specific bypass."
     }
   ],
   "queued_messages": [
