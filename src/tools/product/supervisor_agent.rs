@@ -461,22 +461,27 @@ impl FileSupervisorAgentService {
         stall_seconds: i64,
     ) -> RefineResult<ProcessEvidence> {
         let mut evidence = ProcessEvidence::default();
-        for process in
-            FileProcessSupervisor::new(&self.runtime_root).recover_owner(ProcessOwner::Agent)?
-        {
-            let details = process_details(&process);
-            if details.get("kind").and_then(Value::as_str) == Some("workflow")
-                && let Some(goal_id) = details.get("goal_id").and_then(Value::as_str)
+        // Goal workflow providers use the agent-scoped registry, while chat providers use the
+        // port-scoped registry. Both are the shared process-supervisor substrate and both must be
+        // observed or live Goal agents would be misclassified as missing.
+        for process_root in [&self.runtime_root, &self.runtime_root.join("agents")] {
+            for process in
+                FileProcessSupervisor::new(process_root).recover_owner(ProcessOwner::Agent)?
             {
-                evidence.live_goal_ids.insert(goal_id.to_string());
-                if process_is_quiet(&process, now, stall_seconds) {
-                    evidence.quiet_goal_ids.insert(goal_id.to_string());
+                let details = process_details(&process);
+                if details.get("kind").and_then(Value::as_str) == Some("workflow")
+                    && let Some(goal_id) = details.get("goal_id").and_then(Value::as_str)
+                {
+                    evidence.live_goal_ids.insert(goal_id.to_string());
+                    if process_is_quiet(&process, now, stall_seconds) {
+                        evidence.quiet_goal_ids.insert(goal_id.to_string());
+                    }
                 }
-            }
-            if details.get("mode").and_then(Value::as_str) == Some("supervisor")
-                && let Some(session_id) = details.get("session_id").and_then(Value::as_str)
-            {
-                evidence.supervisor_sessions.insert(session_id.to_string());
+                if details.get("mode").and_then(Value::as_str) == Some("supervisor")
+                    && let Some(session_id) = details.get("session_id").and_then(Value::as_str)
+                {
+                    evidence.supervisor_sessions.insert(session_id.to_string());
+                }
             }
         }
         Ok(evidence)
@@ -1079,6 +1084,47 @@ mod tests {
         };
         let goals = collect_goals(&service.refine_dir.join("goals")).unwrap();
         assert!(stalled_goals(&goals, &processes, now, 1).is_empty());
+    }
+
+    #[test]
+    fn workflow_agent_registry_is_part_of_live_process_evidence() {
+        let service = test_service("workflow-agent-registry");
+        let stdout = service
+            .runtime_root
+            .join("agents/processes/workflow.stdout.log");
+        fs::create_dir_all(stdout.parent().unwrap()).unwrap();
+        fs::write(&stdout, "live workflow output\n").unwrap();
+        FileProcessSupervisor::new(service.runtime_root.join("agents"))
+            .register(ManagedProcess {
+                id: "workflow-agent".to_string(),
+                owner: ProcessOwner::Agent,
+                pid: Some(std::process::id()),
+                state: "running".to_string(),
+                label: Some("smoke-ai".to_string()),
+                details: Some(
+                    json!({
+                        "kind": "workflow",
+                        "goal_id": "GOAL1",
+                        "workflow_state": "in-progress"
+                    })
+                    .to_string(),
+                ),
+                stdout_path: Some(stdout.display().to_string()),
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis()
+                    .to_string(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        let evidence = service.process_evidence(Utc::now(), 30).unwrap();
+        assert!(evidence.live_goal_ids.contains("GOAL1"));
+        assert!(!evidence.quiet_goal_ids.contains("GOAL1"));
     }
 
     #[test]
