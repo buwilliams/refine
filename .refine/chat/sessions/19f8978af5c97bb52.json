@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:32:45Z",
+  "updated_at": "2026-07-22T11:34:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -312,6 +312,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The queue remains healthy: the autonomous-recovery Goal has produced candidate `ebfeec18…` and is in governance, while the other five active agents continue emitting fresh repository/test activity. No provider/authentication errors or lost claims are present, so I’m leaving healthy work untouched and reserving intervention for explicit governance or execution failures."
+    },
+    {
+      "created_at": "2026-07-22T11:34:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720099847-42",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The autonomous-recovery candidate also failed governance, with three actionable findings: it encoded recovery judgment as Rust substring heuristics instead of delegating to the supervisor agent; it ignored live workflow claims/capacity; and it could mutate a Goal before required evidence writes, with no end-to-end recovery or write-failure test. I’m preserving its candidate and issuing a second, tightly scoped round that makes recovery agent-first, claim-aware, and evidence-atomic."
     }
   ],
   "queue_dispatching": true,
