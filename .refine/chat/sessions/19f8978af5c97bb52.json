@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:45:15Z",
+  "updated_at": "2026-07-22T16:53:12Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1512,6 +1512,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Round 5 daemon harness now proves the full lifecycle: a real managed provider starts, cancellation wins despite a trapped late success, retry writes evidence and rolls the interrupted Goal back through the shared recovery capability, the scheduler launches a new managed provider, the new claim reaches Completed, and capacity drains. Final serial and production-shaped gates are running now."
+    },
+    {
+      "created_at": "2026-07-22T16:53:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784739192311-249",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 5 committed as `4da89bd` with only four corrective files. Final evidence is green: 427/427 serial library tests, all-target compilation, the full real workflow daemon test, and the expanded two-daemon provider-race/retry test. Independent governance is now reviewing the complete candidate stack before any merge."
     }
   ],
   "queued_messages": [
