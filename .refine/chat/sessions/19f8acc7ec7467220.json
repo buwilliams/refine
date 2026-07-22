@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:08:05Z",
-  "updated_at": "2026-07-22T17:11:02Z",
+  "updated_at": "2026-07-22T17:11:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:08:05Z",
@@ -204,19 +204,31 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "stderr: 2026-07-22T17:11:02.253927Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5"
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8acedb05467223",
-      "text": "The scrollbar for the Supervisor tab in the toolbar for the web surface is on the wrong element; it should be on the .chat-output-box. Create a refine goal for this.",
-      "created_at": "2026-07-22T17:10:40Z",
-      "updated_at": "2026-07-22T17:10:40Z"
+      "created_at": "2026-07-22T17:11:10Z",
+      "delivered": false,
+      "id": "evt-1784740270733-41",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    },
+    {
+      "created_at": "2026-07-22T17:11:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "process_supervisor"
+      },
+      "id": "evt-1784740270736-43",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Managed provider process exited after cancellation."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
-  "closed": false,
-  "interrupted": false,
-  "interruption_detail": null
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "stopped"
 }
