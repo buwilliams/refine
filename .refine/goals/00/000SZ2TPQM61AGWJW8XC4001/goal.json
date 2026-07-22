@@ -1,0 +1,41 @@
+{
+  "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
+  "branch_name": "refine/00000SZ2TPQM61AGWJW8XC4001/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T19:39:05Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2TPQM61AGWJW8XC4001",
+  "name": "Implement Quality as an agent evaluation for every Goal candidate, parallel in c",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T19:39:05Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement Quality as an agent evaluation for every Goal candidate, parallel in concept to post-implementation governance but with separate plain-text tests. The agent determines how to run each test with pass/fail.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T19:39:05Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T19:39:06Z"
+}
