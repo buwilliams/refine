@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:30:59Z",
+  "updated_at": "2026-07-22T17:31:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -264,6 +264,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Refine accepted the new round but correctly refused `goal start` because the Goal is still `failed`; no worktree or merge was touched. I’m locating the existing failed-Goal recovery transition rather than bypassing the workflow state machine or editing durable JSON directly."
+    },
+    {
+      "created_at": "2026-07-22T17:31:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741473734-101",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The new coordination round is now running in a fresh isolated round-7 worktree via Refine’s shared “last workflow state” recovery path; no durable JSON was edited directly. Current state is two active, zero queued, one parked failure, and one held review."
     }
   ],
   "queued_messages": [
