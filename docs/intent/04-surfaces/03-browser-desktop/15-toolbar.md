@@ -17,8 +17,8 @@ It should reduce context switching without turning every tool into a full page. 
 
 The toolbar should provide persistent assistance for work in progress:
 
-- Supervisor shows durable workflow health and supports conversational steering;
-- System shows local notices and operation events;
+- Supervisor shows durable workflow health and supports conversational steering without an event stream cluttering the conversation;
+- System shows local notices, operation events, and supervisor observations and recoveries;
 - Files lets users inspect project files and search source;
 - Terminal exposes controlled shell access;
 - Standalone supports broad agent conversation and worktree-backed experiments;

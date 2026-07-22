@@ -867,7 +867,6 @@ function syncToolbarTabActivityIndicators() {
 
 function renderSupervisorPanel(active, chatOptions) {
   const state = supervisorAgentState.snapshot;
-  const events = Array.isArray(state?.events) ? state.events.slice(-80).reverse() : [];
   const health = String(state?.health || (supervisorAgentState.error ? "unavailable" : "unknown"));
   const lifecycle = String(state?.lifecycle || (supervisorAgentState.loading ? "loading" : "unknown"));
   return `
@@ -887,29 +886,9 @@ function renderSupervisorPanel(active, chatOptions) {
         <div class="supervisor-agent-error" data-testid="supervisor-agent-error">
           ${htmlEscape(supervisorAgentState.error)}
         </div>` : ""}
-      <div class="supervisor-agent-events" role="log" aria-live="polite"
-           aria-label="Supervisor observations and recoveries" data-testid="supervisor-agent-events">
-        ${events.length ? events.map(renderSupervisorAgentEvent).join("") : `
-          <div class="muted small supervisor-agent-empty" data-testid="supervisor-agent-empty">
-            The supervisor agent is idle. It remains available for prompts and will observe queued workflow work.
-          </div>`}
-      </div>
     </section>
     <div class="supervisor-agent-conversation" data-testid="supervisor-agent-conversation">
       ${renderChatPanel(active, chatOptions)}
-    </div>`;
-}
-
-function renderSupervisorAgentEvent(event) {
-  const status = String(event?.status || "info");
-  return `
-    <div class="supervisor-agent-event supervisor-agent-event-${htmlEscape(status)}"
-         data-testid="supervisor-agent-event" data-supervisor-event-kind="${htmlEscape(event?.kind || "observation")}">
-      <time title="${htmlEscape(event?.created_at || "")}">${htmlEscape(formatSystemLogTime(event?.created_at))}</time>
-      <span class="supervisor-agent-event-kind">${htmlEscape(systemLogStatusLabel(event?.kind || "observation"))}</span>
-      <span>${htmlEscape(event?.message || "")}</span>
-      ${event?.goal_id ? `<a href="#/goals/${encodeURIComponent(event.goal_id)}">${htmlEscape(event.goal_id)}</a>` : ""}
-      ${event?.retryable ? `<span class="supervisor-agent-retryable">Retry available</span>` : ""}
     </div>`;
 }
 
@@ -927,6 +906,7 @@ async function loadSupervisorAgentState() {
     const response = await api("GET", "/api/supervisor-agent");
     const snapshot = response?.supervisor_agent || null;
     supervisorAgentState.snapshot = snapshot;
+    recordSupervisorAgentEvents(snapshot?.events);
     supervisorAgentState.error = "";
     ensureSupervisorTab();
     const tab = chatState.tabs[SUPERVISOR_TAB_ID];
@@ -944,7 +924,30 @@ async function loadSupervisorAgentState() {
   } finally {
     supervisorAgentState.loading = false;
   }
-  if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) drawToolbar();
+  if (
+    chatState.open
+    && (chatState.activeTabId === SUPERVISOR_TAB_ID || chatState.activeTabId === SYSTEM_TAB_ID)
+  ) drawToolbar();
+}
+
+function recordSupervisorAgentEvents(events) {
+  if (!Array.isArray(events)) return;
+  for (const event of events.slice(-80)) {
+    const details = {
+      event_kind: event?.kind || "observation",
+      event_id: event?.id || undefined,
+      goal_id: event?.goal_id || undefined,
+      actionable: event?.actionable || undefined,
+      retryable: event?.retryable || undefined,
+    };
+    recordSystemOperation({
+      message: event?.message,
+      status: event?.status,
+      category: "supervisor",
+      timestamp: event?.created_at,
+      details,
+    }, false);
+  }
 }
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
@@ -1235,7 +1238,7 @@ function bindGoalLogPanel(root, tab) {
   });
 }
 
-function recordSystemOperation(payload) {
+function recordSystemOperation(payload, redraw = true) {
   const item = {
     message: String(payload?.message || "").trim(),
     status: normalizeSystemLogStatus(payload?.status),
@@ -1249,7 +1252,7 @@ function recordSystemOperation(payload) {
   if (systemOperationState.messages.length > SYSTEM_OPERATION_LOG_LIMIT) {
     systemOperationState.messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
   }
-  if (chatState.tabs[SYSTEM_TAB_ID] && chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
+  if (redraw && chatState.tabs[SYSTEM_TAB_ID] && chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
     drawToolbar();
   }
 }

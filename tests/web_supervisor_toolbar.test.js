@@ -138,6 +138,11 @@ function browserRuntime(storage = new Map()) {
         chatState.activeTabId = SUPERVISOR_TAB_ID;
         chatState.open = true;
       },
+      activateSystem() {
+        ensureStandaloneTab();
+        chatState.activeTabId = SYSTEM_TAB_ID;
+        chatState.open = true;
+      },
       draw: drawToolbar,
       emitChat: handleChatSseEvent,
       initSSE,
@@ -147,6 +152,7 @@ function browserRuntime(storage = new Map()) {
       send: sendChatText,
       stop: toggleActiveChat,
       supervisorTab() { return chatState.tabs[SUPERVISOR_TAB_ID]; },
+      systemMessageCount() { return systemOperationState.messages.length; },
       tabIds() { return Object.keys(chatState.tabs); },
       setApi(nextApi) { api = nextApi; },
       setAttached(attached = true) { state.project = { attached }; },
@@ -185,7 +191,7 @@ function queuedMessage(id, text) {
   };
 }
 
-test("Supervisor stays discoverable and prompt-ready while idle", () => {
+test("Supervisor stays discoverable and prompt-ready while idle without an event stream", () => {
   const browser = browserRuntime();
   browser.runtime.activate();
   browser.runtime.draw();
@@ -193,7 +199,7 @@ test("Supervisor stays discoverable and prompt-ready while idle", () => {
   assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
   assert.match(browser.html(), /data-testid="toolbar-tab-supervisor"/);
   assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
-  assert.match(browser.html(), /The supervisor agent is idle/);
+  assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
   assert.match(browser.html(), /Type to queue a message and start the session/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
 });
@@ -229,29 +235,33 @@ test("navigation reinitialization restores the singleton session and transcript"
   assert.equal(restored.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
 });
 
-test("polling and SSE reconnect refresh health, events, and conversation without a duplicate session", async () => {
+test("polling and SSE reconnect route deduplicated supervisor events to System", async () => {
   const browser = browserRuntime();
   browser.runtime.setAttached();
   browser.runtime.setRoute("dashboard");
   browser.runtime.activate();
+  const delayedEvent = {
+    id: "supervisor-delayed",
+    kind: "observation",
+    status: "running",
+    message: "Worker heartbeat delayed",
+    goal_id: "00000000000000000000000001",
+    created_at: "2026-07-21T22:00:01Z",
+  };
   const responses = [
     snapshot({
       lifecycle: "supervising",
       health: "degraded",
       active_work: 1,
       session_id: "supervisor-shared",
-      events: [{
-        kind: "observation",
-        status: "running",
-        message: "Worker heartbeat delayed",
-        created_at: "2026-07-21T22:00:01Z",
-      }],
+      events: [delayedEvent],
     }),
     snapshot({
       lifecycle: "idle",
       health: "healthy",
       session_id: "supervisor-shared",
-      events: [{
+      events: [delayedEvent, {
+        id: "supervisor-recovered",
         kind: "recovery",
         status: "completed",
         message: "Worker heartbeat recovered",
@@ -269,8 +279,17 @@ test("polling and SSE reconnect refresh health, events, and conversation without
   browser.runtime.draw();
   assert.match(browser.html(), /supervisor-agent-health-degraded/);
   assert.match(browser.html(), /supervising/);
-  assert.match(browser.html(), /Worker heartbeat delayed/);
+  assert.doesNotMatch(browser.html(), /Worker heartbeat delayed/);
+  assert.equal(browser.runtime.systemMessageCount(), 1);
 
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
+  assert.match(browser.html(), /data-testid="toolbar-system-panel"/);
+  assert.match(browser.html(), /Worker heartbeat delayed/);
+  assert.match(browser.html(), /supervisor/);
+  assert.match(browser.html(), /00000000000000000000000001/);
+
+  browser.runtime.activate();
   browser.runtime.initSSE();
   assert.equal(FakeEventSource.latest.url, "/api/sse");
   FakeEventSource.latest.emit("chat_event", {
@@ -287,8 +306,14 @@ test("polling and SSE reconnect refresh health, events, and conversation without
   assert.match(browser.html(), /Conversation refreshed after reconnect/);
 
   await browser.runtime.load();
+  browser.runtime.activate();
   browser.runtime.draw();
   assert.match(browser.html(), /supervisor-agent-health-healthy/);
+  assert.doesNotMatch(browser.html(), /Worker heartbeat recovered/);
+  assert.equal(browser.runtime.systemMessageCount(), 2);
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
+  assert.match(browser.html(), /Worker heartbeat delayed/);
   assert.match(browser.html(), /Worker heartbeat recovered/);
   assert.equal(browser.runtime.supervisorTab().sessionId, "supervisor-shared");
   assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
@@ -368,11 +393,18 @@ test("initial prompts and active-work follow-ups share chat APIs and render ever
   );
   assert.match(browser.html(), /Queued messages/);
   assert.match(browser.html(), /Agent working in session supervisor-shared/);
+  assert.doesNotMatch(browser.html(), /Provider authentication required/);
+
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
   for (const status of ["queued", "running", "completed", "failed", "blocked"]) {
-    assert.match(browser.html(), new RegExp(`supervisor-agent-event-${status}`));
+    assert.match(browser.html(), new RegExp(`data-system-log-status="${status}"`));
   }
   assert.match(browser.html(), /Provider authentication required/);
-  assert.match(browser.html(), /Retry available/);
+  assert.match(browser.html(), /retryable/);
+
+  browser.runtime.activate();
+  browser.runtime.draw();
 
   browser.runtime.emitChat({
     session_id: "supervisor-shared",

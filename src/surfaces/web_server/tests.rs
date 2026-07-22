@@ -751,10 +751,12 @@ fn static_toolbar_keeps_supervisor_agent_visible_and_uses_shared_chat() {
     assert!(toolbar.contains(r#"api("GET", "/api/supervisor-agent")"#));
     assert!(toolbar.contains(r#"api("POST", "/api/supervisor-agent/session"#));
     assert!(toolbar.contains("renderChatPanel(active, chatOptions)"));
-    assert!(toolbar.contains(r#"data-testid="supervisor-agent-events""#));
+    assert!(toolbar.contains("recordSupervisorAgentEvents(snapshot?.events)"));
+    assert!(toolbar.contains(r#"category: "supervisor""#));
+    assert!(!toolbar.contains(r#"data-testid="supervisor-agent-events""#));
     assert!(toolbar.contains(r#"data-testid="supervisor-agent-conversation""#));
     assert!(toolbar_css.contains(".supervisor-agent-summary"));
-    assert!(toolbar_css.contains(".supervisor-agent-events"));
+    assert!(!toolbar_css.contains(".supervisor-agent-events"));
 }
 
 #[test]
