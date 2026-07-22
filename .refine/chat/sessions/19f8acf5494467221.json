@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:47:49Z",
+  "updated_at": "2026-07-22T18:50:01Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -924,6 +924,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality now has 22 focused tests green, including current shared-policy resolution, supervised recovery evidence, and cancellation terminating the correlated Git process; clippy also passes. Coordination is extending exact execution authority through the shared work-item service itself so reports and state transitions remain centralized instead of gaining a surface-specific bypass."
+    },
+    {
+      "created_at": "2026-07-22T18:50:01Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784746201065-221",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s new real-daemon failure path passes: two A-owned providers start, the runtime switches to B, one finishes and one is terminated through the supervised registry, and both settle without a Running claim or capacity lease. Quality’s serial library, full workflow, and web suites are green again; its final independent audit is still running."
     }
   ],
   "queued_messages": [
