@@ -181,9 +181,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:09:55Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:10:43Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 5fe8b0dee3735789a0fb65890215cadec4cd820b and remediate the three remaining governance findings. Introduce one shared workflow-state transaction/lock primitive used by every WorkflowClaim and capacity read-modify-write path—runner promote/start/complete/cancel and Supervisor recovery—so recovery atomically validates liveness, ownership, claim state, capacity, retry marker, and failed-to-todo transition against the same current state; do not add another supervisor-only lock. Validate Goal and claim Node ownership before interrupting a claim, terminating a process, or releasing capacity, and leave remote-owned state untouched with an explicit escalation. Build the recovery dossier fingerprint from canonical full Goal/round failure content plus claim, managed process/runtime, repository/worktree/ref, durable operations, and relevant activity evidence (no truncation); include the requested decision/action in the idempotency identity or reject a different decision for an already-recorded dossier so escalation evidence can never suppress a later mutation record or permit an unrecorded Todo transition. Make transcript/activity/round/state writes restart-safe under that transaction and add concurrency tests racing workflow start/complete with recovery, remote-ownership no-side-effect tests, full-dossier change sensitivity, escalation-then-recover conflict tests, and crash/retry evidence consistency tests.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:10:43Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:09:55Z"
+  "updated": "2026-07-22T12:10:43Z"
 }
