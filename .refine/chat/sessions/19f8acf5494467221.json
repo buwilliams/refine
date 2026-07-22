@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:47:30Z",
+  "updated_at": "2026-07-22T17:48:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -444,6 +444,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s corrected ownerless-terminal fixture passes and the full serial gate is still running. Quality has located existing Git cleanliness helpers and is wiring candidate/head/dirty checks into the shared Quality service rather than adding surface-specific logic."
+    },
+    {
+      "created_at": "2026-07-22T17:48:25Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742505007-133",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s 434-test serial gate is green and both production harnesses have completed; the agent is doing final scoped review before commit. Quality is updating the shared claim/context schema so retry timing is preserved durably."
     }
   ],
   "queued_messages": [
