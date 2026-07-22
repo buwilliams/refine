@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2C8SVXH5MGTX1XVA001/round-3",
-  "candidate_commit": "2d56ca2655c64682e10024f0d057fe2e6c50fe7c",
+  "branch_name": "refine/00000SZ2C8SVXH5MGTX1XVA001/round-4",
+  "candidate_commit": null,
   "created": "2026-07-22T11:14:32Z",
   "feature_id": null,
   "feature_order": null,
@@ -266,9 +266,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:44:03Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:45:04Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 2d56ca2655c64682e10024f0d057fe2e6c50fe7c and fix the three independent governance violations from Round 3. (1) Cancellation with a live managed process must release the exact claim's capacity lease even when the claim is already marked Cancelled before the worker exits; terminal worker updates may be rejected, but cleanup must be idempotent and unconditional so the long-lived workflow-runner PID cannot keep a ghost lease. Add a live-process cancellation regression proving capacity is immediately reusable without retry or runner restart. (2) Make recovery decisions durable across Supervisor session replacement with one authoritative recovery journal keyed by dossier fingerprint/decision, written transactionally before or with transcript/activity/state projections. recorded_recovery_decision must consult this journal, including after the originating session closes, and conflicting decisions must remain rejected after injected activity/state failures and daemon/session replacement. Do not treat transcript as the sole authority. (3) Make dossier submission optimistic-concurrency safe across all authoritative evidence it fingerprints: Goal and round, activity, relevant operations/process records, repository state, and any decision state must carry/recompute a version or canonical fingerprint inside the same locked decision transaction. Before side effects, rebuild the full dossier under the shared workflow-state transaction and reject/retry if it differs; never record a fingerprint for stale evidence. Add deterministic cross-surface race tests that append activity or mutate Goal/operation/repository evidence between dossier creation and submission and prove stale recovery is refused with no partial side effects. Retain single shared workflow-state locking, remote ownership checks, agent-first decision reasoning, and all prior recovery behavior. Run focused concurrency/failure/restart tests, all targets, fmt, clippy, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:45:04Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:44:03Z"
+  "updated": "2026-07-22T12:45:05Z"
 }
