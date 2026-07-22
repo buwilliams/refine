@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:20:33Z",
+  "updated_at": "2026-07-22T11:21:47Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -544,6 +544,14 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first important gap is now clear: the UI looks queue-capable, but its `sending` lock still rejects Enter presses while the previous enqueue request is in flight. I’m going to replace that with a per-tab drain worker so submission is always accepted locally, ordered, removable until backend acceptance, and dispatched through the existing server queue unchanged."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f898f71ba97bb57",
+      "text": "Treat the Supervisor conversation as the end-to-end workflow control plane, not only a chat UI. When user intent is sufficient, infer and create the appropriate Feature and Goals directly. Continuously monitor workflow health across Goals, agents, processes, Git, Quality, Governance, queues, and stalls; resolve routine issues autonomously, including recovery Rounds for failed Goals. Auto-approve reviewed Goals when deterministic evidence and configured Quality and Governance establish readiness without product judgment. Ask only for ambiguity, product decisions, policy exceptions, new authority, or destructive action. Keep every action auditable and idempotent, with retry-loop limits.",
+      "created_at": "2026-07-22T11:21:47Z",
+      "updated_at": "2026-07-22T11:21:47Z"
     }
   ],
   "queue_dispatching": true,
