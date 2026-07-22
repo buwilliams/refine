@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T20:16:37Z",
+  "updated_at": "2026-07-22T20:17:42Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -1878,9 +1878,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The durable snapshot confirms there is no live worker or queued work. I’m now checking the failed goal itself and daemon/workflow status; a retry is a state-changing action and will remain withheld unless the failure evidence makes it an unambiguous, authorized continuation."
+    },
+    {
+      "created_at": "2026-07-22T20:17:41Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784751461918-58",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Queue is idle and supervision is complete:\n\n- 0 active, 0 queued, 1 failed; no live Goal worker.\n- Failed Goal `00000SZ2TPQM61AGWJW8XC4001` has eight substantive governance violations. Retrying unchanged would not address them, so I did not retry or approve it.\n- Its candidate worktree is clean at `b04ac0c9`; primary `main` is clean and matches `origin/main`.\n- Codex provider diagnostics currently pass. Earlier argument-size and input-length provider failures remain visible in the audit history.\n- The two latest lock-file synchronization failures lack an explicit recovery event. Current live and projected copies of the failed Goal are nevertheless identical.\n- No merges, worktree removal, state mutation, or destructive recovery was performed.\n\nContinuing the failed Goal requires a substantive remediation round; remaining idle requires no user decision."
+    },
+    {
+      "created_at": "2026-07-22T20:17:42Z",
+      "delivered": false,
+      "id": "evt-1784751462061-60",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Queue is idle and supervision is complete:\n\n- 0 active, 0 queued, 1 failed; no live Goal worker.\n- Failed Goal `00000SZ2TPQM61AGWJW8XC4001` has eight substantive governance violations. Retrying unchanged would not address them, so I did not retry or approve it.\n- Its candidate worktree is clean at `b04ac0c9`; primary `main` is clean and matches `origin/main`.\n- Codex provider diagnostics currently pass. Earlier argument-size and input-length provider failures remain visible in the audit history.\n- The two latest lock-file synchronization failures lack an explicit recovery event. Current live and projected copies of the failed Goal are nevertheless identical.\n- No merges, worktree removal, state mutation, or destructive recovery was performed.\n\nContinuing the failed Goal requires a substantive remediation round; remaining idle requires no user decision."
+    },
+    {
+      "created_at": "2026-07-22T20:17:42Z",
+      "delivered": false,
+      "id": "evt-1784751462061-61",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
