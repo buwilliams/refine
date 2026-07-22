@@ -513,28 +513,76 @@
     },
     {
       "assignee": "Codex",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T17:54:16Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T18:38:45Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-8",
+        "failed_actions": [
+          {
+            "message": "Node activation can change a daemon from Node A to Node B while an A-owned execution is running. Subsequent evidence publication and claim settlement re-check the mutable active node and reject the original worker, while recovery filters out A claims and still treats the live runner plus retained capacity lease as their owner. The Goal, Running claim, and capacity can therefore remain stranded until manual node reactivation or daemon shutdown.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The activation unit test only proves lock serialization, and the distinct-node daemon test activates each node before starting work. Neither switches a daemon's active node during a live provider execution, so the resulting publication, settlement, and recovery failure path is unverified.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Found a live-execution ownership transition defect and missing failure-path evidence.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Node activation can change a daemon from Node A to Node B while an A-owned execution is running. Subsequent evidence publication and claim settlement re-check the mutable active node and reject the original worker, while recovery filters out A claims and still treats the live runner plus retained capacity lease as their owner. The Goal, Running claim, and capacity can therefore remain stranded until manual node reactivation or daemon shutdown.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The activation unit test only proves lock serialization, and the distinct-node daemon test activates each node before starting work. Neither switches a daemon's active node during a live provider execution, so the resulting publication, settlement, and recovery failure path is unverified.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Found a live-execution ownership transition defect and missing failure-path evidence.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Node activation can change a daemon from Node A to Node B while an A-owned execution is running. Subsequent evidence publication and claim settlement re-check the mutable active node and reject the original worker, while recovery filters out A claims and still treats the live runner plus retained capacity lease as their owner. The Goal, Running claim, and capacity can therefore remain stranded until manual node reactivation or daemon shutdown.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The activation unit test only proves lock serialization, and the distinct-node daemon test activates each node before starting work. Neither switches a daemon's active node during a live provider execution, so the resulting publication, settlement, and recovery failure path is unverified.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-8"
+      },
+      "governance_message": "Found a live-execution ownership transition defect and missing failure-path evidence.",
+      "governance_rule_actions": [
+        {
+          "message": "Node activation can change a daemon from Node A to Node B while an A-owned execution is running. Subsequent evidence publication and claim settlement re-check the mutable active node and reject the original worker, while recovery filters out A claims and still treats the live runner plus retained capacity lease as their owner. The Goal, Running claim, and capacity can therefore remain stranded until manual node reactivation or daemon shutdown.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The activation unit test only proves lock serialization, and the distinct-node daemon test activates each node before starting work. Neither switches a daemon's active node during a live provider execution, so the resulting publication, settlement, and recovery failure path is unverified.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Completed Goal `00000SZ2HZHQX2TXXQ7SXVA00D` and committed the clean, reviewable candidate as `ca98963a` (`Enforce active-node workflow ownership`).\n\nChanges:\n\n- Restricted scheduling, start, recovery, retry, cancellation, settlement, interruption, and capacity release to the runtime’s active Node.\n- Serialized active-Node changes with workflow decisions.\n- Protected workflow logs, reports, candidate metadata, and governance/quality evidence with the same ownership boundary.\n- Preserved foreign live and ownerless claims.\n- Added actionable conflicts when transferred Goals retain foreign claims.\n- Added distinct-Node real-daemon/provider coverage.\n\nVerification:\n\n- Focused ownership test: 1 passed.\n- Focused cancellation tests: 2 passed.\n- Distinct-Node daemon test: 1 passed.\n- Serial library suite: 435 passed, 0 failed.\n- Full-workflow harness: 1 passed, 0 failed.\n- Multi-instance harness: 2 passed, 0 failed.\n- `cargo fmt --all -- --check`: passed.\n- `cargo check --all-targets`: passed.\n- `git diff --check`: passed.\n- Independent governance review: passed.\n- Final worktree: clean.\n\nGoal usage: 546,219 tokens over approximately 40 minutes 41 seconds.",
       "implementation_reported_at": "2026-07-22T18:35:17Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate ec0d33687de3c1919464a404a6829e803e671646 and fix the remaining Round 7 off-node ownership violation without weakening the shared coordination model. Restrict scheduling, start, recovery reconciliation, interruption repair, retry commitment handling, and any failure settlement so a daemon mutates only claims owned by its active Node unless an explicit reviewed transfer/recovery protocol authorizes otherwise. Node B must never select Node A's Claimed record, turn it Failed after start_claim rejects ownership, release its capacity, or rewrite its recovery evidence. Add a daemon-backed production-path test with two distinct active Nodes sharing synchronized workflow state: prove each Node schedules/reconciles only its own claims, preserves the other Node's live and ownerless claims, and requires explicit ownership transfer/review before cross-Node recovery. Retain the existing same-Node owner-loss, crash repair, concurrent semantic-conflict, capacity-release, and migration behavior. Run focused distinct-Node tests, serial library, full workflow, multi-instance sync, fmt, all-target checks, diff checks, and independent governance.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Codex",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T18:35:17Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T18:38:45Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T18:35:17Z"
+  "updated": "2026-07-22T18:38:45Z"
 }
