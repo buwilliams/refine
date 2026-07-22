@@ -14,28 +14,121 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:21:22Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T11:41:24Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-1",
+        "failed_actions": [
+          {
+            "message": "POST /api/quality/checks accepts a goal_id but always evaluates current_target_root, while workflow QA evaluates ctx.require_agent_cwd() in the isolated candidate worktree. The API and workflow therefore apply different Quality semantics to the same Goal.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Legacy target_app_test_command(s) settings are ignored or removed without migration into QualitySettings.tests or an explicit transition plan. An existing project with configured test commands consequently loads an empty test list and silently changes to successful no-op QA.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "QualityOperationRunner registers a running operation and then propagates provider errors with ?, leaving the operation permanently marked running until later recovery. Operation cancellation only changes the registry record, is not connected to the supervised agent process, and can be overwritten by finish when that process completes.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "parse_quality_output trusts the top-level ok value without validating result count, ordering, test identity, per-test status, or evidence. Responses such as {\"ok\":true,\"results\":[]} or an ok=true response containing failed test results pass QA and advance workflow without the required per-test evidence.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          },
+          {
+            "message": "Affected documentation remains contradictory: docs/intent/04-surfaces/03-browser-desktop/14-target-app.md still requires target-app test command configuration, and docs/spec/rust-integration-feature-index.md still lists the removed target-app test-command control, warning banner, and Application test command.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Governance review found five committed violations.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"POST /api/quality/checks accepts a goal_id but always evaluates current_target_root, while workflow QA evaluates ctx.require_agent_cwd() in the isolated candidate worktree. The API and workflow therefore apply different Quality semantics to the same Goal.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"Legacy target_app_test_command(s) settings are ignored or removed without migration into QualitySettings.tests or an explicit transition plan. An existing project with configured test commands consequently loads an empty test list and silently changes to successful no-op QA.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"QualityOperationRunner registers a running operation and then propagates provider errors with ?, leaving the operation permanently marked running until later recovery. Operation cancellation only changes the registry record, is not connected to the supervised agent process, and can be overwritten by finish when that process completes.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"parse_quality_output trusts the top-level ok value without validating result count, ordering, test identity, per-test status, or evidence. Responses such as {\\\"ok\\\":true,\\\"results\\\":[]} or an ok=true response containing failed test results pass QA and advance workflow without the required per-test evidence.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Affected documentation remains contradictory: docs/intent/04-surfaces/03-browser-desktop/14-target-app.md still requires target-app test command configuration, and docs/spec/rust-integration-feature-index.md still lists the removed target-app test-command control, warning banner, and Application test command.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Governance review found five committed violations.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "POST /api/quality/checks accepts a goal_id but always evaluates current_target_root, while workflow QA evaluates ctx.require_agent_cwd() in the isolated candidate worktree. The API and workflow therefore apply different Quality semantics to the same Goal.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Legacy target_app_test_command(s) settings are ignored or removed without migration into QualitySettings.tests or an explicit transition plan. An existing project with configured test commands consequently loads an empty test list and silently changes to successful no-op QA.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "QualityOperationRunner registers a running operation and then propagates provider errors with ?, leaving the operation permanently marked running until later recovery. Operation cancellation only changes the registry record, is not connected to the supervised agent process, and can be overwritten by finish when that process completes.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "parse_quality_output trusts the top-level ok value without validating result count, ordering, test identity, per-test status, or evidence. Responses such as {\"ok\":true,\"results\":[]} or an ok=true response containing failed test results pass QA and advance workflow without the required per-test evidence.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            },
+            {
+              "message": "Affected documentation remains contradictory: docs/intent/04-surfaces/03-browser-desktop/14-target-app.md still requires target-app test command configuration, and docs/spec/rust-integration-feature-index.md still lists the removed target-app test-command control, warning banner, and Application test command.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-1"
+      },
+      "governance_message": "Governance review found five committed violations.",
+      "governance_rule_actions": [
+        {
+          "message": "POST /api/quality/checks accepts a goal_id but always evaluates current_target_root, while workflow QA evaluates ctx.require_agent_cwd() in the isolated candidate worktree. The API and workflow therefore apply different Quality semantics to the same Goal.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Legacy target_app_test_command(s) settings are ignored or removed without migration into QualitySettings.tests or an explicit transition plan. An existing project with configured test commands consequently loads an empty test list and silently changes to successful no-op QA.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "QualityOperationRunner registers a running operation and then propagates provider errors with ?, leaving the operation permanently marked running until later recovery. Operation cancellation only changes the registry record, is not connected to the supervised agent process, and can be overwritten by finish when that process completes.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "parse_quality_output trusts the top-level ok value without validating result count, ordering, test identity, per-test status, or evidence. Responses such as {\"ok\":true,\"results\":[]} or an ok=true response containing failed test results pass QA and advance workflow without the required per-test evidence.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        },
+        {
+          "message": "Affected documentation remains contradictory: docs/intent/04-surfaces/03-browser-desktop/14-target-app.md still requires target-app test command configuration, and docs/spec/rust-integration-feature-index.md still lists the removed target-app test-command control, warning banner, and Application test command.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Verification outcomes:\n\n- `cargo test --lib` — 397 passed, 0 failed.\n- `cargo test --test full_workflow -- --ignored` — 1 passed.\n- Targeted Quality tests — 8 passed.\n- Target-app tests — 13 passed.\n- Workflow tests — 28 passed.\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- `cargo clippy --all-targets -- -D warnings` — passed.\n- JavaScript syntax and `git diff --check` — passed.\n\nImplemented a centralized project Quality specification containing business requirements, instructions, ordered plain-language tests, and `quality_timing`. Quality is always active; empty tests produce a successful no-op.\n\nWorkflow and manual API checks now share the agent-backed Quality runner. Pre-merge and post-build timing drive real workflow transitions. Command overrides, `quality_enabled`, target-app test commands/timeouts, their UI, generated configuration, and target-app execution paths were removed. Legacy stored fields deserialize or are ignored safely without restoring obsolete behavior.\n\nUpdated Quality, QA, target-app intent, Rust specifications, guides, fixtures, and regression coverage. The worktree is scoped and reviewable.",
       "implementation_reported_at": "2026-07-22T11:37:21Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Replace command-driven Quality configuration with a shared project Quality specification: business requirements, instructions, an ordered list of plain-language tests, and quality_timing. Quality is always active and an empty test list is a successful no-op. Remove quality_enabled and target-app test command configuration and their UI, API, and workflow dependencies while handling stored legacy fields safely. Keep one centralized model for every surface and update the Quality and QA intent documentation.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T11:37:21Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T11:41:24Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:37:21Z"
+  "updated": "2026-07-22T11:41:24Z"
 }
