@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:08:05Z",
-  "updated_at": "2026-07-22T17:10:11Z",
+  "updated_at": "2026-07-22T17:10:26Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:08:05Z",
@@ -156,6 +156,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The goal has moved from queued to `in-progress` under a new supervised execution. Refine also completed its own `refine/state` reconciliation without an authentication error (`Everything up-to-date`). The previous round-6 edits remain in the same isolated worktree; I’m leaving them under Refine’s ownership and monitoring for the provider process and evaluation result."
+    },
+    {
+      "created_at": "2026-07-22T17:10:26Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740226795-30",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "stderr: 2026-07-22T17:10:26.795373Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5"
     }
   ],
   "queued_messages": [
