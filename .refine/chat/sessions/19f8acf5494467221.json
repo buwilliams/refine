@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:31:13Z",
+  "updated_at": "2026-07-22T17:32:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -276,6 +276,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new coordination round is now running in a fresh isolated round-7 worktree via Refine’s shared “last workflow state” recovery path; no durable JSON was edited directly. Current state is two active, zero queued, one parked failure, and one held review."
+    },
+    {
+      "created_at": "2026-07-22T17:32:25Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741545887-103",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s full test run is green and it is doing a final quiet confirmation. Coordination round 7 is actively implementing the exact owner/provider and concurrent-push gaps from governance. State remains two active, zero queued, with the dependent recovery failure still deliberately parked."
     }
   ],
   "queued_messages": [
