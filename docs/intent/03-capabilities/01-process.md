@@ -5,6 +5,7 @@
 - **Supervisor Ownership**: the system should know which processes it owns and why they exist.
 - **Observable Execution**: long-running work should produce inspectable status, logs, and controls.
 - **Recoverability**: process state should survive daemon restarts well enough to explain current reality.
+- **Execution Truth, Not Workflow Verdict**: process and operation records describe what ran; Workflow decides what that evidence means for a Goal.
 - **Bounded Power**: Refine should run useful commands while keeping command ownership and authorization explicit.
 - **Surface Independence**: process control should be available to CLI, browser, API, and agents through shared capability.
 
@@ -28,6 +29,8 @@ Current implementation details that matter to intent:
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 
 Process management should favor visibility and recovery over hiding execution behind polished UI messages. If something is running, failing, or waiting, Refine should be able to show it.
+
+Operations and managed processes have distinct authority. An operation owns the durable lifecycle and result of a requested unit of work; the managed-process registry owns observed child identity, liveness, output, and exit. Both correlate to the target app and, when applicable, Goal, round, claim, and execution defined by the [Shared Workflow Consistency Contract](03-workflow/11-consistency-contract.md). Neither a successful API request nor process exit zero independently advances workflow.
 
 ## Future Direction
 

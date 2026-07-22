@@ -7,6 +7,7 @@
 - **Worktree Isolation**: agent and standalone work should be isolated when that makes changes safer and easier to inspect.
 - **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Goal intent.
 - **Recoverable Handoff**: work should move from implementation to review to merge without losing context.
+- **Exact Candidate Identity**: review and integration evidence names the repository, worktree, refs, base, and candidate commits it actually observed.
 
 ## Purpose
 
@@ -26,6 +27,8 @@ This capability should connect workflow with the user's source repository:
 - standalone worktree output should be able to become structured ready-merge work.
 
 Review should be a real boundary in workflow. It lets later ordered Feature work proceed when appropriate, but it should not erase the need for evidence or final judgment.
+
+Branch names and worktree paths are locators, not durable proof of content. A reviewable handoff records the exact base and candidate commit identities with the Goal, round, target app, and execution that produced them. Before advancing or integrating, Workflow revalidates that evidence through the [Shared Workflow Consistency Contract](../03-workflow/11-consistency-contract.md); stale branch tips, reused worktrees, or a different active target app become conflicts rather than silently changing the candidate under review.
 
 ## Future Direction
 

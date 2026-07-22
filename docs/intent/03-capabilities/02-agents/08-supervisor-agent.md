@@ -6,6 +6,7 @@
 - **Process And Agent Are Distinct**: the supervisor process keeps Refine runtime work alive; the supervisor agent observes and explains workflow work within that process boundary.
 - **Ordinary CLI Agent**: the supervisor agent uses the configured `agent_cli` and the same provider, process supervision, limits, streaming, session resume, queue, cancellation, and failure handling as every other Refine agent.
 - **One Capacity Truth**: workflow and supervisor turns acquire atomic leases from the same global, node, provider, and target-app capacity policy at provider-launch time.
+- **One Recovery Boundary**: Supervisor diagnosis may use agent judgment, but every recovery mutation uses Workflow's shared versioned consistency contract.
 - **One Provider Truth**: configured `agent_cli` controls session dispatch, capacity accounting, process evidence, and API state; provider-specific resume state is reset when configuration changes.
 - **Existing Backend Evidence**: workflow, process, Git-sync, projection, operation, and activity services remain authoritative; the supervisor projection does not recreate their rules.
 - **Conversation Reuses Chat**: automatic evidence, user prompts, and follow-ups share one ordinary chat session and transcript.
@@ -21,6 +22,8 @@ The supervisor is also the natural agent for finding unknowns across active work
 ## Recovery Boundary
 
 The supervisor agent may invoke safe, idempotent operations already owned by Refine. The workflow engine remains responsible for moving interrupted Goals to `failed`, preserving the existing explicit-retry rule. The supervisor may identify lost or quiet work and point to an existing retry operation, but it does not implement its own repair rules.
+
+Before a recovery mutation, Workflow re-resolves target-app identity and revalidates the Goal, current round, node ownership, claim, operation, managed-process liveness, capacity, Git evidence, and relevant activity revisions under the [Shared Workflow Consistency Contract](../03-workflow/11-consistency-contract.md). A stale dossier is a conflict, not authority to repair. Recovery creates a new execution identity, preserves the previous attempt, and publishes its decision and evidence through the same path used by every other actor.
 
 It must not rewrite source, discard a worktree, force a merge, hide a provider or authentication failure, invent authorization, or loop indefinitely over a failing repair. Those cases become actionable failure events. User steering may guide investigation, but it does not silently expand authority.
 

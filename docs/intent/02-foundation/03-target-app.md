@@ -4,6 +4,7 @@
 
 - **Attached Work Context**: Refine acts on a target app, not an abstract task list.
 - **Local Target-App Authority**: the active app, its external Refine state, runtime root, commands, and Git context define where work happens.
+- **Stable Identity, Resolved Root**: target-app identity remains stable while its canonical root is resolved and validated for each operation.
 - **Durable And Inspectable State**: product, runtime, workflow, and derived state should survive interruption and remain readable.
 - **Flat Files First**: target-app state should be easy to inspect, copy, version, repair, and read by agents.
 - **Detached Is Valid**: Refine can operate without an attached app, but that mode should be explicit.
@@ -42,6 +43,8 @@ The current implementation details that matter to intent are:
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 
 Surfaces should make attached and detached states obvious. Tools and workflow should not guess which app they are operating on when shared target-app context can make the answer explicit.
+
+The target-app registry owns the mapping from stable app identity to canonical root. A selected UI app, request path, working directory, or path copied into runtime state cannot replace that mapping. Cross-process workflow records carry the stable identity and resolve the current root through the [Shared Workflow Consistency Contract](../03-capabilities/03-workflow/11-consistency-contract.md), preventing work or evidence from being attached to whichever app happens to be active during a later write or recovery.
 
 Target App should not become a hosted account model by default. Its first job is local clarity: Refine knows the software it is helping with, and that knowledge is durable enough for people and agents to inspect.
 

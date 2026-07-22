@@ -7,6 +7,7 @@
 - **Agent-First Direction**: surfaces should increasingly support direct agent operation.
 - **Human Accessibility**: browser and desktop surfaces should make Refine usable by people who do not want to operate only through a terminal.
 - **No Surface Monoculture**: the system should not depend on one interface surviving forever.
+- **Version-Aware Mutations**: surfaces submit intent against the state they observed and treat conflicts as refreshable coordination outcomes.
 
 ## Purpose
 
@@ -23,11 +24,14 @@ Surfaces should:
 - call shared services or daemon routes,
 - expose state clearly,
 - avoid duplicating workflow logic,
+- send stable target-app, command/idempotency, and expected-revision context for mutations,
 - make errors visible and recoverable,
 - route user-visible notices into durable activity or System surfaces when appropriate,
 - stay replaceable as AI-native interfaces improve.
 
 The current implementation has CLI, web, web server/API, and desktop modules. The browser and desktop are currently the richest human surfaces; the CLI is the most reliable command surface; the API exists mainly as the local daemon contract that shared surfaces use.
+
+Surfaces must not write authoritative workflow files, infer Goal success from request or process completion, or announce success before the shared command commits. The [Shared Workflow Consistency Contract](../03-capabilities/03-workflow/11-consistency-contract.md) defines the common mutation response, stale-write behavior, and evidence ordering that every surface must preserve.
 
 ## Future Direction
 

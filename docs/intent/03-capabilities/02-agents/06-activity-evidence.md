@@ -7,6 +7,7 @@
 - **Evidence Links Work To Reality**: logs, processes, diffs, checks, chat output, and user actions should connect back to Goals and Features.
 - **Surface Shared**: browser System, Logs, CLI output, API responses, and agents should draw from shared activity semantics.
 - **No Silent Failure**: failures, retries, blocked work, and risky actions should be visible.
+- **Evidence Follows Authority**: activity explains committed decisions and execution facts without becoming a competing source of workflow truth.
 
 ## Purpose
 
@@ -27,6 +28,8 @@ Activity and evidence should support every major capability:
 - chat and standalone sessions should produce durable outputs when they affect work.
 
 Activity should not be only a UI feed. It is product memory. Future agents should be able to inspect it to understand the current state, diagnose failures, and decide what should happen next.
+
+Evidence is correlated by stable target-app, Goal, round, transition, claim, operation, process, and Git identities where they apply. Required evidence is durable before the workflow state it justifies; user notices and derived activity views may be projected afterward using the committed transition identity so retries do not duplicate them. The [Shared Workflow Consistency Contract](../03-workflow/11-consistency-contract.md) defines that ordering and makes missing or late evidence repairable instead of allowing a log entry to overwrite authority.
 
 ## Future Direction
 
