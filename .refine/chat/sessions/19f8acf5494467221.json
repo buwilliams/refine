@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:22:15Z",
+  "updated_at": "2026-07-22T17:23:41Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -192,6 +192,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both live goals remain within their configured 900-second stall window. Shared coordination is running the full library test set after format/diff checks; the Quality evaluator goal has recovered from an intermediate compile error and is continuing its implementation. No provider/authentication failure has occurred."
+    },
+    {
+      "created_at": "2026-07-22T17:23:41Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741021606-87",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The two active agents surfaced ordinary test failures, not provider failures: coordination fixed a lowered-concurrency regression and is rerunning the full library suite; Quality is correcting its focused Quality tests. I’m leaving both under their managed processes and preserving their worktrees."
     }
   ],
   "queued_messages": [
