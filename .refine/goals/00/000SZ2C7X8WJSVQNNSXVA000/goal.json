@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": null,
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "assignee": "Buddy",
@@ -138,7 +138,7 @@
       "updated": "2026-07-22T11:48:08Z"
     },
     {
-      "assignee": "Buddy",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-22T11:49:39Z",
       "governance_checked_at": "2026-07-22T12:03:54Z",
@@ -176,10 +176,10 @@
       "quality_state": "passed",
       "reporter": "Buddy",
       "rule_state": "passed",
-      "updated": "2026-07-22T12:03:55Z"
+      "updated": "2026-07-22T13:07:26Z"
     }
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T12:03:56Z"
+  "updated": "2026-07-22T13:07:26Z"
 }
