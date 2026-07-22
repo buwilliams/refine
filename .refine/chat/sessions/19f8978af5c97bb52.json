@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:00:32Z",
+  "updated_at": "2026-07-22T15:12:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1272,6 +1272,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The implementation has chosen a shared filesystem coordination capability and is wiring authoritative Goal writes through it, rather than copying either parked prototype. That matches the compact contract’s freedom while addressing the cross-process stale-write failure directly."
+    },
+    {
+      "created_at": "2026-07-22T15:12:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784733149078-207",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Focused regressions are driving real fixes rather than being waived: restart recovery initially violated the new transition guard and was corrected; a write/log-failure test then exposed that evidence reads themselves must tolerate failed sidecar creation. The agent is now extending the same coordination boundary to operation registry writes and logs."
     }
   ],
   "queued_messages": [
