@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:29:20Z",
+  "updated_at": "2026-07-22T18:31:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -816,6 +816,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both read-only reviews failed, so neither candidate will advance.\n\n- Coordination: context logs/reports can still publish across an active-Node change, and foreign recovery silently returns `0` instead of an actionable ownership-transfer-required error.\n- Quality: the proposed hard reset/clean was not proven to target only the workflow-owned isolated worktree; retry restoration and claim ownership were not atomic; promotion bypassed the shared Quality ownership check; and tests staged ownership instead of racing acquisition.\n\nThe destructive-scope finding was caught before merge. I am preserving the boundary: no primary worktree reset/clean is authorized, and the remediation must prove the exact isolated worktree identity before any recovery."
+    },
+    {
+      "created_at": "2026-07-22T18:31:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745111249-200",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination now distinguishes safe background observation from an explicit recovery attempt: unrelated foreign work is ignored, but attempting recovery of a transferred Goal with a foreign active claim returns an ownership-transfer conflict. All context evidence writes are also claim-authorized under the shared lease. Focused tests pass and the final full gate is running. Quality is implementing its isolation and atomic-handoff corrections."
     }
   ],
   "queued_messages": [
