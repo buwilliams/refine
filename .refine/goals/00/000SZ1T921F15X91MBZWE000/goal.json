@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T00:45:40Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1T921F15X91MBZWE000",
+  "name": "Implement a first-class workflow monitor agent that serves the supervisory role",
+  "node_id": "default",
+  "notes": [],
+  "priority": "high",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T00:45:40Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement a first-class workflow monitor agent that serves the supervisory role currently requiring a human or external Codex session while Refine agents are active. The monitor must run outside the UI request path and remain active whenever Goal workflow work is active or queued. It should observe Goal transitions, agent/process health, runtime-worker reachability, Git/state synchronization, worktree/branch publication and merge progress, and UI/daemon health signals; detect actionable stalls, crashes, interrupted agents, provider failures, merge conflicts, and state-sync failures; apply only bounded, safe, auditable recoveries automatically; and surface durable, actionable progress and errors in the UI so a user can understand what happened and retry. It must never freeze the UI, must not disguise provider/auth failures, must avoid destructive or unbounded repair, and must preserve the existing rule that an interrupted Goal enters error/failed state and can be restarted later. Provide settings and lifecycle behavior that avoid duplicate monitors across restarts, make recovery idempotent, and stop or idle cleanly when no workflow work remains. Reuse shared backend services so CLI/API/UI can observe the same monitor state. Include proportional unit and integration coverage for active-work lifecycle, worker loss/restart, stalled work, safe recovery, unrecoverable failure, daemon restart/reconnect, concurrency, and no-work idle behavior, plus operator/user documentation and an intent/architecture update explaining the recovery boundary.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T00:45:40Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T00:45:40Z"
+}
