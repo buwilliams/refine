@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:12:29Z",
+  "updated_at": "2026-07-22T15:22:52Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1284,6 +1284,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Focused regressions are driving real fixes rather than being waived: restart recovery initially violated the new transition guard and was corrected; a write/log-failure test then exposed that evidence reads themselves must tolerate failed sidecar creation. The agent is now extending the same coordination boundary to operation registry writes and logs."
+    },
+    {
+      "created_at": "2026-07-22T15:22:52Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784733772885-209",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The production multi-instance sync failure was substantive: coordinating local writers exposed that sync conflict handling could later delete an unrelated Goal. The agent added a regression, corrected the sync merge behavior, and the full multi-instance harness now passes on rerun."
     }
   ],
   "queued_messages": [
