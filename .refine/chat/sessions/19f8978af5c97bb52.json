@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:43:26Z",
+  "updated_at": "2026-07-22T15:45:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1344,6 +1344,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The candidate is committed as `ba537ca` with 11 scoped files. Final gates are warning-free: 422/422 serial library tests, the full daemon workflow, and the two-daemon shared-remote harness. The provider process has exited; I’m now watching Refine ingest the candidate and run its independent governance/merge path rather than treating the agent’s own green report as completion."
+    },
+    {
+      "created_at": "2026-07-22T15:45:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784735151785-219",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Independent governance is actively reviewing the candidate against the compact contract, including direct-write paths, operation settlement ordering, Git copy-back behavior, and the new cancellation/stale-writer evidence. I’m letting that review finish before deciding whether any bounded repair round is justified."
     }
   ],
   "queued_messages": [
