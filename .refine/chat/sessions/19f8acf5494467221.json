@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T20:16:08Z",
+  "updated_at": "2026-07-22T20:16:37Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -1866,6 +1866,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m verifying the live Refine state and the failed goal’s durable evidence. The queue is already idle, so I’ll preserve that boundary and won’t retry, merge, or alter worktrees without evidence that doing so is authorized and safe."
+    },
+    {
+      "created_at": "2026-07-22T20:16:37Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784751397899-56",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The durable snapshot confirms there is no live worker or queued work. I’m now checking the failed goal itself and daemon/workflow status; a retry is a state-changing action and will remain withheld unless the failure evidence makes it an unambiguous, authorized continuation."
     }
   ],
   "queue_dispatching": true,
