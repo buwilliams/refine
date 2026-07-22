@@ -16,18 +16,13 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-21T23:25:24Z",
-      "governance_checked_at": "2026-07-22T00:02:41Z",
+      "governance_checked_at": "2026-07-22T00:25:51Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QZJAR01X6ZSEKWR005-round-1",
         "failed_actions": [
           {
-            "message": "The protected live-tail outcome is not preserved: the initial request sorts ascending with offset 0 and limit 200, returning the oldest 200 entries for large Goals, while the SSE replay filter can suppress the first live Goal log when the stream starts empty.",
-            "rule": "Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.",
-            "rule_id": "rule-6"
-          },
-          {
-            "message": "Tests check static source strings and server-side SSE serialization but do not exercise activity ordering, pagination, or browser SSE consumption, leaving the live cross-surface behavior unverified.",
+            "message": "docs/spec/rust-integration-feature-index.md still documents the Goal action as \"View Logs\" and omits the new Toolbar Goal-log tab, so the implementation leaves an affected feature index stale.",
             "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
             "rule_id": "rule-5"
           }
@@ -35,19 +30,14 @@
         "governance_configured": true,
         "phase": "post_implementation",
         "provider": "codex",
-        "raw_output": "{\"status\":\"failed\",\"message\":\"The Goal log tail can omit the newest activity, and verification does not cover the end-to-end behavior.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.\",\"message\":\"The protected live-tail outcome is not preserved: the initial request sorts ascending with offset 0 and limit 200, returning the oldest 200 entries for large Goals, while the SSE replay filter can suppress the first live Goal log when the stream starts empty.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.\",\"message\":\"Tests check static source strings and server-side SSE serialization but do not exercise activity ordering, pagination, or browser SSE consumption, leaving the live cross-surface behavior unverified.\"}]}",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Implementation behavior and focused tests pass, but affected documentation remains inconsistent.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.\",\"message\":\"docs/spec/rust-integration-feature-index.md still documents the Goal action as \\\"View Logs\\\" and omits the new Toolbar Goal-log tab, so the implementation leaves an affected feature index stale.\"}]}",
         "rules_checked": 6,
         "verdict": {
-          "message": "The Goal log tail can omit the newest activity, and verification does not cover the end-to-end behavior.",
+          "message": "Implementation behavior and focused tests pass, but affected documentation remains inconsistent.",
           "status": "failed",
           "violations": [
             {
-              "message": "The protected live-tail outcome is not preserved: the initial request sorts ascending with offset 0 and limit 200, returning the oldest 200 entries for large Goals, while the SSE replay filter can suppress the first live Goal log when the stream starts empty.",
-              "rule": "Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.",
-              "rule_id": "rule-6"
-            },
-            {
-              "message": "Tests check static source strings and server-side SSE serialization but do not exercise activity ordering, pagination, or browser SSE consumption, leaving the live cross-surface behavior unverified.",
+              "message": "docs/spec/rust-integration-feature-index.md still documents the Goal action as \"View Logs\" and omits the new Toolbar Goal-log tab, so the implementation leaves an affected feature index stale.",
               "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
               "rule_id": "rule-5"
             }
@@ -55,15 +45,10 @@
         },
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1QZJAR01X6ZSEKWR005-round-1"
       },
-      "governance_message": "The Goal log tail can omit the newest activity, and verification does not cover the end-to-end behavior.",
+      "governance_message": "Implementation behavior and focused tests pass, but affected documentation remains inconsistent.",
       "governance_rule_actions": [
         {
-          "message": "The protected live-tail outcome is not preserved: the initial request sorts ascending with offset 0 and limit 200, returning the oldest 200 entries for large Goals, while the SSE replay filter can suppress the first live Goal log when the stream starts empty.",
-          "rule": "Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.",
-          "rule_id": "rule-6"
-        },
-        {
-          "message": "Tests check static source strings and server-side SSE serialization but do not exercise activity ordering, pagination, or browser SSE consumption, leaving the live cross-surface behavior unverified.",
+          "message": "docs/spec/rust-integration-feature-index.md still documents the Goal action as \"View Logs\" and omits the new Toolbar Goal-log tab, so the implementation leaves an affected feature index stale.",
           "rule": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
           "rule_id": "rule-5"
         }
@@ -80,10 +65,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "failed",
-      "updated": "2026-07-22T00:22:36Z"
+      "updated": "2026-07-22T00:25:51Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T00:22:36Z"
+  "updated": "2026-07-22T00:25:51Z"
 }
