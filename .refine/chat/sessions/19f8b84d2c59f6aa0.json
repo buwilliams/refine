@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:38:51Z",
+  "updated_at": "2026-07-22T20:39:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -300,6 +300,36 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The latest evidence supersedes the brief failed state: Goal `00000SZ2TPQM61AGWJW8XC4001` is in round 2, its durable status was refreshed to `in-progress`, and a live Codex worker is attached to the round-2 worktree. There is no current stall/loss signal, so I’m leaving the worker and repository untouched."
+    },
+    {
+      "created_at": "2026-07-22T20:39:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752740717-65",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No intervention is warranted now.\n\nGoal `00000SZ2TPQM61AGWJW8XC4001` is `in-progress` in round 2 with a live workflow-agent process and no stall/loss evidence. Earlier governance, provider-size, and synchronization failures remain part of the audit trail but are not current blockers.\n\nI did not retry, cancel, merge, modify worktrees, or alter durable state. No user decision or additional authority is currently required."
+    },
+    {
+      "created_at": "2026-07-22T20:39:00Z",
+      "delivered": false,
+      "id": "evt-1784752740935-67",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No intervention is warranted now.\n\nGoal `00000SZ2TPQM61AGWJW8XC4001` is `in-progress` in round 2 with a live workflow-agent process and no stall/loss evidence. Earlier governance, provider-size, and synchronization failures remain part of the audit trail but are not current blockers.\n\nI did not retry, cancel, merge, modify worktrees, or alter durable state. No user decision or additional authority is currently required."
+    },
+    {
+      "created_at": "2026-07-22T20:39:00Z",
+      "delivered": false,
+      "id": "evt-1784752740935-68",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
   "importable_artifacts": [],
