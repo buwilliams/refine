@@ -197,8 +197,9 @@ Nav: Toolbar (bottom dock)
 				Extract round modal: review prompt (editable), reporter, Add round / Cancel, Escape close
 		Goal log tail (opened via Watch Logs on a Goal)
 			Tab labeled "Logs {id}…"; live indicator, Goal link, Open full logs, Refresh, Close tab
-			Loads the newest 200 Goal activity entries, displays them chronologically, and appends deduplicated Goal logs from SSE
-			Rows show time, severity, category, message, actor, and expandable details; empty/loading/error states remain visible
+			Loads the newest 200 Goal activity entries, defaults to chronological Tail order, and appends deduplicated Goal logs from SSE
+			Compact text stream shows time, severity, category, actor, safely formatted message links/actions, and expandable details
+			Search filters the recent trail; Head shows newest first and Tail shows newest last; empty/loading/error states remain visible
 		Plan chat / Plan Mode (toolbar tab, mode "plan")
 			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
 			Same chat input/output/queue/activity
