@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 pub mod behavior;
 pub mod behaviors;
+pub mod capacity;
 pub mod context;
 pub mod promotion;
 
@@ -17,7 +18,7 @@ use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal}
 use crate::model::goal::GoalPriority;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
@@ -34,6 +35,7 @@ use crate::workflow::behaviors::{
     WorkflowBuild, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge, WorkflowReview,
     WorkflowTodo,
 };
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::promotion::BacklogPromotionService;
 
@@ -170,6 +172,25 @@ impl WorkflowEngine {
 
     pub fn state_path(&self) -> PathBuf {
         self.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)
+    }
+
+    fn capacity_service(&self) -> AgentCapacityService {
+        AgentCapacityService::new(&self.runtime_root)
+    }
+
+    fn claim_capacity_request(claim: &WorkflowClaim) -> AgentCapacityRequest {
+        AgentCapacityRequest {
+            owner_id: format!("workflow:{}", claim.claim_id),
+            role: "workflow".to_string(),
+            node_id: claim.node_id.clone(),
+            provider: claim.provider.clone(),
+            target_app_id: claim.target_app_id.clone(),
+        }
+    }
+
+    fn release_claim_capacity(&self, claim_id: &str) -> RefineResult<bool> {
+        self.capacity_service()
+            .release(&format!("workflow:{claim_id}"))
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
@@ -361,25 +382,35 @@ impl WorkflowEngine {
         Ok(goal_ids.len())
     }
 
-    fn signal_workflow_subprocesses(&self, execution_id: &str, signal: &str) -> RefineResult<()> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        for process in supervisor.list()? {
-            let matches_execution = process
-                .details
-                .as_deref()
-                .and_then(|details| serde_json::from_str::<Value>(details).ok())
-                .and_then(|details| {
-                    details
-                        .get("execution_id")
-                        .and_then(|value| value.as_str())
-                        .map(|value| value == execution_id)
-                })
-                .unwrap_or(false);
-            if matches_execution {
-                supervisor.signal(&process.id, signal)?;
+    fn signal_workflow_subprocesses(
+        &self,
+        execution_id: &str,
+        signal: &str,
+    ) -> RefineResult<usize> {
+        let mut signalled = 0;
+        // Current providers register under the managed-agent root. The legacy port root remains
+        // observable during migration so a daemon upgrade can still stop an older process.
+        for process_root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
+            let supervisor = FileProcessSupervisor::new(process_root);
+            for process in supervisor.list()? {
+                let matches_execution = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                    .and_then(|details| {
+                        details
+                            .get("execution_id")
+                            .and_then(|value| value.as_str())
+                            .map(|value| value == execution_id)
+                    })
+                    .unwrap_or(false);
+                if matches_execution {
+                    supervisor.request_termination(&process.id, signal)?;
+                    signalled += 1;
+                }
             }
         }
-        Ok(())
+        Ok(signalled)
     }
 
     fn ensure_automation_running(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
@@ -471,18 +502,6 @@ impl WorkflowEngine {
             && load.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
             && load.by_target_app.get(target_app_id).copied().unwrap_or(0)
                 < policy.per_target_app_limit
-    }
-
-    fn capacity_available_excluding(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-        node_id: &str,
-        provider: &str,
-        target_app_id: &str,
-        excluded_index: usize,
-    ) -> bool {
-        let load = Self::claim_load_excluding(state, policy, Some(excluded_index));
-        Self::capacity_available_for_load(&load, policy, node_id, provider, target_app_id)
     }
 
     fn record_claim_load(load: &mut ClaimLoad, claim: &WorkflowClaim) {
@@ -886,13 +905,22 @@ impl WorkflowEngine {
         };
         claim.state = claim_state;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)
+        let terminal = !matches!(
+            claim.state,
+            WorkflowClaimState::Claimed | WorkflowClaimState::Running
+        );
+        self.save_state(&mut state)?;
+        if terminal {
+            self.release_claim_capacity(claim_id)?;
+        }
+        Ok(())
     }
 
     fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
         let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
+        let mut released_claim_ids = Vec::new();
         let now = now_timestamp();
         for claim in &mut state.claims {
             if goal_ids.contains(&claim.goal_id)
@@ -903,11 +931,15 @@ impl WorkflowEngine {
             {
                 claim.state = WorkflowClaimState::Interrupted;
                 claim.updated_at = now.clone();
+                released_claim_ids.push(claim.claim_id.clone());
                 changed = true;
             }
         }
         if changed {
             self.save_state(&mut state)?;
+            for claim_id in released_claim_ids {
+                self.release_claim_capacity(&claim_id)?;
+            }
         }
         Ok(())
     }
@@ -1101,18 +1133,6 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim {claim_id} is not claimed"
             )));
         }
-        let running_load = Self::running_claim_load(&state, &policy);
-        if !Self::capacity_available_for_load(
-            &running_load,
-            &policy,
-            &claim.node_id,
-            &claim.provider,
-            &claim.target_app_id,
-        ) {
-            return Err(RefineError::Conflict(
-                AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
-            ));
-        }
         if let Some(refine_dir) = self.refine_dir()? {
             let snapshot = self.projection_snapshot(&refine_dir)?;
             let goal = snapshot.goals.get(&claim.goal_id).ok_or_else(|| {
@@ -1135,12 +1155,24 @@ impl WorkflowAutomation for WorkflowEngine {
                 )));
             }
         }
+        let capacity_request = Self::claim_capacity_request(&state.claims[claim_index]);
+        if !self
+            .capacity_service()
+            .try_acquire(&policy, capacity_request)?
+        {
+            return Err(RefineError::Conflict(
+                AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
+            ));
+        }
         let execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
         claim.execution_id = Some(execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
+        if let Err(error) = self.save_state(&mut state) {
+            let _ = self.release_claim_capacity(claim_id);
+            return Err(error);
+        }
         Ok(execution_id)
     }
 
@@ -1158,16 +1190,20 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
-        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
             .iter_mut()
             .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
         {
+            let claim_id = claim.claim_id.clone();
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
             self.save_state(&mut state)?;
+            if signalled == 0 {
+                self.release_claim_capacity(&claim_id)?;
+            }
         }
         Ok(())
     }
@@ -1187,28 +1223,27 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim for execution {execution_id} was not found"
             )));
         };
-        let node_id = state.claims[claim_index].node_id.clone();
-        let provider = state.claims[claim_index].provider.clone();
-        let target_app_id = state.claims[claim_index].target_app_id.clone();
-        if !Self::capacity_available_excluding(
-            &state,
-            &policy,
-            &node_id,
-            &provider,
-            &target_app_id,
-            claim_index,
-        ) {
+        if self.signal_workflow_subprocesses(execution_id, "terminate")? > 0 {
+            return Err(RefineError::Conflict(format!(
+                "execution {execution_id} is still stopping; retry after its managed agent process exits"
+            )));
+        }
+        let request = Self::claim_capacity_request(&state.claims[claim_index]);
+        if !self.capacity_service().try_acquire(&policy, request)? {
             return Err(RefineError::Conflict(
                 AUTOMATION_CONCURRENCY_LIMIT_REACHED.to_string(),
             ));
         }
-        self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let retried_execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
+        let claim_id = claim.claim_id.clone();
         claim.execution_id = Some(retried_execution_id.clone());
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
+        if let Err(error) = self.save_state(&mut state) {
+            let _ = self.release_claim_capacity(&claim_id);
+            return Err(error);
+        }
         Ok(retried_execution_id)
     }
 }
@@ -1597,6 +1632,7 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::subprocess::ManagedProcess;
     use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
     use crate::tools::product::nodes::FileNodeRegistryService;
@@ -2853,6 +2889,69 @@ mod tests {
         );
         assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn workflow_cancel_reaches_managed_agent_registry_before_retry() {
+        let temp_root = unique_temp_dir("automation-managed-cancel");
+        let runtime_root = temp_root.join("run/8080");
+        let automation = WorkflowEngine::new(&runtime_root);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        let execution_id = automation.start_claim(&claim_id).unwrap();
+        let agent_supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let mut child = Command::new("sleep").arg("30").spawn().unwrap();
+        agent_supervisor
+            .register(ManagedProcess {
+                id: "workflow-provider".to_string(),
+                owner: crate::process::subprocess::ProcessOwner::Agent,
+                pid: Some(child.id()),
+                state: "running".to_string(),
+                label: Some("sleep".to_string()),
+                details: Some(
+                    json!({
+                        "kind": "workflow",
+                        "execution_id": execution_id,
+                        "goal_id": "GOAL1"
+                    })
+                    .to_string(),
+                ),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        automation.cancel(&execution_id).unwrap();
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Cancelled
+        );
+        assert!(automation.retry(&execution_id).is_err());
+        for _ in 0..40 {
+            if child.try_wait().unwrap().is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        assert!(child.try_wait().unwrap().is_some());
+        assert!(
+            agent_supervisor
+                .recover_owner(crate::process::subprocess::ProcessOwner::Agent)
+                .unwrap()
+                .is_empty()
+        );
+
+        let retried_execution_id = automation.retry(&execution_id).unwrap();
+        assert_ne!(retried_execution_id, execution_id);
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Running
+        );
+        automation.release_claim_capacity(&claim_id).unwrap();
         fs::remove_dir_all(temp_root).unwrap();
     }
 

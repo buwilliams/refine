@@ -7,4 +7,5 @@ pub mod nodes;
 pub mod project_migration;
 pub mod project_registry;
 pub mod project_state;
+pub mod supervisor_agent;
 pub mod work_items;

@@ -849,10 +849,14 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
     let sync = fixture.run_refine(&["cluster", "sync"]);
     fixture.assert_success("cluster sync", &sync);
     let sync_payload = fixture.json_stdout(&sync);
-    assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
-    assert!(sync_payload["goal_count"].is_number(), "{sync_payload:#}");
+    assert_eq!(
+        sync_payload["operation"]["owner"], "project:sync",
+        "{sync_payload:#}"
+    );
     assert!(
-        sync_payload["feature_count"].is_number(),
+        sync_payload["operation"]["id"]
+            .as_str()
+            .is_some_and(|id| !id.is_empty()),
         "{sync_payload:#}"
     );
     let maintenance = fixture.run_refine(&["cluster", "maintenance"]);
@@ -971,6 +975,12 @@ fn log_commands_query_public_activity(fixture: &IntegrationFixture) {
 }
 
 fn agent_commands_use_smoke_ai(fixture: &IntegrationFixture) {
+    let supervisor = fixture.run_refine(&["agent", "supervisor"]);
+    fixture.assert_success("agent supervisor", &supervisor);
+    let supervisor_payload = fixture.json_stdout(&supervisor);
+    assert!(supervisor_payload["supervisor_agent"]["lifecycle"].is_string());
+    assert!(supervisor_payload["supervisor_agent"]["events"].is_array());
+
     let detect = fixture.run_refine(&["agent", "detect"]);
     fixture.assert_success("agent detect", &detect);
     let detect_payload = fixture.json_stdout(&detect);

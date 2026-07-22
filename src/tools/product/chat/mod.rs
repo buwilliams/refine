@@ -1,8 +1,9 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use serde_json::{Value, json};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
+use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
@@ -24,12 +26,15 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::WorkflowEngine;
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChatAttachment {
     Goal(String),
     Feature(String),
+    Supervisor,
     Standalone,
 }
 
@@ -162,6 +167,7 @@ impl FileChatService {
         let attachment_mode = match &attachment {
             ChatAttachment::Goal(_) => "goal",
             ChatAttachment::Feature(_) => "feature",
+            ChatAttachment::Supervisor => "supervisor",
             ChatAttachment::Standalone => "standalone",
         };
         let record = ChatSessionRecord {
@@ -188,6 +194,7 @@ impl FileChatService {
     }
 
     pub fn read(&self, session_id: &str) -> RefineResult<ChatReadResult> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let lines = unread_lines(&record);
         let progress_lines = unread_progress(&record);
@@ -243,6 +250,61 @@ impl FileChatService {
 
     pub fn stop(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
         self.interrupt(session_id, "stopped")
+    }
+
+    pub fn migrate_supervisor_provider(
+        &self,
+        session_id: &str,
+        configured_provider: &str,
+    ) -> RefineResult<Option<ChatSessionRecord>> {
+        let configured_provider = configured_provider.trim();
+        if configured_provider.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "configured agent_cli provider is required".to_string(),
+            ));
+        }
+        let existing = self.load_record(session_id)?;
+        if !matches!(existing.attachment, ChatAttachment::Supervisor) {
+            return Err(RefineError::InvalidInput(
+                "only Supervisor sessions can migrate configured providers".to_string(),
+            ));
+        }
+        if existing.provider == configured_provider {
+            return Ok(Some(existing));
+        }
+        if existing.in_flight
+            || existing.queue_dispatching
+            || self.session_has_active_operation(session_id)?
+            || self.session_has_managed_process(session_id)?
+        {
+            self.interrupt(
+                session_id,
+                &format!(
+                    "closed because configured agent_cli changed from {} to {configured_provider}",
+                    existing.provider
+                ),
+            )?;
+            return Ok(None);
+        }
+
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
+        let previous = std::mem::replace(&mut record.provider, configured_provider.to_string());
+        record.provider_session_id = None;
+        record.interrupted = false;
+        record.interruption_detail = None;
+        record.updated_at = now_timestamp();
+        record.transcript_events.push(chat_event(
+            "system",
+            &format!(
+                "Supervisor provider migrated from {previous} to {configured_provider}; provider-session resume state was reset."
+            ),
+            false,
+            None,
+            Some(json!({"source": "configured_agent_cli"})),
+        ));
+        self.write_record(&record)?;
+        Ok(Some(record))
     }
 
     pub fn start_standalone_with_options(
@@ -507,6 +569,42 @@ impl FileChatService {
         self.sessions_dir().join(format!("{session_id}.json"))
     }
 
+    fn acquire_session_lock(&self, session_id: &str) -> RefineResult<ChatSessionLock> {
+        validate_session_id(session_id)?;
+        fs::create_dir_all(self.sessions_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create chat sessions directory {}: {error}",
+                self.sessions_dir().display()
+            ))
+        })?;
+        let path = self.sessions_dir().join(format!(".{session_id}.lock"));
+        for _ in 0..500 {
+            match OpenOptions::new().write(true).create_new(true).open(&path) {
+                Ok(_) => return Ok(ChatSessionLock { path }),
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                    let stale = fs::metadata(&path)
+                        .and_then(|metadata| metadata.modified())
+                        .ok()
+                        .and_then(|modified| modified.elapsed().ok())
+                        .is_some_and(|age| age > Duration::from_secs(30));
+                    if stale {
+                        let _ = fs::remove_file(&path);
+                        continue;
+                    }
+                    thread::sleep(Duration::from_millis(2));
+                }
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to lock chat session {session_id}: {error}"
+                    )));
+                }
+            }
+        }
+        Err(RefineError::Conflict(format!(
+            "Chat session {session_id} is busy; retry shortly"
+        )))
+    }
+
     fn create_standalone_worktree(&self, session_id: &str) -> RefineResult<ChatSessionWorktree> {
         let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let branch = format!("refine/standalone/{session_id}");
@@ -545,60 +643,100 @@ impl FileChatService {
     }
 
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
-        let mut record = self.load_record(session_id)?;
-        if record.closed {
-            return Err(RefineError::Conflict(format!(
-                "Chat session {session_id} is closed"
-            )));
-        }
-        let Some(provider_session_id) = record.provider_session_id.clone() else {
-            return Err(RefineError::InvalidInput(format!(
-                "Chat session {session_id} does not have a provider session id"
-            )));
+        let capacity = self
+            .try_turn_capacity(&self.load_record(session_id)?)?
+            .ok_or_else(|| {
+                RefineError::Conflict("automation concurrency limit reached".to_string())
+            })?;
+        let (record, provider_session_id) = {
+            let _guard = self.acquire_session_lock(session_id)?;
+            let mut record = self.load_record(session_id)?;
+            if record.closed {
+                return Err(RefineError::Conflict(format!(
+                    "Chat session {session_id} is closed"
+                )));
+            }
+            let Some(provider_session_id) = record.provider_session_id.clone() else {
+                return Err(RefineError::InvalidInput(format!(
+                    "Chat session {session_id} does not have a provider session id"
+                )));
+            };
+            record.in_flight = true;
+            record.last_turn_started_at = Some(now_timestamp());
+            record.updated_at = now_timestamp();
+            record.transcript_events.push(chat_event(
+                "progress",
+                "Resuming provider session.",
+                true,
+                Some(provider_session_id.clone()),
+                None,
+            ));
+            self.write_record(&record)?;
+            (record, provider_session_id)
         };
-        record.in_flight = true;
-        record.last_turn_started_at = Some(now_timestamp());
-        record.updated_at = now_timestamp();
-        record.transcript_events.push(chat_event(
-            "progress",
-            "Resuming provider session.",
-            true,
-            Some(provider_session_id.clone()),
-            None,
-        ));
-        self.write_record(&record)?;
 
         let operation = self.register_provider_operation(&record, "resume")?;
         let provider = HostAgentProviderService {
             path_override: self.provider_path_override(),
-            runtime_root: Some(self.runtime_root.clone()),
+            runtime_root: Some(self.runtime_root.join("agents")),
         };
         let provider_name = record.provider.clone();
-        match provider.resume_detailed_with_output(&provider_name, &provider_session_id, |line| {
-            let _ = self.append_provider_activity_progress(&mut record, &line);
-        }) {
-            Ok(result) => {
-                self.apply_provider_success(&mut record, result, "Provider session resumed.");
-                self.finish_provider_operation(
-                    &operation.id,
-                    OperationState::Succeeded,
-                    "Provider session resumed",
-                )?;
-            }
-            Err(error) => {
-                let detail =
-                    format!("Provider session resume failed; transcript preserved: {error}");
-                self.apply_provider_failure(&mut record, detail);
-                self.finish_provider_operation(
-                    &operation.id,
-                    OperationState::Failed,
-                    "Provider session resume failed",
-                )?;
+        let result = provider.resume_detailed_with_output_and_metadata(
+            &provider_name,
+            &provider_session_id,
+            chat_process_metadata(&record),
+            |line| {
+                let _ = self.append_provider_activity_progress(session_id, &line);
+            },
+        );
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut latest = self.load_record(session_id)?;
+        let mut provider_failure = None;
+        if latest.closed {
+            latest.in_flight = false;
+            latest.queue_dispatching = false;
+            latest.last_turn_started_at = None;
+            latest.transcript_events.push(chat_event(
+                "progress",
+                "Managed provider process exited after cancellation.",
+                true,
+                latest.provider_session_id.clone(),
+                Some(json!({"source": "process_supervisor"})),
+            ));
+            self.finish_provider_operation(
+                &operation.id,
+                OperationState::Cancelled,
+                "Provider session resume cancelled after managed process exit",
+            )?;
+        } else {
+            match result {
+                Ok(result) => {
+                    self.apply_provider_success(&mut latest, result, "Provider session resumed.");
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Succeeded,
+                        "Provider session resumed",
+                    )?;
+                }
+                Err(error) => {
+                    let detail =
+                        format!("Provider session resume failed; transcript preserved: {error}");
+                    provider_failure = Some(detail.clone());
+                    self.apply_provider_failure(&mut latest, detail);
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Failed,
+                        "Provider session resume failed",
+                    )?;
+                }
             }
         }
-        record.updated_at = now_timestamp();
-        self.write_record(&record)?;
-        Ok(record)
+        latest.updated_at = now_timestamp();
+        self.write_record(&latest)?;
+        drop(_guard);
+        self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
+        drop(capacity);
+        Ok(latest)
     }
 
     pub fn recover_interrupted_turns(&self, detail: &str) -> RefineResult<Vec<ChatSessionRecord>> {
@@ -732,18 +870,44 @@ impl FileChatService {
         record.in_flight = false;
         record.last_turn_started_at = None;
         record.interrupted = true;
-        record.interruption_detail = Some(detail);
+        record.interruption_detail = Some(detail.clone());
     }
 
-    fn append_provider_activity_progress(
+    fn record_supervisor_provider_outcome(
         &self,
-        record: &mut ChatSessionRecord,
-        line: &str,
-    ) -> RefineResult<()> {
+        record: &ChatSessionRecord,
+        failure: Option<&str>,
+    ) {
+        if !matches!(record.attachment, ChatAttachment::Supervisor) {
+            return;
+        }
+        let service = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+            &self.refine_dir,
+            &self.runtime_root,
+        );
+        if let Some(detail) = failure {
+            let _ = service.record_failure(
+                "provider",
+                format!("Supervisor provider failure: {detail}"),
+                true,
+            );
+        } else {
+            let _ = service.record_recovery(
+                "provider",
+                "Supervisor provider turn",
+                "completed and preserved in the shared transcript",
+                true,
+            );
+        }
+    }
+
+    fn append_provider_activity_progress(&self, session_id: &str, line: &str) -> RefineResult<()> {
         let text = line.trim();
         if text.is_empty() {
             return Ok(());
         }
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
         let duplicate = record.transcript_events.iter().rev().take(20).any(|event| {
             event_bool(event, "progress") && event_text(event).as_deref() == Some(text)
         });
@@ -758,7 +922,7 @@ impl FileChatService {
             Some(json!({"source": "provider_output"})),
         ));
         record.updated_at = now_timestamp();
-        self.write_record(record)
+        self.write_record(&record)
     }
 
     fn mark_record_interrupted(&self, record: &mut ChatSessionRecord, detail: &str) {
@@ -779,6 +943,42 @@ impl FileChatService {
 
     fn operation_registry(&self) -> FileOperationRegistry {
         FileOperationRegistry::new(&self.runtime_root)
+    }
+
+    fn try_turn_capacity(
+        &self,
+        record: &ChatSessionRecord,
+    ) -> RefineResult<Option<ChatCapacityPermit>> {
+        if !matches!(record.attachment, ChatAttachment::Supervisor) {
+            return Ok(Some(ChatCapacityPermit::unlimited()));
+        }
+        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
+        let policy = WorkflowEngine::with_target_root(&self.runtime_root, &target_root).policy()?;
+        if record.provider != policy.provider {
+            return Err(RefineError::Conflict(format!(
+                "Supervisor session provider {} does not match configured agent_cli {}; migrate the session before dispatch",
+                record.provider, policy.provider
+            )));
+        }
+        if self.other_supervisor_process_is_running(&record.id)? {
+            return Ok(None);
+        }
+        let service = AgentCapacityService::new(&self.runtime_root);
+        let owner_id = format!("supervisor:{}", record.id);
+        let acquired = service.try_acquire(
+            &policy,
+            AgentCapacityRequest {
+                owner_id: owner_id.clone(),
+                role: "supervisor".to_string(),
+                node_id: policy.active_node_id.clone(),
+                provider: policy.provider.clone(),
+                target_app_id: policy.target_app_id.clone(),
+            },
+        )?;
+        Ok(acquired.then(|| ChatCapacityPermit {
+            service: Some(service),
+            owner_id,
+        }))
     }
 
     fn register_provider_operation(
@@ -827,6 +1027,72 @@ impl FileChatService {
             }))
     }
 
+    fn managed_process_roots(&self) -> [PathBuf; 2] {
+        [self.runtime_root.join("agents"), self.runtime_root.clone()]
+    }
+
+    fn session_managed_processes(&self, session_id: &str) -> RefineResult<Vec<(PathBuf, String)>> {
+        let mut matches = Vec::new();
+        for root in self.managed_process_roots() {
+            for process in FileProcessSupervisor::new(&root).list()? {
+                let belongs_to_session = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                    .and_then(|details| {
+                        details
+                            .get("session_id")
+                            .and_then(Value::as_str)
+                            .map(|value| value == session_id)
+                    })
+                    .unwrap_or(false);
+                if belongs_to_session {
+                    matches.push((root.clone(), process.id));
+                }
+            }
+        }
+        Ok(matches)
+    }
+
+    fn session_has_managed_process(&self, session_id: &str) -> RefineResult<bool> {
+        Ok(!self.session_managed_processes(session_id)?.is_empty())
+    }
+
+    fn other_supervisor_process_is_running(&self, session_id: &str) -> RefineResult<bool> {
+        for root in self.managed_process_roots() {
+            for process in FileProcessSupervisor::new(root).list()? {
+                let details = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok());
+                let is_supervisor = details.as_ref().is_some_and(|details| {
+                    details.get("agent_role").and_then(Value::as_str) == Some("supervisor")
+                        || details.get("mode").and_then(Value::as_str) == Some("supervisor")
+                });
+                let is_current = details
+                    .as_ref()
+                    .and_then(|details| details.get("session_id"))
+                    .and_then(Value::as_str)
+                    == Some(session_id);
+                if is_supervisor && !is_current {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn request_session_process_termination(&self, session_id: &str) -> RefineResult<usize> {
+        let processes = self.session_managed_processes(session_id)?;
+        for (root, process_id) in &processes {
+            match FileProcessSupervisor::new(root).request_termination(process_id, "terminate") {
+                Ok(_) | Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(processes.len())
+    }
+
     fn ensure_queue_dispatch(&self, record: &mut ChatSessionRecord) -> RefineResult<()> {
         if record.closed || record.queued_messages.is_empty() || record.queue_dispatching {
             return Ok(());
@@ -848,91 +1114,157 @@ impl FileChatService {
 
     fn dispatch_queued_messages(&self, session_id: &str) -> RefineResult<()> {
         loop {
-            let mut record = self.load_record(session_id)?;
-            if record.closed {
-                record.queue_dispatching = false;
-                record.in_flight = false;
-                record.last_turn_started_at = None;
+            let capacity = loop {
+                let record = {
+                    let _guard = self.acquire_session_lock(session_id)?;
+                    let mut record = self.load_record(session_id)?;
+                    if record.closed || record.queued_messages.is_empty() {
+                        record.queue_dispatching = false;
+                        record.in_flight = false;
+                        record.last_turn_started_at = None;
+                        record.updated_at = now_timestamp();
+                        self.write_record(&record)?;
+                        return Ok(());
+                    }
+                    record
+                };
+                if let Some(permit) = self.try_turn_capacity(&record)? {
+                    break permit;
+                }
+                self.append_capacity_wait_progress(session_id)?;
+                thread::sleep(Duration::from_millis(100));
+            };
+            let (record, message) = {
+                let _guard = self.acquire_session_lock(session_id)?;
+                let mut record = self.load_record(session_id)?;
+                if record.closed || record.queued_messages.is_empty() {
+                    record.queue_dispatching = false;
+                    record.in_flight = false;
+                    record.last_turn_started_at = None;
+                    record.updated_at = now_timestamp();
+                    self.write_record(&record)?;
+                    return Ok(());
+                }
+                let queued = std::mem::take(&mut record.queued_messages);
+                let message = combined_queued_message(&queued);
+                record.transcript_events.push(chat_event(
+                    "user",
+                    &message,
+                    false,
+                    record.provider_session_id.clone(),
+                    None,
+                ));
+                record.transcript_events.push(chat_event(
+                    "progress",
+                    &format!(
+                        "Sent {} queued message{} to the provider.",
+                        queued.len(),
+                        if queued.len() == 1 { "" } else { "s" }
+                    ),
+                    true,
+                    record.provider_session_id.clone(),
+                    None,
+                ));
+                record.in_flight = true;
+                record.last_turn_started_at = Some(now_timestamp());
                 record.updated_at = now_timestamp();
                 self.write_record(&record)?;
-                return Ok(());
-            }
-            if record.queued_messages.is_empty() {
-                record.queue_dispatching = false;
-                record.in_flight = false;
-                record.last_turn_started_at = None;
-                record.updated_at = now_timestamp();
-                self.write_record(&record)?;
-                return Ok(());
-            }
-            let queued = std::mem::take(&mut record.queued_messages);
-            let message = combined_queued_message(&queued);
-            record.transcript_events.push(chat_event(
-                "user",
-                &message,
-                false,
-                record.provider_session_id.clone(),
-                None,
-            ));
-            record.transcript_events.push(chat_event(
-                "progress",
-                &format!(
-                    "Sent {} queued message{} to the provider.",
-                    queued.len(),
-                    if queued.len() == 1 { "" } else { "s" }
-                ),
-                true,
-                record.provider_session_id.clone(),
-                None,
-            ));
-            record.in_flight = true;
-            record.last_turn_started_at = Some(now_timestamp());
-            record.updated_at = now_timestamp();
-            self.write_record(&record)?;
+                (record, message)
+            };
 
             let operation = self.register_provider_operation(&record, "invoke")?;
             let provider = HostAgentProviderService {
                 path_override: self.provider_path_override(),
-                runtime_root: Some(self.runtime_root.clone()),
+                runtime_root: Some(self.runtime_root.join("agents")),
             };
-            match provider.invoke_detailed_with_output(
+            let result = provider.invoke_detailed_with_output(
                 ProviderInvocation {
                     provider: record.provider.clone(),
                     prompt: self.chat_prompt(&record, &message),
                     session_id: record.provider_session_id.clone(),
                     cwd: Some(self.chat_cwd(&record).display().to_string()),
-                    process_metadata: Default::default(),
+                    process_metadata: chat_process_metadata(&record),
                 },
                 |line| {
-                    let _ = self.append_provider_activity_progress(&mut record, &line);
+                    let _ = self.append_provider_activity_progress(session_id, &line);
                 },
-            ) {
-                Ok(result) => {
-                    self.apply_provider_success(&mut record, result, "Provider turn completed.");
-                    self.finish_provider_operation(
-                        &operation.id,
-                        OperationState::Succeeded,
-                        "Provider turn completed",
-                    )?;
-                }
-                Err(error) => {
-                    self.apply_provider_failure(
-                        &mut record,
-                        format!("Provider turn failed: {error}"),
-                    );
-                    self.finish_provider_operation(
-                        &operation.id,
-                        OperationState::Failed,
-                        "Provider turn failed",
-                    )?;
+            );
+            let _guard = self.acquire_session_lock(session_id)?;
+            let mut latest = self.load_record(session_id)?;
+            let mut provider_failure = None;
+            if latest.closed {
+                latest.in_flight = false;
+                latest.queue_dispatching = false;
+                latest.last_turn_started_at = None;
+                latest.transcript_events.push(chat_event(
+                    "progress",
+                    "Managed provider process exited after cancellation.",
+                    true,
+                    latest.provider_session_id.clone(),
+                    Some(json!({"source": "process_supervisor"})),
+                ));
+                self.finish_provider_operation(
+                    &operation.id,
+                    OperationState::Cancelled,
+                    "Provider turn cancelled after managed process exit",
+                )?;
+            } else {
+                match result {
+                    Ok(result) => {
+                        self.apply_provider_success(
+                            &mut latest,
+                            result,
+                            "Provider turn completed.",
+                        );
+                        self.finish_provider_operation(
+                            &operation.id,
+                            OperationState::Succeeded,
+                            "Provider turn completed",
+                        )?;
+                    }
+                    Err(error) => {
+                        let detail = format!("Provider turn failed: {error}");
+                        provider_failure = Some(detail.clone());
+                        self.apply_provider_failure(&mut latest, detail);
+                        self.finish_provider_operation(
+                            &operation.id,
+                            OperationState::Failed,
+                            "Provider turn failed",
+                        )?;
+                    }
                 }
             }
-            record.updated_at = now_timestamp();
-            self.write_record(&record)?;
+            latest.updated_at = now_timestamp();
+            self.write_record(&latest)?;
+            drop(_guard);
+            self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
+            drop(capacity);
         }
     }
 
+    fn append_capacity_wait_progress(&self, session_id: &str) -> RefineResult<()> {
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
+        let message = "Queued; waiting for shared agent capacity.";
+        let already_reported = record.transcript_events.iter().rev().take(10).any(|event| {
+            event_bool(event, "progress") && event_text(event).as_deref() == Some(message)
+        });
+        if !already_reported {
+            record.transcript_events.push(chat_event(
+                "progress",
+                message,
+                true,
+                record.provider_session_id.clone(),
+                Some(json!({"source": "agent_capacity"})),
+            ));
+            record.updated_at = now_timestamp();
+            self.write_record(&record)?;
+        }
+        Ok(())
+    }
+
     fn mark_dispatch_failure(&self, session_id: &str, detail: &str) -> RefineResult<()> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         record.queue_dispatching = false;
         record.in_flight = false;
@@ -952,6 +1284,7 @@ impl FileChatService {
         message_id: &str,
         text: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let text = text.trim();
         if text.is_empty() {
@@ -978,6 +1311,7 @@ impl FileChatService {
         session_id: &str,
         message_id: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         let before = record.queued_messages.len();
         record
@@ -991,6 +1325,38 @@ impl FileChatService {
         record.updated_at = now_timestamp();
         self.write_record(&record)?;
         Ok(record)
+    }
+}
+
+struct ChatSessionLock {
+    path: PathBuf,
+}
+
+struct ChatCapacityPermit {
+    service: Option<AgentCapacityService>,
+    owner_id: String,
+}
+
+impl ChatCapacityPermit {
+    fn unlimited() -> Self {
+        Self {
+            service: None,
+            owner_id: String::new(),
+        }
+    }
+}
+
+impl Drop for ChatCapacityPermit {
+    fn drop(&mut self) {
+        if let Some(service) = &self.service {
+            let _ = service.release(&self.owner_id);
+        }
+    }
+}
+
+impl Drop for ChatSessionLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
     }
 }
 
@@ -1008,6 +1374,7 @@ impl ChatService for FileChatService {
         session_id: &str,
         message: &str,
     ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         if record.closed {
             return Err(RefineError::Conflict(format!(
@@ -1032,6 +1399,8 @@ impl ChatService for FileChatService {
     }
 
     fn interrupt(&self, session_id: &str, detail: &str) -> RefineResult<ChatSessionRecord> {
+        self.request_session_process_termination(session_id)?;
+        let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
         record.closed = true;
         record.interrupted = true;
@@ -1106,6 +1475,7 @@ impl FileChatService {
         let attachment = match &record.attachment {
             ChatAttachment::Goal(id) => format!("Goal {id}"),
             ChatAttachment::Feature(id) => format!("Feature {id}"),
+            ChatAttachment::Supervisor => "supervisor agent".to_string(),
             ChatAttachment::Standalone => "standalone chat".to_string(),
         };
         let instructions = chat_mode_instructions(record);
@@ -1155,6 +1525,19 @@ impl FileChatService {
                     "updated": &feature.feature.updated
                 }))
             }
+            ChatAttachment::Supervisor => {
+                let supervisor =
+                    crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+                        &self.refine_dir,
+                        &self.runtime_root,
+                    )
+                    .snapshot()?;
+                serde_json::to_string_pretty(&json!({
+                    "type": "supervisor",
+                    "supervisor_agent": supervisor,
+                    "workflow": snapshot.runtime,
+                }))
+            }
             ChatAttachment::Standalone => {
                 let mut context = json!({
                     "type": "standalone",
@@ -1193,6 +1576,9 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
         ChatAttachment::Feature(_) => {
             "Discuss the attached Feature and focus on its included Goals, workflow state, and delivery plan."
         }
+        ChatAttachment::Supervisor => {
+            "Act as Refine's supervisor agent. Investigate workflow and runtime health, explain observations and bounded recovery options, and preserve existing confirmation and audit boundaries. Never silently expand destructive authority or disguise provider and authentication failures."
+        }
         ChatAttachment::Standalone => {
             "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Goal-ready behavior."
         }
@@ -1219,6 +1605,17 @@ fn chat_event(
         value["extra"] = extra;
     }
     value.as_object().cloned().unwrap_or_default()
+}
+
+fn chat_process_metadata(record: &ChatSessionRecord) -> JsonObject {
+    let mut metadata = JsonObject::new();
+    metadata.insert("kind".to_string(), json!("chat"));
+    metadata.insert("session_id".to_string(), json!(record.id));
+    metadata.insert("mode".to_string(), json!(record.mode));
+    if matches!(record.attachment, ChatAttachment::Supervisor) {
+        metadata.insert("agent_role".to_string(), json!("supervisor"));
+    }
+    metadata
 }
 
 fn event_text(event: &JsonObject) -> Option<String> {
@@ -1442,6 +1839,7 @@ mod tests {
 
     use super::*;
     use crate::tools::product::work_items::FileWorkItemService;
+    use crate::workflow::{WorkflowAutomation, WorkflowClaimState};
 
     #[test]
     fn file_chat_service_persists_session_transcript_and_stop() {
@@ -1471,12 +1869,6 @@ mod tests {
             streamed
                 .lines
                 .iter()
-                .any(|line| line.contains("What should I test?"))
-        );
-        assert!(
-            streamed
-                .lines
-                .iter()
                 .any(|line| line.contains("provider says hello"))
                 || streamed
                     .progress_lines
@@ -1493,6 +1885,12 @@ mod tests {
         });
         let read = service.read(&session.id).unwrap();
         assert!(read.alive);
+        assert!(record.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|line| line.contains("What should I test?"))
+        }));
         assert!(record.transcript_events.iter().any(|event| {
             event
                 .get("text")
@@ -1535,19 +1933,22 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("streamed activity line"))
         );
-        let completed = wait_for_chat_read(&service, &session.id, |read| {
-            !read.in_flight
-                && read
-                    .lines
-                    .iter()
-                    .any(|line| line.contains("final response line"))
+        let completed = wait_for_chat_read(&service, &session.id, |read| !read.in_flight);
+        assert!(!completed.in_flight);
+        let record = wait_for_chat_record(&service, &session.id, |record| {
+            record.transcript_events.iter().any(|event| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|line| line.contains("final response line"))
+            })
         });
-        assert!(
-            completed
-                .lines
-                .iter()
-                .any(|line| line.contains("final response line"))
-        );
+        assert!(record.transcript_events.iter().any(|event| {
+            event
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|line| line.contains("final response line"))
+        }));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1722,6 +2123,165 @@ mod tests {
                 .as_deref()
                 .unwrap_or("")
                 .contains("provider failed")
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn supervisor_chat_provider_failure_is_shared_with_supervisor_state() {
+        let temp_root = unique_temp_dir("supervisor-chat-failure");
+        init_git_app(&temp_root);
+        let refine_dir =
+            crate::tools::host::project_layout::prepare_refine_dir(&temp_root).unwrap();
+        write_fake_provider(&refine_dir, "smoke-ai", 2, "provider auth failed");
+        let service = FileChatService::new(&refine_dir);
+        FileSettingsService::with_active_root(&refine_dir, &service.runtime_root)
+            .update(&json!({"agent_cli": "smoke-ai"}))
+            .unwrap();
+        let session = service
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+
+        service
+            .append_user_message(&session.id, "investigate")
+            .unwrap();
+        wait_for_chat_record(&service, &session.id, |record| record.interrupted);
+        let state = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
+            &refine_dir,
+            &service.runtime_root,
+        )
+        .snapshot()
+        .unwrap();
+        assert_eq!(state.health, "degraded");
+        assert!(state.events.iter().any(|event| {
+            event.kind == "failure"
+                && event.message.contains("provider auth failed")
+                && event.actionable
+        }));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn supervisor_and_workflow_share_capacity_and_preserve_the_queue() {
+        let temp_root = unique_temp_dir("supervisor-workflow-capacity");
+        let refine_dir = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        write_fake_provider(&refine_dir, "smoke-ai", 0, "shared capacity response");
+        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "parallel_run_cap": "1",
+                "parallel_per_node_cap": "1",
+                "parallel_per_provider_cap": "1",
+                "parallel_per_target_app_cap": "1"
+            }))
+            .unwrap();
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Capacity one", Some("GOAL1"))
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        let workflow = WorkflowEngine::with_target_root(&runtime_root, &temp_root);
+        let claim = workflow.claim("GOAL1").unwrap();
+        let execution = workflow.start_claim(&claim).unwrap();
+
+        let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
+        let supervisor = chat
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+        chat.append_user_message(&supervisor.id, "wait durably")
+            .unwrap();
+        let waiting = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            !record.queued_messages.is_empty()
+                && record.transcript_events.iter().any(|event| {
+                    event
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| text.contains("waiting for shared agent capacity"))
+                })
+        });
+        assert_eq!(waiting.queued_messages.len(), 1);
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .iter()
+                .all(|lease| lease.role == "workflow")
+        );
+
+        workflow.cancel(&execution).unwrap();
+        let completed = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            record.queued_messages.is_empty()
+                && !record.queue_dispatching
+                && record.transcript_events.iter().any(|event| {
+                    event
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| text.contains("shared capacity response"))
+                })
+        });
+        assert!(completed.queued_messages.is_empty());
+
+        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+            .update(&json!({
+                "parallel_run_cap": "2",
+                "parallel_per_node_cap": "2",
+                "parallel_per_provider_cap": "2",
+                "parallel_per_target_app_cap": "2"
+            }))
+            .unwrap();
+        work_items
+            .create_goal_summary("Capacity two", Some("GOAL2"))
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL2", GoalStatus::Todo)
+            .unwrap();
+        let claim = workflow.claim("GOAL2").unwrap();
+        let execution = workflow.start_claim(&claim).unwrap();
+        chat.append_user_message(&supervisor.id, "run concurrently")
+            .unwrap();
+        let concurrent = wait_for_chat_record(&chat, &supervisor.id, |record| {
+            record.transcript_events.iter().any(|event| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| text.contains("shared capacity response"))
+            }) && record.queued_messages.is_empty()
+                && !record.queue_dispatching
+        });
+        assert!(concurrent.queued_messages.is_empty());
+        assert_eq!(
+            workflow
+                .load_state()
+                .unwrap()
+                .claims
+                .iter()
+                .find(|claim| claim.goal_id == "GOAL2")
+                .unwrap()
+                .state,
+            WorkflowClaimState::Running
+        );
+        workflow.cancel(&execution).unwrap();
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
         );
 
         fs::remove_dir_all(temp_root).unwrap();

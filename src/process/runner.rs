@@ -17,6 +17,7 @@ use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::tools::product::supervisor_agent::FileSupervisorAgentService;
 use crate::workflow::WorkflowEngine;
 
 pub const WORKFLOW_RUNNER: &str = "workflow";
@@ -133,24 +134,70 @@ fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
                 .canonicalize()
                 .unwrap_or_else(|_| target_root.clone());
             let workflow = WorkflowEngine::with_target_root(runtime_root, &target_root);
+            let supervisor_agent =
+                FileSupervisorAgentService::new(prepare_refine_dir(&target_root)?, runtime_root);
+            // Coordinate the ordinary supervisor CLI agent before workflow evaluation can block
+            // on a Goal provider process. This lets both agents run through the shared process
+            // supervisor during the same active-work window.
+            if let Err(error) = supervisor_agent.reconcile() {
+                eprintln!("refine supervisor agent: {error}");
+            }
             if recovered_root.as_ref() != Some(&root) {
                 match workflow.fail_interrupted_goals(
                     "workflow runner stopped before the Goal completed; restart the Goal when ready",
                 ) {
                     Ok(count) if count > 0 => {
                         let _ = refresh_projection(runtime_root, &target_root);
+                        let _ = supervisor_agent.record_recovery(
+                            "restart",
+                            "Daemon restart recovery",
+                            format!(
+                                "marked {count} interrupted Goal(s) failed so they can be restarted"
+                            ),
+                            true,
+                        );
                     }
-                    Ok(_) => {}
-                    Err(error) => eprintln!("refine workflow recovery: {error}"),
+                    Ok(_) => {
+                        let _ = supervisor_agent.record_recovery(
+                            "restart",
+                            "Daemon restart recovery",
+                            "no interrupted Goals required repair",
+                            true,
+                        );
+                    }
+                    Err(error) => {
+                        let _ = supervisor_agent.record_failure(
+                            "restart",
+                            format!("Workflow restart recovery failed: {error}"),
+                            true,
+                        );
+                        eprintln!("refine workflow recovery: {error}");
+                    }
                 }
                 recovered_root = Some(root);
             }
             match workflow.evaluate_workflow() {
                 Ok(_) => {
                     let _ = refresh_projection(runtime_root, &target_root);
+                    let _ = supervisor_agent.record_recovery(
+                        "workflow",
+                        "Workflow evaluation",
+                        "completed without an engine error",
+                        true,
+                    );
+                    let _ = supervisor_agent.reconcile();
                 }
-                Err(RefineError::Conflict(message)) if message.contains("paused") => {}
-                Err(error) => eprintln!("refine workflow runner: {error}"),
+                Err(RefineError::Conflict(message)) if message.contains("paused") => {
+                    let _ = supervisor_agent.reconcile();
+                }
+                Err(error) => {
+                    let _ = supervisor_agent.record_failure(
+                        "workflow",
+                        format!("Workflow evaluation failed: {error}"),
+                        true,
+                    );
+                    eprintln!("refine workflow runner: {error}");
+                }
             }
         }
         thread::sleep(WORKFLOW_INTERVAL);
@@ -182,6 +229,9 @@ fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
                 active_schedule = None;
             }
             let service = FileGitSyncService::new(&target_root, runtime_root);
+            let supervisor_agent = prepare_refine_dir(&target_root)
+                .ok()
+                .map(|refine_dir| FileSupervisorAgentService::new(refine_dir, runtime_root));
             if let Ok(fingerprint) = service.durable_state_fingerprint() {
                 let schedule = git_sync_schedule(runtime_root, &target_root).unwrap_or_default();
                 if active_schedule != Some(schedule) {
@@ -217,8 +267,26 @@ fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
                                 .map(|interval| now + interval);
                             next_attempt = now;
                             let _ = refresh_projection(runtime_root, &target_root);
+                            if let Some(supervisor_agent) = &supervisor_agent {
+                                let _ = supervisor_agent.record_recovery(
+                                    "state_sync",
+                                    "Refine state synchronization",
+                                    "state synchronized and projection refreshed",
+                                    true,
+                                );
+                            }
                         }
-                        Ok(_) | Err(_) => {
+                        Ok(_) => {
+                            next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
+                        }
+                        Err(error) => {
+                            if let Some(supervisor_agent) = &supervisor_agent {
+                                let _ = supervisor_agent.record_failure(
+                                    "state_sync",
+                                    format!("Refine state synchronization failed: {error}"),
+                                    true,
+                                );
+                            }
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
                     }

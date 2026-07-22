@@ -197,6 +197,37 @@ pub struct FileProcessSupervisor {
 }
 
 impl FileProcessSupervisor {
+    /// Requests termination without removing the managed-process record. The process runner owns
+    /// final reaping and artifact cleanup, so callers can keep capacity reserved until the real
+    /// child has exited.
+    pub fn request_termination(
+        &self,
+        process_id: &str,
+        signal: &str,
+    ) -> RefineResult<ManagedProcess> {
+        if !matches!(signal, "stop" | "terminate" | "kill") {
+            return Err(RefineError::InvalidInput(format!(
+                "unsupported termination signal {signal}"
+            )));
+        }
+        let process = self.inspect(process_id)?;
+        if let Some(pid) = process.pid {
+            let _ = signal_os_process(pid, signal)?;
+        }
+        // Keep structured metadata byte-for-byte intact while the runner reaps the child. Session
+        // and execution lookup must remain authoritative during the stopping window.
+        self.write_process(&process)?;
+        Ok(process)
+    }
+
+    pub fn process_is_alive(process: &ManagedProcess) -> RefineResult<bool> {
+        process
+            .pid
+            .map(pid_alive)
+            .transpose()
+            .map(|alive| alive.unwrap_or(false))
+    }
+
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
@@ -622,6 +653,10 @@ impl FileProcessSupervisor {
         )
         .authorize_host_command("process_supervisor", &authorization_command)
     }
+}
+
+pub fn managed_pid_is_alive(pid: u32) -> RefineResult<bool> {
+    pid_alive(pid)
 }
 
 impl ProcessSupervisor for FileProcessSupervisor {
@@ -1162,6 +1197,9 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
     }
     #[cfg(not(windows))]
     {
+        if pid > i32::MAX as u32 {
+            return Ok(false);
+        }
         if unix_pid_is_zombie(pid)? {
             return Ok(false);
         }
@@ -1370,6 +1408,47 @@ mod tests {
             std::thread::sleep(Duration::from_millis(25));
         }
         assert!(child.try_wait().unwrap().is_some());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn requested_termination_keeps_registry_truth_until_process_exit() {
+        let temp_root = unique_temp_dir("process-request-termination");
+        let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080/agents"));
+        let mut child = Command::new("sleep").arg("30").spawn().unwrap();
+        let process = supervisor
+            .register(ManagedProcess {
+                id: "managed-agent-stop".to_string(),
+                owner: ProcessOwner::Agent,
+                pid: Some(child.id()),
+                state: "running".to_string(),
+                label: Some("sleep".to_string()),
+                details: Some(json!({"session_id": "CHAT1"}).to_string()),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        let stopping = supervisor
+            .request_termination(&process.id, "terminate")
+            .unwrap();
+        assert_eq!(stopping.state, "running");
+        assert!(supervisor.inspect(&process.id).is_ok());
+        for _ in 0..40 {
+            if child.try_wait().unwrap().is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        assert!(child.try_wait().unwrap().is_some());
+        assert!(!FileProcessSupervisor::process_is_alive(&stopping).unwrap());
+        assert!(supervisor.recover().unwrap().is_empty());
+        assert!(supervisor.inspect(&process.id).is_err());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
