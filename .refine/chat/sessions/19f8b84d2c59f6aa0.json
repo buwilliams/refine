@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:30:36Z",
+  "updated_at": "2026-07-22T20:31:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -111,9 +111,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The failure is substantive, not merely a provider/authentication error: the candidate committed successfully and then governance rejected it on eight concrete architecture, recovery, concurrency, evidence, migration, and documentation findings. I’m checking whether its branch/worktree and candidate commit remain intact before deciding what can safely happen next."
+    },
+    {
+      "created_at": "2026-07-22T20:31:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752290660-25",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No work is currently running or queued. The only actionable item is failed Goal `00000SZ2TPQM61AGWJW8XC4001`.\n\n- Candidate commit `b04ac0c9` and its worktree remain intact and clean.\n- The failure is a post-implementation governance rejection with eight concrete findings—not a current provider/authentication failure.\n- Retrying would start another implementation round to address those findings; it should return the Goal to `todo`, not retry only the Quality stage.\n- I made no state changes, merges, or worktree modifications.\n\nDo you authorize retrying this Goal, or should it remain failed?\n\nEvidence: [goal.json](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/goal.json) and [logs.jsonl](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/logs.jsonl)."
+    },
+    {
+      "created_at": "2026-07-22T20:31:30Z",
+      "delivered": false,
+      "id": "evt-1784752290771-27",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No work is currently running or queued. The only actionable item is failed Goal `00000SZ2TPQM61AGWJW8XC4001`.\n\n- Candidate commit `b04ac0c9` and its worktree remain intact and clean.\n- The failure is a post-implementation governance rejection with eight concrete findings—not a current provider/authentication failure.\n- Retrying would start another implementation round to address those findings; it should return the Goal to `todo`, not retry only the Quality stage.\n- I made no state changes, merges, or worktree modifications.\n\nDo you authorize retrying this Goal, or should it remain failed?\n\nEvidence: [goal.json](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/goal.json) and [logs.jsonl](/home/buddy/projects/refine-next/.git/refine-live-state/goals/00/000SZ2TPQM61AGWJW8XC4001/logs.jsonl)."
+    },
+    {
+      "created_at": "2026-07-22T20:31:30Z",
+      "delivered": false,
+      "id": "evt-1784752290771-28",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
