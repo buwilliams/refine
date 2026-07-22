@@ -299,28 +299,76 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T12:35:18Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T12:58:14Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-4",
+        "failed_actions": [
+          {
+            "message": "QualityOperationRunner checks cancellation before finish_with_result but ignores the returned operation state. If cancellation wins between those calls, finish_with_result preserves Cancelled, yet the runner returns success, persists passing Goal evidence, and may advance workflow despite the cancelled operation.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "WorkflowEngine::cancel marks a Running claim Cancelled before considering correlated Quality operation state. If that operation has already become Failed or Interrupted but its worker has not updated the claim, the operation remains terminal while the claim becomes Cancelled, and terminal-state protection prevents later correction, leaving conflicting durable outcomes.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Governance review found two cancellation-state violations.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"QualityOperationRunner checks cancellation before finish_with_result but ignores the returned operation state. If cancellation wins between those calls, finish_with_result preserves Cancelled, yet the runner returns success, persists passing Goal evidence, and may advance workflow despite the cancelled operation.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"WorkflowEngine::cancel marks a Running claim Cancelled before considering correlated Quality operation state. If that operation has already become Failed or Interrupted but its worker has not updated the claim, the operation remains terminal while the claim becomes Cancelled, and terminal-state protection prevents later correction, leaving conflicting durable outcomes.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Governance review found two cancellation-state violations.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "QualityOperationRunner checks cancellation before finish_with_result but ignores the returned operation state. If cancellation wins between those calls, finish_with_result preserves Cancelled, yet the runner returns success, persists passing Goal evidence, and may advance workflow despite the cancelled operation.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "WorkflowEngine::cancel marks a Running claim Cancelled before considering correlated Quality operation state. If that operation has already become Failed or Interrupted but its worker has not updated the claim, the operation remains terminal while the claim becomes Cancelled, and terminal-state protection prevents later correction, leaving conflicting durable outcomes.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF255HWFA0G9XVA006-round-4"
+      },
+      "governance_message": "Governance review found two cancellation-state violations.",
+      "governance_rule_actions": [
+        {
+          "message": "QualityOperationRunner checks cancellation before finish_with_result but ignores the returned operation state. If cancellation wins between those calls, finish_with_result preserves Cancelled, yet the runner returns success, persists passing Goal evidence, and may advance workflow despite the cancelled operation.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "WorkflowEngine::cancel marks a Running claim Cancelled before considering correlated Quality operation state. If that operation has already become Failed or Interrupted but its worker has not updated the claim, the operation remains terminal while the claim becomes Cancelled, and terminal-state protection prevents later correction, leaving conflicting durable outcomes.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
       "implementation_report": "Goal `00000SZ2CF255HWFA0G9XVA006` is complete and reviewable.\n\nCommit: `d13adee` — `Fix Quality cancellation and restart recovery`\n\nChanged:\n\n- Terminal operation and claim outcomes are immutable; late cancellation/completion cannot erase failure or interruption evidence.\n- Cancellation only affects active owned work.\n- Restart recovery now correlates current running claims and executions, ignoring unrelated historical cancellations.\n- Recovery interrupts Quality operations, terminates managed processes, releases capacity, and records correlated logs.\n\nVerification:\n\n- Focused cancellation/recovery tests: 6 passed.\n- Workflow tests: 32 passed.\n- `cargo test --all-targets --no-fail-fast`: passed, 0 failures.\n- `cargo fmt --all -- --check`: passed.\n- `cargo clippy --all-targets -- -D warnings`: passed.\n- `git diff --check`: passed.\n- Independent read-only governance: `passed`, no violations.\n- Preserved candidate patch ID matches `6afbef6`.\n- Worktree is clean.",
       "implementation_reported_at": "2026-07-22T12:53:54Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate 6afbef60b2634915965f0dc5f723b9ada4952f1b and fix the two independent Rule 4 governance violations from Round 3 without reopening the already-remediated architecture. First, make workflow/Quality cancellation terminal-precedence safe: a cancellation request after a Quality operation is Failed or Interrupted must preserve that durable terminal status, error, logs, and failure feedback; only genuinely active owned operations may transition to Cancelled. Align WorkflowEngine::cancel and the shared operation registry so terminal outcomes cannot be rewritten. Second, make daemon restart recovery execution-aware rather than Goal-history-aware: a historical Cancelled claim for a Goal must not suppress interruption/recovery of a later current Running claim for that same Goal. Correlate the current execution/claim and recover each live claim independently. Add deterministic race and restart tests covering cancel-after-failure, cancel-after-interruption, historical-cancelled plus newer-running claim, operation/process/claim cleanup, and preserved evidence. Retain the shared evaluate-and-persist Quality service, settings migration, immutable timing snapshot, docs, and API/workflow parity from candidate 6afbef6. Run focused tests, all-target tests, fmt, clippy, diff integrity, and independent governance.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:53:54Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T12:58:14Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:53:54Z"
+  "updated": "2026-07-22T12:58:15Z"
 }
