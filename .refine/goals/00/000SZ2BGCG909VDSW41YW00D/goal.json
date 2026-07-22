@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-4",
-  "candidate_commit": "3eae45f513698e89b90b2358454e7efb29573cae",
+  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-5",
+  "candidate_commit": null,
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -261,9 +261,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:43:01Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:44:04Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 3eae45f513698e89b90b2358454e7efb29573cae and fix the two independent restart-recovery findings from Round 4. Wire the existing durable operation recovery capability into the actual production daemon startup/restart path used by run_system_start and lifecycle.start/recover_runtime_state_with_progress. After a daemon stop/restart kills an owned Jira export worker, the durable Running export operation must be atomically marked Interrupted with inspectable evidence so the existing retry_jira_export path is available; it must never remain stale Running. Keep recovery in the shared daemon/operation capability, not a web route. Replace or extend the manual FileDaemonLifecycleService::recover test with a production-path integration test that exercises the real start/restart entry path, associates a managed Jira export process, proves process termination plus Running-to-Interrupted recovery, then proves retry can start a new supervised operation without losing prior logs. Retain all shared cancellation orchestration, UI semantics, race handling, and failure reporting from 3eae45f. Run the smallest production restart integration plus focused operation/API tests, full Rust library and browser suites, fmt, clippy, syntax, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:44:04Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:43:01Z"
+  "updated": "2026-07-22T12:44:06Z"
 }
