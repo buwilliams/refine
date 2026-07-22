@@ -31,10 +31,18 @@ class FakeElement {
     this.dataset = {};
     this.disabled = false;
     this.hidden = false;
-    this.innerHTML = "";
+    this._innerHTML = "";
+    this.innerHTMLWrites = 0;
     this.textContent = "";
     this.value = "";
     this.style = {};
+    this.scrollTop = 0;
+  }
+
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(value) {
+    this._innerHTML = String(value);
+    this.innerHTMLWrites += 1;
   }
 
   addEventListener() {}
@@ -70,6 +78,8 @@ class FakeEventSource {
 function browserRuntime(storage = new Map()) {
   const toolbar = new FakeElement();
   const toggleButton = new FakeElement();
+  const supervisorPanel = new FakeElement();
+  const supervisorEvents = new FakeElement();
   const toasts = [];
   const busyLabels = [];
   const body = {
@@ -90,6 +100,16 @@ function browserRuntime(storage = new Map()) {
     },
     querySelectorAll() { return []; },
   };
+  toolbar.querySelector = (selector) => {
+    if (
+      selector === '[data-testid="toolbar-supervisor-panel"]'
+      && toolbar.innerHTML.includes('data-testid="toolbar-supervisor-panel"')
+    ) return supervisorPanel;
+    return null;
+  };
+  supervisorPanel.querySelector = (selector) => (
+    selector === '[data-testid="supervisor-agent-events"]' ? supervisorEvents : null
+  );
   const context = vm.createContext({
     AbortController,
     EventSource: FakeEventSource,
@@ -155,8 +175,12 @@ function browserRuntime(storage = new Map()) {
   `, context);
   return {
     busyLabels,
-    html: () => toolbar.innerHTML,
+    html: () => toolbar.innerHTML + supervisorPanel.innerHTML,
     runtime: context.supervisorToolbarTest,
+    supervisorEventScroll: () => supervisorEvents.scrollTop,
+    supervisorStatusHtml: () => supervisorPanel.innerHTML,
+    toolbarRenderCount: () => toolbar.innerHTMLWrites,
+    setSupervisorEventScroll(value) { supervisorEvents.scrollTop = value; },
     toasts,
   };
 }
@@ -296,6 +320,34 @@ test("polling and SSE reconnect refresh health, events, and conversation without
     ["GET", "/api/supervisor-agent"],
     ["GET", "/api/supervisor-agent"],
   ]);
+});
+
+test("polling refreshes supervisor status without replacing the prompt or moving scroll position", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setAttached();
+  browser.runtime.activate();
+  browser.runtime.draw();
+  browser.setSupervisorEventScroll(37);
+  const toolbarRenderCount = browser.toolbarRenderCount();
+  browser.runtime.setApi(async () => ({
+    supervisor_agent: snapshot({
+      lifecycle: "supervising",
+      active_work: 1,
+      events: [{
+        kind: "observation",
+        status: "running",
+        message: "Queue observation refreshed",
+        created_at: "2026-07-21T22:00:01Z",
+      }],
+    }),
+  }));
+
+  await browser.runtime.load();
+
+  assert.equal(browser.toolbarRenderCount(), toolbarRenderCount);
+  assert.match(browser.supervisorStatusHtml(), /supervising/);
+  assert.match(browser.supervisorStatusHtml(), /Queue observation refreshed/);
+  assert.equal(browser.supervisorEventScroll(), 37);
 });
 
 test("initial prompts and active-work follow-ups share chat APIs and render every outcome", async () => {

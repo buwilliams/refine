@@ -866,38 +866,55 @@ function syncToolbarTabActivityIndicators() {
 }
 
 function renderSupervisorPanel(active, chatOptions) {
+  return `
+    <section class="supervisor-agent-panel" data-testid="toolbar-supervisor-panel">
+      ${renderSupervisorAgentStatus()}
+    </section>
+    <div class="supervisor-agent-conversation" data-testid="supervisor-agent-conversation">
+      ${renderChatPanel(active, chatOptions)}
+    </div>`;
+}
+
+function renderSupervisorAgentStatus() {
   const state = supervisorAgentState.snapshot;
   const events = Array.isArray(state?.events) ? state.events.slice(-80).reverse() : [];
   const health = String(state?.health || (supervisorAgentState.error ? "unavailable" : "unknown"));
   const lifecycle = String(state?.lifecycle || (supervisorAgentState.loading ? "loading" : "unknown"));
   return `
-    <section class="supervisor-agent-panel" data-testid="toolbar-supervisor-panel">
-      <div class="supervisor-agent-summary" data-testid="supervisor-agent-summary">
-        <span class="supervisor-agent-health supervisor-agent-health-${htmlEscape(health)}"
-              data-testid="supervisor-agent-health">${htmlEscape(health)}</span>
-        <strong data-testid="supervisor-agent-lifecycle">${htmlEscape(lifecycle)}</strong>
-        <span>${Number(state?.active_work || 0)} active</span>
-        <span>${Number(state?.queued_work || 0)} queued</span>
-        <span>${Number(state?.failed_work || 0)} failed</span>
-        <span class="muted small">${htmlEscape(state?.supervisor_process || "daemon-supervised workflow runner")}</span>
-        <span class="spacer"></span>
-        <span class="muted small" title="${htmlEscape(state?.updated_at || "")}">${htmlEscape(supervisorAgentUpdatedLabel(state?.updated_at))}</span>
-      </div>
-      ${supervisorAgentState.error ? `
-        <div class="supervisor-agent-error" data-testid="supervisor-agent-error">
-          ${htmlEscape(supervisorAgentState.error)}
-        </div>` : ""}
-      <div class="supervisor-agent-events" role="log" aria-live="polite"
-           aria-label="Supervisor observations and recoveries" data-testid="supervisor-agent-events">
-        ${events.length ? events.map(renderSupervisorAgentEvent).join("") : `
-          <div class="muted small supervisor-agent-empty" data-testid="supervisor-agent-empty">
-            The supervisor agent is idle. It remains available for prompts and will observe queued workflow work.
-          </div>`}
-      </div>
-    </section>
-    <div class="supervisor-agent-conversation" data-testid="supervisor-agent-conversation">
-      ${renderChatPanel(active, chatOptions)}
+    <div class="supervisor-agent-summary" data-testid="supervisor-agent-summary">
+      <span class="supervisor-agent-health supervisor-agent-health-${htmlEscape(health)}"
+            data-testid="supervisor-agent-health">${htmlEscape(health)}</span>
+      <strong data-testid="supervisor-agent-lifecycle">${htmlEscape(lifecycle)}</strong>
+      <span>${Number(state?.active_work || 0)} active</span>
+      <span>${Number(state?.queued_work || 0)} queued</span>
+      <span>${Number(state?.failed_work || 0)} failed</span>
+      <span class="muted small">${htmlEscape(state?.supervisor_process || "daemon-supervised workflow runner")}</span>
+      <span class="spacer"></span>
+      <span class="muted small" title="${htmlEscape(state?.updated_at || "")}">${htmlEscape(supervisorAgentUpdatedLabel(state?.updated_at))}</span>
+    </div>
+    ${supervisorAgentState.error ? `
+      <div class="supervisor-agent-error" data-testid="supervisor-agent-error">
+        ${htmlEscape(supervisorAgentState.error)}
+      </div>` : ""}
+    <div class="supervisor-agent-events" role="log" aria-live="polite"
+         aria-label="Supervisor observations and recoveries" data-testid="supervisor-agent-events">
+      ${events.length ? events.map(renderSupervisorAgentEvent).join("") : `
+        <div class="muted small supervisor-agent-empty" data-testid="supervisor-agent-empty">
+          The supervisor agent is idle. It remains available for prompts and will observe queued workflow work.
+        </div>`}
     </div>`;
+}
+
+function refreshSupervisorAgentStatus() {
+  const root = $("#toolbar-dock");
+  const panel = root?.querySelector('[data-testid="toolbar-supervisor-panel"]');
+  if (!panel) return false;
+  const previousEvents = panel.querySelector('[data-testid="supervisor-agent-events"]');
+  const eventsScrollTop = previousEvents?.scrollTop || 0;
+  panel.innerHTML = renderSupervisorAgentStatus();
+  const nextEvents = panel.querySelector('[data-testid="supervisor-agent-events"]');
+  if (nextEvents) nextEvents.scrollTop = eventsScrollTop;
+  return true;
 }
 
 function renderSupervisorAgentEvent(event) {
@@ -923,6 +940,7 @@ function supervisorAgentUpdatedLabel(updatedAt) {
 async function loadSupervisorAgentState() {
   if (supervisorAgentState.loading || !state.project?.attached) return;
   supervisorAgentState.loading = true;
+  let conversationChanged = false;
   try {
     const response = await api("GET", "/api/supervisor-agent");
     const snapshot = response?.supervisor_agent || null;
@@ -935,16 +953,20 @@ async function loadSupervisorAgentState() {
       tab.sessionId = serverSessionId;
       tab.closedReason = null;
       saveChatStateToStorage();
+      conversationChanged = true;
     } else if (!serverSessionId && tab.sessionId && !tab.starting && !tab.pending) {
       tab.sessionId = null;
       saveChatStateToStorage();
+      conversationChanged = true;
     }
   } catch (error) {
     supervisorAgentState.error = error.message || String(error);
   } finally {
     supervisorAgentState.loading = false;
   }
-  if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) drawToolbar();
+  if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) {
+    if (conversationChanged || !refreshSupervisorAgentStatus()) drawToolbar();
+  }
 }
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
