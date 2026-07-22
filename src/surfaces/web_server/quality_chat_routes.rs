@@ -21,7 +21,12 @@ impl InProcessWebServer {
             return runtime_root_unavailable("load supervisor agent state");
         };
         let service = FileSupervisorAgentService::new(&refine_dir, runtime_root);
-        let result = service.reconcile_chat_session(&self.chat_service(&refine_dir));
+        // The workflow runner can be blocked in a deliberately long Goal provider turn. Reuse
+        // the same reconciler here so API reads (including the existing SSE-driven toolbar read)
+        // project current workflow truth instead of the snapshot that launched that turn.
+        let result = service
+            .reconcile()
+            .and_then(|_| service.reconcile_chat_session(&self.chat_service(&refine_dir)));
         match result {
             Ok(state) => ApiResponse::json(200, json!({"ok": true, "supervisor_agent": state})),
             Err(error) => error_response(error),

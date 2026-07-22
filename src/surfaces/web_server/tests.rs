@@ -7,6 +7,7 @@ use crate::tools::observability::activity::{ActivityService, FileActivityService
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
+use chrono::Utc;
 use serde_json::json;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -5189,6 +5190,27 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
         .update(&json!({"agent_cli": "smoke-ai"}))
         .unwrap();
 
+    let goal_path = refine_dir.join("goals/GO/GOAL1/goal.json");
+    fs::create_dir_all(goal_path.parent().unwrap()).unwrap();
+    let write_goal_status = |status: &str| {
+        fs::write(
+            &goal_path,
+            serde_json::to_vec_pretty(&json!({
+                "id": "GOAL1",
+                "name": "Live Supervisor state",
+                "status": status,
+                "created": "2026-07-22T12:00:00Z",
+                "updated": Utc::now().to_rfc3339(),
+                "priority": "low",
+                "reporter": "test",
+                "rounds": []
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    };
+    write_goal_status("review");
+
     let state = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/supervisor-agent".to_string(),
@@ -5197,6 +5219,14 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
     assert_eq!(state.status, 200);
     assert_eq!(state.body["supervisor_agent"]["lifecycle"], "idle");
     assert_eq!(state.body["supervisor_agent"]["health"], "healthy");
+    assert_eq!(
+        state.body["supervisor_agent"]["goal_states"]["GOAL1"],
+        "review"
+    );
+    let review_updated_at = state.body["supervisor_agent"]["updated_at"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let override_attempt = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -5226,6 +5256,8 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
     assert_eq!(first.body["mode"], "supervisor");
     assert_eq!(first.body["provider"], "smoke-ai");
 
+    write_goal_status("done");
+
     let restored = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/supervisor-agent".to_string(),
@@ -5234,6 +5266,23 @@ fn web_server_shares_supervisor_state_and_singleton_chat_session() {
     assert_eq!(
         restored.body["supervisor_agent"]["session_id"],
         first.body["session_id"]
+    );
+    assert_eq!(
+        restored.body["supervisor_agent"]["goal_states"]["GOAL1"],
+        "done"
+    );
+    assert_ne!(
+        restored.body["supervisor_agent"]["updated_at"]
+            .as_str()
+            .unwrap(),
+        review_updated_at
+    );
+    assert!(
+        restored.body["supervisor_agent"]["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["message"] == "Goal GOAL1 changed from review to done.")
     );
     assert!(refine_dir.join("supervisor-agent.json").exists());
 

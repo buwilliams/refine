@@ -337,6 +337,7 @@ impl FileSupervisorAgentService {
         state.failed_work = failed;
         state.health = snapshot_health(failed, &state.open_issues).to_string();
 
+        let mut context_session = None;
         if active_window {
             let has_open_session = chat.list_sessions()?.into_iter().any(|session| {
                 !session.closed && matches!(session.attachment, ChatAttachment::Supervisor)
@@ -360,53 +361,25 @@ impl FileSupervisorAgentService {
                 }
                 state.session_id = Some(session.id.clone());
                 state.provider = Some(session.provider.clone());
-                let provider_blocked = session.interrupted
-                    && session
-                        .interruption_detail
-                        .as_deref()
-                        .is_some_and(provider_failure_requires_user);
-                if session.interrupted && !provider_blocked {
-                    // A daemon/process interruption is safe to resume through the existing chat
-                    // queue and provider-session ID. Provider/auth failures instead wait for user
-                    // action so the coordinator never disguises or loops over them.
-                    state.last_context_key.clear();
-                }
-                let context_key = supervision_context_key(&state, &process_evidence);
-                if context_key != state.last_context_key && !provider_blocked {
-                    let prompt = supervision_prompt(&state, &process_evidence, &stalled);
-                    match chat.append_user_message(&session.id, &prompt) {
-                        Ok(_) => {
-                            state.last_context_key = context_key;
-                            push_event(
-                            &mut state,
-                            "decision",
-                            "running",
-                            "Queued active-work evidence to the singleton supervisor CLI agent."
-                                .to_string(),
-                            None,
-                            false,
-                            false,
-                        );
-                        }
-                        Err(error) => {
-                            let message =
-                                format!("Could not queue supervisor CLI-agent context: {error}");
-                            state
-                                .open_issues
-                                .insert("provider".to_string(), message.clone());
-                            push_event(&mut state, "failure", "error", message, None, true, true);
-                        }
-                    }
-                } else if provider_blocked {
-                    let message = session
-                        .interruption_detail
-                        .clone()
-                        .unwrap_or_else(|| "Supervisor provider turn is interrupted.".to_string());
-                    state.open_issues.insert("provider".to_string(), message);
-                }
+                context_session = Some(session);
             }
         } else {
-            state.last_context_key.clear();
+            // A Goal can reach failed, review, or done while the singleton Supervisor provider
+            // turn is still running. Keep those final transitions in the same durable queue and
+            // transcript, but do not wake an otherwise idle Supervisor session.
+            context_session = chat.list_sessions()?.into_iter().find(|session| {
+                !session.closed
+                    && matches!(session.attachment, ChatAttachment::Supervisor)
+                    && (session.queue_dispatching
+                        || !session.queued_messages.is_empty()
+                        || process_evidence.supervisor_sessions.contains(&session.id))
+            });
+            if let Some(session) = &context_session {
+                state.session_id = Some(session.id.clone());
+                state.provider = Some(session.provider.clone());
+            } else {
+                state.last_context_key.clear();
+            }
             if process_evidence.supervisor_sessions.is_empty() && before.lifecycle != "idle" {
                 push_event(
                     &mut state,
@@ -418,6 +391,53 @@ impl FileSupervisorAgentService {
                     false,
                     false,
                 );
+            }
+        }
+
+        if let Some(session) = context_session {
+            let provider_blocked = session.interrupted
+                && session
+                    .interruption_detail
+                    .as_deref()
+                    .is_some_and(provider_failure_requires_user);
+            if session.interrupted && !provider_blocked {
+                // A daemon/process interruption is safe to resume through the existing chat
+                // queue and provider-session ID. Provider/auth failures instead wait for user
+                // action so the coordinator never disguises or loops over them.
+                state.last_context_key.clear();
+            }
+            let context_key = supervision_context_key(&state, &process_evidence);
+            if context_key != state.last_context_key && !provider_blocked {
+                let prompt = supervision_prompt(&state, &process_evidence, &stalled);
+                match chat.append_user_message(&session.id, &prompt) {
+                    Ok(_) => {
+                        state.last_context_key = context_key;
+                        push_event(
+                            &mut state,
+                            "decision",
+                            "running",
+                            "Queued current workflow evidence to the singleton supervisor CLI agent."
+                                .to_string(),
+                            None,
+                            false,
+                            false,
+                        );
+                    }
+                    Err(error) => {
+                        let message =
+                            format!("Could not queue supervisor CLI-agent context: {error}");
+                        state
+                            .open_issues
+                            .insert("provider".to_string(), message.clone());
+                        push_event(&mut state, "failure", "error", message, None, true, true);
+                    }
+                }
+            } else if provider_blocked {
+                let message = session
+                    .interruption_detail
+                    .clone()
+                    .unwrap_or_else(|| "Supervisor provider turn is interrupted.".to_string());
+                state.open_issues.insert("provider".to_string(), message);
             }
         }
         state.health = snapshot_health(failed, &state.open_issues).to_string();
@@ -734,12 +754,6 @@ fn supervision_context_key(state: &SupervisorAgentSnapshot, processes: &ProcessE
     let goals = state
         .goal_states
         .iter()
-        .filter(|(_, status)| {
-            matches!(
-                status.as_str(),
-                "todo" | "in-progress" | "ready-merge" | "build" | "qa"
-            )
-        })
         .map(|(id, status)| format!("{id}:{status}"))
         .collect::<Vec<_>>()
         .join(",");
@@ -1190,6 +1204,92 @@ mod tests {
             .join("\n");
         assert!(user_transcript.contains("Supervise until the queue is idle"));
         assert!(user_transcript.contains("user steering while active"));
+    }
+
+    #[test]
+    fn long_running_turn_tracks_every_goal_transition_without_duplicate_provider() {
+        let service = test_service("live-goal-transitions");
+        let marker = write_cancellable_smoke_provider(&service);
+        write_goal(&service, "GOAL1", "todo", &Utc::now().to_rfc3339());
+        let launched = service.reconcile().unwrap();
+        let session_id = launched.session_id.unwrap();
+        let process_supervisor = FileProcessSupervisor::new(service.runtime_root.join("agents"));
+        for _ in 0..200 {
+            if marker.exists() && !process_supervisor.list().unwrap().is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(fs::read_to_string(&marker).unwrap(), "started");
+        assert_eq!(process_supervisor.list().unwrap().len(), 1);
+
+        let mut previous_updated_at = launched.updated_at;
+        for (status, active, failed, health, lifecycle) in [
+            ("in-progress", 1, 0, "healthy", "observing"),
+            ("failed", 0, 1, "attention", "idle"),
+            ("review", 0, 0, "healthy", "idle"),
+            ("done", 0, 0, "healthy", "idle"),
+        ] {
+            write_goal(&service, "GOAL1", status, &Utc::now().to_rfc3339());
+            let snapshot = service.reconcile().unwrap();
+            assert_eq!(
+                snapshot.goal_states.get("GOAL1").map(String::as_str),
+                Some(status)
+            );
+            assert_eq!(snapshot.active_work, active);
+            assert_eq!(snapshot.queued_work, 0);
+            assert_eq!(snapshot.failed_work, failed);
+            assert_eq!(snapshot.health, health);
+            assert_eq!(snapshot.lifecycle, lifecycle);
+            assert_ne!(snapshot.updated_at, previous_updated_at);
+            previous_updated_at = snapshot.updated_at;
+        }
+
+        let chat = FileChatService::with_runtime_root(&service.refine_dir, &service.runtime_root);
+        let sessions = chat
+            .list_sessions()
+            .unwrap()
+            .into_iter()
+            .filter(|session| matches!(session.attachment, ChatAttachment::Supervisor))
+            .collect::<Vec<_>>();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, session_id);
+        assert!(sessions[0].queue_dispatching);
+        let queued_context = sessions[0]
+            .queued_messages
+            .iter()
+            .map(|message| message.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        for status in ["in-progress", "failed", "review", "done"] {
+            assert!(
+                queued_context.contains(&format!("\"GOAL1\": \"{status}\"")),
+                "missing {status} context from the shared Supervisor queue"
+            );
+        }
+        assert_eq!(process_supervisor.list().unwrap().len(), 1);
+
+        let final_state = service.snapshot().unwrap();
+        for status in ["in-progress", "failed", "review", "done"] {
+            assert_eq!(
+                final_state
+                    .events
+                    .iter()
+                    .filter(|event| event.message.ends_with(&format!("to {status}.")))
+                    .count(),
+                1,
+                "expected exactly one durable observation for {status}"
+            );
+        }
+
+        chat.stop(&session_id).unwrap();
+        for _ in 0..300 {
+            if process_supervisor.list().unwrap().is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert!(process_supervisor.list().unwrap().is_empty());
     }
 
     #[test]
