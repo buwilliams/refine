@@ -33,7 +33,8 @@ use crate::tools::product::project_state::{
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::tools::product::work_items::{
-    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FileWorkItemService,
+    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FeatureGoalAuthoringRequest,
+    FileWorkItemService,
 };
 use crate::workflow::WorkflowEngine;
 
@@ -310,7 +311,7 @@ fn import_extraction_response(
 
 fn feature_detail_response_from_goals(
     feature: &crate::tools::product::project_state::FeatureSummaryProjection,
-    goals: Vec<crate::model::goal::GoalIndexProjection>,
+    goals: Vec<Value>,
 ) -> Value {
     let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
@@ -1504,10 +1505,15 @@ impl InProcessWebServer {
                     .goal_ids
                     .iter()
                     .filter_map(|goal_id| {
-                        service
-                            .show_goal_summary(goal_id)
-                            .ok()
-                            .map(|goal| goal.goal)
+                        let goal = service.show_goal_summary(goal_id).ok()?;
+                        let capability =
+                            FileWorkItemService::feature_goal_authoring_capability(&goal);
+                        let mut value = serde_json::to_value(goal.goal).ok()?;
+                        value.as_object_mut()?.insert(
+                            "feature_authoring".to_string(),
+                            serde_json::to_value(capability).ok()?,
+                        );
+                        Some(value)
                     })
                     .collect::<Vec<_>>();
                 let feature_detail = feature_detail_response_from_goals(&feature, goals);
@@ -1522,6 +1528,64 @@ impl InProcessWebServer {
             }
             Err(error) => error_response(error),
         }
+    }
+
+    pub(super) fn handle_feature_goal_author(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "author Feature Goals");
+        let Some(feature_id) = request
+            .path
+            .strip_prefix("/work/features/")
+            .and_then(|path| path.strip_suffix("/goals/author"))
+            .filter(|feature_id| !feature_id.is_empty() && !feature_id.contains('/'))
+        else {
+            return feature_id_required();
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let authoring = match serde_json::from_value::<FeatureGoalAuthoringRequest>(body) {
+            Ok(authoring) => authoring,
+            Err(error) => {
+                return error_response(RefineError::InvalidInput(format!(
+                    "invalid Feature Goal authoring body: {error}"
+                )));
+            }
+        };
+        let result = match self
+            .work_item_service(refine_dir)
+            .author_feature_goal(feature_id, authoring)
+        {
+            Ok(result) => result,
+            Err(error) => return error_response(error),
+        };
+        if result.requires_duplicate_decision {
+            return ApiResponse::json(
+                409,
+                json!({
+                    "error": {
+                        "code": "duplicate_goal",
+                        "message": "Possible duplicate Goal",
+                        "duplicate": { "match": result.duplicate }
+                    }
+                }),
+            );
+        }
+        if result.created
+            && let Err(error) = self.promote_backlog_after_mutation()
+        {
+            return error_response(error);
+        }
+        if let Err(error) = self.refresh_projection_cache_after_mutation() {
+            return error_response(error);
+        }
+        ApiResponse::json(
+            if result.created { 201 } else { 200 },
+            json!({
+                "created": result.created,
+                "goal": result.goal,
+                "duplicate_action": result.duplicate_action,
+                "duplicate": result.duplicate.map(|duplicate| json!({"match": duplicate})),
+                "move": result.move_result
+            }),
+        )
     }
 
     pub(super) fn handle_feature_add_goal(&self, request: ApiRequest) -> ApiResponse {

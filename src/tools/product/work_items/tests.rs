@@ -918,6 +918,135 @@ fn distribute_skips_feature_and_claimed_goals_and_honors_dry_run() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn feature_goal_authoring_centralizes_create_review_edit_and_placement() {
+    let temp_root = unique_temp_dir("feature-goal-authoring");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_feature_summary("Feature", Some("FEA1"), None, None, None)
+        .unwrap();
+    service
+        .create_goal_summary("Foundation", Some("GOAL1"))
+        .unwrap();
+    service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
+    service.order_goal_in_feature("FEA1", "GOAL1").unwrap();
+
+    let created = service
+        .author_feature_goal(
+            "FEA1",
+            FeatureGoalAuthoringRequest {
+                prompt: "Implement the shared Feature Goal operation".to_string(),
+                reporter: "Buddy".to_string(),
+                priority: "high".to_string(),
+                placement: FeatureGoalPlacement::After("GOAL1".to_string()),
+                ..FeatureGoalAuthoringRequest::default()
+            },
+        )
+        .unwrap();
+    assert!(created.created);
+    let goal = created.goal.unwrap();
+    assert_eq!(goal.name, "Implement the shared Feature Goal operation");
+    assert_eq!(goal.priority, GoalPriority::High);
+    assert_eq!(goal.feature_order, Some(2));
+    let goal_id = goal.id;
+    assert_eq!(
+        service.show_goal_detail(&goal_id).unwrap()["rounds"][0]["prompt"],
+        "Implement the shared Feature Goal operation"
+    );
+
+    let goal_path = refine_dir
+        .join("goals")
+        .join(&goal_id[..2])
+        .join(&goal_id[2..])
+        .join("goal.json");
+    let mut review_goal: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
+    review_goal["status"] = json!("review");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&review_goal).unwrap()).unwrap();
+    let review_summary = service.show_goal_summary(&goal_id).unwrap();
+    assert!(FileWorkItemService::feature_goal_authoring_capability(&review_summary).editable);
+
+    let edited = service
+        .author_feature_goal(
+            "FEA1",
+            FeatureGoalAuthoringRequest {
+                goal_id: Some(goal_id.clone()),
+                name: Some("Reviewed authoring".to_string()),
+                prompt: "Revise the prompt while review is active".to_string(),
+                reporter: "Buddy".to_string(),
+                priority: "medium".to_string(),
+                placement: FeatureGoalPlacement::First,
+                ..FeatureGoalAuthoringRequest::default()
+            },
+        )
+        .unwrap();
+    assert!(!edited.created);
+    let edited = edited.goal.unwrap();
+    assert_eq!(edited.status, GoalStatus::Review);
+    assert_eq!(edited.name, "Reviewed authoring");
+    assert_eq!(edited.feature_order, Some(1));
+    assert_eq!(
+        service
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .feature_order,
+        Some(2)
+    );
+    assert_eq!(
+        service.show_goal_detail(&goal_id).unwrap()["rounds"][0]["prompt"],
+        "Revise the prompt while review is active"
+    );
+
+    let mut done_goal: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
+    done_goal["status"] = json!("done");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&done_goal).unwrap()).unwrap();
+    let done_summary = service.show_goal_summary(&goal_id).unwrap();
+    assert!(!FileWorkItemService::feature_goal_authoring_capability(&done_summary).editable);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn feature_goal_authoring_reports_duplicates_and_validates_before_writes() {
+    let temp_root = unique_temp_dir("feature-goal-authoring-validation");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_feature_summary("Feature", Some("FEA1"), None, None, None)
+        .unwrap();
+    let request = FeatureGoalAuthoringRequest {
+        prompt: "Same prompt".to_string(),
+        reporter: "Buddy".to_string(),
+        priority: "low".to_string(),
+        ..FeatureGoalAuthoringRequest::default()
+    };
+    service
+        .author_feature_goal("FEA1", request.clone())
+        .unwrap();
+    let duplicate = service.author_feature_goal("FEA1", request).unwrap();
+    assert!(duplicate.requires_duplicate_decision);
+    assert_eq!(duplicate.duplicate.unwrap().prompt, "Same prompt");
+    assert_eq!(service.list_goal_summaries().unwrap().len(), 1);
+
+    let invalid = service.author_feature_goal(
+        "FEA1",
+        FeatureGoalAuthoringRequest {
+            prompt: "A different prompt".to_string(),
+            reporter: "Buddy".to_string(),
+            priority: "low".to_string(),
+            placement: FeatureGoalPlacement::After("MISSING".to_string()),
+            ..FeatureGoalAuthoringRequest::default()
+        },
+    );
+    assert!(invalid.is_err());
+    assert_eq!(service.list_goal_summaries().unwrap().len(), 1);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

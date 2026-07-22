@@ -632,7 +632,7 @@ function renderFeatureGoalTable(goals, options = {}) {
           <button class="secondary small feature-goal-edit-btn" data-feature-edit-goal="${htmlEscape(goal.id)}"
                   data-testid="feature-goal-edit"
                   aria-label="Edit ${htmlEscape(goal.name || goal.id)} inline"
-                  title="${featureGoalCanInlineEdit(goal) ? "Edit inline" : `${workflowStatusLabel(goal.status)} Goals cannot be edited` }"
+                  title="${featureGoalCanInlineEdit(goal) ? "Edit inline" : htmlEscape(goal.feature_authoring?.reason || "This Goal cannot be edited") }"
                   ${featureGoalCanInlineEdit(goal) ? "" : "disabled"}>Edit</button>
           <button class="secondary small feature-goal-icon-btn" data-feature-order-toggle="${ordered ? "unorder" : "order"}"
                   data-goal-id="${htmlEscape(goal.id)}"

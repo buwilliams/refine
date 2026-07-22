@@ -1,11 +1,10 @@
 // ---- Feature Goal inline authoring ------------------------------------------
 
-const FEATURE_GOAL_EDITABLE_STATUSES = new Set(["backlog", "todo"]);
 const FEATURE_GOAL_PLACEMENT_UNORDERED = "unordered";
 const FEATURE_GOAL_PLACEMENT_FIRST = "first";
 
 function featureGoalCanInlineEdit(goal) {
-  return FEATURE_GOAL_EDITABLE_STATUSES.has(goal?.status || "");
+  return goal?.feature_authoring?.editable === true;
 }
 
 function featureGoalLatestPrompt(goal) {
@@ -113,42 +112,10 @@ function renderFeatureGoalInlineComposer(goals, reporter = "") {
     </section>`;
 }
 
-async function applyFeatureGoalPlacement(featureId, goal, placement, request = api) {
-  const ordered = Number(goal?.feature_order || 0) > 0;
-  const base = `/api/features/${encodeURIComponent(featureId)}/goals/${encodeURIComponent(goal.id)}`;
-  if (placement === FEATURE_GOAL_PLACEMENT_UNORDERED) {
-    if (ordered) await request("POST", `${base}/unorder`);
-    return;
-  }
-  if (!ordered) await request("POST", `${base}/order`);
-  const body = placement === FEATURE_GOAL_PLACEMENT_FIRST
-    ? { order: 1 }
-    : { after: placement };
-  await request("POST", `${base}/reorder`, body);
-}
-
-async function saveFeatureGoalInline(featureId, editingGoal, fields, request = api) {
-  const { reporter, prompt, name, priority, duplicateDecision = "" } = fields;
-  if (!editingGoal) {
-    return request("POST", "/api/goals", {
-      reporter, prompt, priority, feature_id: featureId,
-      ...(name ? { name } : {}),
-      ...(duplicateDecision ? { duplicate_decision: duplicateDecision } : {}),
-    });
-  }
-  const metadata = await request("PATCH", `/api/goals/${encodeURIComponent(editingGoal.id)}`, {
-    name, priority,
-  });
-  const roundMethod = (editingGoal.rounds || []).length ? "PATCH" : "POST";
-  const roundPath = roundMethod === "PATCH"
-    ? `/api/goals/${encodeURIComponent(editingGoal.id)}/rounds/latest`
-    : `/api/goals/${encodeURIComponent(editingGoal.id)}/rounds`;
-  await request(roundMethod, roundPath, {
-    reporter,
-    assignee: editingGoal.assignee || reporter,
-    prompt,
-  });
-  return { goal: { ...editingGoal, ...(metadata.goal || {}), id: editingGoal.id } };
+function featureGoalPlacementRequest(placement) {
+  if (placement === FEATURE_GOAL_PLACEMENT_UNORDERED) return "unordered";
+  if (placement === FEATURE_GOAL_PLACEMENT_FIRST) return "first";
+  return { after: placement };
 }
 
 function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAway = false } = {}) {
@@ -221,12 +188,13 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
   const startEdit = async (goalId) => {
     setStatus("Loading Goal…");
     try {
-      const result = await api("GET", `/api/goals/${encodeURIComponent(goalId)}`, undefined, { cache: false });
-      const goal = result.goal;
-      if (!featureGoalCanInlineEdit(goal)) {
-        setStatus(`${workflowStatusLabel(goal.status)} Goals cannot be edited.`, "error");
+      const summary = (feature.goals || []).find((goal) => goal.id === goalId);
+      if (!featureGoalCanInlineEdit(summary)) {
+        setStatus(summary?.feature_authoring?.reason || "This Goal cannot be edited.", "error");
         return;
       }
+      const result = await api("GET", `/api/goals/${encodeURIComponent(goalId)}`, undefined, { cache: false });
+      const goal = result.goal;
       editingGoal = goal;
       composer.dataset.mode = "edit";
       form.elements.goal_id.value = goal.id;
@@ -235,7 +203,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
       form.elements.priority.value = goal.priority || "low";
       form.elements.placement.innerHTML = renderFeatureGoalPlacementOptions(feature.goals || [], goal);
       title.textContent = `Edit ${goal.name || goal.id}`;
-      context.textContent = `Editing ${goal.id} in this Feature. Only backlog and to-do Goals are editable.`;
+      context.textContent = `Editing ${goal.id} in this Feature. Availability follows the shared Goal operation policy.`;
       resetButton.hidden = false;
       cancelButton.hidden = false;
       resetDuplicate();
@@ -255,6 +223,19 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
   cancelButton.addEventListener("click", () => reset({ focus: true }));
   form.elements.prompt.addEventListener("input", resetDuplicate);
   form.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      const hasDraft = editingGoal
+        || form.elements.prompt.value.trim()
+        || form.elements.name.value.trim()
+        || form.elements.priority.value !== "low"
+        || form.elements.placement.value !== FEATURE_GOAL_PLACEMENT_UNORDERED;
+      if (hasDraft) {
+        event.preventDefault();
+        event.stopPropagation();
+        reset({ focus: true });
+      }
+      return;
+    }
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       form.requestSubmit();
@@ -289,17 +270,22 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
       const decision = duplicateDecision && duplicateDecisionKey === duplicateKey
         ? duplicateDecision
         : "";
-      const saved = await saveFeatureGoalInline(feature.id, editingGoal, {
-        reporter, prompt, name, priority, duplicateDecision: decision,
+      const saved = await api("POST", `/api/features/${encodeURIComponent(feature.id)}/goals/author`, {
+        ...(editingGoal ? { goal_id: editingGoal.id } : {}),
+        ...(name ? { name } : {}),
+        reporter,
+        assignee: editingGoal?.assignee || reporter,
+        prompt,
+        priority,
+        placement: featureGoalPlacementRequest(placement),
+        ...(decision ? { duplicate_decision: decision } : {}),
       });
-      if (saved?.created === false) {
+      if (saved?.created === false && saved?.duplicate_action) {
           const moved = saved.duplicate_action === "move_original_to_backlog" && saved.move?.moved;
           toast(moved ? "Original Goal moved to backlog; duplicate not created" : "Duplicate not created", "info");
           await reload({ focusComposer: true });
           return;
       }
-      const savedGoal = saved.goal;
-      await applyFeatureGoalPlacement(feature.id, savedGoal, placement);
       toast(editingGoal ? "Goal updated" : "Goal created", "success");
       await reload({ focusComposer: true });
     } catch (error) {
