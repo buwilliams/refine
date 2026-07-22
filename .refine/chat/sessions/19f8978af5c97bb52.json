@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:24:22Z",
+  "updated_at": "2026-07-22T14:24:47Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1116,6 +1116,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m resuming at the remaining Quality-core round. I’ll keep the dependency chain serialized, let Refine’s normal review/merge machinery own transitions, and stop only when active workflow and live agent evidence both reach zero."
+    },
+    {
+      "created_at": "2026-07-22T14:24:47Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784730287057-176",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The final core Goal is still genuinely active, not merely stale workflow state: its Codex process is live and is tightening a production-topology cancellation test across daemon and runner processes. The three failed Goals are intentionally parked—two behind this dependency and one behind a user-owned consistency-model choice."
     }
   ],
   "queued_messages": [
