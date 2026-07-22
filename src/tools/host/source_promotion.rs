@@ -848,19 +848,13 @@ impl SourcePromotionHost for FileSourcePromotionHost {
                 "fetched source is no longer a fast-forward of the controller checkout".to_string(),
             ));
         }
-        git_ok(&self.service.checkout_path, &["read-tree", "-u", to_commit])?;
         let reference = format!("refs/heads/{}", snapshot.local_branch);
-        if let Err(error) = git_ok(
+        update_checked_out_branch(
             &self.service.checkout_path,
-            &["update-ref", &reference, to_commit, from_commit],
-        ) {
-            let _ = git_ok(
-                &self.service.checkout_path,
-                &["read-tree", "-u", from_commit],
-            );
-            return Err(error);
-        }
-        Ok(())
+            &reference,
+            from_commit,
+            to_commit,
+        )
     }
 
     fn restart_daemon(&mut self, executable: &Path) -> RefineResult<()> {
@@ -880,22 +874,15 @@ impl SourcePromotionHost for FileSourcePromotionHost {
     }
 
     fn rollback(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()> {
-        git_ok(
-            &self.service.checkout_path,
-            &["read-tree", "-u", from_commit],
-        )?;
         let branch = git_text(
             &self.service.checkout_path,
             &["symbolic-ref", "--short", "HEAD"],
         )?;
-        git_ok(
+        update_checked_out_branch(
             &self.service.checkout_path,
-            &[
-                "update-ref",
-                &format!("refs/heads/{branch}"),
-                from_commit,
-                to_commit,
-            ],
+            &format!("refs/heads/{branch}"),
+            to_commit,
+            from_commit,
         )
     }
 
@@ -903,6 +890,28 @@ impl SourcePromotionHost for FileSourcePromotionHost {
         let executable = self.previous_executable.clone();
         self.launch(&executable)
     }
+}
+
+fn update_checked_out_branch(
+    checkout: &Path,
+    reference: &str,
+    from_commit: &str,
+    to_commit: &str,
+) -> RefineResult<()> {
+    git_ok(checkout, &["read-tree", "-m", "-u", from_commit, to_commit])?;
+    if let Err(update_error) = git_ok(checkout, &["update-ref", reference, to_commit, from_commit])
+    {
+        return match git_ok(checkout, &["read-tree", "-m", "-u", to_commit, from_commit]) {
+            Ok(()) => Err(update_error),
+            Err(recovery_error) => Err(append_error_context(
+                update_error,
+                &format!(
+                    "failed to restore the index and worktree to {from_commit} after the ref update failed: {recovery_error}"
+                ),
+            )),
+        };
+    }
+    Ok(())
 }
 
 fn cleanup_candidate_worktree(checkout: &Path, worktree: &Path, registered: bool) -> Vec<String> {
@@ -1180,6 +1189,72 @@ mod tests {
         git_text(root, &["rev-parse", "HEAD"]).unwrap()
     }
 
+    struct PromotionRepository {
+        root: PathBuf,
+        checkout: PathBuf,
+        from_commit: String,
+        to_commit: String,
+    }
+
+    fn initialize_promotion_repository(label: &str) -> PromotionRepository {
+        let root = test_directory(label);
+        let checkout = root.join("checkout");
+        fs::create_dir_all(&checkout).unwrap();
+        git_ok(&checkout, &["init", "--quiet", "."]).unwrap();
+        git_ok(
+            &checkout,
+            &["config", "user.email", "refine-test@example.com"],
+        )
+        .unwrap();
+        git_ok(&checkout, &["config", "user.name", "Refine Test"]).unwrap();
+        fs::write(
+            checkout.join("Cargo.toml"),
+            "[package]\nname = \"source-promotion-fixture\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        fs::write(checkout.join("fixture.txt"), "prior fixture\n").unwrap();
+        git_ok(&checkout, &["add", "Cargo.toml", "fixture.txt"]).unwrap();
+        git_ok(&checkout, &["commit", "--quiet", "-m", "prior source"]).unwrap();
+        git_ok(&checkout, &["branch", "-M", "main"]).unwrap();
+        let from_commit = git_text(&checkout, &["rev-parse", "HEAD"]).unwrap();
+
+        fs::write(checkout.join("fixture.txt"), "promoted fixture\n").unwrap();
+        git_ok(&checkout, &["add", "fixture.txt"]).unwrap();
+        git_ok(&checkout, &["commit", "--quiet", "-m", "promoted source"]).unwrap();
+        let to_commit = git_text(&checkout, &["rev-parse", "HEAD"]).unwrap();
+        git_ok(
+            &checkout,
+            &["update-ref", "refs/remotes/origin/main", &to_commit],
+        )
+        .unwrap();
+        git_ok(&checkout, &["reset", "--hard", "--quiet", &from_commit]).unwrap();
+
+        PromotionRepository {
+            root,
+            checkout,
+            from_commit,
+            to_commit,
+        }
+    }
+
+    fn assert_checked_out_commit(checkout: &Path, commit: &str, contents: &str) {
+        assert_eq!(git_text(checkout, &["rev-parse", "HEAD"]).unwrap(), commit);
+        assert_eq!(
+            git_text(checkout, &["rev-parse", "refs/heads/main"]).unwrap(),
+            commit
+        );
+        let tree = format!("{commit}^{{tree}}");
+        assert_eq!(
+            git_text(checkout, &["write-tree"]).unwrap(),
+            git_text(checkout, &["rev-parse", &tree]).unwrap()
+        );
+        assert_eq!(
+            fs::read_to_string(checkout.join("fixture.txt")).unwrap(),
+            contents
+        );
+        assert_eq!(git_text(checkout, &["status", "--porcelain"]).unwrap(), "");
+    }
+
     #[test]
     fn helper_launch_failure_persists_terminal_retryable_operation() {
         let root = test_directory("source-helper-launch");
@@ -1332,6 +1407,142 @@ mod tests {
         assert!(message.contains("git worktree prune"), "{message}");
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn source_activation_advances_ref_index_and_worktree_together() {
+        let repository = initialize_promotion_repository("source-activation");
+        let service = FileSourcePromotionService::new(
+            &repository.checkout,
+            repository.root.join("runtime/8080"),
+            8080,
+        );
+        let mut host = FileSourcePromotionHost::new(service);
+
+        host.activate(&repository.from_commit, &repository.to_commit)
+            .unwrap();
+
+        assert_checked_out_commit(
+            &repository.checkout,
+            &repository.to_commit,
+            "promoted fixture\n",
+        );
+        fs::remove_dir_all(repository.root).unwrap();
+    }
+
+    #[test]
+    fn source_activation_ref_failure_restores_prior_index_and_worktree() {
+        let repository = initialize_promotion_repository("source-activation-ref-failure");
+        let service = FileSourcePromotionService::new(
+            &repository.checkout,
+            repository.root.join("runtime/8080"),
+            8080,
+        );
+        let mut host = FileSourcePromotionHost::new(service);
+        let lock = repository.checkout.join(".git/refs/heads/main.lock");
+        fs::write(&lock, "locked for source-promotion test\n").unwrap();
+
+        let error = host
+            .activate(&repository.from_commit, &repository.to_commit)
+            .unwrap_err();
+
+        assert!(error.to_string().contains("update-ref"), "{error}");
+        fs::remove_file(lock).unwrap();
+        assert_checked_out_commit(
+            &repository.checkout,
+            &repository.from_commit,
+            "prior fixture\n",
+        );
+        fs::remove_dir_all(repository.root).unwrap();
+    }
+
+    #[test]
+    fn source_promotion_rollback_restores_prior_ref_index_and_worktree() {
+        let repository = initialize_promotion_repository("source-rollback");
+        let service = FileSourcePromotionService::new(
+            &repository.checkout,
+            repository.root.join("runtime/8080"),
+            8080,
+        );
+        let mut host = FileSourcePromotionHost::new(service);
+        host.activate(&repository.from_commit, &repository.to_commit)
+            .unwrap();
+
+        host.rollback(&repository.from_commit, &repository.to_commit)
+            .unwrap();
+
+        assert_checked_out_commit(
+            &repository.checkout,
+            &repository.from_commit,
+            "prior fixture\n",
+        );
+        fs::remove_dir_all(repository.root).unwrap();
+    }
+
+    #[test]
+    fn source_activation_leaves_dirty_checkout_untouched() {
+        let repository = initialize_promotion_repository("source-activation-dirty");
+        fs::write(repository.checkout.join("fixture.txt"), "local work\n").unwrap();
+        let service = FileSourcePromotionService::new(
+            &repository.checkout,
+            repository.root.join("runtime/8080"),
+            8080,
+        );
+        let mut host = FileSourcePromotionHost::new(service);
+
+        let error = host
+            .activate(&repository.from_commit, &repository.to_commit)
+            .unwrap_err();
+
+        assert!(error.to_string().contains("checkout changed"), "{error}");
+        assert_eq!(
+            git_text(&repository.checkout, &["rev-parse", "HEAD"]).unwrap(),
+            repository.from_commit
+        );
+        assert_eq!(
+            git_text(&repository.checkout, &["write-tree"]).unwrap(),
+            git_text(
+                &repository.checkout,
+                &["rev-parse", &format!("{}^{{tree}}", repository.from_commit)]
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            fs::read_to_string(repository.checkout.join("fixture.txt")).unwrap(),
+            "local work\n"
+        );
+        fs::remove_dir_all(repository.root).unwrap();
+    }
+
+    #[test]
+    fn source_activation_leaves_diverged_checkout_untouched() {
+        let repository = initialize_promotion_repository("source-activation-diverged");
+        fs::write(
+            repository.checkout.join("fixture.txt"),
+            "diverged fixture\n",
+        )
+        .unwrap();
+        git_ok(&repository.checkout, &["add", "fixture.txt"]).unwrap();
+        git_ok(
+            &repository.checkout,
+            &["commit", "--quiet", "-m", "diverged source"],
+        )
+        .unwrap();
+        let diverged_commit = git_text(&repository.checkout, &["rev-parse", "HEAD"]).unwrap();
+        let service = FileSourcePromotionService::new(
+            &repository.checkout,
+            repository.root.join("runtime/8080"),
+            8080,
+        );
+        let mut host = FileSourcePromotionHost::new(service);
+
+        let error = host
+            .activate(&diverged_commit, &repository.to_commit)
+            .unwrap_err();
+
+        assert!(error.to_string().contains("fast-forward"), "{error}");
+        assert_checked_out_commit(&repository.checkout, &diverged_commit, "diverged fixture\n");
+        fs::remove_dir_all(repository.root).unwrap();
     }
 
     #[test]
