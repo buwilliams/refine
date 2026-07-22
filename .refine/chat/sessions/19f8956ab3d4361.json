@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:41:00Z",
+  "updated_at": "2026-07-22T10:46:57Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -180,6 +180,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first reconciliation batch completed successfully: both goals are back in review, and Refine then claimed the waiting scheduler-governance recovery plus the new command-palette Goal as the next batch. This confirms the old runner’s batch-boundary behavior without any manual dispatch or duplicate engine."
+    },
+    {
+      "created_at": "2026-07-22T10:46:57Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717217389-43",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The scheduler recovery passed its second governance check and is now in review, with the missing intent documentation added through the normal Goal round. The command-palette Goal is the only remaining active work; no provider, authentication, process-loss, or quality failure is present."
     }
   ],
   "queued_messages": [
