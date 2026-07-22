@@ -29,7 +29,8 @@ Current implementation details that matter to intent:
 
 - toolbar tab order is Supervisor, System, Files, Terminal, Standalone, then opened Goal chat and log tabs;
 - Supervisor is always present, including while idle, and reads shared backend state;
-- Supervisor provider, authentication, and Stop failures remain visible with retry guidance instead of being reduced to an idle state;
+- Supervisor has no manual Start or Stop control because its shared backend capability is always observing or idle;
+- Supervisor provider and authentication failures remain visible with retry guidance instead of being reduced to an idle state;
 - tab state is stored in browser local storage;
 - only relevant chat tabs are polled;
 - output and queued messages are session-specific;

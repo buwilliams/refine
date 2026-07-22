@@ -10,6 +10,7 @@
 - **Existing Backend Evidence**: workflow, process, Git-sync, projection, operation, and activity services remain authoritative; the supervisor projection does not recreate their rules.
 - **Conversation Reuses Chat**: automatic evidence, user prompts, and follow-ups share one ordinary chat session and transcript.
 - **Visible While Idle**: the capability remains discoverable and promptable when no Goal is active.
+- **No Manual Lifecycle Controls**: the toolbar does not offer Start or Stop because the shared capability is always observing workflow work or waiting idle.
 
 ## Purpose
 
