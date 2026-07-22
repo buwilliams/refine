@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:22:18Z",
+  "updated_at": "2026-07-22T13:22:27Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -804,6 +804,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Jira candidate `f52967c…` failed Refine governance again. This is now the fifth round, so I’m not automatically launching a sixth: I’ll inspect whether the remaining finding is a small missed invariant or evidence that the Goal needs a broader product decision."
+    },
+    {
+      "created_at": "2026-07-22T13:22:27Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784726547049-124",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The remaining Jira defect is concrete and bounded, not a policy choice: abrupt daemon recovery marks the operation `Interrupted` but can leave the old `kill_on_parent_exit=false` worker alive, allowing retry to overlap it. I’m authorizing one narrow sixth round to terminate and verify the orphan before retry; no broader design change is needed."
     }
   ],
   "queue_dispatching": true,
