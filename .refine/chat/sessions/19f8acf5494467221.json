@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:44:38Z",
+  "updated_at": "2026-07-22T17:45:04Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -408,6 +408,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The newly found crash window now has a passing regression that repairs a terminal Goal with a stranded running claim. Coordination is rerunning the complete serial gate; Quality governance is checking docs/intent provenance and cross-surface parity."
+    },
+    {
+      "created_at": "2026-07-22T17:45:04Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742304606-126",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality governance rejected `a40ab0e` on two concrete issues: retry must preserve the failed round’s original Quality timing, and passing evidence must prove the worktree remained exactly at the candidate commit with no dirty mutation before/after execution. I’m preserving the candidate, recording those findings as a new round, and requeueing through the same shared recovery transition."
     }
   ],
   "queued_messages": [
