@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:58:35Z",
+  "updated_at": "2026-07-22T17:59:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -576,6 +576,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality has corrected the fixture visibility and restarted the full 435-test library gate. Coordination’s Node ownership changes remain compile-clean and are being paired with a distinct-Node daemon test."
+    },
+    {
+      "created_at": "2026-07-22T17:59:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743178323-158",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality’s full library gate is green at 435/435 and it is running the ignored end-to-end daemon workflow. Coordination has added a focused mutation-boundary test proving foreign-Node claims are preserved."
     }
   ],
   "queued_messages": [
