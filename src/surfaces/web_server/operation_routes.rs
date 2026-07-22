@@ -11,7 +11,7 @@ use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::deployed_update::discover_refine_checkout;
+use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_checkout};
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
@@ -499,7 +499,21 @@ impl InProcessWebServer {
         };
         let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
         match service.inspect(fetch) {
-            Ok(source) => ApiResponse::json(200, json!({"source": source})),
+            Ok(source) => {
+                let target_app_is_refine = self
+                    .current_target_root()
+                    .ok()
+                    .flatten()
+                    .as_deref()
+                    .is_some_and(is_refine_checkout);
+                ApiResponse::json(
+                    200,
+                    json!({
+                        "source": source,
+                        "target_app_is_refine": target_app_is_refine
+                    }),
+                )
+            }
             Err(error) => error_response(error),
         }
     }

@@ -25,6 +25,7 @@ Current implementation details that matter to intent:
 - failed blocking Goal notices and other important UI messages should be visible here.
 - Refine (dev) exposes source/dogfood status separately from published-release status: controller checkout, current and fetched commits, upstream, blockers, check, and promote controls;
 - source promotion persists stage-by-stage state outside the daemon so the UI can reconnect and continue polling through a deliberate restart, including failure and recovery guidance.
+- when the attached target app is itself a Refine Git checkout, the main navigation exposes a compact source-refresh control; it stays disabled when source is current or promotion is blocked, enables for a safe fetched update, and queues the same shared source-promotion handoff as Refine (dev).
 - Refine (dev) makes semantic delivery UI-first: major, minor, and patch previews lead to an agent-operated preparation with persisted stages and a normal reviewable candidate. Publication remains a separate, explicitly confirmed action after merge, with clean-main, version/tag, credentials, remote, deployment, and GitHub-release verification.
 
 System should not be only a toast sink. It should make local operations inspectable and reduce surprise.

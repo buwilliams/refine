@@ -3,6 +3,12 @@
 let _releasePlan = null;
 let _releaseRefreshTimer = null;
 let _sourcePromotionPollTimer = null;
+let _sourceUpdateNavPollTimer = null;
+let _sourceUpdateNavCheckTimer = null;
+let _sourceUpdateNavRequest = null;
+let _sourceUpdateNavSnapshot = null;
+let _sourceUpdateNavTargetIsRefine = false;
+const SOURCE_UPDATE_NAV_CHECK_INTERVAL_MS = 300_000;
 
 function renderSettingsReleasesTab(releases = {}) {
   const operations = [...(releases.operations || [])].reverse();
@@ -57,15 +63,30 @@ function shortSourceCommit(commit) {
   return commit ? String(commit).slice(0, 12) : "unknown";
 }
 
-function renderSourcePromotionStatus(source = {}) {
+function sourcePromotionActiveOperation(source = {}) {
   const operation = source.operation || null;
-  const activeOperation = operation && ["queued", "running"].includes(operation.status);
+  return operation && ["queued", "running"].includes(operation.status) ? operation : null;
+}
+
+function sourcePromotionBlockers(source = {}) {
   const blockers = [];
   if (!source.clean) blockers.push("checkout has uncommitted changes");
   if (!source.fast_forward) blockers.push("upstream is not a fast-forward");
   if (!source.update_available) blockers.push("already at the fetched source commit");
   if ((source.active_work || []).length) blockers.push(...source.active_work);
-  if (activeOperation) blockers.push(`promotion ${operation.id} is ${operation.status}`);
+  const operation = sourcePromotionActiveOperation(source);
+  if (operation) blockers.push(`promotion ${operation.id} is ${operation.status}`);
+  return blockers;
+}
+
+function sourcePromotionIsReady(source = {}) {
+  return !!source.clean && !!source.fast_forward && !!source.update_available
+    && !(source.active_work || []).length && !sourcePromotionActiveOperation(source);
+}
+
+function renderSourcePromotionStatus(source = {}) {
+  const operation = source.operation || null;
+  const blockers = sourcePromotionBlockers(source);
   const operationClass = operation?.status === "failed" ? "error" : "muted";
   return `
     <dl class="source-promotion-facts">
@@ -93,10 +114,8 @@ function applySourcePromotionStatus(source) {
   if (!root) return;
   root.setAttribute("aria-busy", "false");
   root.innerHTML = renderSourcePromotionStatus(source);
-  const operation = source?.operation || null;
-  const activeOperation = operation && ["queued", "running"].includes(operation.status);
-  const promotable = source?.clean && source?.fast_forward && source?.update_available
-    && !(source?.active_work || []).length && !activeOperation;
+  const activeOperation = sourcePromotionActiveOperation(source);
+  const promotable = sourcePromotionIsReady(source);
   const promote = document.getElementById("source-promotion-promote");
   const check = document.getElementById("source-promotion-check");
   if (promote) promote.disabled = !promotable;
@@ -116,6 +135,7 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
       { cache: false },
     );
     applySourcePromotionStatus(result.source || {});
+    applySourceUpdateNavStatus(result);
   } catch (error) {
     if (!document.getElementById("source-promotion-status")) return;
     root.setAttribute("aria-busy", "true");
@@ -124,6 +144,154 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
       : htmlEscape(error.message || "Source checkout status is unavailable")}</p>`;
     if (!quiet) stopSourcePromotionPolling();
   }
+}
+
+function applySourceUpdateNavStatus(result = {}) {
+  const button = document.getElementById("btn-source-update");
+  if (!button) return;
+  _sourceUpdateNavTargetIsRefine = result.target_app_is_refine === true && hasAttachedProject();
+  _sourceUpdateNavSnapshot = result.source || null;
+  button.hidden = !_sourceUpdateNavTargetIsRefine;
+  if (button.hidden) {
+    button.disabled = true;
+    button.dataset.state = "hidden";
+    stopSourceUpdateNavPolling();
+    return;
+  }
+
+  const source = _sourceUpdateNavSnapshot || {};
+  const operation = sourcePromotionActiveOperation(source);
+  const ready = sourcePromotionIsReady(source);
+  const blockers = sourcePromotionBlockers(source);
+  button.disabled = !ready;
+  button.dataset.updateAvailable = source.update_available ? "true" : "false";
+  if (operation) {
+    button.dataset.state = "updating";
+    button.title = operation.message || `Refine source promotion is ${operation.status}`;
+    startSourceUpdateNavPolling();
+  } else if (ready) {
+    button.dataset.state = "available";
+    button.title = `Update running Refine to ${shortSourceCommit(source.available_commit)}`;
+    stopSourceUpdateNavPolling();
+  } else if (source.update_available) {
+    button.dataset.state = "blocked";
+    button.title = `Refine source update unavailable: ${blockers.join("; ")}`;
+    stopSourceUpdateNavPolling();
+  } else {
+    button.dataset.state = "current";
+    button.title = `Running Refine source is current at ${shortSourceCommit(source.current_commit)}`;
+    stopSourceUpdateNavPolling();
+  }
+  button.setAttribute("aria-label", button.title);
+}
+
+function markSourceUpdateNavUnavailable(error) {
+  const button = document.getElementById("btn-source-update");
+  if (!button || !_sourceUpdateNavTargetIsRefine) return;
+  button.hidden = false;
+  button.disabled = true;
+  button.dataset.state = "unavailable";
+  button.title = error?.message || "Refine source update status is unavailable";
+  button.setAttribute("aria-label", button.title);
+}
+
+async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {}) {
+  const button = document.getElementById("btn-source-update");
+  if (!button || !hasAttachedProject()) {
+    resetSourceUpdateNav();
+    return null;
+  }
+  if (_sourceUpdateNavRequest) return _sourceUpdateNavRequest;
+  if (!quiet && _sourceUpdateNavTargetIsRefine) {
+    button.hidden = false;
+    button.disabled = true;
+    button.dataset.state = "checking";
+    button.title = "Checking for Refine source updates";
+  }
+  _sourceUpdateNavRequest = (async () => {
+    try {
+      const result = await api(
+        fetchRemote ? "POST" : "GET",
+        fetchRemote ? "/api/system/source/check" : "/api/system/source",
+        fetchRemote ? {} : undefined,
+        { cache: false },
+      );
+      applySourceUpdateNavStatus(result);
+      return result;
+    } catch (error) {
+      markSourceUpdateNavUnavailable(error);
+      return null;
+    } finally {
+      _sourceUpdateNavRequest = null;
+    }
+  })();
+  return _sourceUpdateNavRequest;
+}
+
+function startSourceUpdateNavPolling() {
+  if (_sourceUpdateNavPollTimer) return;
+  _sourceUpdateNavPollTimer = window.setInterval(() => {
+    refreshSourceUpdateNav({ quiet: true });
+  }, 1000);
+}
+
+function stopSourceUpdateNavPolling() {
+  if (!_sourceUpdateNavPollTimer) return;
+  window.clearInterval(_sourceUpdateNavPollTimer);
+  _sourceUpdateNavPollTimer = null;
+}
+
+function resetSourceUpdateNav() {
+  const button = document.getElementById("btn-source-update");
+  _sourceUpdateNavTargetIsRefine = false;
+  _sourceUpdateNavSnapshot = null;
+  stopSourceUpdateNavPolling();
+  if (!button) return;
+  button.hidden = true;
+  button.disabled = true;
+  button.dataset.state = "hidden";
+}
+
+async function queueSourcePromotionFromUi() {
+  const confirmed = window.confirm(
+    "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
+  );
+  if (!confirmed) return null;
+  return api("POST", "/api/system/source/promote", {});
+}
+
+async function promoteSourceFromNav() {
+  const button = document.getElementById("btn-source-update");
+  const current = await refreshSourceUpdateNav({ fetchRemote: true });
+  if (!current || !sourcePromotionIsReady(current.source || {})) return;
+  try {
+    const result = await queueSourcePromotionFromUi();
+    if (!result) return;
+    applySourceUpdateNavStatus({
+      target_app_is_refine: true,
+      source: { ...(current.source || {}), operation: result.operation },
+    });
+    toast("Source promotion queued; Refine will reconnect after restart", "info");
+  } catch (error) {
+    toast(error.message || "Source promotion could not start", "error");
+    await refreshSourceUpdateNav();
+  } finally {
+    if (button) button.blur();
+  }
+}
+
+function initSourceUpdateNav() {
+  const button = document.getElementById("btn-source-update");
+  if (!button) return;
+  if (button.dataset.bound !== "true") {
+    button.dataset.bound = "true";
+    button.addEventListener("click", promoteSourceFromNav);
+  }
+  if (_sourceUpdateNavCheckTimer) window.clearInterval(_sourceUpdateNavCheckTimer);
+  _sourceUpdateNavCheckTimer = window.setInterval(() => {
+    refreshSourceUpdateNav({ fetchRemote: true, quiet: true });
+  }, SOURCE_UPDATE_NAV_CHECK_INTERVAL_MS);
+  refreshSourceUpdateNav({ fetchRemote: true });
 }
 
 function startSourcePromotionPolling() {
@@ -147,15 +315,13 @@ function bindSourcePromotionControls() {
     await refreshSourcePromotionStatus({ fetchRemote: true });
   }));
   promote?.addEventListener("click", () => withButtonBusy(promote, "Queuing…", async () => {
-    const confirmed = window.confirm(
-      "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
-    );
-    if (!confirmed) return;
     try {
-      const result = await api("POST", "/api/system/source/promote", {});
+      const result = await queueSourcePromotionFromUi();
+      if (!result) return;
       const current = await api("GET", "/api/system/source", undefined, { cache: false });
       current.source.operation = result.operation;
       applySourcePromotionStatus(current.source);
+      applySourceUpdateNavStatus(current);
       toast("Source promotion queued; Refine will reconnect after restart", "info");
     } catch (error) {
       toast(error.message || "Source promotion could not start", "error");

@@ -394,6 +394,23 @@ fn static_runtime_settings_expose_state_sync_controls() {
 }
 
 #[test]
+fn static_main_nav_exposes_refine_source_update_affordance() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let releases =
+        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+    let init = fs::read_to_string(static_root.join("js/init.js")).unwrap();
+
+    assert!(index.contains(r#"data-testid="nav-source-update""#));
+    assert!(index.contains("hidden disabled"));
+    assert!(releases.contains("result.target_app_is_refine === true"));
+    assert!(releases.contains("button.disabled = !ready"));
+    assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
+    assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
+    assert!(init.contains("initSourceUpdateNav()"));
+}
+
+#[test]
 fn static_releases_surface_separates_prepare_from_confirmed_publish() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
