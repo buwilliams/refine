@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "lifecycle": "idle",
+  "lifecycle": "observing",
   "health": "attention",
   "active_work": 0,
-  "queued_work": 0,
+  "queued_work": 1,
   "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8978af5c97bb52",
@@ -41,10 +41,12 @@
     "00000SZ2AG11JHPZNR941YW00B": "done",
     "00000SZ2B6AMS3D1A9N41YW00C": "done",
     "00000SZ2BGCG909VDSW41YW00D": "failed",
-    "00000SZ2BK8ZEHQYBFB41YW00E": "review"
+    "00000SZ2BK8ZEHQYBFB41YW00E": "review",
+    "00000SZ2C7X8WJSVQNNSXVA000": "todo"
   },
   "open_issues": {},
-  "updated_at": "2026-07-22T11:04:56.163846535+00:00",
+  "last_context_key": "goals=00000SZ2C7X8WJSVQNNSXVA000:todo|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-22T11:13:34.435344512+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -571,6 +573,25 @@
       "status": "complete",
       "message": "Workflow queue is idle; no further automatic supervisor turns will start.",
       "created_at": "2026-07-22T11:04:56.065528814+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T11:13:34.434375574+00:00-55",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2C7X8WJSVQNNSXVA000 entered workflow state todo.",
+      "created_at": "2026-07-22T11:13:34.434375574+00:00",
+      "goal_id": "00000SZ2C7X8WJSVQNNSXVA000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T11:13:34.435333320+00:00-56",
+      "kind": "decision",
+      "status": "running",
+      "message": "Queued active-work evidence to the singleton supervisor CLI agent.",
+      "created_at": "2026-07-22T11:13:34.435333320+00:00",
       "actionable": false,
       "retryable": false
     }

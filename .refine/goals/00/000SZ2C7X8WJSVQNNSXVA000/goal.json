@@ -1,0 +1,41 @@
+{
+  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
+  "branch_name": "refine/00000SZ2C7X8WJSVQNNSXVA000/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T11:13:33Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2C7X8WJSVQNNSXVA000",
+  "name": "Enable inline Goal authoring in Features",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:13:34Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Rework Feature detail so Goals can be created and edited inline in Feature context. Replace nested modal flows with one visible composer and list interaction that preserves ordering, dependencies, validation, keyboard accessibility, and existing backend behavior. Creation should feel immediate and keep the user oriented in the Feature. Verify desktop and narrow layouts with browser regression coverage.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:13:34Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T11:13:34Z"
+}
