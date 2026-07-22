@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:13:02Z",
+  "updated_at": "2026-07-22T17:13:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -108,6 +108,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll supervise the two live goals and the three queued retries through Refine’s own state and process surfaces. I’ll treat the newest snapshot as authoritative, preserve confirmation boundaries, and report any provider/authentication or recovery failure instead of masking it."
+    },
+    {
+      "created_at": "2026-07-22T17:13:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740395236-69",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The latest evidence supersedes the earlier failed-count snapshot: the three retryable goals are queued as `todo`, while two workflow agents are live. I’m now checking the durable goal records, agent/process leases, and audit tail directly; I won’t infer health merely from the aggregate counts."
     }
   ],
   "queued_messages": [
