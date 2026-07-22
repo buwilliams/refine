@@ -1,0 +1,41 @@
+{
+  "base_commit": "72fd4398a9dc2bf62d583b469e83b3d2e9218322",
+  "branch_name": "refine/00000SZ2HY79M3364XKDXVA00B/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T14:32:41Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2HY79M3364XKDXVA00B",
+  "name": "Define the shared workflow consistency contract",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T14:32:42Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T14:32:42Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T14:32:42Z"
+}

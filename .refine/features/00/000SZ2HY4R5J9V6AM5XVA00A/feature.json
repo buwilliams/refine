@@ -1,0 +1,10 @@
+{
+  "assignee": "Buddy Williams",
+  "created": "2026-07-22T14:32:36Z",
+  "description": "Establish one explicit cross-process consistency and durability model for workflow, operations, managed processes, capacity, Goal evidence, target-app ownership, and repository evidence so concurrency, cancellation, recovery, restart, and late settlement cannot create conflicting authoritative state. Keep surfaces thin and preserve agent-first orchestration; Quality and Supervisor recovery resume only after this foundation lands.",
+  "id": "00000SZ2HY4R5J9V6AM5XVA00A",
+  "name": "Shared workflow consistency and durable evidence",
+  "node_id": "default",
+  "reporter": "Buddy Williams",
+  "updated": "2026-07-22T14:32:36Z"
+}
