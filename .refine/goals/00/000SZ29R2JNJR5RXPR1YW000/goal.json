@@ -1,0 +1,41 @@
+{
+  "base_commit": "64565963c310241ff8755a6a48e6c58a23bc497d",
+  "branch_name": "refine/00000SZ29R2JNJR5RXPR1YW000/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T09:46:21Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ29R2JNJR5RXPR1YW000",
+  "name": "In the web UI, all toolbar tabs with an Activity panel should be collapsed by de",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T09:46:21Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "In the web UI, all toolbar tabs with an Activity panel should be collapsed by default.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T09:46:21Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T09:46:23Z"
+}

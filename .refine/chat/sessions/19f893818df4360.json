@@ -1,0 +1,42 @@
+{
+  "id": "19f893818df4360",
+  "mode": "supervisor",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "supervisor",
+  "created_at": "2026-07-22T09:46:22Z",
+  "updated_at": "2026-07-22T09:46:22Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-22T09:46:22Z",
+      "delivered": false,
+      "id": "evt-1784713582820-3",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "Active Refine workflow work needs supervision. Stay with this active-work window until the queue is idle. Use existing Refine CLI/API tools and shared workflow, process, Git-sync, projection, operation, and activity evidence. Apply only bounded, safe, auditable in-scope fixes; report anything requiring user authority. Do not hide provider/auth failures, force merges, discard worktrees, or invent a second recovery engine. New system evidence and user steering will arrive as follow-ups in this same session.\n\nCurrent counts: 0 active, 1 queued, 0 failed.\nGoal states: {\"00000SZ1J1YD7KCM6JNJRB8000\": \"done\", \"00000SZ1JK89EGZ643W02PG001\": \"done\", \"00000SZ1JK9TD1F0J3B02PG002\": \"done\", \"00000SZ1MQ85B1N7HVB02PG003\": \"done\", \"00000SZ1MZFG72VDPA003DY000\": \"done\", \"00000SZ1NFN22JPF2D8M3DY001\": \"done\", \"00000SZ1QQ8G526TQQ36KWR000\": \"done\", \"00000SZ1QRPTB1P7EQKPKWR001\": \"done\", \"00000SZ1QT8KKHJEKASEKWR002\": \"done\", \"00000SZ1QV26A31TZF4EKWR003\": \"done\", \"00000SZ1QWNM50JC24R2KWR004\": \"done\", \"00000SZ1QZJAR01X6ZSEKWR005\": \"done\", \"00000SZ1RATKM3716TBEKWR006\": \"done\", \"00000SZ1RM3ZAK7KYZ8YKWR007\": \"done\", \"00000SZ1RWPTTJX3GJ6HDS2000\": \"done\", \"00000SZ1T921F15X91MBZWE000\": \"done\", \"00000SZ1X25SZJQPSJ6FZWE001\": \"done\", \"00000SZ1YFDPAG0NJ16FTTY000\": \"done\", \"00000SZ29R2JNJR5RXPR1YW000\": \"todo\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}"
+    },
+    {
+      "created_at": "2026-07-22T09:46:22Z",
+      "delivered": false,
+      "id": "evt-1784713582820-4",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T09:46:22Z",
+      "delivered": false,
+      "id": "evt-1784713582845-6",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+    }
+  ],
+  "importable_artifacts": [],
+  "closed": false,
+  "interrupted": true,
+  "interruption_detail": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+}

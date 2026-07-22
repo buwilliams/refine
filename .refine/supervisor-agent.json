@@ -1,12 +1,13 @@
 {
   "version": 2,
-  "lifecycle": "idle",
-  "health": "healthy",
+  "lifecycle": "observing",
+  "health": "degraded",
   "active_work": 0,
-  "queued_work": 0,
+  "queued_work": 1,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
-  "session_id": null,
+  "session_id": "19f893818df4360",
+  "provider": "codex",
   "initialized": true,
   "goal_states": {
     "00000SZ1J1YD7KCM6JNJRB8000": "done",
@@ -26,10 +27,14 @@
     "00000SZ1RWPTTJX3GJ6HDS2000": "done",
     "00000SZ1T921F15X91MBZWE000": "done",
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
-    "00000SZ1YFDPAG0NJ16FTTY000": "done"
+    "00000SZ1YFDPAG0NJ16FTTY000": "done",
+    "00000SZ29R2JNJR5RXPR1YW000": "todo"
   },
-  "open_issues": {},
-  "updated_at": "2026-07-22T09:45:29.311155451+00:00",
+  "open_issues": {
+    "provider": "Supervisor provider failure: Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+  },
+  "last_context_key": "goals=00000SZ29R2JNJR5RXPR1YW000:todo|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-22T09:46:22.846231123+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -48,6 +53,44 @@
       "created_at": "2026-07-22T09:45:29.311143104+00:00",
       "actionable": false,
       "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:46:21.809180387+00:00-3",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29R2JNJR5RXPR1YW000 entered workflow state backlog.",
+      "created_at": "2026-07-22T09:46:21.809180387+00:00",
+      "goal_id": "00000SZ29R2JNJR5RXPR1YW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:46:22.815312578+00:00-4",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29R2JNJR5RXPR1YW000 changed from backlog to todo.",
+      "created_at": "2026-07-22T09:46:22.815312578+00:00",
+      "goal_id": "00000SZ29R2JNJR5RXPR1YW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:46:22.816692156+00:00-5",
+      "kind": "decision",
+      "status": "running",
+      "message": "Queued active-work evidence to the singleton supervisor CLI agent.",
+      "created_at": "2026-07-22T09:46:22.816692156+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T09:46:22.846208447+00:00-6",
+      "kind": "failure",
+      "status": "error",
+      "message": "Supervisor provider failure: Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
+      "created_at": "2026-07-22T09:46:22.846208447+00:00",
+      "actionable": true,
+      "retryable": true
     }
   ]
 }
