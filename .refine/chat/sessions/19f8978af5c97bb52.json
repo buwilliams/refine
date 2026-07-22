@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:24:47Z",
+  "updated_at": "2026-07-22T14:27:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1128,6 +1128,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The final core Goal is still genuinely active, not merely stale workflow state: its Codex process is live and is tightening a production-topology cancellation test across daemon and runner processes. The three failed Goals are intentionally parked—two behind this dependency and one behind a user-owned consistency-model choice."
+    },
+    {
+      "created_at": "2026-07-22T14:27:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784730453707-178",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The production-topology regression now passes after correcting two test-harness defects (conflicting state roots and fixture prompt matching). Focused operation/workflow suites are also green; the agent is moving through broader verification before candidate submission."
     }
   ],
   "queued_messages": [
