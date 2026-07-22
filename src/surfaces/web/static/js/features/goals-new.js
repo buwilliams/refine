@@ -22,7 +22,7 @@ function openNewGoalModal(options = {}) {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-goal-title" data-testid="new-goal-modal" style="max-width:560px">
+    <div class="modal new-goal-modal" role="dialog" aria-modal="true" aria-labelledby="new-goal-title" data-testid="new-goal-modal">
       <div class="modal-title" id="new-goal-title">${options.featureId ? "New Feature Goal" : "New Goal"}</div>
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">

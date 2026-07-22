@@ -135,6 +135,15 @@
   width: 80vw;
   max-width: 80vw;
 }
+.new-goal-modal {
+  width: 60vw;
+  max-width: 60vw;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.new-goal-modal textarea[name="prompt"] {
+  height: clamp(180px, 32vh, 320px);
+}
 .form-error {
   margin-top: 10px;
   color: var(--error);
@@ -411,6 +420,10 @@
     margin-top: 12px;
   }
   .import-modal {
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+  }
+  .new-goal-modal {
     width: calc(100% - 24px);
     max-width: calc(100% - 24px);
   }
