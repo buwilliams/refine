@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
   "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-4",
-  "candidate_commit": null,
+  "candidate_commit": "d13adee7b63d5173f2af9e666b16cb09cf26884c",
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -305,8 +305,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal `00000SZ2CF255HWFA0G9XVA006` is complete and reviewable.\n\nCommit: `d13adee` — `Fix Quality cancellation and restart recovery`\n\nChanged:\n\n- Terminal operation and claim outcomes are immutable; late cancellation/completion cannot erase failure or interruption evidence.\n- Cancellation only affects active owned work.\n- Restart recovery now correlates current running claims and executions, ignoring unrelated historical cancellations.\n- Recovery interrupts Quality operations, terminates managed processes, releases capacity, and records correlated logs.\n\nVerification:\n\n- Focused cancellation/recovery tests: 6 passed.\n- Workflow tests: 32 passed.\n- `cargo test --all-targets --no-fail-fast`: passed, 0 failures.\n- `cargo fmt --all -- --check`: passed.\n- `cargo clippy --all-targets -- -D warnings`: passed.\n- `git diff --check`: passed.\n- Independent read-only governance: `passed`, no violations.\n- Preserved candidate patch ID matches `6afbef6`.\n- Worktree is clean.",
+      "implementation_reported_at": "2026-07-22T12:53:54Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -317,10 +317,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T12:35:18Z"
+      "updated": "2026-07-22T12:53:54Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:35:19Z"
+  "updated": "2026-07-22T12:53:54Z"
 }
