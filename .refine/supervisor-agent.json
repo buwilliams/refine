@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "lifecycle": "observing",
-  "health": "healthy",
-  "active_work": 1,
+  "lifecycle": "idle",
+  "health": "attention",
+  "active_work": 0,
   "queued_work": 0,
-  "failed_work": 0,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8b84d2c59f6aa0",
   "provider": "codex",
@@ -52,11 +52,10 @@
     "00000SZ2HZHQX2TXXQ7SXVA00D": "cancelled",
     "00000SZ2PGMQR29F16GSKJ4000": "done",
     "00000SZ2SWWPEJZZHS4CXC4000": "cancelled",
-    "00000SZ2TPQM61AGWJW8XC4001": "in-progress"
+    "00000SZ2TPQM61AGWJW8XC4001": "failed"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ2TPQM61AGWJW8XC4001:in-progress|live={\"00000SZ2TPQM61AGWJW8XC4001\"}|quiet={}|issues=",
-  "updated_at": "2026-07-22T20:37:51.147314152+00:00",
+  "updated_at": "2026-07-22T21:11:42.131305718+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1288,6 +1287,33 @@
       "message": "Goal 00000SZ2TPQM61AGWJW8XC4001 changed from failed to todo.",
       "created_at": "2026-07-22T20:37:48.020145071+00:00",
       "goal_id": "00000SZ2TPQM61AGWJW8XC4001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T21:11:40.683887125+00:00-128",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: Four committed governance violations found.",
+      "created_at": "2026-07-22T21:11:40.683887125+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T21:11:41.749355477+00:00-129",
+      "kind": "observation",
+      "status": "complete",
+      "message": "Workflow queue is idle; no further automatic supervisor turns will start.",
+      "created_at": "2026-07-22T21:11:41.749355477+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T21:11:42.131256020+00:00-130",
+      "kind": "recovery",
+      "status": "complete",
+      "message": "Workflow evaluation: completed without an engine error",
+      "created_at": "2026-07-22T21:11:42.131256020+00:00",
       "actionable": false,
       "retryable": false
     }

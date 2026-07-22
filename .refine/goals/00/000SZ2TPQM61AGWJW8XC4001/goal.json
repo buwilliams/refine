@@ -174,28 +174,106 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T20:34:56Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T21:11:39Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2",
+        "failed_actions": [
+          {
+            "message": "The legacy /settings surface still accepts and returns quality_timing, while workflow and dashboard behavior read only quality/settings.json after one-time migration. Subsequent legacy updates succeed but have no effect, leaving contradictory settings representations.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Quality migration reads only the active Node's legacy settings and then permanently marks the project-wide migration complete. Enabled target-app Quality commands belonging to other Nodes can therefore be omitted and silently become a no-op.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "Cancellation can race process launch: the operation is marked cancelled and only currently registered processes are terminated, but the Quality worker never rechecks operation state before launching the provider or each test command. Immediate cancellation or cancellation between tests can therefore allow new supervised work to start afterward.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Quality marks the operation terminal before persisting Goal-round evidence and its Goal log. A crash or evidence-write failure can leave the operation reporting success or failure while the authoritative Goal round remains stale, producing inconsistent durable semantics across operation and workflow surfaces.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Four committed governance violations found.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"The legacy /settings surface still accepts and returns quality_timing, while workflow and dashboard behavior read only quality/settings.json after one-time migration. Subsequent legacy updates succeed but have no effect, leaving contradictory settings representations.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"Quality migration reads only the active Node's legacy settings and then permanently marks the project-wide migration complete. Enabled target-app Quality commands belonging to other Nodes can therefore be omitted and silently become a no-op.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancellation can race process launch: the operation is marked cancelled and only currently registered processes are terminated, but the Quality worker never rechecks operation state before launching the provider or each test command. Immediate cancellation or cancellation between tests can therefore allow new supervised work to start afterward.\"},{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"Quality marks the operation terminal before persisting Goal-round evidence and its Goal log. A crash or evidence-write failure can leave the operation reporting success or failure while the authoritative Goal round remains stale, producing inconsistent durable semantics across operation and workflow surfaces.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Four committed governance violations found.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The legacy /settings surface still accepts and returns quality_timing, while workflow and dashboard behavior read only quality/settings.json after one-time migration. Subsequent legacy updates succeed but have no effect, leaving contradictory settings representations.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Quality migration reads only the active Node's legacy settings and then permanently marks the project-wide migration complete. Enabled target-app Quality commands belonging to other Nodes can therefore be omitted and silently become a no-op.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "Cancellation can race process launch: the operation is marked cancelled and only currently registered processes are terminated, but the Quality worker never rechecks operation state before launching the provider or each test command. Immediate cancellation or cancellation between tests can therefore allow new supervised work to start afterward.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Quality marks the operation terminal before persisting Goal-round evidence and its Goal log. A crash or evidence-write failure can leave the operation reporting success or failure while the authoritative Goal round remains stale, producing inconsistent durable semantics across operation and workflow surfaces.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2"
+      },
+      "governance_message": "Four committed governance violations found.",
+      "governance_rule_actions": [
+        {
+          "message": "The legacy /settings surface still accepts and returns quality_timing, while workflow and dashboard behavior read only quality/settings.json after one-time migration. Subsequent legacy updates succeed but have no effect, leaving contradictory settings representations.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Quality migration reads only the active Node's legacy settings and then permanently marks the project-wide migration complete. Enabled target-app Quality commands belonging to other Nodes can therefore be omitted and silently become a no-op.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "Cancellation can race process launch: the operation is marked cancelled and only currently registered processes are terminated, but the Quality worker never rechecks operation state before launching the provider or each test command. Immediate cancellation or cancellation between tests can therefore allow new supervised work to start afterward.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Quality marks the operation terminal before persisting Goal-round evidence and its Goal log. A crash or evidence-write failure can leave the operation reporting success or failure while the authoritative Goal round remains stale, producing inconsistent durable semantics across operation and workflow surfaces.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        }
+      ],
       "implementation_report": "Implemented and committed Round 2 as `cf73aa4a`. The worktree is clean and reviewable.\n\nWhat changed:\n\n- Manual API checks and workflow QA now share one `QualityOperationRunner` and persist identical, exact-round Goal evidence.\n- `quality/settings.json` is authoritative for timing. Legacy timing and enabled target-app commands migrate once without silently becoming no-ops.\n- Quality returns an operation ID immediately, runs providers and commands as supervised processes, preserves provider/authentication errors verbatim, and supports cancellation and restart recovery.\n- Goal/candidate ownership keys prevent concurrent manual and workflow evaluations.\n- Agent claims require correlated supervised command executions. Missing, extra, empty-command, or unsuccessful claims fail.\n- Candidate commit, HEAD, index, and worktree cleanliness are checked before and after evaluation without modifying user work.\n- Workflow ordering honors pre-build or post-build Quality timing.\n- Only the affected Quality, Target App, workflow, rust-spec, and integration contracts were reconciled.\n\nKey implementation: [quality service](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/tools/host/quality/service.rs), [operation coordination](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/process/supervisor/operations/mod.rs), [workflow behavior](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/workflow/behaviors/mod.rs).\n\nVerification:\n\n- `cargo test --lib tools::host::quality::tests -- --nocapture` — 11 passed\n- `cargo test --lib process::supervisor::operations::tests -- --nocapture` — 6 passed\n- Cross-surface web test — 1 passed\n- Workflow failure/preservation test — 1 passed\n- `cargo test --lib --quiet` — 423 passed, 0 failed\n- `cargo test --test full_workflow -- --ignored --nocapture` — 1 passed\n- `node --test tests/web_*.test.js` — 35 passed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` — passed\n\nOne earlier parallel full-library run hit the existing Jira startup-recovery timing assertion; it passed alone, and the final complete rerun passed all 423 tests.",
       "implementation_reported_at": "2026-07-22T21:08:07Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Address the eight governance findings from round 1 without broadening scope or weakening confirmation, audit, provider-failure, authentication, or cancellation boundaries.\n\nImplement round 2 so that:\n1. Goal-scoped manual Quality checks and workflow QA use one shared Quality capability with identical durable Goal-round Quality evidence semantics; keep API, CLI, UI, desktop, and agent handlers thin.\n2. Establish one authoritative Quality timing setting and make workflow behavior honor it. Remove or compatibly migrate the legacy quality_timing/test-settings split rather than leaving contradictory sources of truth.\n3. Compatibly migrate existing enabled target-app Quality commands. Upgrades must not silently turn formerly enforced QA into a successful no-op; provide an explicit transition path and regression coverage.\n4. Run Quality through the supervised process/operation substrate with explicit ownership, operation ID visibility, logs, cancellation, terminal settlement on provider/parsing failures, and restart recovery. Associate the managed process with its operation so cancellation can terminate it. Preserve provider and authentication failures verbatim and visibly.\n5. Serialize manual and workflow Quality evaluation for the same Goal candidate using the existing claim/capacity/ownership coordination model so they cannot race.\n6. Treat observed supervised executions as authoritative evidence. Correlate each claimed test command/result with the actual process execution; reject agent-authored pass claims that lack observed execution evidence.\n7. Pin evaluation to the candidate commit and verify HEAD, index, and worktree cleanliness before and after Quality. Fail visibly if the evaluated tree changes or differs from the recorded candidate; do not discard or overwrite user work.\n8. Reconcile only the affected intent/contracts (Target App intent, rust-spec, integration index, and Quality timing/evidence documentation) with the implemented behavior.\n\nVerification must cover shared cross-surface semantics, legacy-state migration/no-silent-no-op, provider/parsing failure settlement, cancellation and restart recovery, concurrent manual/workflow exclusion, false-positive evidence rejection, candidate mutation detection, and the production workflow path. Use focused tests proportional to these persistence, process, concurrency, and cross-surface risks. Do not force merges, delete worktrees, discard changes, or conceal provider/authentication failures.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T21:08:07Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T21:11:39Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T21:08:07Z"
+  "updated": "2026-07-22T21:11:40Z"
 }
