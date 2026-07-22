@@ -79,7 +79,6 @@ function browserRuntime(storage = new Map()) {
   const toolbar = new FakeElement();
   const toggleButton = new FakeElement();
   const supervisorPanel = new FakeElement();
-  const supervisorEvents = new FakeElement();
   const toasts = [];
   const busyLabels = [];
   const body = {
@@ -107,9 +106,6 @@ function browserRuntime(storage = new Map()) {
     ) return supervisorPanel;
     return null;
   };
-  supervisorPanel.querySelector = (selector) => (
-    selector === '[data-testid="supervisor-agent-events"]' ? supervisorEvents : null
-  );
   const context = vm.createContext({
     AbortController,
     EventSource: FakeEventSource,
@@ -162,6 +158,11 @@ function browserRuntime(storage = new Map()) {
         chatState.activeTabId = tabId;
         chatState.open = true;
       },
+      activateSystem() {
+        ensureStandaloneTab();
+        chatState.activeTabId = SYSTEM_TAB_ID;
+        chatState.open = true;
+      },
       draw: drawToolbar,
       emitChat: handleChatSseEvent,
       ensurePlan: ensurePlanTab,
@@ -173,6 +174,7 @@ function browserRuntime(storage = new Map()) {
       send: sendChatText,
       supervisorTab() { return chatState.tabs[SUPERVISOR_TAB_ID]; },
       tab(tabId) { return chatState.tabs[tabId]; },
+      systemMessageCount() { return systemOperationState.messages.length; },
       tabIds() { return Object.keys(chatState.tabs); },
       toggleActivity: toggleChatProgress,
       setApi(nextApi) { api = nextApi; },
@@ -184,10 +186,8 @@ function browserRuntime(storage = new Map()) {
     busyLabels,
     html: () => toolbar.innerHTML + supervisorPanel.innerHTML,
     runtime: context.supervisorToolbarTest,
-    supervisorEventScroll: () => supervisorEvents.scrollTop,
     supervisorStatusHtml: () => supervisorPanel.innerHTML,
     toolbarRenderCount: () => toolbar.innerHTMLWrites,
-    setSupervisorEventScroll(value) { supervisorEvents.scrollTop = value; },
     toasts,
   };
 }
@@ -216,7 +216,7 @@ function queuedMessage(id, text) {
   };
 }
 
-test("Supervisor stays discoverable and prompt-ready while idle", () => {
+test("Supervisor stays discoverable and prompt-ready while idle without an event stream", () => {
   const browser = browserRuntime();
   browser.runtime.activate();
   browser.runtime.draw();
@@ -224,10 +224,10 @@ test("Supervisor stays discoverable and prompt-ready while idle", () => {
   assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
   assert.match(browser.html(), /data-testid="toolbar-tab-supervisor"/);
   assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
-  assert.match(browser.html(), /The supervisor agent is idle/);
   assert.match(browser.html(), /Supervisor is idle/);
   assert.match(browser.html(), /Type to queue a message/);
   assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
+  assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
 });
 
@@ -323,29 +323,33 @@ test("navigation reinitialization restores the singleton session and transcript"
   assert.equal(restored.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
 });
 
-test("polling and SSE reconnect refresh health, events, and conversation without a duplicate session", async () => {
+test("polling and SSE reconnect route deduplicated supervisor events to System", async () => {
   const browser = browserRuntime();
   browser.runtime.setAttached();
   browser.runtime.setRoute("dashboard");
   browser.runtime.activate();
+  const delayedEvent = {
+    id: "supervisor-delayed",
+    kind: "observation",
+    status: "running",
+    message: "Worker heartbeat delayed",
+    goal_id: "00000000000000000000000001",
+    created_at: "2026-07-21T22:00:01Z",
+  };
   const responses = [
     snapshot({
       lifecycle: "supervising",
       health: "degraded",
       active_work: 1,
       session_id: "supervisor-shared",
-      events: [{
-        kind: "observation",
-        status: "running",
-        message: "Worker heartbeat delayed",
-        created_at: "2026-07-21T22:00:01Z",
-      }],
+      events: [delayedEvent],
     }),
     snapshot({
       lifecycle: "idle",
       health: "healthy",
       session_id: "supervisor-shared",
-      events: [{
+      events: [delayedEvent, {
+        id: "supervisor-recovered",
         kind: "recovery",
         status: "completed",
         message: "Worker heartbeat recovered",
@@ -363,8 +367,17 @@ test("polling and SSE reconnect refresh health, events, and conversation without
   browser.runtime.draw();
   assert.match(browser.html(), /supervisor-agent-health-degraded/);
   assert.match(browser.html(), /supervising/);
-  assert.match(browser.html(), /Worker heartbeat delayed/);
+  assert.doesNotMatch(browser.html(), /Worker heartbeat delayed/);
+  assert.equal(browser.runtime.systemMessageCount(), 1);
 
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
+  assert.match(browser.html(), /data-testid="toolbar-system-panel"/);
+  assert.match(browser.html(), /Worker heartbeat delayed/);
+  assert.match(browser.html(), /supervisor/);
+  assert.match(browser.html(), /00000000000000000000000001/);
+
+  browser.runtime.activate();
   browser.runtime.initSSE();
   assert.equal(FakeEventSource.latest.url, "/api/sse");
   FakeEventSource.latest.emit("chat_event", {
@@ -381,8 +394,14 @@ test("polling and SSE reconnect refresh health, events, and conversation without
   assert.match(browser.html(), /Conversation refreshed after reconnect/);
 
   await browser.runtime.load();
+  browser.runtime.activate();
   browser.runtime.draw();
   assert.match(browser.html(), /supervisor-agent-health-healthy/);
+  assert.doesNotMatch(browser.html(), /Worker heartbeat recovered/);
+  assert.equal(browser.runtime.systemMessageCount(), 2);
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
+  assert.match(browser.html(), /Worker heartbeat delayed/);
   assert.match(browser.html(), /Worker heartbeat recovered/);
   assert.equal(browser.runtime.supervisorTab().sessionId, "supervisor-shared");
   assert.equal(browser.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
@@ -392,12 +411,11 @@ test("polling and SSE reconnect refresh health, events, and conversation without
   ]);
 });
 
-test("polling refreshes supervisor status without replacing the prompt or moving scroll position", async () => {
+test("polling refreshes supervisor status without replacing the prompt and routes events to System", async () => {
   const browser = browserRuntime();
   browser.runtime.setAttached();
   browser.runtime.activate();
   browser.runtime.draw();
-  browser.setSupervisorEventScroll(37);
   const toolbarRenderCount = browser.toolbarRenderCount();
   browser.runtime.setApi(async () => ({
     supervisor_agent: snapshot({
@@ -416,8 +434,31 @@ test("polling refreshes supervisor status without replacing the prompt or moving
 
   assert.equal(browser.toolbarRenderCount(), toolbarRenderCount);
   assert.match(browser.supervisorStatusHtml(), /supervising/);
-  assert.match(browser.supervisorStatusHtml(), /Queue observation refreshed/);
-  assert.equal(browser.supervisorEventScroll(), 37);
+  assert.doesNotMatch(browser.supervisorStatusHtml(), /Queue observation refreshed/);
+  assert.equal(browser.runtime.systemMessageCount(), 1);
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
+  assert.match(browser.html(), /Queue observation refreshed/);
+});
+
+test("polling an unchanged full supervisor event window does not duplicate System entries", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setAttached();
+  const eventStart = Date.parse("2026-07-21T22:00:00Z");
+  const events = Array.from({ length: 80 }, (_, index) => ({
+    id: `supervisor-event-${index}`,
+    kind: index === 79 ? "recovery" : "observation",
+    status: index === 79 ? "completed" : "running",
+    message: `Supervisor event ${index}`,
+    created_at: new Date(eventStart + index * 1000).toISOString(),
+  }));
+  browser.runtime.setApi(async () => ({ supervisor_agent: snapshot({ events }) }));
+
+  await browser.runtime.load();
+  assert.equal(browser.runtime.systemMessageCount(), 80);
+
+  await browser.runtime.load();
+  assert.equal(browser.runtime.systemMessageCount(), 80);
 });
 
 test("initial prompts and active-work follow-ups share chat APIs and render every outcome", async () => {
@@ -490,11 +531,18 @@ test("initial prompts and active-work follow-ups share chat APIs and render ever
   );
   assert.match(browser.html(), /Queued messages/);
   assert.match(browser.html(), /Agent working in session supervisor-shared/);
+  assert.doesNotMatch(browser.html(), /Provider authentication required/);
+
+  browser.runtime.activateSystem();
+  browser.runtime.draw();
   for (const status of ["queued", "running", "completed", "failed", "blocked"]) {
-    assert.match(browser.html(), new RegExp(`supervisor-agent-event-${status}`));
+    assert.match(browser.html(), new RegExp(`data-system-log-status="${status}"`));
   }
   assert.match(browser.html(), /Provider authentication required/);
-  assert.match(browser.html(), /Retry available/);
+  assert.match(browser.html(), /retryable/);
+
+  browser.runtime.activate();
+  browser.runtime.draw();
 
   browser.runtime.emitChat({
     session_id: "supervisor-shared",
