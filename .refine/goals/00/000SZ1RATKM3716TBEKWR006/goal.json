@@ -1,7 +1,7 @@
 {
-  "base_commit": "7ec92fd6f680c4b398e11039d8a8ef77029ea368",
+  "base_commit": "77caabb1488d294bf93477086135d3a169d17160",
   "branch_name": "refine/00000SZ1RATKM3716TBEKWR006/round-1",
-  "candidate_commit": "a49b2a92d6dee4057446891e5d803e7c52f5c11c",
+  "candidate_commit": null,
   "created": "2026-07-21T23:37:41Z",
   "feature_id": null,
   "feature_order": null,
@@ -66,7 +66,7 @@
       "updated": "2026-07-21T23:57:02Z"
     }
   ],
-  "status": "todo",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-21T23:57:25Z"
+  "updated": "2026-07-22T00:02:43Z"
 }
