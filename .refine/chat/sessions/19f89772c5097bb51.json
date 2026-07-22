@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:09:14Z",
+  "updated_at": "2026-07-22T11:10:22Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -316,6 +316,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worktree already contains a focused, uncommitted Supervisor-toolbar change in exactly the four files this request touches. I’m treating that as the current prototype—not overwriting it—and I’m reviewing its behavior and tests before extending it. The first concrete gap is already visible in the existing test expectations: they still assert a separate “Queued messages” panel, so the transcript model and its regression coverage need to move together."
+    },
+    {
+      "created_at": "2026-07-22T11:10:22Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718622879-103",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The queue is backend-owned, and the important unknown is now closed: Refine batches all queued inputs into one provider turn, but it also writes that batch as one synthetic user transcript event. That canonical shape would prevent true in-place transitions for multiple queued bubbles. I’m going to preserve provider batching while recording each queued input as its own transcript event; the UI can then reconcile one pending bubble to one sent bubble without inventing a second history model."
     }
   ],
   "queue_dispatching": true,
