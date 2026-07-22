@@ -3,7 +3,7 @@
   "lifecycle": "observing",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 2,
+  "queued_work": 1,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8956ab3d4361",
@@ -29,23 +29,24 @@
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
     "00000SZ1YFDPAG0NJ16FTTY000": "done",
     "00000SZ29R2JNJR5RXPR1YW000": "done",
-    "00000SZ29T1KSK3KYJW81YW001": "review",
+    "00000SZ29T1KSK3KYJW81YW001": "done",
     "00000SZ29Y2WEJ5C3YM01YW003": "done",
     "00000SZ2A1VDSHNRTNWM1YW004": "done",
     "00000SZ2A3VTB16YZMNW1YW005": "done",
-    "00000SZ2A8GT1HPT5JXR1YW006": "review",
+    "00000SZ2A8GT1HPT5JXR1YW006": "done",
     "00000SZ2A9V2FG1VXVDM1YW007": "done",
     "00000SZ2AAFPEGY865YM1YW008": "done",
-    "00000SZ2ADNRS13J3YZG1YW009": "todo",
+    "00000SZ2ADNRS13J3YZG1YW009": "review",
     "00000SZ2AEZ6VGKY6RCG1YW00A": "done",
     "00000SZ2AG11JHPZNR941YW00B": "done",
-    "00000SZ2B6AMS3D1A9N41YW00C": "todo"
+    "00000SZ2B6AMS3D1A9N41YW00C": "review",
+    "00000SZ2BGCG909VDSW41YW00D": "todo"
   },
   "open_issues": {
     "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
   },
-  "last_context_key": "goals=00000SZ2ADNRS13J3YZG1YW009:todo,00000SZ2B6AMS3D1A9N41YW00C:todo|live={}|quiet={}|issues=provider:Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
-  "updated_at": "2026-07-22T10:40:14.365429829+00:00",
+  "last_context_key": "goals=00000SZ2BGCG909VDSW41YW00D:todo|live={}|quiet={}|issues=provider:Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
+  "updated_at": "2026-07-22T10:48:13.941766594+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -427,6 +428,56 @@
       "message": "Goal 00000SZ2B6AMS3D1A9N41YW00C entered workflow state todo.",
       "created_at": "2026-07-22T10:40:14.363851064+00:00",
       "goal_id": "00000SZ2B6AMS3D1A9N41YW00C",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:48:13.939965690+00:00-40",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29T1KSK3KYJW81YW001 changed from review to done.",
+      "created_at": "2026-07-22T10:48:13.939965690+00:00",
+      "goal_id": "00000SZ29T1KSK3KYJW81YW001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:48:13.939974052+00:00-41",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A8GT1HPT5JXR1YW006 changed from review to done.",
+      "created_at": "2026-07-22T10:48:13.939974052+00:00",
+      "goal_id": "00000SZ2A8GT1HPT5JXR1YW006",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:48:13.939977288+00:00-42",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2ADNRS13J3YZG1YW009 changed from todo to review.",
+      "created_at": "2026-07-22T10:48:13.939977288+00:00",
+      "goal_id": "00000SZ2ADNRS13J3YZG1YW009",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:48:13.939980193+00:00-43",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2B6AMS3D1A9N41YW00C changed from todo to review.",
+      "created_at": "2026-07-22T10:48:13.939980193+00:00",
+      "goal_id": "00000SZ2B6AMS3D1A9N41YW00C",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:48:13.939983199+00:00-44",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2BGCG909VDSW41YW00D entered workflow state todo.",
+      "created_at": "2026-07-22T10:48:13.939983199+00:00",
+      "goal_id": "00000SZ2BGCG909VDSW41YW00D",
       "actionable": false,
       "retryable": false
     }

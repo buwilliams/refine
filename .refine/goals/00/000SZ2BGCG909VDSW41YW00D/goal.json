@@ -1,6 +1,6 @@
 {
-  "base_commit": null,
-  "branch_name": null,
+  "base_commit": "9b7b2bc2171a0ceb439171dd5d2d2e187cfbcec1",
+  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-1",
   "candidate_commit": null,
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
@@ -35,7 +35,7 @@
       "updated": "2026-07-22T10:47:52Z"
     }
   ],
-  "status": "todo",
-  "target_branch": null,
-  "updated": "2026-07-22T10:47:52Z"
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T10:48:15Z"
 }
