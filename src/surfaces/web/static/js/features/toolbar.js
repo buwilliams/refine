@@ -2702,6 +2702,7 @@ function chatActivityLabel(tab) {
 function chatStatusLine(tab) {
   if (!tab?.sessionId) {
     if (tab?.starting) return "Starting session.";
+    if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
     return "No active session.";
   }
   if (tab.closedReason) return `Session ${tab.sessionId} ended — ${tab.closedReason}.`;
@@ -2874,10 +2875,19 @@ async function toggleActiveChat() {
   const btn = $("#btn-chat-toggle");
   if (t.sessionId) {
     await withButtonBusy(btn, "Stopping…", async () => {
-      try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
-      t.sessionId = null;
-      t.worktree = null;
-      t.closedReason = "stopped by user";
+      const sessionId = t.sessionId;
+      try {
+        const stopped = await api("POST", `/api/chat/${sessionId}/stop`);
+        t.sessionId = null;
+        t.worktree = null;
+        t.pending = false;
+        t.closedReason = stopped?.closed_reason || "stopped by user";
+        if (t.mode === "supervisor") supervisorAgentState.error = "";
+      } catch (error) {
+        const message = `Could not stop session ${sessionId}: ${error.message || error}. Retry Stop or inspect System logs.`;
+        if (t.mode === "supervisor") supervisorAgentState.error = message;
+        toast(message, "error");
+      }
       saveChatStateToStorage();
       refreshProcessesTabForChatChange();
       drawChat();

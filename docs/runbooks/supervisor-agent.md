@@ -26,7 +26,7 @@ Provider and authentication errors are shown as chat failures. Fix provider acce
 
 Automatic recovery is deliberately narrow. On daemon or workflow-runner restart, the existing workflow engine restores the worker and marks interrupted Goals failed so they can be restarted later. The supervisor agent uses existing Refine operations; it does not own a parallel recovery engine. A lost or stalled Goal is reported but is not force-merged, reset, or deleted.
 
-The toolbar Stop action requests termination through the same cross-platform Process capability used by Goal agents. The request returns without waiting on the UI path, but the shared capacity lease remains occupied until the managed provider process is confirmed exited. A retry attempted during that stopping window remains blocked, preventing cap-1 overlap.
+The toolbar Stop action requests termination through the same cross-platform Process capability used by Goal agents. The request returns without waiting on the UI path, but the shared capacity lease remains occupied until the managed provider process is confirmed exited. A retry attempted during that stopping window remains blocked, preventing cap-1 overlap. The toolbar keeps the session attached and shows retry guidance if the Stop request itself fails; it only reports the backend's closed reason after a successful request.
 
 For an actionable failed Goal, inspect its evidence and use the ordinary retry command for the failed stage. For example:
 
