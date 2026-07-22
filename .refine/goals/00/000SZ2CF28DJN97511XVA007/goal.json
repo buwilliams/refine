@@ -1,7 +1,7 @@
 {
   "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
-  "branch_name": "refine/00000SZ2CF28DJN97511XVA007/round-3",
-  "candidate_commit": "7fd8c3a93812c16314eba308642bf1c60566e247",
+  "branch_name": "refine/00000SZ2CF28DJN97511XVA007/round-4",
+  "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -289,9 +289,31 @@
       "reporter": "Codex",
       "rule_state": "failed",
       "updated": "2026-07-22T18:08:15Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T18:09:09Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 7fd8c3a93812c16314eba308642bf1c60566e247 and fix all four Round 3 governance violations in the existing shared Quality capability. (1) When provider or supervised-command mutation is detected, recover the isolated candidate worktree back to the exact stored candidate commit and a clean index/worktree before allowing retry; persist explicit recovery evidence and fail safely if restoration cannot be proven. Use the existing Git worktree service and supervised operation model, not ad hoc shell cleanup or a second recovery engine. (2) Serialize Goal-scoped API Quality and workflow QA for the same Goal/candidate/worktree using the shared claim/capacity/operation substrate so concurrent checks cannot race agent execution, commands, or latest-round evidence; preserve responsive cancellation and ownership. (3) Add focused production-path tests for mutation followed by recovery and successful retry, failed restoration, and concurrent API/workflow checks against one candidate proving one owner and deterministic evidence. (4) Build the delegated Quality prompt from shared Goal intent, active Round intent, exact candidate commit, repository/worktree evidence, requirements, instructions, and tests; keep one prompt/service authority across workflow and API. Preserve original Quality timing across retries and all prior passing behavior. Run focused tests, serial library, full workflow, clippy, fmt, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T18:09:09Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T18:08:15Z"
+  "updated": "2026-07-22T18:09:09Z"
 }
