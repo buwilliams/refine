@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:13:15Z",
+  "updated_at": "2026-07-22T13:14:41Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -756,6 +756,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Autonomous recovery’s full supervisor test slice found two real regressions in projection-failure replay: activity/transcript write failures changed the authoritative evidence fingerprint and caused conflict instead of idempotent resume. The worker has the exact failing tests and stack locations; this is useful gate evidence, and the round remains active for correction."
+    },
+    {
+      "created_at": "2026-07-22T13:14:41Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784726081709-116",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A nested, read-only Quality self-audit ended with `turn interrupted` after inspecting the diff; I’m recording that provider failure rather than treating it as a pass. The implementation tests themselves passed, and Refine’s separate governance phase will still be the acceptance authority once the candidate is submitted."
     }
   ],
   "queue_dispatching": true,
