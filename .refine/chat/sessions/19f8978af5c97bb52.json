@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:13:40Z",
+  "updated_at": "2026-07-22T11:13:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -180,6 +180,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m taking over the queued supervisor turn and will track the workflow map against live process, Git, projection, operation, and activity evidence until the queue is genuinely idle. I’ll preserve the existing merge/worktree and provider boundaries, and I’ll surface any consequential choice rather than guessing."
+    },
+    {
+      "created_at": "2026-07-22T11:13:56Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718836849-20",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first blind spot is already clear: the workflow map says one `todo`, but there is no live workflow-agent Goal ID, while a supervisor chat operation is running. I’m checking the goal record, durable operations, runner output, and both relevant Git checkouts before deciding whether this is normal dispatch latency or lost work."
     }
   ],
   "queue_dispatching": true,
