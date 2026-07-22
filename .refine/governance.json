@@ -42,8 +42,8 @@
       "created": "2026-07-22T02:10:10Z",
       "id": "rule-6",
       "source": "manual",
-      "text": "Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.",
-      "updated": "2026-07-22T02:10:10Z"
+      "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+      "updated": "2026-07-22T10:37:50Z"
     },
     {
       "created": "2026-07-22T02:10:10Z",

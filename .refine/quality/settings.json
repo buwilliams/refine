@@ -1,0 +1,6 @@
+{
+  "business_requirements": "Preserve the relevant Goal and docs/intent product behavior. Keep Foundation, Capabilities, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.",
+  "instructions": "Judge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.",
+  "enabled": "0",
+  "timing": "pre_merge"
+}

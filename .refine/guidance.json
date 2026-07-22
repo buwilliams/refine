@@ -1,0 +1,8 @@
+[
+  {
+    "enabled": true,
+    "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+    "name": "Intent and architecture",
+    "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+  }
+]
