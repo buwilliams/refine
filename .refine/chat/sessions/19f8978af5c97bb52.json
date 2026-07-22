@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:49:05Z",
+  "updated_at": "2026-07-22T14:54:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1236,6 +1236,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The user’s latest steering supersedes the first contract candidate: Round 2 asks for a much smaller invariant-only contract and removes implementation recipes. The implementation Goal’s two attempts also exposed a provider-path defect—raw Codex JSON event fragments were treated as workflow failure text—so its worktree was preserved and cancelled pending the revised contract. I’m continuing with the revised contract first."
+    },
+    {
+      "created_at": "2026-07-22T14:54:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784732072153-200",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The revised contract candidate `f43026bd` passed governance and reached review. It is now the requested compact form: 48-line contract, three docs, seven durable invariants, no prescribed algorithm. I’m waiting for normal merge completion before reactivating the implementation Goal, whose earlier provider-fragment failures remain explicitly recorded."
     }
   ],
   "queued_messages": [
