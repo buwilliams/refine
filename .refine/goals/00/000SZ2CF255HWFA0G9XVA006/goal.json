@@ -1,7 +1,7 @@
 {
-  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-5",
-  "candidate_commit": "019c38286de0d4088f5c4dda096e1031bc8d4d73",
+  "base_commit": "657756564175c241ab966222bc3881207a889978",
+  "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-6",
+  "candidate_commit": null,
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -421,9 +421,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T13:36:17Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T13:36:54Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 019c38286de0d4088f5c4dda096e1031bc8d4d73 and fix the sole independent Rule 4 violation from Round 5. POST /api/operations/{id}/cancel must recognize a Quality operation correlated to a workflow execution/claim and delegate to the same shared workflow cancellation transaction used by WorkflowEngine::cancel, rather than cancelling only the operation/process through QualityOperationRunner::cancel. For workflow-owned Quality work, atomically converge the active Quality operation, managed process, workflow claim, capacity lease, and Goal Quality evidence to Cancelled, with durable logs and no later execute_claimed_work error path rewriting the claim to Failed. Standalone/non-workflow Quality operations should keep the existing direct Quality cancellation behavior. Make execute_claimed_work respect an already-authoritative Cancelled claim/operation outcome instead of unconditionally marking failure. Add a production public-route integration with a running workflow-owned Quality operation: cancel through POST /api/operations/{id}/cancel, prove process exit, operation/claim/evidence all Cancelled, capacity released, and late worker error/completion cannot change them. Also prove standalone Quality cancel remains correct. Retain all prior shared Quality architecture and race fixes. Run focused integration/races, all-target tests, fmt, clippy, diff integrity, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T13:36:54Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T13:36:17Z"
+  "updated": "2026-07-22T13:36:55Z"
 }
