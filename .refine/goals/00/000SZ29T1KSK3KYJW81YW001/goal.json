@@ -110,28 +110,47 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:33:45Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:40:12Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found; the reconciled implementation preserves current toolbar behavior, full-window deduplication, focused regression coverage, and affected intent documentation.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found; the reconciled implementation preserves current toolbar behavior, full-window deduplication, focused regression coverage, and affected intent documentation.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29T1KSK3KYJW81YW001-round-3"
+      },
+      "governance_message": "No Governance rule violations found; the reconciled implementation preserves current toolbar behavior, full-window deduplication, focused regression coverage, and affected intent documentation.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ29T1KSK3KYJW81YW001` is ready for review at commit `f4f4fcda6345188001ed142304e0b42c66a2853d`.\n\nAfter-action report:\n\n- Moved Supervisor events into the System tab while preserving current toolbar behavior.\n- Retained full 80-event deduplication and compatible tests from both conflicting branches.\n- Reason: Supervisor events cluttered its conversation UI.\n\nVerification:\n\n- Browser toolbar tests — exit 0; 10 passed, 0 failed.\n- Exact Rust contract — exit 0; 1 passed, 0 failed.\n- `cargo fmt --all -- --check` — exit 0.\n- `git diff HEAD^ HEAD --check` — exit 0.\n- Initial short-name Rust filter — exit 0 but ran 0 tests; replaced with the fully qualified test above.\n- Final `git status --porcelain` — empty.\n\nGoal run usage: 109,527 tokens over 4m 33s.",
       "implementation_reported_at": "2026-07-22T10:38:56Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Approval found a real conflict in tests/web_supervisor_toolbar.test.js after other reviewed Goals landed on main. Reconcile this Goal against the current main branch in a new candidate. Preserve the Goal intent and the prior round-2 deduplication behavior, combine compatible test coverage instead of discarding either side, run focused toolbar tests, and leave the refreshed candidate ready for review.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:40:13Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:38:56Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:40:14Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:38:56Z"
+  "updated": "2026-07-22T10:40:14Z"
 }
