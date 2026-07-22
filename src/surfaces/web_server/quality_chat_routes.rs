@@ -4,8 +4,7 @@ use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::ConfigService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityOperationRunner, QualityService,
-    QualitySettingsPatch,
+    FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
@@ -65,13 +64,8 @@ impl InProcessWebServer {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| self.settings_service(refine_dir).load().ok())
-            .and_then(|settings| {
-                settings
-                    .get("quality_timing")
-                    .and_then(|value| value.as_str())
-                    .map(str::to_string)
-            })
+            .and_then(|refine_dir| FileQualityService::new(refine_dir).load_settings().ok())
+            .map(|settings| settings.timing)
             .unwrap_or_else(|| "pre_merge".to_string())
     }
 
@@ -222,43 +216,51 @@ impl InProcessWebServer {
             return runtime_root_unavailable("run quality checks");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let owner_id = body
-            .get("owner_id")
-            .or_else(|| body.get("goal_id"))
-            .or_else(|| body.get("feature_id"))
+        if body.get("command").is_some() {
+            return error_response(RefineError::InvalidInput(
+                "Quality checks use the saved plain-text tests; command overrides are not accepted"
+                    .to_string(),
+            ));
+        }
+        let Some(goal_id) = body
+            .get("goal_id")
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
-            .unwrap_or("app")
+            .map(str::trim)
+        else {
+            return error_response(RefineError::InvalidInput(
+                "goal_id is required for Quality evaluation".to_string(),
+            ));
+        };
+        let settings = match self.settings_service(&refine_dir).load() {
+            Ok(settings) => settings,
+            Err(error) => return error_response(error),
+        };
+        let provider = settings
+            .get("agent_cli")
+            .and_then(Value::as_str)
+            .unwrap_or("claude")
             .to_string();
-        let command = body
-            .get("command")
-            .and_then(|value| value.as_str())
-            .unwrap_or("")
-            .to_string();
-        match QualityOperationRunner::new(&refine_dir, runtime_root).run_checks(
-            QualityCheckRequest {
-                owner_id,
-                command,
-                process_metadata: Default::default(),
-            },
-        ) {
-            Ok(operation_result) => {
-                append_quality_activity(
-                    &refine_dir,
-                    format!(
-                        "Quality checks completed for {}",
-                        operation_result.result.owner_id
-                    ),
-                );
-                ApiResponse::json(
-                    200,
-                    json!({
-                        "ok": operation_result.result.ok,
-                        "result": operation_result.result,
-                        "operation": operation_response(operation_result.operation)
-                    }),
-                )
-            }
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("run quality checks"),
+            Err(error) => return error_response(error),
+        };
+        let metadata = serde_json::Map::from_iter([
+            ("kind".to_string(), json!("quality")),
+            ("source".to_string(), json!("manual")),
+            ("goal_id".to_string(), json!(goal_id)),
+        ]);
+        match QualityOperationRunner::new(&refine_dir, runtime_root, target_root)
+            .start_goal_checks(goal_id, &provider, metadata)
+        {
+            Ok(operation) => ApiResponse::json(
+                202,
+                json!({
+                    "ok": true,
+                    "operation": operation_response(operation)
+                }),
+            ),
             Err(error) => error_response(error),
         }
     }

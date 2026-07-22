@@ -1753,6 +1753,7 @@ mod tests {
     use crate::process::subprocess::ManagedProcess;
     use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
+    use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
     use crate::tools::product::nodes::FileNodeRegistryService;
     use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
     use std::process::Command;
@@ -3109,8 +3110,18 @@ mod tests {
         fs::write(
             &smoke_ai,
             "#!/bin/sh\n\
-             printf 'qa should fail\\n' > fail-qa\n\
-             printf '%s\\n' 'smoke-ai goal-agent response'\n",
+             case \"$*\" in\n\
+             *\"Post-implementation Quality evaluation\"*)\n\
+               printf '%s\\n' '{\"ok\":false,\"summary\":\"Candidate marker check failed.\",\"results\":[{\"test\":\"The candidate has no fail-qa marker.\",\"status\":\"failed\",\"evidence\":\"fail-qa exists\",\"command\":\"test ! -f fail-qa\"}]}'\n\
+               ;;\n\
+             *\"governance\"*)\n\
+               printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
+               ;;\n\
+             *)\n\
+               printf 'qa should fail\\n' > fail-qa\n\
+               printf '%s\\n' 'smoke-ai goal-agent response'\n\
+               ;;\n\
+             esac\n",
         )
         .unwrap();
         {
@@ -3146,11 +3157,17 @@ mod tests {
         FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "agent_cli": "smoke-ai",
-                "quality_enabled": "1",
-                "target_app_build_command": "printf build-ok",
+                "quality_enabled": "0",
+                "target_app_build_command": "printf build-ran > build-ran",
                 "target_app_test_command": "test ! -f fail-qa",
                 "allowed_commands": "printf, test"
             }))
+            .unwrap();
+        FileQualityService::new(&refine_dir)
+            .save_settings(QualitySettingsPatch {
+                tests: Some(vec!["The candidate has no fail-qa marker.".to_string()]),
+                ..QualitySettingsPatch::default()
+            })
             .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
@@ -3163,6 +3180,16 @@ mod tests {
         assert!(!target_root.join("fail-qa").exists());
         assert!(worktree_path.exists());
         assert!(worktree_path.join("fail-qa").exists());
+        assert!(
+            !worktree_path.join("build-ran").exists(),
+            "pre-merge Quality must fail before the target-app build"
+        );
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], "failed");
+        assert_eq!(
+            detail["rounds"][0]["quality_details"]["results"][0]["test"],
+            "The candidate has no fail-qa marker."
+        );
         assert_eq!(
             git_stdout(&target_root, &["rev-parse", "HEAD"])
                 .unwrap()

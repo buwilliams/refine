@@ -17,6 +17,7 @@ pub enum PromptTemplate {
     Supervisor,
     ReleaseGoal,
     PostImplementationGovernance,
+    PostImplementationQuality,
     GoalAgent,
     GovernanceGeneration,
     TargetAppGeneration,
@@ -43,6 +44,7 @@ impl PromptTemplate {
             Self::Supervisor => "supervisor.md",
             Self::ReleaseGoal => "release-goal.md",
             Self::PostImplementationGovernance => "post-implementation-governance.md",
+            Self::PostImplementationQuality => "post-implementation-quality.md",
             Self::GoalAgent => "goal-agent.md",
             Self::GovernanceGeneration => "governance-generation.md",
             Self::TargetAppGeneration => "target-app-generation.md",
@@ -71,6 +73,7 @@ impl PromptTemplate {
             Self::PostImplementationGovernance => {
                 include_str!("post-implementation-governance.md")
             }
+            Self::PostImplementationQuality => include_str!("post-implementation-quality.md"),
             Self::GoalAgent => include_str!("goal-agent.md"),
             Self::GovernanceGeneration => include_str!("governance-generation.md"),
             Self::TargetAppGeneration => include_str!("target-app-generation.md"),
@@ -233,6 +236,7 @@ mod tests {
             PromptTemplate::Supervisor,
             PromptTemplate::ReleaseGoal,
             PromptTemplate::PostImplementationGovernance,
+            PromptTemplate::PostImplementationQuality,
             PromptTemplate::GoalAgent,
             PromptTemplate::GovernanceGeneration,
             PromptTemplate::TargetAppGeneration,
@@ -266,7 +270,7 @@ mod tests {
             }
         }
         assert!(
-            total_words <= 700,
+            total_words <= 750,
             "prompt set is too prescriptive at {total_words} words"
         );
 

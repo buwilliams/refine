@@ -338,7 +338,8 @@ Properties:
   `constitution_state`, `governance_message`, `governance_details`,
   `governance_checked_at`, and `governance_rule_actions`.
 - `RoundQuality`: `quality_state`, `quality_message`, `quality_details`, and
-  `quality_checked_at`.
+  `quality_checked_at`. Quality details preserve the configured agent's per-test
+  pass/fail evidence for the candidate.
 - `GoalPriority`: `low`, `medium`, or `high`.
 
 Rules:
@@ -802,18 +803,40 @@ Requirements:
 
 Module: `tools::host::quality`; path: `src/tools/host/quality/`.
 
-Owns abstractions for: run checks, screenshots, compare, gate, and workflow QA
-policy. Workflow QA executes the enabled target-app test commands through the
-target-app service under supervisor ownership.
+Owns abstractions for: run checks, screenshots, compare, gate, operation
+coordination, candidate pinning, observed execution evidence, and workflow QA
+policy. API and workflow adapters call the same Goal-scoped capability.
 
 Requirements:
 
-- Quality checks are operations supervised by the daemon.
-- Target-app tests are configured with `target_app_test_commands`; the
-  compatibility `target_app_test_command` value tracks the first enabled command.
-  Enabled commands run as supervised Quality-owned subprocesses.
-- Results are persisted, visible, and tied to the relevant Goal, Feature, or app.
-- Users can rerun, cancel, and inspect quality operations from any surface.
+- Quality checks register a durable operation before provider work begins, return
+  its identifier immediately to asynchronous surfaces, correlate provider and
+  Quality-owned command processes through `operation_id`, and settle on every
+  success, test failure, provider failure, parsing failure, cancellation, or
+  restart interruption only after authoritative Goal evidence is durable.
+- One exclusive `quality:{goal_id}:{candidate_commit}` owner serializes manual and
+  workflow evaluation of the same candidate.
+- `quality/settings.json` is authoritative for plain-text tests and timing.
+  Legacy `/settings` timing is an adapter to the same file; Node settings do not
+  persist a second value. `pre_merge` orders QA before Build; `post_build` orders
+  QA after Build.
+- First-load migration inspects the complete Node registry before marking the
+  project complete, imports and deduplicates every enabled legacy
+  `target_app_test_commands` value, and remains retryable after a partial write.
+  Imported commands stay enforced until a non-empty plain-text test set
+  explicitly replaces them.
+- The agent proposes one command per exact test. A pass is accepted only when the
+  same command ran as an observed supervised Quality process and exited
+  successfully; process ID, exit code, and output evidence are persisted.
+- Evaluation requires the recorded candidate commit to equal worktree HEAD and a
+  clean index and worktree before and after checks. Mismatches fail visibly and
+  are never reset or cleaned.
+- Results and errors use the same Goal-round Quality fields and logs from every
+  surface. Those fields and the Goal log are written before success or failure
+  settlement; a persistence failure leaves the operation active for restart
+  recovery. Provider and test process registration shares the operation mutation
+  barrier with cancellation, so cancellation prevents later launches. Users can
+  inspect and cancel operations through shared operation APIs.
 
 ### Chat And Planning
 
