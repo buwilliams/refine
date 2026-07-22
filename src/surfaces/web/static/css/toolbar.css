@@ -563,25 +563,87 @@ button.chat-activity-toggle:hover:not(:disabled) {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
   gap: 8px;
-  padding: 2px 0;
+  padding: 5px 0;
   color: var(--color-text-muted);
+}
+.system-log-line + .system-log-line {
+  border-top: 1px solid var(--color-border-subtle);
 }
 .system-log-time {
   color: var(--muted);
   white-space: nowrap;
 }
+.system-log-body {
+  min-width: 0;
+}
+.system-log-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  min-width: 0;
+}
+.system-log-status,
+.system-log-category {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.system-log-status {
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+}
+.system-log-category {
+  background: var(--bg);
+  color: var(--muted);
+}
 .system-log-message {
+  flex: 1 1 240px;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.system-log-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+}
+.system-log-detail {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 5px;
+  max-width: 100%;
+}
+.system-log-detail dt {
+  color: var(--muted);
+}
+.system-log-detail dt::after {
+  content: "=";
+}
+.system-log-detail dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--fg);
   white-space: pre-wrap;
   word-break: break-word;
 }
 .system-log-start .system-log-message,
-.system-log-queued .system-log-message {
+.system-log-start .system-log-status,
+.system-log-queued .system-log-message,
+.system-log-queued .system-log-status {
   color: var(--accent);
 }
-.system-log-complete .system-log-message {
+.system-log-complete .system-log-message,
+.system-log-complete .system-log-status {
   color: #0f766e;
 }
-.system-log-error .system-log-message {
+.system-log-error .system-log-message,
+.system-log-error .system-log-status {
   color: var(--error);
 }
 .system-log-empty {

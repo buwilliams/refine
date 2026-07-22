@@ -1101,6 +1101,7 @@ function recordSystemOperation(payload) {
     status: normalizeSystemLogStatus(payload?.status),
     category: String(payload?.category || "system"),
     timestamp: String(payload?.timestamp || new Date().toISOString()),
+    details: payload?.details ?? null,
   };
   if (!item.message) return;
   if (isDuplicateSystemOperation(item)) return;
@@ -1115,8 +1116,14 @@ function recordSystemOperation(payload) {
 
 function isDuplicateSystemOperation(item) {
   const cutoff = Date.parse(item.timestamp || "") - 5000;
+  const itemDetails = formatSystemOperationDetails(item.details);
   return systemOperationState.messages.slice(-20).some((existing) => {
-    if (existing.message !== item.message || existing.status !== item.status) return false;
+    if (
+      existing.message !== item.message
+      || existing.status !== item.status
+      || existing.category !== item.category
+      || formatSystemOperationDetails(existing.details) !== itemDetails
+    ) return false;
     const existingTime = Date.parse(existing.timestamp || "");
     if (Number.isNaN(existingTime) || Number.isNaN(cutoff)) return true;
     return existingTime >= cutoff;
@@ -1215,11 +1222,60 @@ function systemLogStatusLabel(status) {
 
 function renderSystemLogLine(item) {
   const time = formatSystemLogTime(item.timestamp);
+  const details = systemOperationDetailEntries(item.details);
   return `
-    <div class="system-log-line system-log-${item.status}" data-testid="system-log-line">
-      <span class="system-log-time">${htmlEscape(time)}</span>
-      <span class="system-log-message">${htmlEscape(item.message)}</span>
+    <div class="system-log-line system-log-${item.status}"
+         data-testid="system-log-line"
+         data-system-log-status="${htmlEscape(item.status)}"
+         data-system-log-category="${htmlEscape(item.category)}">
+      <time class="system-log-time" datetime="${htmlEscape(item.timestamp)}" title="${htmlEscape(item.timestamp)}">${htmlEscape(time)}</time>
+      <div class="system-log-body">
+        <div class="system-log-headline">
+          <span class="system-log-status" data-testid="system-log-status">${htmlEscape(systemLogStatusLabel(item.status))}</span>
+          <span class="system-log-category" data-testid="system-log-category">${htmlEscape(item.category)}</span>
+          <span class="system-log-message" data-testid="system-log-message">${htmlEscape(item.message)}</span>
+        </div>
+        ${details.length ? `
+          <dl class="system-log-details" data-testid="system-log-details">
+            ${details.map(([key, value]) => `
+              <div class="system-log-detail" data-testid="system-log-detail">
+                <dt>${htmlEscape(key)}</dt>
+                <dd>${htmlEscape(value)}</dd>
+              </div>`).join("")}
+          </dl>` : ""}
+      </div>
     </div>`;
+}
+
+function systemOperationDetailEntries(details) {
+  if (details === null || details === undefined || details === "") return [];
+  if (typeof details !== "object" || Array.isArray(details)) {
+    return [["details", formatSystemOperationDetailValue(details)]];
+  }
+  const entries = Object.entries(details)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => [key, formatSystemOperationDetailValue(value)]);
+  return entries.length ? entries : [["details", formatSystemOperationDetailValue(details)]];
+}
+
+function formatSystemOperationDetails(details) {
+  return systemOperationDetailEntries(details)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+}
+
+function formatSystemOperationDetailValue(value) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  try {
+    const encoded = JSON.stringify(value);
+    return encoded === undefined ? String(value) : encoded;
+  } catch (_) {
+    return String(value);
+  }
 }
 
 function normalizeSystemLogStatus(status) {

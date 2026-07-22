@@ -687,7 +687,13 @@ async function waitForTargetAppGenerateOperation(operationId) {
   targetAppGeneratePollPromise = waitForBackgroundOperation(operationId, {
     onProgress: (progress) => {
       const message = String(progress?.message || "").trim();
-      if (message) recordUiNotice(message, { kind: "info", source: "background-operation" });
+      if (message) {
+        recordUiNotice(message, {
+          kind: "info",
+          source: "background-operation",
+          details: { operation_id: operationId },
+        });
+      }
     },
   });
   try {
@@ -740,6 +746,7 @@ async function runTargetAppGenerateOperation() {
   recordUiNotice("Target-app config generation queued", {
     kind: "queued",
     source: "background-operation",
+    details: { operation_id: response.operation.id },
   });
   const result = await waitForTargetAppGenerateOperation(response.operation.id);
   writeTargetAppGenerateOperation("");

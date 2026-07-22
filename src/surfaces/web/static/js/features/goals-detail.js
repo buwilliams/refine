@@ -771,6 +771,18 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
         <dl class="pair">
           <dt>prompt</dt><dd data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "").replace(/\n/g, "<br>")}</dd>
         </dl>
+        ${rnd.implementation_report ? `
+          <div class="card implementation-report" data-testid="goal-implementation-report" style="margin-top:12px">
+            <div class="row" style="align-items:center;gap:8px">
+              <h4 style="margin:0">Implementation report</h4>
+              <span class="muted small">what changed, why, and verification</span>
+              <span class="spacer"></span>
+              ${rnd.implementation_reported_at
+                ? `<span class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(rnd.implementation_reported_at)}</span>`
+                : ""}
+            </div>
+            <div data-testid="goal-implementation-report-body" style="margin-top:8px;white-space:pre-wrap">${htmlEscape(rnd.implementation_report)}</div>
+          </div>` : ""}
       </div>
     </details>
   `;

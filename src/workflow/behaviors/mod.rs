@@ -144,6 +144,12 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(output) => output,
             Err(error) => return fail(ctx, "agent", error),
         };
+        if let Err(error) = ctx
+            .work_items
+            .update_latest_goal_round_implementation_report(&ctx.goal_id, &provider_output)
+        {
+            return fail(ctx, "agent", error);
+        }
         ctx.log(
             "agent",
             "Goal agent completed",

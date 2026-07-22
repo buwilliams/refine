@@ -806,6 +806,13 @@ impl InProcessWebServer {
                 Err(error) => return error_response(error),
             }
         }
+        if let Err(error) = self.promote_backlog_after_mutation() {
+            return error_response(error);
+        }
+        match service.show_goal_summary(&goal.goal.id) {
+            Ok(updated) => goal = updated,
+            Err(error) => return error_response(error),
+        }
 
         match self.refresh_projection_cache_after_mutation() {
             Ok(()) => ApiResponse::json(201, json!({"goal": goal.goal})),
@@ -2934,7 +2941,7 @@ impl InProcessWebServer {
         }
         let mut promoted = 0;
         if failures.is_empty() {
-            match self.promote_backlog_after_import() {
+            match self.promote_backlog_after_mutation() {
                 Ok(count) => promoted = count,
                 Err(error) => failures.push(json!({
                     "index": 0,
@@ -3017,7 +3024,7 @@ impl InProcessWebServer {
         Ok(())
     }
 
-    fn promote_backlog_after_import(&self) -> Result<usize, RefineError> {
+    fn promote_backlog_after_mutation(&self) -> Result<usize, RefineError> {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(0);
         };
@@ -3098,7 +3105,7 @@ impl InProcessWebServer {
         };
         let mut promoted = 0;
         if failures.is_empty() {
-            match self.promote_backlog_after_import() {
+            match self.promote_backlog_after_mutation() {
                 Ok(count) => promoted = count,
                 Err(error) => failures.push(json!({
                     "index": 0,
