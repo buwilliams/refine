@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T10:51:01Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2BK8ZEHQYBFB41YW00E",
+  "name": "The Logs UI is table-based, but it looks bad for log output in UX. Typically, a",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T10:51:01Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "The Logs UI is table-based, but it looks bad for log output in UX. Typically, a log trail is a stream of text (HTML-formatted to support links, etc.). All the white space and layout are overkill. It should be a heading/tailing (change order) log with search.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T10:51:01Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T10:51:01Z"
+}
