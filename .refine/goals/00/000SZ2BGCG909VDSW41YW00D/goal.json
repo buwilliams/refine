@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-3",
-  "candidate_commit": "55a92886bbfd6787e48efe9911da63cff0dfc4fd",
+  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-4",
+  "candidate_commit": null,
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -191,9 +191,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T12:29:23Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T12:29:46Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 55a92886bbfd6787e48efe9911da63cff0dfc4fd and fix the sole independent governance finding from Round 3. Move all managed-process cancellation orchestration out of src/surfaces/web_server/operation_routes.rs into the existing shared operation/process capability. The shared capability must own durable cancellation state, associated-process enumeration and termination, persistence of termination/projection-refresh failures, and projection refresh; the HTTP route must become a thin input/output adapter that invokes that capability. Reuse the existing FileOperationRegistry and process supervisor rather than adding a second cancellation service. Retain the Round 3 UI, bounded logs, Cancel/Hide/Download semantics, authoritative Cancelled race behavior, and real managed-process interruption/recovery coverage. Add or adjust tests so the shared capability is exercised directly and the public route is proven to delegate with identical semantics. Run focused failure/race tests, the full Rust library suite, browser tests, fmt, clippy, syntax, and diff checks, then pass Refine's independent governance phase.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T12:29:46Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:29:23Z"
+  "updated": "2026-07-22T12:29:48Z"
 }
