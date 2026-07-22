@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:30:56Z",
+  "updated_at": "2026-07-22T10:32:14Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -120,6 +120,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A user-driven bulk approval partially succeeded: 8 of 10 review goals merged, while two remained in review because Git reported real content conflicts. I will not force or auto-resolve those merges. I’m checking whether the failed approvals left the primary checkout or any Refine-owned merge worktree in a conflicted state, while the final active goal continues governance."
+    },
+    {
+      "created_at": "2026-07-22T10:32:14Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784716334097-31",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The queue has reached idle, but not cleanly: the last goal failed during its post-implementation path. I’m preserving that failure and gathering the exact stage/evidence before deciding whether Refine exposes a bounded retry; I will not relabel it as success or bypass governance. The two approval conflicts also remain safely in review, with the primary checkout clean and aligned to `origin/main`."
     }
   ],
   "queue_dispatching": true,
