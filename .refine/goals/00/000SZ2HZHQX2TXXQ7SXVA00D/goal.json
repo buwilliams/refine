@@ -1,7 +1,7 @@
 {
   "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
-  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-8",
-  "candidate_commit": "ca98963a27742fd50a974d095b732880c81b858d",
+  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-9",
+  "candidate_commit": null,
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -580,9 +580,31 @@
       "reporter": "Codex",
       "rule_state": "failed",
       "updated": "2026-07-22T18:38:45Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T18:39:21Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate ca98963a27742fd50a974d095b732880c81b858d and fix the two official Round 8 governance violations without weakening active-Node ownership. A daemon switching its active Node from A to B while an A-owned supervised provider execution is live must not strand the Goal, Running claim, or capacity: define and implement an explicit serialized ownership/settlement rule using the existing workflow coordination, supervised process ownership, and durable claim/capacity services. The original A worker must either retain authority to publish and settle its exact execution commitment despite the later UI/daemon selection change, or the activation must perform a safe explicit handoff/interruption protocol; do not silently accept foreign mutation, require manual reactivation, or invent a second recovery engine. Recovery must distinguish the exact still-live execution from an ownerless stranded claim and deterministically release capacity after terminal settlement. Add a production-path daemon test that starts an A-owned provider, switches that same daemon/runtime to Node B while the provider is live, then proves publication/settlement/recovery completes with no stranded Goal, Running claim, or lease; include provider-loss during the switch and preserve the existing distinct-Node isolation, transferred-Goal conflict, same-Node recovery, cancellation, and semantic-conflict coverage. Run focused failure-path tests, serial library, full workflow, multi-instance sync, fmt, all-target check, diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T18:39:21Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T18:38:45Z"
+  "updated": "2026-07-22T18:39:22Z"
 }
