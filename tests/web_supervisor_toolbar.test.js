@@ -36,6 +36,8 @@ class FakeElement {
     this.textContent = "";
     this.value = "";
     this.style = {};
+    this.clientHeight = 0;
+    this.scrollHeight = 0;
     this.scrollTop = 0;
   }
 
@@ -79,6 +81,9 @@ function browserRuntime(storage = new Map()) {
   const toolbar = new FakeElement();
   const toggleButton = new FakeElement();
   const supervisorPanel = new FakeElement();
+  const toolbarBody = new FakeElement();
+  const chatOutputBox = new FakeElement();
+  const chatOutput = new FakeElement();
   const toasts = [];
   const busyLabels = [];
   const body = {
@@ -95,6 +100,8 @@ function browserRuntime(storage = new Map()) {
     querySelector(selector) {
       if (selector === "#toolbar-dock") return toolbar;
       if (selector === "#btn-chat-toggle") return toggleButton;
+      if (selector === "#chat-output") return toolbar.querySelector(selector);
+      if (selector === ".chat-output-box") return toolbar.querySelector(selector);
       return null;
     },
     querySelectorAll() { return []; },
@@ -104,6 +111,18 @@ function browserRuntime(storage = new Map()) {
       selector === '[data-testid="toolbar-supervisor-panel"]'
       && toolbar.innerHTML.includes('data-testid="toolbar-supervisor-panel"')
     ) return supervisorPanel;
+    if (
+      selector === '[data-testid="toolbar-body"]'
+      && toolbar.innerHTML.includes('data-testid="toolbar-body"')
+    ) return toolbarBody;
+    if (
+      selector === ".chat-output-box"
+      && toolbar.innerHTML.includes('class="chat-output-box"')
+    ) return chatOutputBox;
+    if (
+      selector === "#chat-output"
+      && toolbar.innerHTML.includes('id="chat-output"')
+    ) return chatOutput;
     return null;
   };
   const context = vm.createContext({
@@ -182,6 +201,7 @@ function browserRuntime(storage = new Map()) {
   `, context);
   return {
     busyLabels,
+    elements: { chatOutput, chatOutputBox, toolbarBody },
     html: () => toolbar.innerHTML + supervisorPanel.innerHTML,
     runtime: context.supervisorToolbarTest,
     supervisorStatusHtml: () => supervisorPanel.innerHTML,
@@ -227,6 +247,42 @@ test("Supervisor stays discoverable and prompt-ready while idle without an event
   assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
   assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
+});
+
+test("overflowing Supervisor transcript scrolls chat-output-box instead of its enclosing toolbar body", () => {
+  const browser = browserRuntime();
+  const transcript = Array.from(
+    { length: 80 },
+    (_, index) => `Supervisor transcript line ${index + 1}`,
+  ).join("\n\n");
+  browser.runtime.activate();
+  Object.assign(browser.runtime.supervisorTab(), { output: transcript });
+
+  const { chatOutput, chatOutputBox, toolbarBody } = browser.elements;
+  chatOutputBox.clientHeight = 240;
+  chatOutputBox.scrollHeight = 1_200;
+  chatOutput.scrollTop = 0;
+  toolbarBody.scrollTop = 0;
+  browser.runtime.draw();
+
+  assert.match(browser.html(), /class="toolbar-dock-body supervisor-toolbar-body"/);
+  assert.ok(chatOutputBox.scrollHeight > chatOutputBox.clientHeight);
+  assert.equal(chatOutputBox.scrollTop, chatOutputBox.scrollHeight);
+  assert.equal(chatOutput.scrollTop, 0);
+  assert.equal(toolbarBody.scrollTop, 0);
+
+  const stylesheet = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/css/toolbar.css"),
+    "utf8",
+  );
+  assert.match(
+    stylesheet,
+    /\.toolbar-dock-body\.supervisor-toolbar-body\s*\{[^}]*overflow-y:\s*hidden;/s,
+  );
+  assert.match(
+    stylesheet,
+    /\.supervisor-toolbar-body \.chat-output-box\s*\{[^}]*overflow-y:\s*auto;/s,
+  );
 });
 
 test("every chat-capable toolbar tab defaults Activity to collapsed", () => {

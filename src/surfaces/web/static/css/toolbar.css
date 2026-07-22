@@ -103,6 +103,23 @@
 .toolbar-dock-body.terminal-toolbar-body {
   overflow: hidden;
 }
+.toolbar-dock-body.supervisor-toolbar-body {
+  overflow-y: hidden;
+}
+.supervisor-toolbar-body .supervisor-agent-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.supervisor-toolbar-body .chat-output-box {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.supervisor-toolbar-body .chat-output-box .chat-output {
+  flex: 0 0 auto;
+  overflow: visible;
+}
 
 /* Fullscreen mode: dock fills the area from just below the topbar to the
    bottom edge. The user-resizable height is overridden and the resize
