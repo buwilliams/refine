@@ -234,12 +234,21 @@ registerCommand({
   id: "goal.new",
   title: "New Goal",
   group: "Create",
-  aliases: ["new", "new-goal", "goal"],
+  aliases: ["new-goal", "goal"],
   keywords: ["create", "submit"],
   run: () => {
     closeTopbarMenus();
     openNewGoalModal();
   },
+});
+
+registerCommand({
+  id: "feature.new",
+  title: "New Feature",
+  group: "Create",
+  aliases: ["new-feature", "feature"],
+  keywords: ["create", "planning"],
+  run: () => navigateCommand("#/features/new"),
 });
 
 registerCommand({
@@ -315,6 +324,26 @@ registerCommand({
   aliases: ["fullscreen-toolbar", "maximize-toolbar", "fullscreen-chat", "maximize-chat"],
   run: () => toggleToolbarFullscreen(),
 });
+
+for (const [id, title, tabId, aliases, keywords] of [
+  ["supervisor.open", "Supervisor agent", SUPERVISOR_TAB_ID,
+    ["supervisor", "supervisor-agent", "open-supervisor"], ["agent", "chat", "health"]],
+  ["system.open", "System operations", SYSTEM_TAB_ID,
+    ["system", "system-operations", "open-system"], ["activity", "runtime", "logs"]],
+  ["terminal.open", "Terminal", TERMINAL_TAB_ID,
+    ["terminal", "shell", "open-terminal"], ["command line", "console"]],
+  ["standalone.open", "Standalone agent", "standalone",
+    ["standalone", "standalone-agent", "open-standalone"], ["agent", "chat"]],
+]) {
+  registerCommand({
+    id,
+    title,
+    group: "Toolbar",
+    aliases,
+    keywords,
+    run: () => openToolbarTab(tabId),
+  });
+}
 
 registerCommand({
   id: "files.open",

@@ -425,6 +425,15 @@ function openChatDock({ goalId = null, goalStatus = null } = {}) {
   }
 }
 
+function openToolbarTab(tabId) {
+  ensureStandaloneTab();
+  if (!chatState.tabs[tabId]) return;
+  chatState.activeTabId = tabId;
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawToolbar();
+}
+
 function goalLogTabId(goalId) {
   return `goal-logs:${goalId}`;
 }
