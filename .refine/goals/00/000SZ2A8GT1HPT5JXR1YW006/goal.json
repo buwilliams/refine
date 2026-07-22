@@ -55,28 +55,47 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:33:45Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:39:17Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A8GT1HPT5JXR1YW006-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Implementation complies with all Governance rules and has proportionate focused verification.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "Implementation complies with all Governance rules and has proportionate focused verification.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2A8GT1HPT5JXR1YW006-round-2"
+      },
+      "governance_message": "Implementation complies with all Governance rules and has proportionate focused verification.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2A8GT1HPT5JXR1YW006` Round 2 is ready for review handoff.\n\nAfter-action report:\n\n- Changed the workflow agent to receive selected Goal metadata, notes, previous Round results, and the latest Round.\n- Kept the current Markdown prompt system and newer scheduler behavior from `main`.\n- Made the latest Round explicitly authoritative and excluded runtime logs to limit prompt growth.\n- Added regression coverage across four scoped files.\n\nVerification:\n\n- Context regression: exit 0 — 1 passed.\n- Prompt-template tests: exit 0 — 4 passed.\n- Workflow tests: exit 0 — 27 passed, 0 failed.\n- `cargo clippy --lib -- -D warnings`: exit 0.\n- `cargo fmt --all -- --check`: exit 0.\n- `git diff --check`: exit 0.\n- One initial overly exact test filter exited 0 with 0 tests; the corrected filter ran and passed the intended test.",
       "implementation_reported_at": "2026-07-22T10:38:16Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Approval found a real conflict in src/workflow/mod.rs after other reviewed Goals landed on main. Reconcile this Goal against the current main branch in a new candidate. Preserve the Goal intent that agents receive Goal and prior-round context with the latest Round authoritative, retain compatible scheduler and prompt changes already on main, run focused workflow tests, and leave the refreshed candidate ready for review.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:39:19Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:38:16Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:39:19Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:38:17Z"
+  "updated": "2026-07-22T10:39:19Z"
 }
