@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:37:40Z",
+  "updated_at": "2026-07-22T17:39:01Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -336,6 +336,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s new genuinely concurrent same-record push test is green, and it is moving into cleanup/final verification. Quality’s integration tests remain green; the agent is doing a final shared-service ownership audit before committing."
+    },
+    {
+      "created_at": "2026-07-22T17:39:01Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741941472-113",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The latest targeted fixes are green. Coordination’s one failed command was only an invalid combined test-filter invocation; the same tests passed when run separately. Quality added and passed a regression proving provider-reported success is rejected when supervised execution fails, then passed the full library suite."
     }
   ],
   "queued_messages": [
