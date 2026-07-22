@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:16:23Z",
+  "updated_at": "2026-07-22T16:20:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1440,6 +1440,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The expanded two-daemon harness now passes end to end. It proves repeated same-revision conflict remains a conflict across blind retries, unrelated records still converge, an explicit higher revision resolves the conflict, late publication loses to cancellation, log-write failure cannot publish success, and a partial claim recovers after restart under a new runtime root/port. The original full-workflow harness also remains green."
+    },
+    {
+      "created_at": "2026-07-22T16:20:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784737245812-236",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The repaired candidate reached final-gate shape: 427/427 serial library tests passed, along with formatting, diff hygiene, and all-target compilation. Focused evidence includes 38 workflow tests, 13 Git-sync tests, seven terminal-operation tests, and the thin web retry adapter. The agent is rerunning both production-shaped daemon harnesses against this exact final source before committing."
     }
   ],
   "queued_messages": [
