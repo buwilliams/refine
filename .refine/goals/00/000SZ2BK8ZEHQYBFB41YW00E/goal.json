@@ -25,17 +25,17 @@
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
-      "prompt": "The Logs UI is table-based, but it looks bad for log output in UX. Typically, a log trail is a stream of text (HTML-formatted to support links, etc.). All the white space and layout are overkill. It should be a heading/tailing (change order) log with search.",
+      "prompt": "The Goal Follow Logs UI is table-based, but it looks bad for log output in UX. Typically, a log trail is a stream of text (HTML-formatted to support links, etc.). All the white space and layout are overkill. It should be a heading/tailing (change order) log with search.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:51:01Z"
+      "updated": "2026-07-22T10:51:18Z"
     }
   ],
   "status": "todo",
   "target_branch": null,
-  "updated": "2026-07-22T10:51:01Z"
+  "updated": "2026-07-22T10:51:18Z"
 }
