@@ -358,28 +358,91 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T16:59:21Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T17:29:07Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-6",
+        "failed_actions": [
+          {
+            "message": "Recovery runs only when a workflow runner first observes a target, and claim_has_live_owner treats any workflow runner in the owning runtime as proof that a specific claim is live. If that claim's provider or settlement is lost after another daemon has attached, the surviving daemon never rechecks it; subsequent evaluation ignores Running claims, leaving the Goal, claim, and capacity evidence stranded.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "After checking state conflicts, the non-fast-forward push retry fetches and rebases the prepared state commit without recomputing semantic conflicts or consulting conflict evidence. Simultaneous Nodes changing different lines of the same authoritative record can therefore cleanly Git-rebase and publish a combined result without explicit conflict review.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "The added multi-daemon test verifies startup observation while the provider remains live, then allows the owner to settle normally; it does not test owner/provider loss while the observing daemon stays attached. Git conflict tests also synchronize Nodes sequentially rather than racing their pushes, leaving both defects unverified.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Found three concrete violations in recovery, distributed conflict handling, and verification evidence.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Recovery runs only when a workflow runner first observes a target, and claim_has_live_owner treats any workflow runner in the owning runtime as proof that a specific claim is live. If that claim's provider or settlement is lost after another daemon has attached, the surviving daemon never rechecks it; subsequent evaluation ignores Running claims, leaving the Goal, claim, and capacity evidence stranded.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"After checking state conflicts, the non-fast-forward push retry fetches and rebases the prepared state commit without recomputing semantic conflicts or consulting conflict evidence. Simultaneous Nodes changing different lines of the same authoritative record can therefore cleanly Git-rebase and publish a combined result without explicit conflict review.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The added multi-daemon test verifies startup observation while the provider remains live, then allows the owner to settle normally; it does not test owner/provider loss while the observing daemon stays attached. Git conflict tests also synchronize Nodes sequentially rather than racing their pushes, leaving both defects unverified.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Found three concrete violations in recovery, distributed conflict handling, and verification evidence.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Recovery runs only when a workflow runner first observes a target, and claim_has_live_owner treats any workflow runner in the owning runtime as proof that a specific claim is live. If that claim's provider or settlement is lost after another daemon has attached, the surviving daemon never rechecks it; subsequent evaluation ignores Running claims, leaving the Goal, claim, and capacity evidence stranded.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "After checking state conflicts, the non-fast-forward push retry fetches and rebases the prepared state commit without recomputing semantic conflicts or consulting conflict evidence. Simultaneous Nodes changing different lines of the same authoritative record can therefore cleanly Git-rebase and publish a combined result without explicit conflict review.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "The added multi-daemon test verifies startup observation while the provider remains live, then allows the owner to settle normally; it does not test owner/provider loss while the observing daemon stays attached. Git conflict tests also synchronize Nodes sequentially rather than racing their pushes, leaving both defects unverified.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2HZHQX2TXXQ7SXVA00D-round-6"
+      },
+      "governance_message": "Found three concrete violations in recovery, distributed conflict handling, and verification evidence.",
+      "governance_rule_actions": [
+        {
+          "message": "Recovery runs only when a workflow runner first observes a target, and claim_has_live_owner treats any workflow runner in the owning runtime as proof that a specific claim is live. If that claim's provider or settlement is lost after another daemon has attached, the surviving daemon never rechecks it; subsequent evaluation ignores Running claims, leaving the Goal, claim, and capacity evidence stranded.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "After checking state conflicts, the non-fast-forward push retry fetches and rebases the prepared state commit without recomputing semantic conflicts or consulting conflict evidence. Simultaneous Nodes changing different lines of the same authoritative record can therefore cleanly Git-rebase and publish a combined result without explicit conflict review.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "The added multi-daemon test verifies startup observation while the provider remains live, then allows the owner to settle normally; it does not test owner/provider loss while the observing daemon stays attached. Git conflict tests also synchronize Nodes sequentially rather than racing their pushes, leaving both defects unverified.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Implemented and committed Round 6 as `bfdfc92` (`Complete cross-process workflow coordination`). The worktree is clean and reviewable.\n\nChanges:\n\n- Atomically revalidates Goal revision, status, eligibility, ownership, workflow state, and capacity at claim/start/retry boundaries.\n- Makes retry rollback a durable, crash-repairable commitment.\n- Records runtime ownership and preserves live providers observed by simultaneous daemons; losing schedulers no longer fail the winning claim.\n- Releases and signals processes/capacity through the owning runtime, while legacy ambiguous ownership blocks unsafe takeover.\n- Persists Git conflict observations so unequal revisions remain conflicted until an explicit post-conflict edit.\n- Derives target identity from configured `git_remote`, preserving existing identity records.\n- Expands the real multi-daemon test for simultaneous workflow runners, duplicate-launch prevention, capacity ownership, and unequal-revision conflict resolution.\n\nVerification:\n\n- `git diff --check` — passed.\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- Six focused coordination, recovery, conflict, and identity tests — all passed.\n- `cargo test --lib --no-fail-fast -- --test-threads=1` — 431 passed, 0 failed.\n- `cargo run --manifest-path xtask/Cargo.toml -- test-full-workflow` — 1 passed, 0 failed.\n- `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync` — 1 passed, 0 failed.\n- Final `git status --short` — clean.",
       "implementation_reported_at": "2026-07-22T17:26:08Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve and build on Round 5 candidate 4da89bd; do not replace its verified migration, retry, settlement, app-switch, and daemon-provider work. Correct only the remaining shared-consistency violations. 1. At the actual claim, promote, retry, and start commitment boundary, revalidate the Goal workflow_revision, status, eligibility, ownership, and relevant workflow-state version under the shared coordination model. A Goal mutation that wins first must make the stale workflow decision fail without publishing Claimed or Running state, acquiring capacity, or rolling the Goal back. Make retry rollback plus its linked claim recoverable as one commitment, with deterministic repair of any partial evidence. 2. Recovery must never fail or interrupt a claim merely because a second daemon or runtime observes the same target. Before changing an active Goal or claim, prove the owning supervised provider process is absent across the target-app runtime/process evidence; a live provider under another runtime remains authoritative. Preserve explicit ownership and add deterministic takeover only after absence is proven. 3. Preserve true Git conflicts regardless of unequal workflow_revision values. Revision magnitude alone is not evidence that a user reviewed a conflict. Reuse durable sync baseline/conflict evidence so only a new authoritative edit made after observing that specific conflict resolves it; blind retries and pre-existing unequal offline edits must remain conflicted while unrelated records converge. 4. Derive target-app identity from the configured git_remote rather than hard-coded origin, while preserving compatible existing identity records. Prove independent clones using a renamed or non-origin configured remote converge on the same identity. 5. Extend the smallest production-shaped evidence to run two workflow-enabled daemons simultaneously against the same target and Node, keep a real managed provider alive in one while the other performs startup recovery, and prove no duplicate launch, failure, interruption, or capacity theft. Add a concurrent unequal-revision same-Goal conflict test, then an explicit post-conflict edit that resolves it. Preserve all prior focused, serial, full-workflow, and two-daemon gates. Do not expand into Quality, Supervisor, UI, or unrelated cleanup.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T17:26:08Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T17:29:07Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T17:26:08Z"
+  "updated": "2026-07-22T17:29:07Z"
 }
