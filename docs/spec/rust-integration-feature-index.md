@@ -172,7 +172,7 @@ Nav: Toolbar (bottom dock)
 		Toggle full-screen (fills viewport below topbar, implies open)
 		Resize (drag handle, 120px–85vh), persists height
 		Persists tabs/active tab/open/height/fullscreen across reload & project switch reset
-	Persistent Tabs (order: System, Files, Standalone) + dynamic Goal/Plan tabs
+	Persistent Tabs (order: System, Files, Terminal, Standalone) + dynamic Goal chat / Goal log / Plan tabs
 		System
 			Recent system operations log (time, message, color by status)
 			Filters: All, Info, Started, Queued, Completed, Errors (persisted)
@@ -195,6 +195,10 @@ Nav: Toolbar (bottom dock)
 			Goal status tracked; same chat input/output/queue/activity as standalone
 			Draft Round (extract): enabled when agent responded, status valid, not busy
 				Extract round modal: review prompt (editable), reporter, Add round / Cancel, Escape close
+		Goal log tail (opened via Watch Logs on a Goal)
+			Tab labeled "Logs {id}…"; live indicator, Goal link, Open full logs, Refresh, Close tab
+			Loads the newest 200 Goal activity entries, displays them chronologically, and appends deduplicated Goal logs from SSE
+			Rows show time, severity, category, message, actor, and expandable details; empty/loading/error states remain visible
 		Plan chat / Plan Mode (toolbar tab, mode "plan")
 			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
 			Same chat input/output/queue/activity
@@ -209,7 +213,7 @@ Modals
 		Banners: failure (error from logs), governance (warn/error)
 		Governance summary: rules/product/constitution/meta pills, message, details, rule actions
 		Quality summary: status pill, checked time, message, details
-		More Goal actions: View Logs, Reporter, Rename, Change Priority, Move to / Assign Feature, Remove from Feature, Cancel, Delete (confirmations)
+		More Goal actions: Watch Logs, Reporter, Rename, Change Priority, Move to / Assign Feature, Remove from Feature, Cancel, Delete (confirmations)
 		Rounds: count, per-round collapsible (round #, latest pill, governance/quality pills, reporter, created, prompt)
 		Edit latest round (backlog/todo): prompt, reporter, Save changes (draft + cursor preserved)
 		Submit follow-up / recovery round (review/failed): prompt, Submit new round
@@ -340,9 +344,9 @@ Implementation Internals (for e2e testing)
 	Key element IDs / selectors
 		Topbar: brand[data-route=dashboard], nav a[data-route=dashboard|features|goals|changes|logs], #nav-context-menu, #global-reporter, #target-app-indicator, #agent-status-indicator, #btn-command-palette, #btn-refine-issue, #btn-new-goal, #nav-create-menu, #btn-new-feature, #btn-plan, #btn-import; #active-node-label
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
-		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab]
+		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab], #goal-log-tail, #btn-goal-log-refresh
 		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
-		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
+		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
 		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)
