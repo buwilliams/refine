@@ -1,7 +1,7 @@
 {
-  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
-  "branch_name": "refine/00000SZ2C8SVXH5MGTX1XVA001/round-1",
-  "candidate_commit": "ebfeec18a1ad4ed9afd63ad25b252178f954b16f",
+  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
+  "branch_name": "refine/00000SZ2C8SVXH5MGTX1XVA001/round-2",
+  "candidate_commit": null,
   "created": "2026-07-22T11:14:32Z",
   "feature_id": null,
   "feature_order": null,
@@ -96,9 +96,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T11:34:05Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:35:07Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate ebfeec18a1ad4ed9afd63ad25b252178f954b16f and remediate all three governance findings. Keep recovery agent-first: remove bespoke category gates and substring heuristics from failed_goal_decision, and instead present failed Goal, runtime, repository, claim, operation, and activity evidence to the installed singleton Supervisor agent so adaptable bounded-recovery judgment remains in the agent; product code should provide only deterministic coordination, idempotency, limits, and auditable tools. Before any failed-to-todo transition, reconcile the durable WorkflowClaim and managed process state so a Claimed or Running execution cannot overlap, leak capacity, or be silently replaced; wait/escalate when ownership is live and close only terminal stale claims through the existing workflow engine. Make round append, shared transcript/activity evidence, retry marker, and state transition atomic or restart-safe so any evidence-write failure cannot leave an unrecorded todo Goal, and retries remain duplicate/cycle bounded. Add focused end-to-end workflow/Git recovery coverage plus live-claim, duplicate, escalation, and transcript/activity write-failure tests. Preserve confirmation, destructive-authority, worktree, merge, provider, and authentication boundaries; do not invent a second recovery engine.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:35:07Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T11:34:05Z"
+  "updated": "2026-07-22T11:35:12Z"
 }
