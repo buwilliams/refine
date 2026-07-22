@@ -93,7 +93,7 @@ function ensureStandaloneTab() {
     chatState.tabs.standalone = {
       goalId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: false,
     };
   }
   ensureChatTabQueueState(chatState.tabs.standalone);
@@ -109,7 +109,7 @@ function ensureSupervisorTab() {
     chatState.tabs[SUPERVISOR_TAB_ID] = {
       goalId: null, label: "Supervisor", mode: "supervisor",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: false,
     };
   }
   ensureChatTabQueueState(chatState.tabs[SUPERVISOR_TAB_ID]);
@@ -240,7 +240,7 @@ function saveChatStateToStorage() {
         sessionId: t.sessionId,
         output: (t.output || "").slice(-50_000),
         progress: (t.progress || "").slice(-20_000),
-        showProgress: t.showProgress !== false,
+        showProgress: t.showProgress === true,
         closedReason: t.closedReason,
         agentResponded: !!t.agentResponded,
         sentUserInput: !!t.sentUserInput,
@@ -407,7 +407,7 @@ function openChatDock({ goalId = null, goalStatus = null } = {}) {
         label: `Goal ${goalId.slice(0, 8)}…`,
         mode: "goal",
         goalStatus: goalStatus || "",
-        sessionId: null, output: "", progress: "", showProgress: true,
+        sessionId: null, output: "", progress: "", showProgress: false,
         closedReason: null, agentResponded: false, sentUserInput: false,
         queuedMessages: [], localQueuedMessages: [], starting: false,
       };
@@ -470,7 +470,7 @@ function ensurePlanTab() {
       sessionId: null,
       output: "",
       progress: "",
-      showProgress: true,
+      showProgress: false,
       closedReason: null,
       agentResponded: false,
       sentUserInput: false,
@@ -513,7 +513,7 @@ async function startPlanChatSession(tab) {
     tab.closedReason = null;
     tab.mode = "plan";
     tab.progress = "";
-    tab.showProgress = true;
+    tab.showProgress = false;
     tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
@@ -538,7 +538,7 @@ async function startGoalChatSession(tab) {
     tab.sessionId = r.session_id;
     tab.closedReason = null;
     tab.progress = "";
-    tab.showProgress = true;
+    tab.showProgress = false;
     tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
@@ -564,7 +564,7 @@ async function startStandaloneChatSession(tab) {
     tab.worktree = r.worktree || null;
     tab.closedReason = null;
     tab.progress = "";
-    tab.showProgress = true;
+    tab.showProgress = false;
     tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
@@ -590,7 +590,7 @@ async function startSupervisorChatSession(tab) {
     tab.closedReason = null;
     tab.mode = "supervisor";
     tab.progress = "";
-    tab.showProgress = true;
+    tab.showProgress = false;
     tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
@@ -981,7 +981,7 @@ function renderChatPanel(active, {
   showSessionToggle = true,
 }) {
   const progressText = active.progress || "";
-  const showProgress = active.showProgress !== false;
+  const showProgress = active.showProgress === true;
   const hasActivityToggle = hasSession || progressText;
   const showActivityPanel = showProgress && hasActivityToggle;
   const activityLabel = chatActivityLabel(active);
@@ -2695,8 +2695,8 @@ function applyPendingIndicator(tab) {
   const status = $("#chat-status");
   if (toggle) {
     toggle.hidden = !tab || !(tab.sessionId || tab.progress);
-    toggle.setAttribute("aria-expanded", tab?.showProgress === false ? "false" : "true");
-    toggle.title = tab?.showProgress === false ? "Expand activity" : "Collapse activity";
+    toggle.setAttribute("aria-expanded", tab?.showProgress === true ? "true" : "false");
+    toggle.title = tab?.showProgress === true ? "Collapse activity" : "Expand activity";
   }
   if (dots) dots.hidden = !chatActivityIsPulsing(tab);
   if (label) label.textContent = chatActivityLabel(tab);
@@ -2900,7 +2900,7 @@ async function clearActiveChat() {
     t.worktree = null;
     t.output = "";
     t.progress = "";
-    t.showProgress = true;
+    t.showProgress = false;
     t.closedReason = null;
     t.pending = false;
     t.queuedMessages = [];
@@ -2946,7 +2946,7 @@ async function toggleActiveChat() {
 function toggleChatProgress() {
   const t = chatState.tabs[chatState.activeTabId];
   if (!t) return;
-  t.showProgress = t.showProgress === false;
+  t.showProgress = t.showProgress !== true;
   saveChatStateToStorage();
   drawChat();
 }

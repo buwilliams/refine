@@ -158,15 +158,23 @@ function browserRuntime(storage = new Map()) {
         chatState.activeTabId = SUPERVISOR_TAB_ID;
         chatState.open = true;
       },
+      activateTab(tabId) {
+        chatState.activeTabId = tabId;
+        chatState.open = true;
+      },
       draw: drawToolbar,
       emitChat: handleChatSseEvent,
+      ensurePlan: ensurePlanTab,
       initSSE,
       load: loadSupervisorAgentState,
+      openGoal(goalId) { openChatDock({ goalId }); },
       restore: loadChatStateFromStorage,
       save: saveChatStateToStorage,
       send: sendChatText,
       supervisorTab() { return chatState.tabs[SUPERVISOR_TAB_ID]; },
+      tab(tabId) { return chatState.tabs[tabId]; },
       tabIds() { return Object.keys(chatState.tabs); },
+      toggleActivity: toggleChatProgress,
       setApi(nextApi) { api = nextApi; },
       setAttached(attached = true) { state.project = { attached }; },
       setRoute(route) { state.currentRoute = route; },
@@ -221,6 +229,66 @@ test("Supervisor stays discoverable and prompt-ready while idle", () => {
   assert.match(browser.html(), /Type to queue a message/);
   assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
+});
+
+test("every chat-capable toolbar tab defaults Activity to collapsed", () => {
+  const browser = browserRuntime();
+  browser.runtime.activate();
+  browser.runtime.ensurePlan();
+  browser.runtime.setApi(async () => ({ session_id: "goal-session" }));
+  browser.runtime.openGoal("GOAL1");
+
+  for (const tabId of ["standalone", "supervisor", "plan", "GOAL1"]) {
+    assert.equal(browser.runtime.tab(tabId).showProgress, false, `${tabId} Activity default`);
+  }
+
+  Object.assign(browser.runtime.supervisorTab(), {
+    sessionId: "supervisor-shared",
+    progress: "Observed active Goal work",
+  });
+  browser.runtime.activateTab("supervisor");
+  browser.runtime.draw();
+
+  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="false"/);
+  assert.match(browser.html(), /data-testid="chat-progress-panel" hidden/);
+
+  browser.runtime.toggleActivity();
+  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="true"/);
+  assert.doesNotMatch(browser.html(), /data-testid="chat-progress-panel" hidden/);
+});
+
+test("restored toolbar state defaults Activity collapsed and preserves explicit expansion", () => {
+  const storage = new Map([["refine_chat_tabs", JSON.stringify({
+    tabs: {
+      standalone: {
+        goalId: null,
+        label: "Standalone",
+        mode: "standalone",
+        sessionId: "standalone-session",
+        output: "",
+        progress: "Agent working",
+      },
+    },
+    activeTabId: "standalone",
+    open: true,
+  })]]);
+  const browser = browserRuntime(storage);
+
+  browser.runtime.restore();
+  browser.runtime.activateTab("standalone");
+  browser.runtime.draw();
+
+  assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="false"/);
+  assert.match(browser.html(), /data-testid="chat-progress-panel" hidden/);
+
+  browser.runtime.toggleActivity();
+  const restoredExpanded = browserRuntime(storage);
+  restoredExpanded.runtime.restore();
+  restoredExpanded.runtime.activateTab("standalone");
+  restoredExpanded.runtime.draw();
+
+  assert.match(restoredExpanded.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="true"/);
+  assert.doesNotMatch(restoredExpanded.html(), /data-testid="chat-progress-panel" hidden/);
 });
 
 test("navigation reinitialization restores the singleton session and transcript", async () => {
