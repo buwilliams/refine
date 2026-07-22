@@ -1,0 +1,67 @@
+{
+  "id": "19f8b84d2c59f6aa0",
+  "mode": "supervisor",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "supervisor",
+  "created_at": "2026-07-22T20:29:25Z",
+  "updated_at": "2026-07-22T20:29:40Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-22T20:29:26Z",
+      "delivered": false,
+      "id": "evt-1784752166122-7",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "What's up with the failed goal?"
+    },
+    {
+      "created_at": "2026-07-22T20:29:26Z",
+      "delivered": false,
+      "id": "evt-1784752166122-8",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T20:29:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752172162-10",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll inspect the failed goal’s durable record, its latest round/evidence, and the current runner state. I’ll keep this read-only and won’t retry, merge, or alter the worktree."
+    },
+    {
+      "created_at": "2026-07-22T20:29:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752180501-12",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failure is substantive, not a flaky test result: implementation completed and was committed, then post-implementation governance rejected it. I’m verifying the candidate is still preserved and extracting the exact eight findings into a concise diagnosis."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f8b84d7759f6e90",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ2TPQM61AGWJW8XC4001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "created_at": "2026-07-22T20:29:26Z",
+      "updated_at": "2026-07-22T20:29:26Z",
+      "internal": true
+    }
+  ],
+  "queue_dispatching": true,
+  "importable_artifacts": [],
+  "closed": false,
+  "interrupted": false,
+  "interruption_detail": null
+}
