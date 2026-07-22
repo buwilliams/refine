@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:30:13Z",
+  "updated_at": "2026-07-22T20:30:36Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -99,6 +99,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll inspect the failed goal’s durable record and current process/state evidence, keeping this read-only. I’ll distinguish a retryable implementation failure from infrastructure noise and only ask you to authorize an explicit retry if the evidence supports it."
+    },
+    {
+      "created_at": "2026-07-22T20:30:36Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752236988-23",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failure is substantive, not merely a provider/authentication error: the candidate committed successfully and then governance rejected it on eight concrete architecture, recovery, concurrency, evidence, migration, and documentation findings. I’m checking whether its branch/worktree and candidate commit remain intact before deciding what can safely happen next."
     }
   ],
   "queue_dispatching": true,
