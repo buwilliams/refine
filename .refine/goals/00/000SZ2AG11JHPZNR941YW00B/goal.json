@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T10:12:31Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:27:18Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AG11JHPZNR941YW00B-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found in the committed implementation.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found in the committed implementation.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2AG11JHPZNR941YW00B-round-1"
+      },
+      "governance_message": "No Governance rule violations found in the committed implementation.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2AG11JHPZNR941YW00B` is ready for review at commit `cb64651`. The worktree is clean.\n\nAfter-action report:\n\n- Changed: Removed Start/Stop controls from the Supervisor conversation, clarified idle messaging, updated tests and intent docs.\n- Why: The Supervisor is continuously observing or idle; users should not manage its lifecycle manually.\n- Verification:\n  - `node --test tests/web_supervisor_toolbar.test.js` — exit `0`, 6 passed.\n  - `node --test tests/*.test.js` — exit `0`, 8 passed.\n  - `./r test unit` — exit `0`, 389 passed.\n  - `cargo fmt --all -- --check` — exit `0`.\n  - `git diff --check` — exit `0`.\n\nElapsed agent time: 6m 8s.",
       "implementation_reported_at": "2026-07-22T10:26:23Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "The supervisor conversation tab doesn't have a \"Start\" or \"Stop\" button since it should always be on (or idle) to ensure that agents are doing their thing well.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:27:20Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:26:23Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:27:20Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:26:23Z"
+  "updated": "2026-07-22T10:27:21Z"
 }
