@@ -60,8 +60,11 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
         (GoalStatus::Todo, GoalStatus::InProgress)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
             | (GoalStatus::ReadyMerge, GoalStatus::Build)
+            | (GoalStatus::ReadyMerge, GoalStatus::Qa)
             | (GoalStatus::Build, GoalStatus::Qa)
+            | (GoalStatus::Build, GoalStatus::Review)
             | (GoalStatus::Qa, GoalStatus::Review)
+            | (GoalStatus::Qa, GoalStatus::Build)
             | (GoalStatus::InProgress, GoalStatus::Failed)
             | (GoalStatus::Qa, GoalStatus::Failed)
             | (GoalStatus::ReadyMerge, GoalStatus::Failed)
@@ -2215,6 +2218,21 @@ impl FileWorkItemService {
         evaluation: &Value,
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
+        let round_idx = current
+            .goal
+            .round_count
+            .checked_sub(1)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+        self.update_goal_round_evaluation_summary(goal_id, round_idx, evaluation)
+    }
+
+    pub fn update_goal_round_evaluation_summary(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        evaluation: &Value,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let fields = evaluation.as_object().ok_or_else(|| {
             RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
@@ -2228,14 +2246,13 @@ impl FileWorkItemService {
             .get_mut("rounds")
             .and_then(Value::as_array_mut)
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = rounds
-            .iter_mut()
-            .rev()
-            .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = latest.as_object_mut().ok_or_else(|| {
+        let round = rounds.get_mut(round_idx).ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} has no round {}", round_idx + 1))
+        })?;
+        let round = round.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
-                "latest round for Goal {goal_id} is not a JSON object"
+                "round {} for Goal {goal_id} is not a JSON object",
+                round_idx + 1
             ))
         })?;
         for key in [
@@ -2253,11 +2270,11 @@ impl FileWorkItemService {
             "quality_checked_at",
         ] {
             if let Some(value) = fields.get(key) {
-                latest.insert(key.to_string(), value.clone());
+                round.insert(key.to_string(), value.clone());
             }
         }
         let now = now_timestamp();
-        latest.insert("updated".to_string(), Value::String(now.clone()));
+        round.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)

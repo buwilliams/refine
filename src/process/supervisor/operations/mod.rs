@@ -86,6 +86,13 @@ pub struct FileOperationRegistry {
     pub runtime_root: PathBuf,
 }
 
+/// Holds the same mutation lock used by cancellation until a supervised process has been
+/// durably registered. This closes the gap where cancellation could observe no process and a
+/// worker could launch one immediately afterward.
+pub struct OperationLaunchGuard {
+    _lock: fs::File,
+}
+
 impl FileOperationRegistry {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
@@ -133,6 +140,22 @@ impl FileOperationRegistry {
             ))
         })?;
         Ok(file)
+    }
+
+    pub fn active_launch_guard(&self, operation_id: &str) -> RefineResult<OperationLaunchGuard> {
+        let lock = self.mutation_lock()?;
+        let operation = self.status(operation_id)?;
+        if !matches!(
+            operation.state,
+            OperationState::Pending | OperationState::Running
+        ) {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} is {}; no later supervised process may start",
+                operation.state.as_api_status()
+            )));
+        }
+        Ok(OperationLaunchGuard { _lock: lock })
     }
 
     fn write(&self, handle: &OperationHandle) -> RefineResult<()> {
@@ -184,6 +207,9 @@ impl FileOperationRegistry {
             if !operation_active(&operation.state) {
                 continue;
             }
+            let Some(operation) = self.begin_recovery(&operation.id)? else {
+                continue;
+            };
             let associated = processes
                 .iter()
                 .filter(|process| {
@@ -207,6 +233,28 @@ impl FileOperationRegistry {
             }
         }
         Ok(recovered)
+    }
+
+    fn begin_recovery(&self, operation_id: &str) -> RefineResult<Option<OperationHandle>> {
+        let lock = self.mutation_lock()?;
+        let mut operation = self.status(operation_id)?;
+        if !operation_active(&operation.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(None);
+        }
+        operation.state = OperationState::Cancelling;
+        self.write(&operation)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            operation_id,
+            operation_log_entry(
+                &operation,
+                "warning",
+                "Operation restart recovery started",
+                None,
+            ),
+        )?;
+        Ok(Some(operation))
     }
 
     fn terminate_recovery_processes(
@@ -330,6 +378,46 @@ impl FileOperationRegistry {
             error: None,
         };
         self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "info", "Operation registered", None),
+        )?;
+        Ok(handle)
+    }
+
+    /// Atomically registers one active operation for an ownership key.
+    ///
+    /// Quality uses a Goal-and-candidate ownership key so manual and workflow callers cannot
+    /// evaluate or mutate the same candidate concurrently. The operation registry mutation lock
+    /// makes the exclusion effective across threads and daemon processes.
+    pub fn register_exclusive_with_request(
+        &self,
+        owner: &str,
+        request: Value,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        if let Some(active) = self
+            .recover()?
+            .into_iter()
+            .find(|operation| operation.owner == owner && operation_active(&operation.state))
+        {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {} already owns {owner}",
+                active.id
+            )));
+        }
+        let handle = OperationHandle {
+            id: new_operation_id(),
+            owner: owner.to_string(),
+            state: OperationState::Running,
+            request,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
+        };
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation registered", None),
@@ -718,14 +806,17 @@ impl FileOperationRegistry {
         let mut handle = self.status(operation_id)?;
         // Cancellation and restart interruption are authoritative terminal decisions. A worker or
         // cleanup path may still discover a real failure after either wins the mutation lock.
-        let interrupted = matches!(handle.state, OperationState::Interrupted);
+        let recovery_owned = matches!(
+            handle.state,
+            OperationState::Cancelling | OperationState::Interrupted
+        );
         if !matches!(
             handle.state,
-            OperationState::Cancelled | OperationState::Interrupted
+            OperationState::Cancelling | OperationState::Cancelled | OperationState::Interrupted
         ) {
             handle.state = OperationState::Failed;
         }
-        if !interrupted {
+        if !recovery_owned {
             handle.error = Some(error.clone());
         }
         self.write(&handle)?;
@@ -888,7 +979,7 @@ fn terminal_recovery_state_is_authoritative(
 ) -> bool {
     matches!(
         current,
-        OperationState::Cancelled | OperationState::Interrupted
+        OperationState::Cancelling | OperationState::Cancelled | OperationState::Interrupted
     ) && current != next
 }
 
@@ -958,6 +1049,28 @@ mod tests {
     use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn exclusive_operation_registration_serializes_one_owner() {
+        let temp_root = unique_temp_dir("operations-exclusive-owner");
+        let registry = FileOperationRegistry::new(&temp_root);
+        let first = registry
+            .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "workflow"}))
+            .unwrap();
+        let conflict = registry
+            .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "manual"}))
+            .unwrap_err();
+        assert!(conflict.to_string().contains(&first.id));
+        registry
+            .finish(&first.id, OperationState::Succeeded)
+            .unwrap();
+        assert!(
+            registry
+                .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "manual"}))
+                .is_ok()
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 
     use crate::process::subprocess::{
         ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,
@@ -1175,6 +1288,55 @@ mod tests {
             .unwrap();
         assert_eq!(late_completion.state, OperationState::Cancelled);
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn operation_launch_guard_serializes_cancel_and_rejects_late_launch() {
+        let temp_root = unique_temp_dir("operations-launch-cancel-barrier");
+        let runtime_root = temp_root.join("run/8080");
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let operation = registry.register("quality:GOAL1:abc").unwrap();
+
+        let launch_guard = registry.active_launch_guard(&operation.id).unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let cancel_registry = registry.clone();
+        let cancel_operation_id = operation.id.clone();
+        let cancel_barrier = Arc::clone(&barrier);
+        let (cancelled_tx, cancelled_rx) = std::sync::mpsc::channel();
+        let cancellation = thread::spawn(move || {
+            cancel_barrier.wait();
+            let cancelled = cancel_registry.cancel(&cancel_operation_id).unwrap();
+            cancelled_tx.send(cancelled).unwrap();
+        });
+        barrier.wait();
+        assert!(
+            cancelled_rx
+                .recv_timeout(Duration::from_millis(25))
+                .is_err(),
+            "cancellation must wait until process registration releases the launch barrier"
+        );
+        drop(launch_guard);
+        assert_eq!(
+            cancelled_rx.recv().unwrap().state,
+            OperationState::Cancelled
+        );
+        cancellation.join().unwrap();
+
+        let late_launch = FileProcessSupervisor::new(&runtime_root)
+            .launch(operation_helper_process_spec(&operation.id))
+            .unwrap_err();
+        assert!(
+            late_launch
+                .to_string()
+                .contains("no later supervised process may start")
+        );
+        assert!(
+            FileProcessSupervisor::new(&runtime_root)
+                .list()
+                .unwrap()
+                .is_empty()
+        );
         fs::remove_dir_all(temp_root).unwrap();
     }
 
