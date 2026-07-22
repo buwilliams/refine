@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:20:07Z",
+  "updated_at": "2026-07-22T12:22:39Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -516,6 +516,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "All four rounds are still live and emitting evidence. The Jira recovery has completed 399 Rust and 23 browser tests and is in governance re-audit; the live-status fix passed its focused backend/browser regressions and is running the broader gate. I’m leaving those healthy processes undisturbed and checking the two shared-state rounds for convergence or a fresh audit finding."
+    },
+    {
+      "created_at": "2026-07-22T12:22:39Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784722959625-76",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The shared-core Quality round hit a command-shape failure (`cargo test` target selection), corrected it to `cargo test --lib`, and all four new exact regressions now pass. That is tooling recovery, not a product failure. The autonomous-recovery round is still actively tightening claim interruption/ownership code; no stale or lost worker evidence is present."
     }
   ],
   "queue_dispatching": true,
