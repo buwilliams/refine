@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:50:15Z",
+  "updated_at": "2026-07-22T17:51:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -480,6 +480,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination governance is actively inspecting the new Git conflict and recovery state transitions. Quality has begun applying the timing and candidate-integrity changes in the shared service/claim path."
+    },
+    {
+      "created_at": "2026-07-22T17:51:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742689139-139",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination governance’s multi-instance and xtask production harnesses both pass; it is performing final candidate/goal evidence checks. Quality continues its scoped shared-core edits without touching main."
     }
   ],
   "queued_messages": [
