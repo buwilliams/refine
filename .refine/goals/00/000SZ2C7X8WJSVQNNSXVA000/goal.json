@@ -14,28 +14,76 @@
   "rounds": [
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:13:34Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T11:26:27Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-1",
+        "failed_actions": [
+          {
+            "message": "feature-goal-inline.js owns a compound metadata, round, and ordering save and hard-codes editable states to backlog/todo. The shared workflow capability permits the complete operation in review, so the browser disables behavior the API allows and implements product orchestration in the surface.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "The new test never binds the composer in a browser DOM or exercises its create, duplicate, validation, error, keyboard, reload, or responsive-layout behavior. The reported browser suite is Node --test, and its layout assertions only match CSS source text, so the interactive modal-flow replacement lacks proportional behavioral verification.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"The browser surface duplicates workflow policy and lacks behavioral browser coverage.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"feature-goal-inline.js owns a compound metadata, round, and ordering save and hard-codes editable states to backlog/todo. The shared workflow capability permits the complete operation in review, so the browser disables behavior the API allows and implements product orchestration in the surface.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The new test never binds the composer in a browser DOM or exercises its create, duplicate, validation, error, keyboard, reload, or responsive-layout behavior. The reported browser suite is Node --test, and its layout assertions only match CSS source text, so the interactive modal-flow replacement lacks proportional behavioral verification.\"}]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "The browser surface duplicates workflow policy and lacks behavioral browser coverage.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "feature-goal-inline.js owns a compound metadata, round, and ordering save and hard-codes editable states to backlog/todo. The shared workflow capability permits the complete operation in review, so the browser disables behavior the API allows and implements product orchestration in the surface.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "The new test never binds the composer in a browser DOM or exercises its create, duplicate, validation, error, keyboard, reload, or responsive-layout behavior. The reported browser suite is Node --test, and its layout assertions only match CSS source text, so the interactive modal-flow replacement lacks proportional behavioral verification.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-1"
+      },
+      "governance_message": "The browser surface duplicates workflow policy and lacks behavioral browser coverage.",
+      "governance_rule_actions": [
+        {
+          "message": "feature-goal-inline.js owns a compound metadata, round, and ordering save and hard-codes editable states to backlog/todo. The shared workflow capability permits the complete operation in review, so the browser disables behavior the API allows and implements product orchestration in the surface.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "The new test never binds the composer in a browser DOM or exercises its create, duplicate, validation, error, keyboard, reload, or responsive-layout behavior. The reported browser suite is Node --test, and its layout assertions only match CSS source text, so the interactive modal-flow replacement lacks proportional behavioral verification.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Goal 00000SZ2C7X8WJSVQNNSXVA000 is ready for review as a scoped seven-file working-tree diff.\n\nChanges:\n\n- Replaced nested Goal creation modal with one always-visible Feature composer supporting create and inline edit.\n- Preserved duplicate detection, validation, reporter context, pagination, drag/button ordering, and existing APIs.\n- Added “independent,” “first,” and “after prerequisite” placement using existing Feature order endpoints.\n- Added accessible labels, live status, Ctrl/⌘+Enter submission, Escape reset, and responsive desktop/narrow layouts.\n- Added browser regressions in [web_feature_goal_inline.test.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-1/tests/web_feature_goal_inline.test.js).\n\nVerification:\n\n- `cargo run --manifest-path xtask/Cargo.toml -- test-browser` — exit 0; 20 passed, 0 failed.\n- Three targeted Feature membership/order backend tests — exit 0; 3 passed, 0 failed.\n- `cargo fmt --all -- --check` — exit 0.\n- Both changed JavaScript files passed `node --check`.\n- `git diff --check` — exit 0, no whitespace errors.",
       "implementation_reported_at": "2026-07-22T11:23:07Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Rework Feature detail so Goals can be created and edited inline in Feature context. Replace nested modal flows with one visible composer and list interaction that preserves ordering, dependencies, validation, keyboard accessibility, and existing backend behavior. Creation should feel immediate and keep the user oriented in the Feature. Verify desktop and narrow layouts with browser regression coverage.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T11:23:07Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T11:26:27Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:23:07Z"
+  "updated": "2026-07-22T11:26:28Z"
 }
