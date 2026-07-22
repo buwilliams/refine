@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:17:08Z",
+  "updated_at": "2026-07-22T14:19:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1092,6 +1092,14 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The final Quality audit is still active after four minutes and consuming CPU normally. There is no lost-worker signal; I’m allowing the bounded read-only review to finish rather than interrupting a fully tested candidate at the last gate."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f8a31ee8297bb58",
+      "text": "Workflow-health intervention: Quality Goal 00000SZ2CF255HWFA0G9XVA006 Round 6 began as a narrow public-cancel convergence fix, but its final audit found the same architectural consistency-model boundary that caused you to park Supervisor recovery: all workflow writers need one cross-process transaction, production-loop race evidence, and atomic state/log durability. The worker is now extending locks across every workflow mutation and hardening persistence. Please classify this scope before it lands. Do not let the active round silently establish a repository-wide consistency model; either stop/park it for the same user decision or explicitly unify the two Goals under one architectural follow-up. Preserve the already validated Quality candidate/evidence.",
+      "created_at": "2026-07-22T14:19:15Z",
+      "updated_at": "2026-07-22T14:19:15Z"
     }
   ],
   "queue_dispatching": true,
