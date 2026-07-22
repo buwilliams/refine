@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:20:16Z",
+  "updated_at": "2026-07-22T10:21:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -60,6 +60,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Live evidence is newer than the attached snapshot: the daemon and both workflow/Git-sync workers are running, and six managed goal-agent processes have launched successfully. That means the earlier `E2BIG` provider failure remains an auditable historical issue, but it is not currently preventing dispatch. I’m leaving those agents and their worktrees untouched while I inspect status through the running daemon."
+    },
+    {
+      "created_at": "2026-07-22T10:21:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784715689339-21",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The active window is healthy enough to continue without intervention: all six slots are claimed under the configured 10-agent limits, the website returns 200, daemon/workflow/Git-sync processes are alive, memory and disk have ample headroom, and no current authentication failure is visible. The only mild runtime pressure is expected build load; I’m now watching state transitions and agent exits for stalls, loss, or provider errors."
     }
   ],
   "queue_dispatching": true,
