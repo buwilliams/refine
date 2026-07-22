@@ -1,7 +1,7 @@
 {
-  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
-  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-5",
-  "candidate_commit": "f52967cb8d3915e3c75f0f04880563e0b65e24ff",
+  "base_commit": "657756564175c241ab966222bc3881207a889978",
+  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-6",
+  "candidate_commit": null,
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -331,9 +331,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T13:22:03Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T13:22:35Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate f52967cb8d3915e3c75f0f04880563e0b65e24ff and fix the sole remaining abrupt-recovery invariant from Round 5. During production daemon startup/recovery, before an owned Jira export operation is made retryable as Interrupted, the shared lifecycle/operation capability must find any still-live managed process correlated to that operation, terminate it through the process supervisor, wait for confirmed exit, persist termination/log evidence, and only then publish Interrupted/retryable state. If termination or exit confirmation fails, preserve a non-retryable failure/attention state with the original operation evidence; never allow public retry to launch a second worker while the original may still run. Keep this orchestration in shared lifecycle/operation capabilities and preserve kill_on_parent_exit=false only if required for durable registration/recovery. Add a production-path abrupt-exit integration: leave the original managed Jira worker alive (do not call lifecycle.stop), invoke the actual run_system_start/recovery path, prove that worker is terminated and its operation becomes Interrupted with old logs, then call public retry and prove exactly one new supervised worker runs and reaches a durable terminal result. Also cover termination failure refusing retry. Retain all prior cancellation, atomic persistence, UI, and full-suite evidence from f52967c. Run focused abrupt-orphan tests, 405+ library tests, browser tests, clippy/fmt/syntax/diff checks, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T13:22:35Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T13:22:03Z"
+  "updated": "2026-07-22T13:22:35Z"
 }
