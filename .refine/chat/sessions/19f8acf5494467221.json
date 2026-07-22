@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:04:33Z",
+  "updated_at": "2026-07-22T18:05:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -648,6 +648,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both active remediations are still within the existing workflow: Quality has its requested gates green and is finalizing its candidate, while coordination is finishing the distinct-node production-path coverage. I’m waiting for Refine’s official governance results before allowing either merge."
+    },
+    {
+      "created_at": "2026-07-22T18:05:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743503402-170",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality is now under Refine’s independent governance review. That reviewer is checking an important recovery edge: detecting candidate mutation is insufficient if the failed Quality run leaves the preserved worktree dirty. Coordination’s new distinct-node test initially exposed a fixture issue, was corrected, and now passes; the implementation is proceeding through its remaining gates."
     }
   ],
   "queued_messages": [
