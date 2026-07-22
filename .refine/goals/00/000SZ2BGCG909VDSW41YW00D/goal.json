@@ -1,7 +1,7 @@
 {
   "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
   "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "f996d058af151f388dcb90ea58db345c9d9af257",
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -75,8 +75,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal `00000SZ2BGCG909VDSW41YW00D` Round 2 is complete and reviewable. No commit was created; 19 scoped files are modified and unstaged.\n\nWhat changed:\n\n- Bulk Jira export now immediately returns a durable `goals:jira-export` operation.\n- A supervised runner owns CSV generation, progress, logs, cancellation, failures, persisted results, and interruption recovery.\n- The UI follows the operation, survives reloads, retries interrupted exports, and downloads the completed CSV.\n- Commit evidence uses batched ref resolution and one supervised `git log --stdin`, eliminating per-Goal Git processes.\n- Selection semantics, deterministic ordering, and single-Goal CLI/MCP compatibility remain intact.\n- Added route completion/failure, cancellation/recovery, UI, and multi-range Git coverage.\n\nVerification:\n\n- Final governance review: **passed**, all 8 rules, zero violations.\n- `cargo test --lib --quiet`: **399 passed, 0 failed**.\n- `cargo clippy --lib -- -D warnings`: passed.\n- `cargo fmt --all -- --check`: passed.\n- Focused export, cancellation/recovery, UI, and commit-graph tests: passed.\n- JavaScript syntax checks: 5/5 passed.\n- `node --test tests/web_supervisor_toolbar.test.js`: 10 passed.\n- `git diff --check`: passed.\n\nOne intermediate full test run encountered an unrelated transient `Text file busy`; that exact test passed immediately when rerun, followed by the clean 399/399 full result.\n\nTracked execution: 31m 26s, 350,658 tokens.",
+      "implementation_reported_at": "2026-07-22T11:48:21Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -87,10 +87,10 @@
       "quality_state": "unclassified",
       "reporter": "Codex",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T11:15:47Z"
+      "updated": "2026-07-22T11:48:21Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T11:16:19Z"
+  "updated": "2026-07-22T11:48:22Z"
 }
