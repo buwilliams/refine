@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:39:00Z",
+  "updated_at": "2026-07-22T14:45:41Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1200,6 +1200,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Ordering is now durable in the feature itself (`feature_order` 1 then 2), so the implementation Goal remains queued without launching while the contract Goal runs. The contract agent is live in its isolated worktree; the Quality and autonomous-recovery prototypes remain preserved and inactive."
+    },
+    {
+      "created_at": "2026-07-22T14:45:41Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784731541968-192",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The contract candidate is committed as `a0036b17` with a docs-only scope (9 Intent files, 141 insertions), clean worktree, link checks, and required-concept scan passing. Refine’s independent governance agent is now reviewing it; the implementation Goal remains ordered behind it."
     }
   ],
   "queued_messages": [
