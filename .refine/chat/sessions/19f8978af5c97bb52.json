@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:28:17Z",
+  "updated_at": "2026-07-22T11:29:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -288,6 +288,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The singleton transcript confirms no competing recovery is being issued. I’m using Refine’s own round/state APIs to preserve the failed candidate and create an auditable round focused exactly on the two governance findings; this is a retry, not an override or forced merge."
+    },
+    {
+      "created_at": "2026-07-22T11:29:25Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719765099-38",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed Feature-authoring Goal is now in round 2 with the governance evidence embedded in its prompt, and the prior worktree/candidate remains intact. Refine also completed the pending Logs review while maintaining six active slots. All six workflow processes currently show forward activity; one is in the full library test gate and the others are editing or mapping their scoped paths."
     }
   ],
   "queue_dispatching": true,
