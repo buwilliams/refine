@@ -33,7 +33,9 @@ Current implementation details that matter to intent:
 - Supervisor provider and authentication failures remain visible with retry guidance instead of being reduced to an idle state;
 - tab state is stored in browser local storage;
 - only relevant chat tabs are polled;
-- output and queued messages are session-specific;
+- output and pending messages are session-specific;
+- pending user messages appear in the transcript rather than in a separate editor, while the prompt input remains ready for the next message;
+- agent status and activity stay inline with the transcript, with activity collapsed by default;
 - toolbar layout can be expanded or resized without changing main route.
 
 The toolbar should expose shared backend capability, not implement its own product rules.

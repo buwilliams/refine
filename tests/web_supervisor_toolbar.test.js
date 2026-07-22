@@ -243,7 +243,7 @@ test("Supervisor stays discoverable and prompt-ready while idle without an event
   assert.match(browser.html(), /data-testid="toolbar-tab-supervisor"/);
   assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
   assert.match(browser.html(), /Supervisor is idle/);
-  assert.match(browser.html(), /Type to queue a message/);
+  assert.match(browser.html(), /placeholder="Type and press Enter\."/);
   assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
   assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
@@ -289,7 +289,9 @@ test("every chat-capable toolbar tab defaults Activity to collapsed", () => {
   const browser = browserRuntime();
   browser.runtime.activate();
   browser.runtime.ensurePlan();
-  browser.runtime.setApi(async () => ({ session_id: "goal-session" }));
+  browser.runtime.setApi(async (_method, requestPath) => requestPath.startsWith("/api/goals/")
+    ? { goal: { status: "todo" } }
+    : { session_id: "goal-session" });
   browser.runtime.openGoal("GOAL1");
 
   for (const tabId of ["standalone", "supervisor", "plan", "GOAL1"]) {
@@ -309,6 +311,46 @@ test("every chat-capable toolbar tab defaults Activity to collapsed", () => {
   browser.runtime.toggleActivity();
   assert.match(browser.html(), /data-testid="chat-activity-toggle"[\s\S]*aria-expanded="true"/);
   assert.doesNotMatch(browser.html(), /data-testid="chat-progress-panel" hidden/);
+});
+
+test("pending messages and collapsed activity render inline across every chat tab", () => {
+  const browser = browserRuntime();
+  browser.runtime.activate();
+  browser.runtime.ensurePlan();
+  browser.runtime.setApi(async (_method, requestPath) => requestPath.startsWith("/api/goals/")
+    ? { goal: { status: "todo" } }
+    : { session_id: "goal-session" });
+  browser.runtime.openGoal("GOAL1");
+
+  for (const tabId of ["standalone", "supervisor", "plan", "GOAL1"]) {
+    Object.assign(browser.runtime.tab(tabId), {
+      sessionId: `${tabId}-session`,
+      progress: `Activity for ${tabId}`,
+      showProgress: false,
+      queuedMessages: [queuedMessage(`${tabId}-pending`, `Pending prompt for ${tabId}`)],
+    });
+    browser.runtime.activateTab(tabId);
+    browser.runtime.draw();
+    const html = browser.html();
+    const outputIndex = html.indexOf('data-testid="chat-output"');
+    const pendingIndex = html.indexOf('data-testid="chat-pending-message"');
+    const activityIndex = html.indexOf('data-testid="chat-inline-activity"');
+    const statusIndex = html.indexOf('data-testid="chat-status"');
+
+    assert.ok(outputIndex >= 0 && pendingIndex > outputIndex, `${tabId} pending prompt belongs to transcript`);
+    assert.ok(activityIndex > pendingIndex, `${tabId} activity follows pending prompts inline`);
+    assert.ok(statusIndex > activityIndex, `${tabId} status belongs to transcript`);
+    assert.ok(html.includes(`Pending prompt for ${tabId}`));
+    assert.ok(html.includes("chat-pending-message-status muted small"));
+    assert.ok(html.includes("<span>Pending</span>"));
+    assert.ok(html.includes('aria-expanded="false"'), `${tabId} activity is collapsed`);
+    assert.ok(html.includes('placeholder="Type and press Enter."'));
+    assert.ok(!html.includes('data-testid="chat-queue-text"'));
+    assert.ok(!html.includes('data-testid="chat-queue-save"'));
+    assert.ok(!html.includes('data-testid="chat-queue-remove"'));
+    assert.ok(!html.includes("chat-input-pending-dots"));
+    assert.ok(!html.includes("chat-input-waiting"));
+  }
 });
 
 test("restored toolbar state defaults Activity collapsed and preserves explicit expansion", () => {
@@ -639,7 +681,9 @@ test("initial prompts and active-work follow-ups share chat APIs and render ever
     requests.filter((request) => request.path === "/api/supervisor-agent/session").length,
     1,
   );
-  assert.match(browser.html(), /Queued messages/);
+  assert.match(browser.html(), /data-testid="chat-pending-messages"/);
+  assert.match(browser.html(), /Investigate the delayed worker[\s\S]*Pending/);
+  assert.doesNotMatch(browser.html(), /data-testid="chat-queue-(?:text|save|remove)"/);
   assert.match(browser.html(), /Agent working in session supervisor-shared/);
   assert.doesNotMatch(browser.html(), /Provider authentication required/);
 

@@ -284,46 +284,32 @@ button.toolbar-tab:hover:not(:disabled),
 .chat-output a { color: var(--accent); }
 .chat-output a:hover { text-decoration: underline; }
 
-.chat-queue {
-  margin-top: 8px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius);
-  background: var(--card);
-  overflow: hidden;
+.chat-pending-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
 }
-.chat-queue-header {
+.chat-output blockquote.chat-pending-message {
+  margin: 0;
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+}
+.chat-pending-message-text > *:last-child { margin-bottom: 0; }
+.chat-pending-message-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-size: 13px;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--accent);
   font-weight: 650;
 }
-.chat-queue-header .muted {
-  margin-left: auto;
-  font-weight: 500;
-}
-.chat-queue-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--color-border-subtle);
-}
-.chat-queue-item:first-of-type { border-top: 0; }
-.chat-queue-edit {
-  min-height: 40px;
-  max-height: 96px;
-  resize: vertical;
-  font-size: 13px;
-  line-height: 1.35;
-}
-.chat-queue-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  white-space: nowrap;
+.chat-pending-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: chat-dot-bounce 1.2s infinite ease-in-out both;
 }
 
 .chat-goal-link {
@@ -334,9 +320,13 @@ button.toolbar-tab:hover:not(:disabled),
 }
 .chat-goal-link:hover { text-decoration: underline; }
 
+.chat-inline-activity {
+  margin: 10px 0;
+}
 .chat-progress-panel {
-  border-top: 1px solid var(--color-border-subtle);
-  background: #f8fafc;
+  margin-top: 6px;
+  border-left: 2px solid var(--color-border-subtle);
+  background: var(--code-bg);
 }
 .chat-progress-panel[hidden] { display: none; }
 .chat-progress {
@@ -371,18 +361,15 @@ button.toolbar-tab:hover:not(:disabled),
 }
 
 .chat-activity-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  width: 100%;
+  width: auto;
   height: auto;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border);
-  border-right: 0;
-  border-bottom: 0;
-  border-left: 0;
-  border-radius: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius);
   background: var(--code-bg);
   box-shadow: none;
   font-size: 13px;
@@ -394,7 +381,7 @@ button.toolbar-tab:hover:not(:disabled),
   cursor: pointer;
 }
 button.chat-activity-toggle:hover:not(:disabled) {
-  border-top-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
   background: var(--color-primary-hover);
   color: white;
 }
@@ -407,7 +394,6 @@ button.chat-activity-toggle:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
   color: currentColor;
 }
 .chat-activity-chevron svg {
@@ -425,6 +411,18 @@ button.chat-activity-toggle:hover:not(:disabled) {
   gap: 6px;
   color: var(--accent);
   font-weight: 700;
+}
+.chat-content-status {
+  position: sticky;
+  bottom: -10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px -12px -10px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--card);
 }
 .chat-status-pending-dots {
   color: currentColor;
@@ -465,18 +463,6 @@ button.chat-activity-toggle:hover:not(:disabled) {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-.chat-input-pending-dots {
-  position: absolute;
-  left: 10px;
-  top: 19px;
-  color: var(--muted);
-  pointer-events: none;
-  z-index: 1;
-}
-#chat-input.chat-input-waiting {
-  padding-left: 44px;
-}
-
 /* --- System tab -------------------------------------------------------- */
 .system-panel {
   display: flex;

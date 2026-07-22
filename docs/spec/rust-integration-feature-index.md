@@ -186,13 +186,13 @@ Nav: Toolbar (bottom dock)
 				Scroll-to-load more (128KB chunks)
 		Standalone chat (default, no Goal)
 			Session: Start/Stop standalone, status line (no session / active / ended — reason)
-			Output (Markdown, auto-scroll), Activity panel (Expand/Collapse activity, last lines, busy dots)
-			Input (Enter send, Shift+Enter newline; placeholder reflects state), Send
-			Queued messages: list, edit textarea, Save, Remove (local + server-side)
+			Output (Markdown, auto-scroll), read-only pending user messages, docked session status
+			Inline Activity disclosure (collapsed by default; expand for last lines and busy state)
+			Input (always prompt-ready; Enter send, Shift+Enter newline), Send
 			Clear history (confirmation: Clear / Keep history)
 		Goal chat (opened via Open Chat on a Goal)
 			Tab labeled "Goal {id}…", link to goal, Close tab
-			Goal status tracked; same chat input/output/queue/activity as standalone
+			Goal status tracked; same chat input/output/pending-message/inline-activity behavior as standalone
 			Draft Round (extract): enabled when agent responded, status valid, not busy
 				Extract round modal: review prompt (editable), reporter, Add round / Cancel, Escape close
 		Goal log tail (opened via Watch Logs on a Goal)
@@ -202,7 +202,7 @@ Nav: Toolbar (bottom dock)
 			Search filters the recent trail; Head shows newest first and Tail shows newest last; empty/loading/error states remain visible
 		Plan chat / Plan Mode (toolbar tab, mode "plan")
 			Tab labeled "Plan"; Start/Stop plan; optional initial prompt
-			Same chat input/output/queue/activity
+			Same chat input/output/pending-message/inline-activity behavior
 			Draft Goal: enabled when agent responded → extracts exactly one standalone Goal for review, minimizes toolbar
 			Draft Feature: enabled when agent responded → opens Plan draft modal, minimizes toolbar
 		Tab management: active-session dot, activity pulse, close (non-standard tabs), reorder
@@ -346,7 +346,7 @@ Implementation Internals (for e2e testing)
 		Topbar: brand[data-route=dashboard], nav a[data-route=dashboard|features|goals|changes|logs], #nav-context-menu, #global-reporter, #target-app-indicator, #agent-status-indicator, #btn-command-palette, #btn-refine-issue, #btn-new-goal, #nav-create-menu, #btn-new-feature, #btn-plan, #btn-import; #active-node-label
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab], #goal-log-tail, #btn-goal-log-refresh
-		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
+		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, [data-testid=chat-pending-messages], [data-testid=chat-inline-activity], #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-goal-link, #btn-plan-draft, #btn-goal-round-extract, #goal-round-extract-form/-body/-title, #btn-add-extracted-round
 		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
 		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), #bulk-export-jira, table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist

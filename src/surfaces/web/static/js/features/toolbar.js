@@ -680,8 +680,6 @@ function drawToolbar() {
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
-  const statusLine = goalLogsActive ? "" : chatStatusLine(active);
-
   root.classList.toggle("open", !!chatState.open);
   root.classList.toggle("fullscreen", !!chatState.fullscreen);
   if (chatState.open && !chatState.bodyHeight) {
@@ -733,14 +731,12 @@ function drawToolbar() {
               ? renderSupervisorPanel(active, {
                   toggleClass,
                   toggleLabel,
-                  statusLine,
                   hasSession,
                   showSessionToggle: false,
                 })
               : renderChatPanel(active, {
                   toggleClass,
                   toggleLabel,
-                  statusLine,
                   hasSession,
                 })}
     </div>
@@ -805,12 +801,6 @@ function drawToolbar() {
     $("#btn-chat-send")?.addEventListener("click", sendChatLine);
     $("#chat-input")?.addEventListener("input", (e) => {
       resizeChatInput(e.currentTarget);
-    });
-    $$("[data-queued-message-save]", root).forEach((button) => {
-      button.addEventListener("click", () => saveQueuedChatMessage(button.dataset.queuedMessageSave || ""));
-    });
-    $$("[data-queued-message-remove]", root).forEach((button) => {
-      button.addEventListener("click", () => removeQueuedChatMessage(button.dataset.queuedMessageRemove || ""));
     });
     resizeChatInput($("#chat-input"));
     if (shouldKeepChatInputFocused()) focusChatInputSoon();
@@ -988,17 +978,8 @@ function recordSupervisorAgentEvents(events) {
 function renderChatPanel(active, {
   toggleClass,
   toggleLabel,
-  statusLine,
-  hasSession,
   showSessionToggle = true,
 }) {
-  const progressText = active.progress || "";
-  const showProgress = active.showProgress === true;
-  const hasActivityToggle = hasSession || progressText;
-  const showActivityPanel = showProgress && hasActivityToggle;
-  const activityLabel = chatActivityLabel(active);
-  const showInputDots = chatActivityIsPulsing(active);
-  const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   const inputPlaceholder = chatInputPlaceholder(active);
   const queuedMessages = allQueuedMessages(active);
   const standaloneWorktreePath = active.mode === "standalone" && active.worktree?.path
@@ -1043,13 +1024,6 @@ function renderChatPanel(active, {
             Goal ${htmlEscape(active.goalId.slice(0, 10))}…
           </a>` : ""}
         <span class="spacer"></span>
-        <span id="chat-status" class="muted small${chatActivityIsPulsing(active) ? " chat-status-working" : ""}" data-testid="chat-status">
-          ${chatActivityIsPulsing(active) ? `
-            <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
-              <span></span><span></span><span></span>
-            </span>` : ""}
-          <span>${htmlEscape(statusLine)}</span>
-        </span>
       </div>
       ${standaloneWorktreePath ? `
         <div class="muted small" style="margin:-4px 0 8px" data-testid="standalone-worktree-path">
@@ -1057,33 +1031,11 @@ function renderChatPanel(active, {
         </div>` : ""}
       <div class="chat-output-box">
         <div id="chat-output" class="chat-output" data-testid="chat-output">${renderChatOutput(active)}</div>
-        <button type="button"
-                id="chat-activity-toggle"
-                class="chat-activity-toggle"
-                data-testid="chat-activity-toggle"
-                aria-expanded="${showProgress ? "true" : "false"}"
-                title="${htmlEscape(progressToggleLabel)}"
-                ${hasActivityToggle ? "" : "hidden"}>
-          <span id="chat-activity-label" data-testid="chat-activity-label">${htmlEscape(activityLabel)}</span>
-          <span class="chat-activity-chevron" aria-hidden="true">
-            ${toolbarIcon(showProgress ? "collapse" : "expand")}
-          </span>
-        </button>
-        <div id="chat-progress-panel" class="chat-progress-panel" data-testid="chat-progress-panel" ${showActivityPanel ? "" : "hidden"}>
-          <div id="chat-progress" class="chat-progress" data-testid="chat-progress">${renderChatProgress(progressText)}</div>
-        </div>
       </div>
-      ${renderQueuedChatMessages(queuedMessages)}
       <div class="actions" style="margin-top:8px">
         <div class="chat-input-wrap">
-          <span id="chat-input-pending-dots"
-                class="chat-pending-dots chat-input-pending-dots"
-                ${showInputDots ? "" : "hidden"}>
-            <span></span><span></span><span></span>
-          </span>
           <textarea id="chat-input"
                     data-testid="chat-input"
-                    class="${showInputDots ? "chat-input-waiting" : ""}"
                     rows="2"
                     placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
         </div>
@@ -1093,10 +1045,16 @@ function renderChatPanel(active, {
 }
 
 function renderChatOutput(tab) {
-  if (tab?.mode === "plan" && !String(tab.output || "").trim()) {
-    return mdToHtml("What do you want to design together?");
-  }
-  return mdToHtml(tab?.output || "");
+  const queuedMessages = allQueuedMessages(tab);
+  const transcript = tab?.mode === "plan"
+    && !String(tab.output || "").trim()
+    && !queuedMessages.length
+    ? mdToHtml("What do you want to design together?")
+    : mdToHtml(tab?.output || "");
+  return transcript
+    + renderPendingChatMessages(queuedMessages)
+    + renderInlineChatActivity(tab)
+    + renderChatContentStatus(tab);
 }
 
 function chatTranscriptScroller(tab, root = document) {
@@ -1112,25 +1070,56 @@ function allQueuedMessages(tab) {
   ];
 }
 
-function renderQueuedChatMessages(messages) {
+function renderPendingChatMessages(messages) {
   if (!messages.length) return "";
   return `
-    <div class="chat-queue" id="chat-queue" data-testid="chat-queue">
-      <div class="chat-queue-header" data-testid="chat-queue-header">
-        <span>Queued messages</span>
-        <span class="muted small" data-testid="chat-queue-count">${messages.length}</span>
-      </div>
+    <div class="chat-pending-messages" data-testid="chat-pending-messages">
       ${messages.map((message) => `
-        <div class="chat-queue-item"
-             data-testid="chat-queue-item"
-             data-queued-message-id="${htmlEscape(message.id)}"
-             data-queued-message-local="${message.local ? "1" : "0"}">
-          <textarea class="chat-queue-edit" rows="2" data-queued-message-text data-testid="chat-queue-text">${htmlEscape(message.text)}</textarea>
-          <div class="chat-queue-actions">
-            <button class="secondary small" data-queued-message-save="${htmlEscape(message.id)}" data-testid="chat-queue-save">Save</button>
-            <button class="danger small" data-queued-message-remove="${htmlEscape(message.id)}" data-testid="chat-queue-remove">Remove</button>
+        <blockquote class="chat-pending-message" data-testid="chat-pending-message">
+          <div class="chat-pending-message-text">${mdToHtml(message.text)}</div>
+          <div class="chat-pending-message-status muted small" role="status">
+            <span class="chat-pending-dot" aria-hidden="true"></span>
+            <span>Pending</span>
           </div>
-        </div>`).join("")}
+        </blockquote>`).join("")}
+    </div>`;
+}
+
+function renderInlineChatActivity(tab) {
+  const progressText = tab?.progress || "";
+  const hasActivity = !!(tab?.sessionId || progressText);
+  if (!hasActivity) return "";
+  const showProgress = tab?.showProgress === true;
+  const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
+  return `
+    <div class="chat-inline-activity" data-testid="chat-inline-activity">
+      <button type="button"
+              id="chat-activity-toggle"
+              class="chat-activity-toggle"
+              data-testid="chat-activity-toggle"
+              aria-expanded="${showProgress ? "true" : "false"}"
+              title="${htmlEscape(progressToggleLabel)}">
+        <span id="chat-activity-label" data-testid="chat-activity-label">${htmlEscape(chatActivityLabel(tab))}</span>
+        <span class="chat-activity-chevron" aria-hidden="true">
+          ${toolbarIcon(showProgress ? "collapse" : "expand")}
+        </span>
+      </button>
+      <div id="chat-progress-panel" class="chat-progress-panel" data-testid="chat-progress-panel" ${showProgress ? "" : "hidden"}>
+        <div id="chat-progress" class="chat-progress" data-testid="chat-progress">${renderChatProgress(progressText)}</div>
+      </div>
+    </div>`;
+}
+
+function renderChatContentStatus(tab) {
+  return `
+    <div id="chat-status"
+         class="chat-content-status muted small${chatActivityIsPulsing(tab) ? " chat-status-working" : ""}"
+         data-testid="chat-status">
+      ${chatActivityIsPulsing(tab) ? `
+        <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>` : ""}
+      <span>${htmlEscape(chatStatusLine(tab))}</span>
     </div>`;
 }
 
@@ -2836,7 +2825,6 @@ function refreshProcessesTabForChatChange() {
 
 function applyPendingIndicator(tab) {
   const toggle = $("#chat-activity-toggle");
-  const dots = $("#chat-input-pending-dots");
   const label = $("#chat-activity-label");
   const input = $("#chat-input");
   const send = $("#btn-chat-send");
@@ -2846,12 +2834,10 @@ function applyPendingIndicator(tab) {
     toggle.setAttribute("aria-expanded", tab?.showProgress === true ? "true" : "false");
     toggle.title = tab?.showProgress === true ? "Collapse activity" : "Expand activity";
   }
-  if (dots) dots.hidden = !chatActivityIsPulsing(tab);
   if (label) label.textContent = chatActivityLabel(tab);
   if (input) {
     input.disabled = !tab;
     input.placeholder = chatInputPlaceholder(tab);
-    input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
   }
   if (send) send.disabled = !tab || !!tab.sending;
   if (status && tab) {
@@ -2897,16 +2883,7 @@ function chatStatusLine(tab) {
   return `Session ${tab.sessionId} active.`;
 }
 
-function chatInputPlaceholder(tab) {
-  if (tab?.mode === "supervisor") {
-    if (!tab?.sessionId && tab?.starting) {
-      return "Opening supervisor conversation. Type to queue messages.";
-    }
-    if (!tab?.sessionId) return "Type to queue a message.";
-  }
-  if (!tab?.sessionId && tab?.starting) return "Starting session. Type to queue messages.";
-  if (!tab?.sessionId) return "Type to queue a message and start the session.";
-  if (tab.pending) return "Agent is busy. Press Enter to queue another message.";
+function chatInputPlaceholder(_tab) {
   return "Type and press Enter.";
 }
 
@@ -3791,65 +3768,6 @@ async function sendChatLine() {
   requestChatInputFocus();
   await sendChatText(text, t);
   requestChatInputFocus();
-}
-
-async function saveQueuedChatMessage(messageId) {
-  const tab = currentChatTab();
-  if (!tab || !messageId) return;
-  const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
-  const text = row?.querySelector("[data-queued-message-text]")?.value || "";
-  if (!text.trim()) return toast("Queued message cannot be empty.", "error");
-  const isLocal = row?.dataset.queuedMessageLocal === "1";
-  if (isLocal || !tab.sessionId) {
-    const message = normalizeQueuedMessages(tab.localQueuedMessages)
-      .find((item) => item.id === messageId);
-    if (!message) return;
-    message.text = text.trim();
-    message.updated_at = new Date().toISOString();
-    message.local = true;
-    tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages)
-      .map((item) => item.id === messageId ? message : item);
-    saveChatStateToStorage();
-    drawToolbar();
-    return;
-  }
-  try {
-    const r = await api("PATCH", `/api/chat/${tab.sessionId}/queue/${encodeURIComponent(messageId)}`, {
-      text: text.trim(),
-    });
-    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
-    saveChatStateToStorage();
-    drawToolbar();
-  } catch (e) {
-    toast("Could not update queued message: " + e.message, "error");
-  }
-}
-
-async function removeQueuedChatMessage(messageId) {
-  const tab = currentChatTab();
-  if (!tab || !messageId) return;
-  const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
-  const isLocal = row?.dataset.queuedMessageLocal === "1";
-  if (isLocal || !tab.sessionId) {
-    tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages)
-      .filter((item) => item.id !== messageId);
-    saveChatStateToStorage();
-    drawToolbar();
-    return;
-  }
-  try {
-    const r = await api("DELETE", `/api/chat/${tab.sessionId}/queue/${encodeURIComponent(messageId)}`);
-    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
-    saveChatStateToStorage();
-    drawToolbar();
-  } catch (e) {
-    toast("Could not remove queued message: " + e.message, "error");
-  }
-}
-
-function cssEscape(value) {
-  if (window.CSS?.escape) return CSS.escape(value);
-  return String(value).replace(/["\\]/g, "\\$&");
 }
 
 function requestChatInputFocus() {
