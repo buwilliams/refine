@@ -1,7 +1,7 @@
 {
   "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
   "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-8",
-  "candidate_commit": null,
+  "candidate_commit": "ca98963a27742fd50a974d095b732880c81b858d",
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -519,8 +519,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Completed Goal `00000SZ2HZHQX2TXXQ7SXVA00D` and committed the clean, reviewable candidate as `ca98963a` (`Enforce active-node workflow ownership`).\n\nChanges:\n\n- Restricted scheduling, start, recovery, retry, cancellation, settlement, interruption, and capacity release to the runtime’s active Node.\n- Serialized active-Node changes with workflow decisions.\n- Protected workflow logs, reports, candidate metadata, and governance/quality evidence with the same ownership boundary.\n- Preserved foreign live and ownerless claims.\n- Added actionable conflicts when transferred Goals retain foreign claims.\n- Added distinct-Node real-daemon/provider coverage.\n\nVerification:\n\n- Focused ownership test: 1 passed.\n- Focused cancellation tests: 2 passed.\n- Distinct-Node daemon test: 1 passed.\n- Serial library suite: 435 passed, 0 failed.\n- Full-workflow harness: 1 passed, 0 failed.\n- Multi-instance harness: 2 passed, 0 failed.\n- `cargo fmt --all -- --check`: passed.\n- `cargo check --all-targets`: passed.\n- `git diff --check`: passed.\n- Independent governance review: passed.\n- Final worktree: clean.\n\nGoal usage: 546,219 tokens over approximately 40 minutes 41 seconds.",
+      "implementation_reported_at": "2026-07-22T18:35:17Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -531,10 +531,10 @@
       "quality_state": "unclassified",
       "reporter": "Codex",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T17:54:16Z"
+      "updated": "2026-07-22T18:35:17Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T17:54:17Z"
+  "updated": "2026-07-22T18:35:17Z"
 }
