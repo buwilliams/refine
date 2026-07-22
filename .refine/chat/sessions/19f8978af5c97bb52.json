@@ -471,7 +471,7 @@
     },
     {
       "created_at": "2026-07-22T12:13:37Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -483,7 +483,7 @@
     },
     {
       "created_at": "2026-07-22T12:17:18Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -495,7 +495,7 @@
     },
     {
       "created_at": "2026-07-22T12:19:42Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -507,7 +507,7 @@
     },
     {
       "created_at": "2026-07-22T12:20:07Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
