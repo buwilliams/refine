@@ -1,7 +1,7 @@
 {
   "base_commit": "891c7276999f3c0be6c82d119681c6a3501290e6",
   "branch_name": "refine/00000SZ1RWPTTJX3GJ6HDS2000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "8df4e5b7bcf1f46a8ad5272af3acf1007e235228",
   "created": "2026-07-21T23:57:13Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,6 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
+      "implementation_report": "Implemented Goal `00000SZ1RWPTTJX3GJ6HDS2000`; the worktree is ready for review.\n\nAfter-action report:\n\n- Added a shared [Jira evidence export service](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ1RWPTTJX3GJ6HDS2000-round-1/src/tools/product/goal_exports/mod.rs:1) producing Jira-importable CSV with Goal metadata, prompts, implementation reports, quality/governance results, notes, and exact commit history.\n- Exposed it through `refine goal export <ID> [--output FILE]`, `GET /work/goals/{id}/export/jira`, the Goal UI’s “Export for Jira” action, and MCP’s `refine_export_goal_jira`.\n- Centralized formatting so every surface returns identical evidence. The CSV follows Atlassian’s required `Summary` field and multiline quoting rules. [Atlassian CSV import documentation](https://support.atlassian.com/jira-cloud-administration/docs/import-data-from-a-csv-file/)\n\nVerification:\n\n- `cargo fmt --all -- --check` — passed.\n- `cargo test --quiet -- --unit` — passed, 358 tests.\n- Focused export tests — passed, 4/4 under both filters.\n- `cargo clippy --all-targets -- -D warnings` — passed.\n- `cargo test --doc` — passed, 0 failures.\n- `cargo build --release --locked` — passed.\n- Static asset check — passed, 53 files.\n- `git diff --check` — passed.\n- Daemon CLI suite — the new export step passed, but the suite later failed twice at existing cluster-sync assertion line 852 because it received `Waiting for the repository worker` instead of a completed payload.\n\nGoal-agent usage: 287,199 tokens over approximately 16 minutes 31 seconds.",
+      "implementation_reported_at": "2026-07-22T00:32:50Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -30,10 +32,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-21T23:57:13Z"
+      "updated": "2026-07-22T00:32:50Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T00:15:47Z"
+  "updated": "2026-07-22T00:32:50Z"
 }
