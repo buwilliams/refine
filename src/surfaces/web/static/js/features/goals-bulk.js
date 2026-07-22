@@ -150,6 +150,12 @@ function _selectionCountText(noun = "selected") {
 const GOALS_JIRA_EXPORT_OPERATION_KEY = "refine_goals_jira_export_operation";
 let goalsJiraExportPollOperationId = "";
 let goalsJiraExportPollPromise = null;
+let goalsJiraExportSnapshot = null;
+let goalsJiraExportLogs = [];
+
+function goalsJiraExportTerminal(status) {
+  return ["complete", "failed", "cancelled", "interrupted"].includes(status);
+}
 
 function readGoalsJiraExportOperation() {
   try {
@@ -187,6 +193,150 @@ function setGoalsJiraExportButtonLoading(active, message = "Exporting…") {
   button.textContent = active ? message : "Export for Jira";
 }
 
+function goalsJiraExportOperationHtml(operation, logs = []) {
+  const status = String(operation?.status || "running");
+  const progress = operation?.progress || {};
+  const completed = Math.max(0, Number(progress.completed || 0));
+  const total = Math.max(0, Number(progress.total || 0));
+  const message = String(
+    progress.message
+      || operation?.error?.message
+      || (status === "complete" ? "Jira CSV ready" : `Jira export ${status}`),
+  );
+  const terminal = goalsJiraExportTerminal(status);
+  const statusLabel = {
+    complete: "Complete",
+    failed: "Failed",
+    cancelled: "Cancelled",
+    interrupted: "Interrupted",
+    cancelling: "Cancelling",
+    pending: "Pending",
+    running: "Running",
+  }[status] || status;
+  const statusClass = status === "complete"
+    ? "done"
+    : ["failed", "interrupted"].includes(status)
+      ? "failed"
+      : status === "cancelled"
+        ? "cancelled"
+        : "in-progress";
+  const progressHtml = total > 0 ? `
+    <progress value="${Math.min(completed, total)}" max="${total}"
+              aria-label="Jira export progress"></progress>
+    <span class="muted small" data-testid="goals-jira-export-progress-count">${htmlEscape(`${completed} of ${total}`)}</span>
+  ` : `<span class="muted small">Working in the background.</span>`;
+  const logHtml = logs.length
+    ? logs.slice(-8).map((entry) => {
+      const severity = entry.severity === "warning" ? "warn" : (entry.severity || "info");
+      return `
+        <div class="log-entry ${htmlEscape(severity)}" data-testid="goals-jira-export-log-entry">
+          <div>${htmlEscape(entry.message || "Operation update")}</div>
+          ${entry.datetime ? `<div class="meta">${htmlEscape(fmtTime(entry.datetime))}</div>` : ""}
+        </div>`;
+    }).join("")
+    : `<p class="muted small" data-testid="goals-jira-export-log-empty">No operation logs yet.</p>`;
+  const errorHtml = operation?.error?.message
+    ? `<p class="banner error" data-testid="goals-jira-export-error">${htmlEscape(operation.error.message)}</p>`
+    : "";
+  const operationId = htmlEscape(operation?.id || "");
+  return `
+    <div class="goals-jira-export-heading">
+      <div>
+        <strong>Jira export</strong>
+        <span class="status-pill ${statusClass}" data-testid="goals-jira-export-status">${htmlEscape(statusLabel)}</span>
+      </div>
+      <code class="muted small" title="Operation ID">${operationId}</code>
+    </div>
+    <p data-testid="goals-jira-export-message">${htmlEscape(message)}</p>
+    <div class="goals-jira-export-progress" data-testid="goals-jira-export-progress">${progressHtml}</div>
+    ${errorHtml}
+    <details class="goals-jira-export-logs" data-testid="goals-jira-export-logs"${["failed", "interrupted"].includes(status) ? " open" : ""}>
+      <summary>Operation logs (${logs.length})</summary>
+      <div>${logHtml}</div>
+    </details>
+    <div class="actions goals-jira-export-actions">
+      ${!terminal ? `<button class="danger secondary" data-jira-export-cancel data-testid="goals-jira-export-cancel">Cancel</button>` : ""}
+      ${status === "complete" ? `<button data-jira-export-download data-testid="goals-jira-export-download">Download CSV</button>` : ""}
+      ${terminal ? `<button class="secondary" data-jira-export-hide data-testid="goals-jira-export-hide">${status === "complete" ? "Hide" : "Dismiss"}</button>` : ""}
+    </div>`;
+}
+
+function renderGoalsJiraExportOperation(operation = goalsJiraExportSnapshot, logs = goalsJiraExportLogs) {
+  const root = $("#goals-jira-export-operation");
+  if (!root) return;
+  if (!operation?.id) {
+    root.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  goalsJiraExportSnapshot = operation;
+  goalsJiraExportLogs = logs.slice(-8);
+  root.hidden = false;
+  root.innerHTML = goalsJiraExportOperationHtml(operation, goalsJiraExportLogs);
+  root.querySelector("[data-jira-export-cancel]")?.addEventListener("click", () => {
+    cancelGoalsJiraExportOperation(operation.id);
+  });
+  root.querySelector("[data-jira-export-download]")?.addEventListener("click", () => {
+    if (operation.status === "complete") downloadGoalsJiraExport(operation.result?.export);
+  });
+  root.querySelector("[data-jira-export-hide]")?.addEventListener("click", () => {
+    hideGoalsJiraExportOperation(operation);
+  });
+}
+
+async function loadGoalsJiraExportLogs(operationId) {
+  try {
+    const response = await api(
+      "GET",
+      `/api/operations/${encodeURIComponent(operationId)}/logs?limit=8`,
+    );
+    return response.logs || [];
+  } catch {
+    return goalsJiraExportLogs;
+  }
+}
+
+async function updateGoalsJiraExportOperation(operation) {
+  const logs = await loadGoalsJiraExportLogs(operation.id);
+  renderGoalsJiraExportOperation(operation, logs);
+  const active = !goalsJiraExportTerminal(operation.status);
+  const message = String(operation.progress?.message || "Exporting…").trim();
+  setGoalsJiraExportButtonLoading(active, message);
+}
+
+async function cancelGoalsJiraExportOperation(operationId) {
+  if (!operationId) return;
+  const button = $("[data-jira-export-cancel]");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Cancelling…";
+  }
+  try {
+    const response = await api(
+      "POST",
+      `/api/operations/${encodeURIComponent(operationId)}/cancel`,
+      {},
+    );
+    await updateGoalsJiraExportOperation(response.operation || {
+      ...goalsJiraExportSnapshot,
+      id: operationId,
+      status: "cancelled",
+    });
+  } catch (error) {
+    await showActionError(error, "Could not cancel Jira export");
+  }
+}
+
+function hideGoalsJiraExportOperation(operation = goalsJiraExportSnapshot) {
+  if (!goalsJiraExportTerminal(operation?.status)) return false;
+  writeGoalsJiraExportOperation("");
+  goalsJiraExportSnapshot = null;
+  goalsJiraExportLogs = [];
+  renderGoalsJiraExportOperation();
+  setGoalsJiraExportButtonLoading(false);
+  return true;
+}
+
 function downloadGoalsJiraExport(payload) {
   if (!payload?.csv) throw new Error("Jira export did not return CSV content");
   const blob = new Blob(
@@ -213,6 +363,7 @@ async function waitForGoalsJiraExportOperation(operationId, allowRecovery = true
   }
   goalsJiraExportPollOperationId = operationId;
   goalsJiraExportPollPromise = waitForBackgroundOperation(operationId, {
+    onStatus: updateGoalsJiraExportOperation,
     onProgress: (progress) => {
       const message = String(progress?.message || "Exporting…").trim();
       setGoalsJiraExportButtonLoading(true, message);
@@ -252,19 +403,20 @@ async function resumeGoalsJiraExportOperation() {
   setGoalsJiraExportButtonLoading(true);
   try {
     const result = await waitForGoalsJiraExportOperation(active.operationId);
-    writeGoalsJiraExportOperation("");
     setGoalsJiraExportButtonLoading(false);
-    downloadGoalsJiraExport(result.export);
+    return result;
   } catch (error) {
-    writeGoalsJiraExportOperation("");
     setGoalsJiraExportButtonLoading(false);
-    await showActionError(error, "Jira export failed");
+    if (!goalsJiraExportTerminal(goalsJiraExportSnapshot?.status)) {
+      await showActionError(error, "Jira export failed");
+    }
   }
 }
 
 function syncGoalsJiraExportOperation() {
   if (!readGoalsJiraExportOperation()) {
     setGoalsJiraExportButtonLoading(false);
+    renderGoalsJiraExportOperation();
     return;
   }
   if (goalsJiraExportPollOperationId) {
@@ -289,12 +441,12 @@ async function exportSelectedGoalsForJira({ button = null } = {}) {
       const operationId = response?.operation?.id;
       if (!operationId) throw new Error("Jira export operation id missing");
       writeGoalsJiraExportOperation(operationId);
-      const result = await waitForGoalsJiraExportOperation(operationId);
-      writeGoalsJiraExportOperation("");
-      downloadGoalsJiraExport(result.export);
+      await updateGoalsJiraExportOperation(response.operation);
+      await waitForGoalsJiraExportOperation(operationId);
     } catch (error) {
-      writeGoalsJiraExportOperation("");
-      await showActionError(error, "Jira export failed");
+      if (!goalsJiraExportTerminal(goalsJiraExportSnapshot?.status)) {
+        await showActionError(error, "Jira export failed");
+      }
     }
   });
 }

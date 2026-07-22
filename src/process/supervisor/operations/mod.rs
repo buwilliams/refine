@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -83,6 +84,35 @@ impl FileOperationRegistry {
             .join(format!("{operation_id}.logs.jsonl"))
     }
 
+    fn mutation_lock(&self) -> RefineResult<fs::File> {
+        fs::create_dir_all(self.operations_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create operation registry {}: {error}",
+                self.operations_dir().display()
+            ))
+        })?;
+        let path = self.operations_dir().join(".mutations.lock");
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open operation mutation lock {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock operation registry {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(file)
+    }
+
     fn write(&self, handle: &OperationHandle) -> RefineResult<()> {
         fs::create_dir_all(self.operations_dir()).map_err(|error| {
             RefineError::Io(format!(
@@ -104,13 +134,23 @@ impl FileOperationRegistry {
 
     pub fn interrupt_active(&self) -> RefineResult<Vec<OperationHandle>> {
         let mut interrupted = Vec::new();
-        for mut operation in self.recover()? {
+        for operation in self.recover()? {
             if matches!(
                 operation.state,
                 OperationState::Pending | OperationState::Running | OperationState::Cancelling
             ) {
+                let lock = self.mutation_lock()?;
+                let mut operation = self.status(&operation.id)?;
+                if !matches!(
+                    operation.state,
+                    OperationState::Pending | OperationState::Running | OperationState::Cancelling
+                ) {
+                    FileExt::unlock(&lock).ok();
+                    continue;
+                }
                 operation.state = OperationState::Interrupted;
                 self.write(&operation)?;
+                FileExt::unlock(&lock).ok();
                 self.append_log(
                     &operation.id,
                     operation_log_entry(&operation, "warning", "Operation interrupted", None),
@@ -262,9 +302,15 @@ impl FileOperationRegistry {
                 "finished operations must use a terminal state".to_string(),
             ));
         }
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if completion_would_overwrite_cancellation(&handle.state, &state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = state;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation finished", None),
@@ -277,9 +323,11 @@ impl FileOperationRegistry {
         operation_id: &str,
         progress: Value,
     ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
         handle.progress = progress;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         Ok(handle)
     }
 
@@ -294,11 +342,17 @@ impl FileOperationRegistry {
                 "result operations must finish as succeeded or failed".to_string(),
             ));
         }
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if completion_would_overwrite_cancellation(&handle.state, &state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = state;
         handle.result = result;
         handle.error = None;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation finished", None),
@@ -311,10 +365,17 @@ impl FileOperationRegistry {
         operation_id: &str,
         error: Value,
     ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
-        handle.state = OperationState::Failed;
+        // Cancellation is the user's authoritative terminal decision. A worker or cleanup path
+        // may still discover a real failure after cancellation wins the mutation lock; retain
+        // that evidence without rewriting the durable terminal state.
+        if !matches!(handle.state, OperationState::Cancelled) {
+            handle.state = OperationState::Failed;
+        }
         handle.error = Some(error);
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "error", "Operation failed", None),
@@ -348,9 +409,16 @@ impl OperationRegistry for FileOperationRegistry {
     }
 
     fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
         let mut handle = self.status(operation_id)?;
+        if operation_terminal(&handle.state) && !matches!(handle.state, OperationState::Interrupted)
+        {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
         handle.state = OperationState::Cancelled;
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "warning", "Operation cancelled", None),
@@ -395,6 +463,23 @@ impl OperationRegistry for FileOperationRegistry {
         operations.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(operations)
     }
+}
+
+fn operation_terminal(state: &OperationState) -> bool {
+    matches!(
+        state,
+        OperationState::Succeeded
+            | OperationState::Failed
+            | OperationState::Cancelled
+            | OperationState::Interrupted
+    )
+}
+
+fn completion_would_overwrite_cancellation(
+    current: &OperationState,
+    next: &OperationState,
+) -> bool {
+    matches!(current, OperationState::Cancelled) && !matches!(next, OperationState::Cancelled)
 }
 
 fn new_operation_id() -> String {
@@ -469,6 +554,26 @@ mod tests {
         let cancelled = registry.cancel(&operation.id).unwrap();
         assert_eq!(cancelled.state, OperationState::Cancelled);
         assert_eq!(cancelled.state.as_api_status(), "cancelled");
+
+        let recovery_failure = registry.register("import:persist").unwrap();
+        registry.cancel(&recovery_failure.id).unwrap();
+        let failed = registry
+            .fail_with_error(
+                &recovery_failure.id,
+                json!({
+                    "code": "projection_refresh_failed",
+                    "message": "cancel rollback could not refresh the projection"
+                }),
+            )
+            .unwrap();
+        assert_eq!(failed.state, OperationState::Cancelled);
+        assert_eq!(failed.error.unwrap()["code"], "projection_refresh_failed");
+        assert_eq!(
+            registry.status(&recovery_failure.id).unwrap().state,
+            OperationState::Cancelled
+        );
+        let (logs, _, _) = registry.page_logs(&recovery_failure.id, 20, 0).unwrap();
+        assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

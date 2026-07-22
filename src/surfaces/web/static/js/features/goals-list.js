@@ -135,6 +135,10 @@ async function renderGoalsList() {
     </div>
       </div>
     </details>
+    <section id="goals-jira-export-operation"
+             class="card goals-jira-export-operation"
+             data-testid="goals-jira-export-operation"
+             hidden></section>
     <div id="goals-table" data-testid="goals-table"><p class="muted">Loading…</p></div>
   `;
   // In-view filter changes update the URL via replaceState (which does NOT

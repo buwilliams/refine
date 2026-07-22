@@ -231,14 +231,32 @@ impl InProcessWebServer {
         if let Err(error) = registry.status(operation_id) {
             return error_response(error);
         }
-        terminate_operation_processes(runtime_root, operation_id);
         match registry.cancel(operation_id) {
             Ok(operation) => {
-                let operation = operation_response(operation);
-                if let Err(error) = self.current_projection_with_runtime() {
+                // Persist cancellation before signalling the worker. A worker that races to
+                // completion after SIGTERM must observe a terminal Cancelled operation rather
+                // than publishing a successful result over the user's cancellation.
+                if let Err(error) = terminate_operation_processes(runtime_root, operation_id) {
+                    let _ = registry.fail_with_error(
+                        operation_id,
+                        json!({
+                            "code": "operation_process_termination_failed",
+                            "message": error.to_string()
+                        }),
+                    );
                     return error_response(error);
                 }
-                ApiResponse::json(200, json!({"operation": operation}))
+                if let Err(error) = self.current_projection_with_runtime() {
+                    let _ = registry.fail_with_error(
+                        operation_id,
+                        json!({
+                            "code": "operation_cancel_projection_refresh_failed",
+                            "message": error.to_string()
+                        }),
+                    );
+                    return error_response(error);
+                }
+                ApiResponse::json(200, json!({"operation": operation_response(operation)}))
             }
             Err(error) => error_response(error),
         }
@@ -837,17 +855,19 @@ impl InProcessWebServer {
     }
 }
 
-fn terminate_operation_processes(runtime_root: &std::path::Path, operation_id: &str) {
+fn terminate_operation_processes(
+    runtime_root: &std::path::Path,
+    operation_id: &str,
+) -> RefineResult<()> {
     let supervisor = FileProcessSupervisor::new(runtime_root);
-    let Ok(processes) = supervisor.list() else {
-        return;
-    };
+    let processes = supervisor.list()?;
     for process in processes
         .iter()
         .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
     {
-        let _ = supervisor.request_termination(&process.id, "terminate");
+        supervisor.request_termination(&process.id, "terminate")?;
     }
+    Ok(())
 }
 
 fn process_operation_id(process: &ManagedProcess) -> Option<String> {

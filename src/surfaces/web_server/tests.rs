@@ -26,8 +26,11 @@ use crate::model::goal::{GoalIndexProjection, GoalPriority};
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+    ProcessSupervisor, managed_pid_is_alive,
 };
+use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::surfaces::web_server::support::{
     runtime_process_status_value, runtime_process_summary_value,
 };
@@ -871,6 +874,14 @@ fn static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces() {
     assert!(goals_bulk.contains("waitForGoalsJiraExportOperation"));
     assert!(goals_bulk.contains("GOALS_JIRA_EXPORT_OPERATION_KEY"));
     assert!(goals_bulk.contains("/retry`"));
+    assert!(goals_list.contains(r#"data-testid="goals-jira-export-operation""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-status""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-progress""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-logs""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-cancel""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-hide""#));
+    assert!(goals_bulk.contains(r#"data-testid="goals-jira-export-download""#));
+    assert!(goals_bulk.contains("/api/operations/${encodeURIComponent(operationId)}/cancel"));
     assert!(goals_list.contains("syncGoalsJiraExportOperation()"));
     assert!(common.contains(r#"err.code = "operation_interrupted""#));
     assert!(commands.contains(r#"id: "goals.bulk.export_jira""#));
@@ -1941,43 +1952,107 @@ fn web_server_cancels_and_recovers_durable_jira_exports() {
         .create_goal_summary("Recoverable export", Some("GOAL1"))
         .unwrap();
 
-    let started = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/export/jira".to_string(),
-        body: Some(json!({"selected_ids": ["GOAL1"]})),
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let request = json!({
+        "refine_dir": refine_dir.clone(),
+        "target_root": temp_root.clone(),
+        "selection": {"selected_ids": ["GOAL1"], "exclude_ids": [], "filter": {}}
     });
-    assert_eq!(started.status, 202);
-    let operation_id = started.body["operation"]["id"].as_str().unwrap();
+    let cancellable = registry
+        .register_with_request("goals:jira-export", request.clone())
+        .unwrap();
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let cancellable_process = supervisor
+        .launch(operation_helper_process_spec(&cancellable.id))
+        .unwrap();
+    let cancellable_pid = cancellable_process.pid.unwrap();
+    assert!(managed_pid_is_alive(cancellable_pid).unwrap());
+
     let cancelled = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: format!("/api/operations/{operation_id}/cancel"),
+        path: format!("/api/operations/{}/cancel", cancellable.id),
         body: None,
     });
     assert_eq!(cancelled.status, 200);
     assert_eq!(cancelled.body["operation"]["status"], "cancelled");
-    thread::sleep(Duration::from_millis(25));
+    wait_for_managed_pid_exit(cancellable_pid);
+    assert!(!managed_pid_is_alive(cancellable_pid).unwrap());
     assert_eq!(
-        FileOperationRegistry::new(&runtime_root)
-            .status(operation_id)
-            .unwrap()
-            .state,
+        registry.status(&cancellable.id).unwrap().state,
         OperationState::Cancelled
     );
-
-    let registry = FileOperationRegistry::new(&runtime_root);
-    let interrupted = registry
-        .register_with_request(
-            "goals:jira-export",
+    let late_completion = registry
+        .finish_with_result(
+            &cancellable.id,
+            OperationState::Succeeded,
+            json!({"export": {"csv": "must not become visible"}}),
+        )
+        .unwrap();
+    assert_eq!(late_completion.state, OperationState::Cancelled);
+    assert_eq!(
+        registry.status(&cancellable.id).unwrap().state,
+        OperationState::Cancelled
+    );
+    let late_failure = registry
+        .fail_with_error(
+            &cancellable.id,
             json!({
-                "refine_dir": refine_dir.clone(),
-                "target_root": temp_root.clone(),
-                "selection": {"selected_ids": ["GOAL1"], "exclude_ids": [], "filter": {}}
+                "code": "late_worker_failure",
+                "message": "worker failed after cancellation"
             }),
         )
         .unwrap();
-    registry
-        .finish(&interrupted.id, OperationState::Interrupted)
+    assert_eq!(late_failure.state, OperationState::Cancelled);
+    assert_eq!(late_failure.error.unwrap()["code"], "late_worker_failure");
+    assert_eq!(
+        registry.status(&cancellable.id).unwrap().state,
+        OperationState::Cancelled
+    );
+    let (cancel_logs, _, _) = registry.page_logs(&cancellable.id, 20, 0).unwrap();
+    assert!(
+        cancel_logs
+            .iter()
+            .any(|entry| entry.message == "Operation cancelled")
+    );
+    assert!(
+        cancel_logs
+            .iter()
+            .any(|entry| entry.message == "Operation failed")
+    );
+
+    let interrupted = registry
+        .register_with_request("goals:jira-export", request)
         .unwrap();
+    let interrupted_process = supervisor
+        .launch(operation_helper_process_spec(&interrupted.id))
+        .unwrap();
+    let interrupted_pid = interrupted_process.pid.unwrap();
+    assert!(managed_pid_is_alive(interrupted_pid).unwrap());
+    supervisor
+        .request_termination(&interrupted_process.id, "terminate")
+        .unwrap();
+    wait_for_managed_pid_exit(interrupted_pid);
+
+    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
+        root: temp_root.join("run"),
+    });
+    let recovery_status = lifecycle.recover(8080).unwrap();
+    assert!(
+        recovery_status
+            .degraded_integrations
+            .contains(&"operation-recovery-interrupted".to_string())
+    );
+    assert_eq!(
+        registry.status(&interrupted.id).unwrap().state,
+        OperationState::Interrupted
+    );
+    let (interruption_logs, _, _) = registry.page_logs(&interrupted.id, 20, 0).unwrap();
+    assert!(
+        interruption_logs
+            .iter()
+            .any(|entry| entry.message == "Operation interrupted")
+    );
+
     let recovered = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/goals/export/jira/{}/retry", interrupted.id),
@@ -1989,8 +2064,81 @@ fn web_server_cancels_and_recovers_durable_jira_exports() {
         wait_for_operation_status(&registry, recovered_id, OperationState::Succeeded);
     assert_eq!(recovered_operation.result["export"]["goal_count"], 1);
     assert_eq!(recovered_operation.request["recovery_of"], interrupted.id);
+    let (recovered_logs, _, _) = registry.page_logs(recovered_id, 20, 0).unwrap();
+    assert!(
+        recovered_logs
+            .iter()
+            .any(|entry| entry.message == "Jira CSV export completed")
+    );
+
+    let failure_runtime_root = temp_root.join("run/cancel-failure");
+    let failure_registry = FileOperationRegistry::new(&failure_runtime_root);
+    let termination_failure = failure_registry.register("goals:jira-export").unwrap();
+    fs::create_dir_all(&failure_runtime_root).unwrap();
+    fs::write(failure_runtime_root.join("processes"), b"not a directory").unwrap();
+    server.runtime_root = Some(failure_runtime_root);
+    let failed_cancel = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/operations/{}/cancel", termination_failure.id),
+        body: None,
+    });
+    assert_eq!(failed_cancel.status, 500);
+    let termination_failure = failure_registry.status(&termination_failure.id).unwrap();
+    assert_eq!(termination_failure.state, OperationState::Cancelled);
+    assert_eq!(
+        termination_failure.error.unwrap()["code"],
+        "operation_process_termination_failed"
+    );
+    let (failure_logs, _, _) = failure_registry
+        .page_logs(&termination_failure.id, 20, 0)
+        .unwrap();
+    assert!(
+        failure_logs
+            .iter()
+            .any(|entry| entry.message == "Operation failed")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+fn operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {
+    #[cfg(windows)]
+    let (command, args) = (
+        "cmd".to_string(),
+        vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()],
+    );
+    #[cfg(not(windows))]
+    let (command, args) = (
+        "sh".to_string(),
+        vec!["-c".to_string(), "while :; do sleep 1; done".to_string()],
+    );
+    ManagedProcessSpec {
+        owner: ProcessOwner::Runner,
+        command,
+        args,
+        cwd: None,
+        env: Vec::new(),
+        stdin: None,
+        limits: Some(ProcessResourceLimits {
+            kill_on_parent_exit: true,
+            ..Default::default()
+        }),
+        authorization_command: Some("refine test operation helper".to_string()),
+        sensitive: false,
+        metadata: serde_json::from_value(json!({
+            "kind": "runner",
+            "worker_kind": "jira-export-test-helper",
+            "operation_id": operation_id
+        }))
+        .unwrap(),
+    }
+}
+
+fn wait_for_managed_pid_exit(pid: u32) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while managed_pid_is_alive(pid).unwrap_or(false) && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[test]
