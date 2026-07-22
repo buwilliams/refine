@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:04:46Z",
+  "updated_at": "2026-07-22T13:07:35Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -720,6 +720,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Jira round has now passed 405 Rust library tests, 23 browser tests, clippy/fmt/syntax/diff checks, a real `run_system_start` + public retry integration with a supervised child reaching `Succeeded`, and an atomic-operation-JSON reader race. Its pre-audit is rerunning against exactly those fixes. Quality’s three new deterministic cancellation races are now executing."
+    },
+    {
+      "created_at": "2026-07-22T13:07:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784725655904-110",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality has reached the full all-target gate after its focused cancellation races. Jira’s nested audit child has exited, but its parent has not emitted a follow-up for about five minutes; I’m giving the provider a short grace window because the managed process is still alive. If activity remains absent, I’ll classify it as a stall from process/activity evidence rather than pretending the Goal state is sufficient."
     }
   ],
   "queue_dispatching": true,
