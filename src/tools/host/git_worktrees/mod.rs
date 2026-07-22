@@ -109,6 +109,11 @@ impl FileGitWorktreeService {
         self
     }
 
+    /// Resolve an already materialized candidate worktree without creating or switching it.
+    pub fn existing_worktree_for_branch(&self, branch: &str) -> RefineResult<Option<PathBuf>> {
+        self.worktree_for_branch(branch)
+    }
+
     pub fn audit_path(&self) -> RefineResult<PathBuf> {
         stdout(self.git_output(&["rev-parse", "--git-path", GIT_AUDIT_FILE])?).map(|path| {
             let path = PathBuf::from(path.trim());

@@ -9,7 +9,9 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::host::quality::QualityCheckResult;
+use crate::tools::host::quality::{
+    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
+};
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
@@ -401,44 +403,27 @@ impl WorkflowBehavior for WorkflowCancelled {
 }
 
 fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
-    if setting_string(&ctx.settings, "quality_enabled", "0") != "1" {
-        return Ok(QualityCheckResult {
+    FileQualityService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root).run_checks(
+        QualityCheckRequest {
             owner_id: ctx.goal_id.clone(),
-            ok: true,
-            diagnostics: vec!["Quality checks disabled.".to_string()],
-        });
-    }
-    let candidate_root = Path::new(ctx.require_worktree_path()?);
-    let service = FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, candidate_root);
-    let snapshot = service.test_with_metadata(ctx.workflow_process_metadata("qa", "WorkflowQa"))?;
-    let mut diagnostics = vec![snapshot.message.clone()];
-    if let Some(operation) = snapshot.last_operation {
-        if !operation.stdout.trim().is_empty() {
-            diagnostics.push(operation.stdout);
-        }
-        if !operation.stderr.trim().is_empty() {
-            diagnostics.push(operation.stderr);
-        }
-    }
-    Ok(QualityCheckResult {
-        owner_id: ctx.goal_id.clone(),
-        ok: snapshot.ok,
-        diagnostics,
-    })
+            provider: ctx.provider.clone(),
+            cwd: ctx.require_agent_cwd()?.display().to_string(),
+            process_metadata: ctx.workflow_process_metadata("qa", "WorkflowQa"),
+        },
+    )
 }
 
 fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> RefineResult<()> {
-    let message = if result.ok {
-        "Quality checks passed"
-    } else {
-        "Quality checks failed"
-    };
+    let message = result.summary.as_str();
     ctx.work_items.update_latest_goal_round_evaluation_summary(
         &ctx.goal_id,
         &json!({
             "quality_state": if result.ok { "passed" } else { "failed" },
             "quality_message": message,
-            "quality_details": {"diagnostics": result.diagnostics},
+            "quality_details": {
+                "results": result.results,
+                "diagnostics": result.diagnostics
+            },
             "quality_checked_at": now_timestamp()
         }),
     )?;
@@ -447,6 +432,7 @@ fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> Ref
         message,
         Some(json_object(json!({
             "ok": result.ok,
+            "results": result.results,
             "diagnostics": result.diagnostics
         }))),
     )

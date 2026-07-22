@@ -3,7 +3,8 @@
 ## Key Ideas
 
 - **Evidence Before Confidence**: work should be judged by checks, logs, diffs, and reviewable outcomes.
-- **Project-Specific Standards**: quality expectations should come from the attached app's commands, guidance, and governance.
+- **Plain-Text Tests**: projects describe observable outcomes without encoding a shell runner into Quality policy.
+- **Agent Evaluation**: the configured agent determines how to evaluate each test and reports pass or fail with evidence.
 - **Shared Capability**: browser, CLI, API, workflow, and agents should use the same quality behavior.
 - **Mitigation Layer**: quality checks are part of Refine's safety model without becoming a permission system.
 - **Recoverable Failure**: failed checks should create useful evidence and a path back into workflow.
@@ -16,15 +17,17 @@ The point is not to prevent all mistakes. The point is to make the system prove 
 
 ## Expected Role
 
-Quality should sit between implementation and trust. It should connect target-app lifecycle context, deterministic checks, process execution, workflow state, logs, changes, guidance, governance, and review.
+Quality should sit between implementation and trust. Every committed Goal candidate receives a Quality evaluation. Quality uses its own project-wide plain-text tests, separate from Governance rules and target-app lifecycle commands.
 
 Current implementation details that matter to intent:
 
-- quality behavior should use target-app test settings rather than page-local assumptions;
-- quality runs should be supervised processes when they execute commands;
+- each configured plain-text test should receive exactly one pass or fail result;
+- the Quality agent should choose the appropriate commands, inspection, or other evidence for each test;
+- Quality agent runs and any commands they launch should remain supervised processes;
 - workflow should use quality evidence before moving work toward merge or done;
 - failures should be visible in logs, System, Goal evidence, or review surfaces;
-- quality settings should be shared target-app context, not hidden UI state.
+- quality settings should be shared project context, not hidden UI state;
+- an empty Quality test list should be an explicit successful no-op, not a reason to skip durable Quality evidence.
 
 Quality should be strict enough to reveal risk and flexible enough to fit different projects. Refine should not assume every app has the same test command, build step, or verification style.
 

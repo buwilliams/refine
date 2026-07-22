@@ -1,17 +1,19 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::model::log::LogEntry;
-use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
-use crate::process::supervisor::security::FileSecurityService;
+use crate::prompts::{PromptTemplate, render};
+use crate::tools::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 
 use super::types::*;
 
@@ -42,10 +44,10 @@ impl FileQualityService {
     pub fn load_settings(&self) -> RefineResult<QualitySettings> {
         let stored = self.read_stored_settings()?;
         Ok(QualitySettings {
-            configured: !stored.business_requirements.trim().is_empty()
-                && !stored.instructions.trim().is_empty(),
+            configured: !stored.tests.is_empty(),
             business_requirements: stored.business_requirements,
             instructions: stored.instructions,
+            tests: stored.tests,
             enabled: stored.enabled,
             timing: stored.timing,
         })
@@ -64,9 +66,11 @@ impl FileQualityService {
                 trimmed.to_string()
             };
         }
-        if let Some(enabled) = patch.enabled {
-            stored.enabled = boolish_setting(&enabled);
+        if let Some(tests) = patch.tests {
+            stored.tests = normalize_tests(tests);
         }
+        // Retain the legacy field in the wire shape, but Quality is always active for Goal
+        // candidates. Older clients may still send `enabled`; it no longer disables evaluation.
         if let Some(timing) = patch.timing {
             stored.timing = normalize_timing(&timing)?;
         }
@@ -119,54 +123,14 @@ impl FileQualityService {
     fn settings_path(&self) -> PathBuf {
         self.refine_dir.join(SETTINGS_FILE)
     }
-
-    fn project_root(&self) -> PathBuf {
-        self.refine_dir
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| self.refine_dir.clone())
-    }
-
-    fn security(&self) -> RefineResult<FileSecurityService> {
-        let runtime_root = self
-            .runtime_root
-            .clone()
-            .unwrap_or_else(|| self.refine_dir.join("runtime"));
-        FileSecurityService::from_project_settings(runtime_root, &self.refine_dir)
-    }
-
-    fn run_quality_process(
-        &self,
-        command: String,
-        args: Vec<String>,
-        authorization_command: &str,
-        process_metadata: Map<String, Value>,
-    ) -> RefineResult<crate::process::subprocess::ManagedProcessOutput> {
-        let security = self.security()?;
-        security.authorize_host_command("quality", authorization_command)?;
-        FileProcessSupervisor::with_allowed_commands(
-            security.runtime_root,
-            security.allowed_commands.iter().cloned(),
-        )
-        .run_to_completion(ManagedProcessSpec {
-            owner: ProcessOwner::Quality,
-            command,
-            args,
-            cwd: Some(self.project_root().display().to_string()),
-            env: Vec::new(),
-            stdin: None,
-            limits: None,
-            authorization_command: Some(authorization_command.to_string()),
-            sensitive: false,
-            metadata: process_metadata,
-        })
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
 struct StoredQualitySettings {
     business_requirements: String,
     instructions: String,
+    tests: Vec<String>,
     enabled: String,
     timing: String,
 }
@@ -180,7 +144,8 @@ impl StoredQualitySettings {
             } else {
                 self.instructions.trim().to_string()
             },
-            enabled: boolish_string(&self.enabled),
+            tests: normalize_tests(self.tests),
+            enabled: "1".to_string(),
             timing: normalize_timing_lossy(&self.timing),
         }
     }
@@ -191,7 +156,8 @@ impl Default for StoredQualitySettings {
         Self {
             business_requirements: String::new(),
             instructions: DEFAULT_INSTRUCTIONS.to_string(),
-            enabled: "0".to_string(),
+            tests: Vec::new(),
+            enabled: "1".to_string(),
             timing: PRE_MERGE.to_string(),
         }
     }
@@ -200,15 +166,27 @@ impl Default for StoredQualitySettings {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct QualityCheckRequest {
     pub owner_id: String,
-    pub command: String,
+    pub provider: String,
+    pub cwd: String,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub process_metadata: Map<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct QualityTestResult {
+    pub test: String,
+    pub status: String,
+    pub evidence: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub command: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct QualityCheckResult {
     pub owner_id: String,
     pub ok: bool,
+    pub summary: String,
+    pub results: Vec<QualityTestResult>,
     pub diagnostics: Vec<String>,
 }
 
@@ -248,7 +226,10 @@ impl QualityOperationRunner {
                 &request.owner_id,
                 "info",
                 "Quality checks started",
-                Some(json!({"command": request.command})),
+                Some(json!({
+                    "provider": request.provider,
+                    "cwd": request.cwd
+                })),
             ),
         )?;
         let service = FileQualityService::with_runtime_root(&self.refine_dir, &self.runtime_root);
@@ -264,6 +245,8 @@ impl QualityOperationRunner {
                     "Quality checks failed"
                 },
                 Some(json!({
+                    "summary": &result.summary,
+                    "results": &result.results,
                     "diagnostics": &result.diagnostics,
                     "ok": result.ok
                 })),
@@ -283,40 +266,45 @@ impl QualityOperationRunner {
 
 impl QualityService for FileQualityService {
     fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityCheckResult> {
-        if request.command.trim().is_empty() {
+        let settings = self.load_settings()?;
+        if settings.tests.is_empty() {
             return Ok(QualityCheckResult {
                 owner_id: request.owner_id,
                 ok: true,
-                diagnostics: vec!["No quality command configured.".to_string()],
+                summary: "No Quality tests configured.".to_string(),
+                results: Vec::new(),
+                diagnostics: vec![
+                    "No Quality tests configured; evaluation was a no-op.".to_string(),
+                ],
             });
         }
-        let (shell, args) = shell_program_args(&request.command);
-        let output =
-            self.run_quality_process(shell, args, &request.command, request.process_metadata)?;
-        let ok = output.success();
-        let exit_code = output.process.exit_code;
-        let stdout = output.stdout;
-        let stderr = output.stderr;
-        let mut diagnostics = Vec::new();
-        if let Some(stdout) = tail_text(&stdout, 4000) {
-            diagnostics.push(stdout);
-        }
-        if let Some(stderr) = tail_text(&stderr, 4000) {
-            diagnostics.push(stderr);
-        }
-        if diagnostics.is_empty() {
-            diagnostics.push(format!(
-                "quality command exited {}",
-                exit_code
-                    .map(|code| code.to_string())
-                    .unwrap_or_else(|| "unknown".to_string())
-            ));
-        }
-        Ok(QualityCheckResult {
-            owner_id: request.owner_id,
-            ok,
-            diagnostics,
-        })
+        let tests_json = serde_json::to_string_pretty(&settings.tests).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode Quality tests: {error}"))
+        })?;
+        let prompt = render(
+            PromptTemplate::PostImplementationQuality,
+            &[
+                ("owner_id", &request.owner_id),
+                ("candidate_cwd", &request.cwd),
+                ("business_requirements", &settings.business_requirements),
+                ("instructions", &settings.instructions),
+                ("tests_json", &tests_json),
+            ],
+        );
+        let runtime_root = self
+            .runtime_root
+            .clone()
+            .unwrap_or_else(|| self.refine_dir.join("runtime/agents"));
+        let output = HostAgentProviderService::with_runtime_root(runtime_root).invoke(
+            ProviderInvocation {
+                provider: request.provider,
+                prompt,
+                session_id: None,
+                cwd: Some(request.cwd),
+                process_metadata: request.process_metadata,
+            },
+        )?;
+        parse_quality_provider_output(&request.owner_id, &settings.tests, &output)
     }
 
     fn screenshots(&self, _owner_id: &str) -> RefineResult<Vec<String>> {
@@ -342,6 +330,12 @@ impl QualityService for FileQualityService {
         Ok(QualityCheckResult {
             owner_id: format!("{baseline}:{candidate}"),
             ok,
+            summary: if ok {
+                "Artifacts match exactly.".to_string()
+            } else {
+                "Artifacts differ.".to_string()
+            },
+            results: Vec::new(),
             diagnostics: vec![if ok {
                 "artifacts match exactly".to_string()
             } else {
@@ -356,22 +350,162 @@ impl QualityService for FileQualityService {
 
     fn gate(&self, owner_id: &str) -> RefineResult<QualityCheckResult> {
         let settings = self.read_stored_settings()?;
-        if settings.enabled != "1" {
-            return Ok(QualityCheckResult {
-                owner_id: owner_id.to_string(),
-                ok: true,
-                diagnostics: vec!["Quality gate is disabled.".to_string()],
-            });
-        }
         Ok(QualityCheckResult {
             owner_id: owner_id.to_string(),
             ok: true,
-            diagnostics: vec![
-                "Quality gate is enabled; workflow QA runs the target-app test command."
-                    .to_string(),
-            ],
+            summary: "Quality evaluates every Goal candidate.".to_string(),
+            results: Vec::new(),
+            diagnostics: vec![format!(
+                "Quality is always active; {} plain-text test(s) are configured.",
+                settings.tests.len()
+            )],
         })
     }
+}
+
+pub(crate) fn parse_quality_provider_output(
+    owner_id: &str,
+    configured_tests: &[String],
+    output: &str,
+) -> RefineResult<QualityCheckResult> {
+    let value = parse_json_value(output).ok_or_else(|| {
+        RefineError::Serialization(
+            "Quality agent did not return the required JSON evaluation".to_string(),
+        )
+    })?;
+    let returned = value
+        .get("results")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            RefineError::Serialization(
+                "Quality agent response is missing a results array".to_string(),
+            )
+        })?;
+    let mut results = Vec::with_capacity(configured_tests.len());
+    let mut diagnostics = Vec::new();
+    let mut all_passed = true;
+    for test in configured_tests {
+        let matches = returned
+            .iter()
+            .filter(|item| item.get("test").and_then(Value::as_str) == Some(test.as_str()))
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            all_passed = false;
+            let evidence = if matches.is_empty() {
+                "Quality agent omitted this configured test.".to_string()
+            } else {
+                "Quality agent returned this configured test more than once.".to_string()
+            };
+            diagnostics.push(evidence.clone());
+            results.push(QualityTestResult {
+                test: test.clone(),
+                status: "failed".to_string(),
+                evidence,
+                command: String::new(),
+            });
+            continue;
+        }
+        let item = matches[0];
+        let status = item
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        let valid_status = matches!(status.as_str(), "passed" | "failed");
+        let passed = status == "passed";
+        all_passed &= valid_status && passed;
+        let evidence = item
+            .get("evidence")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if !valid_status {
+            diagnostics.push(format!(
+                "Quality agent returned invalid status {status:?} for {test:?}."
+            ));
+        } else if evidence.is_empty() {
+            all_passed = false;
+            diagnostics.push(format!("Quality agent returned no evidence for {test:?}."));
+        }
+        results.push(QualityTestResult {
+            test: test.clone(),
+            status: if valid_status {
+                status
+            } else {
+                "failed".to_string()
+            },
+            evidence: if evidence.is_empty() {
+                "No evidence was reported.".to_string()
+            } else {
+                evidence
+            },
+            command: item
+                .get("command")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .to_string(),
+        });
+    }
+    if returned.len() != configured_tests.len() {
+        all_passed = false;
+        diagnostics.push(format!(
+            "Quality agent returned {} result(s) for {} configured test(s).",
+            returned.len(),
+            configured_tests.len()
+        ));
+    }
+    if value.get("ok").and_then(Value::as_bool) == Some(false) {
+        all_passed = false;
+    }
+    let summary = value
+        .get("summary")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|summary| !summary.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| {
+            if all_passed {
+                "All Quality tests passed.".to_string()
+            } else {
+                "One or more Quality tests failed.".to_string()
+            }
+        });
+    diagnostics.push(output.trim().to_string());
+    Ok(QualityCheckResult {
+        owner_id: owner_id.to_string(),
+        ok: all_passed,
+        summary,
+        results,
+        diagnostics,
+    })
+}
+
+fn parse_json_value(raw: &str) -> Option<Value> {
+    serde_json::from_str::<Value>(raw.trim()).ok().or_else(|| {
+        let start = raw.find('{')?;
+        let end = raw.rfind('}')?;
+        serde_json::from_str::<Value>(&raw[start..=end]).ok()
+    })
+}
+
+fn normalize_tests(tests: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for test in tests {
+        let test = test
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(1000)
+            .collect::<String>();
+        if !test.is_empty() && !normalized.contains(&test) {
+            normalized.push(test);
+        }
+    }
+    normalized
 }
 
 pub(super) fn normalize_timing(value: &str) -> RefineResult<String> {
@@ -389,52 +523,6 @@ pub(super) fn normalize_timing_lossy(value: &str) -> String {
         POST_BUILD.to_string()
     } else {
         PRE_MERGE.to_string()
-    }
-}
-
-pub(super) fn boolish_setting(value: &serde_json::Value) -> String {
-    if value_is_truthy(value) {
-        "1".to_string()
-    } else {
-        "0".to_string()
-    }
-}
-
-pub(super) fn boolish_string(value: &str) -> String {
-    if matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "1" | "true" | "yes" | "on"
-    ) {
-        "1".to_string()
-    } else {
-        "0".to_string()
-    }
-}
-
-pub(super) fn value_is_truthy(value: &serde_json::Value) -> bool {
-    match value {
-        serde_json::Value::Bool(value) => *value,
-        serde_json::Value::Number(value) => value.as_i64().unwrap_or_default() != 0,
-        serde_json::Value::String(value) => {
-            matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "on"
-            )
-        }
-        _ => false,
-    }
-}
-
-pub(super) fn tail_text(value: &str, max_chars: usize) -> Option<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let count = trimmed.chars().count();
-    if count <= max_chars {
-        Some(trimmed.to_string())
-    } else {
-        Some(trimmed.chars().skip(count - max_chars).collect())
     }
 }
 
@@ -456,23 +544,6 @@ pub(super) fn quality_operation_log(
             .strip_prefix("GOAL")
             .map(|_| owner_id.to_string())
             .or_else(|| owner_id.strip_prefix("goal:").map(ToString::to_string)),
-    }
-}
-
-pub(super) fn shell_program_args(command: &str) -> (String, Vec<String>) {
-    #[cfg(windows)]
-    {
-        (
-            "cmd".to_string(),
-            vec!["/C".to_string(), command.to_string()],
-        )
-    }
-    #[cfg(not(windows))]
-    {
-        (
-            "sh".to_string(),
-            vec!["-c".to_string(), command.to_string()],
-        )
     }
 }
 

@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::ConfigService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::host::quality::{
     FileQualityService, QualityCheckRequest, QualityOperationRunner, QualityService,
     QualitySettingsPatch,
@@ -222,6 +223,12 @@ impl InProcessWebServer {
             return runtime_root_unavailable("run quality checks");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
+        if body.get("command").is_some() {
+            return error_response(RefineError::InvalidInput(
+                "Quality checks use the saved plain-text tests; command overrides are not accepted"
+                    .to_string(),
+            ));
+        }
         let owner_id = body
             .get("owner_id")
             .or_else(|| body.get("goal_id"))
@@ -230,15 +237,57 @@ impl InProcessWebServer {
             .filter(|value| !value.trim().is_empty())
             .unwrap_or("app")
             .to_string();
-        let command = body
-            .get("command")
-            .and_then(|value| value.as_str())
-            .unwrap_or("")
+        let settings = match self.settings_service(&refine_dir).load() {
+            Ok(settings) => settings,
+            Err(error) => return error_response(error),
+        };
+        let provider = settings
+            .get("agent_cli")
+            .and_then(Value::as_str)
+            .unwrap_or("claude")
             .to_string();
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("run quality checks"),
+            Err(error) => return error_response(error),
+        };
+        let cwd = if let Some(goal_id) = body
+            .get("goal_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|goal_id| !goal_id.is_empty())
+        {
+            let goal = match self
+                .work_item_service(&refine_dir)
+                .show_goal_summary(goal_id)
+            {
+                Ok(goal) => goal,
+                Err(error) => return error_response(error),
+            };
+            let Some(branch) = goal.goal.branch_name else {
+                return error_response(RefineError::Conflict(format!(
+                    "Goal {goal_id} has no candidate branch for Quality evaluation"
+                )));
+            };
+            match FileGitWorktreeService::with_runtime_root(&target_root, runtime_root)
+                .existing_worktree_for_branch(&branch)
+            {
+                Ok(Some(path)) => path,
+                Ok(None) => {
+                    return error_response(RefineError::Conflict(format!(
+                        "Goal {goal_id} candidate worktree was not found"
+                    )));
+                }
+                Err(error) => return error_response(error),
+            }
+        } else {
+            target_root
+        };
         match QualityOperationRunner::new(&refine_dir, runtime_root).run_checks(
             QualityCheckRequest {
                 owner_id,
-                command,
+                provider,
+                cwd: cwd.display().to_string(),
                 process_metadata: Default::default(),
             },
         ) {

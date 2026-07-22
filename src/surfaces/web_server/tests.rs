@@ -5738,6 +5738,25 @@ fn web_server_manages_quality_settings_and_checks() {
     let temp_root = unique_temp_dir("http-quality");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"summary\":\"Dashboard Quality passed.\",\"results\":[{\"test\":\"Dashboard loads for a signed-in user.\",\"status\":\"passed\",\"evidence\":\"Focused browser check passed\",\"command\":\"npm test\"}]}'\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
@@ -5747,6 +5766,7 @@ fn web_server_manages_quality_settings_and_checks() {
         path: "/api/settings".to_string(),
         body: Some(json!({
             "target_app_url": "http://127.0.0.1:3000",
+            "agent_cli": "smoke-ai",
             "target_app_test_commands": [
                 {"command": "printf target-test-ok", "enabled": true},
                 {"command": "printf skipped", "enabled": false}
@@ -5765,8 +5785,9 @@ fn web_server_manages_quality_settings_and_checks() {
         body: None,
     });
     assert_eq!(initial.status, 200);
-    assert_eq!(initial.body["enabled"], "0");
+    assert_eq!(initial.body["enabled"], "1");
     assert_eq!(initial.body["timing"], "pre_merge");
+    assert_eq!(initial.body["tests"], json!([]));
 
     let saved = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -5775,7 +5796,8 @@ fn web_server_manages_quality_settings_and_checks() {
             "enabled": "1",
             "timing": "post_build",
             "business_requirements": "Dashboard must render",
-            "instructions": "Run focused checks"
+            "instructions": "Run focused checks",
+            "tests": ["Dashboard loads for a signed-in user."]
         })),
     });
     assert_eq!(saved.status, 200);
@@ -5787,8 +5809,7 @@ fn web_server_manages_quality_settings_and_checks() {
         method: "POST".to_string(),
         path: "/api/quality/checks".to_string(),
         body: Some(json!({
-            "owner_id": "GOAL1",
-            "command": "printf quality-ok"
+            "owner_id": "GOAL1"
         })),
     });
     assert_eq!(checks.status, 200);
@@ -5796,11 +5817,25 @@ fn web_server_manages_quality_settings_and_checks() {
     assert_eq!(checks.body["result"]["owner_id"], "GOAL1");
     assert_eq!(checks.body["operation"]["owner"], "quality:GOAL1");
     assert_eq!(checks.body["operation"]["status"], "complete");
+    assert_eq!(
+        checks.body["result"]["summary"],
+        "Dashboard Quality passed."
+    );
+    assert_eq!(
+        checks.body["result"]["results"][0]["test"],
+        "Dashboard loads for a signed-in user."
+    );
+    let command_override = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/quality/checks".to_string(),
+        body: Some(json!({"command": "printf bypass"})),
+    });
+    assert_eq!(command_override.status, 400);
     assert!(
-        checks.body["result"]["diagnostics"][0]
+        command_override.body["error"]["message"]
             .as_str()
-            .unwrap()
-            .contains("quality-ok")
+            .unwrap_or("")
+            .contains("plain-text tests")
     );
     let quality_operation_id = checks.body["operation"]["id"].as_str().unwrap();
     let quality_operation_logs = FileOperationRegistry::new(&runtime_root)
@@ -5836,6 +5871,13 @@ fn web_server_manages_quality_settings_and_checks() {
     assert_eq!(listed.status, 200);
     assert!(listed.body.get("regressions").is_none());
 
+    unsafe {
+        if let Some(previous) = previous_smoke_ai {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
     fs::remove_dir_all(temp_root).unwrap();
 }
 

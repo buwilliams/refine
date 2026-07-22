@@ -338,7 +338,8 @@ Properties:
   `constitution_state`, `governance_message`, `governance_details`,
   `governance_checked_at`, and `governance_rule_actions`.
 - `RoundQuality`: `quality_state`, `quality_message`, `quality_details`, and
-  `quality_checked_at`.
+  `quality_checked_at`. Quality details preserve the configured agent's per-test
+  pass/fail evidence for the candidate.
 - `GoalPriority`: `low`, `medium`, or `high`.
 
 Rules:
