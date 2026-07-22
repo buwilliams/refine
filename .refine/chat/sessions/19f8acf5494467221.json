@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:34:41Z",
+  "updated_at": "2026-07-22T18:35:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -840,6 +840,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality now rejects primary-checkout recovery outright and holds restoration, evidence, Goal state change, preserved timing, and claim creation under one shared transition boundary; automatic promotion uses the same boundary. Its first focused command was malformed because Cargo accepts one test filter, so the two tests were immediately split and run separately. That command error is visible and does not weaken the safety boundary."
+    },
+    {
+      "created_at": "2026-07-22T18:35:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745328975-204",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination has now exited implementation with candidate `ca98963a…` and entered Refine’s official `WorkflowImplementationGovernance` process. This is the authoritative review boundary; I’ll use its verdict, not the implementation agent’s self-review, before deciding whether normal approval is permitted. Quality’s focused promotion, mutation, restoration-failure, and retry tests currently pass."
     }
   ],
   "queued_messages": [
