@@ -1,0 +1,41 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-07-22T09:59:14Z",
+  "feature_id": "00000SZ29W6KCGEGMCS81YW002",
+  "feature_order": 3,
+  "id": "00000SZ2A3VTB16YZMNW1YW005",
+  "name": "Incorporate the unhobbling of agents into documentation and governance for Refin",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T09:59:14Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Incorporate the unhobbling of agents into documentation and governance for Refine:\n\n- All agent prompts live in src/prompts as markdown templates.\n- Unhobbling Agents: Understand how models work by recognizing their \"spiky\" intelligence, known as capability overhang. Latest models benefit from reduced system prompts.\n- Finding Your Unknowns: Bridge the gap between your \"map\" (the spec or prompt) and the \"territory\" (the actual codebase). Recommend strategies like \"blind spot paths,\" prototyping, and asking the model to interview you to uncover hidden requirements. This is a good use of the supervisor agent.\n- Being Unreasonable: Argue for abandoning standard trade-offs. Demand \"good, fast, and cheap\" results simultaneously\n- Aim for more ambitious work by leveraging the speed and capabilities of current agents.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T09:59:14Z"
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T09:59:19Z"
+}
