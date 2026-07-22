@@ -1,0 +1,41 @@
+{
+  "base_commit": "964eb8b04de5d8f3a9fa74847db3e41dbb04c41e",
+  "branch_name": "refine/00000SZ1YFDPAG0NJ16FTTY000/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T03:12:26Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ1YFDPAG0NJ16FTTY000",
+  "name": "Fix source promotion activation and rollback",
+  "node_id": "default",
+  "notes": [],
+  "priority": "high",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T03:12:27Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Fix the dogfood source-promotion activation failure exposed by the live UI-equivalent promotion: git read-tree -u <commit> fails because -u requires merge/reset/prefix semantics. Correct the shared FileSourcePromotionHost activation, update-ref failure recovery, and rollback paths using the safest valid Git plumbing while preserving clean-checkout, fast-forward-only, compare-and-swap ref updates, rollback, and daemon recovery invariants. Add focused tests that execute the real Git operations in a temporary repository and would fail with the current invalid command; prove the branch ref, index, and worktree advance together, update-ref failure restores the prior tree, rollback restores the prior commit, and dirty/diverged inputs remain untouched. Keep source promotion in the shared capability used by UI and CLI, update the runbook only if operator behavior changes, run formatting, targeted source-promotion tests, all tests, strict Clippy, CLI/static/browser checks, commit the result, and leave a clean worktree.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T03:12:27Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T03:12:28Z"
+}
