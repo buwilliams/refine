@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T12:12:53Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T12:22:47Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2DY74HKB75CMHXVA009-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance violations found in the committed implementation.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance violations found in the committed implementation.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2DY74HKB75CMHXVA009-round-1"
+      },
+      "governance_message": "No governance violations found in the committed implementation.",
       "governance_rule_actions": [],
       "implementation_report": "Implemented Goal `00000SZ2DY74HKB75CMHXVA009`; the four-file diff is clean and reviewable.\n\n- `/api/supervisor-agent` now runs the existing full reconciliation before returning state, preventing stale snapshots during long Goal turns.\n- Terminal transitions remain synchronized into the active singleton Supervisor queue/transcript without waking an idle session or creating another provider.\n- Context fingerprints now include failed, review, done, and other Goal states.\n- Existing projection, SSE refresh, event deduplication, shared chat, and daemon recovery paths remain intact.\n- Added backend, API, and toolbar regressions in [supervisor_agent.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2DY74HKB75CMHXVA009-round-1/src/tools/product/supervisor_agent.rs:1209), [quality_chat_routes.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2DY74HKB75CMHXVA009-round-1/src/surfaces/web_server/quality_chat_routes.rs:18), and [web_supervisor_toolbar.test.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2DY74HKB75CMHXVA009-round-1/tests/web_supervisor_toolbar.test.js:442).\n\nDeterministic verification:\n\n- `cargo fmt --all -- --check` — passed\n- `cargo clippy --lib -- -D warnings` — passed\n- `cargo test --lib` — 397 passed, 0 failed\n- `cargo test supervisor_agent --lib` — 11 passed, 0 failed\n- API regression — 1 passed, 0 failed\n- `node --test tests/web_supervisor_toolbar.test.js` — 11 passed, 0 failed\n- `git diff --check` — passed",
       "implementation_reported_at": "2026-07-22T12:20:46Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Keep the Supervisor status API and toolbar synchronized with live workflow truth while the singleton provider turn remains active. /api/supervisor-agent must continuously reflect current Goal states, active, queued, failed, health, lifecycle, recent decisions, and updated_at rather than retaining only the snapshot that launched the turn. Reuse the existing Supervisor reconciliation, shared chat session, projection, and SSE event path; do not add another monitor, state engine, or duplicate provider turn. The summary and transcript must agree through Goal transitions and daemon recovery. Add regression coverage with a deliberately long-running Supervisor turn while Goals enter in-progress, failed, review, and done, asserting that API and UI state update promptly without restarting the provider or duplicating events.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T12:22:48Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:20:46Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T12:22:49Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T12:20:46Z"
+  "updated": "2026-07-22T12:22:49Z"
 }
