@@ -656,15 +656,13 @@ function drawToolbar() {
   const supervisorActive = active.mode === "supervisor";
   const hasSession = !!active.sessionId;
 
-  const startLabel = supervisorActive
-    ? "Start supervisor conversation"
-    : active.goalId
+  const startLabel = active.goalId
     ? `Start attached to Goal ${active.goalId.slice(0, 10)}…`
     : active.mode === "plan"
       ? "Start plan"
     : "Start standalone";
   const toggleLabel = hasSession
-    ? (supervisorActive ? "Stop supervisor conversation" : active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
+    ? (active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
@@ -718,7 +716,13 @@ function drawToolbar() {
             : goalLogsActive
               ? renderGoalLogPanel(active)
             : supervisorActive
-              ? renderSupervisorPanel(active, { toggleClass, toggleLabel, statusLine, hasSession })
+              ? renderSupervisorPanel(active, {
+                  toggleClass,
+                  toggleLabel,
+                  statusLine,
+                  hasSession,
+                  showSessionToggle: false,
+                })
               : renderChatPanel(active, {
                   toggleClass,
                   toggleLabel,
@@ -947,7 +951,13 @@ async function loadSupervisorAgentState() {
   if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) drawToolbar();
 }
 
-function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
+function renderChatPanel(active, {
+  toggleClass,
+  toggleLabel,
+  statusLine,
+  hasSession,
+  showSessionToggle = true,
+}) {
   const progressText = active.progress || "";
   const showProgress = active.showProgress !== false;
   const hasActivityToggle = hasSession || progressText;
@@ -962,7 +972,8 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
     : "";
   return `
       <div class="actions" style="margin-bottom:10px">
-        <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>
+        ${showSessionToggle ? `
+          <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>` : ""}
         ${active.mode === "plan" ? `
           <button id="btn-plan-draft-goal" class="secondary" data-testid="plan-draft-goal"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
@@ -2701,6 +2712,11 @@ function chatActivityLabel(tab) {
 
 function chatStatusLine(tab) {
   if (!tab?.sessionId) {
+    if (tab?.mode === "supervisor") {
+      if (tab?.starting) return "Opening supervisor conversation.";
+      if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
+      return "Supervisor is idle.";
+    }
     if (tab?.starting) return "Starting session.";
     if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
     return "No active session.";
@@ -2712,6 +2728,12 @@ function chatStatusLine(tab) {
 }
 
 function chatInputPlaceholder(tab) {
+  if (tab?.mode === "supervisor") {
+    if (!tab?.sessionId && tab?.starting) {
+      return "Opening supervisor conversation. Type to queue messages.";
+    }
+    if (!tab?.sessionId) return "Type to queue a message.";
+  }
   if (!tab?.sessionId && tab?.starting) return "Starting session. Type to queue messages.";
   if (!tab?.sessionId) return "Type to queue a message and start the session.";
   if (tab.pending) return "Agent is busy. Press Enter to queue another message.";

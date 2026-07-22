@@ -145,7 +145,6 @@ function browserRuntime(storage = new Map()) {
       restore: loadChatStateFromStorage,
       save: saveChatStateToStorage,
       send: sendChatText,
-      stop: toggleActiveChat,
       supervisorTab() { return chatState.tabs[SUPERVISOR_TAB_ID]; },
       tabIds() { return Object.keys(chatState.tabs); },
       setApi(nextApi) { api = nextApi; },
@@ -194,7 +193,9 @@ test("Supervisor stays discoverable and prompt-ready while idle", () => {
   assert.match(browser.html(), /data-testid="toolbar-tab-supervisor"/);
   assert.match(browser.html(), /data-testid="toolbar-supervisor-panel"/);
   assert.match(browser.html(), /The supervisor agent is idle/);
-  assert.match(browser.html(), /Type to queue a message and start the session/);
+  assert.match(browser.html(), /Supervisor is idle/);
+  assert.match(browser.html(), /Type to queue a message/);
+  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
 });
 
@@ -225,6 +226,7 @@ test("navigation reinitialization restores the singleton session and transcript"
   assert.match(restored.html(), /investigate queue/);
   assert.match(restored.html(), /queue is healthy/);
   assert.match(restored.html(), /Observed active Goal work/);
+  assert.doesNotMatch(restored.html(), /data-testid="chat-toggle"/);
   assert.deepEqual(requests, [["GET", "/api/supervisor-agent"]]);
   assert.equal(restored.runtime.tabIds().filter((id) => id === "supervisor").length, 1);
 });
@@ -432,38 +434,21 @@ test("a pending refresh does not block the toolbar or require a Goal page", asyn
   assert.doesNotMatch(browser.html(), /Goal [A-Z0-9]/);
 });
 
-test("Stop uses shared cancellation and keeps failures visible and retryable", async () => {
+test("Supervisor never offers manual Start or Stop controls", () => {
   const browser = browserRuntime();
   browser.runtime.activate();
+  browser.runtime.draw();
+
+  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
+  assert.doesNotMatch(browser.html(), /Start supervisor conversation/);
+
   Object.assign(browser.runtime.supervisorTab(), {
     sessionId: "supervisor-shared",
     pending: true,
   });
-  const requests = [];
-  browser.runtime.setApi(async (method, requestPath) => {
-    requests.push([method, requestPath]);
-    return { closed_reason: "stopped" };
-  });
+  browser.runtime.draw();
 
-  await browser.runtime.stop();
-  assert.deepEqual(requests, [["POST", "/api/chat/supervisor-shared/stop"]]);
-  assert.deepEqual(browser.busyLabels, ["Stopping…"]);
-  assert.equal(browser.runtime.supervisorTab().sessionId, null);
-  assert.equal(browser.runtime.supervisorTab().pending, false);
-  assert.match(browser.html(), /Session ended — stopped/);
-
-  Object.assign(browser.runtime.supervisorTab(), {
-    sessionId: "supervisor-shared",
-    closedReason: null,
-  });
-  browser.runtime.setApi(async () => {
-    throw new Error("provider process did not acknowledge termination");
-  });
-  await browser.runtime.stop();
-
-  assert.equal(browser.runtime.supervisorTab().sessionId, "supervisor-shared");
-  assert.match(browser.html(), /Could not stop session supervisor-shared/);
-  assert.match(browser.html(), /Retry Stop or inspect System logs/);
-  assert.equal(browser.toasts.length, 1);
-  assert.match(browser.toasts[0].textContent, /provider process did not acknowledge termination/);
+  assert.match(browser.html(), /Agent working in session supervisor-shared/);
+  assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
+  assert.doesNotMatch(browser.html(), /Stop supervisor conversation/);
 });
