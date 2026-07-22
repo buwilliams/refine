@@ -193,7 +193,7 @@
     },
     {
       "created_at": "2026-07-22T11:04:58Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718298737-62",
       "progress": false,
       "provider_session_id": null,
@@ -202,7 +202,7 @@
     },
     {
       "created_at": "2026-07-22T11:04:58Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718298737-63",
       "progress": true,
       "provider_session_id": null,
@@ -211,7 +211,7 @@
     },
     {
       "created_at": "2026-07-22T11:05:04Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -223,7 +223,7 @@
     },
     {
       "created_at": "2026-07-22T11:05:47Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
