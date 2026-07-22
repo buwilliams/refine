@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:40:35Z",
+  "updated_at": "2026-07-22T18:43:17Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -888,6 +888,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s second independent audit still failed on two architecture points: standalone API checks could resolve stale/default capacity limits instead of the workflow’s authoritative policy, and reset/clean restoration was recorded but not itself cancellable supervised work. The agent accepted both findings and is centralizing policy resolution plus routing restoration through the process supervisor with operation-correlated evidence. The candidate remains uncommitted and unapproved."
+    },
+    {
+      "created_at": "2026-07-22T18:43:17Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784745797552-215",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination is narrowing authority correctly: mutable active-Node selection still governs UI/API decisions, while an exact running commitment—claim, execution, decision version, Node, and owning runtime—retains only its publication/settlement authority. Recovery is being limited to ownerless commitments from the same runtime after a switch, without granting authority over another runtime’s claims. Quality is implementing supervised, cancellable restoration and authoritative workflow-policy lookup."
     }
   ],
   "queued_messages": [
