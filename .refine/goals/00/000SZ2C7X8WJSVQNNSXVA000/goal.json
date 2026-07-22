@@ -1,7 +1,7 @@
 {
-  "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
-  "branch_name": "refine/00000SZ2C7X8WJSVQNNSXVA000/round-2",
-  "candidate_commit": "7a06daf42eafbf15e29c8f0bf53e9c07518ab359",
+  "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
+  "branch_name": "refine/00000SZ2C7X8WJSVQNNSXVA000/round-3",
+  "candidate_commit": null,
   "created": "2026-07-22T11:13:33Z",
   "feature_id": null,
   "feature_order": null,
@@ -136,9 +136,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T11:48:08Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:49:39Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 7a06daf42eafbf15e29c8f0bf53e9c07518ab359 and remediate the single remaining governance violation. Generalize the shared work-item Goal authoring capability so both ordinary POST /work/goals and Feature inline authoring call the same authoritative name derivation, latest-round duplicate matching, duplicate-decision handling, metadata/round creation, and validation implementation. Remove derive_goal_name, latest_round_duplicate_match, and equivalent decision orchestration from work_routes.rs rather than wrapping or copying them again; keep route handlers thin adapters and preserve existing ordinary Goal API/CLI/MCP behavior and response/error contracts. Add parity tests that drive both ordinary and Feature creation through the shared service for generated names, explicit names, duplicate skip/update/create decisions, latest-round prompt matching, invalid input, reporter/assignee, and Feature placement. Retain the round-2 DOM interaction coverage and rerun focused service/API, browser, static-asset, formatting, and diff gates.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:49:39Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T11:48:08Z"
+  "updated": "2026-07-22T11:49:44Z"
 }
