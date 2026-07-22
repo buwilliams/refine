@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:23:05Z",
+  "updated_at": "2026-07-22T18:24:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -768,6 +768,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s second review still failed, so it remains blocked from approval. The remaining findings are: pause rollback is outside the coordination lease; the ownerless-claim test manufactures state through service calls instead of daemon scheduling; and the daemon test proves cancellation but not a Review transition or an explicit reviewed transfer/recovery boundary. These are evidence and atomicity failures, not hidden; the candidate stays isolated for another correction."
+    },
+    {
+      "created_at": "2026-07-22T18:24:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784744698933-192",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The latest focused coordination tests pass after putting pause rollback under the shared lease and making owner loss originate from the real daemon/provider path. Quality’s full library run reached 438/439; the only failure was the repository-wide prompt-size invariant. The agent compacted labels without dropping required context, restored the exact 700-word limit, and is rerunning all 439 tests."
     }
   ],
   "queued_messages": [
