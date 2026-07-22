@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:45:14Z",
+  "updated_at": "2026-07-22T17:46:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -420,6 +420,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality governance rejected `a40ab0e` on two concrete issues: retry must preserve the failed round’s original Quality timing, and passing evidence must prove the worktree remained exactly at the candidate commit with no dirty mutation before/after execution. I’m preserving the candidate, recording those findings as a new round, and requeueing through the same shared recovery transition."
+    },
+    {
+      "created_at": "2026-07-22T17:46:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742367495-129",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination’s new ownerless-terminal test exposed an invalid test setup transition (`Todo→Cancelled/Failed`), not a provider or production failure; the agent is correcting the fixture. Quality round 3 cleanly merged its preserved candidate into the fresh isolated branch and is implementing only the two governance fixes."
     }
   ],
   "queued_messages": [
