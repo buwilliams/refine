@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T20:17:42Z",
+  "updated_at": "2026-07-22T20:23:26Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -1908,10 +1908,19 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T20:23:26Z",
+      "delivered": false,
+      "id": "evt-1784751806931-0",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Daemon restarted before the provider turn completed."
     }
   ],
   "importable_artifacts": [],
   "closed": false,
-  "interrupted": false,
-  "interruption_detail": null
+  "interrupted": true,
+  "interruption_detail": "Daemon restarted before the provider turn completed."
 }
