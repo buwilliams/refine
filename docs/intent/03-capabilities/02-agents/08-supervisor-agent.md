@@ -15,7 +15,7 @@
 
 The automated supervisor agent exists so active Goal work does not require a person to keep a separate terminal or agent conversation open just to notice failures. When queued or active work appears, Refine starts or resumes exactly one configured CLI-agent session and gives it current shared backend evidence plus Refine's existing CLI/API tools. Automatic evidence stays in that backend automation session.
 
-The user-controlled Supervisor toolbar profile launches a separate configured agent in the target app checkout with a concise prompt to monitor, investigate, fix, and verify the workflow using Refine's CLI and repository evidence. It is registered in the ordinary process manager and has explicit Start, Stop, and Restart controls. The native harness owns its conversation and approval UX.
+The user-controlled Supervisor toolbar profile launches a separate configured agent in the target app checkout with a concise prompt to monitor, investigate, fix, and verify the workflow using Refine's CLI and repository evidence. Selecting the tab starts it automatically when stopped, and the process remains explicitly stoppable and restartable through the ordinary process manager. The native harness owns its conversation and tool UX, while Refine launches it with the same full-access permission mode used by background agents.
 
 Both forms are natural agents for finding unknowns across active work. They should compare the workflow map with process, Git, projection, operation, and activity evidence; follow blind-spot paths; and prototype bounded recovery when that is the fastest safe way to learn. Product judgment and new authority remain user decisions.
 

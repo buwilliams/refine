@@ -47,10 +47,27 @@ class FakeEventSource {
   addEventListener(name, listener) { this.listeners.set(name, listener); }
   close() { this.closed = true; }
   emit(name, payload) { this.listeners.get(name)?.({ data: JSON.stringify(payload) }); }
+  emitError() { this.onerror?.(new Error("stream interrupted")); }
+}
+
+class FakeResizeObserver {
+  static instances = [];
+  constructor(callback) {
+    this.callback = callback;
+    this.target = null;
+    this.disconnected = false;
+    FakeResizeObserver.instances.push(this);
+  }
+  observe(target) { this.target = target; }
+  disconnect() { this.disconnected = true; }
+  trigger() {
+    if (!this.disconnected && this.target) this.callback([{ target: this.target }]);
+  }
 }
 
 function browserRuntime(storage = new Map()) {
   FakeEventSource.instances = [];
+  FakeResizeObserver.instances = [];
   const toolbar = new FakeElement();
   const terminalOutput = new FakeElement();
   const document = {
@@ -74,13 +91,22 @@ function browserRuntime(storage = new Map()) {
   const context = vm.createContext({
     AbortController,
     EventSource: FakeEventSource,
+    ResizeObserver: FakeResizeObserver,
     URLSearchParams,
     clearInterval() {},
     clearTimeout,
     console,
     document,
     fetch: async () => ({ ok: true, json: async () => ({}) }),
-    getComputedStyle: () => ({ fontSize: "13", lineHeight: "18" }),
+    getComputedStyle: () => ({
+      fontFamily: "monospace",
+      fontSize: "15px",
+      lineHeight: "20.25px",
+      paddingBottom: "12px",
+      paddingLeft: "16px",
+      paddingRight: "16px",
+      paddingTop: "12px",
+    }),
     location: { hash: "#/dashboard", pathname: "/" },
     localStorage: {
       getItem(key) { return storage.get(key) ?? null; },
@@ -92,7 +118,15 @@ function browserRuntime(storage = new Map()) {
     window: {
       addEventListener() {},
       CSS: { escape: (value) => String(value) },
-      getComputedStyle: () => ({ fontSize: "13", lineHeight: "18" }),
+      getComputedStyle: () => ({
+        fontFamily: "monospace",
+        fontSize: "15px",
+        lineHeight: "20.25px",
+        paddingBottom: "12px",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+        paddingTop: "12px",
+      }),
       innerHeight: 800,
     },
     withButtonBusy: async (_button, _label, action) => action(),
@@ -105,13 +139,12 @@ function browserRuntime(storage = new Map()) {
       activate(tabId) {
         ensureStandaloneTab();
         if (tabId === "plan") ensurePlanTab();
-        chatState.activeTabId = tabId;
-        chatState.open = true;
-        drawToolbar();
+        return activateToolbarTab(tabId);
       },
+      click(tabId) { return activateToolbarTab(tabId, { toggleIfActive: true }); },
       draw: drawToolbar,
       ensurePlan: ensurePlanTab,
-      openGoal(goalId) { openChatDock({ goalId }); },
+      openGoal(goalId) { return openChatDock({ goalId }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       restore: loadChatStateFromStorage,
       reset: resetChatForProjectSwitch,
@@ -132,11 +165,23 @@ function browserRuntime(storage = new Map()) {
           processId: value?.processId,
           connected: value?.connected,
           exited: value?.exited,
+          statusChecked: value?.statusChecked,
+          reattaching: value?.reattaching,
           display: value?.display,
         };
       },
       tabIds() { return Object.keys(chatState.tabs); },
       setApi(nextApi) { api = nextApi; },
+      installTerminalResizer(tabId, resize) {
+        terminalStateFor(tabId).term = { resize };
+      },
+      resizeOutput(width, height) {
+        const output = document.querySelector(".terminal-output");
+        output.clientWidth = width;
+        output.clientHeight = height;
+        const terminal = terminalStateFor(chatState.activeTabId);
+        terminal.outputResizeObserver?.trigger();
+      },
     };
   `, context);
   return {
@@ -149,10 +194,10 @@ function browserRuntime(storage = new Map()) {
 test("Supervisor, Plan, Goal, and Standalone render the shared terminal surface", async () => {
   const browser = browserRuntime();
   await browser.runtime.openPlan("Design a retry queue");
-  browser.runtime.openGoal("GOAL1");
+  await browser.runtime.openGoal("GOAL1");
 
   for (const tabId of ["supervisor", "plan", "GOAL1", "standalone", "terminal"]) {
-    browser.runtime.activate(tabId);
+    await browser.runtime.activate(tabId);
     assert.match(browser.html(), /data-testid="toolbar-terminal-panel"/);
     assert.match(browser.html(), /data-testid="terminal-start"/);
     assert.doesNotMatch(browser.html(), /id="chat-input"/);
@@ -182,29 +227,29 @@ test("each terminal profile sends its launch context and keeps an independent ma
   });
 
   await browser.runtime.openPlan("Design a retry queue");
-  browser.runtime.openGoal("GOAL1");
-  for (const tabId of ["terminal", "supervisor", "plan", "GOAL1", "standalone"]) {
-    await browser.runtime.start(tabId);
+  await browser.runtime.openGoal("GOAL1");
+  for (const tabId of ["terminal", "supervisor", "standalone"]) {
+    await browser.runtime.activate(tabId);
   }
 
   const starts = requests.filter((request) => request.path === "/api/terminal/session");
   assert.deepEqual(starts.map((request) => request.body.profile), [
-    "terminal", "supervisor", "plan", "goal", "standalone",
+    "plan", "goal", "terminal", "supervisor", "standalone",
   ]);
   assert.equal(starts.find((request) => request.body.profile === "goal").body.goal_id, "GOAL1");
   assert.equal(starts.find((request) => request.body.profile === "plan").body.initial_prompt, "Design a retry queue");
   assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");
-  assert.equal(browser.runtime.terminal("supervisor").processId, "interactive-2");
-  assert.equal(browser.runtime.terminal("GOAL1").processId, "interactive-4");
+  assert.equal(browser.runtime.terminal("supervisor").processId, "interactive-4");
+  assert.equal(browser.runtime.terminal("GOAL1").processId, "interactive-2");
 
   await browser.runtime.stop("standalone");
-  await browser.runtime.start("standalone");
+  await browser.runtime.activate("standalone");
   const restarted = requests.filter((request) => request.path === "/api/terminal/session").at(-1);
   assert.equal(restarted.body.worktree.path, "/tmp/worktree-5");
   assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");
 });
 
-test("Start, Stop, and Restart use terminal lifecycle routes", async () => {
+test("Stop and tab reactivation use terminal lifecycle routes", async () => {
   const browser = browserRuntime();
   const requests = [];
   let sequence = 0;
@@ -227,15 +272,66 @@ test("Start, Stop, and Restart use terminal lifecycle routes", async () => {
   assert.equal(browser.runtime.terminal("supervisor").connected, true);
   await browser.runtime.stop("supervisor");
   assert.equal(browser.runtime.terminal("supervisor").exited, true);
-  browser.runtime.activate("supervisor");
   assert.match(browser.html(), />Restart</);
-  await browser.runtime.start("supervisor");
+  await browser.runtime.activate("supervisor");
   assert.equal(browser.runtime.terminal("supervisor").sessionId, "supervisor-2");
   assert.deepEqual(requests.map((request) => request[1]), [
     "/api/terminal/session",
     "/api/terminal/supervisor-1/stop",
     "/api/terminal/session",
   ]);
+});
+
+test("clicking a stopped terminal tab starts it once", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    requests.push(requestPath);
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    return {
+      id: `session-${body.profile}`,
+      process_id: `interactive-${body.profile}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: body.profile === "terminal" ? null : "codex",
+    };
+  });
+
+  await browser.runtime.click("terminal");
+  await browser.runtime.click("terminal");
+
+  assert.equal(browser.runtime.terminal("terminal").connected, true);
+  assert.deepEqual(requests, ["/api/terminal/session"]);
+});
+
+test("terminal columns refit when its rendered width changes", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  const sizes = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    return {
+      id: "responsive-terminal",
+      process_id: "interactive-responsive-terminal",
+      cwd: "/repo",
+      profile: "terminal",
+      provider: null,
+    };
+  });
+  await browser.runtime.click("terminal");
+  browser.runtime.installTerminalResizer("terminal", (cols, rows) => sizes.push({ cols, rows }));
+
+  browser.runtime.resizeOutput(600, 300);
+  browser.runtime.resizeOutput(1000, 300);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  assert.equal(sizes.length, 2);
+  assert.ok(sizes[1].cols > sizes[0].cols);
+  assert.equal(sizes[1].rows, sizes[0].rows);
+  const backendResize = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.equal(backendResize.body.cols, sizes[1].cols);
+  assert.equal(backendResize.body.rows, sizes[1].rows);
 });
 
 test("terminal output and exit events remain scoped to their tab", async () => {
@@ -265,7 +361,7 @@ test("terminal output and exit events remain scoped to their tab", async () => {
   assert.equal(browser.runtime.terminal("supervisor").exited, true);
 });
 
-test("stored custom-chat ids are discarded while managed terminal ids reattach", () => {
+test("stored custom-chat ids are discarded while managed terminal ids reattach", async () => {
   const storage = new Map();
   storage.set("refine_chat_tabs", JSON.stringify({
     tabs: {
@@ -278,14 +374,85 @@ test("stored custom-chat ids are discarded while managed terminal ids reattach",
         cwd: "/repo",
       },
     },
-    activeTabId: "supervisor",
+    activeTabId: "terminal",
     open: true,
   }));
   const browser = browserRuntime(storage);
+  browser.runtime.setApi(async (_method, requestPath) => {
+    assert.equal(requestPath, "/api/terminal/managed-terminal/status");
+    return {
+      id: "managed-terminal",
+      process_id: "interactive-managed",
+      profile: "terminal",
+      provider: null,
+      cwd: "/repo",
+      worktree: null,
+      alive: true,
+      exited: false,
+    };
+  });
   browser.runtime.restore();
+  browser.runtime.draw();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(browser.runtime.tab("supervisor").sessionId, null);
   assert.equal(browser.runtime.tab("terminal").sessionId, "managed-terminal");
   assert.equal(browser.runtime.terminal("terminal").connected, true);
+});
+
+test("refresh reattaches a live terminal and stream errors do not persist process exit", async () => {
+  const storage = new Map();
+  storage.set("refine_chat_tabs", JSON.stringify({
+    tabs: {
+      terminal: {
+        label: "Terminal",
+        mode: "terminal",
+        sessionId: "managed-terminal",
+        processId: "interactive-managed",
+        cwd: "/repo",
+        exited: true,
+      },
+    },
+    activeTabId: "terminal",
+    open: true,
+  }));
+  const browser = browserRuntime(storage);
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath) => {
+    requests.push([method, requestPath]);
+    return {
+      id: "managed-terminal",
+      process_id: "interactive-managed",
+      profile: "terminal",
+      provider: null,
+      cwd: "/repo",
+      worktree: null,
+      alive: true,
+      exited: false,
+    };
+  });
+
+  browser.runtime.restore();
+  browser.runtime.draw();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(browser.runtime.terminal("terminal").connected, true);
+  assert.equal(browser.runtime.terminal("terminal").exited, false);
+  assert.doesNotMatch(browser.html(), />Restart</);
+  assert.equal(browser.events().length, 1);
+
+  browser.events()[0].emitError();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(browser.runtime.terminal("terminal").connected, true);
+  assert.equal(browser.runtime.terminal("terminal").exited, false);
+  assert.equal(browser.runtime.tab("terminal").exited, false);
+  assert.doesNotMatch(browser.html(), />Restart</);
+  assert.deepEqual(requests, [
+    ["GET", "/api/terminal/managed-terminal/status"],
+    ["GET", "/api/terminal/managed-terminal/status"],
+  ]);
+  const persisted = JSON.parse(storage.get("refine_chat_tabs"));
+  assert.equal(persisted.tabs.terminal.exited, false);
 });
 
 test("switching projects stops live terminal profiles before clearing the toolbar", async () => {

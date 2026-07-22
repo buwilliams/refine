@@ -100,6 +100,8 @@
 }
 .toolbar-dock-body.terminal-toolbar-body {
   overflow: hidden;
+  padding-inline: 0;
+  padding-bottom: 0;
 }
 
 /* Fullscreen mode: dock fills the area from just below the topbar to the
@@ -547,6 +549,9 @@ button.toolbar-tab:hover:not(:disabled),
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
   gap: 8px;
 }
 .terminal-titlebar {
@@ -555,6 +560,7 @@ button.toolbar-tab:hover:not(:disabled),
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+  padding-inline: 12px;
 }
 .terminal-titlebar code {
   overflow-wrap: anywhere;
@@ -569,16 +575,21 @@ button.toolbar-tab:hover:not(:disabled),
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: 12px 14px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 12px 16px;
   overflow: hidden;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
   background: #fbfbf7;
   color: #111827;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.35;
   white-space: pre-wrap;
   word-break: break-word;
   outline: none;
@@ -591,6 +602,7 @@ button.toolbar-tab:hover:not(:disabled),
 }
 .terminal-output .xterm {
   height: 100%;
+  width: 100%;
 }
 .terminal-output .xterm-viewport {
   background: #fbfbf7 !important;

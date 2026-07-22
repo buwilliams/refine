@@ -828,9 +828,14 @@ Requirements:
   Supervisor, Plan, Goal, and Standalone profiles use the shared PTY terminal
   implementation; agent profiles launch the configured native CLI with concise
   role and durable-work context.
-- Browser terminal profiles have explicit Start/Stop/Restart lifecycle, register
-  in the ordinary daemon process registry, and remain independently observable
-  and stoppable from the Processes surface.
+- Selecting a stopped browser terminal profile starts it automatically. Sessions
+  retain Stop/Restart lifecycle, register in the ordinary daemon process registry,
+  and remain independently observable and stoppable from the Processes surface.
+- Browser reload verifies persisted terminal sessions through daemon status and
+  reattaches to live PTYs. A transport-level event-stream interruption must not
+  be persisted as managed-process exit.
+- Interactive agent profiles use the provider's full-access permission flag, as
+  background agents do, while preserving native interactive mode.
 - Standalone browser sessions run in a Refine-owned Git worktree. Stop preserves
   the worktree, and restart validates and reuses the recorded path and branch.
 - Goal-attached chat and standalone chat have explicit storage and resumption

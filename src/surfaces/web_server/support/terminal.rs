@@ -3,6 +3,7 @@ use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 
@@ -47,6 +48,7 @@ struct TerminalSession {
     master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
     child: Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>,
     events: Mutex<TerminalEventLog>,
+    exited: AtomicBool,
 }
 
 static TERMINAL_SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<TerminalSession>>>> = OnceLock::new();
@@ -121,6 +123,13 @@ pub(in crate::surfaces::web_server) fn terminal_resize_response(
     let session = terminal_session(session_id)?;
     session.resize(cols, rows)?;
     Ok(json!({"ok": true}))
+}
+
+pub(in crate::surfaces::web_server) fn terminal_status_response(
+    session_id: &str,
+) -> RefineResult<Value> {
+    let session = terminal_session(session_id)?;
+    Ok(session.status_json())
 }
 
 pub(in crate::surfaces::web_server) fn terminal_stop_response(
@@ -348,6 +357,7 @@ impl TerminalSession {
                 next_seq: 1,
                 events: VecDeque::new(),
             }),
+            exited: AtomicBool::new(false),
         });
         let reader_session = Arc::clone(&session);
         thread::spawn(move || {
@@ -378,6 +388,7 @@ impl TerminalSession {
                 .as_ref()
                 .map(|status| format!("{status:?}"))
                 .unwrap_or_else(|| "closed".to_string());
+            reader_session.exited.store(true, Ordering::Release);
             reader_session.finish_process(exit.as_ref());
             reader_session.push_event("terminal_exit", status);
         });
@@ -446,6 +457,26 @@ impl TerminalSession {
         };
         process.exit_code = status.and_then(|status| i32::try_from(status.exit_code()).ok());
         let _ = self.supervisor.register(process);
+    }
+
+    fn status_json(&self) -> Value {
+        let worktree = self
+            .process
+            .details
+            .as_deref()
+            .and_then(|details| serde_json::from_str::<Value>(details).ok())
+            .and_then(|details| details.get("worktree").cloned());
+        let exited = self.exited.load(Ordering::Acquire);
+        json!({
+            "id": self.id,
+            "process_id": self.process_id,
+            "profile": self.profile,
+            "provider": self.provider,
+            "cwd": self.cwd.display().to_string(),
+            "worktree": worktree,
+            "alive": !exited,
+            "exited": exited,
+        })
     }
 
     fn push_event(&self, event: &'static str, data: String) {

@@ -5,7 +5,7 @@
 - **Unattached Exploration**: Standalone supports work that is not yet attached to a Goal.
 - **Native Agent Terminal**: it runs the configured agent harness in the shared toolbar terminal surface.
 - **Worktree Backed**: every session runs in an isolated Refine-owned Git worktree.
-- **Restartable Workspace**: stopping the process preserves the worktree, and restarting the tab reuses that exact validated branch and path.
+- **Restartable Workspace**: stopping the process preserves the worktree, and selecting the stopped tab reuses that exact validated branch and path.
 - **Workflow Through Refine**: useful output becomes durable through Refine's existing CLI, API, and product operations rather than transcript extraction.
 
 ## Purpose
@@ -16,7 +16,7 @@ This matters because not all useful work starts as a clean Goal. Refine should p
 
 ## Expected Role
 
-Standalone is a permanent toolbar tab with explicit Start, Stop, and Restart controls. Starting it creates a Refine-owned branch and worktree, launches the configured agent there with a concise standalone prompt, and registers the PTY as an ordinary managed process. Its output streams through the shared terminal implementation and remains independent from other toolbar terminals.
+Standalone is a permanent toolbar tab. Selecting it starts the session automatically when stopped: Refine creates a Refine-owned branch and worktree, launches the configured agent there with a concise standalone prompt, and registers the PTY as an ordinary managed process. The prompt identifies the worktree as empty of assigned work and requires the agent to wait for the user's request before inspecting or changing anything. Its output streams through the shared terminal implementation and remains independent from other toolbar terminals.
 
 Stopping ends the agent process but does not delete or discard the worktree. Restart validates and reuses the recorded Refine worktree. The agent or user can inspect the result and use ordinary Refine commands or product surfaces to create Goals, Features, or merge handoffs.
 

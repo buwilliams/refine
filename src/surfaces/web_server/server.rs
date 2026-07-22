@@ -393,6 +393,12 @@ impl InProcessWebServer {
             return self.handle_terminal_events_snapshot(&raw_path);
         }
 
+        if request.method == "GET"
+            && let Some(session_id) = terminal_session_route(&request.path, "/status")
+        {
+            return self.handle_terminal_status(&session_id);
+        }
+
         if request.method == "POST"
             && let Some(session_id) = terminal_session_route(&request.path, "/input")
         {

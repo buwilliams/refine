@@ -2725,6 +2725,13 @@ impl InProcessWebServer {
         }
     }
 
+    pub(super) fn handle_terminal_status(&self, session_id: &str) -> ApiResponse {
+        match terminal_status_response(session_id) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn handle_terminal_events_snapshot(&self, raw_path: &str) -> ApiResponse {
         let Some(session_id) = raw_path
             .split('?')

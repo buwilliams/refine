@@ -5,7 +5,7 @@
 - **Persistent Utility Dock**: the toolbar is always available without replacing the main route.
 - **Native Agent Harnesses**: agent interaction uses the configured frontier-lab CLI in a real terminal rather than a Refine-owned chat imitation.
 - **Profiles, Not Custom UIs**: Terminal, Supervisor, Plan Mode, Goal, and Standalone share one terminal surface and differ only by working directory, prompt context, agent launch, and optional worktree.
-- **Managed Lifecycle**: every shell or agent terminal is an explicit Start/Stop process owned by the daemon process manager.
+- **Managed Lifecycle**: selecting a stopped terminal tab starts it automatically, while Stop and Restart remain explicit process actions owned by the daemon process manager.
 - **Stateful But Recoverable**: toolbar state should persist enough to reattach to a live terminal after normal navigation or reload without owning product state.
 
 ## Purpose
@@ -30,11 +30,14 @@ The toolbar should provide persistent assistance for work in progress:
 Current implementation details that matter to intent:
 
 - persistent tab order is Supervisor, System, Files, Terminal, and Standalone, with Plan, Goal, and Goal-log tabs opened contextually;
-- all five terminal profiles use the same terminal renderer, input, output stream, resize behavior, and Start/Stop/Restart controls;
+- all five terminal profiles use the same terminal renderer, input, output stream, resize behavior, and lifecycle controls;
+- activating a Terminal, Supervisor, Plan, Goal, or Standalone tab automatically starts its session when it is not already running;
 - each terminal session is registered as an `interactive_session` in the daemon's ordinary process registry, so the toolbar and Processes surface share lifecycle truth;
 - the configured `agent_cli` selects the native agent executable and interactive prompt form for every agent profile;
+- agent profiles use the provider's full-access mode, matching background agents, so native harness permission prompts do not interrupt work;
 - terminal profile state is tab-specific, including process/session identifiers, provider, current directory, output, and standalone worktree identity;
-- reload reattaches to a live terminal by session identifier; a stopped or lost session remains restartable;
+- terminal profiles use readable terminal typography and fill the available dock width; changes to the browser, dock, or terminal panel refit xterm columns and rows and propagate the new PTY size to the backend;
+- reload verifies the persisted session identifier against daemon process truth and reattaches to a live terminal; an interrupted browser event stream is not treated as process exit, while a stopped or lost session remains restartable;
 - stopping a standalone session preserves its worktree, and restarting it reuses the same validated Refine worktree;
 - changing target apps stops live toolbar terminals before clearing project-specific browser state;
 - toolbar layout can be expanded or resized without changing the main route.

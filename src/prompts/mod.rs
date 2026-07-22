@@ -217,6 +217,14 @@ mod tests {
     }
 
     #[test]
+    fn standalone_chat_waits_for_user_in_an_unassigned_worktree() {
+        let loaded = PromptEngine::load(PromptTemplate::ChatStandalone);
+
+        assert!(loaded.contains("empty of assigned work"));
+        assert!(loaded.contains("until the user tells you what they want"));
+    }
+
+    #[test]
     fn agent_prompts_keep_only_task_specific_contracts() {
         let templates = [
             PromptTemplate::Chat,

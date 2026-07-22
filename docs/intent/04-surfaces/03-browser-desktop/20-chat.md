@@ -6,11 +6,13 @@
 - **Context Through Launch**: Supervisor, Plan Mode, Goal, and Standalone inject concise role and work context when the native agent starts.
 - **One Terminal Primitive**: agent profiles reuse the same PTY, streaming, resize, and managed-process implementation as the plain Terminal tab.
 - **Durable Work Outside Conversation**: Goals, Features, rounds, logs, governance, and workflow remain Refine state; a terminal transcript is not product truth.
-- **Explicit Lifecycle**: users start, stop, and restart every browser agent session.
+- **Managed Lifecycle**: selecting a stopped agent tab starts it automatically; users can still stop and restart the managed process.
 
 ## Purpose
 
 The browser agent surface lets users work with frontier agent harnesses without leaving Refine's orchestration context. Refine supplies the target app, role, Goal or Feature context, and isolated worktree where appropriate. The native CLI owns conversation UX, tools, approvals, and provider-specific capabilities.
+
+Agent harnesses launch with their provider's full-access permission mode, matching Refine's background agents. This suppresses provider approval prompts without expanding the agent's Refine governance authority.
 
 This removes Refine's former custom browser chat UI from Supervisor, Plan Mode, Goal, and Standalone tabs. The backend chat capability may still support automated workflow or non-browser adapters, but it does not define the toolbar interaction model.
 
@@ -22,6 +24,8 @@ This removes Refine's former custom browser chat UI from Supervisor, Plan Mode, 
 - Standalone starts a configured agent inside an isolated, reusable worktree.
 
 Browser persistence is limited to what is needed to reconnect the terminal: its managed process/session identity, profile metadata, provider, working directory, and standalone worktree. Refine does not parse a native harness transcript to infer durable work. The agent or user creates and changes Refine work through the existing CLI, API, or product surfaces.
+
+On reload, the browser checks the persisted terminal session against the daemon before deciding whether to show Restart. Event-stream connectivity and process liveness are separate: a transient SSE interruption reconnects to the existing PTY and cannot mark the managed process exited.
 
 ## Future Direction
 

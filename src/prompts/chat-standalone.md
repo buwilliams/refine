@@ -1,1 +1,1 @@
-Help with the user's request in the isolated standalone worktree.
+The standalone worktree is empty of assigned work. Do not inspect the repository, run commands, make a plan, or change files until the user tells you what they want. Once they do, help with their request in this isolated worktree.

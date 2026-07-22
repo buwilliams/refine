@@ -26,6 +26,8 @@ const FILES_SEARCH_MAX_RESULTS = 20;
 const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
 const TERMINAL_OUTPUT_MAX_CHARS = 50_000;
+const TERMINAL_FONT_SIZE = 15;
+const TERMINAL_LINE_HEIGHT = 1.35;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
@@ -104,10 +106,15 @@ function terminalStateFor(tabId = chatState.activeTabId) {
       lastCols: 0,
       lastRows: 0,
       loading: false,
-      connected: !!tab.sessionId && !tab.exited,
-      exited: !!tab.exited,
+      connected: false,
+      exited: tab.sessionId ? false : !!tab.exited,
+      statusChecked: !tab.sessionId,
+      reattaching: !!tab.sessionId,
+      attachmentPromise: null,
       error: "",
       eventSource: null,
+      outputResizeObserver: null,
+      observedOutput: null,
     };
     terminalStates.set(tabId, terminal);
   }
@@ -323,6 +330,7 @@ function resetTerminalState() {
       );
     }
     terminal.eventSource?.close();
+    terminal.outputResizeObserver?.disconnect();
     terminal.term?.dispose();
     if (terminal.inputFlushTimer) clearTimeout(terminal.inputFlushTimer);
     if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
@@ -360,6 +368,7 @@ function observeToolbarSize() {
     document.documentElement.style.setProperty(
       "--toolbar-dock-height", `${root.offsetHeight}px`,
     );
+    scheduleActiveTerminalFit();
   };
   apply();
   if (typeof ResizeObserver === "function") {
@@ -372,9 +381,10 @@ function observeToolbarSize() {
 function observeChatDockSize() { observeToolbarSize(); }
 
 // Opens the dock and (optionally) ensures a terminal launch profile for a Goal.
-// The user explicitly starts the configured agent from the tab.
+// Activating an agent tab starts its configured terminal session on demand.
 function openChatDock({ goalId = null, goalStatus = null } = {}) {
   ensureStandaloneTab();
+  let tabId = "standalone";
   if (goalId) {
     if (!chatState.tabs[goalId]) {
       chatState.tabs[goalId] = {
@@ -388,20 +398,13 @@ function openChatDock({ goalId = null, goalStatus = null } = {}) {
       chatState.tabs[goalId].goalStatus = goalStatus;
     }
     normalizeInteractiveTerminalTab(chatState.tabs[goalId]);
-    chatState.activeTabId = goalId;
+    tabId = goalId;
   }
-  chatState.open = true;
-  saveChatStateToStorage();
-  drawToolbar();
+  return activateToolbarTab(tabId);
 }
 
 function openToolbarTab(tabId) {
-  ensureStandaloneTab();
-  if (!chatState.tabs[tabId]) return;
-  chatState.activeTabId = tabId;
-  chatState.open = true;
-  saveChatStateToStorage();
-  drawToolbar();
+  return activateToolbarTab(tabId);
 }
 
 function goalLogTabId(goalId) {
@@ -459,16 +462,36 @@ async function openPlanChatDock(options = {}) {
     ? options
     : String(options.initialPrompt || "");
   ensurePlanTab();
-  chatState.activeTabId = "plan";
-  chatState.open = true;
-  saveChatStateToStorage();
-  drawToolbar();
   const t = chatState.tabs.plan;
   if (initialPrompt.trim()) {
     t.initialPrompt = initialPrompt.trim();
-    saveChatStateToStorage();
-    drawToolbar();
   }
+  await activateToolbarTab("plan");
+}
+
+async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
+  ensureStandaloneTab();
+  const tab = chatState.tabs[tabId];
+  if (!tab) return;
+  const wasActive = chatState.activeTabId === tabId;
+  const terminal = toolbarTabUsesTerminal(tab) ? terminalStateFor(tabId) : null;
+  let shouldStart = !!terminal && !terminal.loading &&
+    (!terminal.sessionId || (terminal.statusChecked && terminal.exited));
+
+  if (toggleIfActive && wasActive && chatState.open && !shouldStart && terminal?.statusChecked !== false) {
+    toggleToolbar();
+    return;
+  }
+
+  chatState.activeTabId = tabId;
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawToolbar();
+  if (terminal?.sessionId && !terminal.statusChecked) {
+    await reattachTerminalSession(tab, terminal);
+    shouldStart = !terminal.connected && !terminal.loading && terminal.statusChecked && terminal.exited;
+  }
+  if (shouldStart) await startTerminalSession(tab);
 }
 
 function toggleToolbar() {
@@ -502,6 +525,11 @@ function toggleChatFullscreen() { toggleToolbarFullscreen(); }
 function drawToolbar() {
   const root = $("#toolbar-dock");
   if (!root) return;
+  for (const terminal of terminalStates.values()) {
+    terminal.outputResizeObserver?.disconnect();
+    terminal.outputResizeObserver = null;
+    terminal.observedOutput = null;
+  }
   ensureStandaloneTab();
   const active = currentToolbarTab();
   const tabs = chatState.tabs;
@@ -576,17 +604,7 @@ function drawToolbar() {
       if (e.target.matches("[data-close-tab]")) return;
       const id = el.dataset.tabId;
       if (!id) return;
-      if (id === chatState.activeTabId) {
-        // Clicking the active tab toggles the dock open/closed.
-        toggleToolbar();
-      } else {
-        switchChatTab(id);
-        if (!chatState.open) {
-          chatState.open = true;
-          saveChatStateToStorage();
-          drawToolbar();
-        }
-      }
+      void activateToolbarTab(id, { toggleIfActive: true });
     });
   });
   $$("[data-close-tab]", root).forEach((el) => {
@@ -603,7 +621,12 @@ function drawToolbar() {
     loadFilesDirectory("", { expand: true, redraw: true });
   }
   if (terminalActive) {
-    connectTerminalEvents(active);
+    const terminal = terminalStateFor(chatState.activeTabId);
+    if (terminal?.sessionId && !terminal.statusChecked) {
+      void reattachTerminalSession(active, terminal);
+    } else {
+      connectTerminalEvents(active);
+    }
     focusTerminalSoon(active);
   }
   if (goalLogsActive && !active.logsLoaded && !active.logsLoading) {
@@ -1145,6 +1168,8 @@ function renderTerminalPanel(tab) {
   const role = tab.mode === "terminal" ? "shell" : `${tab.label} agent`;
   const status = terminal?.loading
     ? `Starting ${role}...`
+    : terminal?.reattaching
+      ? `Reattaching to ${role}...`
     : terminal?.error
       ? terminal.error
       : terminal?.exited
@@ -1152,10 +1177,12 @@ function renderTerminalPanel(tab) {
         : terminal?.connected
           ? terminal.cwd || `${role} active.`
           : `${role} stopped.`;
-  const action = terminal?.loading
-    ? `<button type="button" class="secondary" data-terminal-action disabled>Starting…</button>`
+  const action = terminal?.loading || terminal?.reattaching
+    ? `<button type="button" class="secondary" data-terminal-action disabled>${terminal?.reattaching ? "Reattaching…" : "Starting…"}</button>`
     : terminal?.connected
       ? `<button type="button" class="danger" data-terminal-action="stop" data-testid="terminal-stop">Stop</button>`
+      : terminal?.sessionId && !terminal?.statusChecked
+        ? `<button type="button" class="secondary" data-terminal-action="reattach">Reconnect</button>`
       : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${terminal?.exited ? "Restart" : "Start"}</button>`;
   const provider = tab.provider ? ` · ${htmlEscape(tab.provider)}` : "";
   const worktree = tab.worktree?.path
@@ -1184,7 +1211,9 @@ function bindTerminalPanel(root, tab) {
   output?.addEventListener("focus", () => output.classList.add("focused"));
   output?.addEventListener("blur", () => output.classList.remove("focused"));
   ensureTerminalRenderer(output, tab);
+  observeTerminalOutputSize(output, tab);
   root.querySelector('[data-terminal-action="start"]')?.addEventListener("click", () => startTerminalSession(tab));
+  root.querySelector('[data-terminal-action="reattach"]')?.addEventListener("click", () => reattachTerminalSession(tab));
   root.querySelector('[data-terminal-action="stop"]')?.addEventListener("click", () => stopTerminalSession(tab));
 }
 
@@ -1215,6 +1244,8 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     terminal.cwd = result.cwd || "";
     terminal.connected = !!terminal.sessionId;
     terminal.exited = false;
+    terminal.statusChecked = true;
+    terminal.reattaching = false;
     terminal.lastSeq = 0;
     terminal.lastCols = size.cols;
     terminal.lastRows = size.rows;
@@ -1248,6 +1279,8 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
     await api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/stop`);
     terminal.connected = false;
     terminal.exited = true;
+    terminal.statusChecked = true;
+    terminal.reattaching = false;
     terminal.loading = false;
     if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
     terminal.resizeTimer = null;
@@ -1262,6 +1295,71 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
     terminal.error = e.message || String(e);
     drawToolbar();
   }
+}
+
+async function reattachTerminalSession(tab = currentToolbarTab(), existingTerminal = null) {
+  if (!toolbarTabUsesTerminal(tab)) return false;
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
+  const terminal = existingTerminal || terminalStateFor(tabId);
+  if (!terminal?.sessionId) return false;
+  if (terminal.statusChecked) return terminal.connected && !terminal.exited;
+  if (terminal.attachmentPromise) return terminal.attachmentPromise;
+
+  terminal.reattaching = true;
+  terminal.error = "";
+  const sessionId = terminal.sessionId;
+  terminal.attachmentPromise = (async () => {
+    try {
+      const status = await api(
+        "GET",
+        `/api/terminal/${encodeURIComponent(sessionId)}/status`,
+        undefined,
+        { cache: false },
+      );
+      if (terminal.sessionId !== sessionId) return false;
+      terminal.statusChecked = true;
+      terminal.reattaching = false;
+      terminal.connected = !!status.alive;
+      terminal.exited = !status.alive;
+      terminal.processId = status.process_id || terminal.processId;
+      terminal.cwd = status.cwd || terminal.cwd;
+      tab.processId = terminal.processId;
+      tab.cwd = terminal.cwd;
+      tab.provider = status.provider || tab.provider || null;
+      tab.worktree = status.worktree || tab.worktree || null;
+      tab.exited = terminal.exited;
+      saveChatStateToStorage();
+      if (terminal.connected) {
+        connectTerminalEvents(tab);
+      } else {
+        terminal.eventSource?.close();
+        terminal.eventSource = null;
+        refreshProcessesTabForChatChange();
+      }
+      if (chatState.activeTabId === tabId) drawToolbar();
+      return terminal.connected;
+    } catch (error) {
+      if (terminal.sessionId !== sessionId) return false;
+      terminal.reattaching = false;
+      terminal.connected = false;
+      if (error?.status === 404) {
+        terminal.statusChecked = true;
+        terminal.exited = true;
+        terminal.eventSource?.close();
+        terminal.eventSource = null;
+        tab.exited = true;
+        saveChatStateToStorage();
+      } else {
+        terminal.statusChecked = false;
+        terminal.error = `Unable to reattach terminal: ${error?.message || String(error)}`;
+      }
+      if (chatState.activeTabId === tabId) drawToolbar();
+      return false;
+    } finally {
+      terminal.attachmentPromise = null;
+    }
+  })();
+  return terminal.attachmentPromise;
 }
 
 function connectTerminalEvents(tab = currentToolbarTab()) {
@@ -1281,6 +1379,8 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
     handleTerminalEvent(event, terminal);
     terminal.exited = true;
     terminal.connected = false;
+    terminal.statusChecked = true;
+    terminal.reattaching = false;
     if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
     terminal.resizeTimer = null;
     terminal.eventSource?.close();
@@ -1291,16 +1391,13 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
     if (chatState.activeTabId === tabId) drawToolbar();
   });
   source.onerror = () => {
-    if (!terminal.exited) {
-      terminal.error = "Terminal connection lost. Restart the session to continue.";
-      terminal.connected = false;
-      terminal.exited = true;
-      terminal.eventSource?.close();
-      terminal.eventSource = null;
-      tab.exited = true;
-      saveChatStateToStorage();
-      if (chatState.activeTabId === tabId) drawToolbar();
-    }
+    if (terminal.exited || terminal.eventSource !== source) return;
+    terminal.error = "Terminal stream interrupted. Reconnecting…";
+    terminal.connected = false;
+    terminal.statusChecked = false;
+    terminal.reattaching = true;
+    void reattachTerminalSession(tab, terminal);
+    if (chatState.activeTabId === tabId) drawToolbar();
   };
 }
 
@@ -1425,8 +1522,8 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
     cursorBlink: true,
     convertEol: true,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-    fontSize: 12.5,
-    lineHeight: 1.35,
+    fontSize: TERMINAL_FONT_SIZE,
+    lineHeight: TERMINAL_LINE_HEIGHT,
     scrollback: 2000,
     theme: {
       background: "#fbfbf7",
@@ -1463,7 +1560,7 @@ function resizeTerminalRenderer(
   terminal = terminalStateFor(),
 ) {
   if (!terminal?.term || typeof terminal.term.resize !== "function") return;
-  const size = terminalSize(output);
+  const size = terminalSize(output, terminal);
   try {
     terminal.term.resize(size.cols, size.rows);
   } catch {}
@@ -1490,15 +1587,65 @@ function scheduleTerminalResize(terminal, size) {
   }, 80);
 }
 
-function terminalSize(output = document.querySelector(".terminal-output")) {
+function terminalSize(
+  output = document.querySelector(".terminal-output"),
+  terminal = terminalStateFor(),
+) {
   if (!output) return { cols: 100, rows: 30 };
   const styles = window.getComputedStyle(output);
-  const fontSize = parseFloat(styles.fontSize) || 13;
-  const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.4;
+  const fontSize = parseFloat(styles.fontSize) || TERMINAL_FONT_SIZE;
+  const horizontalPadding = (parseFloat(styles.paddingLeft) || 0)
+    + (parseFloat(styles.paddingRight) || 0);
+  const verticalPadding = (parseFloat(styles.paddingTop) || 0)
+    + (parseFloat(styles.paddingBottom) || 0);
+  const contentWidth = Math.max(0, output.clientWidth - horizontalPadding);
+  const contentHeight = Math.max(0, output.clientHeight - verticalPadding);
+  const cellWidth = terminal?.term?._core?._renderService?.dimensions?.css?.cell?.width
+    || measuredTerminalCellWidth(styles, fontSize)
+    || fontSize * 0.61;
+  const cellHeight = terminal?.term?._core?._renderService?.dimensions?.css?.cell?.height
+    || fontSize * TERMINAL_LINE_HEIGHT;
+  const scrollbarWidth = terminal?.term?._core?._viewport?._scrollBarWidth || 16;
   return {
-    cols: Math.max(20, Math.floor(output.clientWidth / (fontSize * 0.62))),
-    rows: Math.max(8, Math.floor(output.clientHeight / lineHeight)),
+    cols: Math.max(20, Math.floor((contentWidth - scrollbarWidth) / cellWidth)),
+    rows: Math.max(8, Math.floor(contentHeight / cellHeight)),
   };
+}
+
+function measuredTerminalCellWidth(styles, fontSize) {
+  const canvas = document.createElement?.("canvas");
+  const context = canvas?.getContext?.("2d");
+  if (!context || typeof context.measureText !== "function") return 0;
+  context.font = `${fontSize}px ${styles.fontFamily || "monospace"}`;
+  return context.measureText("MMMMMMMMMM").width / 10;
+}
+
+function observeTerminalOutputSize(output, tab = currentToolbarTab()) {
+  if (!output) return;
+  const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab)
+    || chatState.activeTabId;
+  const terminal = terminalStateFor(tabId);
+  if (!terminal) return;
+  terminal.outputResizeObserver?.disconnect();
+  terminal.observedOutput = output;
+  if (typeof ResizeObserver !== "function") return;
+  terminal.outputResizeObserver = new ResizeObserver(() => {
+    const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
+    schedule(() => {
+      if (terminal.observedOutput === output) resizeTerminalRenderer(output, terminal);
+    });
+  });
+  terminal.outputResizeObserver.observe(output);
+}
+
+function scheduleActiveTerminalFit() {
+  const tab = chatState.tabs[chatState.activeTabId];
+  if (!toolbarTabUsesTerminal(tab)) return;
+  const terminal = terminalStateFor(chatState.activeTabId);
+  const output = terminal?.observedOutput || document.querySelector(".terminal-output");
+  if (!terminal?.term || !output) return;
+  const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
+  schedule(() => resizeTerminalRenderer(output, terminal));
 }
 
 function focusTerminalSoon(tab = currentToolbarTab()) {
@@ -2402,12 +2549,7 @@ function refreshProcessesTabForChatChange() {
   refreshSettings().catch(() => {});
 }
 
-function switchChatTab(tabId) {
-  if (!chatState.tabs[tabId]) return;
-  chatState.activeTabId = tabId;
-  saveChatStateToStorage();
-  drawChat();
-}
+function switchChatTab(tabId) { return activateToolbarTab(tabId); }
 
 async function closeChatTab(tabId) {
   if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID || tabId === TERMINAL_TAB_ID) return;

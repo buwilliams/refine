@@ -516,16 +516,21 @@ impl ProviderSpec {
     }
 
     fn interactive_args(&self, prompt: &str) -> Vec<String> {
-        if prompt.trim().is_empty() {
-            return Vec::new();
-        }
         match self.name {
-            // Claude Code and Codex accept an initial interactive prompt positionally.
-            "claude" | "codex" | "smoke-ai" => vec![prompt.to_string()],
-            // Gemini and Copilot distinguish an initial interactive prompt from their
-            // non-interactive print modes with `-i`.
-            "gemini" | "copilot" => vec!["-i".to_string(), prompt.to_string()],
-            _ => vec![prompt.to_string()],
+            "claude" => with_initial_prompt(
+                vec!["--dangerously-skip-permissions".to_string()],
+                prompt,
+                false,
+            ),
+            "codex" => with_initial_prompt(
+                vec!["--dangerously-bypass-approvals-and-sandbox".to_string()],
+                prompt,
+                false,
+            ),
+            "gemini" => with_initial_prompt(vec!["--yolo".to_string()], prompt, true),
+            "copilot" => with_initial_prompt(vec!["--allow-all".to_string()], prompt, true),
+            "smoke-ai" => with_initial_prompt(Vec::new(), prompt, false),
+            _ => with_initial_prompt(Vec::new(), prompt, false),
         }
     }
 
@@ -591,6 +596,17 @@ impl ProviderSpec {
     fn prompt_stdin(&self, prompt: &str) -> Option<String> {
         (self.name == "codex" && !prompt.is_empty()).then(|| prompt.to_string())
     }
+}
+
+fn with_initial_prompt(mut args: Vec<String>, prompt: &str, interactive_flag: bool) -> Vec<String> {
+    if prompt.trim().is_empty() {
+        return args;
+    }
+    if interactive_flag {
+        args.push("-i".to_string());
+    }
+    args.push(prompt.to_string());
+    args
 }
 
 fn find_executable(binary: &str, path_override: Option<&str>) -> Option<PathBuf> {
@@ -996,23 +1012,32 @@ mod tests {
             ..HostAgentProviderService::default()
         };
 
-        for provider in ["claude", "codex", "smoke-ai"] {
+        for (provider, expected_args) in [
+            (
+                "claude",
+                vec!["--dangerously-skip-permissions", "initial context"],
+            ),
+            (
+                "codex",
+                vec![
+                    "--dangerously-bypass-approvals-and-sandbox",
+                    "initial context",
+                ],
+            ),
+            ("gemini", vec!["--yolo", "-i", "initial context"]),
+            ("copilot", vec!["--allow-all", "-i", "initial context"]),
+            ("smoke-ai", vec!["initial context"]),
+        ] {
             let command = service
                 .interactive_command(provider, "initial context")
                 .unwrap();
-            assert_eq!(command.args, ["initial context"]);
+            assert_eq!(command.args, expected_args);
             assert!(
                 !command
                     .args
                     .iter()
                     .any(|arg| { matches!(arg.as_str(), "--print" | "exec" | "-p" | "--prompt") })
             );
-        }
-        for provider in ["gemini", "copilot"] {
-            let command = service
-                .interactive_command(provider, "initial context")
-                .unwrap();
-            assert_eq!(command.args, ["-i", "initial context"]);
         }
 
         fs::remove_dir_all(temp_root).unwrap();

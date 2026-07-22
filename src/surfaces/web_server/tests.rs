@@ -717,6 +717,8 @@ fn static_plan_mode_uses_managed_terminal_with_initial_context() {
     assert!(toolbar.contains(r#"initial_prompt: tab.initialPrompt"#));
     assert!(toolbar.contains(r#"data-testid="terminal-start""#));
     assert!(toolbar.contains(r#"data-testid="terminal-stop""#));
+    assert!(toolbar.contains("async function activateToolbarTab"));
+    assert!(toolbar.contains("if (shouldStart) await startTerminalSession(tab)"));
     assert!(!toolbar.contains("renderChatPanel"));
     assert!(!toolbar.contains("/api/chat/start"));
 }
@@ -760,6 +762,10 @@ fn static_toolbar_keeps_supervisor_visible_and_uses_shared_managed_terminal() {
     assert!(!toolbar_css.contains(".supervisor-agent-summary"));
     assert!(!toolbar_css.contains(".chat-input-wrap"));
     assert!(toolbar_css.contains(".terminal-panel"));
+    assert!(toolbar_css.contains("padding-inline: 0"));
+    assert!(toolbar_css.contains("font-size: 15px"));
+    assert!(toolbar.contains("observeTerminalOutputSize(output, tab)"));
+    assert!(toolbar.contains("scheduleActiveTerminalFit()"));
 }
 
 #[test]
@@ -4860,6 +4866,17 @@ fn web_server_runs_interactive_terminal_session() {
         .unwrap();
     assert!(managed.iter().any(|process| process.id == process_id));
 
+    let status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/terminal/{session_id}/status"),
+        body: None,
+    });
+    assert_eq!(status.status, 200, "{}", status.body);
+    assert_eq!(status.body["id"], session_id);
+    assert_eq!(status.body["process_id"], process_id);
+    assert_eq!(status.body["alive"], true);
+    assert_eq!(status.body["exited"], false);
+
     let resize = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/terminal/{session_id}/resize"),
@@ -4898,6 +4915,13 @@ fn web_server_runs_interactive_terminal_session() {
         body: None,
     });
     assert_eq!(stop.status, 200);
+
+    let stopped_status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/terminal/{session_id}/status"),
+        body: None,
+    });
+    assert_eq!(stopped_status.status, 404);
 
     let second = server.handle(ApiRequest {
         method: "POST".to_string(),

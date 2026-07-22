@@ -206,9 +206,12 @@ Nav: Toolbar (bottom dock)
 			Configured agent CLI receives planning and Refine CLI persistence guidance at launch
 		Shared terminal behavior
 			One xterm renderer and PTY API for Terminal, Supervisor, Plan, Goal, and Standalone profiles
+			Selecting a stopped terminal-profile tab starts it automatically; selecting an already-running active tab retains the dock toggle behavior
+			Agent profiles pass the provider's background-agent-equivalent full-access flag while retaining native interactive mode
 			Each session registers as `interactive_session` in the daemon process registry and appears in Processes
 			Terminal output uses per-session SSE; input and resize use the terminal API
-			Session/process/provider/cwd/worktree state is tab-specific and reload can reattach to a live session
+			Terminal typography defaults to 15px; the terminal fills the dock width and a ResizeObserver refits xterm plus the backend PTY when its rendered box changes
+			Session/process/provider/cwd/worktree state is tab-specific; reload checks daemon status and reattaches to a live session without treating an SSE interruption as process exit
 		Tab management: active-session dot, close (non-standard tabs), reorder
 Modals
 	Goal Modal (#/goals/:id)
@@ -344,7 +347,7 @@ Implementation Internals (for e2e testing)
 		Priority enum: low, medium, high
 	Interactive terminal sessions
 		POST /api/terminal/session with body { profile:"terminal"|"supervisor"|"plan"|"goal"|"standalone", goal_id?, feature_id?, initial_prompt?, worktree?, cols?, rows? }
-		GET /api/terminal/:id/events streams terminal_output, terminal_error, and terminal_exit events; POST /api/terminal/:id/input sends bytes; POST /api/terminal/:id/resize changes PTY size; POST /api/terminal/:id/stop terminates it
+		GET /api/terminal/:id/status reports authoritative session liveness and metadata; GET /api/terminal/:id/events streams terminal_output, terminal_error, and terminal_exit events; POST /api/terminal/:id/input sends bytes; POST /api/terminal/:id/resize changes PTY size; POST /api/terminal/:id/stop terminates it
 		Start response includes terminal id, managed process id, profile, provider, cwd, and optional worktree; the process can also be stopped through POST /api/processes/:process_id/stop
 	Backend chat sessions
 		/api/chat remains a backend capability for workflow automation and non-browser adapters; toolbar agent profiles do not use it as their interaction renderer
