@@ -128,7 +128,7 @@ Nav & Guide: Manage Drop-down
 				Constitution (markdown field)
 				Rules: list (text input + Remove per rule), Add rule, Generate rules (needs product + constitution), autosave
 			Quality
-				Quality is active for every Goal candidate; pre_merge runs before Build and post_build after Build
+				Quality is active for every Goal candidate; the candidate round pins whether pre_merge runs before Build or post_build runs after Build
 				Business requirements + agent instructions (markdown fields)
 				Tests: one project-wide plain-text outcome per line; the agent proposes a command and Refine records the observed supervised execution
 				Legacy transition: formerly enabled target-app QA commands remain enforced until replaced by non-empty plain-text tests

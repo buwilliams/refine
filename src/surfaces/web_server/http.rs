@@ -31,6 +31,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
 };
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::tools::host::quality::QualityOperationRunner;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
@@ -194,6 +195,12 @@ impl LocalHttpDaemon {
         &self,
         mut report: impl FnMut(&str),
     ) -> RefineResult<()> {
+        if let Some(runtime_root) = &self.server.runtime_root {
+            report("recovering supervised operations");
+            FileOperationRegistry::new(runtime_root).recover_active_supervised()?;
+            report("recovering incomplete Quality cancellations");
+            QualityOperationRunner::recover_cancelled_operations_for_runtime(runtime_root)?;
+        }
         if let Some(refine_dir) = self.server.current_refine_dir()? {
             report("recovering interrupted chat turns");
             self.server
@@ -201,14 +208,6 @@ impl LocalHttpDaemon {
                 .recover_interrupted_turns(
                     "Daemon restarted before the provider turn completed.",
                 )?;
-            if let (Some(runtime_root), Some(target_root)) = (
-                &self.server.runtime_root,
-                self.server.current_target_root()?,
-            ) {
-                report("recovering incomplete Quality cancellations");
-                QualityOperationRunner::new(&refine_dir, runtime_root, target_root)
-                    .recover_cancelled_operations()?;
-            }
         }
         report("warming project and runtime caches");
         let _ = self.server.warm_current_projection_cache()?;

@@ -9,9 +9,7 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::host::quality::{
-    FileQualityService, POST_BUILD, QualityCheckResult, QualityOperationRunner,
-};
+use crate::tools::host::quality::{POST_BUILD, QualityCheckResult, QualityOperationRunner};
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
@@ -278,7 +276,7 @@ impl WorkflowBehavior for WorkflowQa {
                 ),
             );
         }
-        let next = if quality_timing(ctx)? == POST_BUILD {
+        let next = if ctx.quality_timing()? == POST_BUILD {
             GoalStatus::Review
         } else {
             GoalStatus::Build
@@ -304,7 +302,7 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             &format!("Prepared implementation candidate {branch} for validation"),
             Some(json_object(json!({"branch": branch}))),
         )?;
-        let next = if quality_timing(ctx)? == POST_BUILD {
+        let next = if ctx.quality_timing()? == POST_BUILD {
             GoalStatus::Build
         } else {
             GoalStatus::Qa
@@ -347,7 +345,7 @@ impl WorkflowBehavior for WorkflowBuild {
             "Target app build passed",
             Some(json_object(json!({"target_app": &build}))),
         )?;
-        let next = if quality_timing(ctx)? == POST_BUILD {
+        let next = if ctx.quality_timing()? == POST_BUILD {
             GoalStatus::Qa
         } else {
             GoalStatus::Review
@@ -421,12 +419,6 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
             ctx.workflow_process_metadata("qa", "WorkflowQa"),
         )
         .map(|operation| operation.result)
-}
-
-fn quality_timing(ctx: &WorkflowContext<'_>) -> RefineResult<String> {
-    FileQualityService::new(ctx.refine_dir())
-        .load_settings()
-        .map(|settings| settings.timing)
 }
 
 fn evaluate_workflow_governance(

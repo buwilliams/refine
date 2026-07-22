@@ -2268,6 +2268,7 @@ impl FileWorkItemService {
             "quality_message",
             "quality_details",
             "quality_checked_at",
+            "workflow_quality_timing",
         ] {
             if let Some(value) = fields.get(key) {
                 round.insert(key.to_string(), value.clone());

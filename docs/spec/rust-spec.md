@@ -815,11 +815,13 @@ Requirements:
   success, test failure, provider failure, parsing failure, cancellation, or
   restart interruption only after authoritative Goal evidence is durable.
 - One exclusive `quality:{goal_id}:{candidate_commit}` owner serializes manual and
-  workflow evaluation of the same candidate.
+  workflow evaluation of the same candidate. Manual evaluation also validates
+  active Node ownership and acquires the workflow agent-capacity policy.
 - `quality/settings.json` is authoritative for plain-text tests and timing.
   Legacy `/settings` timing is an adapter to the same file; Node settings do not
-  persist a second value. `pre_merge` orders QA before Build; `post_build` orders
-  QA after Build.
+  persist a second value. The candidate round durably pins the effective value
+  before validation transitions; later Build, QA, and retry steps reuse it.
+  `pre_merge` orders QA before Build; `post_build` orders QA after Build.
 - First-load migration inspects the complete Node registry before marking the
   project complete, imports and deduplicates every enabled legacy
   `target_app_test_commands` value, and remains retryable after a partial write.
@@ -835,8 +837,12 @@ Requirements:
   surface. Those fields and the Goal log are written before success or failure
   settlement; a persistence failure leaves the operation active for restart
   recovery. Provider and test process registration shares the operation mutation
-  barrier with cancellation, so cancellation prevents later launches. Users can
-  inspect and cancel operations through shared operation APIs.
+  barrier with cancellation, so cancellation prevents later launches. A
+  cancellation remains nonterminal until every owned process is confirmed
+  exited. Each Quality operation retains its target-app and Refine-state paths,
+  and startup recovery routes evidence through those original paths rather than
+  the currently selected app. Users can inspect and cancel operations through
+  shared operation APIs.
 
 ### Chat And Planning
 

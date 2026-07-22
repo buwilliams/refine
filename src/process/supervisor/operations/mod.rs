@@ -232,17 +232,10 @@ impl FileOperationRegistry {
                 }
                 Err(error) => {
                     if deferred_cancellation {
-                        self.append_log(
+                        self.record_recoverable_failure(
                             &operation.id,
-                            operation_log_entry(
-                                &operation,
-                                "error",
-                                "Deferred cancellation recovery could not terminate managed processes",
-                                Some(crate::model::JsonObject::from_iter([(
-                                    "error".to_string(),
-                                    json!(error.to_string()),
-                                )])),
-                            ),
+                            "operation_recovery_process_termination_failed",
+                            &error,
                         )?;
                         recovered.push(self.status(&operation.id)?);
                     } else if let Some(failed) =
@@ -284,6 +277,18 @@ impl FileOperationRegistry {
         operation: &OperationHandle,
         processes: &[ManagedProcess],
     ) -> RefineResult<()> {
+        #[cfg(test)]
+        if operation
+            .request
+            .get("test_inject_recovery_termination_failure")
+            .and_then(Value::as_bool)
+            == Some(true)
+            && !processes.is_empty()
+        {
+            return Err(RefineError::Degraded(
+                "injected managed-process termination failure".to_string(),
+            ));
+        }
         for process in processes {
             self.append_log(
                 &operation.id,
@@ -763,12 +768,107 @@ impl FileOperationRegistry {
                 handle.state.as_api_status()
             )));
         }
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        let mut live = Vec::new();
+        for process in supervisor
+            .list()?
+            .into_iter()
+            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+        {
+            if FileProcessSupervisor::process_is_alive(&process)? {
+                live.push(json!({"id": process.id, "pid": process.pid}));
+            }
+        }
+        if !live.is_empty() {
+            let error = RefineError::Degraded(format!(
+                "Quality cancellation cannot settle while {} owned managed process(es) remain alive",
+                live.len()
+            ));
+            if handle
+                .error
+                .as_ref()
+                .and_then(|value| value.get("code"))
+                .and_then(Value::as_str)
+                != Some("operation_recovery_process_termination_failed")
+            {
+                handle.error = Some(json!({
+                    "code": "operation_cancellation_process_still_alive",
+                    "message": error.to_string(),
+                    "attention_required": true,
+                    "retryable": true,
+                    "processes": live
+                }));
+            }
+            self.write(&handle)?;
+            FileExt::unlock(&lock).ok();
+            self.append_log(
+                &handle.id,
+                operation_log_entry(
+                    &handle,
+                    "error",
+                    "Cancellation settlement deferred until managed processes exit",
+                    Some(crate::model::JsonObject::from_iter([(
+                        "error".to_string(),
+                        json!(error.to_string()),
+                    )])),
+                ),
+            )?;
+            return Err(error);
+        }
         handle.state = OperationState::Cancelled;
+        handle.error = None;
         self.write(&handle)?;
         FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "warning", "Operation cancelled", None),
+        )?;
+        Ok(handle)
+    }
+
+    /// Records a startup/capability recovery failure without making a deferred cancellation
+    /// terminal. A later daemon start can retry after the underlying process or state store is
+    /// available again.
+    pub fn record_recoverable_failure(
+        &self,
+        operation_id: &str,
+        code: &str,
+        error: &RefineError,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if !matches!(handle.state, OperationState::Cancelling) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        let preserve_termination_failure = handle
+            .error
+            .as_ref()
+            .and_then(|value| value.get("code"))
+            .and_then(Value::as_str)
+            == Some("operation_recovery_process_termination_failed")
+            && code != "operation_recovery_process_termination_failed";
+        if !preserve_termination_failure {
+            handle.error = Some(json!({
+                "code": code,
+                "message": error.to_string(),
+                "attention_required": true,
+                "retryable": true
+            }));
+        }
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &handle.id,
+            operation_log_entry(
+                &handle,
+                "error",
+                "Deferred cancellation recovery remains incomplete",
+                Some(crate::model::JsonObject::from_iter([
+                    ("code".to_string(), json!(code)),
+                    ("error".to_string(), json!(error.to_string())),
+                ])),
+            ),
         )?;
         Ok(handle)
     }

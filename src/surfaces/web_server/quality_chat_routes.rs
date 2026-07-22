@@ -252,7 +252,7 @@ impl InProcessWebServer {
             ("goal_id".to_string(), json!(goal_id)),
         ]);
         match QualityOperationRunner::new(&refine_dir, runtime_root, target_root)
-            .start_goal_checks(goal_id, &provider, metadata)
+            .start_manual_goal_checks(goal_id, &provider, metadata)
         {
             Ok(operation) => ApiResponse::json(
                 202,

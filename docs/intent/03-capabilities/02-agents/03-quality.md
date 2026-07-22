@@ -25,13 +25,15 @@ Current implementation details that matter to intent:
 - the Quality agent should choose one non-interactive command for each test, and a pass without a correlated observed execution should fail;
 - the provider and test commands should be correlated with one durable operation ID, and process registration should share the cancellation barrier so no work can launch after cancellation wins;
 - manual and workflow evaluation of the same Goal candidate should share one exclusive operation owner and identical Goal-round evidence;
+- manual evaluation should validate active Node ownership and reserve the same Node, provider, target-app, and global agent capacity used by workflow;
+- each operation should retain its originating target-app and Refine-state identity so restart recovery cannot write evidence into a subsequently selected app;
 - evaluation should pin the recorded candidate commit and require matching HEAD plus a clean index and worktree before and after checks, preserving any detected user changes;
 - workflow should use quality evidence before moving work toward merge or done;
 - failures should be visible in logs, System, Goal evidence, or review surfaces;
 - quality settings should be shared project context, not hidden UI state;
 - an empty Quality test list should be an explicit successful no-op, not a reason to skip durable Quality evidence.
 
-`quality/settings.json` is the authoritative timing and test policy. Legacy `/settings` timing reads and writes are compatibility adapters to that file rather than independent Node settings. Before migration is marked complete, Refine inspects every Node and deduplicates all enabled legacy target-app QA commands; a failed migration remains retryable. Imported commands remain enforced as supervised Quality tests until a user saves a non-empty plain-text test set, so upgrade cannot silently convert an enforced gate into a no-op. `pre_merge` evaluates Quality before the target-app build; `post_build` evaluates it after the build.
+`quality/settings.json` is the authoritative timing and test policy. Legacy `/settings` timing reads and writes are compatibility adapters to that file rather than independent Node settings. When a candidate enters validation, workflow durably commits the effective timing to that Goal round; Build, QA, and retries reuse the committed decision even if project settings later change. Before migration is marked complete, Refine inspects every Node and deduplicates all enabled legacy target-app QA commands; a failed migration remains retryable. Imported commands remain enforced as supervised Quality tests until a user saves a non-empty plain-text test set, so upgrade cannot silently convert an enforced gate into a no-op. `pre_merge` evaluates Quality before the target-app build; `post_build` evaluates it after the build.
 
 Quality should be strict enough to reveal risk and flexible enough to fit different projects. Refine should not assume every app has the same test command, build step, or verification style.
 

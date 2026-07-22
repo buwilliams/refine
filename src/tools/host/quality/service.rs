@@ -23,6 +23,8 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::WorkflowEngine;
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 use super::types::*;
 
@@ -410,6 +412,67 @@ impl QualityOperationRunner {
         Ok(operation)
     }
 
+    /// Starts an operator-requested Quality evaluation under the same Node ownership and agent
+    /// capacity policy used by automated workflow work.
+    pub fn start_manual_goal_checks(
+        &self,
+        goal_id: &str,
+        provider: &str,
+        process_metadata: Map<String, Value>,
+    ) -> RefineResult<OperationHandle> {
+        let summary = FileWorkItemService::new(&self.refine_dir).show_goal_summary(goal_id)?;
+        let goal_node = summary.goal.node_id.as_deref().unwrap_or("default");
+        let active_node =
+            FileNodeRegistryService::with_active_root(&self.refine_dir, &self.runtime_root)
+                .active_node_id()?;
+        if goal_node != active_node {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} is owned by node {goal_node}, not active node {active_node}",
+                summary.goal.id
+            )));
+        }
+
+        let engine = WorkflowEngine::with_target_root(&self.runtime_root, &self.target_root);
+        let policy = engine.policy_for_refine_dir(&self.refine_dir)?;
+        let capacity = AgentCapacityService::new(&self.runtime_root);
+        let lease_owner = format!(
+            "quality-manual:{}:{}",
+            summary.goal.id,
+            uuid::Uuid::new_v4()
+        );
+        let acquired = capacity.try_acquire(
+            &policy,
+            AgentCapacityRequest {
+                owner_id: lease_owner.clone(),
+                role: "quality".to_string(),
+                node_id: goal_node.to_string(),
+                provider: provider.to_string(),
+                target_app_id: self.target_root.display().to_string(),
+            },
+        )?;
+        if !acquired {
+            return Err(RefineError::Conflict(
+                "automation concurrency limit reached".to_string(),
+            ));
+        }
+
+        let (operation, request) =
+            match self.register_goal_checks(goal_id, provider, process_metadata) {
+                Ok(registered) => registered,
+                Err(error) => {
+                    let _ = capacity.release(&lease_owner);
+                    return Err(error);
+                }
+            };
+        let runner = self.clone();
+        let operation_id = operation.id.clone();
+        thread::spawn(move || {
+            let _ = runner.run_registered(&operation_id, request);
+            let _ = AgentCapacityService::new(&runner.runtime_root).release(&lease_owner);
+        });
+        Ok(operation)
+    }
+
     pub(super) fn register_goal_checks(
         &self,
         goal_id: &str,
@@ -469,6 +532,8 @@ impl QualityOperationRunner {
                 "provider": provider,
                 "cwd": request.cwd,
                 "candidate_commit": request.candidate_commit,
+                "target_root": self.target_root.display().to_string(),
+                "refine_dir": self.refine_dir.display().to_string(),
                 "defer_cancellation_terminal": true
             }),
         )?;
@@ -751,41 +816,76 @@ impl QualityOperationRunner {
         let registry = FileOperationRegistry::new(&self.runtime_root);
         let mut recovered = Vec::new();
         for operation in registry.recover()? {
-            if !matches!(operation.state, OperationState::Cancelling)
-                || operation
-                    .request
-                    .get("defer_cancellation_terminal")
-                    .and_then(Value::as_bool)
-                    != Some(true)
-                || !cancellation_requested(&operation)
-                || !operation.owner.starts_with("quality:")
+            if !recoverable_quality_cancellation(&operation) {
+                continue;
+            }
+            if let Some(operation_refine_dir) =
+                operation.request.get("refine_dir").and_then(Value::as_str)
+                && Path::new(operation_refine_dir) != self.refine_dir
             {
                 continue;
             }
-            let request = QualityCheckRequest {
-                owner_id: required_operation_request_string(&operation, "goal_id")?,
-                round_idx: operation
-                    .request
-                    .get("round_idx")
-                    .and_then(Value::as_u64)
-                    .and_then(|value| usize::try_from(value).ok())
-                    .ok_or_else(|| {
-                        RefineError::Serialization(format!(
-                            "Quality operation {} has no valid round_idx for cancellation recovery",
-                            operation.id
-                        ))
-                    })?,
-                provider: required_operation_request_string(&operation, "provider")?,
-                cwd: required_operation_request_string(&operation, "cwd")?,
-                candidate_commit: required_operation_request_string(
-                    &operation,
-                    "candidate_commit",
-                )?,
-                process_metadata: Map::new(),
-            };
-            recovered.push(self.settle_cancelled(&request, &operation.id)?);
+            recovered.push(self.recover_cancelled_operation(&operation)?);
         }
         Ok(recovered)
+    }
+
+    /// Replays every deferred Quality cancellation against the target-app state identity stored
+    /// on that operation. Individual app/evidence failures remain durable and visible without
+    /// preventing the daemon from starting or other apps from recovering.
+    pub fn recover_cancelled_operations_for_runtime(
+        runtime_root: impl Into<PathBuf>,
+    ) -> RefineResult<Vec<OperationHandle>> {
+        let runtime_root = runtime_root.into();
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let mut recovered = Vec::new();
+        for operation in registry.recover()? {
+            if !recoverable_quality_cancellation(&operation) {
+                continue;
+            }
+            let recovery = (|| {
+                let refine_dir = required_operation_request_string(&operation, "refine_dir")?;
+                let target_root = required_operation_request_string(&operation, "target_root")?;
+                Self::new(refine_dir, &runtime_root, target_root)
+                    .recover_cancelled_operation(&operation)
+            })();
+            match recovery {
+                Ok(operation) => recovered.push(operation),
+                Err(error) => {
+                    registry.record_recoverable_failure(
+                        &operation.id,
+                        "quality_cancellation_evidence_recovery_failed",
+                        &error,
+                    )?;
+                }
+            }
+        }
+        Ok(recovered)
+    }
+
+    fn recover_cancelled_operation(
+        &self,
+        operation: &OperationHandle,
+    ) -> RefineResult<OperationHandle> {
+        let request = QualityCheckRequest {
+            owner_id: required_operation_request_string(operation, "goal_id")?,
+            round_idx: operation
+                .request
+                .get("round_idx")
+                .and_then(Value::as_u64)
+                .and_then(|value| usize::try_from(value).ok())
+                .ok_or_else(|| {
+                    RefineError::Serialization(format!(
+                        "Quality operation {} has no valid round_idx for cancellation recovery",
+                        operation.id
+                    ))
+                })?,
+            provider: required_operation_request_string(operation, "provider")?,
+            cwd: required_operation_request_string(operation, "cwd")?,
+            candidate_commit: required_operation_request_string(operation, "candidate_commit")?,
+            process_metadata: Map::new(),
+        };
+        self.settle_cancelled(&request, &operation.id)
     }
 
     fn append_goal_log(
@@ -853,6 +953,17 @@ fn cancellation_requested(operation: &OperationHandle) -> bool {
         .get("cancellation_requested")
         .and_then(Value::as_bool)
         .unwrap_or(false)
+}
+
+fn recoverable_quality_cancellation(operation: &OperationHandle) -> bool {
+    matches!(operation.state, OperationState::Cancelling)
+        && operation
+            .request
+            .get("defer_cancellation_terminal")
+            .and_then(Value::as_bool)
+            == Some(true)
+        && cancellation_requested(operation)
+        && operation.owner.starts_with("quality:")
 }
 
 impl QualityService for FileQualityService {

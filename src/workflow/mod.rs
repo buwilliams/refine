@@ -213,11 +213,21 @@ impl WorkflowEngine {
     }
 
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
+        let Some(target_root) = &self.target_root else {
+            return Ok(WorkflowPolicy::default());
+        };
+        let refine_dir = prepare_refine_dir(target_root)?;
+        self.policy_for_refine_dir(&refine_dir)
+    }
+
+    /// Resolves the workflow/agent capacity policy for an already-established target-app state
+    /// directory. Manual agent capabilities use this entry point so they share the scheduler's
+    /// exact limits without rediscovering or relocating state.
+    pub fn policy_for_refine_dir(&self, refine_dir: &Path) -> RefineResult<WorkflowPolicy> {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
-            let refine_dir = prepare_refine_dir(target_root)?;
             let settings =
-                FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
+                FileSettingsService::with_active_root(refine_dir, &self.runtime_root).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
@@ -240,7 +250,7 @@ impl WorkflowEngine {
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
             policy.target_app_id = target_root.display().to_string();
             policy.active_node_id =
-                FileNodeRegistryService::with_active_root(&refine_dir, &self.runtime_root)
+                FileNodeRegistryService::with_active_root(refine_dir, &self.runtime_root)
                     .active_node_id()?;
         }
         Ok(policy)

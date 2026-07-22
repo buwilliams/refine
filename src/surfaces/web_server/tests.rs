@@ -4,6 +4,7 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
@@ -1704,6 +1705,115 @@ fn local_http_daemon_reports_startup_cache_progress() {
             "startup cache warming complete",
         ]
     );
+}
+
+#[test]
+fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() {
+    let temp_root = unique_temp_dir("http-quality-cancellation-app-routing");
+    let app_a = temp_root.join("app-a");
+    let app_b = temp_root.join("app-b");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&app_a);
+    init_git_app(&app_b);
+    let refine_a = refine_dir_for_target_root(&app_a).unwrap();
+    let refine_b = refine_dir_for_target_root(&app_b).unwrap();
+    let apps = crate::tools::product::project_registry::FileProjectRegistryService::new(
+        &runtime_root,
+        None,
+    );
+    apps.register_path(Some("App A"), app_a.to_str().unwrap(), true)
+        .unwrap();
+    apps.register_path(Some("App B"), app_b.to_str().unwrap(), true)
+        .unwrap();
+    let work_items_a = FileWorkItemService::new(&refine_a);
+    work_items_a
+        .create_goal_summary("Recover on original app", Some("GOAL1"))
+        .unwrap();
+    work_items_a
+        .append_goal_round_summary("GOAL1", "Buddy", "Cancel safely")
+        .unwrap();
+
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry
+        .register_exclusive_with_request(
+            "quality:GOAL1:candidate-a",
+            json!({
+                "goal_id": "GOAL1",
+                "round_idx": 0,
+                "provider": "smoke-ai",
+                "cwd": app_a.display().to_string(),
+                "candidate_commit": "candidate-a",
+                "target_root": app_a.display().to_string(),
+                "refine_dir": refine_a.display().to_string(),
+                "defer_cancellation_terminal": true,
+                "test_inject_recovery_termination_failure": true
+            }),
+        )
+        .unwrap();
+
+    let managed = FileProcessSupervisor::new(&runtime_root)
+        .launch(operation_helper_process_spec(&operation.id))
+        .unwrap();
+    registry.cancel(&operation.id).unwrap();
+    let pid = managed.pid.unwrap();
+    assert!(managed_pid_is_alive(pid).unwrap());
+
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root.clone());
+    let daemon = LocalHttpDaemon {
+        server,
+        static_root: None,
+    };
+    daemon.recover_runtime_state().unwrap();
+
+    let incomplete = registry.status(&operation.id).unwrap();
+    assert_eq!(incomplete.state, OperationState::Cancelling);
+    assert_eq!(
+        incomplete.error.unwrap()["code"],
+        "operation_recovery_process_termination_failed"
+    );
+    assert!(managed_pid_is_alive(pid).unwrap());
+    let detail_a = work_items_a.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail_a["rounds"][0]["quality_state"], "cancelled");
+    assert!(
+        FileWorkItemService::new(&refine_b)
+            .show_goal_detail("GOAL1")
+            .is_err(),
+        "recovery must not write original-app evidence into the selected unrelated app"
+    );
+
+    let operation_path = runtime_root
+        .join("operations")
+        .join(format!("{}.json", operation.id));
+    let mut stored: serde_json::Value =
+        serde_json::from_slice(&fs::read(&operation_path).unwrap()).unwrap();
+    stored["request"]["test_inject_recovery_termination_failure"] = json!(false);
+    fs::write(&operation_path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+
+    daemon.recover_runtime_state().unwrap();
+    wait_for_managed_pid_exit(pid);
+    assert_eq!(
+        registry.status(&operation.id).unwrap().state,
+        OperationState::Cancelled
+    );
+    daemon.recover_runtime_state().unwrap();
+    let cancelled_logs = FileLogService::new(&refine_a)
+        .all_round_logs("GOAL1")
+        .unwrap()
+        .into_iter()
+        .filter(|entry| {
+            entry.round_idx == Some(0)
+                && entry.entry.message == "Quality checks cancelled."
+                && entry
+                    .entry
+                    .details
+                    .as_ref()
+                    .and_then(|details| details.get("operation_id"))
+                    == Some(&json!(operation.id))
+        })
+        .count();
+    assert_eq!(cancelled_logs, 1, "replayed settlement must be idempotent");
+    fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]

@@ -6,6 +6,8 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::WorkflowPolicy;
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
@@ -436,6 +438,82 @@ fn quality_operation_preserves_provider_failure_and_settles_terminally() {
 }
 
 #[test]
+fn manual_quality_rejects_foreign_node_before_registering_an_operation() {
+    let fixture = goal_quality_fixture("quality-manual-node-owner", "exit 99");
+    fs::create_dir_all(&fixture.runtime_root).unwrap();
+    fs::write(
+        fixture.runtime_root.join("active-node.json"),
+        serde_json::to_vec_pretty(&json!({"active_node_id": "node-b"})).unwrap(),
+    )
+    .unwrap();
+
+    let error = fixture
+        .runner()
+        .start_manual_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap_err();
+    assert!(error.to_string().contains("owned by node default"));
+    assert!(error.to_string().contains("active node node-b"));
+    assert!(
+        FileOperationRegistry::new(&fixture.runtime_root)
+            .recover()
+            .unwrap()
+            .is_empty()
+    );
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn manual_quality_uses_shared_workflow_agent_capacity() {
+    let fixture = goal_quality_fixture("quality-manual-capacity", "exit 99");
+    let capacity = AgentCapacityService::new(&fixture.runtime_root);
+    let policy = WorkflowPolicy {
+        global_limit: 1,
+        per_node_limit: 1,
+        per_provider_limit: 1,
+        per_target_app_limit: 1,
+        active_node_id: "default".to_string(),
+        provider: "smoke-ai".to_string(),
+        target_app_id: fixture.candidate_root.display().to_string(),
+    };
+    assert!(
+        capacity
+            .try_acquire(
+                &policy,
+                AgentCapacityRequest {
+                    owner_id: "workflow:existing".to_string(),
+                    role: "workflow".to_string(),
+                    node_id: "default".to_string(),
+                    provider: "smoke-ai".to_string(),
+                    target_app_id: fixture.candidate_root.display().to_string(),
+                },
+            )
+            .unwrap()
+    );
+    FileSettingsService::with_active_root(&fixture.refine_dir, &fixture.runtime_root)
+        .update(&json!({
+            "parallel_run_cap": "1",
+            "parallel_per_node_cap": "1",
+            "parallel_per_provider_cap": "1",
+            "parallel_per_target_app_cap": "1"
+        }))
+        .unwrap();
+
+    let error = fixture
+        .runner()
+        .start_manual_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap_err();
+    assert!(error.to_string().contains("concurrency limit"));
+    assert!(
+        FileOperationRegistry::new(&fixture.runtime_root)
+            .recover()
+            .unwrap()
+            .is_empty()
+    );
+    capacity.release("workflow:existing").unwrap();
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
 fn quality_operation_is_exclusive_and_cancellation_terminates_its_provider() {
     let fixture = goal_quality_fixture("quality-cancel-exclusive", "exec sleep 30");
     let _guard = smoke_ai_env_lock()
@@ -447,6 +525,14 @@ fn quality_operation_is_exclusive_and_cancellation_terminates_its_provider() {
         .runner()
         .start_goal_checks("GOAL1", "smoke-ai", Default::default())
         .unwrap();
+    assert_eq!(
+        operation.request["target_root"],
+        fixture.candidate_root.display().to_string()
+    );
+    assert_eq!(
+        operation.request["refine_dir"],
+        fixture.refine_dir.display().to_string()
+    );
     let conflict = fixture
         .runner()
         .run_goal_checks("GOAL1", "smoke-ai", Default::default())
