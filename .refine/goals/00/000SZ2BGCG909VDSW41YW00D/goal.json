@@ -194,28 +194,76 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T12:29:46Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-22T12:43:01Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-4",
+        "failed_actions": [
+          {
+            "message": "Jira export recovery is not invoked by production daemon startup. system stop/restart terminates the export worker but leaves its durable operation Running; run_system_start calls lifecycle.start and recover_runtime_state_with_progress, neither of which interrupts active operations. The UI therefore polls indefinitely and cannot retry because retry_jira_export accepts only Interrupted operations.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The recovery test manually calls FileDaemonLifecycleService::recover, but that method is not called by the real daemon startup/restart path. Consequently the committed test does not verify the documented restart-safe recovery behavior and misses the stale-Running operation failure.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Daemon restart recovery is not wired into the production startup path.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Jira export recovery is not invoked by production daemon startup. system stop/restart terminates the export worker but leaves its durable operation Running; run_system_start calls lifecycle.start and recover_runtime_state_with_progress, neither of which interrupts active operations. The UI therefore polls indefinitely and cannot retry because retry_jira_export accepts only Interrupted operations.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The recovery test manually calls FileDaemonLifecycleService::recover, but that method is not called by the real daemon startup/restart path. Consequently the committed test does not verify the documented restart-safe recovery behavior and misses the stale-Running operation failure.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Daemon restart recovery is not wired into the production startup path.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Jira export recovery is not invoked by production daemon startup. system stop/restart terminates the export worker but leaves its durable operation Running; run_system_start calls lifecycle.start and recover_runtime_state_with_progress, neither of which interrupts active operations. The UI therefore polls indefinitely and cannot retry because retry_jira_export accepts only Interrupted operations.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The recovery test manually calls FileDaemonLifecycleService::recover, but that method is not called by the real daemon startup/restart path. Consequently the committed test does not verify the documented restart-safe recovery behavior and misses the stale-Running operation failure.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-4"
+      },
+      "governance_message": "Daemon restart recovery is not wired into the production startup path.",
+      "governance_rule_actions": [
+        {
+          "message": "Jira export recovery is not invoked by production daemon startup. system stop/restart terminates the export worker but leaves its durable operation Running; run_system_start calls lifecycle.start and recover_runtime_state_with_progress, neither of which interrupts active operations. The UI therefore polls indefinitely and cannot retry because retry_jira_export accepts only Interrupted operations.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The recovery test manually calls FileDaemonLifecycleService::recover, but that method is not called by the real daemon startup/restart path. Consequently the committed test does not verify the documented restart-safe recovery behavior and misses the stale-Running operation failure.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Goal Round 4 is implemented and reviewable.\n\nVerification outcomes:\n\n- Focused capability failure/race tests: 2 passed.\n- Route delegation boundary test: 1 passed.\n- Real managed-process cancellation/recovery route test: 1 passed.\n- `cargo test --lib --quiet`: 402 passed, 0 failed.\n- `node --test tests/*.test.js`: 23 passed, 0 failed.\n- JavaScript syntax: 6 files passed.\n- `cargo clippy --lib -- -D warnings`: passed.\n- `cargo fmt --all -- --check`: passed.\n- `git diff --check`: passed.\n\nWhat changed:\n\n- [operations/mod.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-4/src/process/supervisor/operations/mod.rs:303) now owns durable cancellation, associated-process discovery and termination, projection refresh sequencing, and durable failure evidence through `FileOperationRegistry::cancel_supervised`.\n- [operation_routes.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-4/src/surfaces/web_server/operation_routes.rs:218) is reduced to input parsing, one shared-capability invocation, and response serialization.\n- [runtime.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2BGCG909VDSW41YW00D-round-4/src/surfaces/web_server/runtime.rs:55) supplies the existing projection implementation through a narrow shared port.\n- Direct capability and public-route tests preserve authoritative `Cancelled` races, real process termination/interruption, failure logs, and Round 3 UI semantics.\n\nCandidate `55a92886…` was replayed unchanged: original and replayed commits share patch ID `b674bfaf14a40edf79dfeb266aead5a2531b5002`.\n\nFour scoped Round 4 files remain modified and unstaged. Refine’s independent governance gate runs after this implementation report completes the active agent phase.",
       "implementation_reported_at": "2026-07-22T12:39:24Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate 55a92886bbfd6787e48efe9911da63cff0dfc4fd and fix the sole independent governance finding from Round 3. Move all managed-process cancellation orchestration out of src/surfaces/web_server/operation_routes.rs into the existing shared operation/process capability. The shared capability must own durable cancellation state, associated-process enumeration and termination, persistence of termination/projection-refresh failures, and projection refresh; the HTTP route must become a thin input/output adapter that invokes that capability. Reuse the existing FileOperationRegistry and process supervisor rather than adding a second cancellation service. Retain the Round 3 UI, bounded logs, Cancel/Hide/Download semantics, authoritative Cancelled race behavior, and real managed-process interruption/recovery coverage. Add or adjust tests so the shared capability is exercised directly and the public route is proven to delegate with identical semantics. Run focused failure/race tests, the full Rust library suite, browser tests, fmt, clippy, syntax, and diff checks, then pass Refine's independent governance phase.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:39:24Z"
+      "rule_state": "failed",
+      "updated": "2026-07-22T12:43:01Z"
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T12:39:24Z"
+  "updated": "2026-07-22T12:43:01Z"
 }
