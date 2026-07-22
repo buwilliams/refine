@@ -79,6 +79,18 @@ pub struct ChatQueuedMessage {
     pub text: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub internal: bool,
+}
+
+impl ChatSessionRecord {
+    pub fn visible_queued_messages(&self) -> Vec<ChatQueuedMessage> {
+        self.queued_messages
+            .iter()
+            .filter(|message| !is_internal_queued_message(&self.attachment, message))
+            .cloned()
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -211,13 +223,65 @@ impl FileChatService {
             session_id: record.id.clone(),
             lines,
             progress_lines,
-            queued_messages: record.queued_messages.clone(),
+            queued_messages: record.visible_queued_messages(),
             importable_artifacts: record.importable_artifacts.clone(),
             closed_reason: record.interruption_detail.clone(),
             in_flight: record.in_flight || record.queue_dispatching || active_operation,
             provider_session_id: record.provider_session_id.clone(),
             worktree: record.worktree.clone(),
         })
+    }
+
+    pub fn queue_internal_message(
+        &self,
+        session_id: &str,
+        message: &str,
+    ) -> RefineResult<ChatSessionRecord> {
+        let _guard = self.acquire_session_lock(session_id)?;
+        let mut record = self.load_record(session_id)?;
+        if record.closed {
+            return Err(RefineError::Conflict(format!(
+                "Chat session {session_id} is closed"
+            )));
+        }
+        let text = message.trim();
+        if text.is_empty() {
+            return Err(RefineError::InvalidInput("text is required".to_string()));
+        }
+
+        let attachment = record.attachment.clone();
+        let existing_id = record
+            .queued_messages
+            .iter()
+            .find(|queued| is_internal_queued_message(&attachment, queued))
+            .map(|queued| queued.id.clone());
+        let now = now_timestamp();
+        if let Some(existing_id) = existing_id {
+            record.queued_messages.retain(|queued| {
+                !is_internal_queued_message(&attachment, queued) || queued.id == existing_id
+            });
+            if let Some(queued) = record
+                .queued_messages
+                .iter_mut()
+                .find(|queued| queued.id == existing_id)
+            {
+                queued.text = text.to_string();
+                queued.updated_at = now.clone();
+                queued.internal = true;
+            }
+        } else {
+            record.queued_messages.push(ChatQueuedMessage {
+                id: new_queued_message_id(),
+                text: text.to_string(),
+                created_at: now.clone(),
+                updated_at: now.clone(),
+                internal: true,
+            });
+        }
+        record.updated_at = now;
+        self.write_record(&record)?;
+        self.ensure_queue_dispatch(&mut record)?;
+        self.load_record(session_id)
     }
 
     pub fn attach_worktree(
@@ -1148,13 +1212,20 @@ impl FileChatService {
                 }
                 let queued = std::mem::take(&mut record.queued_messages);
                 let message = combined_queued_message(&queued);
-                record.transcript_events.push(chat_event(
-                    "user",
-                    &message,
-                    false,
-                    record.provider_session_id.clone(),
-                    None,
-                ));
+                let visible = queued
+                    .iter()
+                    .filter(|message| !is_internal_queued_message(&record.attachment, message))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if !visible.is_empty() {
+                    record.transcript_events.push(chat_event(
+                        "user",
+                        &combined_queued_message(&visible),
+                        false,
+                        record.provider_session_id.clone(),
+                        None,
+                    ));
+                }
                 record.transcript_events.push(chat_event(
                     "progress",
                     &format!(
@@ -1392,6 +1463,7 @@ impl ChatService for FileChatService {
             text: text.to_string(),
             created_at: now.clone(),
             updated_at: now,
+            internal: false,
         });
         record.updated_at = now_timestamp();
         self.write_record(&record)?;
@@ -1722,6 +1794,14 @@ fn combined_queued_message(messages: &[ChatQueuedMessage]) -> String {
         .map(|(idx, message)| format!("Message {}:\n{}", idx + 1, message.text))
         .collect::<Vec<_>>()
         .join("\n\n")
+}
+
+fn is_internal_queued_message(attachment: &ChatAttachment, message: &ChatQueuedMessage) -> bool {
+    message.internal
+        || (matches!(attachment, ChatAttachment::Supervisor)
+            && message.text.starts_with(
+                "Supervise until the queue is idle using the evidence and Refine's tools.",
+            ))
 }
 
 fn nonempty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {

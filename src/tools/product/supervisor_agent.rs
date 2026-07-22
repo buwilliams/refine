@@ -409,7 +409,7 @@ impl FileSupervisorAgentService {
             let context_key = supervision_context_key(&state, &process_evidence);
             if context_key != state.last_context_key && !provider_blocked {
                 let prompt = supervision_prompt(&state, &process_evidence, &stalled);
-                match chat.append_user_message(&session.id, &prompt) {
+                match chat.queue_internal_message(&session.id, &prompt) {
                     Ok(_) => {
                         state.last_context_key = context_key;
                         push_event(
@@ -751,8 +751,7 @@ fn provider_failure_requires_user(detail: &str) -> bool {
 }
 
 fn supervision_context_key(state: &SupervisorAgentSnapshot, processes: &ProcessEvidence) -> String {
-    let goals = state
-        .goal_states
+    let goals = supervision_relevant_goal_states(state)
         .iter()
         .map(|(id, status)| format!("{id}:{status}"))
         .collect::<Vec<_>>()
@@ -769,6 +768,15 @@ fn supervision_context_key(state: &SupervisorAgentSnapshot, processes: &ProcessE
     )
 }
 
+fn supervision_relevant_goal_states(state: &SupervisorAgentSnapshot) -> BTreeMap<String, String> {
+    state
+        .goal_states
+        .iter()
+        .filter(|(_, status)| !matches!(status.as_str(), "done" | "cancelled"))
+        .map(|(id, status)| (id.clone(), status.clone()))
+        .collect()
+}
+
 fn supervision_prompt(
     state: &SupervisorAgentSnapshot,
     processes: &ProcessEvidence,
@@ -777,7 +785,7 @@ fn supervision_prompt(
     let active_work = state.active_work.to_string();
     let queued_work = state.queued_work.to_string();
     let failed_work = state.failed_work.to_string();
-    let goal_states = format!("{:?}", state.goal_states);
+    let goal_states = format!("{:?}", supervision_relevant_goal_states(state));
     let live_goal_ids = format!("{:?}", processes.live_goal_ids);
     let stalled = format!("{stalled:?}");
     render(
@@ -1177,7 +1185,7 @@ mod tests {
     }
 
     #[test]
-    fn user_and_system_followups_share_the_supervisor_queue_and_transcript() {
+    fn user_steering_is_visible_while_internal_supervision_context_stays_hidden() {
         let service = test_service("shared-followups");
         write_slow_smoke_provider(&service, "shared-supervisor-output");
         write_goal(&service, "GOAL1", "todo", &Utc::now().to_rfc3339());
@@ -1202,7 +1210,7 @@ mod tests {
             .filter_map(|event| event.get("text").and_then(Value::as_str))
             .collect::<Vec<_>>()
             .join("\n");
-        assert!(user_transcript.contains("Supervise until the queue is idle"));
+        assert!(!user_transcript.contains("The workflow evidence changed"));
         assert!(user_transcript.contains("user steering while active"));
     }
 
@@ -1255,18 +1263,19 @@ mod tests {
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].id, session_id);
         assert!(sessions[0].queue_dispatching);
-        let queued_context = sessions[0]
+        let internal_context = sessions[0]
             .queued_messages
             .iter()
-            .map(|message| message.text.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
-        for status in ["in-progress", "failed", "review", "done"] {
-            assert!(
-                queued_context.contains(&format!("\"GOAL1\": \"{status}\"")),
-                "missing {status} context from the shared Supervisor queue"
-            );
-        }
+            .filter(|message| message.internal)
+            .collect::<Vec<_>>();
+        assert_eq!(internal_context.len(), 1);
+        assert!(
+            internal_context[0]
+                .text
+                .contains("Non-terminal Goal states: {}")
+        );
+        assert!(!internal_context[0].text.contains("\"GOAL1\": \"done\""));
+        assert!(sessions[0].visible_queued_messages().is_empty());
         assert_eq!(process_supervisor.list().unwrap().len(), 1);
 
         let final_state = service.snapshot().unwrap();

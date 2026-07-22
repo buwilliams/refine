@@ -370,7 +370,7 @@ impl InProcessWebServer {
                 json!({
                     "ok": true,
                     "in_flight": session.in_flight || session.queue_dispatching,
-                    "queued_messages": session.queued_messages
+                    "queued_messages": session.visible_queued_messages()
                 }),
             ),
             Err(error) => error_response(error),
@@ -405,7 +405,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "ok": true,
-                    "queued_messages": session.queued_messages
+                    "queued_messages": session.visible_queued_messages()
                 }),
             ),
             Err(error) => error_response(error),
@@ -423,7 +423,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "ok": true,
-                    "queued_messages": session.queued_messages
+                    "queued_messages": session.visible_queued_messages()
                 }),
             ),
             Err(error) => error_response(error),

@@ -182,6 +182,7 @@ function ensureChatTabQueueState(tab) {
   if (!tab) return tab;
   tab.queuedMessages = normalizeQueuedMessages(tab.queuedMessages);
   tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages);
+  tab.inputDraft = String(tab.inputDraft || "");
   tab.starting = !!tab.starting;
   tab.sending = !!tab.sending;
   tab.sentUserInput = !!tab.sentUserInput;
@@ -191,6 +192,7 @@ function ensureChatTabQueueState(tab) {
 function normalizeQueuedMessages(messages) {
   if (!Array.isArray(messages)) return [];
   return messages
+    .filter((message) => message?.internal !== true)
     .map((message) => ({
       id: String(message?.id || newLocalQueuedMessageId()),
       text: String(message?.text || ""),
@@ -245,6 +247,7 @@ function saveChatStateToStorage() {
         closedReason: t.closedReason,
         agentResponded: !!t.agentResponded,
         sentUserInput: !!t.sentUserInput,
+        inputDraft: String(t.inputDraft || "").slice(-50_000),
         queuedMessages: normalizeQueuedMessages(t.queuedMessages),
         localQueuedMessages: normalizeQueuedMessages(t.localQueuedMessages),
         starting: !!t.starting,
@@ -656,9 +659,50 @@ function toggleToolbarFullscreen() {
 
 function toggleChatFullscreen() { toggleToolbarFullscreen(); }
 
+function updateChatInputDraft(input) {
+  if (!input) return;
+  const tabId = String(input.dataset?.chatTabId || chatState.activeTabId || "");
+  const tab = chatState.tabs[tabId];
+  if (tab) tab.inputDraft = String(input.value || "");
+}
+
+function captureToolbarChatInputState(root) {
+  const input = root?.querySelector?.("#chat-input");
+  if (!input) return null;
+  updateChatInputDraft(input);
+  const tabId = String(input.dataset?.chatTabId || "");
+  return {
+    tabId,
+    focused: document.activeElement === input,
+    selectionStart: Number.isInteger(input.selectionStart) ? input.selectionStart : null,
+    selectionEnd: Number.isInteger(input.selectionEnd) ? input.selectionEnd : null,
+    selectionDirection: String(input.selectionDirection || "none"),
+    scrollTop: Number(input.scrollTop || 0),
+  };
+}
+
+function restoreToolbarChatInputState(snapshot, activeTabId) {
+  if (!chatState.open || !snapshot?.focused || snapshot.tabId !== activeTabId) return false;
+  const input = $("#chat-input");
+  if (!input || input.disabled) return false;
+  input.focus();
+  if (typeof input.setSelectionRange === "function"
+      && snapshot.selectionStart !== null
+      && snapshot.selectionEnd !== null) {
+    input.setSelectionRange(
+      snapshot.selectionStart,
+      snapshot.selectionEnd,
+      snapshot.selectionDirection,
+    );
+  }
+  input.scrollTop = snapshot.scrollTop;
+  return true;
+}
+
 function drawToolbar() {
   const root = $("#toolbar-dock");
   if (!root) return;
+  const inputRenderState = captureToolbarChatInputState(root);
   ensureStandaloneTab();
   const active = currentToolbarTab();
   const tabs = chatState.tabs;
@@ -800,10 +844,12 @@ function drawToolbar() {
     });
     $("#btn-chat-send")?.addEventListener("click", sendChatLine);
     $("#chat-input")?.addEventListener("input", (e) => {
+      updateChatInputDraft(e.currentTarget);
       resizeChatInput(e.currentTarget);
     });
     resizeChatInput($("#chat-input"));
-    if (shouldKeepChatInputFocused()) focusChatInputSoon();
+    const inputRestored = restoreToolbarChatInputState(inputRenderState, activeId);
+    if (!inputRestored && shouldKeepChatInputFocused()) focusChatInputSoon();
   }
 
   wireToolbarResize(root);
@@ -1036,8 +1082,9 @@ function renderChatPanel(active, {
         <div class="chat-input-wrap">
           <textarea id="chat-input"
                     data-testid="chat-input"
+                    data-chat-tab-id="${htmlEscape(chatState.activeTabId)}"
                     rows="2"
-                    placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
+                    placeholder="${htmlEscape(inputPlaceholder)}">${htmlEscape(active.inputDraft || "")}</textarea>
         </div>
         <button id="btn-chat-send" class="primary" data-testid="chat-send" ${active.sending ? "disabled" : ""}>Send</button>
       </div>
@@ -1050,11 +1097,36 @@ function renderChatOutput(tab) {
     && !String(tab.output || "").trim()
     && !queuedMessages.length
     ? mdToHtml("What do you want to design together?")
-    : mdToHtml(tab?.output || "");
+    : mdToHtml(visibleChatTranscript(tab));
   return transcript
     + renderPendingChatMessages(queuedMessages)
     + renderInlineChatActivity(tab)
     + renderChatContentStatus(tab);
+}
+
+function visibleChatTranscript(tab) {
+  const output = String(tab?.output || "");
+  if (tab?.mode !== "supervisor") return output;
+  const lines = output.split(/\r?\n/);
+  const visible = [];
+  let internalContext = false;
+  for (const line of lines) {
+    const normalized = line.replace(/^>\s*/, "");
+    const startsInternalContext = normalized.startsWith(
+      "Supervise until the queue is idle using the evidence and Refine's tools.",
+    ) || normalized.startsWith("The workflow evidence changed.");
+    if (startsInternalContext) {
+      if (visible.at(-1)?.replace(/^>\s*/, "").match(/^Message \d+:$/)) visible.pop();
+      internalContext = true;
+      continue;
+    }
+    if (internalContext) {
+      if (normalized.startsWith("Actionable stall/loss evidence:")) internalContext = false;
+      continue;
+    }
+    visible.push(line);
+  }
+  return visible.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
 function chatTranscriptScroller(tab, root = document) {
@@ -3028,6 +3100,7 @@ async function clearActiveChat() {
     t.showProgress = false;
     t.closedReason = null;
     t.pending = false;
+    t.inputDraft = "";
     t.queuedMessages = [];
     t.localQueuedMessages = [];
     t.starting = false;
@@ -3763,6 +3836,7 @@ async function sendChatLine() {
   const input = $("#chat-input");
   const text = input.value;
   if (!text.trim()) return;
+  t.inputDraft = "";
   input.value = "";
   resizeChatInput(input);
   requestChatInputFocus();

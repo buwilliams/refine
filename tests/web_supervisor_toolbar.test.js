@@ -39,6 +39,10 @@ class FakeElement {
     this.clientHeight = 0;
     this.scrollHeight = 0;
     this.scrollTop = 0;
+    this.selectionStart = 0;
+    this.selectionEnd = 0;
+    this.selectionDirection = "none";
+    this.listeners = new Map();
   }
 
   get innerHTML() { return this._innerHTML; }
@@ -47,7 +51,15 @@ class FakeElement {
     this.innerHTMLWrites += 1;
   }
 
-  addEventListener() {}
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(listener);
+  }
+  emit(type, event = {}) {
+    for (const listener of this.listeners.get(type) || []) {
+      listener({ target: this, currentTarget: this, ...event });
+    }
+  }
   appendChild() {}
   focus() {}
   insertBefore() {}
@@ -55,6 +67,11 @@ class FakeElement {
   querySelectorAll() { return []; }
   remove() {}
   setAttribute(name, value) { this[name] = String(value); }
+  setSelectionRange(start, end, direction = "none") {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+    this.selectionDirection = direction;
+  }
 }
 
 class FakeEventSource {
@@ -86,13 +103,16 @@ function browserRuntime(storage = new Map()) {
   const chatOutput = new FakeElement();
   const toasts = [];
   const busyLabels = [];
+  let chatInput = null;
+  let document;
   const body = {
     appendChild(element) {
       toasts.push(element);
     },
   };
-  const document = {
+  document = {
     body,
+    activeElement: body,
     documentElement: { style: { setProperty() {} } },
     addEventListener() {},
     createElement() { return new FakeElement(); },
@@ -102,10 +122,35 @@ function browserRuntime(storage = new Map()) {
       if (selector === "#btn-chat-toggle") return toggleButton;
       if (selector === "#chat-output") return toolbar.querySelector(selector);
       if (selector === ".chat-output-box") return toolbar.querySelector(selector);
+      if (selector === "#chat-input") return toolbar.querySelector(selector);
       return null;
     },
     querySelectorAll() { return []; },
   };
+  Object.defineProperty(toolbar, "innerHTML", {
+    get() { return toolbar._innerHTML; },
+    set(value) {
+      const previousInput = chatInput;
+      toolbar._innerHTML = String(value);
+      toolbar.innerHTMLWrites += 1;
+      if (document.activeElement === previousInput) document.activeElement = body;
+      const match = toolbar._innerHTML.match(/<textarea id="chat-input"([\s\S]*?)>([\s\S]*?)<\/textarea>/);
+      chatInput = match ? new FakeElement() : null;
+      if (chatInput) {
+        const tabId = match[1].match(/data-chat-tab-id="([^"]*)"/)?.[1] || "";
+        chatInput.dataset.chatTabId = tabId;
+        chatInput.value = match[2]
+          .replaceAll("&lt;", "<")
+          .replaceAll("&gt;", ">")
+          .replaceAll("&quot;", '"')
+          .replaceAll("&#39;", "'")
+          .replaceAll("&amp;", "&");
+        chatInput.selectionStart = chatInput.value.length;
+        chatInput.selectionEnd = chatInput.value.length;
+        chatInput.focus = () => { document.activeElement = chatInput; };
+      }
+    },
+  });
   toolbar.querySelector = (selector) => {
     if (
       selector === '[data-testid="toolbar-supervisor-panel"]'
@@ -123,6 +168,7 @@ function browserRuntime(storage = new Map()) {
       selector === "#chat-output"
       && toolbar.innerHTML.includes('id="chat-output"')
     ) return chatOutput;
+    if (selector === "#chat-input" && chatInput) return chatInput;
     return null;
   };
   const context = vm.createContext({
@@ -195,6 +241,16 @@ function browserRuntime(storage = new Map()) {
       tabIds() { return Object.keys(chatState.tabs); },
       toggleActivity: toggleChatProgress,
       setApi(nextApi) { api = nextApi; },
+      chatInput() { return document.querySelector("#chat-input"); },
+      typeDraft(value, { start = value.length, end = start, direction = "none", scrollTop = 0 } = {}) {
+        const input = document.querySelector("#chat-input");
+        input.value = value;
+        input.setSelectionRange(start, end, direction);
+        input.scrollTop = scrollTop;
+        input.focus();
+        input.emit("input");
+      },
+      activeElement() { return document.activeElement; },
       setAttached(attached = true) { state.project = { attached }; },
       setRoute(route) { state.currentRoute = route; },
     };
@@ -247,6 +303,77 @@ test("Supervisor stays discoverable and prompt-ready while idle without an event
   assert.doesNotMatch(browser.html(), /data-testid="chat-toggle"/);
   assert.doesNotMatch(browser.html(), /data-testid="supervisor-agent-events"/);
   assert.doesNotMatch(browser.html(), /data-close-tab="supervisor"/);
+});
+
+test("toolbar redraw preserves the active prompt draft, focus, caret, and scroll", () => {
+  const storage = new Map();
+  const browser = browserRuntime(storage);
+  browser.runtime.activate();
+  browser.runtime.draw();
+  const originalInput = browser.runtime.chatInput();
+  const draft = "Keep this <draft> while status updates";
+  browser.runtime.typeDraft(draft, {
+    start: 5,
+    end: 12,
+    direction: "forward",
+    scrollTop: 17,
+  });
+
+  Object.assign(browser.runtime.supervisorTab(), {
+    sessionId: "supervisor-shared",
+    pending: true,
+    progress: "New agent activity arrived",
+  });
+  browser.runtime.draw();
+
+  const replacementInput = browser.runtime.chatInput();
+  assert.notEqual(replacementInput, originalInput, "the toolbar replaced its DOM input");
+  assert.equal(replacementInput.value, draft);
+  assert.equal(browser.runtime.activeElement(), replacementInput);
+  assert.equal(replacementInput.selectionStart, 5);
+  assert.equal(replacementInput.selectionEnd, 12);
+  assert.equal(replacementInput.selectionDirection, "forward");
+  assert.equal(replacementInput.scrollTop, 17);
+
+  browser.runtime.save();
+  const restored = browserRuntime(storage);
+  restored.runtime.restore();
+  restored.runtime.activate();
+  restored.runtime.draw();
+  assert.equal(restored.runtime.chatInput().value, draft);
+});
+
+test("Supervisor transcript hides internal evidence prompts and keeps agent responses", () => {
+  const browser = browserRuntime();
+  browser.runtime.activate();
+  Object.assign(browser.runtime.supervisorTab(), {
+    output: [
+      "> Message 1:",
+      "Supervise until the queue is idle using the evidence and Refine's tools.",
+      "",
+      "Current counts: 0 active, 0 queued, 1 failed.",
+      'Goal states: {"OLD": "done", "FAILED": "failed"}',
+      "Live workflow-agent Goal IDs: {}",
+      "Actionable stall/loss evidence: {}",
+      "",
+      "Message 2:",
+      "The workflow evidence changed. Supervise only work that is actionable now.",
+      "Current counts: 0 active, 0 queued, 1 failed.",
+      'Non-terminal Goal states: {"FAILED": "failed"}',
+      "Live workflow-agent Goal IDs: {}",
+      "Actionable stall/loss evidence: {}",
+      "",
+      "The failed Goal needs user review; no automatic retry was attempted.",
+    ].join("\n"),
+  });
+  browser.runtime.draw();
+
+  const html = browser.html();
+  assert.match(html, /The failed Goal needs user review/);
+  assert.doesNotMatch(html, /Supervise until the queue is idle/);
+  assert.doesNotMatch(html, /The workflow evidence changed/);
+  assert.doesNotMatch(html, /Goal states:/);
+  assert.doesNotMatch(html, /Message [12]:/);
 });
 
 test("overflowing Supervisor transcript scrolls chat-output-box instead of its enclosing toolbar body", () => {

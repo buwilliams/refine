@@ -188,7 +188,7 @@ Nav: Toolbar (bottom dock)
 			Session: Start/Stop standalone, status line (no session / active / ended — reason)
 			Output (Markdown, auto-scroll), read-only pending user messages, docked session status
 			Inline Activity disclosure (collapsed by default; expand for last lines and busy state)
-			Input (always prompt-ready; Enter send, Shift+Enter newline), Send
+			Input (always prompt-ready; draft/focus/caret survive redraws; Enter send, Shift+Enter newline), Send
 			Clear history (confirmation: Clear / Keep history)
 		Goal chat (opened via Open Chat on a Goal)
 			Tab labeled "Goal {id}…", link to goal, Close tab

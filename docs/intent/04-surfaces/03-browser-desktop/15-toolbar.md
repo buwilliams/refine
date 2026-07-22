@@ -35,7 +35,9 @@ Current implementation details that matter to intent:
 - only relevant chat tabs are polled;
 - output and pending messages are session-specific;
 - pending user messages appear in the transcript rather than in a separate editor, while the prompt input remains ready for the next message;
+- prompt drafts, focus, caret selection, and input scroll survive toolbar DOM redraws and remain tab-specific;
 - agent status and activity stay inline with the transcript, with activity collapsed by default;
+- Supervisor transcripts show user steering and agent responses; automatic evidence and provider/tool progress remain internal or under collapsed Activity;
 - toolbar layout can be expanded or resized without changing main route.
 
 The toolbar should expose shared backend capability, not implement its own product rules.
