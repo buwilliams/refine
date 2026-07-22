@@ -21,7 +21,9 @@ The Feature UI should show Feature identity, description, reporter, assignee, no
 Current implementation details that matter to intent:
 
 - Feature rows use shared table, filter, sort, bulk, and pagination behavior;
-- Feature details include a rollup and Goal list;
+- Feature details include a rollup, one always-visible inline Goal composer, and an ordered Goal list;
+- the same inline composer creates Goals and edits editable Goal metadata, prompts, priority, and sequence placement without nesting another modal;
+- ordered placement expresses Feature dependencies as a visible “after” relationship while independent Goals remain unordered;
 - completed or protected Goals should not be casually disrupted by Feature-level actions;
 - large Feature-managed Goal collections need pagination or incremental loading;
 - Feature work should reuse shared work item services rather than page-only rules.

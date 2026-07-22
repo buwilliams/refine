@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::model::goal::GoalIndexProjection;
+use crate::model::workflow::GoalStatus;
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BulkGoalFilter {
     pub status: Option<String>,
@@ -125,3 +128,76 @@ pub struct WorkflowEnforcementSummary {
     pub checked: usize,
     pub automated: Vec<String>,
 }
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeatureGoalPlacement {
+    #[default]
+    Unordered,
+    First,
+    After(String),
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct FeatureGoalAuthoringRequest {
+    pub goal_id: Option<String>,
+    pub name: Option<String>,
+    pub prompt: String,
+    pub reporter: String,
+    pub assignee: Option<String>,
+    pub priority: String,
+    #[serde(default)]
+    pub placement: FeatureGoalPlacement,
+    #[serde(default)]
+    pub duplicate_decision: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GoalAuthoringRequest {
+    pub id: Option<String>,
+    pub goal_id: Option<String>,
+    pub name: Option<String>,
+    pub prompt: String,
+    pub reporter: String,
+    pub assignee: Option<String>,
+    pub priority: String,
+    pub feature_id: Option<String>,
+    pub placement: FeatureGoalPlacement,
+    pub duplicate_decision: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct FeatureGoalAuthoringCapability {
+    pub editable: bool,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GoalAuthoringDuplicate {
+    pub id: String,
+    pub name: String,
+    pub status: GoalStatus,
+    pub node_id: Option<String>,
+    pub node_display_name: Option<String>,
+    pub prompt: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GoalAuthoringDuplicateMove {
+    pub moved: bool,
+    pub from: GoalStatus,
+    pub to: GoalStatus,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct GoalAuthoringResult {
+    pub created: bool,
+    pub goal: Option<GoalIndexProjection>,
+    pub duplicate_action: Option<String>,
+    pub duplicate: Option<GoalAuthoringDuplicate>,
+    pub move_result: Option<GoalAuthoringDuplicateMove>,
+    pub requires_duplicate_decision: bool,
+}
+
+pub type FeatureGoalAuthoringResult = GoalAuthoringResult;

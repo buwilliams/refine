@@ -614,7 +614,14 @@ function renderFeatureGoalTable(goals, options = {}) {
         </button>
       </td>` : ""}
       <td data-label="Order" data-testid="feature-goal-order">${ordered ? htmlEscape(goal.feature_order) : '<span class="muted">Unordered</span>'}</td>
-      <td data-label="Goal"><a href="#/goals/${encodeURIComponent(goal.id)}" data-testid="feature-goal-link">${htmlEscape(goal.name || goal.id)}</a></td>
+      <td data-label="Goal">
+        <a href="#/goals/${encodeURIComponent(goal.id)}" data-testid="feature-goal-link">${htmlEscape(goal.name || goal.id)}</a>
+        ${ordered && previousOrdered
+          ? `<div class="muted small feature-goal-dependency" data-testid="feature-goal-dependency">After ${htmlEscape(previousOrdered.name || previousOrdered.id)}</div>`
+          : ordered
+            ? '<div class="muted small feature-goal-dependency" data-testid="feature-goal-dependency">First in sequence</div>'
+            : '<div class="muted small feature-goal-dependency" data-testid="feature-goal-dependency">Independent</div>'}
+      </td>
       <td data-label="Status"><span class="status-pill ${htmlEscape(goal.status || "backlog")}" data-testid="feature-goal-status">${workflowStatusLabel(goal.status || "backlog")}</span></td>
       <td data-label="Priority" data-testid="feature-goal-priority">${htmlEscape(goal.priority || "low")}</td>
       <td data-label="Reporter" data-testid="feature-goal-reporter">${htmlEscape(goal.reporter || "-")}</td>
@@ -622,6 +629,11 @@ function renderFeatureGoalTable(goals, options = {}) {
       <td data-label="Updated" data-testid="feature-goal-updated">${fmtTime(goal.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
+          <button class="secondary small feature-goal-edit-btn" data-feature-edit-goal="${htmlEscape(goal.id)}"
+                  data-testid="feature-goal-edit"
+                  aria-label="Edit ${htmlEscape(goal.name || goal.id)} inline"
+                  title="${featureGoalCanInlineEdit(goal) ? "Edit inline" : htmlEscape(goal.feature_authoring?.reason || "This Goal cannot be edited") }"
+                  ${featureGoalCanInlineEdit(goal) ? "" : "disabled"}>Edit</button>
           <button class="secondary small feature-goal-icon-btn" data-feature-order-toggle="${ordered ? "unorder" : "order"}"
                   data-goal-id="${htmlEscape(goal.id)}"
                   data-testid="feature-goal-order-toggle"
@@ -815,12 +827,9 @@ function openFeatureModal(feature = null, options = {}) {
           ${missingFeatureAssignee}
           ${reporterOptions}
         </select>
-        ${feature ? `<div class="feature-modal-goal-heading">
+        ${feature ? `${renderFeatureGoalInlineComposer(goals, state.lastReporter || "")}
+        <div class="feature-modal-goal-heading">
           <div class="modal-title compact">Feature Goals</div>
-          <div class="actions feature-goal-heading-actions">
-            <button type="button" class="secondary small feature-goal-add-btn"
-                    data-feature-new-goal data-testid="feature-new-goal" aria-label="New Goal" title="New Goal">+</button>
-          </div>
         </div>
         ${renderFeatureGoalTable(goals, {
           actions: true,
@@ -837,7 +846,16 @@ function openFeatureModal(feature = null, options = {}) {
   _featureModalRoot = root;
   const close = () => closeFeatureModal({ navigateAway });
   function onKey(e) {
-    if (e.key === "Escape") { e.preventDefault(); close(); }
+    if (e.key === "Escape") {
+      const composer = root.querySelector("[data-feature-goal-composer]");
+      if (composer?.contains(e.target) && root._featureComposerHasDraft?.()) {
+        e.preventDefault();
+        root._featureComposerReset?.({ focus: true });
+        return;
+      }
+      e.preventDefault();
+      close();
+    }
   }
   document.addEventListener("keydown", onKey, true);
   root._cleanup = () => document.removeEventListener("keydown", onKey, true);
@@ -883,13 +901,7 @@ function openFeatureModal(feature = null, options = {}) {
       const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
       openFeatureModal(data.feature, { goalPage, navigateAway });
     };
-    root.querySelector("[data-feature-new-goal]")?.addEventListener("click", () => {
-      close();
-      openFeatureNewGoalFlow(feature.id, async () => {
-        const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
-        openFeatureModal(data.feature, { navigateAway });
-      });
-    });
+    bindFeatureGoalInlineComposer(root, feature, { goalPage, navigateAway });
     bindFeatureGoalActions(root, feature.id, reloadModal);
     bindFeatureGoalDragReorder(root, feature.id, reloadModal);
     bindPaginationControls(root, "feature-modal-goals", (pageNo) => {
@@ -906,8 +918,11 @@ function openFeatureModal(feature = null, options = {}) {
           reload: reloadModal,
         }));
     });
+    if (options.focusComposer) {
+      root.querySelector("[data-feature-goal-form] textarea[name='prompt']")?.focus();
+    }
   }
-  root.querySelector("#feature-name")?.focus();
+  if (!options.focusComposer) root.querySelector("#feature-name")?.focus();
 }
 
 function bindFeatureAutosave(root, feature) {
@@ -1109,15 +1124,6 @@ function bindFeatureGoalActions(root, featureId, onChanged) {
         showActionError(e, "Delete failed");
       }
     });
-  });
-}
-
-function openFeatureNewGoalFlow(featureId, onSaved) {
-  openNewGoalModal({
-    featureId,
-    onSaved: async () => {
-      await onSaved?.();
-    },
   });
 }
 

@@ -212,23 +212,69 @@
   margin-top: 16px;
   margin-bottom: 8px;
 }
+
+.feature-goal-composer {
+  margin: 22px 0 18px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+}
+.feature-goal-composer-head,
+.feature-goal-composer-actions,
+.feature-goal-composer-pair {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.feature-goal-composer-head {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.feature-goal-composer-head h3,
+.feature-goal-composer-head p {
+  margin: 0;
+}
+.feature-goal-composer-head p {
+  margin-top: 3px;
+}
+.feature-goal-composer-reporter {
+  margin-bottom: 10px;
+}
+.feature-goal-composer-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(250px, 2fr);
+  gap: 14px;
+}
+.feature-goal-composer-side,
+.feature-goal-prompt-field {
+  min-width: 0;
+}
+.feature-goal-composer-pair > .form-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.feature-goal-composer input,
+.feature-goal-composer select,
+.feature-goal-composer textarea {
+  width: 100%;
+}
+.feature-goal-composer textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+.feature-goal-composer-actions {
+  align-items: center;
+  margin-top: 12px;
+}
+.feature-goal-form-status.error {
+  color: var(--color-danger);
+}
+.feature-goal-composer [hidden] {
+  display: none;
+}
 .feature-modal-goal-heading .modal-title {
   margin-bottom: 0;
-}
-.feature-goal-heading-actions {
-  margin-left: auto;
-  justify-content: flex-end;
-}
-.feature-goal-add-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  line-height: 1;
 }
 
 /* --- Command palette -------------------------------------------------- */
@@ -432,5 +478,24 @@
   }
   .command-palette-row-group {
     display: none;
+  }
+  .feature-goal-composer {
+    margin: 18px 0 14px;
+    padding: 12px;
+  }
+  .feature-goal-composer-fields {
+    display: block;
+  }
+  .feature-goal-composer-pair {
+    display: block;
+  }
+  .feature-goal-composer-actions {
+    flex-wrap: wrap;
+  }
+  .feature-goal-composer-actions .spacer {
+    display: none;
+  }
+  .feature-goal-composer-actions button {
+    flex: 1 1 auto;
   }
 }
