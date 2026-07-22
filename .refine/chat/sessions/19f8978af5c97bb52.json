@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T12:35:03Z",
+  "updated_at": "2026-07-22T12:38:31Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -588,6 +588,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The independent Quality-core governance gate found another territory/map mismatch and failed candidate `6afbef6…`. I’m pulling its exact rule evidence now; the downstream Quality Goals remain parked, so this failure has not propagated into overlapping work."
+    },
+    {
+      "created_at": "2026-07-22T12:38:31Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784723911353-88",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Autonomous recovery has produced candidate `2d56ca2…` after all-target tests and clippy and has entered independent governance. Its round stayed active through the agent-to-governance handoff, which matches the process evidence; no false “lost worker” recovery was triggered."
     }
   ],
   "queue_dispatching": true,
