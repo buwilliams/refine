@@ -1,7 +1,7 @@
 {
   "base_commit": "6b9638ce18ebcfee70cf6cda7f785ca91c06fcc8",
-  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-5",
-  "candidate_commit": "4da89bd0a230f26a5e0547960ad0d69af0fd1cae",
+  "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-6",
+  "candidate_commit": null,
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -355,9 +355,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T16:58:26Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T16:59:21Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve and build on Round 5 candidate 4da89bd; do not replace its verified migration, retry, settlement, app-switch, and daemon-provider work. Correct only the remaining shared-consistency violations. 1. At the actual claim, promote, retry, and start commitment boundary, revalidate the Goal workflow_revision, status, eligibility, ownership, and relevant workflow-state version under the shared coordination model. A Goal mutation that wins first must make the stale workflow decision fail without publishing Claimed or Running state, acquiring capacity, or rolling the Goal back. Make retry rollback plus its linked claim recoverable as one commitment, with deterministic repair of any partial evidence. 2. Recovery must never fail or interrupt a claim merely because a second daemon or runtime observes the same target. Before changing an active Goal or claim, prove the owning supervised provider process is absent across the target-app runtime/process evidence; a live provider under another runtime remains authoritative. Preserve explicit ownership and add deterministic takeover only after absence is proven. 3. Preserve true Git conflicts regardless of unequal workflow_revision values. Revision magnitude alone is not evidence that a user reviewed a conflict. Reuse durable sync baseline/conflict evidence so only a new authoritative edit made after observing that specific conflict resolves it; blind retries and pre-existing unequal offline edits must remain conflicted while unrelated records converge. 4. Derive target-app identity from the configured git_remote rather than hard-coded origin, while preserving compatible existing identity records. Prove independent clones using a renamed or non-origin configured remote converge on the same identity. 5. Extend the smallest production-shaped evidence to run two workflow-enabled daemons simultaneously against the same target and Node, keep a real managed provider alive in one while the other performs startup recovery, and prove no duplicate launch, failure, interruption, or capacity theft. Add a concurrent unequal-revision same-Goal conflict test, then an explicit post-conflict edit that resolves it. Preserve all prior focused, serial, full-workflow, and two-daemon gates. Do not expand into Quality, Supervisor, UI, or unrelated cleanup.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T16:59:21Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T16:58:26Z"
+  "updated": "2026-07-22T16:59:22Z"
 }
