@@ -52,10 +52,10 @@
     "00000SZ2HZHQX2TXXQ7SXVA00D": "todo"
   },
   "open_issues": {
-    "workflow": "Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_8\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"for f in /home/buddy/projects/refine-next/.git/refine-live-state/goals/*/*/goal.json; do jq -r '[.created,.id,.name,.status] | @tsv' \\\\\\\"\\\"'$f\\\"; done | sort | tail -40\\nrg -n \\\"consistency\\\" /home/buddy/projects/refine-next/.git/refine-live-state/goals -g goal.json | head -80'\",\"aggregated_output\":\"2026-07-21T19:58:16Z\\t00000SZ1J1YD7KCM6JNJRB8000\\tWhen I tried to change the model I get an error "
+    "workflow": "Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_9\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n \\\\\\\"round|claim|operation|lease|capacity|target.app|worktree|branch|managed process|evidence|authoritative|transaction|concurr|stale|crash|migration|legacy\\\\\\\" docs/intent | sed -n '1,320p'\\nrg -n \\\\\\\"struct (WorkflowClaim|Operation|ManagedProcess|Capacity|Round)|enum (WorkflowClaimState|OperationState)|capacity lease|target_app_id|target_app_root|worktree\\\\\\\" src/model src/workflow src/pro"
   },
-  "last_context_key": "goals=00000SZ2HZ9S31P6FH65XVA00C:todo,00000SZ2HZHQX2TXXQ7SXVA00D:todo|live={}|quiet={}|issues=workflow:Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_8\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"for f in /home/buddy/projects/refine-next/.git/refine-live-state/goals/*/*/goal.json; do jq -r '[.created,.id,.name,.status] | @tsv' \\\\\\\"\\\"'$f\\\"; done | sort | tail -40\\nrg -n \\\"consistency\\\" /home/buddy/projects/refine-next/.git/refine-live-state/goals -g goal.json | head -80'\",\"aggregated_output\":\"2026-07-21T19:58:16Z\\t00000SZ1J1YD7KCM6JNJRB8000\\tWhen I tried to change the model I get an error ",
-  "updated_at": "2026-07-22T14:36:49.594440135+00:00",
+  "last_context_key": "goals=00000SZ2HZ9S31P6FH65XVA00C:todo,00000SZ2HZHQX2TXXQ7SXVA00D:todo|live={}|quiet={}|issues=workflow:Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_9\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n \\\\\\\"round|claim|operation|lease|capacity|target.app|worktree|branch|managed process|evidence|authoritative|transaction|concurr|stale|crash|migration|legacy\\\\\\\" docs/intent | sed -n '1,320p'\\nrg -n \\\\\\\"struct (WorkflowClaim|Operation|ManagedProcess|Capacity|Round)|enum (WorkflowClaimState|OperationState)|capacity lease|target_app_id|target_app_root|worktree\\\\\\\" src/model src/workflow src/pro",
+  "updated_at": "2026-07-22T14:37:01.611560356+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -731,6 +731,15 @@
       "goal_id": "00000SZ2HZHQX2TXXQ7SXVA00D",
       "actionable": false,
       "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T14:37:00.601460531+00:00-70",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_9\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n \\\\\\\"round|claim|operation|lease|capacity|target.app|worktree|branch|managed process|evidence|authoritative|transaction|concurr|stale|crash|migration|legacy\\\\\\\" docs/intent | sed -n '1,320p'\\nrg -n \\\\\\\"struct (WorkflowClaim|Operation|ManagedProcess|Capacity|Round)|enum (WorkflowClaimState|OperationState)|capacity lease|target_app_id|target_app_root|worktree\\\\\\\" src/model src/workflow src/pro",
+      "created_at": "2026-07-22T14:37:00.601460531+00:00",
+      "actionable": true,
+      "retryable": true
     }
   ]
 }
