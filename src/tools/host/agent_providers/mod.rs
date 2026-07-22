@@ -200,8 +200,10 @@ impl HostAgentProviderService {
             invocation.session_id.as_deref(),
             cwd,
         );
+        let stdin = spec.prompt_stdin(&invocation.prompt);
         self.run_provider_command_result_with_output(
             &args,
+            stdin,
             cwd,
             spec.output_format,
             invocation.process_metadata,
@@ -255,6 +257,7 @@ impl HostAgentProviderService {
         self.run_provider_command_result_with_output(
             &args,
             None,
+            None,
             spec.output_format,
             process_metadata,
             on_output,
@@ -264,6 +267,7 @@ impl HostAgentProviderService {
     fn run_provider_command_result_with_output<F>(
         &self,
         args: &[String],
+        stdin: Option<String>,
         cwd: Option<&Path>,
         output_format: &str,
         process_metadata: Map<String, Value>,
@@ -289,7 +293,7 @@ impl HostAgentProviderService {
                 args: rest.to_vec(),
                 cwd: cwd.map(|path| path.display().to_string()),
                 env: Vec::new(),
-                stdin: None,
+                stdin,
                 limits: Some(ProcessResourceLimits {
                     kill_on_parent_exit: true,
                     ..Default::default()
@@ -453,7 +457,9 @@ impl ProviderSpec {
                 if let Some(cwd) = cwd {
                     args.extend(["-C".to_string(), cwd.display().to_string()]);
                 }
-                args.push(prompt.to_string());
+                if !prompt.is_empty() {
+                    args.push("-".to_string());
+                }
                 args
             }
             "gemini" => vec![
@@ -515,7 +521,7 @@ impl ProviderSpec {
                     session_id.unwrap_or_default().to_string(),
                 ];
                 if !prompt.is_empty() {
-                    args.push(prompt.to_string());
+                    args.push("-".to_string());
                 }
                 args
             }
@@ -539,6 +545,10 @@ impl ProviderSpec {
             }
             _ => self.agent_args(binary_path, prompt, cwd),
         }
+    }
+
+    fn prompt_stdin(&self, prompt: &str) -> Option<String> {
+        (self.name == "codex" && !prompt.is_empty()).then(|| prompt.to_string())
     }
 }
 
@@ -959,6 +969,45 @@ mod tests {
         assert!(output.contains("agent_message"));
         assert!(temp_root.join("run/8080/processes").exists());
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn host_provider_service_sends_large_codex_prompts_over_stdin() {
+        let temp_root = unique_temp_dir("provider-large-codex-prompt");
+        let bin_dir = temp_root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let codex = bin_dir.join("codex");
+        fs::write(
+            &codex,
+            concat!(
+                "#!/bin/sh\n",
+                "test \"$6\" = - || exit 2\n",
+                "test \"$(wc -c)\" -eq 1048576 || exit 3\n",
+                "printf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"large prompt received\"}}'\n",
+            ),
+        )
+        .unwrap();
+        make_executable(&codex);
+
+        let service = HostAgentProviderService {
+            path_override: Some(bin_dir.display().to_string()),
+            runtime_root: Some(temp_root.join("run/8080")),
+        };
+        for session_id in [None, Some("session-1".to_string())] {
+            let result = service
+                .invoke_detailed(ProviderInvocation {
+                    provider: "codex".to_string(),
+                    prompt: "x".repeat(1024 * 1024),
+                    session_id,
+                    cwd: None,
+                    process_metadata: Default::default(),
+                })
+                .unwrap();
+
+            assert_eq!(result.output, "large prompt received");
+        }
         fs::remove_dir_all(temp_root).unwrap();
     }
 
