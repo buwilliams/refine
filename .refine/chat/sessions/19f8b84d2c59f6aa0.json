@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:37:16Z",
+  "updated_at": "2026-07-22T20:38:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -195,18 +195,101 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 2 was added successfully. The installed CLI rejects `goal undo` from `failed` despite the model permitting a failed→todo user transition, so I’m not bypassing the service with a JSON edit. I’m checking the supported bulk/workflow transition path that the browser uses for this exact move."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8b88af479f6e91",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ2TPQM61AGWJW8XC4001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-22T20:33:38Z",
-      "updated_at": "2026-07-22T20:37:16Z",
-      "internal": true
+      "created_at": "2026-07-22T20:37:42Z",
+      "delivered": false,
+      "id": "evt-1784752662932-0",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Daemon restarted before the provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T20:37:43Z",
+      "delivered": false,
+      "extra": {
+        "source": "agent_capacity"
+      },
+      "id": "evt-1784752663739-6",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Queued; waiting for shared agent capacity."
+    },
+    {
+      "created_at": "2026-07-22T20:37:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752678275-45",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The authoritative bulk transition succeeded: exactly one goal was updated, with zero failures or skips. I’m doing a final read-back of the durable goal and supervisor projection to confirm round count and `todo` state."
+    },
+    {
+      "created_at": "2026-07-22T20:38:26Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752706294-53",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Added round 2 to goal `00000SZ2TPQM61AGWJW8XC4001`, covering all eight governance findings and required failure-path verification.\n\nThe goal was returned to `todo`; the active workflow immediately claimed it, so it is now `in-progress` with:\n\n- Round 2 worktree created\n- Live Codex worker running\n- Supervisor health `healthy`\n- No merges forced, worktrees removed, or provider/authentication failures hidden\n- Main worktree clean"
+    },
+    {
+      "created_at": "2026-07-22T20:38:26Z",
+      "delivered": false,
+      "id": "evt-1784752706485-55",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Added round 2 to goal `00000SZ2TPQM61AGWJW8XC4001`, covering all eight governance findings and required failure-path verification.\n\nThe goal was returned to `todo`; the active workflow immediately claimed it, so it is now `in-progress` with:\n\n- Round 2 worktree created\n- Live Codex worker running\n- Supervisor health `healthy`\n- No merges forced, worktrees removed, or provider/authentication failures hidden\n- Main worktree clean"
+    },
+    {
+      "created_at": "2026-07-22T20:38:26Z",
+      "delivered": false,
+      "id": "evt-1784752706485-56",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T20:38:26Z",
+      "delivered": false,
+      "id": "evt-1784752706500-58",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ2TPQM61AGWJW8XC4001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}"
+    },
+    {
+      "created_at": "2026-07-22T20:38:26Z",
+      "delivered": false,
+      "id": "evt-1784752706500-59",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 2 queued messages to the provider."
+    },
+    {
+      "created_at": "2026-07-22T20:38:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752712725-61",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll verify the current durable goal and live-worker evidence, then intervene only if it shows an actionable stall, loss, or a decision boundary. I won’t retry, cancel, merge, or alter state based solely on the earlier transient failures."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
