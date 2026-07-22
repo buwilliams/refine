@@ -2156,6 +2156,13 @@ fn cluster_commands_use_shared_cluster_service() {
 
 #[test]
 fn agent_configure_and_diagnose_use_provider_service() {
+    let supervisor = Cli::try_parse_from(["refine", "agent", "supervisor"]).unwrap();
+    assert!(matches!(
+        supervisor.command,
+        Commands::Agent {
+            action: AgentAction::Supervisor
+        }
+    ));
     dispatch(
         Cli::try_parse_from(["refine", "agent", "configure", "--provider", "smoke-ai"]).unwrap(),
     )

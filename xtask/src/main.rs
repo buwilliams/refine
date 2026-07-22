@@ -21,6 +21,7 @@ fn main() {
         Some("test-rust") => test_rust(),
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
+        Some("test-browser") => test_browser(),
         Some("test-cluster-ssh") => test_cluster_ssh(),
         Some("test-install-uninstall") => test_install_uninstall(),
         Some("test-full-workflow") => test_full_workflow(),
@@ -37,12 +38,17 @@ fn main() {
 
 fn release_plan() -> Result<(), String> {
     let root = repo_root()?;
-    let bump = std::env::args().nth(2).unwrap_or_else(|| "patch".to_string());
+    let bump = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "patch".to_string());
     let bump = ReleaseBump::parse(&bump).map_err(|error| error.to_string())?;
     let plan = FileReleaseService::new(&root, root.join("run"))
         .plan(bump)
         .map_err(|error| error.to_string())?;
-    println!("{}", serde_json::to_string_pretty(&plan).map_err(|error| error.to_string())?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&plan).map_err(|error| error.to_string())?
+    );
     Ok(())
 }
 
@@ -50,8 +56,14 @@ fn release_check() -> Result<(), String> {
     let root = repo_root()?;
     let checks = [
         ("format", vec!["fmt", "--all", "--", "--check"]),
-        ("unit tests", vec!["test", "--lib", "--bins", "--", "--test-threads=1"]),
-        ("locked release build", vec!["build", "--release", "--locked"]),
+        (
+            "unit tests",
+            vec!["test", "--lib", "--bins", "--", "--test-threads=1"],
+        ),
+        (
+            "locked release build",
+            vec!["build", "--release", "--locked"],
+        ),
     ];
     for (label, args) in checks {
         run(Command::new("cargo").args(args).current_dir(&root), label)?;
@@ -67,6 +79,7 @@ fn release_check() -> Result<(), String> {
 fn check_all() -> Result<(), String> {
     print_api_contract()?;
     check_static_assets()?;
+    test_browser()?;
     print_runtime_layout()
 }
 
@@ -136,16 +149,22 @@ fn test_smoke_ai() -> Result<(), String> {
     let repo_root = repo_root()?;
     run(
         Command::new("cargo")
-            .args(["build", "--manifest-path", "tests/fixtures/smoke-ai/Cargo.toml"])
+            .args([
+                "build",
+                "--manifest-path",
+                "tests/fixtures/smoke-ai/Cargo.toml",
+            ])
             .current_dir(&repo_root),
         "build smoke-ai fixture",
     )?;
     let smoke_ai = fixture_binary_path(&repo_root, "smoke-ai");
-    let stderr_path = repo_root
-        .join("target/refine-integration/artifacts/smoke-ai/stderr.log");
+    let stderr_path = repo_root.join("target/refine-integration/artifacts/smoke-ai/stderr.log");
     if let Some(parent) = stderr_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
-            format!("failed to create smoke-ai artifact directory {}: {error}", parent.display())
+            format!(
+                "failed to create smoke-ai artifact directory {}: {error}",
+                parent.display()
+            )
         })?;
     }
     let mut command = Command::new("cargo");
@@ -177,6 +196,37 @@ fn test_cli() -> Result<(), String> {
         .env("REFINE_DAEMON_PORT", test_port())
         .env("REFINE_SMOKE_AI_PATH", smoke_ai);
     run(&mut command, "run CLI surface tests")
+}
+
+fn test_browser() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    let tests_root = repo_root.join("tests");
+    let mut tests = Vec::new();
+    for entry in fs::read_dir(&tests_root)
+        .map_err(|error| format!("failed to read {}: {error}", tests_root.display()))?
+    {
+        let path = entry
+            .map_err(|error| {
+                format!(
+                    "failed to inspect an entry under {}: {error}",
+                    tests_root.display()
+                )
+            })?
+            .path();
+        if path.to_string_lossy().ends_with(".test.js") {
+            tests.push(path);
+        }
+    }
+    tests.sort();
+    if tests.is_empty() {
+        return Err(format!(
+            "no browser JavaScript tests found under {}",
+            tests_root.display()
+        ));
+    }
+    let mut command = Command::new("node");
+    command.arg("--test").args(tests).current_dir(&repo_root);
+    run(&mut command, "run browser JavaScript tests")
 }
 
 fn test_cluster_ssh() -> Result<(), String> {
@@ -307,7 +357,10 @@ fn check_static_assets() -> Result<(), String> {
     let static_root = repo_root.join("src/surfaces/web/static");
     let assets = collect_files(&static_root)?;
     if assets.is_empty() {
-        return Err(format!("no static assets found under {}", static_root.display()));
+        return Err(format!(
+            "no static assets found under {}",
+            static_root.display()
+        ));
     }
     println!(
         "{}",
@@ -336,7 +389,11 @@ fn repo_root() -> Result<PathBuf, String> {
 fn ensure_smoke_ai_built(repo_root: &Path) -> Result<PathBuf, String> {
     run(
         Command::new("cargo")
-            .args(["build", "--manifest-path", "tests/fixtures/smoke-ai/Cargo.toml"])
+            .args([
+                "build",
+                "--manifest-path",
+                "tests/fixtures/smoke-ai/Cargo.toml",
+            ])
             .current_dir(repo_root),
         "build smoke-ai fixture",
     )?;

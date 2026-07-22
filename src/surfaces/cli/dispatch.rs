@@ -793,6 +793,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Agent {
+            action: AgentAction::Supervisor,
+        } => {
+            let response = daemon_json("GET", "/supervisor-agent", None)?;
+            print_json(&response);
+            Ok(())
+        }
+        Commands::Agent {
             action: AgentAction::Detect,
         } => {
             let providers = HostAgentProviderService::new().detect()?;
@@ -2738,6 +2745,7 @@ fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
 #[cfg(not(test))]
 fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
     let response = match action {
+        AgentAction::Supervisor => daemon_json("GET", "/supervisor-agent", None)?,
         AgentAction::Detect => daemon_json("GET", "/agents", None)?,
         AgentAction::Configure { provider } => daemon_json(
             "POST",

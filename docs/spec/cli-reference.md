@@ -542,6 +542,10 @@ Build a support bundle of diagnostics and logs for troubleshooting, redacting se
 
 Manage coding agent providers (e.g. claude): detect, configure, authenticate, diagnose, and invoke directly
 
+### `refine agent supervisor`
+
+Show the shared supervisor agent lifecycle, health, and recovery evidence
+
 ### `refine agent detect`
 
 Detect which agent provider CLIs are installed and available on this host

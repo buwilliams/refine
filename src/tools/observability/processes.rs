@@ -171,10 +171,10 @@ fn append_chat_session_processes(
 
 fn is_process_visible_chat_session(session: &ChatSessionRecord) -> bool {
     !session.closed
-        && matches!(session.mode.as_str(), "standalone" | "goal")
+        && matches!(session.mode.as_str(), "standalone" | "goal" | "supervisor")
         && matches!(
             session.attachment,
-            ChatAttachment::Standalone | ChatAttachment::Goal(_)
+            ChatAttachment::Standalone | ChatAttachment::Goal(_) | ChatAttachment::Supervisor
         )
 }
 

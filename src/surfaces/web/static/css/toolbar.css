@@ -1065,3 +1065,57 @@ button.chat-activity-toggle:hover:not(:disabled) {
     max-height: 32vh;
   }
 }
+.supervisor-agent-panel {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.supervisor-agent-summary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.supervisor-agent-health {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.supervisor-agent-health-healthy { color: var(--success, #2f9e62); }
+.supervisor-agent-health-attention { color: var(--warning, #c47f17); }
+.supervisor-agent-health-degraded,
+.supervisor-agent-health-unavailable { color: var(--danger, #d45555); }
+
+.supervisor-agent-events {
+  background: var(--panel, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 150px;
+  overflow: auto;
+}
+
+.supervisor-agent-event {
+  align-items: baseline;
+  display: grid;
+  font-size: 12px;
+  gap: 8px;
+  grid-template-columns: auto auto minmax(200px, 1fr) auto auto;
+  padding: 6px 8px;
+}
+
+.supervisor-agent-event + .supervisor-agent-event { border-top: 1px solid var(--border); }
+.supervisor-agent-event time,
+.supervisor-agent-event-kind { color: var(--muted); }
+.supervisor-agent-event-error,
+.supervisor-agent-event-blocked { border-left: 3px solid var(--danger, #d45555); }
+.supervisor-agent-retryable { color: var(--warning, #c47f17); font-weight: 600; }
+.supervisor-agent-empty,
+.supervisor-agent-error { padding: 8px; }
+.supervisor-agent-error { color: var(--danger, #d45555); }

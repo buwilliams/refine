@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Persistent Utility Dock**: the toolbar is always available without replacing the main route.
-- **Multi-Tool Surface**: System, Files, Terminal, Standalone, Goal chat, and live Goal logs belong together as operational aids.
+- **Multi-Tool Surface**: Supervisor, System, Files, Terminal, Standalone, Goal chat, and live Goal logs belong together as operational aids.
 - **Contextual Chat**: chat can attach to a Goal or remain standalone.
 - **Stateful But Recoverable**: toolbar state should persist enough to survive normal navigation without owning product state.
 
@@ -17,6 +17,7 @@ It should reduce context switching without turning every tool into a full page. 
 
 The toolbar should provide persistent assistance for work in progress:
 
+- Supervisor shows durable workflow health and supports conversational steering;
 - System shows local notices and operation events;
 - Files lets users inspect project files and search source;
 - Terminal exposes controlled shell access;
@@ -26,7 +27,9 @@ The toolbar should provide persistent assistance for work in progress:
 
 Current implementation details that matter to intent:
 
-- toolbar tab order is System, Files, Terminal, Standalone, then opened Goal chat and log tabs;
+- toolbar tab order is Supervisor, System, Files, Terminal, Standalone, then opened Goal chat and log tabs;
+- Supervisor is always present, including while idle, and reads shared backend state;
+- Supervisor provider, authentication, and Stop failures remain visible with retry guidance instead of being reduced to an idle state;
 - tab state is stored in browser local storage;
 - only relevant chat tabs are polled;
 - output and queued messages are session-specific;

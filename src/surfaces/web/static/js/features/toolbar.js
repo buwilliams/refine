@@ -8,8 +8,9 @@
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const SYSTEM_TAB_ID = "system";
+const SUPERVISOR_TAB_ID = "supervisor";
 const TERMINAL_TAB_ID = "terminal";
-const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
+const STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID, SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
 const SYSTEM_LOG_FILTERS = [
@@ -43,6 +44,12 @@ const chatState = {
 const systemOperationState = {
   messages: [],
   filters: new Set(),
+};
+const supervisorAgentState = {
+  snapshot: null,
+  loading: false,
+  error: "",
+  timer: null,
 };
 const filesState = {
   path: "",
@@ -90,10 +97,22 @@ function ensureStandaloneTab() {
     };
   }
   ensureChatTabQueueState(chatState.tabs.standalone);
+  ensureSupervisorTab();
   ensureFilesTab();
   ensureSystemTab();
   ensureTerminalTab();
   reorderStandardToolbarTabs();
+}
+
+function ensureSupervisorTab() {
+  if (!chatState.tabs[SUPERVISOR_TAB_ID]) {
+    chatState.tabs[SUPERVISOR_TAB_ID] = {
+      goalId: null, label: "Supervisor", mode: "supervisor",
+      sessionId: null, output: "", closedReason: null,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+    };
+  }
+  ensureChatTabQueueState(chatState.tabs[SUPERVISOR_TAB_ID]);
 }
 
 function ensureFilesTab() {
@@ -264,6 +283,9 @@ function initToolbar() {
   drawToolbar();
   observeToolbarSize();
   observeTopbarHeight();
+  loadSupervisorAgentState();
+  if (supervisorAgentState.timer) clearInterval(supervisorAgentState.timer);
+  supervisorAgentState.timer = setInterval(loadSupervisorAgentState, 5000);
 }
 
 function initChatDock() { initToolbar(); }
@@ -275,6 +297,8 @@ function resetChatForProjectSwitch() {
   chatState.bodyHeight = null;
   chatState.fullscreen = false;
   systemOperationState.filters.clear();
+  supervisorAgentState.snapshot = null;
+  supervisorAgentState.error = "";
   ensureStandaloneTab();
   resetFilesState();
   resetTerminalState();
@@ -555,9 +579,37 @@ async function startStandaloneChatSession(tab) {
   }
 }
 
+async function startSupervisorChatSession(tab) {
+  if (!tab || tab.starting || tab.sessionId) return;
+  tab.starting = true;
+  saveChatStateToStorage();
+  applyPendingIndicator(tab);
+  try {
+    const r = await api("POST", "/api/supervisor-agent/session", {});
+    tab.sessionId = r.session_id;
+    tab.closedReason = null;
+    tab.mode = "supervisor";
+    tab.progress = "";
+    tab.showProgress = true;
+    tab.starting = false;
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
+    await flushLocalQueuedMessages(tab);
+    await loadSupervisorAgentState();
+    drawToolbar();
+  } catch (e) {
+    tab.starting = false;
+    tab.closedReason = e.message;
+    saveChatStateToStorage();
+    applyPendingIndicator(tab);
+    toast("Could not start supervisor conversation: " + e.message, "error");
+  }
+}
+
 async function ensureChatSession(tab) {
   if (!tab || tab.sessionId || tab.starting) return;
-  if (tab.mode === "plan") await startPlanChatSession(tab);
+  if (tab.mode === "supervisor") await startSupervisorChatSession(tab);
+  else if (tab.mode === "plan") await startPlanChatSession(tab);
   else if (tab.goalId) await startGoalChatSession(tab);
   else await startStandaloneChatSession(tab);
 }
@@ -601,15 +653,18 @@ function drawToolbar() {
   const systemActive = active.mode === "system";
   const terminalActive = active.mode === "terminal";
   const goalLogsActive = active.mode === "goal_logs";
+  const supervisorActive = active.mode === "supervisor";
   const hasSession = !!active.sessionId;
 
-  const startLabel = active.goalId
+  const startLabel = supervisorActive
+    ? "Start supervisor conversation"
+    : active.goalId
     ? `Start attached to Goal ${active.goalId.slice(0, 10)}…`
     : active.mode === "plan"
       ? "Start plan"
     : "Start standalone";
   const toggleLabel = hasSession
-    ? (active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
+    ? (supervisorActive ? "Stop supervisor conversation" : active.goalId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
@@ -637,7 +692,7 @@ function drawToolbar() {
                   data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
             ${htmlEscape(t.label)}${toolbarTabSessionDot(t)}
-            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID || id === TERMINAL_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
+            ${id === "standalone" || id === SUPERVISOR_TAB_ID || id === FILES_TAB_ID || id === SYSTEM_TAB_ID || id === TERMINAL_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
@@ -662,6 +717,8 @@ function drawToolbar() {
             ? renderTerminalPanel()
             : goalLogsActive
               ? renderGoalLogPanel(active)
+            : supervisorActive
+              ? renderSupervisorPanel(active, { toggleClass, toggleLabel, statusLine, hasSession })
               : renderChatPanel(active, {
                   toggleClass,
                   toggleLabel,
@@ -759,6 +816,7 @@ function drawToolbar() {
 function drawChatDock() { drawToolbar(); }
 
 function toolbarTabTitle(tab) {
+  if (tab.mode === "supervisor") return "Supervisor agent health and conversation";
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
   if (tab.mode === "terminal") return "Terminal";
@@ -805,6 +863,88 @@ function syncToolbarTabActivityIndicators() {
       dot.title = chatActivityIsPulsing(tab) ? "agent working" : "active session";
     }
   });
+}
+
+function renderSupervisorPanel(active, chatOptions) {
+  const state = supervisorAgentState.snapshot;
+  const events = Array.isArray(state?.events) ? state.events.slice(-80).reverse() : [];
+  const health = String(state?.health || (supervisorAgentState.error ? "unavailable" : "unknown"));
+  const lifecycle = String(state?.lifecycle || (supervisorAgentState.loading ? "loading" : "unknown"));
+  return `
+    <section class="supervisor-agent-panel" data-testid="toolbar-supervisor-panel">
+      <div class="supervisor-agent-summary" data-testid="supervisor-agent-summary">
+        <span class="supervisor-agent-health supervisor-agent-health-${htmlEscape(health)}"
+              data-testid="supervisor-agent-health">${htmlEscape(health)}</span>
+        <strong data-testid="supervisor-agent-lifecycle">${htmlEscape(lifecycle)}</strong>
+        <span>${Number(state?.active_work || 0)} active</span>
+        <span>${Number(state?.queued_work || 0)} queued</span>
+        <span>${Number(state?.failed_work || 0)} failed</span>
+        <span class="muted small">${htmlEscape(state?.supervisor_process || "daemon-supervised workflow runner")}</span>
+        <span class="spacer"></span>
+        <span class="muted small" title="${htmlEscape(state?.updated_at || "")}">${htmlEscape(supervisorAgentUpdatedLabel(state?.updated_at))}</span>
+      </div>
+      ${supervisorAgentState.error ? `
+        <div class="supervisor-agent-error" data-testid="supervisor-agent-error">
+          ${htmlEscape(supervisorAgentState.error)}
+        </div>` : ""}
+      <div class="supervisor-agent-events" role="log" aria-live="polite"
+           aria-label="Supervisor observations and recoveries" data-testid="supervisor-agent-events">
+        ${events.length ? events.map(renderSupervisorAgentEvent).join("") : `
+          <div class="muted small supervisor-agent-empty" data-testid="supervisor-agent-empty">
+            The supervisor agent is idle. It remains available for prompts and will observe queued workflow work.
+          </div>`}
+      </div>
+    </section>
+    <div class="supervisor-agent-conversation" data-testid="supervisor-agent-conversation">
+      ${renderChatPanel(active, chatOptions)}
+    </div>`;
+}
+
+function renderSupervisorAgentEvent(event) {
+  const status = String(event?.status || "info");
+  return `
+    <div class="supervisor-agent-event supervisor-agent-event-${htmlEscape(status)}"
+         data-testid="supervisor-agent-event" data-supervisor-event-kind="${htmlEscape(event?.kind || "observation")}">
+      <time title="${htmlEscape(event?.created_at || "")}">${htmlEscape(formatSystemLogTime(event?.created_at))}</time>
+      <span class="supervisor-agent-event-kind">${htmlEscape(systemLogStatusLabel(event?.kind || "observation"))}</span>
+      <span>${htmlEscape(event?.message || "")}</span>
+      ${event?.goal_id ? `<a href="#/goals/${encodeURIComponent(event.goal_id)}">${htmlEscape(event.goal_id)}</a>` : ""}
+      ${event?.retryable ? `<span class="supervisor-agent-retryable">Retry available</span>` : ""}
+    </div>`;
+}
+
+function supervisorAgentUpdatedLabel(updatedAt) {
+  if (!updatedAt) return "Not observed yet";
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return `Updated ${parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+}
+
+async function loadSupervisorAgentState() {
+  if (supervisorAgentState.loading || !state.project?.attached) return;
+  supervisorAgentState.loading = true;
+  try {
+    const response = await api("GET", "/api/supervisor-agent");
+    const snapshot = response?.supervisor_agent || null;
+    supervisorAgentState.snapshot = snapshot;
+    supervisorAgentState.error = "";
+    ensureSupervisorTab();
+    const tab = chatState.tabs[SUPERVISOR_TAB_ID];
+    const serverSessionId = String(snapshot?.session_id || "");
+    if (serverSessionId && tab.sessionId !== serverSessionId) {
+      tab.sessionId = serverSessionId;
+      tab.closedReason = null;
+      saveChatStateToStorage();
+    } else if (!serverSessionId && tab.sessionId && !tab.starting && !tab.pending) {
+      tab.sessionId = null;
+      saveChatStateToStorage();
+    }
+  } catch (error) {
+    supervisorAgentState.error = error.message || String(error);
+  } finally {
+    supervisorAgentState.loading = false;
+  }
+  if (chatState.open && chatState.activeTabId === SUPERVISOR_TAB_ID) drawToolbar();
 }
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
@@ -2562,6 +2702,7 @@ function chatActivityLabel(tab) {
 function chatStatusLine(tab) {
   if (!tab?.sessionId) {
     if (tab?.starting) return "Starting session.";
+    if (tab?.closedReason) return `Session ended — ${tab.closedReason}.`;
     return "No active session.";
   }
   if (tab.closedReason) return `Session ${tab.sessionId} ended — ${tab.closedReason}.`;
@@ -2681,7 +2822,7 @@ function switchChatTab(tabId) {
 }
 
 async function closeChatTab(tabId) {
-  if (tabId === "standalone" || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID) return;
+  if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID) return;
   const t = chatState.tabs[tabId];
   if (!t) return;
   if (t.sessionId) {
@@ -2734,10 +2875,19 @@ async function toggleActiveChat() {
   const btn = $("#btn-chat-toggle");
   if (t.sessionId) {
     await withButtonBusy(btn, "Stopping…", async () => {
-      try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
-      t.sessionId = null;
-      t.worktree = null;
-      t.closedReason = "stopped by user";
+      const sessionId = t.sessionId;
+      try {
+        const stopped = await api("POST", `/api/chat/${sessionId}/stop`);
+        t.sessionId = null;
+        t.worktree = null;
+        t.pending = false;
+        t.closedReason = stopped?.closed_reason || "stopped by user";
+        if (t.mode === "supervisor") supervisorAgentState.error = "";
+      } catch (error) {
+        const message = `Could not stop session ${sessionId}: ${error.message || error}. Retry Stop or inspect System logs.`;
+        if (t.mode === "supervisor") supervisorAgentState.error = message;
+        toast(message, "error");
+      }
       saveChatStateToStorage();
       refreshProcessesTabForChatChange();
       drawChat();
