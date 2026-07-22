@@ -1,7 +1,7 @@
 {
   "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
   "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-9",
-  "candidate_commit": null,
+  "candidate_commit": "ab500d6be9483d37103f601a460efb7fff400203",
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -589,8 +589,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Completed and committed as `ab500d6b` (`Preserve live workflow authority across node switches`), directly atop `ca98963a`. Worktree is clean and reviewable.\n\nChanged:\n\n- Live executions retain exact claim/execution authority across active-Node switches.\n- Cancellation, transfer, or decision-version changes still invalidate stale workers.\n- Recovery distinguishes live supervised ownership from stranded claims and releases capacity from the owning runtime.\n- Automated Goal mutations verify durable ownership rather than stale projections.\n- Added daemon coverage for successful settlement and provider loss during an A→B switch.\n\nVerification:\n\n- Focused authority test: 1 passed.\n- Serial library suite: 436 passed, 0 failed.\n- Multi-instance daemon harness: 3 passed, 0 failed.\n- Full-workflow harness: 1 passed, 0 failed.\n- `cargo check --all-targets`: passed.\n- `cargo fmt --all -- --check`: passed.\n- `git diff --check` and committed-diff check: passed.\n- Post-implementation review against all 8 configured governance rules: passed.\n- Final Git status: clean.",
+      "implementation_reported_at": "2026-07-22T19:12:26Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -601,10 +601,10 @@
       "quality_state": "unclassified",
       "reporter": "Codex",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T18:39:21Z"
+      "updated": "2026-07-22T19:12:26Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T19:07:08Z"
+  "updated": "2026-07-22T19:12:27Z"
 }
