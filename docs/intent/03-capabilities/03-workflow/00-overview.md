@@ -39,6 +39,9 @@ Current implementation details that matter to intent:
 - Pause controls can stop agents, target-app work, or all automation.
 - Goal state rules distinguish manual transitions from automated transitions.
 - Feature ordering is respected so ordered Goals advance without losing Feature intent.
+- While agents are running, the engine periodically discovers newly eligible queued Goals and
+  uses available capacity without waiting for the current agents to finish. Each replenishment
+  applies the same priority and Feature-order eligibility rules as the initial claim pass.
 - Review is a meaningful boundary: a Goal in review can unblock later ordered Feature work.
 
 Workflow should not be reimplemented in page-local JavaScript, one-off CLI commands, or provider-specific scripts. Those surfaces should call the shared capability.
