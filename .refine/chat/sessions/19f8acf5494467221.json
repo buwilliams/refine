@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:42:32Z",
+  "updated_at": "2026-07-22T17:43:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -384,6 +384,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Coordination’s serial library and full-workflow gates are green; after a small final adjustment its focused recovery/conflict checks are green again. Quality governance’s targeted evidence-integrity and retry-path tests also pass."
+    },
+    {
+      "created_at": "2026-07-22T17:43:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742209240-121",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A supplemental independent review caught an additional coordination crash window where `Goal=Failed` could persist before the claim became `Interrupted`; the active agent is fixing it before committing. Quality governance found no repository-evidence path under the searched ownership area (the search exited 1 for no matches) and is continuing its test audit."
     }
   ],
   "queued_messages": [
