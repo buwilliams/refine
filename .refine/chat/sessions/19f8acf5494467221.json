@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:05:03Z",
+  "updated_at": "2026-07-22T18:07:22Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -660,6 +660,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality is now under Refine’s independent governance review. That reviewer is checking an important recovery edge: detecting candidate mutation is insufficient if the failed Quality run leaves the preserved worktree dirty. Coordination’s new distinct-node test initially exposed a fixture issue, was corrected, and now passes; the implementation is proceeding through its remaining gates."
+    },
+    {
+      "created_at": "2026-07-22T18:07:22Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743642269-172",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No authority decision is needed at this point. Coordination has entered its full serial regression suite after its focused ownership and recovery cases passed. Quality governance is still auditing cross-surface and concurrency behavior; I’m preserving that review boundary rather than treating the implementation agent’s own green report as approval."
     }
   ],
   "queued_messages": [
