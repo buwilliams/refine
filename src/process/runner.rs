@@ -580,7 +580,7 @@ fn jira_export_stopped(registry: &FileOperationRegistry, operation_id: &str) -> 
         .map(|operation| {
             matches!(
                 operation.state,
-                OperationState::Cancelled | OperationState::Interrupted
+                OperationState::Cancelled | OperationState::Interrupted | OperationState::Failed
             )
         })
         .unwrap_or(false)

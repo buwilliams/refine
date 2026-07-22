@@ -372,8 +372,10 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
         let port_root = self.runtime_root.port_root(port);
         let supervisor = FileProcessSupervisor::new(&port_root);
         let before_recovery = supervisor.list()?;
+        supervisor.recover()?;
+        let recovered_operations =
+            FileOperationRegistry::new(&port_root).recover_active_supervised()?;
         let recovered = supervisor.recover()?;
-        let interrupted_operations = FileOperationRegistry::new(&port_root).interrupt_active()?;
         let mut status = running_status(port);
         status.active_operations = recovered
             .iter()
@@ -397,10 +399,23 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
                 .degraded_integrations
                 .push("process-recovery-reconciled".to_string());
         }
-        if !interrupted_operations.is_empty() {
+        if recovered_operations
+            .iter()
+            .any(|operation| operation.state.as_api_status() == "interrupted")
+        {
             status
                 .degraded_integrations
                 .push("operation-recovery-interrupted".to_string());
+        }
+        if recovered_operations.iter().any(|operation| {
+            operation.error.as_ref().is_some_and(|error| {
+                error.get("code").and_then(serde_json::Value::as_str)
+                    == Some("operation_recovery_process_termination_failed")
+            })
+        }) {
+            status
+                .degraded_integrations
+                .push("operation-recovery-attention-required".to_string());
         }
         self.write_status(&status)?;
         Ok(status)
