@@ -207,6 +207,8 @@ impl FileOperationRegistry {
             if !operation_active(&operation.state) {
                 continue;
             }
+            let deferred_cancellation = matches!(operation.state, OperationState::Cancelling)
+                && cancellation_terminal_is_deferred(&operation);
             let Some(operation) = self.begin_recovery(&operation.id)? else {
                 continue;
             };
@@ -219,12 +221,31 @@ impl FileOperationRegistry {
                 .collect::<Vec<_>>();
             match self.terminate_recovery_processes(&supervisor, &operation, &associated) {
                 Ok(()) => {
-                    if let Some(interrupted) = self.interrupt_if_active(&operation.id)? {
+                    if deferred_cancellation {
+                        // The owning capability must durably persist its cancellation evidence
+                        // before this operation becomes terminal. Keep the launch-blocking state
+                        // recoverable for that capability's startup reconciliation.
+                        recovered.push(self.status(&operation.id)?);
+                    } else if let Some(interrupted) = self.interrupt_if_active(&operation.id)? {
                         recovered.push(interrupted);
                     }
                 }
                 Err(error) => {
-                    if let Some(failed) =
+                    if deferred_cancellation {
+                        self.append_log(
+                            &operation.id,
+                            operation_log_entry(
+                                &operation,
+                                "error",
+                                "Deferred cancellation recovery could not terminate managed processes",
+                                Some(crate::model::JsonObject::from_iter([(
+                                    "error".to_string(),
+                                    json!(error.to_string()),
+                                )])),
+                            ),
+                        )?;
+                        recovered.push(self.status(&operation.id)?);
+                    } else if let Some(failed) =
                         self.fail_recovery_if_active(&operation, &associated, &error)?
                     {
                         recovered.push(failed);
@@ -725,6 +746,33 @@ impl FileOperationRegistry {
         Ok(handle)
     }
 
+    /// Completes a capability-owned two-phase cancellation after its durable evidence is stored.
+    /// Repeated settlement is idempotent, while unrelated operation states cannot be converted to
+    /// cancelled accidentally.
+    pub fn settle_cancellation(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if matches!(handle.state, OperationState::Cancelled) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        if !matches!(handle.state, OperationState::Cancelling) {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} is {}; only cancelling operations can settle as cancelled",
+                handle.state.as_api_status()
+            )));
+        }
+        handle.state = OperationState::Cancelled;
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "warning", "Operation cancelled", None),
+        )?;
+        Ok(handle)
+    }
+
     pub fn update_progress(
         &self,
         operation_id: &str,
@@ -869,12 +917,39 @@ impl OperationRegistry for FileOperationRegistry {
             FileExt::unlock(&lock).ok();
             return Ok(handle);
         }
-        handle.state = OperationState::Cancelled;
+        if matches!(handle.state, OperationState::Cancelling)
+            && cancellation_terminal_is_deferred(&handle)
+        {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        let deferred = handle
+            .request
+            .get("defer_cancellation_terminal")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if deferred && let Some(request) = handle.request.as_object_mut() {
+            request.insert("cancellation_requested".to_string(), json!(true));
+        }
+        handle.state = if deferred {
+            OperationState::Cancelling
+        } else {
+            OperationState::Cancelled
+        };
         self.write(&handle)?;
         FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
-            operation_log_entry(&handle, "warning", "Operation cancelled", None),
+            operation_log_entry(
+                &handle,
+                "warning",
+                if deferred {
+                    "Operation cancellation requested"
+                } else {
+                    "Operation cancelled"
+                },
+                None,
+            ),
         )?;
         Ok(handle)
     }
@@ -933,6 +1008,19 @@ fn operation_active(state: &OperationState) -> bool {
         state,
         OperationState::Pending | OperationState::Running | OperationState::Cancelling
     )
+}
+
+fn cancellation_terminal_is_deferred(operation: &OperationHandle) -> bool {
+    operation
+        .request
+        .get("defer_cancellation_terminal")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        && operation
+            .request
+            .get("cancellation_requested")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
 }
 
 #[cfg(not(windows))]

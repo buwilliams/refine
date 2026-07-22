@@ -1,9 +1,9 @@
-Post-implementation Quality evaluation for committed Goal candidate {{owner_id}} from {{candidate_cwd}}. Do not edit files.
+Post-implementation Quality evaluation for Goal {{owner_id}} at {{candidate_cwd}}. No edits.
 
-For every exact test, choose one non-interactive shell command. Refine executes it as a supervised Quality process and treats the observed exit and output as authoritative. A pass without execution is rejected. Do not omit, combine, rewrite, or add tests.
+Choose one supervised non-interactive shell command per exact test. Observed output and exit decide results. Reject unexecuted passes. Never omit, combine, rewrite, or add tests.
 
 Return only:
-{"ok":true|false,"summary":"short human-readable result","results":[{"test":"exact configured test text","status":"passed|failed","evidence":"what the command is intended to prove","command":"required non-interactive shell command"}]}
+{"ok":true|false,"summary":"result","results":[{"test":"exact test","status":"passed|failed","evidence":"proof","command":"non-interactive shell command"}]}
 
 Requirements:
 {{business_requirements}}

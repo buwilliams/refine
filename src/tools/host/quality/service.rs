@@ -468,7 +468,8 @@ impl QualityOperationRunner {
                 "round_idx": round_idx,
                 "provider": provider,
                 "cwd": request.cwd,
-                "candidate_commit": request.candidate_commit
+                "candidate_commit": request.candidate_commit,
+                "defer_cancellation_terminal": true
             }),
         )?;
         registry.append_log(
@@ -532,6 +533,10 @@ impl QualityOperationRunner {
                 )?;
                 let current = registry.status(operation_id)?;
                 match current.state {
+                    OperationState::Cancelling if cancellation_requested(&current) => {
+                        let operation = self.settle_cancelled(&request, operation_id)?;
+                        return Ok(QualityOperationResult { operation, result });
+                    }
                     OperationState::Cancelled => {
                         self.record_cancelled(&request, operation_id)?;
                         return Ok(QualityOperationResult {
@@ -564,6 +569,12 @@ impl QualityOperationRunner {
                         ))
                     })?,
                 )?;
+                if matches!(operation.state, OperationState::Cancelling)
+                    && cancellation_requested(&operation)
+                {
+                    let operation = self.settle_cancelled(&request, operation_id)?;
+                    return Ok(QualityOperationResult { operation, result });
+                }
                 if matches!(operation.state, OperationState::Cancelled) {
                     self.record_cancelled(&request, operation_id)?;
                 }
@@ -581,6 +592,10 @@ impl QualityOperationRunner {
                 )?;
                 let current = registry.status(operation_id)?;
                 match current.state {
+                    OperationState::Cancelling if cancellation_requested(&current) => {
+                        self.settle_cancelled(&request, operation_id)?;
+                        return Err(error);
+                    }
                     OperationState::Cancelled => {
                         self.record_cancelled(&request, operation_id)?;
                         return Err(error);
@@ -673,17 +688,104 @@ impl QualityOperationRunner {
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit
         });
-        FileWorkItemService::new(&self.refine_dir).update_goal_round_evaluation_summary(
-            &request.owner_id,
-            request.round_idx,
-            &json!({
-                "quality_state": "cancelled",
-                "quality_message": message,
-                "quality_details": details,
-                "quality_checked_at": now_timestamp()
-            }),
-        )?;
-        self.append_goal_log(request, "warning", message, details)
+        let work_items = FileWorkItemService::new(&self.refine_dir);
+        let detail = work_items.show_goal_detail(&request.owner_id)?;
+        let summary_persisted = detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(request.round_idx))
+            .is_some_and(|round| {
+                round.get("quality_state").and_then(Value::as_str) == Some("cancelled")
+                    && round
+                        .get("quality_details")
+                        .and_then(|details| details.get("operation_id"))
+                        .and_then(Value::as_str)
+                        == Some(operation_id)
+            });
+        if !summary_persisted {
+            work_items.update_goal_round_evaluation_summary(
+                &request.owner_id,
+                request.round_idx,
+                &json!({
+                    "quality_state": "cancelled",
+                    "quality_message": message,
+                    "quality_details": details,
+                    "quality_checked_at": now_timestamp()
+                }),
+            )?;
+        }
+        let logs = FileLogService::new(&self.refine_dir).all_round_logs(&request.owner_id)?;
+        let log_persisted = logs.iter().any(|entry| {
+            entry.round_idx == Some(request.round_idx)
+                && entry.entry.category == "quality"
+                && entry.entry.message == message
+                && entry
+                    .entry
+                    .details
+                    .as_ref()
+                    .and_then(|details| details.get("operation_id"))
+                    .and_then(Value::as_str)
+                    == Some(operation_id)
+        });
+        if !log_persisted {
+            self.append_goal_log(request, "warning", message, details)?;
+        }
+        Ok(())
+    }
+
+    fn settle_cancelled(
+        &self,
+        request: &QualityCheckRequest,
+        operation_id: &str,
+    ) -> RefineResult<OperationHandle> {
+        if let Err(error) = self.record_cancelled(request, operation_id) {
+            self.record_persistence_failure(operation_id, request, &error);
+            return Err(error);
+        }
+        FileOperationRegistry::new(&self.runtime_root).settle_cancellation(operation_id)
+    }
+
+    /// Replays incomplete Quality cancellation settlement after generic process recovery has
+    /// confirmed that no owned provider or command remains alive.
+    pub fn recover_cancelled_operations(&self) -> RefineResult<Vec<OperationHandle>> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        let mut recovered = Vec::new();
+        for operation in registry.recover()? {
+            if !matches!(operation.state, OperationState::Cancelling)
+                || operation
+                    .request
+                    .get("defer_cancellation_terminal")
+                    .and_then(Value::as_bool)
+                    != Some(true)
+                || !cancellation_requested(&operation)
+                || !operation.owner.starts_with("quality:")
+            {
+                continue;
+            }
+            let request = QualityCheckRequest {
+                owner_id: required_operation_request_string(&operation, "goal_id")?,
+                round_idx: operation
+                    .request
+                    .get("round_idx")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| usize::try_from(value).ok())
+                    .ok_or_else(|| {
+                        RefineError::Serialization(format!(
+                            "Quality operation {} has no valid round_idx for cancellation recovery",
+                            operation.id
+                        ))
+                    })?,
+                provider: required_operation_request_string(&operation, "provider")?,
+                cwd: required_operation_request_string(&operation, "cwd")?,
+                candidate_commit: required_operation_request_string(
+                    &operation,
+                    "candidate_commit",
+                )?,
+                process_metadata: Map::new(),
+            };
+            recovered.push(self.settle_cancelled(&request, &operation.id)?);
+        }
+        Ok(recovered)
     }
 
     fn append_goal_log(
@@ -726,6 +828,31 @@ impl QualityOperationRunner {
             ),
         );
     }
+}
+
+fn required_operation_request_string(
+    operation: &OperationHandle,
+    field: &str,
+) -> RefineResult<String> {
+    operation
+        .request
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "Quality operation {} has no valid {field} for cancellation recovery",
+                operation.id
+            ))
+        })
+}
+
+fn cancellation_requested(operation: &OperationHandle) -> bool {
+    operation
+        .request
+        .get("cancellation_requested")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 impl QualityService for FileQualityService {

@@ -4,6 +4,7 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
+use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
 use serde_json::{Value, json};
 use std::fs;
@@ -539,6 +540,97 @@ fn quality_cancellation_between_commands_prevents_later_work() {
     assert!(!fixture.candidate_root.join("second-ran").exists());
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn quality_cancelled_evidence_failures_remain_nonterminal_and_restart_retries_them() {
+    for failure in ["summary", "log"] {
+        let fixture = goal_quality_fixture(
+            &format!("quality-cancelled-{failure}-persistence"),
+            "printf provider-must-not-launch > provider-launched",
+        );
+        let runner = fixture.runner();
+        let (operation, request) = runner
+            .register_goal_checks("GOAL1", "smoke-ai", Default::default())
+            .unwrap();
+        let blocked_path = if failure == "summary" {
+            let summary = FileWorkItemService::new(&fixture.refine_dir)
+                .show_goal_summary("GOAL1")
+                .unwrap();
+            fixture.refine_dir.join(summary.goal.json_path)
+        } else {
+            fixture.refine_dir.join("goals/GO/AL1/logs.jsonl")
+        };
+        let backup = blocked_path.with_extension("backup");
+        if blocked_path.exists() {
+            fs::rename(&blocked_path, &backup).unwrap();
+        }
+        fs::create_dir_all(&blocked_path).unwrap();
+
+        let registry = FileOperationRegistry::new(&fixture.runtime_root);
+        let cancelling = registry.cancel(&operation.id).unwrap();
+        assert_eq!(cancelling.state, OperationState::Cancelling);
+        let error = runner.run_registered(&operation.id, request).unwrap_err();
+        assert!(error.to_string().contains(if failure == "summary" {
+            "Goal"
+        } else {
+            "Goal log sidecar"
+        }));
+        assert_eq!(
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Cancelling
+        );
+        assert!(!fixture.candidate_root.join("provider-launched").exists());
+
+        let recovered = registry.recover_active_supervised().unwrap();
+        assert!(
+            recovered.iter().any(|item| {
+                item.id == operation.id && item.state == OperationState::Cancelling
+            })
+        );
+        runner.recover_cancelled_operations().unwrap_err();
+        assert_eq!(
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Cancelling
+        );
+
+        fs::remove_dir(&blocked_path).unwrap();
+        if backup.exists() {
+            fs::rename(&backup, &blocked_path).unwrap();
+        }
+        let settled = runner.recover_cancelled_operations().unwrap();
+        assert_eq!(settled.len(), 1);
+        assert_eq!(settled[0].id, operation.id);
+        assert_eq!(settled[0].state, OperationState::Cancelled);
+        assert!(runner.recover_cancelled_operations().unwrap().is_empty());
+
+        let detail = FileWorkItemService::new(&fixture.refine_dir)
+            .show_goal_detail("GOAL1")
+            .unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], "cancelled");
+        assert_eq!(
+            detail["rounds"][0]["quality_details"]["operation_id"],
+            operation.id
+        );
+        let cancelled_logs = FileLogService::new(&fixture.refine_dir)
+            .all_round_logs("GOAL1")
+            .unwrap()
+            .into_iter()
+            .filter(|entry| {
+                entry.round_idx == Some(0)
+                    && entry.entry.category == "quality"
+                    && entry.entry.message == "Quality checks cancelled."
+                    && entry
+                        .entry
+                        .details
+                        .as_ref()
+                        .and_then(|details| details.get("operation_id"))
+                        == Some(&json!(operation.id))
+            })
+            .count();
+        assert_eq!(cancelled_logs, 1);
+        fs::remove_dir_all(fixture.temp_root).unwrap();
+    }
 }
 
 #[test]
