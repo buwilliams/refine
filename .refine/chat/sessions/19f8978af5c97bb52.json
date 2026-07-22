@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:34:59Z",
+  "updated_at": "2026-07-22T11:36:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -324,6 +324,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The autonomous-recovery candidate also failed governance, with three actionable findings: it encoded recovery judgment as Rust substring heuristics instead of delegating to the supervisor agent; it ignored live workflow claims/capacity; and it could mutate a Goal before required evidence writes, with no end-to-end recovery or write-failure test. I’m preserving its candidate and issuing a second, tightly scoped round that makes recovery agent-first, claim-aware, and evidence-atomic."
+    },
+    {
+      "created_at": "2026-07-22T11:36:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720210823-44",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 2 of inline authoring now passes its new focused shared-capability/API tests. Two Quality-related agents hit non-terminal verification failures (one clippy run and one targeted command chain) and are still active, inspecting/fixing them; these are visible provider/tool outcomes, not being treated as successes. The Jira recovery and supervisor-recovery round 2 also continue with fresh changes."
     }
   ],
   "queue_dispatching": true,
