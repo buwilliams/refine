@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:49:33Z",
+  "updated_at": "2026-07-22T11:51:14Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -396,6 +396,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Inline authoring round 2 cleared the original two findings but failed one narrower governance check: Feature authoring centralized its own create/dedup logic while ordinary Goal creation still retained the old route-local copy. I’m issuing round 3 to make both endpoints call one shared creation/dedup capability and delete the duplicate route helpers."
+    },
+    {
+      "created_at": "2026-07-22T11:51:14Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784721074791-56",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality UX failed for the same architectural split as the always-on Quality candidate, plus silent timing migration. Since both are downstream of the shared Quality core now being corrected, I’m recording its recovery round but parking it too. Re-queuing either downstream Goal before the core lands would repeat the same conflict and waste another agent turn."
     }
   ],
   "queue_dispatching": true,
