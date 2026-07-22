@@ -66,9 +66,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T10:01:55Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T10:07:19Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "The previous round was nearly successful but failed Governance with \"Supervisor event polling can repeatedly duplicate System entries.\" Correct the issue Governance is warning us about.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T10:07:19Z"
     }
   ],
-  "status": "failed",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-22T10:01:56Z"
+  "updated": "2026-07-22T10:07:24Z"
 }
