@@ -682,6 +682,9 @@ fn static_goal_detail_renders_round_implementation_reports() {
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report""#));
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report-body""#));
     assert!(goals_detail.contains("rnd.implementation_reported_at"));
+    assert!(goals_detail.contains(r#"data-testid="goal-action-export-jira""#));
+    assert!(goals_detail.contains("/export/jira"));
+    assert!(goals_detail.contains("new Blob([payload.csv]"));
 }
 
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
@@ -1623,6 +1626,46 @@ fn web_server_creates_and_shows_goal() {
     });
     assert_eq!(show.status, 200);
     assert_eq!(show.body["goal"]["name"], "Created by API");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_exports_goal_delivery_evidence_for_jira() {
+    let temp_root = unique_temp_dir("http-goal-jira-export");
+    let refine_dir = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Export delivery evidence", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Auditor", "Implement the export")
+        .unwrap();
+    service
+        .update_latest_goal_round_implementation_report(
+            "GOAL1",
+            "Added Jira CSV export. cargo test passed.",
+        )
+        .unwrap();
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/goals/GOAL1/export/jira".to_string(),
+        body: None,
+    });
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["export"]["format"], "jira_csv");
+    assert_eq!(
+        response.body["export"]["filename"],
+        "refine-goal-GOAL1-jira.csv"
+    );
+    let csv = response.body["export"]["csv"].as_str().unwrap();
+    assert!(csv.starts_with("Summary,Description,Work Type,Priority"));
+    assert!(csv.contains("Implement the export"));
+    assert!(csv.contains("Added Jira CSV export. cargo test passed."));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

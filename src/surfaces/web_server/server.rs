@@ -760,6 +760,13 @@ impl InProcessWebServer {
             return self.handle_goal_logs(request);
         }
 
+        if request.method == "GET"
+            && request.path.starts_with("/work/goals/")
+            && request.path.ends_with("/export/jira")
+        {
+            return self.handle_goal_jira_export(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/transition")

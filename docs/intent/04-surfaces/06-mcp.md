@@ -26,6 +26,8 @@ Because MCP delegates to the shared daemon API, it inherits the system's local-f
 
 Current agent-facing planning support includes `refine_draft_goal`, which sends a Plan transcript through the same one-Goal extraction capability used by the browser, CLI, and HTTP API and returns the draft for review without persisting it.
 
+Current audit support includes `refine_export_goal_jira`, which maps a Goal id onto the shared Jira evidence export route rather than formatting a separate agent-only report.
+
 ## Future Direction
 
 As agent-native interaction grows, MCP may become a primary way external assistants drive Refine. The tool catalog should grow toward the most valuable capabilities — planning, import, workflow advancement, review — while keeping each tool aligned to a shared capability rather than a one-off behavior.

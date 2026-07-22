@@ -110,6 +110,13 @@ Show full detail for one Goal: status, rounds, notes, and ownership
 
 - `<ID>` (required) — Goal id
 
+### `refine goal export`
+
+Export a Jira-importable CSV containing the Goal's SOC 2 delivery evidence
+
+- `<ID>` (required) — Goal id
+- `--output` — Write the CSV to a file instead of standard output
+
 ### `refine goal edit`
 
 Edit a Goal's metadata (name and/or priority). Only valid while the Goal's status allows editing

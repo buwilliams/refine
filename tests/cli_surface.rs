@@ -286,6 +286,20 @@ fn goal_create_list_show_edit_note_round_delete(fixture: &IntegrationFixture) {
     fixture.assert_success("goal round", &round);
     assert_eq!(fixture.goal_field(&goal_id, "round_count"), 1);
 
+    let jira_export_path = fixture.app_root.join("goal-evidence.csv");
+    let jira_export = fixture.run_refine(&[
+        "goal",
+        "export",
+        &goal_id,
+        "--output",
+        jira_export_path.to_str().unwrap(),
+    ]);
+    fixture.assert_success("goal Jira export", &jira_export);
+    let jira_csv = fs::read_to_string(&jira_export_path).unwrap();
+    assert!(jira_csv.starts_with("Summary,Description,Work Type,Priority"));
+    assert!(jira_csv.contains("Implement the desired behavior"));
+    fs::remove_file(jira_export_path).unwrap();
+
     let delete = fixture.run_refine(&["goal", "delete", &goal_id]);
     fixture.assert_success("goal delete", &delete);
     let payload = fixture.json_stdout(&delete);

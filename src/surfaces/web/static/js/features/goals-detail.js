@@ -306,6 +306,7 @@ function drawGoalDetail(goal) {
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
               <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
+              <button class="nav-menu-item" type="button" id="btn-export-jira" data-testid="goal-action-export-jira">Export for Jira</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
               <button class="nav-menu-item" type="button" id="btn-rename" data-testid="goal-action-rename">Rename</button>
@@ -403,6 +404,29 @@ function drawGoalDetail(goal) {
   $("#btn-watch-logs")?.addEventListener("click", () => {
     closeGoalActionMenu();
     openGoalLogTail({ goalId: goal.id, goalName: goal.name });
+  });
+  $("#btn-export-jira")?.addEventListener("click", async () => {
+    closeGoalActionMenu();
+    const button = $("#btn-export-jira");
+    await withButtonBusy(button, "Exporting…", async () => {
+      try {
+        const response = await api("GET", `/api/goals/${encodeURIComponent(goal.id)}/export/jira`);
+        const payload = response.export;
+        if (!payload?.csv) throw new Error("Jira export did not return CSV content");
+        const blob = new Blob([payload.csv], { type: payload.content_type || "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = payload.filename || `refine-goal-${goal.id}-jira.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        toast("Jira CSV exported", "success");
+      } catch (error) {
+        await showActionError(error);
+      }
+    });
   });
 
   // Workflow back / forward buttons. Forward from `review` calls the
