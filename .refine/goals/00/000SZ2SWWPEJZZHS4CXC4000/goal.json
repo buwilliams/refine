@@ -1,0 +1,41 @@
+{
+  "base_commit": "6d3b535d3c71377cea80a2a044cbd6b4942a1a1a",
+  "branch_name": "refine/00000SZ2SWWPEJZZHS4CXC4000/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-22T19:10:51Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ2SWWPEJZZHS4CXC4000",
+  "name": "Distinguish paused workflow, unreachable runtime, and provider auth failures",
+  "node_id": "default",
+  "notes": [],
+  "priority": "medium",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T19:10:51Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Make runtime-status messaging distinguish three separate conditions: an intentionally paused workflow, a genuinely unavailable runtime worker, and a provider authentication failure. When workflow automation is intentionally paused, show an actionable paused-state message such as: Workflow is paused. Enable workflow automation to resume processing. Do not describe an intentional pause as a runtime or provider failure. Report worker unavailability only when the required runtime worker is unexpectedly absent or unhealthy. Mention authentication only when an actual provider authentication check has failed. Preserve the existing runtime-health semantics used by other surfaces, keep the state classification in shared backend truth where practical, and add focused regression coverage for each condition and its dashboard action.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T19:10:51Z"
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-22T19:10:52Z"
+}
