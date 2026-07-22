@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:18:00Z",
+  "updated_at": "2026-07-22T17:19:46Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -168,6 +168,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The scrollbar goal was approved through Refine’s normal non-force path: its candidate merged cleanly, pushed to `origin/main`, and its worktree was cleaned only after merge. One separate goal—autonomous failed-Goal recovery—has now failed its validation and is explicitly visible as retryable; I’m inspecting that failure before deciding whether an evidence-backed retry is appropriate. The no-op Quality UX review remains unapproved because its own report says its prerequisites are not yet on `main`."
+    },
+    {
+      "created_at": "2026-07-22T17:19:46Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784740786498-83",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed recovery goal is intentionally parked behind the still-running shared-coordination goal; its retry would currently reproduce the same two evidence-integrity violations, so I am not cycling it. The two remaining workers are healthy and making progress in their isolated worktrees. One review is still held because it produced no implementation and explicitly requires the shared Quality evaluator first."
     }
   ],
   "queued_messages": [
