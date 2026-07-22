@@ -1,7 +1,7 @@
 {
   "base_commit": "6b9638ce18ebcfee70cf6cda7f785ca91c06fcc8",
   "branch_name": "refine/00000SZ2HZHQX2TXXQ7SXVA00D/round-5",
-  "candidate_commit": null,
+  "candidate_commit": "4da89bd0a230f26a5e0547960ad0d69af0fd1cae",
   "created": "2026-07-22T14:34:08Z",
   "feature_id": "00000SZ2HY4R5J9V6AM5XVA00A",
   "feature_order": 2,
@@ -264,8 +264,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Completed and committed as `4da89bd` (`Complete supervised workflow coordination`). Worktree is clean and reviewable.\n\nChanges:\n\n- Migrates path-owned legacy workflow records to stable app IDs across runtime roots.\n- Distinguishes owned, foreign, and ambiguous authority; ambiguous active claims or pause decisions block automation without creating competing state.\n- Retry now creates a durable `Claimed` commitment, requires a managed workflow runner, preserves prior execution history, and acquires capacity only when scheduled.\n- Explicit retry records evidence before rolling interrupted in-progress Goals back to `todo`.\n- Daemon coverage now exercises cancellation versus late provider success and retry through the real workflow runner and managed provider process, including terminal settlement and capacity release.\n\nVerification:\n\n- `git diff --check` — passed.\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- Focused migration, app-switch, and retry tests — passed.\n- `cargo test --lib --no-fail-fast -- --test-threads=1` — 427 passed, 0 failed.\n- `cargo run --manifest-path xtask/Cargo.toml -- test-full-workflow` — 1 passed.\n- `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync` — 1 passed.\n- Final `git status --short` — clean.\n\nGoal tracker usage: 270,098 tokens over about 24 minutes 36 seconds.",
+      "implementation_reported_at": "2026-07-22T16:52:17Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -276,10 +276,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T16:26:53Z"
+      "updated": "2026-07-22T16:52:17Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T16:27:16Z"
+  "updated": "2026-07-22T16:52:18Z"
 }
