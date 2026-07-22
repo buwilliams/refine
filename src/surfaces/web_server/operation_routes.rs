@@ -4,9 +4,9 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
-use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -228,34 +228,8 @@ impl InProcessWebServer {
             return operation_id_required();
         };
         let registry = FileOperationRegistry::new(runtime_root);
-        if let Err(error) = registry.status(operation_id) {
-            return error_response(error);
-        }
-        match registry.cancel(operation_id) {
+        match registry.cancel_supervised(operation_id, self) {
             Ok(operation) => {
-                // Persist cancellation before signalling the worker. A worker that races to
-                // completion after SIGTERM must observe a terminal Cancelled operation rather
-                // than publishing a successful result over the user's cancellation.
-                if let Err(error) = terminate_operation_processes(runtime_root, operation_id) {
-                    let _ = registry.fail_with_error(
-                        operation_id,
-                        json!({
-                            "code": "operation_process_termination_failed",
-                            "message": error.to_string()
-                        }),
-                    );
-                    return error_response(error);
-                }
-                if let Err(error) = self.current_projection_with_runtime() {
-                    let _ = registry.fail_with_error(
-                        operation_id,
-                        json!({
-                            "code": "operation_cancel_projection_refresh_failed",
-                            "message": error.to_string()
-                        }),
-                    );
-                    return error_response(error);
-                }
                 ApiResponse::json(200, json!({"operation": operation_response(operation)}))
             }
             Err(error) => error_response(error),
@@ -853,34 +827,6 @@ impl InProcessWebServer {
             );
         Ok(value)
     }
-}
-
-fn terminate_operation_processes(
-    runtime_root: &std::path::Path,
-    operation_id: &str,
-) -> RefineResult<()> {
-    let supervisor = FileProcessSupervisor::new(runtime_root);
-    let processes = supervisor.list()?;
-    for process in processes
-        .iter()
-        .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
-    {
-        supervisor.request_termination(&process.id, "terminate")?;
-    }
-    Ok(())
-}
-
-fn process_operation_id(process: &ManagedProcess) -> Option<String> {
-    process
-        .details
-        .as_deref()
-        .and_then(|details| serde_json::from_str::<Value>(details).ok())
-        .and_then(|details| {
-            details
-                .get("operation_id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
 }
 
 fn workflow_retry_response(automation: &WorkflowEngine, execution_id: &str) -> ApiResponse {

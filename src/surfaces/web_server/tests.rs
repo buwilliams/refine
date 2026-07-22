@@ -1940,7 +1940,7 @@ fn web_server_exports_selected_goals_for_jira() {
 }
 
 #[test]
-fn web_server_cancels_and_recovers_durable_jira_exports() {
+fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
     let temp_root = unique_temp_dir("http-goals-jira-export-lifecycle");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -2099,6 +2099,24 @@ fn web_server_cancels_and_recovers_durable_jira_exports() {
     );
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn operation_cancel_route_is_a_thin_shared_capability_adapter() {
+    let routes = include_str!("operation_routes.rs");
+    let handler = routes
+        .split("pub(super) fn handle_operation_cancel")
+        .nth(1)
+        .unwrap()
+        .split("pub(super) fn handle_workflow_execution_retry")
+        .next()
+        .unwrap();
+
+    assert!(handler.contains("registry.cancel_supervised"));
+    assert!(!handler.contains("current_projection_with_runtime"));
+    assert!(!handler.contains("request_termination"));
+    assert!(!handler.contains("fail_with_error"));
+    assert!(!routes.contains("fn terminate_operation_processes"));
 }
 
 fn operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {

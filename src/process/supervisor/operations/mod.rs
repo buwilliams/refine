@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
+use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -57,6 +58,19 @@ pub trait OperationRegistry {
     fn status(&self, operation_id: &str) -> RefineResult<OperationHandle>;
     fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle>;
     fn recover(&self) -> RefineResult<Vec<OperationHandle>>;
+}
+
+pub trait OperationProjectionRefresher {
+    fn refresh_operation_projection(&self) -> RefineResult<()>;
+}
+
+impl<F> OperationProjectionRefresher for F
+where
+    F: Fn() -> RefineResult<()>,
+{
+    fn refresh_operation_projection(&self) -> RefineResult<()> {
+        self()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -286,6 +300,68 @@ impl FileOperationRegistry {
         Ok((page, has_more, total))
     }
 
+    /// Cancels an operation and all managed processes associated with it, then refreshes the
+    /// caller's projection of runtime state. Durable cancellation is written first so a worker
+    /// racing with termination cannot publish success over the user's cancellation.
+    ///
+    /// The projection refresher keeps projection construction independent of the operation
+    /// registry while this shared capability remains responsible for sequencing it and persisting
+    /// any failure evidence.
+    pub fn cancel_supervised(
+        &self,
+        operation_id: &str,
+        projection_refresher: &impl OperationProjectionRefresher,
+    ) -> RefineResult<OperationHandle> {
+        let operation = self.cancel(operation_id)?;
+
+        if let Err(error) = self.terminate_associated_processes(operation_id) {
+            self.persist_cancellation_failure(
+                operation_id,
+                "operation_process_termination_failed",
+                &error,
+            )?;
+            return Err(error);
+        }
+        if let Err(error) = projection_refresher.refresh_operation_projection() {
+            self.persist_cancellation_failure(
+                operation_id,
+                "operation_cancel_projection_refresh_failed",
+                &error,
+            )?;
+            return Err(error);
+        }
+
+        Ok(operation)
+    }
+
+    fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        for process in supervisor
+            .list()?
+            .iter()
+            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+        {
+            supervisor.request_termination(&process.id, "terminate")?;
+        }
+        Ok(())
+    }
+
+    fn persist_cancellation_failure(
+        &self,
+        operation_id: &str,
+        code: &str,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        self.fail_with_error(
+            operation_id,
+            json!({
+                "code": code,
+                "message": error.to_string()
+            }),
+        )?;
+        Ok(())
+    }
+
     pub fn finish(
         &self,
         operation_id: &str,
@@ -482,6 +558,19 @@ fn completion_would_overwrite_cancellation(
     matches!(current, OperationState::Cancelled) && !matches!(next, OperationState::Cancelled)
 }
 
+fn process_operation_id(process: &ManagedProcess) -> Option<String> {
+    process
+        .details
+        .as_deref()
+        .and_then(|details| serde_json::from_str::<Value>(details).ok())
+        .and_then(|details| {
+            details
+                .get("operation_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+}
+
 fn new_operation_id() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let now = SystemTime::now()
@@ -531,6 +620,14 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use crate::process::subprocess::{
+        ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,
+        managed_pid_is_alive,
+    };
 
     #[test]
     fn file_operation_registry_registers_recovers_and_cancels_operations() {
@@ -576,6 +673,143 @@ mod tests {
         assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_supervised_cancel_terminates_process_and_refreshes_projection() {
+        let temp_root = unique_temp_dir("operations-supervised-cancel");
+        let runtime_root = temp_root.join("run/8080");
+        let registry = FileOperationRegistry::new(&runtime_root);
+        let operation = registry.register("goals:jira-export").unwrap();
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let process = supervisor
+            .launch(operation_helper_process_spec(&operation.id))
+            .unwrap();
+        let pid = process.pid.unwrap();
+        assert!(managed_pid_is_alive(pid).unwrap());
+
+        let projection_refreshed = AtomicBool::new(false);
+        let projection_refresher = || {
+            projection_refreshed.store(true, AtomicOrdering::SeqCst);
+            Ok(())
+        };
+        let cancelled = registry
+            .cancel_supervised(&operation.id, &projection_refresher)
+            .unwrap();
+
+        assert_eq!(cancelled.state, OperationState::Cancelled);
+        assert!(projection_refreshed.load(AtomicOrdering::SeqCst));
+        wait_for_managed_pid_exit(pid);
+        assert!(!managed_pid_is_alive(pid).unwrap());
+        assert_eq!(
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Cancelled
+        );
+        let late_completion = registry
+            .finish_with_result(
+                &operation.id,
+                OperationState::Succeeded,
+                json!({"result": "must not replace cancellation"}),
+            )
+            .unwrap();
+        assert_eq!(late_completion.state, OperationState::Cancelled);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_operation_registry_supervised_cancel_persists_capability_failures() {
+        let temp_root = unique_temp_dir("operations-supervised-cancel-failures");
+
+        let termination_runtime_root = temp_root.join("run/termination");
+        let termination_registry = FileOperationRegistry::new(&termination_runtime_root);
+        let termination_operation = termination_registry.register("goals:jira-export").unwrap();
+        fs::write(
+            termination_runtime_root.join("processes"),
+            b"not a directory",
+        )
+        .unwrap();
+        let projection_refreshed = AtomicBool::new(false);
+        let projection_refresher = || {
+            projection_refreshed.store(true, AtomicOrdering::SeqCst);
+            Ok(())
+        };
+        let termination_error = termination_registry
+            .cancel_supervised(&termination_operation.id, &projection_refresher)
+            .unwrap_err();
+        assert!(termination_error.to_string().contains("process registry"));
+        assert!(!projection_refreshed.load(AtomicOrdering::SeqCst));
+        let termination_operation = termination_registry
+            .status(&termination_operation.id)
+            .unwrap();
+        assert_eq!(termination_operation.state, OperationState::Cancelled);
+        assert_eq!(
+            termination_operation.error.unwrap()["code"],
+            "operation_process_termination_failed"
+        );
+
+        let projection_runtime_root = temp_root.join("run/projection");
+        let projection_registry = FileOperationRegistry::new(&projection_runtime_root);
+        let projection_operation = projection_registry.register("goals:jira-export").unwrap();
+        let projection_refresher = || Err(RefineError::Io("projection refresh failed".to_string()));
+        let projection_error = projection_registry
+            .cancel_supervised(&projection_operation.id, &projection_refresher)
+            .unwrap_err();
+        assert_eq!(projection_error.to_string(), "projection refresh failed");
+        let projection_operation = projection_registry
+            .status(&projection_operation.id)
+            .unwrap();
+        assert_eq!(projection_operation.state, OperationState::Cancelled);
+        assert_eq!(
+            projection_operation.error.unwrap()["code"],
+            "operation_cancel_projection_refresh_failed"
+        );
+        let (logs, _, _) = projection_registry
+            .page_logs(&projection_operation.id, 20, 0)
+            .unwrap();
+        assert!(logs.iter().any(|entry| entry.message == "Operation failed"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {
+        #[cfg(windows)]
+        let (command, args) = (
+            "cmd".to_string(),
+            vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()],
+        );
+        #[cfg(not(windows))]
+        let (command, args) = (
+            "sh".to_string(),
+            vec!["-c".to_string(), "while :; do sleep 1; done".to_string()],
+        );
+        ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command,
+            args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: Some(ProcessResourceLimits {
+                kill_on_parent_exit: true,
+                ..Default::default()
+            }),
+            authorization_command: Some("refine test operation helper".to_string()),
+            sensitive: false,
+            metadata: serde_json::from_value(json!({
+                "kind": "runner",
+                "worker_kind": "operation-capability-test-helper",
+                "operation_id": operation_id
+            }))
+            .unwrap(),
+        }
+    }
+
+    fn wait_for_managed_pid_exit(pid: u32) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while managed_pid_is_alive(pid).unwrap_or(false) && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
