@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T16:00:02Z",
+  "updated_at": "2026-07-22T16:05:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1404,6 +1404,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first repair test pass exposed six compatibility regressions around legacy claims, feature ordering, and detached-app cancellation. The agent corrected those without weakening the new ownership rule; the broad `file_automation_*`, operation-registry, and Git-sync focused suites are now green. Next is the daemon-backed risk evidence governance explicitly required."
+    },
+    {
+      "created_at": "2026-07-22T16:05:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784736305031-230",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The new evidence is being added at the daemon integration layer, not just as mocks: ambiguous legacy migration, partial-claim restart, terminal success with log failure, concurrent mutation/conflict repetition, cancellation versus late settlement, and app/runtime switching. This expands the test surface only where governance found risk; unrelated Quality, Supervisor, and UI code remains parked."
     }
   ],
   "queued_messages": [
