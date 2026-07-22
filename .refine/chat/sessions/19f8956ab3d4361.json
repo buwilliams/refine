@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:19:46Z",
-  "updated_at": "2026-07-22T10:28:49Z",
+  "updated_at": "2026-07-22T10:30:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:19:46Z",
@@ -108,6 +108,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Four of the six queued goals have now completed Refine’s full implementation → governance → publish/build/quality path and are in review. Two remain in progress: the provider-argument failure fix is in validation, and the parallel-agent visibility/capacity fix is still implementing. No goal has failed in this active window."
+    },
+    {
+      "created_at": "2026-07-22T10:30:56Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784716256820-29",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A user-driven bulk approval partially succeeded: 8 of 10 review goals merged, while two remained in review because Git reported real content conflicts. I will not force or auto-resolve those merges. I’m checking whether the failed approvals left the primary checkout or any Refine-owned merge worktree in a conflicted state, while the final active goal continues governance."
     }
   ],
   "queue_dispatching": true,
