@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T13:53:45Z",
+  "updated_at": "2026-07-22T13:56:12Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -996,6 +996,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Jira round 7 submitted candidate `d1ee474…` after a clean 414-test run and a zero-violation pre-audit; Refine’s authoritative audit is now running. Quality’s all-target gate saw one unrelated project-sync timing flake after the library had passed, the isolated rerun passed, and the worker is rerunning the full command for deterministic evidence."
+    },
+    {
+      "created_at": "2026-07-22T13:56:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784728572808-156",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Jira candidate `d1ee474…` passed Refine governance and is now `ready-merge`. The normal serial merger owns the next step; I will not force it. Quality is the only remaining implementation worker."
     }
   ],
   "queue_dispatching": true,
