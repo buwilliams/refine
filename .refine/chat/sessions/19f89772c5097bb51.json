@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T10:58:28Z",
+  "updated_at": "2026-07-22T11:00:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -64,6 +64,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The second symptom is architectural, not just stale pixels. “Clear history” currently calls the generic chat-clear path, which explicitly stops the supervisor session—even though the Supervisor capability’s own contract says there are no manual lifecycle controls. Meanwhile reconnect restoration is only a ten-event SSE replay and there is no explicit full-session hydration in the toolbar, so an existing session can appear active with an empty or partial transcript. I’m validating that gap with the focused tests and the documented capability contract now."
+    },
+    {
+      "created_at": "2026-07-22T11:00:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718032448-36",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Focused tests are green, which is useful because it exposes the missing coverage: they only prove restoration from browser local storage, not from the authoritative chat record. I also checked the live durable state. The supposedly inactive session actually received the prompt at 10:56, streamed progress at 10:57, and completed at 10:58; the UI failed to make that work visible. The goal should therefore fix session continuity and observability, not merely add a spinner."
     }
   ],
   "queued_messages": [
