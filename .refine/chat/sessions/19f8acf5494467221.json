@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T20:13:41Z",
+  "updated_at": "2026-07-22T20:13:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -1782,6 +1782,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll inspect the failed goal’s durable evidence and current Refine status, then take only the recovery action the existing workflow supports. I’ll keep the provider input-limit failure and any verification failures visible."
+    },
+    {
+      "created_at": "2026-07-22T20:13:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784751239124-42",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The lone failure is substantive, not just a lost worker: governance rejected the candidate with eight specific issues spanning durable Quality semantics, migration, process settlement/cancellation, concurrency, evidence integrity, and intent docs. The earlier provider failure was separate—the supervisor prompt exceeded 1,048,576 characters—and later recovered; I’m now checking the supported retry path and preserved worktree before deciding whether a retry is safe."
     }
   ],
   "queued_messages": [
