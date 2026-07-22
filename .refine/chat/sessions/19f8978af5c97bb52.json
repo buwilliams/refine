@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:46:32Z",
+  "updated_at": "2026-07-22T11:49:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -384,6 +384,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The inline-authoring round 2 is now committed and under governance. Quality UX has a green full library pass, and supervisor recovery round 2 is in compile/test. The always-on Quality retry remains deliberately parked until the shared core converges; this is an explicit concurrency safeguard, not an abandoned failure."
+    },
+    {
+      "created_at": "2026-07-22T11:49:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720973050-54",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Inline authoring round 2 cleared the original two findings but failed one narrower governance check: Feature authoring centralized its own create/dedup logic while ordinary Goal creation still retained the old route-local copy. I’m issuing round 3 to make both endpoints call one shared creation/dedup capability and delete the duplicate route helpers."
     }
   ],
   "queue_dispatching": true,
