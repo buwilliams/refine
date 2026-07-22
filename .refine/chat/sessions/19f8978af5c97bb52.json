@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:41:08Z",
+  "updated_at": "2026-07-22T11:41:57Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -348,6 +348,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Three candidates are now under governance (plain-language Quality tests, always-on Quality validation, and the supervisor-recovery candidate’s earlier round history), while the remaining implementation rounds continue. The failed test commands were followed by green focused reruns where applicable; all live process logs have updated within the last minute, so there is still no stall/loss condition."
+    },
+    {
+      "created_at": "2026-07-22T11:41:57Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784720517736-48",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The plain-language Quality model candidate failed governance on five concrete boundaries: API checks used the primary root instead of the Goal worktree; legacy test commands would silently become a no-op; provider errors/cancellation could leave or overwrite operation state; output validation trusted an `ok` flag without matching per-test evidence; and two affected docs still described removed commands. I’m issuing a preservation round that addresses those exact semantics and migration risks."
     }
   ],
   "queue_dispatching": true,
