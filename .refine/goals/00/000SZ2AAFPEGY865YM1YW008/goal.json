@@ -1,12 +1,12 @@
 {
-  "base_commit": "64565963c310241ff8755a6a48e6c58a23bc497d",
-  "branch_name": "refine/00000SZ2A8GT1HPT5JXR1YW006/round-1",
+  "base_commit": null,
+  "branch_name": null,
   "candidate_commit": null,
-  "created": "2026-07-22T10:04:19Z",
+  "created": "2026-07-22T10:06:28Z",
   "feature_id": null,
   "feature_order": null,
-  "id": "00000SZ2A8GT1HPT5JXR1YW006",
-  "name": "Agents work on the latest Round, but they should have context from the Goal and",
+  "id": "00000SZ2AAFPEGY865YM1YW008",
+  "name": "Supervisor tab is failed with the message, \"Provider turn failed: failed to laun",
   "node_id": "default",
   "notes": [],
   "priority": "low",
@@ -15,7 +15,7 @@
     {
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
-      "created": "2026-07-22T10:04:19Z",
+      "created": "2026-07-22T10:06:28Z",
       "governance_checked_at": "",
       "governance_details": "",
       "governance_message": "",
@@ -25,17 +25,17 @@
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
-      "prompt": "Agents work on the latest Round, but they should have context from the Goal and previous rounds.",
+      "prompt": "Supervisor tab is failed with the message, \"Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)\" Fix.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:04:19Z"
+      "updated": "2026-07-22T10:06:28Z"
     }
   ],
-  "status": "in-progress",
-  "target_branch": "main",
-  "updated": "2026-07-22T10:06:23Z"
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-07-22T10:06:28Z"
 }

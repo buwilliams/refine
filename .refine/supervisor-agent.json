@@ -3,8 +3,8 @@
   "lifecycle": "observing",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 2,
-  "failed_work": 0,
+  "queued_work": 4,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f893818df4360",
   "provider": "codex",
@@ -29,14 +29,19 @@
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
     "00000SZ1YFDPAG0NJ16FTTY000": "done",
     "00000SZ29R2JNJR5RXPR1YW000": "review",
-    "00000SZ29T1KSK3KYJW81YW001": "todo",
-    "00000SZ29Y2WEJ5C3YM01YW003": "todo"
+    "00000SZ29T1KSK3KYJW81YW001": "failed",
+    "00000SZ29Y2WEJ5C3YM01YW003": "review",
+    "00000SZ2A1VDSHNRTNWM1YW004": "todo",
+    "00000SZ2A3VTB16YZMNW1YW005": "todo",
+    "00000SZ2A8GT1HPT5JXR1YW006": "todo",
+    "00000SZ2A9V2FG1VXVDM1YW007": "todo"
   },
   "open_issues": {
-    "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+    "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
+    "workflow": "Workflow evaluation failed: Supervisor event polling can repeatedly duplicate System entries."
   },
   "last_context_key": "goals=00000SZ29R2JNJR5RXPR1YW000:todo|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-22T09:53:23.134995080+00:00",
+  "updated_at": "2026-07-22T10:06:22.573095934+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -121,6 +126,75 @@
       "message": "Goal 00000SZ29Y2WEJ5C3YM01YW003 entered workflow state todo.",
       "created_at": "2026-07-22T09:53:23.134583739+00:00",
       "goal_id": "00000SZ29Y2WEJ5C3YM01YW003",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:21.565141948+00:00-10",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: Supervisor event polling can repeatedly duplicate System entries.",
+      "created_at": "2026-07-22T10:06:21.565141948+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572581749+00:00-11",
+      "kind": "observation",
+      "status": "error",
+      "message": "Goal 00000SZ29T1KSK3KYJW81YW001 changed from todo to failed.",
+      "created_at": "2026-07-22T10:06:22.572581749+00:00",
+      "goal_id": "00000SZ29T1KSK3KYJW81YW001",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572589880+00:00-12",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29Y2WEJ5C3YM01YW003 changed from todo to review.",
+      "created_at": "2026-07-22T10:06:22.572589880+00:00",
+      "goal_id": "00000SZ29Y2WEJ5C3YM01YW003",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572592064+00:00-13",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A1VDSHNRTNWM1YW004 entered workflow state todo.",
+      "created_at": "2026-07-22T10:06:22.572592064+00:00",
+      "goal_id": "00000SZ2A1VDSHNRTNWM1YW004",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572593762+00:00-14",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A3VTB16YZMNW1YW005 entered workflow state todo.",
+      "created_at": "2026-07-22T10:06:22.572593762+00:00",
+      "goal_id": "00000SZ2A3VTB16YZMNW1YW005",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572595609+00:00-15",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A8GT1HPT5JXR1YW006 entered workflow state todo.",
+      "created_at": "2026-07-22T10:06:22.572595609+00:00",
+      "goal_id": "00000SZ2A8GT1HPT5JXR1YW006",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:06:22.572597278+00:00-16",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2A9V2FG1VXVDM1YW007 entered workflow state todo.",
+      "created_at": "2026-07-22T10:06:22.572597278+00:00",
+      "goal_id": "00000SZ2A9V2FG1VXVDM1YW007",
       "actionable": false,
       "retryable": false
     }

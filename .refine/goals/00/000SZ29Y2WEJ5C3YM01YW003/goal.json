@@ -14,28 +14,47 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T09:52:55Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T10:06:19Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29Y2WEJ5C3YM01YW003-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No Governance rule violations found; prompts are centralized behind one shared engine, existing capability boundaries and supervised execution remain intact, and verification evidence is proportionate.\",\"violations\":[]}",
+        "rules_checked": 7,
+        "verdict": {
+          "message": "No Governance rule violations found; prompts are centralized behind one shared engine, existing capability boundaries and supervised execution remain intact, and verification evidence is proportionate.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29Y2WEJ5C3YM01YW003-round-1"
+      },
+      "governance_message": "No Governance rule violations found; prompts are centralized behind one shared engine, existing capability boundaries and supervised execution remain intact, and verification evidence is proportionate.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ29Y2WEJ5C3YM01YW003` is implemented and committed at `af88ac96591d50d3a5a02e96d1ce64f574c5937f`.\n\nAfter-action report:\n\n- Changed: Added a validated template engine and moved 21 agent prompts into Markdown files under [src/prompts](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ29Y2WEJ5C3YM01YW003-round-1/src/prompts).\n- Why: Agent instructions are now centralized, reviewable, and support checked variable substitution instead of being embedded throughout Rust code.\n- `./r test`: exit 0 — 392 passed, 0 failed, 0 ignored.\n- `cargo clippy --all-targets -- -D warnings`: exit 0.\n- `cargo fmt --all -- --check`: exit 0.\n- `git diff --check <base>..HEAD`: exit 0.\n- Worktree: clean.\n\nThis report completes the provider handoff so Refine can advance the Goal into review. Goal-agent usage: 158,259 tokens over 10m 53s.",
       "implementation_reported_at": "2026-07-22T10:04:41Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Create src/prompts and move all agent prompts to src/prompts as Markdown template files instead of being hardcoded in the source code. Create a prompt engine to parse and load templates, substituting variables as needed.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T10:06:21Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T10:04:41Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T10:06:21Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T10:04:41Z"
+  "updated": "2026-07-22T10:06:21Z"
 }
