@@ -150,9 +150,7 @@ function browserRuntime(storage = new Map()) {
   vm.runInContext(`
     globalThis.supervisorToolbarTest = {
       activate() {
-        ensureStandaloneTab();
-        chatState.activeTabId = SUPERVISOR_TAB_ID;
-        chatState.open = true;
+        openToolbarTab(SUPERVISOR_TAB_ID);
       },
       activateTab(tabId) {
         chatState.activeTabId = tabId;
