@@ -1699,7 +1699,6 @@ function initSSE() {
     if (state.currentRoute === "changes") loadChanges();
   });
   sseSource.addEventListener("goal_log_added", (e) => {
-    if (!sseEventChanged("GoalLog", e)) return;
     try {
       const entry = JSON.parse(e.data || "{}");
       if (typeof handleGoalLogSseEvent === "function") handleGoalLogSseEvent(entry);

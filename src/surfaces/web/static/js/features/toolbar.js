@@ -1003,7 +1003,8 @@ async function loadGoalLogTail(tab, { redraw = true } = {}) {
     limit: String(GOAL_LOG_TAIL_LIMIT),
     offset: "0",
     sort: "datetime",
-    dir: "asc",
+    // Fetch the newest page, then mergeGoalLogEntries presents it oldest-first.
+    dir: "desc",
   });
   try {
     const data = await api("GET", `/api/activity?${params}`);
