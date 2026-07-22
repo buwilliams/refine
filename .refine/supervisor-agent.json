@@ -3,10 +3,10 @@
   "lifecycle": "observing",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 1,
+  "queued_work": 2,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
-  "session_id": "19f8956ab3d4361",
+  "session_id": "19f89761c85980810",
   "provider": "codex",
   "initialized": true,
   "goal_states": {
@@ -36,17 +36,18 @@
     "00000SZ2A8GT1HPT5JXR1YW006": "done",
     "00000SZ2A9V2FG1VXVDM1YW007": "done",
     "00000SZ2AAFPEGY865YM1YW008": "done",
-    "00000SZ2ADNRS13J3YZG1YW009": "review",
+    "00000SZ2ADNRS13J3YZG1YW009": "done",
     "00000SZ2AEZ6VGKY6RCG1YW00A": "done",
     "00000SZ2AG11JHPZNR941YW00B": "done",
-    "00000SZ2B6AMS3D1A9N41YW00C": "review",
-    "00000SZ2BGCG909VDSW41YW00D": "todo"
+    "00000SZ2B6AMS3D1A9N41YW00C": "done",
+    "00000SZ2BGCG909VDSW41YW00D": "todo",
+    "00000SZ2BK8ZEHQYBFB41YW00E": "todo"
   },
   "open_issues": {
-    "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
+    "state_sync": "Refine state synchronization failed: background process launch is stopped"
   },
-  "last_context_key": "goals=00000SZ2BGCG909VDSW41YW00D:todo|live={}|quiet={}|issues=provider:Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
-  "updated_at": "2026-07-22T10:48:13.941766594+00:00",
+  "last_context_key": "goals=00000SZ2BGCG909VDSW41YW00D:todo,00000SZ2BK8ZEHQYBFB41YW00E:todo|live={}|quiet={}|issues=state_sync:Refine state synchronization failed: background process launch is stopped",
+  "updated_at": "2026-07-22T10:54:06.981596155+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -478,6 +479,54 @@
       "message": "Goal 00000SZ2BGCG909VDSW41YW00D entered workflow state todo.",
       "created_at": "2026-07-22T10:48:13.939983199+00:00",
       "goal_id": "00000SZ2BGCG909VDSW41YW00D",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:51:46.689347120+00:00-45",
+      "kind": "failure",
+      "status": "error",
+      "message": "Refine state synchronization failed: background process launch is stopped",
+      "created_at": "2026-07-22T10:51:46.689347120+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T10:51:53.056561956+00:00-46",
+      "kind": "recovery",
+      "status": "complete",
+      "message": "Supervisor provider turn: completed and preserved in the shared transcript",
+      "created_at": "2026-07-22T10:51:53.056561956+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:54:06.980849059+00:00-47",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2ADNRS13J3YZG1YW009 changed from review to done.",
+      "created_at": "2026-07-22T10:54:06.980849059+00:00",
+      "goal_id": "00000SZ2ADNRS13J3YZG1YW009",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:54:06.980852154+00:00-48",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2B6AMS3D1A9N41YW00C changed from review to done.",
+      "created_at": "2026-07-22T10:54:06.980852154+00:00",
+      "goal_id": "00000SZ2B6AMS3D1A9N41YW00C",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:54:06.980853284+00:00-49",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ2BK8ZEHQYBFB41YW00E entered workflow state todo.",
+      "created_at": "2026-07-22T10:54:06.980853284+00:00",
+      "goal_id": "00000SZ2BK8ZEHQYBFB41YW00E",
       "actionable": false,
       "retryable": false
     }
