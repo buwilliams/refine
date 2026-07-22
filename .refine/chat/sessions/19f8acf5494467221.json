@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:29:08Z",
+  "updated_at": "2026-07-22T17:29:43Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -240,6 +240,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s focused retry path now passes end to end with the failed candidate preserved; it has started the full library suite. Coordination governance is still actively checking recovery/process ownership paths and has not produced a verdict yet."
+    },
+    {
+      "created_at": "2026-07-22T17:29:43Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741383782-96",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Independent governance rejected coordination candidate `bfdfc92` with three concrete issues: continuous owner-loss recovery, semantic conflict recheck after non-fast-forward state pushes, and missing concurrent failure-path tests. This is a legitimate in-scope retry—not a provider failure or a request for destructive authority—so I’m preserving the candidate, recording those findings as a new round, and requeueing it through Refine. The dependent recovery goal remains parked."
     }
   ],
   "queued_messages": [
