@@ -1,7 +1,7 @@
 {
-  "base_commit": "64565963c310241ff8755a6a48e6c58a23bc497d",
-  "branch_name": "refine/00000SZ29T1KSK3KYJW81YW001/round-2",
-  "candidate_commit": "d2722c4aaa7510553ba8f1dab5540ab1dd38a203",
+  "base_commit": "4b27c6c94b9bf8d893f44b4639c29ee62b0d7588",
+  "branch_name": "refine/00000SZ29T1KSK3KYJW81YW001/round-3",
+  "candidate_commit": null,
   "created": "2026-07-22T09:48:30Z",
   "feature_id": null,
   "feature_order": null,
@@ -107,9 +107,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "passed",
       "updated": "2026-07-22T10:26:11Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T10:33:45Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Approval found a real conflict in tests/web_supervisor_toolbar.test.js after other reviewed Goals landed on main. Reconcile this Goal against the current main branch in a new candidate. Preserve the Goal intent and the prior round-2 deduplication behavior, combine compatible test coverage instead of discarding either side, run focused toolbar tests, and leave the refreshed candidate ready for review.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T10:33:45Z"
     }
   ],
-  "status": "review",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T10:26:11Z"
+  "updated": "2026-07-22T10:33:46Z"
 }

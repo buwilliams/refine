@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "lifecycle": "idle",
+  "lifecycle": "observing",
   "health": "degraded",
   "active_work": 0,
-  "queued_work": 0,
+  "queued_work": 1,
   "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8956ab3d4361",
@@ -29,7 +29,7 @@
     "00000SZ1X25SZJQPSJ6FZWE001": "done",
     "00000SZ1YFDPAG0NJ16FTTY000": "done",
     "00000SZ29R2JNJR5RXPR1YW000": "done",
-    "00000SZ29T1KSK3KYJW81YW001": "review",
+    "00000SZ29T1KSK3KYJW81YW001": "todo",
     "00000SZ29Y2WEJ5C3YM01YW003": "done",
     "00000SZ2A1VDSHNRTNWM1YW004": "done",
     "00000SZ2A3VTB16YZMNW1YW005": "done",
@@ -43,7 +43,8 @@
   "open_issues": {
     "provider": "Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)"
   },
-  "updated_at": "2026-07-22T10:31:41.459593669+00:00",
+  "last_context_key": "goals=00000SZ29T1KSK3KYJW81YW001:todo|live={}|quiet={}|issues=provider:Provider turn failed: failed to launch managed process /home/buddy/.local/bin/codex: Argument list too long (os error 7)",
+  "updated_at": "2026-07-22T10:33:45.927504021+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -395,6 +396,16 @@
       "message": "Goal 00000SZ2AG11JHPZNR941YW00B changed from todo to done.",
       "created_at": "2026-07-22T10:31:41.277506812+00:00",
       "goal_id": "00000SZ2AG11JHPZNR941YW00B",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-22T10:33:45.926049707+00:00-37",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ29T1KSK3KYJW81YW001 changed from review to todo.",
+      "created_at": "2026-07-22T10:33:45.926049707+00:00",
+      "goal_id": "00000SZ29T1KSK3KYJW81YW001",
       "actionable": false,
       "retryable": false
     }
