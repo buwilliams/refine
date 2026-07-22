@@ -1,56 +1,56 @@
 {
   "configured": true,
-  "constitution": "- Preserve product intent over current implementation details. Architectures, storage mechanisms, and surfaces may evolve when the replacement better serves the intent and the change includes proportionate rationale, migration, and verification.\n- Keep the core model understandable: Goals, Features, Nodes, target apps, workflow state, and evidence should remain explicit enough for people and agents to inspect.\n- Prefer one shared capability and source of truth behind every surface. UI, CLI, API, and agent-facing adapters should not silently develop conflicting product behavior.\n- Keep user-owned state durable, inspectable, recoverable, and separate from disposable caches and runtime artifacts. Git remains a safety and collaboration substrate, not an excuse for hidden side effects.\n- Use mitigation, auditability, review, and quality evidence instead of broad capability denial. External, destructive, merge, release, and deployment actions require clear intent and visible outcomes.\n- Preserve room for discovery. Governance should flag unexplained risk or product drift, not reject a change solely because it introduces a new pattern or replaces a documented implementation choice.\n- Treat agent roles as policies over one shared execution substrate: configured CLI providers, process supervision, concurrency, authentication, streaming, and durable evidence. New roles should compose existing primitives; replacing that substrate requires explicit migration rationale and compatibility evidence.",
-  "product": "Refine is a local-first, agent-first software delivery system that coordinates Goals, Features, workflows, processes, and evidence across a fleet of nodes and existing coding agents. It helps technical and non-technical contributors turn product intent into reviewable software changes while keeping feedback inexpensive, local, observable, and repeatable.\n\nSuccess means work remains understandable to people and agents; shared capabilities behave consistently across UI, CLI, API, and future surfaces; durable state and Git history make actions inspectable and recoverable; distributed implementation converges to explicit human judgment; and Refine can safely improve itself without requiring centralized infrastructure.",
+  "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+  "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
   "rules": [
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-1",
       "source": "manual",
-      "text": "When a change affects a shared capability, implement the product behavior in the shared backend and keep UI, CLI, API, and agent surfaces as consistent adapters, unless the candidate documents a justified surface-specific exception.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-2",
       "source": "manual",
-      "text": "When persisted Refine state or its layout changes, keep authoritative state outside the primary target-app worktree, keep caches rebuildable, and include a compatible migration or an explicit transition plan.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-3",
       "source": "manual",
-      "text": "When a change performs destructive, externally mutating, merge, release, deployment, or daemon-replacement work, require explicit scoped intent plus durable progress, actionable failure feedback, and a safe retry or recovery path appropriate to the risk.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-4",
       "source": "manual",
-      "text": "When changing public commands, APIs, durable schemas, or workflow semantics, preserve compatibility where practical; otherwise document the break, migration, and operator impact.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-5",
       "source": "manual",
-      "text": "Use verification proportional to risk: focused tests are sufficient for localized behavior, while cross-surface, persistence, concurrency, release, or recovery changes need corresponding integration evidence and affected documentation updates.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-21T21:42:32Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-6",
       "source": "manual",
-      "text": "Architectural evolution is allowed: a candidate satisfies governance when it preserves the protected product outcome or clearly explains why a better design replaces it, with relevant tests and intent documentation updated.",
-      "updated": "2026-07-21T21:42:32Z"
+      "text": "Require evidence proportional to architectural and operational risk. Changes crossing capabilities, surfaces, persistence, concurrency, process, Git, release, or recovery boundaries need focused integration evidence, visible failure behavior, and affected intent documentation.",
+      "updated": "2026-07-22T02:10:10Z"
     },
     {
-      "created": "2026-07-22T01:37:14Z",
+      "created": "2026-07-22T02:10:10Z",
       "id": "rule-7",
       "source": "manual",
-      "text": "When adding or changing an agent role, use the existing configured CLI-agent provider, chat or workflow, process-supervisor, concurrency, authentication, and evidence services. Governance must reject parallel agent executors or duplicated workflow, process, Git, or recovery engines unless the candidate explicitly replaces the shared architecture and documents migration, compatibility, and cross-surface verification.",
-      "updated": "2026-07-22T01:37:14Z"
+      "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+      "updated": "2026-07-22T02:10:10Z"
     }
   ]
 }
