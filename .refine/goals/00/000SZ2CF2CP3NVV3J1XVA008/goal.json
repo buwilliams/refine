@@ -137,28 +137,47 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:51:23Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T17:16:12Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Round 2 made no implementation changes and introduced no governance violations.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Round 2 made no implementation changes and introduced no governance violations.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-2"
+      },
+      "governance_message": "Round 2 made no implementation changes and introduced no governance violations.",
       "governance_rule_actions": [],
       "implementation_report": "Blocked by the latest Round’s explicit sequencing constraint; no files were changed.\n\nVerified:\n\n- `origin/main` is `6b9638ce18ebcfee70cf6cda7f785ca91c06fcc8`.\n- Quality core `c1e9a9a…` is not an ancestor of `main`.\n- Shared evaluator candidate `58d5b76…` is not an ancestor of `main`; its Round 2 branch still equals `main`.\n- Candidate `a0f1c58e…` remains preserved on the Round 1 branch.\n- Current `main` still accepts caller-supplied commands and treats an empty command as success in [service.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-2/src/tools/host/quality/service.rs:284) and [quality_chat_routes.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2CF2CP3NVV3J1XVA008-round-2/src/surfaces/web_server/quality_chat_routes.rs:219).\n- Worktree and index are clean.\n\nImplementing the UX now would recreate or depend upon precisely the competing semantics Round 2 prohibits. Goal `…006` must first be resolved onto `main`, followed by `…007`; then this branch can apply the thin UX/documentation composition serially.",
       "implementation_reported_at": "2026-07-22T17:15:31Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate a0f1c58eacf61b1d28c2a15e9f78da30f0cc7caa, but do not reimplement Quality core. After sibling Goal 00000SZ2CF255HWFA0G9XVA006 converges on main and Goal 00000SZ2CF28DJN97511XVA007 establishes the one shared evaluator/retry/evidence path, rebase or compose this Goal as a thin UX/documentation change on those authoritative capabilities. Remove competing workflow evaluators, parsers, FileQualityService command semantics, caller-supplied command checks, and split Node versus quality/settings ownership from this branch; UI/API/CLI/desktop/MCP must read and invoke the shared model/service only. Preserve and explicitly migrate legacy quality_timing (including post_build) into the one authoritative local durable settings record without silently defaulting. Keep retry-quality and supervised execution/evidence semantics owned by the shared core, and add only the cross-surface UX/evidence presentation tests needed here: requirements/instructions/ordered tests editors, timing, always-on Quality plus Governance explanation, Goal summary/per-test evidence, accessibility, responsive layout, and API/CLI documentation parity. Verify this branch does not accept non-JSON prose or self-reported evidence and does not expose arbitrary command or empty-command success paths, but reuse core tests instead of cloning them. Preserve isolated worktrees and serial review; do not force merges.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T17:16:14Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T17:15:31Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T17:16:14Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T17:15:31Z"
+  "updated": "2026-07-22T17:16:14Z"
 }
