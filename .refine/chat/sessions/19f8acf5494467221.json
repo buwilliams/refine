@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:39:01Z",
+  "updated_at": "2026-07-22T17:40:12Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -348,6 +348,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The latest targeted fixes are green. Coordination’s one failed command was only an invalid combined test-filter invocation; the same tests passed when run separately. Quality added and passed a regression proving provider-reported success is rejected when supervised execution fails, then passed the full library suite."
+    },
+    {
+      "created_at": "2026-07-22T17:40:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784742012864-115",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Quality candidate `a40ab0e` is committed and has entered independent governance; coordination is still in implementation verification. Both remain unmerged and reviewable."
     }
   ],
   "queued_messages": [
