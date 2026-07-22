@@ -9,7 +9,7 @@
     "path": "/home/buddy/projects/refine-next/.git/refine-standalone-worktrees/19f89772c5097bb51"
   },
   "created_at": "2026-07-22T10:55:16Z",
-  "updated_at": "2026-07-22T11:15:40Z",
+  "updated_at": "2026-07-22T11:18:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:19Z",
@@ -436,6 +436,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prototype now uses one canonical message identity end to end: each queued input remains individually recorded even when the provider receives a batch. In the browser, optimistic local input appears immediately inside the transcript, server-queued input stays removable, dispatching input becomes a compact “Sent” entry, and the matching user event replaces it without redrawing the toolbar shell. I’m at the verification pass now, including the race where dispatch wins before the POST response returns."
+    },
+    {
+      "created_at": "2026-07-22T11:18:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784719093278-127",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Targeted browser and queue-service tests are green. One static contract test exposed an older assertion tied to the pre-prototype Supervisor renderer (`renderChatPanel(active, chatOptions)`); the tab is still in the same toolbar, but the renderer now injects health into the fixed row through an options spread. I’m updating that contract to assert the actual invariant and rerunning it."
     }
   ],
   "queued_messages": [
