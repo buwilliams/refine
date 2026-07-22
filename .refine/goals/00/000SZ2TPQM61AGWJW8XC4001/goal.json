@@ -171,9 +171,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T20:02:13Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T20:34:56Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Address the eight governance findings from round 1 without broadening scope or weakening confirmation, audit, provider-failure, authentication, or cancellation boundaries.\n\nImplement round 2 so that:\n1. Goal-scoped manual Quality checks and workflow QA use one shared Quality capability with identical durable Goal-round Quality evidence semantics; keep API, CLI, UI, desktop, and agent handlers thin.\n2. Establish one authoritative Quality timing setting and make workflow behavior honor it. Remove or compatibly migrate the legacy quality_timing/test-settings split rather than leaving contradictory sources of truth.\n3. Compatibly migrate existing enabled target-app Quality commands. Upgrades must not silently turn formerly enforced QA into a successful no-op; provide an explicit transition path and regression coverage.\n4. Run Quality through the supervised process/operation substrate with explicit ownership, operation ID visibility, logs, cancellation, terminal settlement on provider/parsing failures, and restart recovery. Associate the managed process with its operation so cancellation can terminate it. Preserve provider and authentication failures verbatim and visibly.\n5. Serialize manual and workflow Quality evaluation for the same Goal candidate using the existing claim/capacity/ownership coordination model so they cannot race.\n6. Treat observed supervised executions as authoritative evidence. Correlate each claimed test command/result with the actual process execution; reject agent-authored pass claims that lack observed execution evidence.\n7. Pin evaluation to the candidate commit and verify HEAD, index, and worktree cleanliness before and after Quality. Fail visibly if the evaluated tree changes or differs from the recorded candidate; do not discard or overwrite user work.\n8. Reconcile only the affected intent/contracts (Target App intent, rust-spec, integration index, and Quality timing/evidence documentation) with the implemented behavior.\n\nVerification must cover shared cross-surface semantics, legacy-state migration/no-silent-no-op, provider/parsing failure settlement, cancellation and restart recovery, concurrent manual/workflow exclusion, false-positive evidence rejection, candidate mutation detection, and the production workflow path. Use focused tests proportional to these persistence, process, concurrency, and cross-surface risks. Do not force merges, delete worktrees, discard changes, or conceal provider/authentication failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T20:34:56Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T20:02:13Z"
+  "updated": "2026-07-22T20:34:56Z"
 }

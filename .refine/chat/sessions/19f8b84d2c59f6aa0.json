@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T20:29:25Z",
-  "updated_at": "2026-07-22T20:34:03Z",
+  "updated_at": "2026-07-22T20:35:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T20:29:26Z",
@@ -183,6 +183,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The failed goal has one committed candidate and eight explicit governance findings. I’m treating those findings as the scope for round 2; the cancelled goals remain untouched. Next I’m checking the supported state-transition command so the update goes through Refine’s authoritative service rather than editing JSON directly."
+    },
+    {
+      "created_at": "2026-07-22T20:35:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784752508278-40",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 2 was added successfully. The installed CLI rejects `goal undo` from `failed` despite the model permitting a failed→todo user transition, so I’m not bypassing the service with a JSON edit. I’m checking the supported bulk/workflow transition path that the browser uses for this exact move."
     }
   ],
   "queued_messages": [
