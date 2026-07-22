@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:54:06Z",
-  "updated_at": "2026-07-22T10:54:16Z",
+  "updated_at": "2026-07-22T10:54:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:54:06Z",
@@ -36,6 +36,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m taking over the supervisor loop now. I’ll first reconcile the two queued goal IDs against live workflow, process, Git, projection, and activity evidence, then use only Refine’s auditable recovery paths and keep watching until the queue is genuinely idle. I’ll surface any provider/authentication failure unchanged and stop for your decision if recovery would cross a confirmation boundary."
+    },
+    {
+      "created_at": "2026-07-22T10:54:32Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717672672-8",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The map already understates the territory: both queued goals have dedicated worktrees, and goal `...00D` has advanced to commit `9b7b2bc` while still reported `todo`; `...00E` has only the base commit. I’m following that divergence first, while preserving both worktrees and avoiding any manual merge or branch rewrite."
     }
   ],
   "queue_dispatching": true,
