@@ -124,7 +124,14 @@ impl WorkflowBehavior for WorkflowImplementation {
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
         let worktree_path = ctx.require_worktree_path()?.to_string();
-        let prompt = goal_agent_prompt(&ctx.goal_id);
+        let goal = match ctx.work_items.show_goal_detail(&ctx.goal_id) {
+            Ok(goal) => goal,
+            Err(error) => return fail(ctx, "agent", error),
+        };
+        let prompt = match goal_agent_prompt(&ctx.goal_id, &goal, ctx.round_idx) {
+            Ok(prompt) => prompt,
+            Err(error) => return fail(ctx, "agent", error),
+        };
         let agent_cwd = match agent_worktree_cwd(
             &worktree_path,
             setting_string(&ctx.settings, "agent_subpath", "").as_str(),
