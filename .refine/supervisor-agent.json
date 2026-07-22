@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "idle",
-  "health": "degraded",
+  "health": "attention",
   "active_work": 0,
   "queued_work": 0,
   "failed_work": 3,
@@ -50,10 +50,8 @@
     "00000SZ2DY74HKB75CMHXVA009": "done",
     "00000SZ2HY79M3364XKDXVA00B": "backlog"
   },
-  "open_issues": {
-    "state_sync": "Refine state synchronization failed: background process launch is stopped"
-  },
-  "updated_at": "2026-07-22T14:33:32.167215120+00:00",
+  "open_issues": {},
+  "updated_at": "2026-07-22T14:35:10.403280113+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
