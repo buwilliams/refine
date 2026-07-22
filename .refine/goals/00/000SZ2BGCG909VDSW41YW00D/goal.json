@@ -1,7 +1,7 @@
 {
   "base_commit": "e01dec2d30f84f4c05cb10b1b0c540982fc44816",
   "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "5a644c446ba97dbab45002e20a6979c837f51c9c",
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented Goal `00000SZ2BGCG909VDSW41YW00D` and left the worktree reviewable.\n\nWhat changed:\n\n- Moved Jira export from Goal detail to the Goals bulk-action screen.\n- Supports all matching Goals, exclusions, or explicit subsets.\n- Produces one deterministic CSV row per Goal with aggregate counts.\n- Reuses the existing selection and Jira evidence logic.\n- Preserved CLI/MCP single-Goal compatibility.\n- Added service, HTTP-route, selection, ordering, empty-selection, and UI-placement coverage.\n- Updated intent/spec/story documentation.\n\nVerification:\n\n- `cargo test --lib` — 396 passed, 0 failed.\n- `cargo clippy --lib -- -D warnings` — passed.\n- `cargo fmt --all -- --check` — passed.\n- JavaScript syntax checks for all four changed files — passed.\n- `git diff --check` — passed.\n- Focused Jira bulk-export tests — all passed.\n\nNo commit was created; 14 scoped files remain modified for review.",
+      "implementation_reported_at": "2026-07-22T10:59:44Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,10 +32,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T10:47:52Z"
+      "updated": "2026-07-22T10:59:44Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T10:54:07Z"
+  "updated": "2026-07-22T10:59:44Z"
 }
