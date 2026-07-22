@@ -323,6 +323,26 @@ test("polling and SSE reconnect route deduplicated supervisor events to System",
   ]);
 });
 
+test("polling an unchanged full supervisor event window does not duplicate System entries", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setAttached();
+  const eventStart = Date.parse("2026-07-21T22:00:00Z");
+  const events = Array.from({ length: 80 }, (_, index) => ({
+    id: `supervisor-event-${index}`,
+    kind: index === 79 ? "recovery" : "observation",
+    status: index === 79 ? "completed" : "running",
+    message: `Supervisor event ${index}`,
+    created_at: new Date(eventStart + index * 1000).toISOString(),
+  }));
+  browser.runtime.setApi(async () => ({ supervisor_agent: snapshot({ events }) }));
+
+  await browser.runtime.load();
+  assert.equal(browser.runtime.systemMessageCount(), 80);
+
+  await browser.runtime.load();
+  assert.equal(browser.runtime.systemMessageCount(), 80);
+});
+
 test("initial prompts and active-work follow-ups share chat APIs and render every outcome", async () => {
   const browser = browserRuntime();
   browser.runtime.setAttached();

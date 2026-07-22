@@ -1260,7 +1260,7 @@ function recordSystemOperation(payload, redraw = true) {
 function isDuplicateSystemOperation(item) {
   const cutoff = Date.parse(item.timestamp || "") - 5000;
   const itemDetails = formatSystemOperationDetails(item.details);
-  return systemOperationState.messages.slice(-20).some((existing) => {
+  return systemOperationState.messages.some((existing) => {
     if (
       existing.message !== item.message
       || existing.status !== item.status
