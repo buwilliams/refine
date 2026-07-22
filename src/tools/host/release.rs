@@ -1464,7 +1464,7 @@ mod tests {
         assert!(prompt.contains("Current version: 1.0.0"));
         assert!(prompt.contains("Proposed version: 1.1.0"));
         assert!(prompt.contains("GOAL0: Reviewed work"));
-        assert!(prompt.contains("Do not tag, push a tag"));
+        assert!(prompt.contains("Do not tag, push, create a GitHub release"));
         assert!(!runtime.join("releases/worktrees").exists());
         assert!(host.calls.is_empty());
         let _ = fs::remove_dir_all(root);

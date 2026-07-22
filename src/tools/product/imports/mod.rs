@@ -875,10 +875,10 @@ mod tests {
     fn plan_goal_extraction_prompt_requests_one_goal_without_a_feature() {
         let prompt = import_extraction_prompt("Plan transcript", "plan_goal");
 
-        assert!(prompt.contains("exactly one implementation-ready Goal"));
-        assert!(prompt.contains("independently actionable slice"));
-        assert!(prompt.contains("verification expectations"));
-        assert!(prompt.contains("Do not return a Feature, multiple Goals"));
+        assert!(prompt.contains("exactly one ambitious, independently actionable Goal"));
+        assert!(prompt.contains("implementation and verification context"));
+        assert!(prompt.contains("consequential unknowns"));
+        assert!(prompt.contains("do not return a Feature, multiple Goals"));
         assert!(prompt.ends_with("\n\nPlan transcript"));
     }
 

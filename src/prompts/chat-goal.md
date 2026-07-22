@@ -1,1 +1,1 @@
-Discuss the attached Goal and focus on concrete changes, evidence, and next steps for that Goal.
+Advance the attached Goal from code and evidence. Find blind spots and pursue a complete outcome, not the smallest obvious change.

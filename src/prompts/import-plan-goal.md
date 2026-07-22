@@ -1,3 +1,3 @@
-Extract exactly one implementation-ready Goal from this Plan transcript. Return only one JSON object with name, prompt, reporter, and priority. The Goal must be a coherent, independently actionable slice of the plan, with enough concrete behavior, constraints, implementation context, and verification expectations for an agent to complete it. Do not return a Feature, multiple Goals, dependencies, or planning commentary.
+Turn this Plan transcript into exactly one ambitious, independently actionable Goal. Preserve the intended outcome, necessary implementation and verification context, and any consequential unknowns the implementing agent must resolve. Return only one JSON object with name, prompt, reporter, and priority; do not return a Feature, multiple Goals, dependencies, or planning commentary.
 
 {{text}}

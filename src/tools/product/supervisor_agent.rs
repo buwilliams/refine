@@ -1188,7 +1188,7 @@ mod tests {
             .filter_map(|event| event.get("text").and_then(Value::as_str))
             .collect::<Vec<_>>()
             .join("\n");
-        assert!(user_transcript.contains("Active Refine workflow work needs supervision"));
+        assert!(user_transcript.contains("Supervise until the queue is idle"));
         assert!(user_transcript.contains("user steering while active"));
     }
 

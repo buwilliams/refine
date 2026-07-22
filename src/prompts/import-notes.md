@@ -1,3 +1,3 @@
-Import these notes into Refine Goal drafts. Return only draft data, one draft per line, using prompt text or JSON objects with name, prompt, reporter, and priority.
+Turn these notes into an ambitious, complete set of actionable Goal drafts. Preserve intent, implementation, verification, and consequential unknowns. Return only one draft per line as prompt text or JSON with name, prompt, reporter, and priority.
 
 {{text}}

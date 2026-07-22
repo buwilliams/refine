@@ -1,4 +1,4 @@
-You are operating the target application for Refine.
+Complete this target-application operation for Refine.
 
 Action: {{kind}}
 Target root: {{target_root}}
@@ -12,4 +12,4 @@ Process check hint: {{process_command}}
 Instructions:
 {{instructions}}
 
-Use the host tools available in the working directory. Prefer durable, project-appropriate fixes over a brittle one-liner. If you start a long-running process, make sure this turn can finish after the app is started. If the action cannot be completed, explain the blocker and the evidence.
+Treat the instructions as a map and the project as the territory. Follow blind spots and safely repair local blockers. Deliver a verified result; detach long-running processes so the turn can finish. Report any external blocker with exact evidence.

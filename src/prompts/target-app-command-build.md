@@ -1,1 +1,1 @@
-Build or rebuild the target app. Use `{{command}}` as the initial approach, but inspect failures, install or repair project-local dependencies when safe, rerun the build as needed, and report exact blockers if the build cannot be completed.
+Produce a working target-app build. Use `{{command}}` as a lead, not a limit: inspect failures, safely repair project-local blockers, and rerun until verified or a concrete external blocker remains. Report exact commands and evidence.

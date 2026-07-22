@@ -198,7 +198,64 @@ mod tests {
     fn loads_templates_without_trailing_file_whitespace() {
         let loaded = PromptEngine::load(PromptTemplate::ChatGoal);
 
-        assert!(loaded.starts_with("Discuss the attached Goal"));
+        assert!(loaded.starts_with("Advance the attached Goal"));
         assert!(!loaded.ends_with('\n'));
+    }
+
+    #[test]
+    fn agent_prompts_are_concise_and_unhobble_discovery() {
+        let templates = [
+            PromptTemplate::Chat,
+            PromptTemplate::ChatPlan,
+            PromptTemplate::ChatGoal,
+            PromptTemplate::ChatFeature,
+            PromptTemplate::ChatSupervisor,
+            PromptTemplate::ChatStandalone,
+            PromptTemplate::ImportFeature,
+            PromptTemplate::ImportRound,
+            PromptTemplate::ImportPlanGoal,
+            PromptTemplate::ImportStandaloneGoal,
+            PromptTemplate::ImportNotes,
+            PromptTemplate::Supervisor,
+            PromptTemplate::ReleaseGoal,
+            PromptTemplate::PostImplementationGovernance,
+            PromptTemplate::GoalAgent,
+            PromptTemplate::GovernanceGeneration,
+            PromptTemplate::TargetAppGeneration,
+            PromptTemplate::TargetAppLifecycle,
+            PromptTemplate::TargetAppCommandStart,
+            PromptTemplate::TargetAppCommandStop,
+            PromptTemplate::TargetAppCommandBuild,
+        ];
+        for template in templates {
+            let word_count = PromptEngine::load(template).split_whitespace().count();
+            assert!(
+                word_count <= 120,
+                "{} is too prescriptive at {word_count} words",
+                template.name()
+            );
+        }
+
+        let plan = PromptEngine::load(PromptTemplate::ChatPlan);
+        for strategy in [
+            "map",
+            "territory",
+            "blind-spot paths",
+            "prototype",
+            "interview the user",
+            "good, fast, and cheap",
+        ] {
+            assert!(plan.contains(strategy), "plan prompt omitted {strategy}");
+        }
+
+        let goal = PromptEngine::load(PromptTemplate::GoalAgent);
+        assert!(goal.contains("strongest solution"));
+        assert!(goal.contains("good, fast, and cheap"));
+
+        let supervisor = PromptEngine::load(PromptTemplate::Supervisor);
+        assert!(supervisor.contains("interview the user"));
+        assert!(supervisor.contains("Never hide provider failures"));
+        assert!(supervisor.contains("force merges"));
+        assert!(supervisor.contains("discard worktrees"));
     }
 }

@@ -1978,24 +1978,19 @@ mod tests {
             .unwrap();
 
         let prompt = service.chat_prompt(&session, "Plan authentication cleanup.");
-        assert!(prompt.contains("Plan Mode drafts the whole picture of the software"));
-        assert!(prompt.contains("product spec"));
-        assert!(prompt.contains("software purpose"));
+        assert!(prompt.contains("Co-design ambitious software"));
+        assert!(prompt.contains("map"));
+        assert!(prompt.contains("territory"));
+        assert!(prompt.contains("blind-spot paths"));
+        assert!(prompt.contains("prototype uncertain parts"));
+        assert!(prompt.contains("interview the user"));
         assert!(prompt.contains("audience"));
-        assert!(prompt.contains("success criteria"));
         assert!(prompt.contains("constraints"));
-        assert!(prompt.contains("surfaces"));
-        assert!(prompt.contains("technical work"));
-        assert!(prompt.contains("architecture lenses"));
-        assert!(prompt.contains("durable state"));
-        assert!(prompt.contains("logic and code organization"));
-        assert!(prompt.contains("do not force a fixed checklist"));
-        assert!(prompt.contains("natural build order"));
-        assert!(prompt.contains("test or verification work"));
-        assert!(prompt.contains("Draft Feature or Draft Goal action"));
-        assert!(prompt.contains("implementation-ready work"));
-        assert!(prompt.contains("Do not reduce the answer to generic strategy"));
-        assert!(!prompt.contains("highest-leverage"));
+        assert!(prompt.contains("architecture"));
+        assert!(prompt.contains("build order"));
+        assert!(prompt.contains("verification"));
+        assert!(prompt.contains("good, fast, and cheap"));
+        assert!(prompt.contains("reviewable Features or Goals"));
         assert!(prompt.contains("Plan authentication cleanup."));
 
         fs::remove_dir_all(temp_root).unwrap();

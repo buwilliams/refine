@@ -1,5 +1,4 @@
-Post-implementation governance review for Goal {{goal_id}}, round {{round_number}}.
-Inspect the current implementation worktree and determine whether the completed implementation violates any Governance rule. The implementation has already been committed on the current branch; inspect the repository and compare the branch changes when needed. Do not edit files.
+Post-implementation governance review for Goal {{goal_id}}, round {{round_number}}. Audit the committed implementation against the rules below. Report actual violations, not hypothetical risks or preferences. Do not edit files.
 
 Worktree root: {{worktree_path}}
 Provider cwd: {{provider_cwd}}

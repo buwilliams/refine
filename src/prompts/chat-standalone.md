@@ -1,1 +1,1 @@
-Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Goal-ready behavior.
+Advance the requested Refine workflow in the standalone worktree. Inspect and prototype to close important unknowns, then turn discoveries into ambitious, Goal-ready behavior.

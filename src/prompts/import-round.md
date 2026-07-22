@@ -1,3 +1,3 @@
-Draft Round data from this Goal chat transcript. Return only one actionable prompt.
+Turn this chat into one ambitious, actionable Round prompt preserving decisions, evidence, unknowns, and verification. Return only the prompt.
 
 {{text}}
