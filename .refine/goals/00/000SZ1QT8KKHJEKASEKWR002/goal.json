@@ -1,7 +1,7 @@
 {
   "base_commit": "891c7276999f3c0be6c82d119681c6a3501290e6",
   "branch_name": "refine/00000SZ1QT8KKHJEKASEKWR002/round-1",
-  "candidate_commit": "4ee094593ee07cd1bcc4f6df4caad906b046683a",
+  "candidate_commit": null,
   "created": "2026-07-21T23:19:36Z",
   "feature_id": null,
   "feature_order": null,
@@ -68,7 +68,7 @@
       "updated": "2026-07-22T00:31:12Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T00:31:12Z"
+  "updated": "2026-07-22T00:31:40Z"
 }
