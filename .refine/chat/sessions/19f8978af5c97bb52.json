@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:27:33Z",
+  "updated_at": "2026-07-22T14:31:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1140,6 +1140,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The production-topology regression now passes after correcting two test-harness defects (conflicting state roots and fixture prompt matching). Focused operation/workflow suites are also green; the agent is moving through broader verification before candidate submission."
+    },
+    {
+      "created_at": "2026-07-22T14:31:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784730708220-180",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A consequential anomaly just surfaced: the Quality-core Goal transitioned to `cancelled`, not review or failed, while its worker was finishing validation. I’m tracing the operation, claim, and activity records before deciding whether this is a legitimate cancellation or evidence corruption; I will not silently requeue it."
     }
   ],
   "queued_messages": [
