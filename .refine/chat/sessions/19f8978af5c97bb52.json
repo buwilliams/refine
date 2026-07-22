@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T10:58:03Z",
+  "updated_at": "2026-07-22T11:06:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -78,8 +78,27 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-22T11:06:15Z",
+      "delivered": false,
+      "id": "evt-1784718375797-73",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "Do Goal rounds now have context from previous rounds?"
+    },
+    {
+      "created_at": "2026-07-22T11:06:15Z",
+      "delivered": false,
+      "id": "evt-1784718375797-74",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
+  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
