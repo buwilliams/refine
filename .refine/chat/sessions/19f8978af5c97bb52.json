@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T14:47:12Z",
+  "updated_at": "2026-07-22T14:47:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1212,6 +1212,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The contract candidate is committed as `a0036b17` with a docs-only scope (9 Intent files, 141 insertions), clean worktree, link checks, and required-concept scan passing. Refine’s independent governance agent is now reviewing it; the implementation Goal remains ordered behind it."
+    },
+    {
+      "created_at": "2026-07-22T14:47:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784731670778-195",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Contract governance passed with no violations. One blind spot is visible: Refine launched the implementation at the contract’s `review` boundary before its merge reached `main`, so the implementation worktree starts from the old main commit. I’m watching that agent for explicit composition of `a0036b17`; if it proceeds without the contract, I’ll treat that as a review blocker rather than merging around it."
     }
   ],
   "queued_messages": [
