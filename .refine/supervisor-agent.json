@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "idle",
-  "health": "attention",
+  "health": "degraded",
   "active_work": 0,
   "queued_work": 0,
   "failed_work": 1,
@@ -54,8 +54,10 @@
     "00000SZ2SWWPEJZZHS4CXC4000": "cancelled",
     "00000SZ2TPQM61AGWJW8XC4001": "failed"
   },
-  "open_issues": {},
-  "updated_at": "2026-07-22T21:23:39.560203873+00:00",
+  "open_issues": {
+    "state_sync": "Refine state synchronization failed: failed to copy Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock to /home/buddy/projects/refine-next/.git/refine-state-worktree/.refine/.refine-sync-653032-22909: No such file or directory (os error 2)"
+  },
+  "updated_at": "2026-07-22T21:24:40.539369397+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1332,6 +1334,15 @@
       "status": "error",
       "message": "Refine state synchronization failed: failed to copy Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock to /home/buddy/projects/refine-next/.git/refine-state-worktree/.refine/.refine-sync-653032-20935: No such file or directory (os error 2)",
       "created_at": "2026-07-22T21:20:05.696615131+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-22T21:24:40.539349007+00:00-133",
+      "kind": "failure",
+      "status": "error",
+      "message": "Refine state synchronization failed: failed to copy Refine state /home/buddy/projects/refine-next/.git/refine-live-state/supervisor-agent.lock to /home/buddy/projects/refine-next/.git/refine-state-worktree/.refine/.refine-sync-653032-22909: No such file or directory (os error 2)",
+      "created_at": "2026-07-22T21:24:40.539349007+00:00",
       "actionable": true,
       "retryable": true
     }
