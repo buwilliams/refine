@@ -139,28 +139,47 @@
     },
     {
       "assignee": "Buddy",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-22T11:49:39Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-22T12:03:54Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Committed implementation complies with the governance rules.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Committed implementation complies with the governance rules.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-3"
+      },
+      "governance_message": "Committed implementation complies with the governance rules.",
       "governance_rule_actions": [],
       "implementation_report": "Goal `00000SZ2C7X8WJSVQNNSXVA000` is complete and reviewable.\n\n- Commit: `119b532682038ed886ee56be65b1d1ceeee705cb`\n- Preserved candidate `7a06daf42eafbf15e29c8f0bf53e9c07518ab359` as the second parent.\n- Worktree: clean.\n\nWhat changed:\n\n- Ordinary and Feature Goal creation now share one `FileWorkItemService` authoring implementation for naming, validation, metadata/round persistence, latest-round duplicate matching, duplicate decisions, and placement.\n- Removed Goal-name derivation and duplicate orchestration from [work_routes.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2C7X8WJSVQNNSXVA000-round-3/src/surfaces/web_server/work_routes.rs).\n- Added parity coverage for generated/explicit names, reporter/assignee, invalid input, latest-round matching, duplicate skip/move/create decisions, and Feature placement.\n- Preserved ordinary API/CLI/MCP response contracts, including duplicate-move response shape.\n\nVerification:\n\n- Shared service/Feature authoring: 5 passed, 0 failed.\n- Focused ordinary API tests: 3 passed, 0 failed.\n- Browser interaction suite: 26 passed, 0 failed.\n- Static assets: 54 present.\n- `cargo fmt --all -- --check`: exit 0.\n- Four changed JavaScript files passed `node --check`.\n- Staged, unstaged, and final commit diff checks: exit 0.\n- Candidate ancestry and route-policy scans: exit 0.\n\nOne initial unscoped Cargo filter was rejected by the repository’s custom test harness after its two matching unit tests passed; rerunning with the required `--lib` scope passed cleanly.\n\nGoal accounting: 139,013 tokens over approximately 11 minutes.",
       "implementation_reported_at": "2026-07-22T12:01:15Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve candidate 7a06daf42eafbf15e29c8f0bf53e9c07518ab359 and remediate the single remaining governance violation. Generalize the shared work-item Goal authoring capability so both ordinary POST /work/goals and Feature inline authoring call the same authoritative name derivation, latest-round duplicate matching, duplicate-decision handling, metadata/round creation, and validation implementation. Remove derive_goal_name, latest_round_duplicate_match, and equivalent decision orchestration from work_routes.rs rather than wrapping or copying them again; keep route handlers thin adapters and preserve existing ordinary Goal API/CLI/MCP behavior and response/error contracts. Add parity tests that drive both ordinary and Feature creation through the shared service for generated names, explicit names, duplicate skip/update/create decisions, latest-round prompt matching, invalid input, reporter/assignee, and Feature placement. Retain the round-2 DOM interaction coverage and rerun focused service/API, browser, static-asset, formatting, and diff gates.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-22T12:03:55Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
       "reporter": "Buddy",
-      "rule_state": "unclassified",
-      "updated": "2026-07-22T12:01:15Z"
+      "rule_state": "passed",
+      "updated": "2026-07-22T12:03:55Z"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-22T12:01:16Z"
+  "updated": "2026-07-22T12:03:56Z"
 }
