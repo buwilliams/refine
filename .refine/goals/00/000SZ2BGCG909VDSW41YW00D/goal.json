@@ -66,9 +66,31 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T11:03:08Z"
+    },
+    {
+      "assignee": "Codex",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T11:15:47Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve the committed bulk Jira export behavior and fix the governance failure. Do not run an unbounded per-Goal Git loop in the HTTP request handler. Use Refine’s existing supervised process and durable operation path so the export has ownership, progress and logs, cancellation, failure reporting, and recovery; have the UI follow that operation and download the completed CSV. Batch or otherwise bound commit-evidence lookup instead of spawning one git log per Goal. Keep the shared export service, deterministic ordering, selection semantics, and single-Goal CLI/MCP compatibility. Add focused coverage for route responsiveness, operation completion, cancellation and failure, and commit lookup behavior, then rerun governance and relevant tests.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Codex",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T11:15:47Z"
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-22T11:03:08Z"
+  "updated": "2026-07-22T11:15:47Z"
 }
