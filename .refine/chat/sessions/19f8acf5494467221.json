@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T18:03:05Z",
+  "updated_at": "2026-07-22T18:04:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -636,6 +636,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality’s implementation gates and its internal pre-commit audit are green; it is staging the scoped round-3 files for commit, after which Refine will still run the official independent governance step. Coordination’s first harness compile command stopped on formatting; it ran formatter and restarted the compile check."
+    },
+    {
+      "created_at": "2026-07-22T18:04:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784743473469-168",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both active remediations are still within the existing workflow: Quality has its requested gates green and is finalizing its candidate, while coordination is finishing the distinct-node production-path coverage. I’m waiting for Refine’s official governance results before allowing either merge."
     }
   ],
   "queued_messages": [
