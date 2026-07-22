@@ -6,7 +6,8 @@
   "queued_work": 2,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
-  "session_id": null,
+  "session_id": "19f8978af5c97bb52",
+  "provider": "codex",
   "initialized": true,
   "goal_states": {
     "00000SZ1J1YD7KCM6JNJRB8000": "done",
@@ -43,7 +44,7 @@
     "00000SZ2BK8ZEHQYBFB41YW00E": "todo"
   },
   "open_issues": {},
-  "updated_at": "2026-07-22T10:54:50.142900749+00:00",
+  "updated_at": "2026-07-22T10:56:55.645111267+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",

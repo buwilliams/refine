@@ -1,0 +1,46 @@
+{
+  "id": "19f8978af5c97bb52",
+  "mode": "supervisor",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "supervisor",
+  "created_at": "2026-07-22T10:56:55Z",
+  "updated_at": "2026-07-22T10:57:00Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-22T10:56:55Z",
+      "delivered": false,
+      "id": "evt-1784717815803-21",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "user",
+      "text": "How is is going?"
+    },
+    {
+      "created_at": "2026-07-22T10:56:55Z",
+      "delivered": false,
+      "id": "evt-1784717815803-22",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T10:57:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784717820631-24",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m checking the live workflow, the two queued goals, runtime health, and repository state so I can separate real progress from stale supervisor events."
+    }
+  ],
+  "queue_dispatching": true,
+  "importable_artifacts": [],
+  "closed": false,
+  "interrupted": false,
+  "interruption_detail": null
+}
