@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T15:33:11Z",
+  "updated_at": "2026-07-22T15:36:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -1320,6 +1320,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The implementation cleared its full serial library suite: 421/421 tests passed, plus all-target compilation. The two earlier regressions now pass in isolation; the agent is running the daemon-level restart and multi-instance harnesses from the final code before it submits a candidate."
+    },
+    {
+      "created_at": "2026-07-22T15:36:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784734567876-215",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The final review found a real late-settlement blind spot even after the green suites: cancellation could win the claim decision while a provider that ignored termination still attempted a later Goal transition. The implementation is tightening that boundary so cancellation, status publication, and capacity release are ordered under the same shared lock; this is exactly the kind of territory-level check the contract was meant to force."
     }
   ],
   "queued_messages": [
