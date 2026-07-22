@@ -17,8 +17,14 @@ dirty or divergent checkout explicitly before retrying.
 
 ## UI Workflow
 
-1. Open **Node → Refine (dev)** and find **Dogfood source**.
-2. Select **Check for source updates**. Confirm the checkout, current commit,
+When the attached target app is a Refine Git checkout, the refresh icon in the
+main navigation provides the same promotion action at a glance. It is disabled
+when the running source is current or any promotion precondition is blocked,
+and enabled when the fetched update is safe to promote.
+
+1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
+   and find **Dogfood source** for the detailed status.
+2. In the detailed view, select **Check for source updates**. Confirm the checkout, current commit,
    upstream remote/branch, and available commit.
 3. If the panel reports a blocker, resolve it without overwriting work and
    check again.

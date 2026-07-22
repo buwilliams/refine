@@ -535,6 +535,15 @@ ancestry, paused automation with no active Goal claim or non-daemon process,
 and a successful locked release build of the candidate before the daemon
 stops.
 
+The browser may expose source promotion in the main navigation only when the
+attached target app is a Refine Git checkout. That compact control consumes the
+same source-status response and promotion endpoint as the detailed Refine (dev)
+surface: it is disabled while current or blocked and enabled only for a safe
+fetched update. The source-status API returns that affordance presentation from
+the shared source-promotion capability so the browser does not independently
+reinterpret readiness. The browser requires confirmation before it invokes the
+existing, backward-compatible promotion API.
+
 The promotion handoff runs as an external helper that outlives the initiating
 HTTP request. It persists atomic stage state under the port runtime root,
 rechecks Git and runtime preconditions before activation, advances the checked

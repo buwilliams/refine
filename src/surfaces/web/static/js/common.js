@@ -166,6 +166,7 @@ function clearProjectScopedUiState() {
   updateActiveNodeLabel();
   updateNavAppContextLabel("No app");
   if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
+  if (typeof resetSourceUpdateNav === "function") resetSourceUpdateNav();
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
 }
 
@@ -1761,6 +1762,7 @@ function initSSE() {
     }
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
+    if (typeof refreshSourceUpdateNav === "function") refreshSourceUpdateNav({ quiet: true });
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "goals") refreshGoalsTable();
     if (state.currentRoute === "logs") loadLogs();

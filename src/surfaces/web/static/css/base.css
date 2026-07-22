@@ -217,6 +217,38 @@ pre {
 .nav-issue-button:hover:not(:disabled) {
   color: var(--color-text);
 }
+.nav-source-update-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+}
+.nav-source-update-button[hidden] { display: none; }
+.nav-source-update-button[data-state="available"] {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.nav-source-update-button[data-state="blocked"] { color: var(--color-warning); }
+.nav-source-update-button[data-state="updating"] { color: var(--color-primary); }
+.nav-source-update-button[data-state="checking"] .nav-source-update-icon,
+.nav-source-update-button[data-state="updating"] .nav-source-update-icon {
+  animation: nav-source-update-spin 1s linear infinite;
+}
+.nav-source-update-icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes nav-source-update-spin { to { transform: rotate(360deg); } }
 .nav-bug-icon {
   width: 26px;
   height: 26px;
