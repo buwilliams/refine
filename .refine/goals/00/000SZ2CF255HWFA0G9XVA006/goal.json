@@ -1,7 +1,7 @@
 {
   "base_commit": "6194bbf4b7137700ef0f83e9a54f1172ea18d063",
   "branch_name": "refine/00000SZ2CF255HWFA0G9XVA006/round-3",
-  "candidate_commit": null,
+  "candidate_commit": "6afbef60b2634915965f0dc5f723b9ada4952f1b",
   "created": "2026-07-22T11:21:22Z",
   "feature_id": "00000SZ2CDKBK2EYNVXDXVA002",
   "feature_order": null,
@@ -235,8 +235,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal `00000SZ2CF255HWFA0G9XVA006` is complete and reviewable.\n\nCommit: `6afbef6` — `Complete Quality governance remediation`  \nPreserved candidate: `6f6b6d5`  \nWorktree: clean\n\nImplemented:\n\n- One shared Goal Quality evaluation-and-persist capability for API and workflow evidence parity.\n- Legacy Quality migration before any settings load/update can discard fields.\n- Coupled workflow, managed-process, and durable-operation cancellation with `Cancelled` precedence and restart safety.\n- Immutable per-claim `quality_timing` snapshots.\n- Focused parity, first-update migration, cancellation race/recovery, and timing-mutation regressions.\n- Updated directly affected Quality, QA, and Rust specification documentation.\n\nVerification:\n\n- `cargo test --lib` — 403 passed.\n- Quality tests — 8 passed.\n- Target-app tests — 10 passed.\n- Workflow tests — 30 passed.\n- Ignored full workflow — 1 passed.\n- Browser JavaScript tests — 19 passed.\n- JavaScript syntax checks — passed.\n- `cargo fmt --all -- --check` — passed.\n- `cargo check --all-targets` — passed.\n- `cargo clippy --all-targets -- -D warnings` — passed.\n- `git diff --check` — passed.\n\nGoal tracking usage: 276,326 tokens over 17m 31s.",
+      "implementation_reported_at": "2026-07-22T12:29:10Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -247,10 +247,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T12:11:01Z"
+      "updated": "2026-07-22T12:29:10Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T12:11:10Z"
+  "updated": "2026-07-22T12:29:10Z"
 }
