@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T17:11:11Z",
-  "updated_at": "2026-07-22T17:33:43Z",
+  "updated_at": "2026-07-22T17:35:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T17:11:13Z",
@@ -300,6 +300,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Quality has also passed both normal and ignored full-workflow integration paths, plus final format/diff/legacy-path checks. It is at final review/commit; coordination remains active in its targeted fix."
+    },
+    {
+      "created_at": "2026-07-22T17:35:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784741700334-107",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Coordination has isolated the lost-owner defect to exact claim/lease evidence and is running the first targeted recovery test after patching. Quality is tightening test evidence after its green integration run; both remain under the managed workflow processes."
     }
   ],
   "queued_messages": [
