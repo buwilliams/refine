@@ -1,7 +1,7 @@
 {
   "base_commit": "657756564175c241ab966222bc3881207a889978",
-  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-6",
-  "candidate_commit": "95aebcbbce5d7af85586848805a3c48002c8fc6d",
+  "branch_name": "refine/00000SZ2BGCG909VDSW41YW00D/round-7",
+  "candidate_commit": null,
   "created": "2026-07-22T10:47:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -401,9 +401,31 @@
       "reporter": "Buddy",
       "rule_state": "failed",
       "updated": "2026-07-22T13:39:24Z"
+    },
+    {
+      "assignee": "Buddy",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T13:40:28Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Preserve candidate 95aebcbbce5d7af85586848805a3c48002c8fc6d and fix the sole remaining concurrent-retry defect from Round 6. Add one atomic registry-level find-or-register replacement operation under the existing FileOperationRegistry state lock: for an Interrupted Jira export source operation, concurrent retry callers must either create exactly one replacement operation/worker or receive the same already-created replacement record. The source-operation id and retry identity/idempotency key must be durable in the replacement so this remains correct across threads and daemon restart. The API route stays a thin adapter and launches a worker only when the atomic result reports that this caller created the replacement. Add a deterministic barrier integration issuing two concurrent POST retry requests for the same Interrupted operation, asserting both return the same replacement id, exactly one managed Jira worker is registered/launched, source logs remain intact, and the replacement reaches one durable terminal result. Also cover replay after restart returning the same replacement without relaunch. Retain all abrupt-orphan termination, non-retryable termination failure, cancellation, atomic JSON, UI, and full-suite behavior from 95aebcb. Run focused concurrency/restart tests, full Rust/browser/clippy/fmt/syntax/diff gates, and independent governance.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T13:40:28Z"
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T13:39:24Z"
+  "updated": "2026-07-22T13:40:29Z"
 }
