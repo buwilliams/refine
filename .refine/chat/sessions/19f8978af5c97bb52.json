@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-22T10:56:55Z",
-  "updated_at": "2026-07-22T11:13:34Z",
+  "updated_at": "2026-07-22T11:13:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
@@ -168,6 +168,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-22T11:13:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784718820807-18",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m taking over the queued supervisor turn and will track the workflow map against live process, Git, projection, operation, and activity evidence until the queue is genuinely idle. I’ll preserve the existing merge/worktree and provider boundaries, and I’ll surface any consequential choice rather than guessing."
     }
   ],
   "queue_dispatching": true,
