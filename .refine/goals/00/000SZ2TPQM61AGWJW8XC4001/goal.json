@@ -1,7 +1,7 @@
 {
   "base_commit": "003a011ce99bbdca232a29bd7ad2c822043eee15",
   "branch_name": "refine/00000SZ2TPQM61AGWJW8XC4001/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "cf73aa4a344343a028172b7093aec53ab43311a8",
   "created": "2026-07-22T19:39:05Z",
   "feature_id": null,
   "feature_order": null,
@@ -180,8 +180,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented and committed Round 2 as `cf73aa4a`. The worktree is clean and reviewable.\n\nWhat changed:\n\n- Manual API checks and workflow QA now share one `QualityOperationRunner` and persist identical, exact-round Goal evidence.\n- `quality/settings.json` is authoritative for timing. Legacy timing and enabled target-app commands migrate once without silently becoming no-ops.\n- Quality returns an operation ID immediately, runs providers and commands as supervised processes, preserves provider/authentication errors verbatim, and supports cancellation and restart recovery.\n- Goal/candidate ownership keys prevent concurrent manual and workflow evaluations.\n- Agent claims require correlated supervised command executions. Missing, extra, empty-command, or unsuccessful claims fail.\n- Candidate commit, HEAD, index, and worktree cleanliness are checked before and after evaluation without modifying user work.\n- Workflow ordering honors pre-build or post-build Quality timing.\n- Only the affected Quality, Target App, workflow, rust-spec, and integration contracts were reconciled.\n\nKey implementation: [quality service](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/tools/host/quality/service.rs), [operation coordination](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/process/supervisor/operations/mod.rs), [workflow behavior](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-2/src/workflow/behaviors/mod.rs).\n\nVerification:\n\n- `cargo test --lib tools::host::quality::tests -- --nocapture` — 11 passed\n- `cargo test --lib process::supervisor::operations::tests -- --nocapture` — 6 passed\n- Cross-surface web test — 1 passed\n- Workflow failure/preservation test — 1 passed\n- `cargo test --lib --quiet` — 423 passed, 0 failed\n- `cargo test --test full_workflow -- --ignored --nocapture` — 1 passed\n- `node --test tests/web_*.test.js` — 35 passed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` — passed\n\nOne earlier parallel full-library run hit the existing Jira startup-recovery timing assertion; it passed alone, and the final complete rerun passed all 423 tests.",
+      "implementation_reported_at": "2026-07-22T21:08:07Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -192,10 +192,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-22T20:34:56Z"
+      "updated": "2026-07-22T21:08:07Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-22T20:37:49Z"
+  "updated": "2026-07-22T21:08:07Z"
 }
