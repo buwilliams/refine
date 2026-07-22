@@ -9,7 +9,7 @@
   "transcript_events": [
     {
       "created_at": "2026-07-22T10:56:55Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717815803-21",
       "progress": false,
       "provider_session_id": null,
@@ -18,7 +18,7 @@
     },
     {
       "created_at": "2026-07-22T10:56:55Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717815803-22",
       "progress": true,
       "provider_session_id": null,
@@ -27,7 +27,7 @@
     },
     {
       "created_at": "2026-07-22T10:57:00Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -39,7 +39,7 @@
     },
     {
       "created_at": "2026-07-22T10:57:16Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -51,7 +51,7 @@
     },
     {
       "created_at": "2026-07-22T10:58:03Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -63,7 +63,7 @@
     },
     {
       "created_at": "2026-07-22T10:58:03Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717883443-30",
       "progress": false,
       "provider_session_id": null,
@@ -72,7 +72,7 @@
     },
     {
       "created_at": "2026-07-22T10:58:03Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784717883443-31",
       "progress": true,
       "provider_session_id": null,
@@ -81,7 +81,7 @@
     },
     {
       "created_at": "2026-07-22T11:06:15Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718375797-73",
       "progress": false,
       "provider_session_id": null,
@@ -90,7 +90,7 @@
     },
     {
       "created_at": "2026-07-22T11:06:15Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718375797-74",
       "progress": true,
       "provider_session_id": null,
@@ -99,7 +99,7 @@
     },
     {
       "created_at": "2026-07-22T11:06:24Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -111,7 +111,7 @@
     },
     {
       "created_at": "2026-07-22T11:06:50Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -123,7 +123,7 @@
     },
     {
       "created_at": "2026-07-22T11:07:20Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -135,7 +135,7 @@
     },
     {
       "created_at": "2026-07-22T11:07:20Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718440541-82",
       "progress": false,
       "provider_session_id": null,
@@ -144,7 +144,7 @@
     },
     {
       "created_at": "2026-07-22T11:07:20Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718440541-83",
       "progress": true,
       "provider_session_id": null,
@@ -153,7 +153,7 @@
     },
     {
       "created_at": "2026-07-22T11:13:34Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718814438-15",
       "progress": false,
       "provider_session_id": null,
@@ -162,7 +162,7 @@
     },
     {
       "created_at": "2026-07-22T11:13:34Z",
-      "delivered": false,
+      "delivered": true,
       "id": "evt-1784718814438-16",
       "progress": true,
       "provider_session_id": null,
@@ -171,7 +171,7 @@
     },
     {
       "created_at": "2026-07-22T11:13:40Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -183,7 +183,7 @@
     },
     {
       "created_at": "2026-07-22T11:13:56Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -195,7 +195,7 @@
     },
     {
       "created_at": "2026-07-22T11:14:27Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -207,7 +207,7 @@
     },
     {
       "created_at": "2026-07-22T11:16:09Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -219,7 +219,7 @@
     },
     {
       "created_at": "2026-07-22T11:17:49Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -231,7 +231,7 @@
     },
     {
       "created_at": "2026-07-22T11:19:20Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -243,7 +243,7 @@
     },
     {
       "created_at": "2026-07-22T11:23:30Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -255,7 +255,7 @@
     },
     {
       "created_at": "2026-07-22T11:24:27Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -267,7 +267,7 @@
     },
     {
       "created_at": "2026-07-22T11:27:14Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -279,7 +279,7 @@
     },
     {
       "created_at": "2026-07-22T11:28:17Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -291,7 +291,7 @@
     },
     {
       "created_at": "2026-07-22T11:29:25Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -303,7 +303,7 @@
     },
     {
       "created_at": "2026-07-22T11:32:45Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -315,7 +315,7 @@
     },
     {
       "created_at": "2026-07-22T11:34:59Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -327,7 +327,7 @@
     },
     {
       "created_at": "2026-07-22T11:36:50Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -339,7 +339,7 @@
     },
     {
       "created_at": "2026-07-22T11:41:08Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -351,7 +351,7 @@
     },
     {
       "created_at": "2026-07-22T11:41:57Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -363,7 +363,7 @@
     },
     {
       "created_at": "2026-07-22T11:44:09Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -375,7 +375,7 @@
     },
     {
       "created_at": "2026-07-22T11:46:32Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -387,7 +387,7 @@
     },
     {
       "created_at": "2026-07-22T11:49:33Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -399,7 +399,7 @@
     },
     {
       "created_at": "2026-07-22T11:51:14Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -411,7 +411,7 @@
     },
     {
       "created_at": "2026-07-22T11:52:22Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -423,7 +423,7 @@
     },
     {
       "created_at": "2026-07-22T11:54:58Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -435,7 +435,7 @@
     },
     {
       "created_at": "2026-07-22T11:59:32Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -447,7 +447,7 @@
     },
     {
       "created_at": "2026-07-22T12:04:10Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
@@ -459,7 +459,7 @@
     },
     {
       "created_at": "2026-07-22T12:10:36Z",
-      "delivered": false,
+      "delivered": true,
       "extra": {
         "source": "provider_output"
       },
