@@ -14,29 +14,51 @@
   "rounds": [
     {
       "assignee": "Refine",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T18:40:02Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T18:49:55Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ42710VGCA2VWG2JW003-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ42710VGCA2VWG2JW003-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Root cause: the benchmark's fixed 2026-07-23T12:00:00Z fixture timestamp aged past the real one-hour backlog promotion threshold, so the measured successful POST durably promoted all 50 fixture Goals (observed after the failing run: 50 todo, 1 backlog), producing 130.710348ms; duplicate was 5.564587ms. Changed only src/surfaces/web_server/tests.rs: use one fresh Utc timestamp for Goal and Round fixtures and assert all 50 scale fixtures remain backlog, preserving the <50ms threshold, atomic authoring, one complete projection rebuild, promotion behavior, and audit durability. Commit 87029e72. Verification: initial clean-main reproduction failed exactly 1 test at duplicate=5.379245ms/create=134.554018ms. Post-fix isolated run passed at duplicate=5.149659ms/create=19.199012ms. Ten consecutive isolated passes: duplicate 5.192007, 5.507352, 5.309803, 5.455109, 5.497387, 5.690850, 5.794801, 5.275995, 6.122375, 5.471053ms (min 5.192007, median 5.484220, max 6.122375); create 19.410337, 18.078188, 17.703582, 18.984005, 19.010852, 19.758669, 18.991463, 18.451925, 18.244997, 18.156425ms (min 17.703582, median 18.717965, max 19.758669). Web suite 120 passed/0 failed; library suite 471 passed/0 failed; cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff --check passed. No provider/authentication failures occurred or were suppressed.",
       "implementation_reported_at": "2026-07-23T18:48:20Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Investigate and fix the reproducible current-main failure `surfaces::web_server::tests::warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale`. On clean main 562abe5fff5c81713300bf7d539f5fc38e61aacb, an isolated `cargo test --lib warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale -- --test-threads=1` measured late duplicate=5.310601ms and successful create=129.912569ms, failing the required <50ms threshold. Two prior independent candidate runs also reproduced successful create around 126-140ms. Determine whether the regression is in atomic prompt/metadata authoring, projection refresh/state sync, duplicate handling, Git synchronization, or the benchmark contract; preserve the recently merged fast Goal creation behavior and audit durability. Fix product code or the test only when evidence supports the actual contract—do not simply loosen/remove the threshold or hide timing failures. Add focused measurements/regressions, rerun the isolated test repeatedly plus relevant web/library/all-target/format/diff gates, and report all failures and distributions exactly. Keep this low priority and independent of the cancellation-recovery and transcript-handoff review candidates. Do not approve or merge, force Git, rewrite history, discard worktrees, suppress provider/authentication failures, or edit durable Goal state directly.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T18:49:58Z",
+      "quality_details": {
+        "candidate_commit": "87029e7299f6025da6b4e2d23ec775e28dd55548",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f905021e856d5",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Refine Supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T18:48:20Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T18:49:58Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T18:48:20Z"
+  "updated": "2026-07-23T18:49:59Z"
 }
