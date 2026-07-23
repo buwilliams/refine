@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:05:10Z",
+  "updated_at": "2026-07-23T19:06:11Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2706,6 +2706,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live runtime now contradicts the supplied stall snapshot: Refine reports PID 375463 as the Round 7 Goal Agent, and the OS still has that managed session. I’m checking whether it is genuinely making progress or merely a stale supervisor record before deciding whether any recovery is actionable."
+    },
+    {
+      "created_at": "2026-07-23T19:06:11Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784833571702-173",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "There is no lost-worker recovery to perform now. The Goal Agent is alive, consuming CPU, its transcript is being updated at the current minute, and Round 7 has six modified files in its preserved worktree. The other supplied non-terminal Goal has already crossed review to `done`; I’m leaving that historical confirmation/merge decision untouched and watching the active Round for a real terminal signal."
     }
   ],
   "queued_messages": [
