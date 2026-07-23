@@ -38,9 +38,12 @@ Current implementation details that matter to intent:
   Only then does it atomically validate and cancel the exact claim and linked
   Goal, release claim capacity, and preserve the execution, round, Goal
   revision/status, and competing-owner fences. Claim, capacity, and Goal writes
-  are journaled as one settlement; a write failure restores their exact
-  pre-settlement state and retains a retryable receipt, while confirmed process
-  exit remains explicit. Missing registration-time PID
+  are journaled with their exact before/after states as one settlement. A write
+  failure restores the exact pre-settlement state, while an interruption is
+  replayed before terminal-state shortcuts after restart. Both normal
+  persistence and replay preserve the complete existing workflow policy and
+  target-app context, and confirmed process exit remains explicit. Missing
+  registration-time PID
   identity, mismatched or stale workflow ownership, failed or resisted stops,
   and cleanup failures keep the Goal active, while every post-exit failure
   retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,

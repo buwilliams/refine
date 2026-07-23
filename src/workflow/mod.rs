@@ -243,12 +243,24 @@ impl WorkflowEngine {
         state: &mut WorkflowAutomationState,
         claim_ids: &[String],
     ) -> RefineResult<()> {
+        let cancelled = self.claims_cancelled_state(state, claim_ids)?;
+        self.persist_state_preserving_policy_locked(&cancelled)?;
+        *state = cancelled;
+        Ok(())
+    }
+
+    pub(crate) fn claims_cancelled_state(
+        &self,
+        state: &WorkflowAutomationState,
+        claim_ids: &[String],
+    ) -> RefineResult<WorkflowAutomationState> {
         if claim_ids.is_empty() {
-            return Ok(());
+            return Ok(state.clone());
         }
+        let mut cancelled = state.clone();
         let now = now_timestamp();
         for claim_id in claim_ids {
-            let claim = state
+            let claim = cancelled
                 .claims
                 .iter_mut()
                 .find(|claim| claim.claim_id == *claim_id)
@@ -260,12 +272,19 @@ impl WorkflowEngine {
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now.clone();
         }
-        self.save_state(state)?;
-        Ok(())
+        cancelled.updated_at = Some(now);
+        Ok(cancelled)
+    }
+
+    pub(crate) fn persist_state_preserving_policy_locked(
+        &self,
+        state: &WorkflowAutomationState,
+    ) -> RefineResult<()> {
+        write_state(&self.state_path(), state)
     }
 
     pub(crate) fn restore_state_locked(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
-        write_state(&self.state_path(), state)
+        self.persist_state_preserving_policy_locked(state)
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {

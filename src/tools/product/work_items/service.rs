@@ -75,6 +75,14 @@ impl GoalCancellationTransaction {
     pub(crate) fn projection(&self) -> RefineResult<GoalSummaryProjection> {
         self.service.show_goal_summary(&self.goal_id)
     }
+
+    pub(crate) fn original_value(&self) -> Value {
+        self.original.clone()
+    }
+
+    pub(crate) fn cancelled_value(&self) -> Value {
+        self.cancelled.clone()
+    }
 }
 
 pub trait WorkItemService {
@@ -1961,6 +1969,32 @@ impl FileWorkItemService {
             original,
             cancelled,
             committed: false,
+        })
+    }
+
+    pub(crate) fn prepare_goal_cancellation_replay(
+        &self,
+        goal_id: &str,
+        original: &Value,
+        cancelled: &Value,
+    ) -> RefineResult<GoalCancellationTransaction> {
+        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, current_value) = self.read_goal_value_unchecked_locked(&current)?;
+        if &current_value != original && &current_value != cancelled {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} changed outside the interrupted cancellation settlement; replay did not overwrite the newer Goal state"
+            )));
+        }
+        Ok(GoalCancellationTransaction {
+            service: self.clone(),
+            _lock: goal_lock,
+            goal_id: goal_id.to_string(),
+            goal_path,
+            original: original.clone(),
+            cancelled: cancelled.clone(),
+            committed: current_value == *cancelled,
         })
     }
 
