@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:03:01Z",
+  "updated_at": "2026-07-23T18:03:11Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1806,6 +1806,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T18:03:11Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784829791179-21",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll correlate the current Goal record, live process, branch/worktree, and provider output before deciding whether intervention is warranted. I’ll keep the five review Goals at their confirmation boundary and won’t treat them as merged."
     }
   ],
   "queue_dispatching": true,
