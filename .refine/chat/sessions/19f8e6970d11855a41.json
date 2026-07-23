@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:08:39Z",
+  "updated_at": "2026-07-23T10:09:41Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -177,6 +177,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The corrected library command revealed a real regression-test defect: the test counted the `global-reporter` identifier twice because it appears in both the control and its label association. This is not yet a product failure, but verification is not green; I’m keeping that distinction explicit while the worker corrects the assertion and reruns it."
+    },
+    {
+      "created_at": "2026-07-23T10:09:41Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801381370-20",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Focused verification is now green: formatting/diff checks pass, the new regression test runs and passes (1/1), and the browser suite passes 29/29. The Goal remains in implementation and uncommitted, so I’m not treating this as a candidate or review handoff yet."
     }
   ],
   "queued_messages": [
