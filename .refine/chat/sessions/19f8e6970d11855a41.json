@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:01:25Z",
+  "updated_at": "2026-07-23T12:02:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -891,6 +891,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker is still active and is repairing two failing fixtures; it has not yet produced a candidate. One earlier steering note was received, but the more important cancellation/revision warning has not appeared in its transcript, so I’m resolving the supported process-input path before relying on that feedback."
+    },
+    {
+      "created_at": "2026-07-23T12:02:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808168800-83",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The worker’s repaired full library suite now passes 457/457. That is useful but not sufficient: the cancellation/CAS warning is queued through Refine’s audited terminal channel, and the earlier two multi-instance failures remain visible until there is fresh production-path evidence or an explicit unresolved report."
     }
   ],
   "queued_messages": [
