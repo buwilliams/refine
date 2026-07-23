@@ -1907,6 +1907,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
+    use crate::process::subprocess::{ManagedProcess, ProcessOwner};
     use crate::tools::product::work_items::FileWorkItemService;
     use crate::workflow::{WorkflowAutomation, WorkflowClaimState};
 
@@ -2247,11 +2248,15 @@ mod tests {
             .create_goal_summary("Capacity one", Some("GOAL1"))
             .unwrap();
         work_items
+            .append_goal_round_summary("GOAL1", "Capacity test", "Run workflow")
+            .unwrap();
+        work_items
             .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
         let workflow = WorkflowEngine::with_target_root(&runtime_root, &temp_root);
         let claim = workflow.claim("GOAL1").unwrap();
         let execution = workflow.start_claim(&claim).unwrap();
+        register_capacity_test_workflow_process(&runtime_root, "GOAL1", &claim, &execution);
 
         let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
         let supervisor = chat
@@ -2307,10 +2312,14 @@ mod tests {
             .create_goal_summary("Capacity two", Some("GOAL2"))
             .unwrap();
         work_items
+            .append_goal_round_summary("GOAL2", "Capacity test", "Run workflow")
+            .unwrap();
+        work_items
             .transition_goal_status("GOAL2", GoalStatus::Todo)
             .unwrap();
         let claim = workflow.claim("GOAL2").unwrap();
         let execution = workflow.start_claim(&claim).unwrap();
+        register_capacity_test_workflow_process(&runtime_root, "GOAL2", &claim, &execution);
         chat.append_user_message(&supervisor.id, "run concurrently")
             .unwrap();
         let concurrent = wait_for_chat_record(&chat, &supervisor.id, |record| {
@@ -2344,6 +2353,48 @@ mod tests {
         );
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn register_capacity_test_workflow_process(
+        runtime_root: &Path,
+        goal_id: &str,
+        claim_id: &str,
+        execution_id: &str,
+    ) {
+        let child = if cfg!(windows) {
+            Command::new("cmd")
+                .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+                .spawn()
+                .unwrap()
+        } else {
+            Command::new("sleep").arg("30").spawn().unwrap()
+        };
+        FileProcessSupervisor::new(runtime_root.join("agents"))
+            .register(ManagedProcess {
+                id: format!("capacity-test-{goal_id}"),
+                owner: ProcessOwner::Agent,
+                pid: Some(child.id()),
+                state: "running".to_string(),
+                label: Some("capacity test workflow".to_string()),
+                details: Some(
+                    json!({
+                        "kind": "workflow",
+                        "goal_id": goal_id,
+                        "claim_id": claim_id,
+                        "execution_id": execution_id,
+                        "round_idx": 0,
+                        "workflow_state": "in-progress"
+                    })
+                    .to_string(),
+                ),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: format!("capacity-test-{goal_id}"),
+                exit_code: None,
+            })
+            .unwrap();
     }
 
     #[test]

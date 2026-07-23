@@ -47,6 +47,36 @@ impl Drop for GoalMutationLock {
     }
 }
 
+pub(crate) struct GoalCancellationTransaction {
+    service: FileWorkItemService,
+    _lock: GoalMutationLock,
+    goal_id: String,
+    goal_path: PathBuf,
+    original: Value,
+    cancelled: Value,
+    committed: bool,
+}
+
+impl GoalCancellationTransaction {
+    pub(crate) fn commit(&mut self) -> RefineResult<()> {
+        write_json_atomically(&self.goal_path, &self.cancelled)?;
+        self.committed = true;
+        Ok(())
+    }
+
+    pub(crate) fn restore(&mut self) -> RefineResult<()> {
+        if self.committed {
+            write_json_atomically(&self.goal_path, &self.original)?;
+            self.committed = false;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn projection(&self) -> RefineResult<GoalSummaryProjection> {
+        self.service.show_goal_summary(&self.goal_id)
+    }
+}
+
 pub trait WorkItemService {
     fn create_goal(&self, goal: Goal) -> RefineResult<Goal>;
     fn list_goals(&self) -> RefineResult<Vec<Goal>>;
@@ -1886,16 +1916,12 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub(crate) fn cancel_goal_summary_if_current<F>(
+    pub(crate) fn prepare_goal_cancellation_if_current(
         &self,
         goal_id: &str,
         expected: &GoalCancellationExpectation,
-        before_write: F,
-    ) -> RefineResult<GoalSummaryProjection>
-    where
-        F: FnOnce() -> RefineResult<()>,
-    {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+    ) -> RefineResult<GoalCancellationTransaction> {
+        let goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         if current.goal.status != expected.status
@@ -1917,12 +1943,25 @@ impl FileWorkItemService {
                 "done Goal {goal_id} cannot be cancelled"
             )));
         }
-
-        before_write()?;
-        if current.goal.status != GoalStatus::Cancelled {
-            self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Cancelled)?;
-        }
-        self.show_goal_summary(goal_id)
+        let (goal_path, original) = self.read_goal_value_unchecked_locked(&current)?;
+        let mut cancelled = original.clone();
+        let object = cancelled.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        object.insert(
+            "status".to_string(),
+            Value::String(GoalStatus::Cancelled.as_str().to_string()),
+        );
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        Ok(GoalCancellationTransaction {
+            service: self.clone(),
+            _lock: goal_lock,
+            goal_id: goal_id.to_string(),
+            goal_path,
+            original,
+            cancelled,
+            committed: false,
+        })
     }
 
     pub fn update_goal_metadata_summary(

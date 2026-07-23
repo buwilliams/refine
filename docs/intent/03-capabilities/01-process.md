@@ -32,9 +32,15 @@ Current implementation details that matter to intent:
   capability, including Workflow execution cancellation, rather than splitting
   process and Workflow semantics. It retains ownership evidence, confirms exact
   process exit, and records that outcome before registry or identity cleanup.
+  Workflow spawn-to-registration and cancellation share one execution fence:
+  an empty target-bound process lookup is never treated as exit evidence, and a
+  delayed worker cannot launch after its exact claim has settled.
   Only then does it atomically validate and cancel the exact claim and linked
   Goal, release claim capacity, and preserve the execution, round, Goal
-  revision/status, and competing-owner fences. Missing registration-time PID
+  revision/status, and competing-owner fences. Claim, capacity, and Goal writes
+  are journaled as one settlement; a write failure restores their exact
+  pre-settlement state and retains a retryable receipt, while confirmed process
+  exit remains explicit. Missing registration-time PID
   identity, mismatched or stale workflow ownership, failed or resisted stops,
   and cleanup failures keep the Goal active, while every post-exit failure
   retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,

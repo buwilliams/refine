@@ -223,6 +223,15 @@ where
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
     }
+    let workflow_registration_guard =
+        match supervisor.workflow_process_registration_guard(&managed_spec) {
+            Ok(guard) => guard,
+            Err(error) => {
+                cleanup_session_artifacts(&command_path, &signal_path);
+                let _ = fs::remove_file(&stdout_path);
+                return Err(error);
+            }
+        };
 
     let pty_system = native_pty_system();
     let pair = match pty_system.openpty(pty_size(DEFAULT_COLS, DEFAULT_ROWS)) {
@@ -327,6 +336,7 @@ where
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
     }
+    drop(workflow_registration_guard);
     let _ = FileExt::unlock(&launch_lock);
     drop(launch_lock);
 

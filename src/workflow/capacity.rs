@@ -113,6 +113,18 @@ impl AgentCapacityService {
         Ok(state)
     }
 
+    pub(crate) fn begin_cancellation_settlement(&self) -> RefineResult<AgentCapacitySettlement> {
+        let guard = self.acquire_lock()?;
+        let original = self.load_state()?;
+        Ok(AgentCapacitySettlement {
+            service: self.clone(),
+            _guard: guard,
+            current: original.clone(),
+            original,
+            changed: false,
+        })
+    }
+
     fn load_state(&self) -> RefineResult<AgentCapacityState> {
         let path = self.state_path();
         if !path.exists() {
@@ -245,6 +257,41 @@ struct AgentCapacityLock {
 impl Drop for AgentCapacityLock {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+pub(crate) struct AgentCapacitySettlement {
+    service: AgentCapacityService,
+    _guard: AgentCapacityLock,
+    original: AgentCapacityState,
+    current: AgentCapacityState,
+    changed: bool,
+}
+
+impl AgentCapacitySettlement {
+    pub(crate) fn release_claims(&mut self, claim_ids: &[String]) -> RefineResult<()> {
+        let owners = claim_ids
+            .iter()
+            .map(|claim_id| format!("workflow:{claim_id}"))
+            .collect::<Vec<_>>();
+        let before = self.current.leases.len();
+        self.current
+            .leases
+            .retain(|lease| !owners.contains(&lease.owner_id));
+        self.changed = self.current.leases.len() != before;
+        if self.changed {
+            self.service.write_state(&self.current)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn restore(&mut self) -> RefineResult<()> {
+        if self.changed {
+            self.service.write_state(&self.original)?;
+            self.current = self.original.clone();
+            self.changed = false;
+        }
+        Ok(())
     }
 }
 
