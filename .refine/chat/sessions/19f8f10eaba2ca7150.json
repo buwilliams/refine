@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:18:01Z",
+  "updated_at": "2026-07-23T19:18:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2940,6 +2940,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m correlating the current Goal record, live processes, round evidence, Git/worktree state, and daemon health. I’ll keep this read-only unless the evidence shows a supported recovery action is actually required."
+    },
+    {
+      "created_at": "2026-07-23T19:18:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834298663-216",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is internally inconsistent: it reports no live workflow Goal IDs, but also contains a running Round 9 Goal Agent process. I’m resolving that against the live daemon and OS process table before deciding whether this is a stall, a retry, or simply stale supervisor projection."
     }
   ],
   "queue_dispatching": true,
