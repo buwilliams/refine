@@ -1,7 +1,7 @@
 {
   "base_commit": "1ff4d51efcc231fbbf724a3ef43437804c471d1f",
   "branch_name": "refine/00000SZ3K92DJJT8PWF5AP8000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "4444ec0a811ab7fc174a6ab2decf8f10b63a3331",
   "created": "2026-07-23T09:57:58Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented Goal `00000SZ3K92DJJT8PWF5AP8000` and committed it as `4444ec0a` on the Goal branch. The worktree is clean and remains unmerged for review.\n\nChanged:\n\n- Replaced the app/reporter topbar label with a compact cog + “Controls” menu.\n- Moved application status/name, reporter, agent status/count, Refine update status, command palette, and bug reporting into that menu.\n- Preserved existing control IDs and handlers.\n- Updated Guide targeting and added focused regression coverage.\n\nKey files: [index.html](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3K92DJJT8PWF5AP8000-round-1/src/surfaces/web/static/index.html:31), [target-app.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3K92DJJT8PWF5AP8000-round-1/src/surfaces/web/static/js/target-app.js:89), [tests.rs](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3K92DJJT8PWF5AP8000-round-1/src/surfaces/web_server/tests.rs:420).\n\nVerification:\n\n- Focused regression: `1 passed, 0 failed`\n- Rust unit/bin suite: `445 passed, 0 failed`\n- Browser JavaScript suite: `29 passed, 0 failed`\n- Static asset check: `54` assets present\n- Modified JavaScript syntax checks: all passed\n- `cargo fmt --all -- --check`: passed\n- `git diff --check`: passed\n- Final worktree: clean",
+      "implementation_reported_at": "2026-07-23T10:12:20Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,10 +32,10 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T09:57:59Z"
+      "updated": "2026-07-23T10:12:20Z"
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T10:02:34Z"
+  "updated": "2026-07-23T10:12:20Z"
 }
