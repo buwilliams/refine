@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:28:52Z",
+  "updated_at": "2026-07-23T11:30:09Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -735,6 +735,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The state changed again during verification: both review candidates were merged and marked done by another actor or workflow surface; I did not approve them. I’m auditing the merge provenance now because that confirmation boundary must be explicit. The remaining Goal is reported stalled by the supervisor, but its Codex process was live moments ago, so I’m resolving that contradiction before any retry."
+    },
+    {
+      "created_at": "2026-07-23T11:30:09Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784806209840-57",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovered Ready Merge worker is still live and progressing, so I’m not issuing another retry. I’m checking the two completed review merges for explicit approval provenance while continuing to watch the remaining worker through its verification stages."
     }
   ],
   "queued_messages": [
