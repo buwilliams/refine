@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:11:22Z",
+  "updated_at": "2026-07-23T11:11:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -591,6 +591,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m using the prior Refine auditable-recovery guidance because this live topology has review and round-transition boundaries that are easy to mishandle. It constrains any recovery to supported Goal rounds and keeps human approval separate from implementation."
+    },
+    {
+      "created_at": "2026-07-23T11:11:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805098298-33",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is internally stale: it says Goal `00000SZ3N803…` is `todo`, but also names a running worker for it. I’m refreshing each surface now so no recovery is triggered from contradictory evidence."
     }
   ],
   "queue_dispatching": true,
