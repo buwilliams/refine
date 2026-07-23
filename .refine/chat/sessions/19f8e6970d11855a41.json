@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:14:48Z",
+  "updated_at": "2026-07-23T10:14:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -225,6 +225,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "One candidate has reached the human review boundary, so I’m leaving it untouched. I’m checking the two remaining live workflows now: the controls-menu Governance pass and the agent-process visibility implementation."
+    },
+    {
+      "created_at": "2026-07-23T10:14:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801698062-28",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The controls-menu candidate also passed all 8 Governance rules and is now in review. Both review candidates have a caveat: Refine’s configured Quality phase was a no-op (“No Quality tests configured”), so their implementation suites—not a provider Quality evaluation—are the substantive test evidence. I’m leaving both unmerged and continuing with the one live agent-process fix."
     }
   ],
   "queued_messages": [
