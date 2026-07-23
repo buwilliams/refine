@@ -2,7 +2,7 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "degraded",
-  "active_work": 2,
+  "active_work": 3,
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -59,13 +59,14 @@
     "00000SZ3KJDDGGCK29J4N4Y001": "done",
     "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done",
-    "00000SZ3RN3BS397T4SE5P4000": "in-progress"
+    "00000SZ3RN3BS397T4SE5P4000": "in-progress",
+    "00000SZ3RP4G52RZ706A5P4001": "in-progress"
   },
   "open_issues": {
     "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1"
   },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
-  "updated_at": "2026-07-23T13:06:45.367485603+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:in-progress,00000SZ3RP4G52RZ706A5P4001:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
+  "updated_at": "2026-07-23T13:07:02.478629625+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1886,6 +1887,16 @@
       "status": "complete",
       "message": "Refine state synchronization: state synchronized and projection refreshed",
       "created_at": "2026-07-23T13:06:20.718254115+00:00",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:07:02.392543881+00:00-189",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 entered workflow state in-progress.",
+      "created_at": "2026-07-23T13:07:02.392543881+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
       "actionable": false,
       "retryable": false
     }
