@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:42:16Z",
+  "updated_at": "2026-07-23T13:42:57Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -474,15 +474,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The ownership audit confirms the three live executions were marked `interrupted` at 13:37:54 and their capacity leases were removed, even though their OS processes and worktrees remain active. That makes a retry unsafe and creates a duplicate-launch risk. Pausing all workflow automation would be the safe containment action, but it is global and would affect Goals you are actively creating/undoing, so I’m not taking it without your authority."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8f2fb6b83b8b623",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 4 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"todo\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"todo\", \"00000SZ3SFP4N10NXGAE5P4002\": \"todo\", \"00000SZ3SHFHFK352VJT5P4003\": \"todo\"}\nLive workflow-agent Goal IDs: {\"00000SZ3SFP4N10NXGAE5P4002\"}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T13:34:56Z",
-      "updated_at": "2026-07-23T13:42:16Z",
-      "internal": true
+      "created_at": "2026-07-23T13:42:57Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814177200-102",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I recommend pausing workflow automation now. May I do that?\n\nCurrent evidence:\n\n- State sync marked three live executions `interrupted` and removed their capacity leases while their processes kept running. Supervisor reports **0 active / 4 queued**, creating duplicate-launch risk.\n- Ready Merge commit `80ca16b8` passed its reported tests but failed Governance on three remaining cancellation/state-sync violations. It remains `todo`, unmerged.\n- Stop-button recovery is still running with a preserved 16-file patch.\n- Toolbar-history recovery committed `bcf9d063`; Governance began despite its interrupted claim.\n- Controls-menu candidate `ed0f6936` remains in `review`, is not on `main`, and needs human approval. Governance passed, but Quality was a no-op because no tests were configured.\n\nI have not retried, merged, approved, cancelled, edited durable Goal state, or discarded any worktree. A pause is reversible, prevents new launches, and preserves the existing processes and worktrees."
+    },
+    {
+      "created_at": "2026-07-23T13:42:57Z",
+      "delivered": false,
+      "id": "evt-1784814177407-104",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "I recommend pausing workflow automation now. May I do that?\n\nCurrent evidence:\n\n- State sync marked three live executions `interrupted` and removed their capacity leases while their processes kept running. Supervisor reports **0 active / 4 queued**, creating duplicate-launch risk.\n- Ready Merge commit `80ca16b8` passed its reported tests but failed Governance on three remaining cancellation/state-sync violations. It remains `todo`, unmerged.\n- Stop-button recovery is still running with a preserved 16-file patch.\n- Toolbar-history recovery committed `bcf9d063`; Governance began despite its interrupted claim.\n- Controls-menu candidate `ed0f6936` remains in `review`, is not on `main`, and needs human approval. Governance passed, but Quality was a no-op because no tests were configured.\n\nI have not retried, merged, approved, cancelled, edited durable Goal state, or discarded any worktree. A pause is reversible, prevents new launches, and preserves the existing processes and worktrees."
+    },
+    {
+      "created_at": "2026-07-23T13:42:57Z",
+      "delivered": false,
+      "id": "evt-1784814177407-105",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T13:42:57Z",
+      "delivered": false,
+      "id": "evt-1784814177415-107",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
