@@ -489,29 +489,51 @@
     },
     {
       "assignee": "Supervisor",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T15:34:13Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T15:54:14Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-6",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-6"
+      },
+      "governance_message": "No governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Committed reviewable Round 6 as ebc7d269 after replaying the preserved Round 5 stack onto current main. Cancellation journals now durably store exact workflow, capacity, and Goal before/after states; a recreated shared service replays them before any already-cancelled short circuit, finishes only the linked claim/lease/Goal changes, preserves unrelated concurrent claims and capacity, and completes retained process receipts. Cancellation persistence no longer uses target-less default policy: successful and recovered settlement preserve non-default limits, Node, provider, and target identity byte-for-byte. Added deterministic restart tests for interruption after claim persistence, capacity release, and Goal persistence plus successful non-default-policy coverage; updated process intent. Verification: process_control 16/16; real pre-registration worker 1/1; real worker settlement 1/1; workflow replenishment 2/2; subprocess 11/11; agent sessions 3/3; web API 1/1; CLI 1/1; MCP 1/1; workflow metadata 1/1; focused browser processes 4/4; final full library 474/474; final web suite 37/37; cargo check --all-targets, cargo fmt --all -- --check, git diff --check, git diff --cached --check, and git show --check passed. Initial full-library verification exposed an unrelated interactive-terminal cleanup race (473 passed, 1 failed); its isolated rerun passed and an unchanged-source rerun passed 474/474. A later full run exposed a new policy-test-only /proc disappearance race (473 passed, 1 failed); the unnecessary subprocess was removed from that success-only test while real restart tests retained process-exit coverage, focused reruns passed, and the final full run passed 474/474. Worktree is clean; original 18bac908 and all prior worktrees remain preserved.",
       "implementation_reported_at": "2026-07-23T15:50:34Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover Governance-rejected candidate 18bac908 from current main while preserving 18bac908, d81385dc, 2d0d226b, c9a92ee5, ea2103e3, all earlier candidates, worktrees, rounds, tests, and provider/Governance evidence. Fix only the three newly recorded violations in the authoritative shared cancellation capability. Add durable settlement-journal recovery and replay before any already-cancelled short circuit so interruption or restart after claim persistence or capacity release can deterministically finish or restore the exact linked Goal, claim, and capacity outcome through the shared capability. Preserve the complete existing WorkflowAutomation policy and target-app context when persisting cancellation; never construct or save a default-context engine that can erase configured limits, Node, provider, remote, or target identity. Add deterministic restart-level tests that interrupt after each durable write, recreate the service, replay the journal, and assert exact Goal/claim/capacity recovery; also seed and assert a non-default workflow policy survives successful and recovered cancellation byte-for-byte except for the intended claim transition. Re-run the focused service, real workflow-worker, workflow scheduling, subprocess, agent-session, web API, CLI, MCP/browser, workflow metadata, full library and web suites, all-target check, formatting, and diff checks, reporting every initial failure and final result accurately. Preserve one shared capability across surfaces and all provider, authentication, cancellation, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T15:54:18Z",
+      "quality_details": {
+        "candidate_commit": "ebc7d2699abcb6ffe26aaccac826197d2ccdb163",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f8faf4ccc3b969e4",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T15:50:34Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T15:54:18Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T15:50:34Z"
+  "updated": "2026-07-23T15:54:19Z"
 }

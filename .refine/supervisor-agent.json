@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "lifecycle": "observing",
+  "lifecycle": "idle",
   "health": "healthy",
   "active_work": 0,
-  "queued_work": 1,
+  "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8f10eaba2ca7150",
@@ -60,13 +60,13 @@
     "00000SZ3N803TK00E78AK4M000": "review",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "review",
-    "00000SZ3RP4G52RZ706A5P4001": "todo",
+    "00000SZ3RP4G52RZ706A5P4001": "review",
     "00000SZ3SFP4N10NXGAE5P4002": "review",
     "00000SZ3SHFHFK352VJT5P4003": "review"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:review,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:todo,00000SZ3SFP4N10NXGAE5P4002:review,00000SZ3SHFHFK352VJT5P4003:review|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T15:34:22.557093430+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:review,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:review,00000SZ3SFP4N10NXGAE5P4002:review,00000SZ3SHFHFK352VJT5P4003:review|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T15:54:19.641745689+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2153,6 +2153,16 @@
       "created_at": "2026-07-23T15:33:51.125332531+00:00",
       "actionable": true,
       "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-23T15:54:19.601052170+00:00-216",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from todo to review.",
+      "created_at": "2026-07-23T15:54:19.601052170+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
+      "actionable": false,
+      "retryable": false
     }
   ]
 }
