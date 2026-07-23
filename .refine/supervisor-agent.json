@@ -2,7 +2,7 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "healthy",
-  "active_work": 2,
+  "active_work": 1,
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -63,12 +63,12 @@
     "00000SZ3RP4G52RZ706A5P4001": "review",
     "00000SZ3SFP4N10NXGAE5P4002": "done",
     "00000SZ3SHFHFK352VJT5P4003": "done",
-    "00000SZ412RXR0TQRHE82JW000": "in-progress",
+    "00000SZ412RXR0TQRHE82JW000": "review",
     "00000SZ41923HGWZSREC2JW001": "in-progress"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:in-progress,00000SZ41923HGWZSREC2JW001:in-progress|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T18:14:08.219480319+00:00",
+  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:review,00000SZ41923HGWZSREC2JW001:in-progress|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T18:17:35.014083227+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2253,6 +2253,26 @@
       "message": "Goal 00000SZ41923HGWZSREC2JW001 changed from failed to in-progress.",
       "created_at": "2026-07-23T18:14:08.085461297+00:00",
       "goal_id": "00000SZ41923HGWZSREC2JW001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T18:17:32.139128224+00:00-226",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ412RXR0TQRHE82JW000 changed from in-progress to qa.",
+      "created_at": "2026-07-23T18:17:32.139128224+00:00",
+      "goal_id": "00000SZ412RXR0TQRHE82JW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T18:17:34.926868708+00:00-227",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ412RXR0TQRHE82JW000 changed from qa to review.",
+      "created_at": "2026-07-23T18:17:34.926868708+00:00",
+      "goal_id": "00000SZ412RXR0TQRHE82JW000",
       "actionable": false,
       "retryable": false
     }

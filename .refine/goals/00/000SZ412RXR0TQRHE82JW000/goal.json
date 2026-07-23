@@ -14,29 +14,51 @@
   "rounds": [
     {
       "assignee": "Refine",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T18:00:27Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T18:17:28Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ412RXR0TQRHE82JW000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ412RXR0TQRHE82JW000-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Fixed startup-warmed diagnostics so cached doctor/provider data stays static while every diagnostics read overlays compact process status from FileProcessStatusService; shared process_status_value now keeps diagnostics and /api/processes?summary=1 semantics aligned, including live runner reachability/counts, pause flags, and terminal filtering. Added deterministic web coverage for warm-before-runners, workflow/git-sync registration, stale/terminal reconciliation, pause flags, and unchanged cached doctor/provider data, plus daemon-backed project doctor CLI coverage without restart. Verification: focused regression 1/1 passed; process-list compatibility regression 1/1 passed; web suite 106/106 passed; CLI surface suite 1/1 passed; full library rerun 455/455 passed; cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff --check passed. One earlier full-library attempt was 454/455 due an unrelated interactive-terminal timing assertion (500 vs 404); that test passed immediately alone and in the clean 455/455 rerun.",
       "implementation_reported_at": "2026-07-23T18:16:20Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Implement and verify this Goal.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T18:17:32Z",
+      "quality_details": {
+        "candidate_commit": "fa0a43ff93af8cf33b80ed32d6269ed74d59a67f",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f90326fb756d0",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T18:16:20Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T18:17:32Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T18:16:21Z"
+  "updated": "2026-07-23T18:17:33Z"
 }
