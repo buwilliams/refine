@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:44:37Z",
+  "updated_at": "2026-07-23T15:46:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1476,6 +1476,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The process remains live and its transcript continues to grow; no cargo or node process is currently running, so it is still constructing the restart tests rather than hanging in a test command."
+    },
+    {
+      "created_at": "2026-07-23T15:46:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821573799-276",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 6’s restart and policy tests have completed, and the full library suite is green at 474/474. `cargo check --all-targets` passed with one warning; the agent is reviewing the final diff and warning before committing."
     }
   ],
   "queued_messages": [
