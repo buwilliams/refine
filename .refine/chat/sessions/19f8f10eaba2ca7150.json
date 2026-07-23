@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:01:26Z",
+  "updated_at": "2026-07-23T18:01:34Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1755,6 +1755,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot has no lost-worker signal, so I’m treating the active Goal as observational unless the live records contradict it. The prior recovery guidance also confirms that `review` is a human-controlled stop, not permission to approve or merge."
+    },
+    {
+      "created_at": "2026-07-23T18:01:34Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784829694836-12",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Live evidence resolves the apparent mismatch: Goal `00000SZ412RXR0TQRHE82JW000` has a running Codex worker (PID 35952) in its owned round-1 worktree, with the workflow runner reachable, daemon healthy, and UI/API both HTTP 200. There is no recovery action to take now; I’m checking its output and worktree progress for a genuine stall or provider failure."
     }
   ],
   "queued_messages": [
