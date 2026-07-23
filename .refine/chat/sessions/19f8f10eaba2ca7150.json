@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:07:57Z",
+  "updated_at": "2026-07-23T13:08:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -105,20 +105,62 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A third Goal started while I was checking (`00000SZ3RP4G52RZ706A5P4001`). All three claims are live and the scheduler reports steady state, so there is still no supported intervention. Historical degradation remains visible: `operation-recovery-interrupted` and the prior Goal Agent exit are still recorded, although state sync has recovered and Codex authentication currently passes."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8f15539a3b969e0",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 3 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\", \"00000SZ3RN3BS397T4SE5P4000\": \"in-progress\", \"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T13:06:07Z",
-      "updated_at": "2026-07-23T13:07:57Z",
-      "internal": true
+      "created_at": "2026-07-23T13:08:24Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812104736-23",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No intervention was warranted.\n\n- Current state: 3 active, 0 queued, 0 failed.\n- The two supplied Goals are now `in-progress` with live, working Codex agents in isolated, clean worktrees.\n- A third Goal, `00000SZ3RP4G52RZ706A5P4001`, started normally and is also working.\n- Daemon and web UI are healthy; Codex diagnostics and authentication pass.\n- Degradation remains visible: historical `Goal Agent exited unsuccessfully: 1` and `operation-recovery-interrupted`.\n- State synchronization subsequently recovered.\n- No Goal is stalled, lost, requesting input, or awaiting an authority decision. No retry, merge, approval, cancellation, or worktree mutation was performed.\n\nThe automatic supervisor remains observing. Any Goal reaching review should stop at the human approval boundary."
+    },
+    {
+      "created_at": "2026-07-23T13:08:24Z",
+      "delivered": false,
+      "id": "evt-1784812104912-25",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No intervention was warranted.\n\n- Current state: 3 active, 0 queued, 0 failed.\n- The two supplied Goals are now `in-progress` with live, working Codex agents in isolated, clean worktrees.\n- A third Goal, `00000SZ3RP4G52RZ706A5P4001`, started normally and is also working.\n- Daemon and web UI are healthy; Codex diagnostics and authentication pass.\n- Degradation remains visible: historical `Goal Agent exited unsuccessfully: 1` and `operation-recovery-interrupted`.\n- State synchronization subsequently recovered.\n- No Goal is stalled, lost, requesting input, or awaiting an authority decision. No retry, merge, approval, cancellation, or worktree mutation was performed.\n\nThe automatic supervisor remains observing. Any Goal reaching review should stop at the human approval boundary."
+    },
+    {
+      "created_at": "2026-07-23T13:08:24Z",
+      "delivered": false,
+      "id": "evt-1784812104913-26",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T13:08:24Z",
+      "delivered": false,
+      "id": "evt-1784812104931-28",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T13:08:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812110632-30",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll correlate the three Goal records with current processes, worktrees, runtime/HTTP health, and provider evidence before deciding whether any intervention is justified. I’m using the Refine auditable-recovery guidance because stale “in-progress” state must not be retried or rewritten without confirming worker loss and the supported recovery path."
     }
   ],
   "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
-  "interrupted": true,
-  "interruption_detail": "Daemon restarted before the provider turn completed."
+  "interrupted": false,
+  "interruption_detail": null
 }
