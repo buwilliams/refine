@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:08:10Z",
+  "updated_at": "2026-07-23T10:08:39Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -165,6 +165,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The rerun exposed a command-selection problem, not a failing assertion: the named test passed through the library target but the repository’s `tests/test_all.rs` wrapper rejects arbitrary Cargo test filters. The worker has the exact output and is still active; the supported focused form is expected to target the library explicitly before broader gates."
+    },
+    {
+      "created_at": "2026-07-23T10:08:39Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801319855-18",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The corrected library command revealed a real regression-test defect: the test counted the `global-reporter` identifier twice because it appears in both the control and its label association. This is not yet a product failure, but verification is not green; I’m keeping that distinction explicit while the worker corrects the assertion and reruns it."
     }
   ],
   "queued_messages": [
