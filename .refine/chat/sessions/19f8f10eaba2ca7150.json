@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:53:31Z",
+  "updated_at": "2026-07-23T18:54:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2631,9 +2631,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live evidence contradicts the snapshot’s empty `live={}` field in a useful way: Goal `…P4001` still has PID 375463 alive, a current runtime record and transcript, active child test work, and five modified files in its preserved Round 7 worktree. It is working, not lost, so I am not retrying or cancelling it. I’m doing the final health/auth and review-boundary checks now."
+    },
+    {
+      "created_at": "2026-07-23T18:54:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832891600-156",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No automatic intervention is warranted now.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` is genuinely active: PID 375463 is alive, its transcript is updating, and it is running focused tests in the preserved Round 7 worktree. It is not stalled or lost.\n- The empty live-Agent field is incomplete: system status and OS evidence confirm the worker despite the summary API omitting process details.\n- Goals `…JW002` at `9b7d9d33` and `…JW003` at `87029e72` remain clean, unmerged review candidates. Governance passed, but Quality was a no-op because no Quality tests are configured.\n- Daemon and runners are healthy; Codex is detected and authenticated. Historical provider failures remain in the audit trail, with no current provider/authentication failure.\n- I performed no retry, cancellation, approval, merge, worktree mutation, or state edit.\n\nYour authority is required for the two review candidates. Should they remain pending—which is safest while Round 7 explicitly treats `…JW002` as unapproved—or do"
+    },
+    {
+      "created_at": "2026-07-23T18:54:51Z",
+      "delivered": false,
+      "id": "evt-1784832891774-158",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No automatic intervention is warranted now.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` is genuinely active: PID 375463 is alive, its transcript is updating, and it is running focused tests in the preserved Round 7 worktree. It is not stalled or lost.\n- The empty live-Agent field is incomplete: system status and OS evidence confirm the worker despite the summary API omitting process details.\n- Goals `…JW002` at `9b7d9d33` and `…JW003` at `87029e72` remain clean, unmerged review candidates. Governance passed, but Quality was a no-op because no Quality tests are configured.\n- Daemon and runners are healthy; Codex is detected and authenticated. Historical provider failures remain in the audit trail, with no current provider/authentication failure.\n- I performed no retry, cancellation, approval, merge, worktree mutation, or state edit.\n\nYour authority is required for the two review candidates. Should they remain pending—which is safest while Round 7 explicitly treats `…JW002` as unapproved—or do you want a specific Goal reviewed for approval?"
+    },
+    {
+      "created_at": "2026-07-23T18:54:51Z",
+      "delivered": false,
+      "id": "evt-1784832891774-159",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
