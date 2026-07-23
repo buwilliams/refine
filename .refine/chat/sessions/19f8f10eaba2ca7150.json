@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:47:38Z",
+  "updated_at": "2026-07-23T19:48:05Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3156,6 +3156,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance passed all configured checks: “No governance rule violations found,” with rule, constitution, meta-rule, and product states all passed. The Goal has not yet crossed into review, so I’m waiting for the workflow’s Quality/build settlement rather than approving it myself."
+    },
+    {
+      "created_at": "2026-07-23T19:48:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836085930-253",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The Goal has reached `review` at Round 9. I’m doing the final read-only handoff audit now: candidate/worktree cleanliness, non-ancestry to `main`, remote branch presence, daemon/HTTP health, provider diagnostics, and the supervisor’s active-work count. I will not approve or merge it."
     }
   ],
   "queued_messages": [
