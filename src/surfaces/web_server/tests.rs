@@ -443,6 +443,8 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(summary.contains(r#"aria-label="Open controls""#));
     assert!(summary.contains(r#"class="nav-context-icon""#));
     assert!(summary.contains("<span>Controls</span>"));
+    assert!(summary.contains(r#"class="nav-context-main""#));
+    assert!(summary.contains(r#"class="nav-context-more" aria-hidden="true""#));
     assert!(!summary.contains("target-app-dot"));
     assert!(!summary.contains("context-app-name"));
     assert!(!summary.contains("context-reporter-name"));
@@ -469,6 +471,30 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(menu.contains(r#"class="nav-control-status target-app-state""#));
     assert!(menu.contains(r#"class="nav-control-status agent-status-label""#));
     assert!(menu.contains(r#"class="nav-control-status nav-source-update-status""#));
+    let management_start = menu
+        .find(r#">Management</div>"#)
+        .expect("management section should exist");
+    let source_update_start = menu
+        .find(r#"id="btn-source-update""#)
+        .expect("source update control should exist");
+    let guide_start = menu
+        .find(r#"id="nav-guide-open""#)
+        .expect("guide management control should exist");
+    assert!(
+        management_start < source_update_start && source_update_start < guide_start,
+        "source update should be the first management control"
+    );
+    assert!(menu.contains(
+        r#"class="nav-menu-item nav-control-item nav-management-item nav-command-button""#
+    ));
+    let command_start = menu
+        .find(r#"class="nav-menu-item nav-control-item nav-management-item nav-command-button""#)
+        .expect("command palette management-style control should exist");
+    let command_end = command_start
+        + menu[command_start..]
+            .find("</button>")
+            .expect("command palette control should close");
+    assert!(menu[command_start..command_end].contains(r#"class="nav-menu-icon""#));
     assert!(target_app.contains(r#"querySelector(".target-app-state")"#));
     assert!(target_app.contains(r#"`${statusLabel} · ${agentCount}`"#));
     assert!(releases.contains(r#"querySelector(".nav-source-update-status")"#));
