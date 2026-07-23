@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:38:48Z",
+  "updated_at": "2026-07-23T13:39:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -450,6 +450,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Ready Merge implementation finished its agent phase and entered Governance on commit `80ca16b8`; its report says focused state-sync 19/19, library 463/463, workflow 1/1, multi-instance 7/7, check/fmt/diff/ancestry/clean-worktree gates all passed. I have not accepted that report as final—Governance is still running. The workflow also replenished capacity with two new Goals, so I’m refreshing the active set rather than relying on the earlier count of two."
+    },
+    {
+      "created_at": "2026-07-23T13:39:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813943898-95",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A new coordination mismatch appeared during Governance: durable Goal states were reset to `todo` and the supervisor now reports 0 active/3 queued, while three exact owned processes are still running (two implementation agents and the Ready Merge Governance process). I am not retrying or cancelling anything—either would cross the ownership/cancellation boundary while live work exists. I’m tracing the state-sync failure and checking whether the mismatch self-recovers."
     }
   ],
   "queued_messages": [
