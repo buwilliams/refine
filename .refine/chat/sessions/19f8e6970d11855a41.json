@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:28:38Z",
+  "updated_at": "2026-07-23T11:28:52Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -723,6 +723,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Two Goals now require human approval (`00000SZ3KJDD…` and `00000SZ3NBF…`), while the ready-merge Goal continues active verification. I’m taking one final cross-surface snapshot so I can hand you the approval decision with exact limitations and leave the active worker running."
+    },
+    {
+      "created_at": "2026-07-23T11:28:52Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784806132589-55",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The state changed again during verification: both review candidates were merged and marked done by another actor or workflow surface; I did not approve them. I’m auditing the merge provenance now because that confirmation boundary must be explicit. The remaining Goal is reported stalled by the supervisor, but its Codex process was live moments ago, so I’m resolving that contradiction before any retry."
     }
   ],
   "queued_messages": [
