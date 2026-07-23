@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
@@ -216,15 +216,27 @@ impl FileGitSyncService {
             .into_iter()
             .filter(|path| tracked_transient.contains(path))
             .collect::<Vec<_>>();
-        let remote_state = durable_state_map(&state_refine)?;
-        let conflicts = state_conflicts(&base, &local, &remote_state);
+        let mut remote_state = durable_state_map(&state_refine)?;
+        let supervisor_merge = reconcile_supervisor_snapshot(
+            &live_refine,
+            &state_refine,
+            &base,
+            &local,
+            &remote_state,
+        )?;
+        if supervisor_merge.resolved {
+            remote_state = durable_state_map(&state_refine)?;
+        }
+        let resolved_paths = supervisor_merge.resolved_paths();
+        let mut conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
+        conflicts.extend(supervisor_merge.conflicts);
         if !conflicts.is_empty() {
             return Err(RefineError::Conflict(format!(
                 "Refine state changed on multiple nodes: {}",
                 conflicts.join(", ")
             )));
         }
-        apply_local_state_delta(&live_refine, &state_refine, &base, &local)?;
+        apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 
         let updated = durable_state_map(&state_refine)?;
         let mut changed = state_change_status(&remote_state, &updated);
@@ -270,8 +282,42 @@ impl FileGitSyncService {
                 let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
                 self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
                 remove_transient_state_files(&state_refine)?;
-                let retry_remote_state = durable_state_map(&state_refine)?;
-                apply_local_state_delta(&live_refine, &state_refine, &base, &local)?;
+                let mut retry_remote_state = durable_state_map(&state_refine)?;
+                // A rejected push means both the remote and the live store may have advanced
+                // since the original reconciliation. Re-evaluate the original observed base
+                // against both fresh sides before replaying any local delta.
+                let retry_local = durable_state_map(&live_refine)?;
+                let supervisor_retry = reconcile_supervisor_snapshot(
+                    &live_refine,
+                    &state_refine,
+                    &base,
+                    &retry_local,
+                    &retry_remote_state,
+                )?;
+                if supervisor_retry.resolved {
+                    retry_remote_state = durable_state_map(&state_refine)?;
+                }
+                let retry_resolved_paths = supervisor_retry.resolved_paths();
+                let mut retry_conflicts = state_conflicts(
+                    &base,
+                    &retry_local,
+                    &retry_remote_state,
+                    &retry_resolved_paths,
+                );
+                retry_conflicts.extend(supervisor_retry.conflicts);
+                if !retry_conflicts.is_empty() {
+                    return Err(RefineError::Conflict(format!(
+                        "Refine state changed on multiple nodes during push retry: {}",
+                        retry_conflicts.join(", ")
+                    )));
+                }
+                apply_local_state_delta(
+                    &live_refine,
+                    &state_refine,
+                    &base,
+                    &retry_local,
+                    &retry_resolved_paths,
+                )?;
                 let retry_updated = durable_state_map(&state_refine)?;
                 let retry_changed = state_change_status(&retry_remote_state, &retry_updated);
                 committed = !retry_changed.is_empty();
@@ -759,10 +805,315 @@ fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableStateMap> {
     Ok(state)
 }
 
+const SUPERVISOR_AGENT_STATE_PATH: &str = "supervisor-agent.json";
+
+#[derive(Default)]
+struct SupervisorSnapshotMerge {
+    resolved: bool,
+    conflicts: Vec<String>,
+}
+
+impl SupervisorSnapshotMerge {
+    fn resolved_paths(&self) -> BTreeSet<PathBuf> {
+        if self.resolved {
+            BTreeSet::from([PathBuf::from(SUPERVISOR_AGENT_STATE_PATH)])
+        } else {
+            BTreeSet::new()
+        }
+    }
+}
+
+fn reconcile_supervisor_snapshot(
+    live_root: &std::path::Path,
+    state_root: &std::path::Path,
+    base: &DurableStateMap,
+    local: &DurableStateMap,
+    remote: &DurableStateMap,
+) -> RefineResult<SupervisorSnapshotMerge> {
+    let relative = PathBuf::from(SUPERVISOR_AGENT_STATE_PATH);
+    let base_value = base.get(&relative);
+    let local_value = local.get(&relative);
+    let remote_value = remote.get(&relative);
+    if local_value == base_value || remote_value == base_value || local_value == remote_value {
+        return Ok(SupervisorSnapshotMerge::default());
+    }
+    if local_value.is_none() || remote_value.is_none() {
+        return Ok(SupervisorSnapshotMerge {
+            resolved: false,
+            conflicts: vec![SUPERVISOR_AGENT_STATE_PATH.to_string()],
+        });
+    }
+
+    let local_snapshot = read_json_value(&live_root.join(&relative), "local supervisor snapshot")?;
+    let remote_snapshot =
+        read_json_value(&state_root.join(&relative), "remote supervisor snapshot")?;
+    let (merged, conflicts) = merge_supervisor_snapshot_values(local_snapshot, remote_snapshot)?;
+    if !conflicts.is_empty() {
+        return Ok(SupervisorSnapshotMerge {
+            resolved: false,
+            conflicts,
+        });
+    }
+    let encoded = serde_json::to_vec_pretty(&merged).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode reconciled {SUPERVISOR_AGENT_STATE_PATH}: {error}"
+        ))
+    })?;
+    fs::write(state_root.join(&relative), encoded).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to write reconciled supervisor snapshot {}: {error}",
+            state_root.join(&relative).display()
+        ))
+    })?;
+    Ok(SupervisorSnapshotMerge {
+        resolved: true,
+        conflicts: Vec::new(),
+    })
+}
+
+fn read_json_value(path: &std::path::Path, label: &str) -> RefineResult<Value> {
+    let bytes = fs::read(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read {label} {}: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        RefineError::Conflict(format!(
+            "{SUPERVISOR_AGENT_STATE_PATH} cannot be reconciled because {label} is invalid JSON: {error}"
+        ))
+    })
+}
+
+fn merge_supervisor_snapshot_values(
+    local: Value,
+    remote: Value,
+) -> RefineResult<(Value, Vec<String>)> {
+    let local = local.as_object().ok_or_else(|| {
+        RefineError::Conflict(format!(
+            "{SUPERVISOR_AGENT_STATE_PATH} local snapshot is not a JSON object"
+        ))
+    })?;
+    let remote = remote.as_object().ok_or_else(|| {
+        RefineError::Conflict(format!(
+            "{SUPERVISOR_AGENT_STATE_PATH} remote snapshot is not a JSON object"
+        ))
+    })?;
+    let local_updated = local
+        .get("updated_at")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let remote_updated = remote
+        .get("updated_at")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let mut merged = if local_updated >= remote_updated {
+        local.clone()
+    } else {
+        remote.clone()
+    };
+    let mut conflicts = Vec::new();
+
+    for field in ["provider", "session_id"] {
+        match merge_optional_snapshot_identity(local, remote, field) {
+            Ok(value) => {
+                merged.insert(field.to_string(), value);
+            }
+            Err(path) => conflicts.push(path),
+        }
+    }
+    for field in ["goal_states", "open_issues"] {
+        match merge_supervisor_string_map(local, remote, field) {
+            Ok(value) => {
+                merged.insert(field.to_string(), Value::Object(value));
+            }
+            Err(mut paths) => conflicts.append(&mut paths),
+        }
+    }
+    match merge_supervisor_events(local, remote) {
+        Ok(events) => {
+            merged.insert("events".to_string(), Value::Array(events));
+        }
+        Err(mut paths) => conflicts.append(&mut paths),
+    }
+    if !conflicts.is_empty() {
+        conflicts.sort();
+        conflicts.dedup();
+        return Ok((Value::Object(merged), conflicts));
+    }
+
+    let version = local
+        .get("version")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        .max(remote.get("version").and_then(Value::as_u64).unwrap_or(0));
+    merged.insert("version".to_string(), json!(version));
+    merged.insert(
+        "initialized".to_string(),
+        json!(
+            local
+                .get("initialized")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || remote
+                    .get("initialized")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        ),
+    );
+    merged.insert(
+        "updated_at".to_string(),
+        Value::String(local_updated.max(remote_updated).to_string()),
+    );
+    let goal_states = merged
+        .get("goal_states")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let active_work = goal_states
+        .values()
+        .filter(|status| {
+            status.as_str().is_some_and(|status| {
+                matches!(status, "in-progress" | "ready-merge" | "build" | "qa")
+            })
+        })
+        .count();
+    let queued_work = goal_states
+        .values()
+        .filter(|status| {
+            status
+                .as_str()
+                .is_some_and(|status| matches!(status, "backlog" | "todo"))
+        })
+        .count();
+    let failed_work = goal_states
+        .values()
+        .filter(|status| status.as_str() == Some("failed"))
+        .count();
+    merged.insert("active_work".to_string(), json!(active_work));
+    merged.insert("queued_work".to_string(), json!(queued_work));
+    merged.insert("failed_work".to_string(), json!(failed_work));
+    let has_open_issues = merged
+        .get("open_issues")
+        .and_then(Value::as_object)
+        .is_some_and(|issues| !issues.is_empty());
+    merged.insert(
+        "health".to_string(),
+        json!(if has_open_issues {
+            "degraded"
+        } else if failed_work > 0 {
+            "attention"
+        } else {
+            "healthy"
+        }),
+    );
+    Ok((Value::Object(merged), Vec::new()))
+}
+
+fn merge_optional_snapshot_identity(
+    local: &Map<String, Value>,
+    remote: &Map<String, Value>,
+    field: &str,
+) -> Result<Value, String> {
+    let local = local.get(field).filter(|value| !value.is_null());
+    let remote = remote.get(field).filter(|value| !value.is_null());
+    match (local, remote) {
+        (Some(local), Some(remote)) if local != remote => {
+            Err(format!("{SUPERVISOR_AGENT_STATE_PATH}.{field}"))
+        }
+        (Some(value), _) | (_, Some(value)) => Ok(value.clone()),
+        (None, None) => Ok(Value::Null),
+    }
+}
+
+fn merge_supervisor_string_map(
+    local: &Map<String, Value>,
+    remote: &Map<String, Value>,
+    field: &str,
+) -> Result<Map<String, Value>, Vec<String>> {
+    let mut merged = remote
+        .get(field)
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let mut conflicts = Vec::new();
+    for (key, local_value) in local
+        .get(field)
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(remote_value) = merged.get(key)
+            && remote_value != local_value
+        {
+            conflicts.push(format!("{SUPERVISOR_AGENT_STATE_PATH}.{field}.{key}"));
+            continue;
+        }
+        merged.insert(key.clone(), local_value.clone());
+    }
+    if conflicts.is_empty() {
+        Ok(merged)
+    } else {
+        Err(conflicts)
+    }
+}
+
+fn merge_supervisor_events(
+    local: &Map<String, Value>,
+    remote: &Map<String, Value>,
+) -> Result<Vec<Value>, Vec<String>> {
+    let mut events = BTreeMap::<String, Value>::new();
+    let mut conflicts = Vec::new();
+    for event in remote
+        .get("events")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .chain(
+            local
+                .get("events")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten(),
+        )
+    {
+        let id = event
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if id.is_empty() {
+            conflicts.push(format!("{SUPERVISOR_AGENT_STATE_PATH}.events.<missing-id>"));
+        } else if let Some(existing) = events.get(&id)
+            && existing != event
+        {
+            conflicts.push(format!("{SUPERVISOR_AGENT_STATE_PATH}.events.{id}"));
+        } else {
+            events.insert(id, event.clone());
+        }
+    }
+    if !conflicts.is_empty() {
+        return Err(conflicts);
+    }
+    let mut events = events.into_values().collect::<Vec<_>>();
+    events.sort_by(|left, right| {
+        left.get("created_at")
+            .and_then(Value::as_str)
+            .cmp(&right.get("created_at").and_then(Value::as_str))
+            .then_with(|| {
+                left.get("id")
+                    .and_then(Value::as_str)
+                    .cmp(&right.get("id").and_then(Value::as_str))
+            })
+    });
+    Ok(events)
+}
+
 fn state_conflicts(
     base: &DurableStateMap,
     local: &DurableStateMap,
     remote: &DurableStateMap,
+    resolved: &BTreeSet<PathBuf>,
 ) -> Vec<String> {
     let paths = base
         .keys()
@@ -773,11 +1124,7 @@ fn state_conflicts(
     paths
         .into_iter()
         .filter(|path| {
-            // State-sync failure and recovery reporting mutates this derived
-            // supervisor snapshot. Treating that mutation as a same-record
-            // conflict creates a self-sustaining loop that prevents unrelated
-            // durable Goal records from ever being reconciled.
-            if path == std::path::Path::new("supervisor-agent.json") {
+            if resolved.contains(path) {
                 return false;
             }
             let base_value = base.get(path);
@@ -816,6 +1163,7 @@ fn apply_local_state_delta(
     state_root: &std::path::Path,
     base: &DurableStateMap,
     local: &DurableStateMap,
+    resolved: &BTreeSet<PathBuf>,
 ) -> RefineResult<()> {
     let paths = base
         .keys()
@@ -823,6 +1171,9 @@ fn apply_local_state_delta(
         .cloned()
         .collect::<BTreeSet<_>>();
     for relative in paths {
+        if resolved.contains(&relative) {
+            continue;
+        }
         if local.get(&relative) == base.get(&relative) {
             continue;
         }
@@ -1448,6 +1799,180 @@ mod tests {
         assert!(
             error.to_string().contains("goals/GOALA/goal.json"),
             "{error}"
+        );
+    }
+
+    #[test]
+    fn sync_reports_unequal_supervisor_snapshots_without_hiding_evidence() {
+        let fixture = SyncFixture::new("supervisor-snapshot-conflict");
+        let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+        let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+        fs::create_dir_all(&refine_a).unwrap();
+        fs::write(
+            refine_a.join("supervisor-agent.json"),
+            serde_json::to_vec_pretty(&json!({
+                "provider": "smoke-ai",
+                "open_issues": {},
+                "events": [{"id": "baseline", "message": "observed"}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+
+        fs::write(
+            refine_a.join("supervisor-agent.json"),
+            serde_json::to_vec_pretty(&json!({
+                "provider": "smoke-ai",
+                "open_issues": {"provider": "authentication failed on node a"},
+                "events": [
+                    {"id": "baseline", "message": "observed"},
+                    {"id": "node-a", "message": "provider failure retained"}
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            refine_b.join("supervisor-agent.json"),
+            serde_json::to_vec_pretty(&json!({
+                "provider": "other-provider",
+                "open_issues": {"goal": "review conflict on node b"},
+                "events": [
+                    {"id": "baseline", "message": "observed"},
+                    {"id": "node-b", "message": "open issue retained"}
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+
+        let error = fixture.service(&fixture.b).sync().unwrap_err();
+
+        assert!(
+            error.to_string().contains("supervisor-agent.json"),
+            "{error}"
+        );
+        let local_b = fs::read_to_string(refine_b.join("supervisor-agent.json")).unwrap();
+        assert!(local_b.contains("review conflict on node b"), "{local_b}");
+        let remote = git_stdout(
+            &fixture.b,
+            &["show", "origin/refine/state:.refine/supervisor-agent.json"],
+        );
+        assert!(
+            remote.contains("authentication failed on node a"),
+            "{remote}"
+        );
+    }
+
+    #[test]
+    fn supervisor_snapshot_merge_preserves_disjoint_issues_and_event_history() {
+        let local = json!({
+            "version": 2,
+            "updated_at": "2026-07-23T12:00:01Z",
+            "initialized": true,
+            "provider": "smoke-ai",
+            "session_id": "session-1",
+            "goal_states": {"GOALA": "review"},
+            "open_issues": {"provider": "authentication failed"},
+            "events": [{"id": "event-a", "created_at": "2026-07-23T12:00:01Z", "message": "auth"}]
+        });
+        let remote = json!({
+            "version": 2,
+            "updated_at": "2026-07-23T12:00:02Z",
+            "initialized": true,
+            "provider": "smoke-ai",
+            "session_id": "session-1",
+            "goal_states": {"GOALB": "failed"},
+            "open_issues": {"goal": "review conflict"},
+            "events": [{"id": "event-b", "created_at": "2026-07-23T12:00:02Z", "message": "goal"}]
+        });
+
+        let (merged, conflicts) = merge_supervisor_snapshot_values(local, remote).unwrap();
+
+        assert!(conflicts.is_empty(), "{conflicts:?}");
+        assert_eq!(merged["goal_states"]["GOALA"], "review");
+        assert_eq!(merged["goal_states"]["GOALB"], "failed");
+        assert_eq!(merged["open_issues"]["provider"], "authentication failed");
+        assert_eq!(merged["open_issues"]["goal"], "review conflict");
+        assert_eq!(merged["events"].as_array().unwrap().len(), 2);
+        assert_eq!(merged["health"], "degraded");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = SyncFixture::new("push-retry-conflict");
+        write_goal(&fixture.a, "GOALA");
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+        let goal_a = refine_dir_for_target_root(&fixture.a)
+            .unwrap()
+            .join("goals/GOALA/goal.json");
+        let goal_b = refine_dir_for_target_root(&fixture.b)
+            .unwrap()
+            .join("goals/GOALA/goal.json");
+        fs::write(&goal_a, "{\"id\":\"GOALA\",\"status\":\"review\"}\n").unwrap();
+        fs::write(&goal_b, "{\"id\":\"GOALA\",\"status\":\"qa\"}\n").unwrap();
+
+        let remote = fixture.root.join("remote.git");
+        let arrivals = fixture.root.join("push-arrivals");
+        fs::create_dir_all(&arrivals).unwrap();
+        let hook = remote.join("hooks/pre-receive");
+        fs::write(
+            &hook,
+            format!(
+                "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state; then\n    touch \"{}/$$\"\n    while test \"$(find \"{}\" -type f | wc -l)\" -lt 2; do sleep 0.01; done\n  fi\ndone\n",
+                arrivals.display(),
+                arrivals.display()
+            ),
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&hook).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&hook, permissions).unwrap();
+
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let left_service = fixture.service(&fixture.a);
+        let right_service = fixture.service(&fixture.b);
+        let (left, right) = thread::scope(|scope| {
+            let left_barrier = Arc::clone(&barrier);
+            let left = scope.spawn(move || {
+                left_barrier.wait();
+                left_service.sync()
+            });
+            let right_barrier = Arc::clone(&barrier);
+            let right = scope.spawn(move || {
+                right_barrier.wait();
+                right_service.sync()
+            });
+            (left.join().unwrap(), right.join().unwrap())
+        });
+
+        let errors = [left.as_ref().err(), right.as_ref().err()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        assert_eq!(errors.len(), 1, "left={left:?}, right={right:?}");
+        assert!(
+            errors[0]
+                .to_string()
+                .contains("during push retry: goals/GOALA/goal.json"),
+            "{}",
+            errors[0]
+        );
+        assert!(left.is_ok() || right.is_ok());
+        assert_eq!(
+            fs::read_to_string(&goal_a).unwrap(),
+            "{\"id\":\"GOALA\",\"status\":\"review\"}\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&goal_b).unwrap(),
+            "{\"id\":\"GOALA\",\"status\":\"qa\"}\n"
         );
     }
 

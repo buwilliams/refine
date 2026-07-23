@@ -9,7 +9,9 @@ use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{FileOperationRegistry, OperationState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
@@ -61,25 +63,57 @@ impl FileMergerService {
         expected_candidate: &str,
         expected_remote: &str,
     ) -> RefineResult<RoundIntegration> {
+        self.integrate_workflow_candidate_and_settle(
+            goal_id,
+            round_idx,
+            claim_id,
+            execution_id,
+            node_id,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+            |_| Ok(()),
+        )
+        .map(|(integration, ())| integration)
+    }
+
+    /// Integrates a Ready Merge candidate and atomically orders its operation settlement with the
+    /// caller's next workflow transition.
+    ///
+    /// The workflow coordination lease remains held from the initial fence commitment through
+    /// every Git effect, evidence persistence, settlement callback, and success record. Operation
+    /// cancellation uses its independent launch/settlement barrier so it can still terminate a
+    /// running Git child while workflow mutations are excluded.
+    #[allow(clippy::too_many_arguments)]
+    pub fn integrate_workflow_candidate_and_settle<T>(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        claim_id: &str,
+        execution_id: &str,
+        node_id: &str,
+        expected_branch: &str,
+        expected_candidate: &str,
+        expected_remote: &str,
+        settlement: impl FnOnce(&RoundIntegration) -> RefineResult<T>,
+    ) -> RefineResult<(RoundIntegration, T)> {
         let target_root = match &self.target_root {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
-        let fence = {
-            let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
-            let detail = FileWorkItemService::for_node(&self.refine_dir, node_id)
-                .show_goal_detail(goal_id)?;
-            let goal_revision = workflow_revision(&detail);
-            WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
-                .commit_ready_merge_fence(
-                    claim_id,
-                    execution_id,
-                    goal_id,
-                    node_id,
-                    round_idx,
-                    goal_revision,
-                )?
-        };
+        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
+        let detail =
+            FileWorkItemService::for_node(&self.refine_dir, node_id).show_goal_detail(goal_id)?;
+        let goal_revision = workflow_revision(&detail);
+        let mut fence = WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
+            .commit_ready_merge_fence(
+                claim_id,
+                execution_id,
+                goal_id,
+                node_id,
+                round_idx,
+                goal_revision,
+            )?;
         let operations = FileOperationRegistry::new(&self.runtime_root);
         let operation = operations.register_exclusive_with_request(
             &format!("merger:{goal_id}:{}", round_idx + 1),
@@ -96,27 +130,36 @@ impl FileMergerService {
             }),
         )?;
         let result = with_repository_git_lock(&target_root, || {
-            self.integrate_workflow_candidate_locked(
+            let integration = self.integrate_workflow_candidate_locked(
                 &target_root,
                 goal_id,
                 round_idx,
+                &mut fence,
+                &operation.id,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
+            self.verify_integration_fence(
+                &FileWorkItemService::for_node(&self.refine_dir, node_id),
                 &fence,
                 &operation.id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
-            )
+            )?;
+            let (_, transitioned) = operations.succeed_after(
+                &operation.id,
+                json!({"stage": "settled"}),
+                json!({"integration": &integration}),
+                || settlement(&integration),
+            )?;
+            Ok((integration, transitioned))
         });
         match result {
-            Ok(integration) => {
-                operations.succeed_with_result_and_progress(
-                    &operation.id,
-                    json!({"stage": "settled"}),
-                    json!({"integration": &integration}),
-                )?;
-                Ok(integration)
-            }
+            Ok(settled) => Ok(settled),
             Err(error) => {
+                let operation_state = operations.status(&operation.id).ok();
                 let state = WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
                     .load_state()
                     .ok()
@@ -127,8 +170,16 @@ impl FileMergerService {
                             .find(|claim| claim.claim_id == claim_id)
                             .map(|claim| claim.state)
                     });
-                if matches!(state, Some(crate::workflow::WorkflowClaimState::Cancelled)) {
-                    let _ = operations.finish(&operation.id, OperationState::Cancelled);
+                let cancelled = operation_state
+                    .as_ref()
+                    .is_some_and(|operation| operation.state == OperationState::Cancelled)
+                    || matches!(state, Some(crate::workflow::WorkflowClaimState::Cancelled));
+                if cancelled {
+                    // Cancellation is already durable and authoritative. Preserve its causal
+                    // operation error instead of replacing it with a late Git/settlement failure.
+                    return Err(RefineError::Conflict(format!(
+                        "Ready Merge execution {execution_id} was cancelled: {error}"
+                    )));
                 } else {
                     let _ = operations.fail_with_error(
                         &operation.id,
@@ -221,7 +272,7 @@ impl FileMergerService {
         target_root: &Path,
         goal_id: &str,
         round_idx: usize,
-        fence: &WorkflowExecutionFence,
+        fence: &mut WorkflowExecutionFence,
         operation_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
@@ -231,6 +282,7 @@ impl FileMergerService {
         self.verify_integration_fence(
             &work_items,
             fence,
+            operation_id,
             expected_branch,
             expected_candidate,
             expected_remote,
@@ -285,11 +337,20 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
             )?;
             self.verify_existing_integration(&git, &existing)?;
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                operation_id,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             return Ok(existing);
         }
         if goal.goal.status != GoalStatus::ReadyMerge {
@@ -303,6 +364,7 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
@@ -311,6 +373,7 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
@@ -325,6 +388,7 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
@@ -335,6 +399,7 @@ impl FileMergerService {
                 self.verify_integration_fence(
                     &work_items,
                     fence,
+                    operation_id,
                     expected_branch,
                     expected_candidate,
                     expected_remote,
@@ -343,6 +408,7 @@ impl FileMergerService {
                 self.verify_integration_fence(
                     &work_items,
                     fence,
+                    operation_id,
                     expected_branch,
                     expected_candidate,
                     expected_remote,
@@ -367,11 +433,15 @@ impl FileMergerService {
                 self.verify_integration_fence(
                     &work_items,
                     fence,
+                    operation_id,
                     expected_branch,
                     expected_candidate,
                     expected_remote,
                 )?;
-                self.persist_integration(&work_items, goal_id, round_idx, &recovered)?;
+                let revision =
+                    self.persist_integration(&work_items, goal_id, round_idx, &recovered)?;
+                WorkflowEngine::with_target_root(&self.runtime_root, target_root)
+                    .advance_ready_merge_fence_revision(fence, revision)?;
                 return Ok(recovered);
             }
         }
@@ -391,6 +461,7 @@ impl FileMergerService {
         self.verify_integration_fence(
             &work_items,
             fence,
+            operation_id,
             expected_branch,
             expected_candidate,
             expected_remote,
@@ -405,6 +476,7 @@ impl FileMergerService {
                 self.verify_integration_fence(
                     &work_items,
                     fence,
+                    operation_id,
                     expected_branch,
                     expected_candidate,
                     expected_remote,
@@ -430,6 +502,7 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
@@ -446,6 +519,7 @@ impl FileMergerService {
             self.verify_integration_fence(
                 &work_items,
                 fence,
+                operation_id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
@@ -464,11 +538,14 @@ impl FileMergerService {
         self.verify_integration_fence(
             &work_items,
             fence,
+            operation_id,
             expected_branch,
             expected_candidate,
             expected_remote,
         )?;
-        self.persist_integration(&work_items, goal_id, round_idx, &integration)?;
+        let revision = self.persist_integration(&work_items, goal_id, round_idx, &integration)?;
+        WorkflowEngine::with_target_root(&self.runtime_root, target_root)
+            .advance_ready_merge_fence_revision(fence, revision)?;
         Ok(integration)
     }
 
@@ -476,6 +553,7 @@ impl FileMergerService {
         &self,
         work_items: &FileWorkItemService,
         fence: &WorkflowExecutionFence,
+        operation_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
         expected_remote: &str,
@@ -487,6 +565,17 @@ impl FileMergerService {
         };
         WorkflowEngine::with_target_root(&self.runtime_root, target_root)
             .verify_ready_merge_fence(fence)?;
+        let operation = FileOperationRegistry::new(&self.runtime_root).status(operation_id)?;
+        if !matches!(
+            operation.state,
+            OperationState::Pending | OperationState::Running
+        ) {
+            return Err(RefineError::Conflict(format!(
+                "Ready Merge operation {operation_id} is {}; execution {} can no longer integrate or settle",
+                operation.state.as_api_status(),
+                fence.execution_id
+            )));
+        }
         let detail = work_items.show_goal_detail(&fence.goal_id)?;
         let actual_revision = workflow_revision(&detail);
         if actual_revision != fence.goal_revision {
@@ -548,13 +637,13 @@ impl FileMergerService {
         goal_id: &str,
         round_idx: usize,
         integration: &RoundIntegration,
-    ) -> RefineResult<()> {
+    ) -> RefineResult<u64> {
         work_items.update_goal_round_evaluation_summary(
             goal_id,
             round_idx,
             &json!({"workflow_integration": integration}),
         )?;
-        Ok(())
+        Ok(workflow_revision(&work_items.show_goal_detail(goal_id)?))
     }
 
     fn verify_existing_integration(
@@ -787,16 +876,10 @@ mod tests {
             });
             (first.join().unwrap(), second.join().unwrap())
         });
-        let (integrated, concurrent_error) = match (first_result, second_result) {
-            (Ok(integrated), Err(error)) | (Err(error), Ok(integrated)) => (integrated, error),
-            unexpected => panic!("expected one serialized integration owner: {unexpected:?}"),
-        };
+        let integrated = first_result.unwrap();
+        let concurrent_recovery = second_result.unwrap();
         assert!(integrated.merge.ok);
-        assert!(
-            concurrent_error
-                .to_string()
-                .contains("already owns merger:GOAL1:1")
-        );
+        assert_eq!(concurrent_recovery, integrated);
         let repeated = merger
             .integrate_workflow_candidate(
                 "GOAL1",

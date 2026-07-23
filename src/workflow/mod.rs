@@ -22,6 +22,7 @@ use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, MergeResult};
@@ -352,6 +353,46 @@ impl WorkflowEngine {
             )));
         }
         Ok(())
+    }
+
+    /// Advances a Ready Merge fence after the integration owner writes its durable evidence.
+    ///
+    /// The workflow coordination lease must cover both the evidence write and this update. That
+    /// keeps the claim's committed Goal revision equal to the actual record revision before
+    /// operation settlement and the Ready Merge transition.
+    pub fn advance_ready_merge_fence_revision(
+        &self,
+        fence: &mut WorkflowExecutionFence,
+        goal_revision: u64,
+    ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let mut state = self.load_state()?;
+        let claim = state
+            .claims
+            .iter_mut()
+            .find(|claim| claim.claim_id == fence.claim_id)
+            .ok_or_else(|| {
+                RefineError::Conflict(format!("Ready Merge claim {} was replaced", fence.claim_id))
+            })?;
+        if claim.goal_id != fence.goal_id
+            || claim.node_id != fence.node_id
+            || claim.execution_id.as_deref() != Some(fence.execution_id.as_str())
+            || claim.round_idx != Some(fence.round_idx)
+            || claim.goal_revision != Some(fence.goal_revision)
+            || claim.decision_version != fence.decision_version
+            || claim.state != WorkflowClaimState::Running
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {} no longer owns Ready Merge claim {}",
+                fence.execution_id, fence.claim_id
+            )));
+        }
+        claim.goal_revision = Some(goal_revision);
+        claim.decision_version = claim.decision_version.saturating_add(1);
+        claim.updated_at = now_timestamp();
+        fence.goal_revision = goal_revision;
+        fence.decision_version = claim.decision_version;
+        self.save_state(&mut state)
     }
 
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
@@ -1423,8 +1464,16 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
-        let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let operations = FileOperationRegistry::new(&self.runtime_root);
+        // Cancel operation ownership first. Its mutation lock is also the managed-process launch
+        // barrier, so this responsive pass either blocks a late Git launch or terminates the
+        // durably registered child.
+        operations.cancel_workflow_execution_operations(execution_id)?;
+        self.signal_workflow_subprocesses(execution_id, "terminate")?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        // Repeat while workflow authority is locked. This covers an integration operation that
+        // was registered after the responsive pass but before cancellation acquired authority.
+        operations.cancel_workflow_execution_operations(execution_id)?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
@@ -1436,9 +1485,10 @@ impl WorkflowAutomation for WorkflowEngine {
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
             self.save_state(&mut state)?;
-            if signalled == 0 {
-                self.release_claim_capacity(&claim_id)?;
-            }
+            // A cancelled claim cannot launch further operation-owned work, so its scheduler slot
+            // is always released. Managed-process records remain visible until their real children
+            // exit and repository coordination still serializes any cleanup.
+            self.release_claim_capacity(&claim_id)?;
         }
         Ok(())
     }

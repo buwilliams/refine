@@ -622,6 +622,7 @@ impl FileGitWorktreeService {
         process_args.extend(args.iter().map(|arg| arg.to_string()));
         let mut metadata = self.process_metadata.clone();
         metadata.insert("kind".to_string(), json!("git"));
+        metadata.insert("isolated_process_group".to_string(), json!(true));
         metadata.insert(
             "git_command".to_string(),
             json!(args.first().copied().unwrap_or("git")),

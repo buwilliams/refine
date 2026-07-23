@@ -323,19 +323,52 @@ impl WorkflowBehavior for WorkflowReadyMerge {
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
+        let commit = ctx.require_commit()?.to_string();
+        let remote = ctx.git_remote()?;
         let timing = ctx.quality_timing(GoalStatus::ReadyMerge)?;
-        if let Err(error) = integrate_workflow_candidate(ctx) {
-            return fail(ctx, "merge", error);
-        }
-        ctx.log(
-            "merge",
-            &format!("Ready Merge integrated implementation candidate {branch}"),
-            Some(json_object(
-                json!({"branch": branch, "quality_timing": timing}),
-            )),
-        )?;
         let next = GoalStatus::Build;
-        ctx.request_transition(GoalStatus::ReadyMerge, next.clone())?;
+        let merger = FileMergerService::with_target_root(
+            ctx.runtime_root,
+            ctx.refine_dir(),
+            ctx.target_root,
+        );
+        let goal_id = ctx.goal_id.clone();
+        let claim_id = ctx.claim_id.clone();
+        let execution_id = ctx.execution_id.clone();
+        let node_id = ctx.node_id.clone();
+        let round_idx = ctx.round_idx;
+        let integration = match merger.integrate_workflow_candidate_and_settle(
+            &goal_id,
+            round_idx,
+            &claim_id,
+            &execution_id,
+            &node_id,
+            &branch,
+            &commit,
+            &remote,
+            |integration| {
+                ctx.log(
+                    "merge",
+                    &format!("Ready Merge integrated implementation candidate {branch}"),
+                    Some(json_object(json!({
+                        "branch": branch,
+                        "quality_timing": timing,
+                        "integration": integration
+                    }))),
+                )?;
+                ctx.request_transition(GoalStatus::ReadyMerge, next.clone())
+            },
+        ) {
+            Ok((integration, _)) => integration,
+            Err(error)
+                if error.to_string().contains("Ready Merge execution")
+                    && error.to_string().contains("was cancelled") =>
+            {
+                return Err(error);
+            }
+            Err(error) => return fail(ctx, "merge", error),
+        };
+        ctx.merge = Some(integration.merge);
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::ReadyMerge,
             to: next,
@@ -459,52 +492,6 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
             ctx.workflow_process_metadata("qa", "WorkflowQa"),
         )
         .map(|operation| operation.result)
-}
-
-fn integrate_workflow_candidate(ctx: &mut WorkflowContext<'_>) -> RefineResult<()> {
-    if ctx.merge.is_some() {
-        return Ok(());
-    }
-    let branch = ctx.require_branch()?.to_string();
-    let commit = ctx.require_commit()?.to_string();
-    let remote = ctx.git_remote()?;
-    let merger =
-        FileMergerService::with_target_root(ctx.runtime_root, ctx.refine_dir(), ctx.target_root);
-    let integration = match merger.integrate_workflow_candidate(
-        &ctx.goal_id,
-        ctx.round_idx,
-        &ctx.claim_id,
-        &ctx.execution_id,
-        &ctx.node_id,
-        &branch,
-        &commit,
-        &remote,
-    ) {
-        Ok(integration) => integration,
-        Err(error) => {
-            ctx.log(
-                "merge",
-                "Implementation candidate integration failed",
-                Some(json_object(json!({
-                    "branch": branch,
-                    "commit": commit,
-                    "error": error.to_string()
-                }))),
-            )?;
-            return Err(error);
-        }
-    };
-    ctx.log(
-        "merge",
-        &format!("Integrated implementation candidate {branch}"),
-        Some(json_object(json!({
-            "branch": branch,
-            "commit": commit,
-            "integration": &integration
-        }))),
-    )?;
-    ctx.merge = Some(integration.merge);
-    Ok(())
 }
 
 fn evaluate_workflow_governance(

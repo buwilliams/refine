@@ -691,6 +691,74 @@ impl FileOperationRegistry {
         Ok(operation)
     }
 
+    /// Cancels every active operation durably owned by one workflow execution.
+    ///
+    /// Ready Merge uses this before changing the workflow claim. Operation cancellation and
+    /// managed-process launch share the mutation lock, so cancellation either prevents a new
+    /// child from launching or observes its durable registration and terminates it. Repeating the
+    /// call is intentional: the workflow coordination lock closes registration races between the
+    /// first responsive cancellation pass and the authoritative claim update.
+    pub fn cancel_workflow_execution_operations(
+        &self,
+        execution_id: &str,
+    ) -> RefineResult<Vec<OperationHandle>> {
+        let execution_id = execution_id.trim();
+        let operation_ids = self
+            .recover()?
+            .into_iter()
+            .filter(|operation| {
+                operation
+                    .request
+                    .get("execution_id")
+                    .and_then(Value::as_str)
+                    == Some(execution_id)
+                    && operation_active(&operation.state)
+            })
+            .map(|operation| operation.id)
+            .collect::<Vec<_>>();
+        let mut cancelled = Vec::new();
+        for operation_id in operation_ids {
+            let operation = self.cancel_with_error(
+                &operation_id,
+                json!({
+                    "code": "workflow_execution_cancelled",
+                    "message": format!(
+                        "Workflow execution {execution_id} was cancelled while the operation was active"
+                    ),
+                    "execution_id": execution_id
+                }),
+            )?;
+            if let Err(error) = self.terminate_associated_processes(&operation_id) {
+                self.persist_cancellation_failure(
+                    &operation_id,
+                    "operation_process_termination_failed",
+                    &error,
+                )?;
+                return Err(error);
+            }
+            cancelled.push(operation);
+        }
+        Ok(cancelled)
+    }
+
+    fn cancel_with_error(&self, operation_id: &str, error: Value) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if operation_terminal(&handle.state) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        handle.state = OperationState::Cancelled;
+        handle.error = Some(error);
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &handle.id,
+            operation_log_entry(&handle, "warning", "Workflow operation cancelled", None),
+        )?;
+        Ok(handle)
+    }
+
     fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         for process in supervisor
@@ -951,6 +1019,47 @@ impl FileOperationRegistry {
         self.write(&handle)?;
         FileExt::unlock(&lock).ok();
         Ok(handle)
+    }
+
+    /// Runs the capability's final state transition and operation settlement under the same
+    /// mutation lock used by cancellation.
+    ///
+    /// If cancellation wins the lock, the transition is never invoked. If settlement wins, the
+    /// transition and success record become one ordered decision and a later cancellation cannot
+    /// replace them.
+    pub fn succeed_after<T>(
+        &self,
+        operation_id: &str,
+        progress: Value,
+        result: Value,
+        transition: impl FnOnce() -> RefineResult<T>,
+    ) -> RefineResult<(OperationHandle, T)> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if !matches!(
+            handle.state,
+            OperationState::Pending | OperationState::Running
+        ) {
+            let state = handle.state.as_api_status();
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} is {state}; workflow settlement no longer owns it"
+            )));
+        }
+        let transitioned = match transition() {
+            Ok(transitioned) => transitioned,
+            Err(error) => {
+                FileExt::unlock(&lock).ok();
+                return Err(error);
+            }
+        };
+        handle.state = OperationState::Succeeded;
+        handle.progress = progress;
+        handle.result = result;
+        handle.error = None;
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        Ok((handle, transitioned))
     }
 
     pub fn finish_with_result(

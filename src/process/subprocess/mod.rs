@@ -222,11 +222,11 @@ impl FileProcessSupervisor {
         }
         let process = self.inspect(process_id)?;
         if let Some(pid) = process.pid {
-            let _ = signal_os_process(pid, signal)?;
+            let _ = signal_os_process(pid, signal, process_owns_group(&process))?;
         }
-        // Keep structured metadata byte-for-byte intact while the runner reaps the child. Session
-        // and execution lookup must remain authoritative during the stopping window.
-        self.write_process(&process)?;
+        // The existing durable record remains authoritative while the runner reaps the child.
+        // Rewriting it here can resurrect a stale running record if reaping removes the file
+        // between signal delivery and this call.
         Ok(process)
     }
 
@@ -851,7 +851,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
         let mut process = self.inspect(process_id)?;
         if matches!(signal, "stop" | "terminate" | "kill") {
             if let Some(pid) = process.pid
-                && let Some(message) = signal_os_process(pid, signal)?
+                && let Some(message) = signal_os_process(pid, signal, process_owns_group(&process))?
             {
                 process.details = Some(match process.details {
                     Some(details) if !details.trim().is_empty() => {
@@ -1070,16 +1070,21 @@ fn configure_process_lifecycle(command: &mut Command, spec: &ManagedProcessSpec)
     }
 
     let detached_daemon = spec.owner == ProcessOwner::Daemon;
+    let isolated_process_group = spec
+        .metadata
+        .get("isolated_process_group")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let kill_on_parent_exit = spec
         .limits
         .as_ref()
         .is_some_and(|limits| limits.kill_on_parent_exit);
-    if !detached_daemon && !kill_on_parent_exit {
+    if !detached_daemon && !kill_on_parent_exit && !isolated_process_group {
         return;
     }
     unsafe {
         command.pre_exec(move || {
-            if detached_daemon && setsid() == -1 {
+            if (detached_daemon || isolated_process_group) && setsid() == -1 {
                 return Err(std::io::Error::last_os_error());
             }
             #[cfg(target_os = "linux")]
@@ -1217,11 +1222,14 @@ fn new_process_id() -> String {
     )
 }
 
-fn signal_os_process(pid: u32, signal: &str) -> RefineResult<Option<String>> {
+fn signal_os_process(pid: u32, signal: &str, process_group: bool) -> RefineResult<Option<String>> {
     #[cfg(windows)]
     {
         let mut command = Command::new("taskkill");
         command.arg("/PID").arg(pid.to_string());
+        if process_group {
+            command.arg("/T");
+        }
         if signal == "kill" {
             command.arg("/F");
         }
@@ -1240,23 +1248,39 @@ fn signal_os_process(pid: u32, signal: &str) -> RefineResult<Option<String>> {
     }
     #[cfg(not(windows))]
     {
-        let os_signal = if signal == "kill" { "-KILL" } else { "-TERM" };
-        let status = Command::new("kill")
-            .arg(os_signal)
-            .arg(pid.to_string())
-            .stderr(Stdio::null())
-            .status()
-            .map_err(|error| {
-                RefineError::Io(format!("failed to signal process {pid} with kill: {error}"))
-            })?;
-        if status.success() {
+        unsafe extern "C" {
+            fn kill(pid: i32, signal: i32) -> i32;
+        }
+        const SIGTERM: i32 = 15;
+        const SIGKILL: i32 = 9;
+        let target = if process_group {
+            -(pid as i32)
+        } else {
+            pid as i32
+        };
+        let os_signal = if signal == "kill" { SIGKILL } else { SIGTERM };
+        if unsafe { kill(target, os_signal) } == 0 {
             Ok(None)
         } else {
+            let error = std::io::Error::last_os_error();
             Ok(Some(format!(
-                "kill {os_signal} returned {status}; process may already have exited"
+                "kill signal {os_signal} returned {error}; process may already have exited"
             )))
         }
     }
+}
+
+fn process_owns_group(process: &ManagedProcess) -> bool {
+    process
+        .details
+        .as_deref()
+        .and_then(|details| serde_json::from_str::<Value>(details).ok())
+        .and_then(|details| {
+            details
+                .get("isolated_process_group")
+                .and_then(Value::as_bool)
+        })
+        .unwrap_or(false)
 }
 
 fn pid_alive(pid: u32) -> RefineResult<bool> {

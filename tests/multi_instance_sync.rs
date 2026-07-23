@@ -11,10 +11,11 @@ use serde_json::{Value, json};
 
 use refine::model::workflow::GoalStatus;
 use refine::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
-use refine::process::supervisor::operations::FileOperationRegistry;
+use refine::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use refine::tools::host::project_layout::prepare_refine_dir;
 use refine::tools::product::merging::FileMergerService;
 use refine::tools::product::work_items::FileWorkItemService;
+use refine::workflow::capacity::AgentCapacityService;
 use refine::workflow::{WorkflowAutomation, WorkflowEngine};
 
 static IDEMPOTENCY_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -96,6 +97,36 @@ fn ready_merge_child_process() {
 }
 
 #[test]
+#[ignore = "production operation-settlement child used by the multi-instance gate"]
+fn ready_merge_settlement_child_process() {
+    if std::env::var("REFINE_SETTLEMENT_CHILD").ok().as_deref() != Some("1") {
+        return;
+    }
+    let runtime_root = PathBuf::from(std::env::var("REFINE_CHILD_RUNTIME").unwrap());
+    let operation_id = std::env::var("REFINE_CHILD_OPERATION").unwrap();
+    let ready = PathBuf::from(std::env::var("REFINE_CHILD_READY").unwrap());
+    let proceed = PathBuf::from(std::env::var("REFINE_CHILD_PROCEED").unwrap());
+    let transitioned = PathBuf::from(std::env::var("REFINE_CHILD_TRANSITIONED").unwrap());
+    let output = PathBuf::from(std::env::var("REFINE_CHILD_OUTPUT").unwrap());
+    fs::write(&ready, b"ready").unwrap();
+    wait_for_path(&proceed, "settlement continuation");
+    let result = FileOperationRegistry::new(runtime_root).succeed_after(
+        &operation_id,
+        json!({"stage": "settled"}),
+        json!({"integration": "candidate"}),
+        || {
+            fs::write(&transitioned, b"transitioned").unwrap();
+            Ok(())
+        },
+    );
+    let value = match result {
+        Ok(_) => json!({"ok": true}),
+        Err(error) => json!({"ok": false, "error": error.to_string()}),
+    };
+    fs::write(output, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
+}
+
+#[test]
 #[ignore = "multi-process Ready Merge cancellation/replacement gate; run through xtask"]
 fn ready_merge_multi_process_cancellation_replacement_retry_is_exactly_once() {
     let fixture = ready_merge_fixture("ready-merge-process-cancel");
@@ -104,8 +135,30 @@ fn ready_merge_multi_process_cancellation_replacement_retry_is_exactly_once() {
     let mut first = spawn_ready_merge_child(&fixture, &fixture.execution_id, &first_output);
     wait_for_workflow_git_process(&fixture.runtime_root, &fixture.execution_id, "push");
 
+    let concurrent_work_items = FileWorkItemService::new(&fixture.refine_dir);
+    let (revision_tx, revision_rx) = std::sync::mpsc::channel();
+    let revision_writer = thread::spawn(move || {
+        let result = concurrent_work_items.update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"quality_message": "concurrent daemon revision"}),
+        );
+        revision_tx.send(result.map(|_| ())).unwrap();
+    });
+    assert!(
+        matches!(
+            revision_rx.recv_timeout(Duration::from_millis(250)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ),
+        "the Ready Merge workflow lease must exclude a concurrent Goal revision"
+    );
     fixture.automation().cancel(&fixture.execution_id).unwrap();
     assert!(first.wait().unwrap().success());
+    revision_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .unwrap();
+    revision_writer.join().unwrap();
     let cancelled = read_json(&first_output);
     assert_eq!(cancelled["ok"], false, "{cancelled:#}");
     let operations = fs::read_dir(fixture.runtime_root.join("operations"))
@@ -116,9 +169,19 @@ fn ready_merge_multi_process_cancellation_replacement_retry_is_exactly_once() {
         .collect::<Vec<_>>();
     assert!(
         operations.iter().any(|operation| {
-            operation["owner"] == "merger:GOAL1:1" && operation["state"] == "Cancelled"
+            operation["owner"] == "merger:GOAL1:1"
+                && operation["state"] == "Cancelled"
+                && operation["error"]["code"] == "workflow_execution_cancelled"
         }),
         "{operations:#?}"
+    );
+    assert!(
+        AgentCapacityService::new(&fixture.runtime_root)
+            .snapshot()
+            .unwrap()
+            .leases
+            .is_empty(),
+        "workflow cancellation must release capacity even after signalling a child"
     );
     assert!(!git_succeeds(
         &fixture.repo,
@@ -183,6 +246,143 @@ fn ready_merge_multi_process_cancellation_replacement_retry_is_exactly_once() {
         1
     );
     let _ = fs::remove_dir_all(&fixture.root);
+}
+
+#[test]
+#[ignore = "multi-process Ready Merge launch/cancellation gate; run through xtask"]
+fn ready_merge_multi_process_cancellation_during_git_launch_is_atomic() {
+    let fixture = ready_merge_fixture("ready-merge-process-launch-cancel");
+    let wrapper = fixture.root.join("git-wrapper");
+    let marker = fixture.root.join("git-child-spawned");
+    let resume = fixture.root.join("git-child-resume");
+    fs::create_dir_all(&wrapper).unwrap();
+    let script = wrapper.join("git");
+    fs::write(
+        &script,
+        "#!/bin/sh\nif test \"$3\" = remote && test \"$4\" = get-url; then\n  : > \"$REFINE_LAUNCH_MARKER\"\n  while test ! -f \"$REFINE_LAUNCH_RESUME\"; do sleep 0.01; done\nfi\nexec /usr/bin/git \"$@\"\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&script).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).unwrap();
+    }
+
+    let output = fixture.root.join("launch-cancel.json");
+    let mut child = spawn_ready_merge_child_with_env(
+        &fixture,
+        &fixture.execution_id,
+        &output,
+        &[
+            (
+                "PATH",
+                format!(
+                    "{}:{}",
+                    wrapper.display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            ),
+            ("REFINE_LAUNCH_MARKER", marker.display().to_string()),
+            ("REFINE_LAUNCH_RESUME", resume.display().to_string()),
+        ],
+    );
+    wait_for_path(&marker, "just-spawned managed Git child");
+
+    fixture.automation().cancel(&fixture.execution_id).unwrap();
+    assert!(child.wait().unwrap().success());
+    let cancelled = read_json(&output);
+    assert_eq!(cancelled["ok"], false, "{cancelled:#}");
+    assert!(!git_succeeds(
+        &fixture.repo,
+        &[
+            "merge-base",
+            "--is-ancestor",
+            &fixture.candidate,
+            "origin/main",
+        ],
+    ));
+    let operations = merger_operations(&fixture.runtime_root);
+    assert!(
+        operations.iter().any(|operation| {
+            operation["state"] == "Cancelled"
+                && operation["error"]["code"] == "workflow_execution_cancelled"
+        }),
+        "{operations:#?}"
+    );
+    assert!(
+        AgentCapacityService::new(&fixture.runtime_root)
+            .snapshot()
+            .unwrap()
+            .leases
+            .is_empty()
+    );
+    let _ = fs::remove_dir_all(&fixture.root);
+}
+
+#[test]
+#[ignore = "multi-process Ready Merge settlement/cancellation gate; run through xtask"]
+fn ready_merge_multi_process_cancellation_before_settlement_rejects_transition() {
+    let root = temp_root("ready-merge-process-settlement-cancel");
+    let runtime_root = root.join("run/8080");
+    let ready = root.join("settlement-ready");
+    let proceed = root.join("settlement-proceed");
+    let transitioned = root.join("transitioned");
+    let output = root.join("settlement.json");
+    fs::create_dir_all(&runtime_root).unwrap();
+    let execution_id = "exec-settlement-race";
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry
+        .register_with_request(
+            "merger:GOAL1:1",
+            json!({"execution_id": execution_id, "goal_id": "GOAL1"}),
+        )
+        .unwrap();
+    let mut child = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "ready_merge_settlement_child_process",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env("REFINE_SETTLEMENT_CHILD", "1")
+        .env("REFINE_CHILD_RUNTIME", &runtime_root)
+        .env("REFINE_CHILD_OPERATION", &operation.id)
+        .env("REFINE_CHILD_READY", &ready)
+        .env("REFINE_CHILD_PROCEED", &proceed)
+        .env("REFINE_CHILD_TRANSITIONED", &transitioned)
+        .env("REFINE_CHILD_OUTPUT", &output)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    wait_for_path(&ready, "post-fence pre-settlement child");
+
+    registry
+        .cancel_workflow_execution_operations(execution_id)
+        .unwrap();
+    fs::write(&proceed, b"go").unwrap();
+    assert!(child.wait().unwrap().success());
+
+    let result = read_json(&output);
+    assert_eq!(result["ok"], false, "{result:#}");
+    assert!(
+        result["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("no longer owns"),
+        "{result:#}"
+    );
+    assert!(!transitioned.exists());
+    let cancelled = registry.status(&operation.id).unwrap();
+    assert_eq!(format!("{:?}", cancelled.state).to_lowercase(), "cancelled");
+    assert_eq!(
+        cancelled.error.unwrap()["code"],
+        "workflow_execution_cancelled"
+    );
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -612,7 +812,17 @@ fn spawn_ready_merge_child(
     execution_id: &str,
     output_path: &Path,
 ) -> Child {
-    Command::new(std::env::current_exe().unwrap())
+    spawn_ready_merge_child_with_env(fixture, execution_id, output_path, &[])
+}
+
+fn spawn_ready_merge_child_with_env(
+    fixture: &ReadyMergeFixture,
+    execution_id: &str,
+    output_path: &Path,
+    env: &[(&str, String)],
+) -> Child {
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
         .args([
             "--exact",
             "ready_merge_child_process",
@@ -631,9 +841,11 @@ fn spawn_ready_merge_child(
         .env("REFINE_CHILD_CANDIDATE", &fixture.candidate)
         .env("REFINE_CHILD_OUTPUT", output_path)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap()
+        .stderr(Stdio::null());
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    command.spawn().unwrap()
 }
 
 fn install_slow_main_hook(remote: &Path) {
@@ -680,6 +892,31 @@ fn wait_for_workflow_git_process(runtime_root: &Path, execution_id: &str, comman
         thread::sleep(Duration::from_millis(25));
     }
     panic!("managed Git {command} process for {execution_id} was not observed");
+}
+
+fn wait_for_path(path: &Path, label: &str) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        if path.exists() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    panic!("{label} was not observed at {}", path.display());
+}
+
+fn merger_operations(runtime_root: &Path) -> Vec<Value> {
+    fs::read_dir(runtime_root.join("operations"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .map(|entry| read_json(&entry.path()))
+        .filter(|operation| {
+            operation["owner"]
+                .as_str()
+                .is_some_and(|owner| owner.starts_with("merger:"))
+        })
+        .collect()
 }
 
 fn read_json(path: &Path) -> Value {
