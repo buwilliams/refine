@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-4",
-  "candidate_commit": null,
+  "candidate_commit": "d81385dc624e661f52f71033560074e14513aba8",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -323,8 +323,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed d81385dc on Round 4 after preserving and replaying the Round 3 stack. WorkflowEngine::cancel now delegates to the authoritative FileProcessControlService; confirmed process exit is durably recorded before registry/identity cleanup; cleanup failures retain accurate partial receipts; exact claim cancellation, Goal cancellation, and capacity release settle under the workflow/Goal fences; terminal worker failure cannot overwrite cancelled claim/Goal state. Added real workflow-worker cancellation/race coverage, registry and identity cleanup fault injection, final claim/capacity assertions, and updated process intent. Verification: process_control 12 passed, 0 failed; real workflow worker 1 passed, 0 failed; subprocess 10 passed, 0 failed; agent_sessions 3 passed, 0 failed; web API 1 passed, 0 failed; CLI 1 passed, 0 failed; MCP 1 passed, 0 failed; workflow metadata 1 passed, 0 failed; browser process UI 4 passed, 0 failed; final cargo test --lib 468 passed, 0 failed; node --test tests/*.test.js 37 passed, 0 failed; cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff --check, git diff --cached --check, and git show --check passed. Earlier full-library attempts each exposed the same pre-existing intra-test quality-settings EOF race in one of two live-replenishment tests (467 passed, 1 failed); both isolated reruns passed, the overly broad timing change was narrowed, and the final unchanged-source default full run passed 468/468.",
+      "implementation_reported_at": "2026-07-23T15:05:38Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -335,11 +335,11 @@
       "quality_state": "unclassified",
       "reporter": "Supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T14:44:44Z",
+      "updated": "2026-07-23T15:05:38Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T14:45:03Z"
+  "updated": "2026-07-23T15:05:38Z"
 }

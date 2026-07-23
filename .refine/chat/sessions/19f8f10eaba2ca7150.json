@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:04:22Z",
+  "updated_at": "2026-07-23T15:05:36Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1164,6 +1164,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The broader lock initially disturbed existing workflow/Quality scheduling tests. The agent isolated that effect and narrowed protection to the worker-failure path required by this Goal; it is rerunning the real-worker and affected scheduling tests before another full suite."
+    },
+    {
+      "created_at": "2026-07-23T15:05:36Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784819136101-224",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 4 has completed its implementation gates and committed a clean candidate at `d81385dc`; the final unchanged full library run passed 468/468. The workflow still must publish and pass Governance, so I’m not treating the commit as review-ready yet."
     }
   ],
   "queued_messages": [
