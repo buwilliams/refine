@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3SHFHFK352VJT5P4003/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "7b67a8ef0438c756c00ca1d7fe40e2a6d9a10c53",
   "created": "2026-07-23T13:36:52Z",
   "feature_id": null,
   "feature_order": null,
@@ -43,8 +43,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Goal creation now uses one fingerprint-validated hot projection with an exact latest-Round prompt field for duplicate detection, writes a complete Goal atomically once, serializes concurrent daemon creates under the repository lock, applies revision-checked backlog promotion from the same snapshot, and rebuilds/persists the projection exactly once. Warm 50-Goal POST /api/goals timings: before late duplicate 227.940547 ms and successful explicit-ID create 917.437242 ms; after late duplicate 6.65488 ms and successful non-duplicate create 24.324711 ms. The regression asserts 0 full rebuilds for the duplicate and exactly 1 for create. Verification: cargo fmt --all -- --check passed; cargo check --all-targets passed; focused performance, external cache invalidation, concurrent create (one 201 and one duplicate 409), stale revision conflict, idempotency, duplicate decisions, and instant backlog promotion tests passed; cargo test --lib --bins -- --test-threads=1 passed 458 tests with 0 failures; git diff --check passed.",
+      "implementation_reported_at": "2026-07-23T14:09:03Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -55,11 +55,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T13:38:48Z",
+      "updated": "2026-07-23T14:09:03Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T13:49:18Z"
+  "updated": "2026-07-23T14:09:04Z"
 }
