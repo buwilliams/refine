@@ -112,9 +112,32 @@
       "rule_state": "failed",
       "updated": "2026-07-23T12:10:08Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T12:10:56Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Reconcile the failed Ready Merge candidate from current main while preserving candidate c9afedb7 and all prior evidence. Fix only the four recorded Governance violations: (1) move durable integration evidence types into the Foundation model so GoalRound does not depend on host Git adapter MergeResult; (2) run Ready Merge fetch, merge, and push through supervised processes owned by the exact workflow execution_id, with cancellation, failure, and restart evidence; (3) atomically fence the active claim, execution_id, node ownership, round, status, candidate identity, and state revision immediately before Git side effects and again before settlement, rejecting cancellation, replacement, stale revision, or unequal concurrent claims; and ensure the new candidate descends from the round recorded current-main base; (4) add production-path coverage using separate daemons/processes for cancellation, replaced claims, unequal revisions, retry/restart, and exactly-once integration. Re-run the multi-instance synchronization gate and do not report it clean unless it passes. Preserve configurable target branch/remote and both pinned Quality timing paths. Do not force merge, rewrite history, discard the prior worktree, or bypass provider, authentication, cancellation, Governance, Quality, or human Review boundaries.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T12:10:56Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T12:10:09Z"
+  "updated": "2026-07-23T12:10:56Z"
 }
