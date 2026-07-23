@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:12:44Z",
+  "updated_at": "2026-07-23T18:13:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2004,6 +2004,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot is internally consistent on one important point: no live workflow-agent owns either the active or failed Goal. I’m checking whether that still holds in the runtime and whether the active Goal has durable worker-exit evidence that makes a supported recovery actionable."
+    },
+    {
+      "created_at": "2026-07-23T18:13:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830380830-61",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Live evidence has already changed again: Goal `00000SZ412RXR0TQRHE82JW000` now has a running Codex Goal Agent (PID 35952) in its managed round-1 worktree. I will not classify it as lost or restart it. I’m narrowing the remaining supervision to its recent output and the failed Goal’s durable failure/round evidence."
     }
   ],
   "queue_dispatching": true,
