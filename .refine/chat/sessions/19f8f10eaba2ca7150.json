@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:16:35Z",
+  "updated_at": "2026-07-23T13:16:55Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -243,6 +243,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prior Refine supervision record points to the auditable Goal-recovery skill, so I’m using it for the evidence and recovery checks. Its key constraint is that a lost or failed worker is recovered through a new supported round, never by directly rewriting Goal state."
+    },
+    {
+      "created_at": "2026-07-23T13:16:55Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812615537-51",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is already stale in one important respect: there is a live provider process for Goal `…N803…` under the workflow runner, so I will not classify it as lost or retry it. I’m now checking the other two Goals through the supported CLI and process registry, including nested-provider addressing and the current build operation."
     }
   ],
   "queued_messages": [
