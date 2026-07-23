@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:39:48Z",
+  "updated_at": "2026-07-23T18:40:04Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2334,14 +2334,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T18:40:01Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832001335-8",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll reconcile the two non-terminal Goals against durable Goal/Round records, live processes, worktrees, and the running service. I’ll keep the review candidate at the confirmation boundary and won’t retry the queued Goal unless the evidence shows an actual lost worker or supported recovery need."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f9046d1ce52e5",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\", \"00000SZ41QQB4GWTN3AW2JW002\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 2 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\", \"00000SZ41QQB4GWTN3AW2JW002\": \"review\", \"00000SZ42710VGCA2VWG2JW003\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T18:39:48Z",
-      "updated_at": "2026-07-23T18:39:48Z",
+      "updated_at": "2026-07-23T18:40:04Z",
       "internal": true
     }
   ],

@@ -1,0 +1,42 @@
+{
+  "base_commit": "562abe5fff5c81713300bf7d539f5fc38e61aacb",
+  "branch_name": "refine/00000SZ42710VGCA2VWG2JW003/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-23T18:40:02Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ42710VGCA2VWG2JW003",
+  "name": "Restore warmed Goal creation performance gate on current main",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Refine Supervisor",
+  "rounds": [
+    {
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T18:40:02Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Investigate and fix the reproducible current-main failure `surfaces::web_server::tests::warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale`. On clean main 562abe5fff5c81713300bf7d539f5fc38e61aacb, an isolated `cargo test --lib warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale -- --test-threads=1` measured late duplicate=5.310601ms and successful create=129.912569ms, failing the required <50ms threshold. Two prior independent candidate runs also reproduced successful create around 126-140ms. Determine whether the regression is in atomic prompt/metadata authoring, projection refresh/state sync, duplicate handling, Git synchronization, or the benchmark contract; preserve the recently merged fast Goal creation behavior and audit durability. Fix product code or the test only when evidence supports the actual contract—do not simply loosen/remove the threshold or hide timing failures. Add focused measurements/regressions, rerun the isolated test repeatedly plus relevant web/library/all-target/format/diff gates, and report all failures and distributions exactly. Keep this low priority and independent of the cancellation-recovery and transcript-handoff review candidates. Do not approve or merge, force Git, rewrite history, discard worktrees, suppress provider/authentication failures, or edit durable Goal state directly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine Supervisor",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T18:40:02Z",
+      "workflow_quality_timing": null
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-23T18:40:04Z"
+}
