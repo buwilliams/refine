@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:01:34Z",
+  "updated_at": "2026-07-23T18:03:01Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1767,20 +1767,50 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Live evidence resolves the apparent mismatch: Goal `00000SZ412RXR0TQRHE82JW000` has a running Codex worker (PID 35952) in its owned round-1 worktree, with the workflow runner reachable, daemon healthy, and UI/API both HTTP 200. There is no recovery action to take now; I’m checking its output and worktree progress for a genuine stall or provider failure."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f9022dbb152e1",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"review\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"review\", \"00000SZ3SFP4N10NXGAE5P4002\": \"review\", \"00000SZ3SHFHFK352VJT5P4003\": \"review\", \"00000SZ412RXR0TQRHE82JW000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T18:00:31Z",
-      "updated_at": "2026-07-23T18:01:26Z",
-      "internal": true
+      "created_at": "2026-07-23T18:03:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784829780779-14",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No intervention is warranted now.\n\n- Goal `00000SZ412RXR0TQRHE82JW000` has a live Codex worker, PID 35952, with fresh output and ~20% CPU activity. Its worktree is clean and the agent is still investigating.\n- Daemon healthy; workflow runner reachable; UI and Goal API return HTTP 200.\n- `project doctor` incorrectly reports no agents and an unreachable runner—the exact defect this Goal addresses.\n- No current provider/authentication failure. Codex warns that weekly usage is below 25%; this remains visible.\n- Five candidates remain at `review`, all reporting passed Quality and Governance. I did not approve or merge them.\n\nYour authority is required before any review approval. Tell me which candidate, if any, you want evaluated for approval; otherwise they remain untouched."
+    },
+    {
+      "created_at": "2026-07-23T18:03:00Z",
+      "delivered": false,
+      "id": "evt-1784829780991-16",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No intervention is warranted now.\n\n- Goal `00000SZ412RXR0TQRHE82JW000` has a live Codex worker, PID 35952, with fresh output and ~20% CPU activity. Its worktree is clean and the agent is still investigating.\n- Daemon healthy; workflow runner reachable; UI and Goal API return HTTP 200.\n- `project doctor` incorrectly reports no agents and an unreachable runner—the exact defect this Goal addresses.\n- No current provider/authentication failure. Codex warns that weekly usage is below 25%; this remains visible.\n- Five candidates remain at `review`, all reporting passed Quality and Governance. I did not approve or merge them.\n\nYour authority is required before any review approval. Tell me which candidate, if any, you want evaluated for approval; otherwise they remain untouched."
+    },
+    {
+      "created_at": "2026-07-23T18:03:00Z",
+      "delivered": false,
+      "id": "evt-1784829780991-17",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T18:03:01Z",
+      "delivered": false,
+      "id": "evt-1784829781008-19",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
-  "interrupted": true,
-  "interruption_detail": "Daemon restarted before the provider turn completed."
+  "interrupted": false,
+  "interruption_detail": null
 }
