@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:50:08Z",
+  "updated_at": "2026-07-23T15:50:47Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1512,6 +1512,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The provider continues to process with a live PID, unchanged worktree, and no error record. I’m continuing to monitor; interrupting now would create exactly the kind of ambiguous partial state this recovery is designed to avoid."
+    },
+    {
+      "created_at": "2026-07-23T15:50:47Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821847416-282",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 6 is committed cleanly at `ebc7d269`; the long provider phase completed normally. A fresh Governance process is now reviewing the restart replay and policy-preservation evidence."
     }
   ],
   "queued_messages": [
