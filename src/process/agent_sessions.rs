@@ -17,6 +17,7 @@ use crate::process::subprocess::{
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::HostAgentProviderService;
+use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_checkout};
 
 const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(40);
 const DEFAULT_COLS: u16 = 120;
@@ -95,6 +96,7 @@ where
             launch.cwd.display()
         ))
     })?;
+    let (refine_executable, refine_checkout) = active_refine_paths()?;
     let session_id = Uuid::new_v4().to_string();
     let process_id = format!("goal-agent-{session_id}");
     let supervisor = FileProcessSupervisor::new(&launch.runtime_root);
@@ -163,7 +165,12 @@ where
     }
 
     let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
-    let protocol_prompt = goal_agent_protocol_prompt(&launch.prompt, &signal_path);
+    let protocol_prompt = goal_agent_protocol_prompt(
+        &launch.prompt,
+        &signal_path,
+        &refine_executable,
+        &refine_checkout,
+    );
     let command = match provider_service.interactive_command(&launch.provider, &protocol_prompt) {
         Ok(command) => command,
         Err(error) => {
@@ -866,11 +873,39 @@ fn cleanup_session_artifacts(command_path: &Path, signal_path: &Path) {
     }
 }
 
-fn goal_agent_protocol_prompt(prompt: &str, signal_path: &Path) -> String {
+fn active_refine_paths() -> RefineResult<(PathBuf, PathBuf)> {
+    let executable = std::env::current_exe().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to resolve active Refine executable: {error}"
+        ))
+    })?;
+    let executable = executable.canonicalize().unwrap_or(executable);
+    let checkout = executable
+        .ancestors()
+        .find(|path| is_refine_checkout(path))
+        .map(Path::to_path_buf)
+        .map(Ok)
+        .unwrap_or_else(discover_refine_checkout)?;
+    Ok((executable, checkout))
+}
+
+fn goal_agent_protocol_prompt(
+    prompt: &str,
+    signal_path: &Path,
+    refine_executable: &Path,
+    refine_checkout: &Path,
+) -> String {
     let signal_path = signal_path.display().to_string();
+    let refine_executable = refine_executable.display().to_string();
+    let refine_checkout = refine_checkout.display().to_string();
     render(
         PromptTemplate::GoalAgentSession,
-        &[("goal_prompt", prompt), ("signal_path", &signal_path)],
+        &[
+            ("goal_prompt", prompt),
+            ("signal_path", &signal_path),
+            ("refine_executable", &refine_executable),
+            ("refine_checkout", &refine_checkout),
+        ],
     )
 }
 
@@ -920,6 +955,24 @@ mod tests {
 
     fn unique_temp_dir(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("refine-{name}-{}", Uuid::new_v4()))
+    }
+
+    #[test]
+    fn goal_agent_prompt_identifies_active_refine_and_checkout_wrapper() {
+        let prompt = goal_agent_protocol_prompt(
+            "Implement Goal GOAL1",
+            Path::new("/runtime/processes/goal-agent.signal.json"),
+            Path::new("/opt/refine/bin/refine"),
+            Path::new("/srv/refine"),
+        );
+
+        assert!(prompt.contains("Active Refine executable: `/opt/refine/bin/refine`"));
+        assert!(prompt.contains("`refine` is absent from `PATH`"));
+        assert!(prompt.contains("checkout-local `./r` from `/srv/refine`"));
+        assert!(prompt.contains(
+            r#"write `{"state":"completed","message":"what changed and exact verification results"}` to `/runtime/processes/goal-agent.signal.json`"#
+        ));
+        assert!(!prompt.contains("{{"));
     }
 
     #[test]
