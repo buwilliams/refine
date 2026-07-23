@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:36:51Z",
+  "updated_at": "2026-07-23T18:37:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2220,15 +2220,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "`00000SZ41QQB4GWTN3AW2JW002` has reached `review` with Governance passed and no-op Quality passed. I’m stopping at review: no approval or merge. The reproducible timing-test and Clippy failures remain in its implementation report and are not superseded by the no-op Quality badge."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f902e9af552e4",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"review\", \"00000SZ41QQB4GWTN3AW2JW002\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T18:13:21Z",
-      "updated_at": "2026-07-23T18:36:37Z",
-      "internal": true
+      "created_at": "2026-07-23T18:37:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831865160-109",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Supervisor is healthy and idle: 0 active, 0 queued, 0 failed. Daemon/web, state sync, Codex diagnostics, and authentication are healthy.\n\n- `00000SZ41QQB4GWTN3AW2JW002` is at human review. Candidate `9b7d9d33` is published, clean, and not merged. Governance passed 8/8; Quality was a no-op. Focused tests passed, but the full library suite failed 1/471 on the reproducible timing threshold, and strict Clippy found six existing lints.\n- `00000SZ41923HGWZSREC2JW001` and `00000SZ412RXR0TQRHE82JW000` were approved and merged by another actor while supervised. I did not approve them. Their recorded failures remain visible, including the missing transcript and timing-test failures.\n- The original dirty round-1 recovery worktree remains preserved.\n- The older `00000SZ3RP4G52RZ706A5P4001` also remains at review.\n\nYour decision is required for `00000SZ41QQB4GWTN3AW2JW002`: I recommend holding it for another Round unless you explicitly accept the known baseline timing and Clippy failures."
+    },
+    {
+      "created_at": "2026-07-23T18:37:45Z",
+      "delivered": false,
+      "id": "evt-1784831865420-111",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Supervisor is healthy and idle: 0 active, 0 queued, 0 failed. Daemon/web, state sync, Codex diagnostics, and authentication are healthy.\n\n- `00000SZ41QQB4GWTN3AW2JW002` is at human review. Candidate `9b7d9d33` is published, clean, and not merged. Governance passed 8/8; Quality was a no-op. Focused tests passed, but the full library suite failed 1/471 on the reproducible timing threshold, and strict Clippy found six existing lints.\n- `00000SZ41923HGWZSREC2JW001` and `00000SZ412RXR0TQRHE82JW000` were approved and merged by another actor while supervised. I did not approve them. Their recorded failures remain visible, including the missing transcript and timing-test failures.\n- The original dirty round-1 recovery worktree remains preserved.\n- The older `00000SZ3RP4G52RZ706A5P4001` also remains at review.\n\nYour decision is required for `00000SZ41QQB4GWTN3AW2JW002`: I recommend holding it for another Round unless you explicitly accept the known baseline timing and Clippy failures."
+    },
+    {
+      "created_at": "2026-07-23T18:37:45Z",
+      "delivered": false,
+      "id": "evt-1784831865420-112",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T18:37:45Z",
+      "delivered": false,
+      "id": "evt-1784831865433-114",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
