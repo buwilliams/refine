@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:06:11Z",
+  "updated_at": "2026-07-23T19:07:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2718,15 +2718,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "There is no lost-worker recovery to perform now. The Goal Agent is alive, consuming CPU, its transcript is being updated at the current minute, and Round 7 has six modified files in its preserved worktree. The other supplied non-terminal Goal has already crossed review to `done`; I’m leaving that historical confirmation/merge decision untouched and watching the active Round for a real terminal signal."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f905d79b452e9",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {\"00000SZ3RP4G52RZ706A5P4001\": \"Goal 00000SZ3RP4G52RZ706A5P4001 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.\"}",
-      "created_at": "2026-07-23T19:04:32Z",
-      "updated_at": "2026-07-23T19:04:32Z",
-      "internal": true
+      "created_at": "2026-07-23T19:07:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784833665298-175",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No recovery action is warranted now.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` has a live Codex worker, PID `375463`. Its transcript grew by ~314 KB in 25 seconds and CPU remained active.\n- Round 7’s preserved worktree has six modified files (`91` insertions, `21` deletions); `git diff --check` passes. It is not on `main`.\n- Goal `00000SZ41QQB4GWTN3AW2JW002` advanced from review to done and its candidate is now on aligned `main`/`origin/main`. I did not approve or merge it.\n- Codex provider diagnostics pass. The supervisor remains degraded because its open stall issue still says no worker exists; that issue is stale relative to both Refine’s process table and OS evidence.\n- No retry, merge, cancellation, state edit, or worktree cleanup was performed. No user decision is currently required."
+    },
+    {
+      "created_at": "2026-07-23T19:07:45Z",
+      "delivered": false,
+      "id": "evt-1784833665564-177",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No recovery action is warranted now.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` has a live Codex worker, PID `375463`. Its transcript grew by ~314 KB in 25 seconds and CPU remained active.\n- Round 7’s preserved worktree has six modified files (`91` insertions, `21` deletions); `git diff --check` passes. It is not on `main`.\n- Goal `00000SZ41QQB4GWTN3AW2JW002` advanced from review to done and its candidate is now on aligned `main`/`origin/main`. I did not approve or merge it.\n- Codex provider diagnostics pass. The supervisor remains degraded because its open stall issue still says no worker exists; that issue is stale relative to both Refine’s process table and OS evidence.\n- No retry, merge, cancellation, state edit, or worktree cleanup was performed. No user decision is currently required."
+    },
+    {
+      "created_at": "2026-07-23T19:07:45Z",
+      "delivered": false,
+      "id": "evt-1784833665564-178",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T19:07:45Z",
+      "delivered": false,
+      "id": "evt-1784833665584-180",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
