@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
-use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
@@ -324,7 +324,7 @@ impl InProcessWebServer {
         else {
             return process_id_required();
         };
-        match FileProcessSupervisor::new(runtime_root).stream(process_id) {
+        match FileProcessStatusService::new(runtime_root).stream(process_id) {
             Ok(output) => ApiResponse::json(
                 200,
                 json!({
