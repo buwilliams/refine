@@ -127,6 +127,18 @@ pub struct ConfirmedProcessExit {
     pub waited_ms: u128,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProcessCleanupStage {
+    Registry,
+    Identity,
+}
+
+#[derive(Debug)]
+pub(crate) struct ConfirmedProcessCleanupFailure {
+    pub outcome: ConfirmedProcessExit,
+    pub error: RefineError,
+}
+
 impl ManagedProcessOutput {
     pub fn success(&self) -> bool {
         self.process.exit_code == Some(0)
@@ -300,6 +312,10 @@ impl FileProcessSupervisor {
     /// Signals the exact process registration supplied by the caller and waits until that owned
     /// OS process exits. PID reuse, registry replacement, and delayed termination are causal
     /// failures: the process record and its identity evidence remain available for recovery.
+    ///
+    /// This method deliberately does not clean up registry or identity evidence. The product
+    /// capability must durably record the confirmed-exit outcome before cleanup can erase either
+    /// source of supervision evidence.
     pub fn terminate_owned_and_confirm_exit(
         &self,
         expected: &ManagedProcess,
@@ -316,7 +332,6 @@ impl FileProcessSupervisor {
         self.ensure_expected_registration(expected, &identity)?;
         match self.owned_process_state(expected, &identity)? {
             OwnedProcessState::Exited => {
-                self.recover()?;
                 return Ok(confirmed_process_exit(expected, signal, &identity, started));
             }
             OwnedProcessState::IdentityMismatch(actual) => {
@@ -354,7 +369,6 @@ impl FileProcessSupervisor {
         loop {
             match self.owned_process_state(expected, &identity)? {
                 OwnedProcessState::Exited => {
-                    self.recover()?;
                     return Ok(confirmed_process_exit(expected, signal, &identity, started));
                 }
                 OwnedProcessState::IdentityMismatch(actual) => {
@@ -374,6 +388,59 @@ impl FileProcessSupervisor {
                 OwnedProcessState::Alive => std::thread::sleep(Duration::from_millis(10)),
             }
         }
+    }
+
+    #[cfg_attr(test, allow(dead_code))]
+    pub(crate) fn cleanup_confirmed_exit(
+        &self,
+        expected: &ManagedProcess,
+        outcome: ConfirmedProcessExit,
+    ) -> Result<ConfirmedProcessExit, ConfirmedProcessCleanupFailure> {
+        self.cleanup_confirmed_exit_with(expected, outcome, |_| Ok(()))
+    }
+
+    pub(crate) fn cleanup_confirmed_exit_with<F>(
+        &self,
+        expected: &ManagedProcess,
+        mut outcome: ConfirmedProcessExit,
+        mut before_stage: F,
+    ) -> Result<ConfirmedProcessExit, ConfirmedProcessCleanupFailure>
+    where
+        F: FnMut(ProcessCleanupStage) -> RefineResult<()>,
+    {
+        for path in [
+            expected.stdout_path.as_deref(),
+            expected.stderr_path.as_deref(),
+            expected.stdin_path.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Err(error) = remove_file_if_present(Path::new(path), "process artifact") {
+                return Err(ConfirmedProcessCleanupFailure { outcome, error });
+            }
+        }
+
+        if let Err(error) = before_stage(ProcessCleanupStage::Registry).and_then(|()| {
+            remove_file_if_present(
+                &self.processes_dir().join(format!("{}.json", expected.id)),
+                "process registry",
+            )
+        }) {
+            return Err(ConfirmedProcessCleanupFailure { outcome, error });
+        }
+        outcome.registry_cleanup_completed = true;
+
+        if let Err(error) = before_stage(ProcessCleanupStage::Identity).and_then(|()| {
+            remove_file_if_present(
+                &self.process_identity_path(&expected.id),
+                "process identity",
+            )
+        }) {
+            return Err(ConfirmedProcessCleanupFailure { outcome, error });
+        }
+        outcome.identity_cleanup_completed = true;
+        Ok(outcome)
     }
 
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
@@ -1529,9 +1596,20 @@ fn confirmed_process_exit(
         os_identity: identity.os_identity.clone(),
         confirmed_exit: true,
         registry_retained_until_exit: true,
-        registry_cleanup_completed: true,
-        identity_cleanup_completed: true,
+        registry_cleanup_completed: false,
+        identity_cleanup_completed: false,
         waited_ms: started.elapsed().as_millis(),
+    }
+}
+
+fn remove_file_if_present(path: &Path, label: &str) -> RefineResult<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(RefineError::Io(format!(
+            "failed to remove {label} {}: {error}",
+            path.display()
+        ))),
     }
 }
 

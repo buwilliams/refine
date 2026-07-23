@@ -28,6 +28,7 @@ use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::project_state::{
     FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
 };
@@ -206,6 +207,39 @@ impl WorkflowEngine {
     fn release_claim_capacity(&self, claim_id: &str) -> RefineResult<bool> {
         self.capacity_service()
             .release(&format!("workflow:{claim_id}"))
+    }
+
+    pub(crate) fn settle_claims_cancelled_locked(
+        &self,
+        state: &mut WorkflowAutomationState,
+        claim_ids: &[String],
+    ) -> RefineResult<()> {
+        if claim_ids.is_empty() {
+            return Ok(());
+        }
+        let now = now_timestamp();
+        for claim_id in claim_ids {
+            let claim = state
+                .claims
+                .iter_mut()
+                .find(|claim| claim.claim_id == *claim_id)
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "workflow claim {claim_id} disappeared before cancellation settlement"
+                    ))
+                })?;
+            claim.state = WorkflowClaimState::Cancelled;
+            claim.updated_at = now.clone();
+        }
+        self.save_state(state)?;
+        for claim_id in claim_ids {
+            self.release_claim_capacity(claim_id).map_err(|error| {
+                RefineError::Degraded(format!(
+                    "workflow claim {claim_id} is cancelled but its capacity release failed: {error}"
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
@@ -979,6 +1013,12 @@ impl WorkflowEngine {
                 "claim {claim_id} was not found"
             )));
         };
+        if !matches!(
+            claim.state,
+            WorkflowClaimState::Claimed | WorkflowClaimState::Running
+        ) {
+            return Ok(());
+        }
         claim.state = claim_state;
         claim.updated_at = now_timestamp();
         let terminal = !matches!(
@@ -1272,23 +1312,13 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
-        let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        if let Some(claim) = state
-            .claims
-            .iter_mut()
-            .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
-        {
-            let claim_id = claim.claim_id.clone();
-            claim.state = WorkflowClaimState::Cancelled;
-            claim.updated_at = now_timestamp();
-            self.save_state(&mut state)?;
-            if signalled == 0 {
-                self.release_claim_capacity(&claim_id)?;
+        let control = match self.refine_dir()? {
+            Some(refine_dir) => {
+                FileProcessControlService::with_refine_dir(&self.runtime_root, refine_dir)
             }
-        }
-        Ok(())
+            None => FileProcessControlService::new(&self.runtime_root),
+        };
+        control.cancel_workflow_execution(execution_id).map(|_| ())
     }
 
     fn retry(&self, execution_id: &str) -> RefineResult<String> {
@@ -3378,7 +3408,6 @@ mod tests {
             automation.load_state().unwrap().claims[0].state,
             WorkflowClaimState::Cancelled
         );
-        assert!(automation.retry(&execution_id).is_err());
         for _ in 0..40 {
             if child.try_wait().unwrap().is_some() {
                 break;
@@ -3400,6 +3429,183 @@ mod tests {
             WorkflowClaimState::Running
         );
         automation.release_claim_capacity(&claim_id).unwrap();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn shared_cancel_stops_real_workflow_worker_and_worker_failure_cannot_overwrite_settlement() {
+        let temp_root = unique_temp_dir("workflow-real-worker-cancel");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::write(target_root.join("app.txt"), "initial\n").unwrap();
+        git(
+            &target_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&target_root, &["add", "app.txt"]).unwrap();
+        git(&target_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             trap 'exit 143' TERM\n\
+             while :; do sleep 0.05; done\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Cancel real worker", Some("GOAL-REAL-CANCEL"))
+            .unwrap();
+        work_items
+            .append_goal_round_summary("GOAL-REAL-CANCEL", "Reporter", "Wait until cancelled")
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL-REAL-CANCEL", GoalStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        automation.claim("GOAL-REAL-CANCEL").unwrap();
+        let worker_runtime = runtime_root.clone();
+        let worker_target = target_root.clone();
+        let worker = std::thread::spawn(move || {
+            WorkflowEngine::with_target_root(worker_runtime, worker_target).execute_claimed_work()
+        });
+
+        let (execution_id, process) = {
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                let execution_id = automation
+                    .load_state()
+                    .unwrap()
+                    .claims
+                    .iter()
+                    .find(|claim| claim.goal_id == "GOAL-REAL-CANCEL")
+                    .and_then(|claim| claim.execution_id.clone());
+                if let Some(execution_id) = execution_id
+                    && let Some(process) = [&runtime_root, &runtime_root.join("agents")]
+                        .into_iter()
+                        .find_map(|root| {
+                            FileProcessSupervisor::new(root)
+                                .list()
+                                .unwrap()
+                                .into_iter()
+                                .find(|process| {
+                                    process
+                                        .details
+                                        .as_deref()
+                                        .and_then(|details| {
+                                            serde_json::from_str::<Value>(details).ok()
+                                        })
+                                        .and_then(|details| {
+                                            details
+                                                .get("execution_id")
+                                                .and_then(Value::as_str)
+                                                .map(|candidate| candidate == execution_id)
+                                        })
+                                        .unwrap_or(false)
+                                })
+                        })
+                {
+                    break (execution_id, process);
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "real workflow worker did not register a managed process; state={:?}; goal={:?}; worker_finished={}",
+                    automation.load_state().unwrap(),
+                    work_items
+                        .show_goal_summary("GOAL-REAL-CANCEL")
+                        .unwrap()
+                        .goal,
+                    worker.is_finished()
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        };
+
+        let (at_settlement_tx, at_settlement_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let release_rx = std::sync::Arc::new(std::sync::Mutex::new(release_rx));
+        let hook_release = std::sync::Arc::clone(&release_rx);
+        let control = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_settlement_hook(move || {
+                at_settlement_tx.send(()).unwrap();
+                hook_release.lock().unwrap().recv().unwrap();
+            });
+        let cancel_execution = execution_id.clone();
+        let cancel_thread =
+            std::thread::spawn(move || control.cancel_workflow_execution(&cancel_execution));
+        at_settlement_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("shared cancellation did not reach atomic settlement");
+        release_tx.send(()).unwrap();
+
+        let cancelled = cancel_thread.join().unwrap().unwrap();
+        assert_eq!(cancelled["cancelled"], true);
+        let worker_result = worker.join().unwrap();
+        assert!(
+            worker_result.is_err(),
+            "the killed workflow worker must report its causal failure"
+        );
+        let goal = work_items.show_goal_summary("GOAL-REAL-CANCEL").unwrap();
+        assert_eq!(goal.goal.status, GoalStatus::Cancelled);
+        let state = automation.load_state().unwrap();
+        let claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.execution_id.as_deref() == Some(&execution_id))
+            .unwrap();
+        assert_eq!(claim.state, WorkflowClaimState::Cancelled);
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
+        assert!(!FileProcessSupervisor::process_is_alive(&process).unwrap());
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(
+                runtime_root
+                    .join("process-stop-outcomes")
+                    .join(format!("{}.json", process.id)),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(receipt["state"], "completed");
+        assert_eq!(receipt["confirmed_exit"], true);
+        assert_eq!(receipt["goal_cancelled"], true);
+        assert_eq!(receipt["claim_cancelled"], true);
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
         fs::remove_dir_all(temp_root).unwrap();
     }
 

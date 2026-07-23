@@ -121,9 +121,7 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn fail(&self, category: &str, error: &RefineError) -> RefineResult<()> {
-        let _ = self
-            .work_items
-            .advance_automated_goal_status(&self.goal_id, GoalStatus::Failed);
+        let _ = self.work_items.fail_automated_goal_if_active(&self.goal_id);
         self.log(
             category,
             &format!("Workflow failed: {error}"),
