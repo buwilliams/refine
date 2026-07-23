@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:26:18Z",
+  "updated_at": "2026-07-23T12:27:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1203,6 +1203,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The current draft now fences claim settlement by execution ID and prevents a replaced/cancelled execution from marking itself complete. I’m still withholding acceptance: the merge path itself has not yet been wired to revalidate the durable Goal revision around Git side effects."
+    },
+    {
+      "created_at": "2026-07-23T12:27:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809658780-138",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The merge path is now wired to the live claim/execution and managed Git metadata, but the first compile caught outdated test callers. This is an ordinary implementation failure, not provider or authentication failure; the worker remains live and is correcting it."
     }
   ],
   "queued_messages": [
