@@ -14,29 +14,107 @@
   "rounds": [
     {
       "assignee": "Refine",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T11:06:44Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-23T12:10:08Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3N803TK00E78AK4M000-round-1",
+        "failed_actions": [
+          {
+            "message": "The durable GoalRound foundation model imports and persists tools::host::git_worktrees::MergeResult, coupling Foundation state to a host adapter type.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Ready Merge Git processes lack the workflow execution_id, so workflow cancellation cannot target fetch, merge, or push; cancelled work can continue integrating.",
+            "rule": "Run long-running Git work through supervised processes with explicit ownership, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Integration validates node, status, round, and artifact strings but not the active claim, execution, or state revision. Additionally, candidate c9afedb7 is not descended from recorded base 749923d9, so this round is already stale and omits intervening integrated work.",
+            "rule": "Coordinate parallel work through workflow claims, ownership, revisions, and isolated Git branches or worktrees.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "The concurrency test uses two identical in-process merger calls and does not cover replaced or cancelled claims, unequal revisions, or separate daemons; the reported multi-instance test also failed twice.",
+            "rule": "Require evidence proportional to concurrency, persistence, process, Git, and recovery risk.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Four governance rules are violated.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary.\",\"message\":\"The durable GoalRound foundation model imports and persists tools::host::git_worktrees::MergeResult, coupling Foundation state to a host adapter type.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Run long-running Git work through supervised processes with explicit ownership, cancellation, failure feedback, and recovery.\",\"message\":\"Ready Merge Git processes lack the workflow execution_id, so workflow cancellation cannot target fetch, merge, or push; cancelled work can continue integrating.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel work through workflow claims, ownership, revisions, and isolated Git branches or worktrees.\",\"message\":\"Integration validates node, status, round, and artifact strings but not the active claim, execution, or state revision. Additionally, candidate c9afedb7 is not descended from recorded base 749923d9, so this round is already stale and omits intervening integrated work.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to concurrency, persistence, process, Git, and recovery risk.\",\"message\":\"The concurrency test uses two identical in-process merger calls and does not cover replaced or cancelled claims, unequal revisions, or separate daemons; the reported multi-instance test also failed twice.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Four governance rules are violated.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The durable GoalRound foundation model imports and persists tools::host::git_worktrees::MergeResult, coupling Foundation state to a host adapter type.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Ready Merge Git processes lack the workflow execution_id, so workflow cancellation cannot target fetch, merge, or push; cancelled work can continue integrating.",
+              "rule": "Run long-running Git work through supervised processes with explicit ownership, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Integration validates node, status, round, and artifact strings but not the active claim, execution, or state revision. Additionally, candidate c9afedb7 is not descended from recorded base 749923d9, so this round is already stale and omits intervening integrated work.",
+              "rule": "Coordinate parallel work through workflow claims, ownership, revisions, and isolated Git branches or worktrees.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "The concurrency test uses two identical in-process merger calls and does not cover replaced or cancelled claims, unequal revisions, or separate daemons; the reported multi-instance test also failed twice.",
+              "rule": "Require evidence proportional to concurrency, persistence, process, Git, and recovery risk.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3N803TK00E78AK4M000-round-1"
+      },
+      "governance_message": "Four governance rules are violated.",
+      "governance_rule_actions": [
+        {
+          "message": "The durable GoalRound foundation model imports and persists tools::host::git_worktrees::MergeResult, coupling Foundation state to a host adapter type.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Ready Merge Git processes lack the workflow execution_id, so workflow cancellation cannot target fetch, merge, or push; cancelled work can continue integrating.",
+          "rule": "Run long-running Git work through supervised processes with explicit ownership, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Integration validates node, status, round, and artifact strings but not the active claim, execution, or state revision. Additionally, candidate c9afedb7 is not descended from recorded base 749923d9, so this round is already stale and omits intervening integrated work.",
+          "rule": "Coordinate parallel work through workflow claims, ownership, revisions, and isolated Git branches or worktrees.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "The concurrency test uses two identical in-process merger calls and does not cover replaced or cancelled claims, unequal revisions, or separate daemons; the reported multi-instance test also failed twice.",
+          "rule": "Require evidence proportional to concurrency, persistence, process, Git, and recovery risk.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Committed c9afedb7 (Make Ready Merge own candidate integration). Ready Merge now serializes exact candidate integration and configured-remote push, persists idempotent merge evidence, recovers safely after retry/restart/push failure, then runs optional rebuild on the integrated target and Quality in the round-pinned pre_merge or post_build order. Review approval only accepts the existing integration; decline requires a new auditable round. UI, CLI/API guards, docs, and tests were updated. Exact verification: fresh `cargo test --lib -- --test-threads=1` passed 457/457; `test-full-workflow` passed 1/1; `cargo check --all-targets`, `cargo fmt --all -- --check`, and `git diff --check` passed; the two formerly index-racy workflows passed in the fresh suite plus 30/30 and 20/20 stress reruns. Separate `test-multi-instance-sync` failed 0/1 twice because supervisor-state synchronization deleted the first daemon's new Goal before reconciliation; retained Git history showed that state-sync deletion, outside the Ready Merge integration path.",
       "implementation_reported_at": "2026-07-23T12:05:03Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Correct the Goal workflow implementation so Ready Merge is the merger-owned queue that integrates candidate work into the configured target branch before optional rebuild and final manual Review. Preserve the existing configurable Quality timing instead of hard-coding one visual order.\n\nThe required workflow paths are:\n- With Quality timing pre_merge: In Progress -> QA -> Ready Merge -> Rebuild -> Review.\n- With Quality timing post_build: In Progress -> Ready Merge -> Rebuild -> QA -> Review.\nRebuild is optional in both paths; when it is not configured, record an explicit skip and continue to the next configured stage. Each Goal round must continue to pin its effective Quality timing durably so later setting changes, retries, and restart recovery cannot reorder an in-flight candidate.\n\nReady Merge is a queue that performs integration, not a candidate-preparation label. When a Goal enters ready-merge, the system must serialize integration into the configured target branch. Use the recorded target branch and exact candidate commit, honor the configured Git remote, synchronize safely, merge and push exactly once through the existing repository and cross-process coordination boundaries, and persist auditable merge evidence. Advance out of ready-merge only after integration succeeds. A conflict, stale candidate, ownership race, revision mismatch, or push failure must abort safely, preserve the candidate and evidence, and use the supported failed/retry path; it must never advance while merely pretending the candidate was merged.\n\nAfter successful integration, run the optional target-app rebuild against the integrated target-branch checkout, not the isolated candidate worktree. Pre-merge Quality evaluates the isolated candidate before integration. Post-build Quality evaluates the integrated, rebuilt target after integration. Preserve visible provider, test, cancellation, and recovery evidence for either timing.\n\nReview is the post-integration manual acceptance boundary. Approving a reviewed Goal marks it Done and must not perform or repeat the Git merge. Requesting another round or otherwise declining acceptance must use the supported auditable workflow from the current target state without duplicate integration or hidden history rewriting.\n\nKeep CLI, browser, API, and background workers on shared product services. Preserve configurable target branches and remotes, repository locking, worktree isolation, multi-daemon ownership, crash/restart idempotency, exact candidate identity, and the dynamic UI workflow ordering driven by the pinned Quality timing. Correct transition guards, worker ownership, and recovery behavior for both timing paths.\n\nUpdate all affected intent and capability documentation so Ready Merge explicitly owns target-branch integration, Rebuild is optional and runs after integration, Quality can run before Ready Merge or after Rebuild according to configuration, and Review is acceptance after merge rather than the merge trigger. Update misleading comments and surface descriptions as needed while preserving the dynamic UI ordering.\n\nReplace tests that assert the target branch remains unchanged in Review. End-to-end coverage must prove both Quality timing paths; that the candidate is merged and pushed during Ready Merge before Review; that rebuild runs from the integrated target when configured; that the no-rebuild path advances correctly; that post-build QA runs after integration and rebuild; that Review approval does not create a second merge or push; that merge failures do not reach later stages; and that retry, restart, stale-revision, and concurrent-daemon paths cannot integrate a candidate more than once.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T12:05:03Z",
+      "rule_state": "failed",
+      "updated": "2026-07-23T12:10:08Z",
       "workflow_quality_timing": null
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T12:05:03Z"
+  "updated": "2026-07-23T12:10:09Z"
 }
