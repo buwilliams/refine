@@ -1,0 +1,42 @@
+{
+  "base_commit": "57551ae709a983001dbb39175e4ae380f1b03bee",
+  "branch_name": "refine/00000SZ3N803TK00E78AK4M000/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-23T11:06:42Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ3N803TK00E78AK4M000",
+  "name": "Make ready-merge integrate Goals before rebuild and review",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T11:06:44Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T11:06:44Z",
+      "workflow_quality_timing": null
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-23T11:06:45Z"
+}
