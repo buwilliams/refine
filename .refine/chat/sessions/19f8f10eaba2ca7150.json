@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:51:58Z",
+  "updated_at": "2026-07-23T18:52:06Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2595,6 +2595,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T18:52:06Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832726259-150",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m reconciling the changed snapshot against live Goal, process, round, and repository evidence. I’ll keep review candidates at review and won’t retry or mutate anything unless the supported evidence shows a genuinely lost worker or another actionable condition."
     }
   ],
   "queue_dispatching": true,
