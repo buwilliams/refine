@@ -29,6 +29,11 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     );
     fixture.api_json(
         "PATCH",
+        "/api/quality",
+        serde_json::json!({"timing": "post_build"}),
+    );
+    fixture.api_json(
+        "PATCH",
         "/api/governance",
         serde_json::json!({
             "product": "Disposable automation workflow test app",
@@ -137,7 +142,19 @@ fn deterministic_provider_script() -> std::path::PathBuf {
     ));
     fs::write(
         &path,
-        "#!/bin/sh\nprintf '\\n# full workflow provider edit\\n' >> app.py\nprintf '%s\\n' 'full workflow provider completed'\n",
+        "#!/bin/sh\n\
+         case \"$*\" in\n\
+         *\"Post-implementation Quality evaluation\"*)\n\
+           printf '%s\\n' '{\"ok\":true,\"summary\":\"Quality planned.\",\"results\":[{\"test\":\"Migrated Quality command passes: printf target-tests-ok\",\"status\":\"passed\",\"evidence\":\"legacy command selected\",\"command\":\"printf target-tests-ok\"}]}'\n\
+           ;;\n\
+         *\"governance\"*)\n\
+           printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
+           ;;\n\
+         *)\n\
+           printf '\\n# full workflow provider edit\\n' >> app.py\n\
+           printf '%s\\n' 'full workflow provider completed'\n\
+           ;;\n\
+         esac\n",
     )
     .unwrap();
     #[cfg(unix)]

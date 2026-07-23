@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationLaunchGuard};
 use crate::process::supervisor::security::FileSecurityService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -488,6 +489,7 @@ impl FileProcessSupervisor {
         F: FnMut(ManagedProcessOutputStream, &[u8]),
     {
         self.validate_launch(&spec)?;
+        let launch_guard = self.operation_launch_guard(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -553,7 +555,12 @@ impl FileProcessSupervisor {
             started_at: now_millis_string(),
             exit_code: None,
         };
-        self.write_process(&process)?;
+        if let Err(error) = self.write_process(&process) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+        drop(launch_guard);
 
         let stdout = child.stdout.take().ok_or_else(|| {
             RefineError::Io(format!(
@@ -699,6 +706,23 @@ impl FileProcessSupervisor {
         )
         .authorize_host_command("process_supervisor", &authorization_command)
     }
+
+    fn operation_launch_guard(
+        &self,
+        spec: &ManagedProcessSpec,
+    ) -> RefineResult<Option<OperationLaunchGuard>> {
+        let Some(operation_id) = spec
+            .metadata
+            .get("operation_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        else {
+            return Ok(None);
+        };
+        FileOperationRegistry::new(&self.runtime_root)
+            .active_launch_guard(operation_id)
+            .map(Some)
+    }
 }
 
 pub fn managed_pid_is_alive(pid: u32) -> RefineResult<bool> {
@@ -708,6 +732,7 @@ pub fn managed_pid_is_alive(pid: u32) -> RefineResult<bool> {
 impl ProcessSupervisor for FileProcessSupervisor {
     fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
         self.validate_launch(&spec)?;
+        let launch_guard = self.operation_launch_guard(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -787,7 +812,12 @@ impl ProcessSupervisor for FileProcessSupervisor {
             started_at: now_millis_string(),
             exit_code: None,
         };
-        self.write_process(&process)?;
+        if let Err(error) = self.write_process(&process) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+        drop(launch_guard);
         let reaper = self.clone();
         let reaped_process = process.clone();
         std::thread::spawn(move || {

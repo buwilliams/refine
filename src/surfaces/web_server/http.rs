@@ -31,6 +31,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
 };
+use crate::process::supervisor::operations::FileOperationRegistry;
+use crate::tools::host::quality::QualityOperationRunner;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
 use crate::tools::product::project_state::ProjectionQuery;
@@ -193,6 +195,12 @@ impl LocalHttpDaemon {
         &self,
         mut report: impl FnMut(&str),
     ) -> RefineResult<()> {
+        if let Some(runtime_root) = &self.server.runtime_root {
+            report("recovering supervised operations");
+            FileOperationRegistry::new(runtime_root).recover_active_supervised()?;
+            report("recovering incomplete Quality cancellations");
+            QualityOperationRunner::recover_cancelled_operations_for_runtime(runtime_root)?;
+        }
         if let Some(refine_dir) = self.server.current_refine_dir()? {
             report("recovering interrupted chat turns");
             self.server
