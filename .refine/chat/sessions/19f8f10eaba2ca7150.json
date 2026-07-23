@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:50:21Z",
+  "updated_at": "2026-07-23T18:50:43Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2532,6 +2532,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prior runbook confirms the correct boundary: durable Goal state plus process and worktree evidence must agree before intervention, and a review candidate remains unmerged. I’m now checking the current runtime rather than relying on yesterday’s snapshot."
+    },
+    {
+      "created_at": "2026-07-23T18:50:43Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832643799-139",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The live snapshot has already diverged from the supplied evidence: Refine now reports one active workflow item, and Goal `…5P4001` does have a live managed Goal Agent (PID 375463) running Round 7 verification. So its earlier “no live agent” appearance is stale and is not grounds for retry. I’m narrowing the other two states now, especially whether `…2JW003` is genuinely building or only awaiting settlement."
     }
   ],
   "queued_messages": [
