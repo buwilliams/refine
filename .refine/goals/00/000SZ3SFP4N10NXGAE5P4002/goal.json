@@ -16,7 +16,7 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T13:34:55Z",
-      "governance_checked_at": "2026-07-23T13:44:03Z",
+      "governance_checked_at": "2026-07-23T13:53:16Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3SFP4N10NXGAE5P4002-round-1",
@@ -41,17 +41,24 @@
       "meta_rule_state": "passed",
       "product_state": "passed",
       "prompt": "Loading Goal Agent into the toolbar should not require the user to watch the stream of previous text to load, it should immediately show the latest text and load the history of context in the background appending to the UI has it is loaded.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T13:53:19Z",
+      "quality_details": {
+        "candidate_commit": "bcf9d0637d8b845cd82f95f5a0bfab5a60ca5636",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f8f408ac13b969e1",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-23T13:50:55Z",
-      "workflow_quality_timing": null
+      "updated": "2026-07-23T13:53:19Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T13:50:55Z"
+  "updated": "2026-07-23T13:53:20Z"
 }
