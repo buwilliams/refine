@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:20:12Z",
+  "updated_at": "2026-07-23T12:20:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1167,6 +1167,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The agent has now located the durable claim’s `goal_revision` and `decision_version` fencing machinery. It has not modified the tree yet; this is still productive investigation, not a stall."
+    },
+    {
+      "created_at": "2026-07-23T12:20:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809258769-132",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "One actionable verification issue appeared: the command it just ran reported the daemon-backed test as ignored, so it is not evidence. I’m sending a narrow reminder that the required gate is the explicit multi-instance harness and must include unequal-revision/cancelled-claim behavior."
     }
   ],
   "queued_messages": [
