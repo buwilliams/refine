@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:51:13Z",
+  "updated_at": "2026-07-23T18:51:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2556,15 +2556,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both previously listed build/review items are now at review with published candidates; neither should be auto-approved. The only active item is healthy and visibly working. I’m doing one final read-only check of its transcript/progress, candidate worktree cleanliness, merge relationship to current `main`, and current Codex authentication so the handoff distinguishes “ready for your decision” from “blocked by infrastructure.”"
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f9050309352e7",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\", \"00000SZ41QQB4GWTN3AW2JW002\": \"review\", \"00000SZ42710VGCA2VWG2JW003\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T18:50:02Z",
-      "updated_at": "2026-07-23T18:50:02Z",
-      "internal": true
+      "created_at": "2026-07-23T18:51:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832718083-143",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current evidence supports observation, not recovery:\n\n- `00000SZ3RP4G52RZ706A5P4001` is actively working in Round 7. Its managed Goal Agent is running, producing fresh output, and modifying its isolated worktree. No stall or lost-worker condition exists.\n- `00000SZ41QQB4GWTN3AW2JW002` is at review with candidate `9b7d9d33`.\n- `00000SZ42710VGCA2VWG2JW003` advanced from build to review with candidate `87029e72`.\n- Both review worktrees are clean. Neither candidate is merged into `main`.\n- `main` and `origin/main` agree at `562abe5f`.\n- Daemon and web are healthy; HTTP checks return 200. Current Codex diagnostics and authentication pass.\n- Both candidates report Governance passed, but Quality was a no-op because no Quality tests were configured.\n\nI made no transitions, retries, approvals, merges, or worktree changes. I recommend waiting for the active Round 7 to reach review before advancing either candidate, since merging now would move `main` underneath the active recovery.\n\nYour author"
+    },
+    {
+      "created_at": "2026-07-23T18:51:58Z",
+      "delivered": false,
+      "id": "evt-1784832718231-145",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Current evidence supports observation, not recovery:\n\n- `00000SZ3RP4G52RZ706A5P4001` is actively working in Round 7. Its managed Goal Agent is running, producing fresh output, and modifying its isolated worktree. No stall or lost-worker condition exists.\n- `00000SZ41QQB4GWTN3AW2JW002` is at review with candidate `9b7d9d33`.\n- `00000SZ42710VGCA2VWG2JW003` advanced from build to review with candidate `87029e72`.\n- Both review worktrees are clean. Neither candidate is merged into `main`.\n- `main` and `origin/main` agree at `562abe5f`.\n- Daemon and web are healthy; HTTP checks return 200. Current Codex diagnostics and authentication pass.\n- Both candidates report Governance passed, but Quality was a no-op because no Quality tests were configured.\n\nI made no transitions, retries, approvals, merges, or worktree changes. I recommend waiting for the active Round 7 to reach review before advancing either candidate, since merging now would move `main` underneath the active recovery.\n\nYour authority is required for the two review candidates: should I perform a read-only candidate review and recommend an approval order, or do you explicitly authorize approval of a particular Goal?"
+    },
+    {
+      "created_at": "2026-07-23T18:51:58Z",
+      "delivered": false,
+      "id": "evt-1784832718231-146",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T18:51:58Z",
+      "delivered": false,
+      "id": "evt-1784832718248-148",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
