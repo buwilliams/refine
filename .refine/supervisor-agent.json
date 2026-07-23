@@ -2,9 +2,9 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "degraded",
-  "active_work": 2,
+  "active_work": 1,
   "queued_work": 0,
-  "failed_work": 0,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8f10eaba2ca7150",
   "provider": "codex",
@@ -60,13 +60,13 @@
     "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "review",
-    "00000SZ3RP4G52RZ706A5P4001": "in-progress"
+    "00000SZ3RP4G52RZ706A5P4001": "failed"
   },
   "open_issues": {
     "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1"
   },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
-  "updated_at": "2026-07-23T13:16:23.568179340+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:failed|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
+  "updated_at": "2026-07-23T13:20:09.121532148+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1928,6 +1928,16 @@
       "goal_id": "00000SZ3RN3BS397T4SE5P4000",
       "actionable": false,
       "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:20:09.038380656+00:00-193",
+      "kind": "observation",
+      "status": "error",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from in-progress to failed.",
+      "created_at": "2026-07-23T13:20:09.038380656+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
+      "actionable": true,
+      "retryable": true
     }
   ]
 }
