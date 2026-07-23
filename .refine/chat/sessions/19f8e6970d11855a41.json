@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:20:58Z",
+  "updated_at": "2026-07-23T12:22:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1179,6 +1179,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "One actionable verification issue appeared: the command it just ran reported the daemon-backed test as ignored, so it is not evidence. I’m sending a narrow reminder that the required gate is the explicit multi-instance harness and must include unequal-revision/cancelled-claim behavior."
+    },
+    {
+      "created_at": "2026-07-23T12:22:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809320267-134",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The reminder was accepted through the audited terminal-input path. The agent has begun a scoped change in the model, workflow engine, and Git host; I’ll inspect the resulting diff for the same four Governance failures before treating its tests as sufficient."
     }
   ],
   "queued_messages": [
