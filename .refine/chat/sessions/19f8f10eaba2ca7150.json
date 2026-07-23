@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:07:44Z",
+  "updated_at": "2026-07-23T18:08:00Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1917,6 +1917,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot is internally cautious but incomplete: it reports two active Goals while exposing no managed-process records, yet it also says there is no stall/loss evidence. I’m checking the authoritative live surfaces before deciding whether either Goal needs recovery; the five review Goals will remain untouched unless the user explicitly asks to approve them."
+    },
+    {
+      "created_at": "2026-07-23T18:08:00Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830080148-43",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The live evidence resolves the apparent contradiction: both active Goals have running workflow-owned Codex processes (PIDs 35952 and 69917), and the daemon/UI are healthy. There is no lost-worker recovery to perform now. I’m inspecting their current Round/worktree activity and recent process output for progress or a fresh provider/auth/cancellation failure, while leaving all review items unapproved."
     }
   ],
   "queue_dispatching": true,
