@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:26:19Z",
+  "updated_at": "2026-07-23T11:28:21Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -711,6 +711,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The initial focused workflow tests passed. The worker found and is now extending missing Quality provenance coverage so post-build Quality is tied to the integrated target commit; this is substantive progress, not a stall. No intervention is warranted."
+    },
+    {
+      "created_at": "2026-07-23T11:28:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784806101609-53",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Two Goals now require human approval (`00000SZ3KJDD…` and `00000SZ3NBF…`), while the ready-merge Goal continues active verification. I’m taking one final cross-surface snapshot so I can hand you the approval decision with exact limitations and leave the active worker running."
     }
   ],
   "queued_messages": [
