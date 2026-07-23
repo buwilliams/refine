@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:13:35Z",
+  "updated_at": "2026-07-23T11:14:25Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -639,6 +639,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The stale execution stopped cleanly, its six-file worktree was preserved, and Refine immediately reclaimed the still-queued Goal as a new audited execution. Both workers now match `in-progress` Goal state, so there is no remaining cancellation violation to act on. I’m monitoring their transitions; the existing review candidate remains untouched."
+    },
+    {
+      "created_at": "2026-07-23T11:14:25Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805265830-41",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both executions are healthy and producing current output; neither has requested input or shown provider/auth failure. The next actionable boundary is a worker completion/failure or a Governance/Quality result, so I’m continuing observation without interrupting them."
     }
   ],
   "queued_messages": [
