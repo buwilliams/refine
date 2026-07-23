@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:28:49Z",
+  "updated_at": "2026-07-23T14:31:49Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -984,6 +984,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The patch now covers the full narrow chain Governance required: process exit evidence, the shared process-control capability, atomic work-item transition support, and workflow fencing. It is five files with no surface-specific duplication. Tests are likely being added inline; I’m waiting for the agent’s exact verification and Governance result rather than treating the diff as success."
+    },
+    {
+      "created_at": "2026-07-23T14:31:49Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817109769-194",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The agent has added deterministic concurrency and partial-outcome coverage in the same five-file scope; the worktree now shows roughly 563 insertions and 101 deletions. The Goal remains `in-progress`, with no provider failure or input request. I’m continuing through its required verification gates."
     }
   ],
   "queued_messages": [
