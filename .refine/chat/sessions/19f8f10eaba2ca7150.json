@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:48:24Z",
+  "updated_at": "2026-07-23T15:50:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1500,6 +1500,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The agent is still live after the verification run and has not emitted a completion or failure signal. I’m leaving it undisturbed because the provider is actively processing; there is no evidence of worker loss or a confirmation request."
+    },
+    {
+      "created_at": "2026-07-23T15:50:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821808231-280",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The provider continues to process with a live PID, unchanged worktree, and no error record. I’m continuing to monitor; interrupting now would create exactly the kind of ambiguous partial state this recovery is designed to avoid."
     }
   ],
   "queued_messages": [
