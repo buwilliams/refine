@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:12:04Z",
+  "updated_at": "2026-07-23T11:12:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -603,6 +603,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot is internally stale: it says Goal `00000SZ3N803…` is `todo`, but also names a running worker for it. I’m refreshing each surface now so no recovery is triggered from contradictory evidence."
+    },
+    {
+      "created_at": "2026-07-23T11:12:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805130734-35",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "One concrete issue is emerging: Goal `00000SZ3N803…` was cancelled and returned to `todo`, yet its original worker is still alive and working. I’m checking whether it is actually producing output or merely an unreaped process before deciding whether a cancellation-preserving stop is warranted. The other active worker has a matching `in-progress` Goal and should be left alone."
     }
   ],
   "queued_messages": [
