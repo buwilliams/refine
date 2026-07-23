@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:23:08Z",
+  "updated_at": "2026-07-23T13:23:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -303,15 +303,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The corrective Round was appended successfully and the rejected candidate remains untouched. Refine has not yet moved the failed Goal back into the runnable queue, so I’m checking the current CLI’s supported retry transition before taking any further action; I will not substitute a direct state edit or `goal start`."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8f1eba8f3b8b622",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 2 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {\"00000SZ3N803TK00E78AK4M000\": \"Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.\"}",
-      "created_at": "2026-07-23T13:16:23Z",
-      "updated_at": "2026-07-23T13:23:08Z",
-      "internal": true
+      "created_at": "2026-07-23T13:23:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813033588-63",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Supervision is current and no unsafe action was taken.\n\n- `…N803…`: still `in-progress` with a live agent running focused concurrency/state-sync tests. Its earlier agent failure remains recorded.\n- `…RP4…`: Governance rejected `a1f6c2e6` on five cancellation/surface-consistency violations. I preserved the candidate/worktree, created corrective Round 2, and requeued it through the supported API. It is now `in-progress` with a live agent.\n- `…RN3…`: reached `review` at `ed0f6936`; Governance passed 8/8 and the worktree/remote branch are clean. It is not in `main`. Quality and build were no-ops because neither is configured.\n\nThe daemon and Codex provider are responsive, but health remains degraded by recorded interrupted-operation recovery evidence and unknown target-app state.\n\nYour decision is required for `00000SZ3RN3BS397T4SE5P4000`: approve candidate `ed0f6936`, request another round, or leave it in review? I have not merged or approved it."
+    },
+    {
+      "created_at": "2026-07-23T13:23:53Z",
+      "delivered": false,
+      "id": "evt-1784813033760-65",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Supervision is current and no unsafe action was taken.\n\n- `…N803…`: still `in-progress` with a live agent running focused concurrency/state-sync tests. Its earlier agent failure remains recorded.\n- `…RP4…`: Governance rejected `a1f6c2e6` on five cancellation/surface-consistency violations. I preserved the candidate/worktree, created corrective Round 2, and requeued it through the supported API. It is now `in-progress` with a live agent.\n- `…RN3…`: reached `review` at `ed0f6936`; Governance passed 8/8 and the worktree/remote branch are clean. It is not in `main`. Quality and build were no-ops because neither is configured.\n\nThe daemon and Codex provider are responsive, but health remains degraded by recorded interrupted-operation recovery evidence and unknown target-app state.\n\nYour decision is required for `00000SZ3RN3BS397T4SE5P4000`: approve candidate `ed0f6936`, request another round, or leave it in review? I have not merged or approved it."
+    },
+    {
+      "created_at": "2026-07-23T13:23:53Z",
+      "delivered": false,
+      "id": "evt-1784813033760-66",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T13:23:53Z",
+      "delivered": false,
+      "id": "evt-1784813033775-68",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
