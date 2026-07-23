@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "lifecycle": "observing",
-  "health": "healthy",
-  "active_work": 1,
+  "lifecycle": "idle",
+  "health": "attention",
+  "active_work": 0,
   "queued_work": 0,
-  "failed_work": 0,
+  "failed_work": 1,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8e6970d11855a41",
   "provider": "codex",
@@ -56,11 +56,11 @@
     "00000SZ301MXF1Q5K4QDSJ6000": "done",
     "00000SZ3K92DJJT8PWF5AP8000": "review",
     "00000SZ3KH6A2G1JKVCWN4Y000": "review",
-    "00000SZ3KJDDGGCK29J4N4Y001": "in-progress"
+    "00000SZ3KJDDGGCK29J4N4Y001": "failed"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3K92DJJT8PWF5AP8000:review,00000SZ3KH6A2G1JKVCWN4Y000:review,00000SZ3KJDDGGCK29J4N4Y001:in-progress|live={\"00000SZ3KJDDGGCK29J4N4Y001\"}|quiet={}|issues=",
-  "updated_at": "2026-07-23T10:15:27.915970043+00:00",
+  "last_context_key": "goals=00000SZ3K92DJJT8PWF5AP8000:review,00000SZ3KH6A2G1JKVCWN4Y000:review,00000SZ3KJDDGGCK29J4N4Y001:failed|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T10:19:07.139396479+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1618,6 +1618,25 @@
       "goal_id": "00000SZ3K92DJJT8PWF5AP8000",
       "actionable": false,
       "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T10:19:05.963136750+00:00-162",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: Nested agents are listed, but process output and control paths cannot address them.",
+      "created_at": "2026-07-23T10:19:05.963136750+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-23T10:19:06.971604894+00:00-163",
+      "kind": "observation",
+      "status": "error",
+      "message": "Goal 00000SZ3KJDDGGCK29J4N4Y001 changed from in-progress to failed.",
+      "created_at": "2026-07-23T10:19:06.971604894+00:00",
+      "goal_id": "00000SZ3KJDDGGCK29J4N4Y001",
+      "actionable": true,
+      "retryable": true
     }
   ]
 }

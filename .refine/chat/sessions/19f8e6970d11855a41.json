@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:16:56Z",
+  "updated_at": "2026-07-23T10:20:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -249,20 +249,62 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The remaining candidate is committed as `04177422`; its Governance agent is actively validating the runtime registry against the real `run/8082/processes` and `run/8082/agents/processes` surfaces. There is no stall or lost-worker evidence, so I’m allowing that read-only validation to finish."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8e6d4aac272a4f0",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3K92DJJT8PWF5AP8000\": \"review\", \"00000SZ3KH6A2G1JKVCWN4Y000\": \"review\", \"00000SZ3KJDDGGCK29J4N4Y001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {\"00000SZ3KJDDGGCK29J4N4Y001\"}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T10:02:35Z",
-      "updated_at": "2026-07-23T10:15:34Z",
-      "internal": true
+      "created_at": "2026-07-23T10:19:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801970881-74",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance rejected the remaining candidate on three concrete grounds: nested agents became visible, but API/CLI stream and stop still resolve only the top-level process registry, and the tests did not cover those failure paths. The Goal is now failed with no live worker. A recovery round would expand the fix across shared process controls, so I’m stopping at the authority boundary and collecting the final current-state evidence."
+    },
+    {
+      "created_at": "2026-07-23T10:20:01Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784802001799-133",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Supervision is stopped at the confirmation boundary.\n\n| Goal | State | Evidence |\n|---|---|---|\n| Controls menu `00000SZ3K92…` | Review | Candidate `4444ec0a`; Governance 8/8 passed; implementation suites passed |\n| Terminal scrolling `00000SZ3KH6…` | Review | Candidate `624447d3`; Governance 8/8 passed; browser suites passed |\n| Agent visibility `00000SZ3KJDD…` | Failed | Candidate `04177422`; Governance found nested-process stream/stop paths broken across API/CLI and missing integration coverage |\n\nCurrent counts: 0 active, 0 queued, 1 failed. API status endpoints return HTTP 200. Both review candidates had “No Quality tests configured,” so Quality was a no-op—not an independent evaluation.\n\nThe earlier supervisor provider failure and state-sync failure remain visible in history; current open issues are empty. I preserved the dirty main checkout and made no merges, approvals, state edits, or worktree changes.\n\nYour authority is required for either next action:\n\n- Start a narrow recov"
+    },
+    {
+      "created_at": "2026-07-23T10:20:02Z",
+      "delivered": false,
+      "id": "evt-1784802002011-136",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Supervision is stopped at the confirmation boundary.\n\n| Goal | State | Evidence |\n|---|---|---|\n| Controls menu `00000SZ3K92…` | Review | Candidate `4444ec0a`; Governance 8/8 passed; implementation suites passed |\n| Terminal scrolling `00000SZ3KH6…` | Review | Candidate `624447d3`; Governance 8/8 passed; browser suites passed |\n| Agent visibility `00000SZ3KJDD…` | Failed | Candidate `04177422`; Governance found nested-process stream/stop paths broken across API/CLI and missing integration coverage |\n\nCurrent counts: 0 active, 0 queued, 1 failed. API status endpoints return HTTP 200. Both review candidates had “No Quality tests configured,” so Quality was a no-op—not an independent evaluation.\n\nThe earlier supervisor provider failure and state-sync failure remain visible in history; current open issues are empty. I preserved the dirty main checkout and made no merges, approvals, state edits, or worktree changes.\n\nYour authority is required for either next action:\n\n- Start a narrow recovery round for `00000SZ3KJDDGGCK29J4N4Y001`, covering shared nested-process list/stream/stop behavior and integration tests.\n- Approve either review candidate—please specify the Goal ID(s)."
+    },
+    {
+      "created_at": "2026-07-23T10:20:02Z",
+      "delivered": false,
+      "id": "evt-1784802002011-137",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T10:20:02Z",
+      "delivered": false,
+      "id": "evt-1784802002016-139",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
-  "interrupted": true,
-  "interruption_detail": "Daemon restarted before the provider turn completed."
+  "interrupted": false,
+  "interruption_detail": null
 }
