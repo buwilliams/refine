@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:27:44Z",
+  "updated_at": "2026-07-23T18:30:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2172,6 +2172,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new agent has confirmed the race in code: dead-PID reconciliation deletes the transcript before the workflow reads it. It is still designing the ownership/cleanup ordering and has not modified files yet; the live process remains active, so this is investigation rather than a stall."
+    },
+    {
+      "created_at": "2026-07-23T18:30:02Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831402351-101",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The deterministic race test now passes after the agent corrected an initially over-filtered test invocation (0 tests run) and reran the exact test successfully (1/1). A second cleanup-after-lease-release test also passes. Broader library verification is now running; the false-green 0-test attempt remains visible in the transcript."
     }
   ],
   "queued_messages": [
