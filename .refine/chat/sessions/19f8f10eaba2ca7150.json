@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:37:00Z",
+  "updated_at": "2026-07-23T13:37:21Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -426,6 +426,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The stop-button recovery has reached a 14-file cross-surface patch, including a new shared product capability plus CLI, MCP, web, documentation, and test changes—the shape matches the five recorded Governance failures. It is still uncommitted and unverified, so I’m not treating it as a candidate yet."
+    },
+    {
+      "created_at": "2026-07-23T13:37:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813841576-87",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Ready Merge recovery has produced clean commit `80ca16b8` (“Close Ready Merge cancellation and sync races”), with 1,155 additions across the eight scoped files. The Goal is still `in-progress`, so I’m waiting for its exact verification report and Governance transition; a clean commit alone does not close the work."
     }
   ],
   "queued_messages": [
