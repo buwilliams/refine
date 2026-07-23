@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:29:17Z",
+  "updated_at": "2026-07-23T13:31:44Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -390,6 +390,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The lost-worker issue remains cleared: round 4 has advanced from seven to eight modified files while its exact registered process stays live. There is still no supported reason to launch another round or touch that worktree. I’m continuing to watch for a state transition, provider failure, or an explicit `needs_input` signal."
+    },
+    {
+      "created_at": "2026-07-23T13:31:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813504804-78",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The second recovery agent has now begun a scoped implementation change in the supervised subprocess module. Neither agent has emitted `needs_input`, and no new provider/authentication failure is present, so intervention would currently duplicate or disrupt valid owned work."
     }
   ],
   "queue_dispatching": true,
