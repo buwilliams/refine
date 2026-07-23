@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:34:53Z",
+  "updated_at": "2026-07-23T14:36:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1008,6 +1008,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The affected process intent page was updated to document the new atomic cancellation contract and retained partial-outcome receipt; this is directly tied to the behavior change. The implementation is still uncommitted and under agent verification, so it is not yet a review candidate."
+    },
+    {
+      "created_at": "2026-07-23T14:36:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817411735-198",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The agent is now running the serial full library suite (`cargo test --lib -- --test-threads=1`), not merely focused checks. The process is live and the candidate remains isolated and uncommitted while verification runs."
     }
   ],
   "queued_messages": [
