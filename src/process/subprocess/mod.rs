@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -295,6 +296,49 @@ impl FileProcessSupervisor {
         self.runtime_root.join("processes")
     }
 
+    /// Hold transient process artifacts while a workflow-owned consumer finishes reading them.
+    ///
+    /// The filesystem lock is released automatically if the consumer exits, so later recovery can
+    /// still remove abandoned artifacts.
+    pub(crate) fn begin_artifact_handoff(&self, process_id: &str) -> RefineResult<fs::File> {
+        fs::create_dir_all(self.processes_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process registry {}: {error}",
+                self.processes_dir().display()
+            ))
+        })?;
+        let path = self.artifact_handoff_path(process_id);
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open process artifact handoff {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock process artifact handoff {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(file)
+    }
+
+    pub(crate) fn finish_artifact_handoff(&self, handoff: fs::File) -> RefineResult<()> {
+        drop(handoff);
+        Ok(())
+    }
+
+    pub(crate) fn artifact_handoff_path(&self, process_id: &str) -> PathBuf {
+        self.processes_dir()
+            .join(format!("{process_id}.artifact-handoff.lock"))
+    }
+
     pub fn pause_state_path(&self) -> PathBuf {
         self.runtime_root.join("process-control.json")
     }
@@ -428,6 +472,32 @@ impl FileProcessSupervisor {
     }
 
     fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
+        let handoff_path = self.artifact_handoff_path(&process.id);
+        // A live workflow consumer owns the transcript through this lease. Reconciliation may
+        // already persist a truthful terminal state, but deletion waits until consumption ends.
+        let handoff = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&handoff_path)
+        {
+            Ok(file) => match file.try_lock_exclusive() {
+                Ok(()) => Some(file),
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to lock process artifact handoff {} for cleanup: {error}",
+                        handoff_path.display()
+                    )));
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to open process artifact handoff {} for cleanup: {error}",
+                    handoff_path.display()
+                )));
+            }
+        };
         for path in [
             process.stdout_path.as_deref(),
             process.stderr_path.as_deref(),
@@ -442,6 +512,19 @@ impl FileProcessSupervisor {
                 Err(error) => {
                     return Err(RefineError::Io(format!(
                         "failed to remove process artifact {path}: {error}"
+                    )));
+                }
+            }
+        }
+        if let Some(handoff) = handoff {
+            drop(handoff);
+            match fs::remove_file(&handoff_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove process artifact handoff {}: {error}",
+                        handoff_path.display()
                     )));
                 }
             }
@@ -462,6 +545,7 @@ impl FileProcessSupervisor {
 
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
         if process.state != "running" {
+            self.write_process(&process)?;
             self.remove_process_artifacts(&process)?;
             return Ok(process);
         }
@@ -861,6 +945,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
                 });
             }
             process.state = "stopped".to_string();
+            self.write_process(&process)?;
             self.remove_process_artifacts(&process)?;
         } else {
             process.state = format!("signalled:{signal}");
@@ -876,6 +961,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             && !pid_alive(pid)?
         {
             process.state = "exited".to_string();
+            self.write_process(&process)?;
             self.remove_process_artifacts(&process)?;
         }
         Ok(process)
@@ -995,6 +1081,7 @@ impl FileProcessSupervisor {
                     process.details.take(),
                     "process was not alive during recovery",
                 ));
+                self.write_process(process)?;
                 self.remove_process_artifacts(process)?;
                 return Ok(false);
             }
@@ -1004,6 +1091,7 @@ impl FileProcessSupervisor {
                     process.details.take(),
                     "running process had no pid during recovery",
                 ));
+                self.write_process(process)?;
                 self.remove_process_artifacts(process)?;
                 return Ok(false);
             }
@@ -1628,6 +1716,53 @@ mod tests {
         let recovered = supervisor.recover().unwrap();
         assert!(recovered.is_empty());
         assert!(supervisor.inspect("stale").is_err());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
+        let temp_root = unique_temp_dir("process-artifact-handoff");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let process_id = "workflow-owned-transcript";
+        let stdout_path = supervisor
+            .processes_dir()
+            .join(format!("{process_id}.stdout.log"));
+        fs::create_dir_all(supervisor.processes_dir()).unwrap();
+        fs::write(&stdout_path, "workflow result").unwrap();
+        let handoff = supervisor.begin_artifact_handoff(process_id).unwrap();
+        supervisor
+            .register(ManagedProcess {
+                id: process_id.to_string(),
+                owner: ProcessOwner::Agent,
+                pid: None,
+                state: "running".to_string(),
+                label: Some("Goal Agent".to_string()),
+                details: None,
+                stdout_path: Some(stdout_path.display().to_string()),
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        assert!(supervisor.recover().unwrap().is_empty());
+        assert!(stdout_path.is_file());
+        let process_path = supervisor
+            .processes_dir()
+            .join(format!("{process_id}.json"));
+        let reconciled: ManagedProcess =
+            serde_json::from_slice(&fs::read(&process_path).unwrap()).unwrap();
+        assert_eq!(reconciled.state, "interrupted");
+
+        supervisor.finish_artifact_handoff(handoff).unwrap();
+        assert!(supervisor.recover().unwrap().is_empty());
+        assert!(!stdout_path.exists());
+        assert!(!process_path.exists());
+        assert!(!supervisor.artifact_handoff_path(process_id).exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

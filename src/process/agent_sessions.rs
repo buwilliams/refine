@@ -82,12 +82,21 @@ struct AgentSessionSignal {
 /// command queue, and signal file are ordinary runtime artifacts. That split lets
 /// the daemon, browser, and CLI attach to the same Goal Agent without making a
 /// browser connection part of workflow execution.
-pub fn run_goal_agent<F>(
+pub fn run_goal_agent<F>(launch: GoalAgentLaunch, on_attention: F) -> RefineResult<GoalAgentResult>
+where
+    F: FnMut(GoalAgentAttention),
+{
+    run_goal_agent_session(launch, on_attention, |_, _| Ok(()))
+}
+
+fn run_goal_agent_session<F, O>(
     launch: GoalAgentLaunch,
     mut on_attention: F,
+    mut on_process_exit: O,
 ) -> RefineResult<GoalAgentResult>
 where
     F: FnMut(GoalAgentAttention),
+    O: FnMut(&FileProcessSupervisor, &ManagedProcess) -> RefineResult<()>,
 {
     let cwd = launch.cwd.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
@@ -302,6 +311,16 @@ where
             return Err(error);
         }
     };
+    let artifact_handoff = match supervisor.begin_artifact_handoff(&process_id) {
+        Ok(handoff) => handoff,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            cleanup_session_artifacts(&command_path, &signal_path);
+            let _ = fs::remove_file(&stdout_path);
+            return Err(error);
+        }
+    };
     let mut process = ManagedProcess {
         id: process_id.clone(),
         owner: ProcessOwner::Agent,
@@ -325,6 +344,8 @@ where
     if let Err(error) = supervisor.register(process.clone()) {
         let _ = child.kill();
         let _ = child.wait();
+        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+        let _ = fs::remove_file(supervisor.artifact_handoff_path(&process_id));
         cleanup_session_artifacts(&command_path, &signal_path);
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
@@ -452,11 +473,20 @@ where
             let _ = child.wait();
             let _ = reader_thread.join();
             process.state = "failed".to_string();
+            let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let _ = supervisor.register(process);
             cleanup_session_artifacts(&command_path, &signal_path);
             return Err(error);
         }
     };
+    if let Err(error) = on_process_exit(&supervisor, &process) {
+        let _ = reader_thread.join();
+        process.state = "failed".to_string();
+        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+        let _ = supervisor.register(process);
+        cleanup_session_artifacts(&command_path, &signal_path);
+        return Err(error);
+    }
 
     let reader_result = reader_thread
         .join()
@@ -464,6 +494,7 @@ where
         .and_then(|result| result);
     if let Err(error) = reader_result {
         process.state = "failed".to_string();
+        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
         let _ = supervisor.register(process);
         cleanup_session_artifacts(&command_path, &signal_path);
         return Err(error);
@@ -472,6 +503,7 @@ where
         Ok(output) => String::from_utf8_lossy(&output).into_owned(),
         Err(error) => {
             process.state = "failed".to_string();
+            let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let _ = supervisor.register(process);
             cleanup_session_artifacts(&command_path, &signal_path);
             return Err(RefineError::Io(format!(
@@ -489,6 +521,7 @@ where
         "failed".to_string()
     };
     process.exit_code = i32::try_from(status.exit_code()).ok();
+    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
     let _ = supervisor.register(process);
     cleanup_session_artifacts(&command_path, &signal_path);
 
@@ -916,6 +949,7 @@ fn strip_terminal_control(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::subprocess::ProcessSupervisor;
     use std::os::unix::fs::PermissionsExt;
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -1089,6 +1123,97 @@ mod tests {
         assert_eq!(
             result.output,
             "Implemented and verified the selected public name."
+        );
+
+        unsafe {
+            if let Some(previous) = previous {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
+        let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let root = unique_temp_dir("goal-agent-recovery-handoff");
+        let runtime_root = root.join("run/8082");
+        let app_root = root.join("app");
+        let provider = root.join("smoke-ai");
+        fs::create_dir_all(&app_root).unwrap();
+        fs::write(
+            &provider,
+            "#!/bin/sh\n\
+             printf 'transcript survives recovery\\n'\n\
+             printf '%s\\n' '{\"state\":\"completed\"}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+             sleep 10\n",
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+        let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+        }
+
+        let mut metadata = Map::new();
+        metadata.insert("goal_id".to_string(), json!("GOAL-RECOVERY"));
+        let result = run_goal_agent_session(
+            GoalAgentLaunch {
+                runtime_root: runtime_root.clone(),
+                cwd: app_root,
+                provider: "smoke-ai".to_string(),
+                prompt: "test".to_string(),
+                metadata,
+            },
+            |_| {},
+            |supervisor, process| {
+                assert!(!FileProcessSupervisor::process_is_alive(process)?);
+                let stdout_path = Path::new(process.stdout_path.as_deref().unwrap());
+                assert!(stdout_path.is_file());
+
+                assert!(supervisor.recover()?.is_empty());
+                assert!(stdout_path.is_file());
+                assert!(matches!(
+                    supervisor.inspect(&process.id),
+                    Err(RefineError::NotFound(_))
+                ));
+                assert!(stdout_path.is_file());
+
+                let process_path = supervisor
+                    .processes_dir()
+                    .join(format!("{}.json", process.id));
+                let reconciled: ManagedProcess =
+                    serde_json::from_slice(&fs::read(&process_path).unwrap()).unwrap();
+                assert_eq!(reconciled.state, "exited");
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert!(result.output.contains("transcript survives recovery"));
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        assert!(
+            !supervisor
+                .processes_dir()
+                .join(format!("{}.json", result.process_id))
+                .exists()
+        );
+        assert!(
+            !supervisor
+                .processes_dir()
+                .join(format!("{}.stdout.log", result.process_id))
+                .exists()
+        );
+        assert!(
+            !supervisor
+                .artifact_handoff_path(&result.process_id)
+                .exists()
         );
 
         unsafe {
