@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:04:49Z",
+  "updated_at": "2026-07-23T18:06:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1854,9 +1854,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The corrective note was delivered through the managed terminal input API and acknowledged. The agent remains live and authenticated; I’ll verify that the patch converges on the requested process-only overlay and that it does not signal for user input."
+    },
+    {
+      "created_at": "2026-07-23T18:06:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784829989916-29",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Supervision is current; no user decision is required now.\n\n- Goal `00000SZ412RXR0TQRHE82JW000` remains `in-progress`.\n- Its Codex agent is alive, working, authenticated, and has not requested input.\n- The managed worktree contains two in-progress source changes; nothing was merged, reset, discarded, or force-modified.\n- I sent corrective guidance to preserve cached provider data and strengthen workflow/git-sync, pause, stale, and terminal-record regression coverage.\n- The five Goals in `review` remain untouched at the human confirmation boundary.\n- The stale `diagnostics.runner_reachable=false` value is the defect being repaired, not evidence that the live runners or agent are lost."
+    },
+    {
+      "created_at": "2026-07-23T18:06:30Z",
+      "delivered": false,
+      "id": "evt-1784829990125-31",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Supervision is current; no user decision is required now.\n\n- Goal `00000SZ412RXR0TQRHE82JW000` remains `in-progress`.\n- Its Codex agent is alive, working, authenticated, and has not requested input.\n- The managed worktree contains two in-progress source changes; nothing was merged, reset, discarded, or force-modified.\n- I sent corrective guidance to preserve cached provider data and strengthen workflow/git-sync, pause, stale, and terminal-record regression coverage.\n- The five Goals in `review` remain untouched at the human confirmation boundary.\n- The stale `diagnostics.runner_reachable=false` value is the defect being repaired, not evidence that the live runners or agent are lost."
+    },
+    {
+      "created_at": "2026-07-23T18:06:30Z",
+      "delivered": false,
+      "id": "evt-1784829990125-32",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
