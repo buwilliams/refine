@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:37:09Z",
+  "updated_at": "2026-07-23T12:43:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1263,6 +1263,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Cancellation now prevents completion, but the child receives an empty error string. That hides the termination cause, so simply weakening the assertion would violate the audit boundary. I’m requiring a non-empty cancellation/termination error and durable operation evidence."
+    },
+    {
+      "created_at": "2026-07-23T12:43:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784810613711-148",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed gate’s Git history confirms the loss: commit `d12505f` added the Goal, then `851178a` deleted that same Goal during the other daemon’s sync; later commits only churned supervisor state. I’m feeding that exact ancestry to the worker so it fixes reconciliation rather than extending timeouts."
     }
   ],
   "queued_messages": [
