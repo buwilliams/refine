@@ -283,29 +283,23 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_processes(&self, raw_path: &str) -> ApiResponse {
-        if self.runtime_root.is_none() {
+        let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("read managed processes");
-        }
+        };
         let refine_dir = match self.current_refine_dir() {
             Ok(root) => root,
             Err(error) => return error_response(error),
         };
-        match self.current_projection_with_runtime() {
-            Ok(projection) => ApiResponse::json(
+        if let Err(error) = self.current_projection_with_runtime() {
+            return error_response(error);
+        }
+        match live_process_summary(runtime_root, refine_dir.as_deref()) {
+            Ok(summary) => ApiResponse::json(
                 200,
                 if query_param(raw_path, "summary").as_deref() == Some("1") {
-                    runtime_process_status_value(&projection.runtime)
+                    process_status_value(&summary)
                 } else {
-                    let Some(runtime_root) = &self.runtime_root else {
-                        return runtime_root_unavailable("read managed processes");
-                    };
-                    match process_summary_value_with_chat_sessions(
-                        runtime_root,
-                        refine_dir.as_deref(),
-                    ) {
-                        Ok(value) => value,
-                        Err(error) => return error_response(error),
-                    }
+                    summary
                 },
             ),
             Err(error) => error_response(error),
@@ -792,12 +786,19 @@ impl InProcessWebServer {
         let refine_dir = self.current_refine_dir()?;
         let cache_key = diagnostics_cache_key(runtime_root, refine_dir.as_ref(), &repo_root);
         if !refresh {
-            let cache = DIAGNOSTICS_CACHE
-                .get_or_init(|| Mutex::new(BTreeMap::new()))
-                .lock()
-                .map_err(|_| RefineError::Io("diagnostics cache lock was poisoned".to_string()))?;
-            if let Some(entry) = cache.get(&cache_key) {
-                return Ok(entry.value.clone());
+            let cached = {
+                let cache = DIAGNOSTICS_CACHE
+                    .get_or_init(|| Mutex::new(BTreeMap::new()))
+                    .lock()
+                    .map_err(|_| {
+                        RefineError::Io("diagnostics cache lock was poisoned".to_string())
+                    })?;
+                cache.get(&cache_key).map(|entry| entry.value.clone())
+            };
+            if let Some(mut value) = cached {
+                let process_summary = live_process_summary(runtime_root, refine_dir.as_deref())?;
+                value["processes"] = process_status_value(&process_summary);
+                return Ok(value);
             }
         }
         let projection = self.current_projection_with_runtime()?;
@@ -809,7 +810,8 @@ impl InProcessWebServer {
             .clone()
             .map(Value::Object)
             .unwrap_or_else(|| json!({"ok": false, "providers": []}));
-        let process = runtime_process_status_value(&projection.runtime);
+        let process =
+            process_status_value(&live_process_summary(runtime_root, refine_dir.as_deref())?);
         let value = json!({
             "reachable": true,
             "backend": {
@@ -887,6 +889,18 @@ fn diagnostics_cache_key(
             .unwrap_or_else(|| "none".to_string()),
         repo_root.display()
     )
+}
+
+fn live_process_summary(
+    runtime_root: &std::path::Path,
+    refine_dir: Option<&std::path::Path>,
+) -> RefineResult<Value> {
+    match refine_dir {
+        Some(refine_dir) => {
+            FileProcessStatusService::with_refine_dir(runtime_root, refine_dir).summary()
+        }
+        None => FileProcessStatusService::new(runtime_root).summary(),
+    }
 }
 
 fn secret_scope_name_from_path(path: &str) -> Option<(String, String)> {

@@ -2004,6 +2004,118 @@ fn local_http_daemon_reports_startup_cache_progress() {
 }
 
 #[test]
+fn diagnostics_cache_keeps_process_health_live_after_startup_warming() {
+    let temp_root = unique_temp_dir("http-diagnostics-live-process-health");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&temp_root).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    server.warm_diagnostics_cache().unwrap();
+    let warmed = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/diagnostics".to_string(),
+        body: None,
+    });
+    assert_eq!(warmed.status, 200);
+    assert_eq!(warmed.body["processes"]["process_count"], 0);
+    assert_eq!(warmed.body["processes"]["runner_reachable"], false);
+    let warmed_provider = warmed.body["provider"].clone();
+    let warmed_doctor = warmed.body["doctor"].clone();
+
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    for (id, worker_kind) in [
+        ("workflow-runner", "workflow"),
+        ("git-sync-runner", "git-sync"),
+    ] {
+        supervisor
+            .register(ManagedProcess {
+                id: id.to_string(),
+                owner: ProcessOwner::Runner,
+                pid: Some(std::process::id()),
+                state: "running".to_string(),
+                label: Some(format!("{worker_kind} runner")),
+                details: Some(json!({"kind": "runner", "worker_kind": worker_kind}).to_string()),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+    }
+    supervisor
+        .register(ManagedProcess {
+            id: "stale-runner".to_string(),
+            owner: ProcessOwner::Runner,
+            pid: Some(u32::MAX),
+            state: "running".to_string(),
+            label: Some("Stale runner".to_string()),
+            details: Some(json!({"kind": "runner", "worker_kind": "stale"}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    fs::write(
+        supervisor.processes_dir().join("terminal-runner.json"),
+        serde_json::to_vec_pretty(&ManagedProcess {
+            id: "terminal-runner".to_string(),
+            owner: ProcessOwner::Runner,
+            pid: Some(std::process::id()),
+            state: "completed".to_string(),
+            label: Some("Terminal runner".to_string()),
+            details: Some(json!({"kind": "runner", "worker_kind": "terminal"}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: Some(0),
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    supervisor.set_background_processes_stopped(true).unwrap();
+    supervisor.set_agents_paused(true).unwrap();
+
+    let live = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/diagnostics".to_string(),
+        body: None,
+    });
+    assert_eq!(live.status, 200);
+    assert_eq!(live.body["processes"]["runner_reachable"], true);
+    assert_eq!(live.body["processes"]["process_count"], 2);
+    assert_eq!(live.body["processes"]["running_process_count"], 2);
+    assert_eq!(live.body["processes"]["background_processes_stopped"], true);
+    assert_eq!(live.body["processes"]["agents_paused"], true);
+    assert_eq!(live.body["processes"]["paused"], true);
+    assert_eq!(live.body["processes"]["processes"], json!([]));
+    assert_eq!(live.body["provider"], warmed_provider);
+    assert_eq!(live.body["doctor"], warmed_doctor);
+    assert!(
+        !supervisor
+            .processes_dir()
+            .join("stale-runner.json")
+            .exists()
+    );
+    assert!(
+        !supervisor
+            .processes_dir()
+            .join("terminal-runner.json")
+            .exists()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() {
     let temp_root = unique_temp_dir("http-quality-cancellation-app-routing");
     let app_a = temp_root.join("app-a");

@@ -1,7 +1,11 @@
 mod support;
 
 use std::fs;
+use std::thread;
+use std::time::{Duration, Instant};
 
+use refine::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
+use serde_json::json;
 use support::integration::IntegrationFixture;
 
 #[test]
@@ -73,10 +77,64 @@ fn project_status_is_attached_to_test_app(fixture: &IntegrationFixture) {
 }
 
 fn project_doctor_runs(fixture: &IntegrationFixture) {
-    let output = fixture.run_refine(&["project", "doctor"]);
-    fixture.assert_success("project doctor", &output);
-    let payload = fixture.json_stdout(&output);
-    assert!(payload.is_object() || payload.is_array(), "{payload:#}");
+    let initial = fixture.run_refine(&["project", "doctor"]);
+    fixture.assert_success("initial project doctor", &initial);
+    let initial = fixture.json_stdout(&initial);
+    assert_eq!(
+        initial["processes"]["runner_reachable"], false,
+        "{initial:#}"
+    );
+
+    let runtime_root = fixture.runtime_root.join(fixture.port.to_string());
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    supervisor
+        .register(ManagedProcess {
+            id: "cli-test-workflow-runner".to_string(),
+            owner: ProcessOwner::Runner,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("CLI test workflow runner".to_string()),
+            details: Some(json!({"kind": "runner", "worker_kind": "workflow"}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let output = fixture.run_refine(&["project", "doctor"]);
+        fixture.assert_success("project doctor", &output);
+        let payload = fixture.json_stdout(&output);
+        if payload["processes"]["runner_reachable"] == true {
+            assert!(
+                payload["processes"]["process_count"]
+                    .as_u64()
+                    .is_some_and(|count| count >= 2),
+                "{payload:#}"
+            );
+            assert_eq!(
+                payload["processes"]["running_process_count"],
+                payload["processes"]["process_count"],
+                "{payload:#}"
+            );
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "project doctor kept stale startup process health: {payload:#}"
+        );
+        thread::sleep(Duration::from_millis(100));
+    }
+    fs::remove_file(
+        supervisor
+            .processes_dir()
+            .join("cli-test-workflow-runner.json"),
+    )
+    .unwrap();
 }
 
 fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) {
