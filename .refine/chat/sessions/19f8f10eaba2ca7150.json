@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:08:25Z",
+  "updated_at": "2026-07-23T14:09:14Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -741,6 +741,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "`c9a92ee5` has now failed Governance and its worker exited. This is actionable recovery, not a review decision. I’m applying the auditable recovery guidance: capture the exact violations, create a narrowly scoped fresh Goal round from current `main`, preserve the rejected candidate/worktree, and let normal implementation/Governance resume."
+    },
+    {
+      "created_at": "2026-07-23T14:09:14Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784815754364-153",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery round was recorded successfully, but the Goal remains `failed` and has no live worker. I’m checking the supported transition surface before doing anything else; I will not direct-edit durable state or use an unsupported start path."
     }
   ],
   "queued_messages": [
