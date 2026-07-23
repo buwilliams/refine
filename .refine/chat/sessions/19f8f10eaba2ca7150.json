@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:09:00Z",
+  "updated_at": "2026-07-23T18:09:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1941,9 +1941,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Current checks show Codex installed and authenticated, `main` clean and exactly aligned with `origin/main`, the durable state worktree clean and remote-aligned, and HTTP 200. One inconsistency is visible rather than hidden: `project doctor` reports cached `runner_reachable=false`/zero agents while live system/process evidence proves both Goal agents and both runner workers are running—the first active Goal is specifically correcting that stale health projection. No user authority is needed at this point."
+    },
+    {
+      "created_at": "2026-07-23T18:09:49Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830189601-47",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No recovery action is warranted now. Both active Goals have live workflow-owned Codex processes and are modifying their isolated worktrees:\n\n- `00000SZ412RXR0TQRHE82JW000`: PID 35952; five files changed.\n- `00000SZ41923HGWZSREC2JW001`: PID 69917; two files changed.\n\nVerified:\n\n- Daemon healthy; UI and Goals API return HTTP 200.\n- Codex is installed and authenticated.\n- `main` is clean and matches `origin/main` at `a413fac2`.\n- `refine/state` is clean and remote-aligned.\n- No current provider, authentication, stall, or lost-worker failure.\n- `project doctor` incorrectly reports cached `runner_reachable=false` and zero agents despite live process evidence; the first active Goal is addressing that discrepancy.\n\nAll five existing review Goals remain untouched. Crossing review/approval requires your explicit direction; no merge, cleanup, retry, cancellation, or worktree disposal was performed. Historical provider and synchronization failures remain preserved in the supervisor audit."
+    },
+    {
+      "created_at": "2026-07-23T18:09:50Z",
+      "delivered": false,
+      "id": "evt-1784830190216-49",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No recovery action is warranted now. Both active Goals have live workflow-owned Codex processes and are modifying their isolated worktrees:\n\n- `00000SZ412RXR0TQRHE82JW000`: PID 35952; five files changed.\n- `00000SZ41923HGWZSREC2JW001`: PID 69917; two files changed.\n\nVerified:\n\n- Daemon healthy; UI and Goals API return HTTP 200.\n- Codex is installed and authenticated.\n- `main` is clean and matches `origin/main` at `a413fac2`.\n- `refine/state` is clean and remote-aligned.\n- No current provider, authentication, stall, or lost-worker failure.\n- `project doctor` incorrectly reports cached `runner_reachable=false` and zero agents despite live process evidence; the first active Goal is addressing that discrepancy.\n\nAll five existing review Goals remain untouched. Crossing review/approval requires your explicit direction; no merge, cleanup, retry, cancellation, or worktree disposal was performed. Historical provider and synchronization failures remain preserved in the supervisor audit."
+    },
+    {
+      "created_at": "2026-07-23T18:09:50Z",
+      "delivered": false,
+      "id": "evt-1784830190216-50",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
