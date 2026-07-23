@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:46:08Z",
+  "updated_at": "2026-07-23T18:47:58Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2469,9 +2469,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "One issue remains deliberately visible: the cancellation-recovery agent’s first focused build hit a compile error (`E0063`) after replaying the older stack onto current main. The agent is still live and working the current-main versioning seam, so I’m not retrying or replacing it. The performance agent’s relevant web suite has passed 120/120 and broader verification is still running."
+    },
+    {
+      "created_at": "2026-07-23T18:47:58Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832478077-31",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current supervision result: no recovery or termination action is warranted.\n\n- Two active Goal agents are live, OS-visible, and producing output.\n- `00000SZ3RP4G52RZ706A5P4001`: Round 7 is reconciling cancellation settlement onto current main. Its first focused build exposed `E0063`; the agent remains active and is correcting it. Failure preserved.\n- `00000SZ42710VGCA2VWG2JW003`: traced the latency to an aging test fixture causing 50 backlog promotions. Product code remains unchanged; relevant web tests passed 120/120, with broader gates running.\n- `00000SZ41QQB4GWTN3AW2JW002`: remains at review. Candidate `9b7d9d33` is clean, pushed, and Governance passed 8/8, but Quality was a no-op and a read-only merge preview against current main shows a real conflict in `src/process/agent_sessions.rs`. It should not be approved now.\n- Daemon and web are healthy; Codex is installed and authenticated.\n- No merge, retry, process stop, Goal transition, or worktree mutation was performed.\n\nNo user dec"
+    },
+    {
+      "created_at": "2026-07-23T18:47:58Z",
+      "delivered": false,
+      "id": "evt-1784832478299-33",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Current supervision result: no recovery or termination action is warranted.\n\n- Two active Goal agents are live, OS-visible, and producing output.\n- `00000SZ3RP4G52RZ706A5P4001`: Round 7 is reconciling cancellation settlement onto current main. Its first focused build exposed `E0063`; the agent remains active and is correcting it. Failure preserved.\n- `00000SZ42710VGCA2VWG2JW003`: traced the latency to an aging test fixture causing 50 backlog promotions. Product code remains unchanged; relevant web tests passed 120/120, with broader gates running.\n- `00000SZ41QQB4GWTN3AW2JW002`: remains at review. Candidate `9b7d9d33` is clean, pushed, and Governance passed 8/8, but Quality was a no-op and a read-only merge preview against current main shows a real conflict in `src/process/agent_sessions.rs`. It should not be approved now.\n- Daemon and web are healthy; Codex is installed and authenticated.\n- No merge, retry, process stop, Goal transition, or worktree mutation was performed.\n\nNo user decision is useful yet. The review candidate should wait until the overlapping cancellation work settles, then be recovered or presented for approval with fresh conflict evidence."
+    },
+    {
+      "created_at": "2026-07-23T18:47:58Z",
+      "delivered": false,
+      "id": "evt-1784832478299-34",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
