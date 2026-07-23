@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:16:54Z",
+  "updated_at": "2026-07-23T19:17:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2877,6 +2877,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A concurrent supervisor turn appended Round 8 two seconds before my recovery command appended Round 9. I’m preserving both audit records and amending only the latest Round through the supported `--edit-latest` path to incorporate Round 8’s additional current-main conflict evidence. I will not delete either Round or let the newer prompt silently omit the approved transcript-handoff behavior now on `main`."
+    },
+    {
+      "created_at": "2026-07-23T19:17:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834230173-205",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The edit was correctly rejected because automation claimed the latest Round before metadata could be amended; I’m preserving that refusal. I’ll deliver the omitted Round 8/current-main conflict evidence to the already-running Round 9 agent through its managed input channel, without changing the Goal or branch out from under the active claim."
     }
   ],
   "queued_messages": [
