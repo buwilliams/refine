@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:27:38Z",
+  "updated_at": "2026-07-23T12:29:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1215,6 +1215,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The merge path is now wired to the live claim/execution and managed Git metadata, but the first compile caught outdated test callers. This is an ordinary implementation failure, not provider or authentication failure; the worker remains live and is correcting it."
+    },
+    {
+      "created_at": "2026-07-23T12:29:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809780947-140",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A remaining race is concrete: each fence check releases the coordination lock before spawning the Git subprocess. Cancellation can change authority in that gap, miss a not-yet-created process, and the stale execution can still begin the mutation. I’m sending that exact TOCTOU finding now, before the worker finalizes."
     }
   ],
   "queued_messages": [
