@@ -67,8 +67,8 @@
     "00000SZ41923HGWZSREC2JW001": "in-progress"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:review,00000SZ41923HGWZSREC2JW001:in-progress|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T18:17:35.014083227+00:00",
+  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:review,00000SZ41923HGWZSREC2JW001:in-progress|live={\"00000SZ41923HGWZSREC2JW001\"}|quiet={}|issues=",
+  "updated_at": "2026-07-23T18:21:34.297975693+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
