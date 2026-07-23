@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:58:08Z",
+  "updated_at": "2026-07-23T12:00:52Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -867,6 +867,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The post-guard full rerun is not clean yet: 455 passed, 2 failed. One failure is a fixture that now violates the new Review transition guard; the other is a dashboard process-count assertion outside this workflow path. The worker is isolating both and has not declared a candidate."
+    },
+    {
+      "created_at": "2026-07-23T12:00:52Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808052637-79",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m continuing the live audit from the current N803 execution. The remaining decision boundary is whether its candidate actually closes the cancellation/revision race and passes the required multi-instance evidence; I will not approve or merge it on partial evidence."
     }
   ],
   "queued_messages": [
