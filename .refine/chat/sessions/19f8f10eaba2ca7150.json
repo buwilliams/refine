@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:24:11Z",
+  "updated_at": "2026-07-23T18:24:27Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2136,6 +2136,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both Goals are now at `review`. The recovery candidate published successfully and Governance passed, but its full-library performance test remains a real, reproducible failure in the report; Quality itself was a no-op because no Quality tests are configured. I’m doing the final correlation now and will leave all three review candidates unapproved."
+    },
+    {
+      "created_at": "2026-07-23T18:24:27Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831067233-94",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The state changed again during final correlation. An external workflow action approved/merged `00000SZ41923HGWZSREC2JW001` at 18:24:11 UTC; I did not perform that approval. Its commit is now in `main` even though the report retains the reproducible 469/470 library-test failure and no-op Quality result. A new live Goal, `00000SZ41QQB4GWTN3AW2JW002`, is now addressing the transcript-deletion defect with PID 272624. I’m supervising that active work next and leaving the remaining review Goals untouched."
     }
   ],
   "queued_messages": [
