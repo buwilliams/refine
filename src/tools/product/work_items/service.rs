@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
+use fs2::FileExt;
 use serde_json::{Map, Value};
 
 use crate::model::feature::{
@@ -25,6 +26,26 @@ use crate::tools::product::project_state::{
 };
 
 use super::types::*;
+
+const GOAL_MUTATION_LOCK_FILE: &str = ".goal-mutations.lock";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GoalCancellationExpectation {
+    pub status: GoalStatus,
+    pub round_count: usize,
+    pub updated: String,
+}
+
+#[derive(Debug)]
+struct GoalMutationLock {
+    file: File,
+}
+
+impl Drop for GoalMutationLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
 
 pub trait WorkItemService {
     fn create_goal(&self, goal: Goal) -> RefineResult<Goal>;
@@ -142,6 +163,35 @@ impl FileWorkItemService {
         }
     }
 
+    fn acquire_goal_mutation_lock(&self) -> RefineResult<GoalMutationLock> {
+        fs::create_dir_all(&self.refine_dir).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create Refine state directory {}: {error}",
+                self.refine_dir.display()
+            ))
+        })?;
+        let path = self.refine_dir.join(GOAL_MUTATION_LOCK_FILE);
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open Goal mutation lock {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock Goal mutations {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(GoalMutationLock { file })
+    }
+
     fn active_node_id(&self) -> RefineResult<String> {
         if let Some(node_id) = &self.active_node_id_override {
             return Ok(node_id.clone());
@@ -256,7 +306,7 @@ impl FileWorkItemService {
         let current = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })?;
-        let (_, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, _, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
         })?;
@@ -1733,7 +1783,7 @@ impl FileWorkItemService {
                 "branch name is required".to_string(),
             ));
         }
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -1766,6 +1816,7 @@ impl FileWorkItemService {
         goal_id: &str,
         target: GoalStatus,
     ) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
         let snapshot = self.projection_snapshot()?;
         let current = snapshot.goals.get(goal_id).ok_or_else(|| {
             RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
@@ -1804,6 +1855,7 @@ impl FileWorkItemService {
     }
 
     pub fn cancel_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
         if current.goal.status == GoalStatus::Cancelled {
             return Ok(current);
@@ -1813,7 +1865,46 @@ impl FileWorkItemService {
                 "done Goals cannot be cancelled".to_string(),
             ));
         }
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::Cancelled)?;
+        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Cancelled)?;
+        self.show_goal_summary(goal_id)
+    }
+
+    pub(crate) fn cancel_goal_summary_if_current<F>(
+        &self,
+        goal_id: &str,
+        expected: &GoalCancellationExpectation,
+        before_write: F,
+    ) -> RefineResult<GoalSummaryProjection>
+    where
+        F: FnOnce() -> RefineResult<()>,
+    {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        if current.goal.status != expected.status
+            || current.goal.round_count != expected.round_count
+            || current.goal.updated != expected.updated
+        {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} ownership fence changed before cancellation (expected status {}, round {}, revision {}; observed status {}, round {}, revision {}); the Goal was not cancelled",
+                expected.status.as_str(),
+                expected.round_count,
+                expected.updated,
+                current.goal.status.as_str(),
+                current.goal.round_count,
+                current.goal.updated
+            )));
+        }
+        if current.goal.status == GoalStatus::Done {
+            return Err(RefineError::InvalidInput(format!(
+                "done Goal {goal_id} cannot be cancelled"
+            )));
+        }
+
+        before_write()?;
+        if current.goal.status != GoalStatus::Cancelled {
+            self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Cancelled)?;
+        }
         self.show_goal_summary(goal_id)
     }
 
@@ -1828,7 +1919,7 @@ impl FileWorkItemService {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::EditMetadata)?;
 
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -1870,6 +1961,7 @@ impl FileWorkItemService {
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&goal_path, &value)?;
+        drop(_goal_lock);
         if let Some(assignee) = assignee {
             self.set_latest_round_assignee(goal_id, assignee)?;
         }
@@ -1933,7 +2025,7 @@ impl FileWorkItemService {
             ));
         }
 
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2021,7 +2113,7 @@ impl FileWorkItemService {
             next_notes.push(Value::Object(cleaned));
         }
 
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2047,8 +2139,6 @@ impl FileWorkItemService {
         assignee: Option<&str>,
         prompt: &str,
     ) -> RefineResult<GoalSummaryProjection> {
-        let current = self.show_goal_summary(goal_id)?;
-        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
         let reporter = Self::validate_goal_reporter(reporter)?;
         let assignee = assignee
             .map(Self::validate_goal_assignee)
@@ -2062,7 +2152,11 @@ impl FileWorkItemService {
             ));
         }
 
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2094,7 +2188,7 @@ impl FileWorkItemService {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::EditLatestRound)?;
 
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2149,7 +2243,7 @@ impl FileWorkItemService {
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2176,7 +2270,7 @@ impl FileWorkItemService {
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2217,7 +2311,7 @@ impl FileWorkItemService {
         }
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2256,7 +2350,7 @@ impl FileWorkItemService {
             RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
         })?;
 
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2312,7 +2406,7 @@ impl FileWorkItemService {
         }
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2341,6 +2435,7 @@ impl FileWorkItemService {
     }
 
     pub fn delete_goal_record(&self, goal_id: &str) -> RefineResult<()> {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::Delete)?;
@@ -2357,13 +2452,24 @@ impl FileWorkItemService {
         Ok(())
     }
 
-    fn read_goal_value(&self, goal_id: &str) -> RefineResult<(PathBuf, Value)> {
+    fn read_goal_value(&self, goal_id: &str) -> RefineResult<(GoalMutationLock, PathBuf, Value)> {
+        let goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        self.read_goal_value_unchecked(&current)
+        let (goal_path, value) = self.read_goal_value_unchecked_locked(&current)?;
+        Ok((goal_lock, goal_path, value))
     }
 
     fn read_goal_value_unchecked(
+        &self,
+        current: &GoalSummaryProjection,
+    ) -> RefineResult<(GoalMutationLock, PathBuf, Value)> {
+        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let (goal_path, value) = self.read_goal_value_unchecked_locked(current)?;
+        Ok((goal_lock, goal_path, value))
+    }
+
+    fn read_goal_value_unchecked_locked(
         &self,
         current: &GoalSummaryProjection,
     ) -> RefineResult<(PathBuf, Value)> {
@@ -2389,7 +2495,7 @@ impl FileWorkItemService {
         feature_id: Option<&str>,
         feature_order: Option<i64>,
     ) -> RefineResult<()> {
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2414,7 +2520,27 @@ impl FileWorkItemService {
         goal_id: &str,
         status: &GoalStatus,
     ) -> RefineResult<()> {
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
+        self.write_goal_status_value(&goal_path, &mut value, status)
+    }
+
+    fn set_goal_status_unchecked_locked(
+        &self,
+        goal_id: &str,
+        status: &GoalStatus,
+    ) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
+        self.write_goal_status_value(&goal_path, &mut value, status)
+    }
+
+    fn write_goal_status_value(
+        &self,
+        goal_path: &std::path::Path,
+        value: &mut Value,
+        status: &GoalStatus,
+    ) -> RefineResult<()> {
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2423,11 +2549,11 @@ impl FileWorkItemService {
             Value::String(status.as_str().to_string()),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&goal_path, &value)
+        write_json_atomically(goal_path, value)
     }
 
     fn set_goal_priority_unchecked(&self, goal_id: &str, priority: &str) -> RefineResult<()> {
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2438,7 +2564,7 @@ impl FileWorkItemService {
 
     fn set_goal_reporter_unchecked(&self, goal_id: &str, reporter: &str) -> RefineResult<()> {
         let reporter = Self::validate_goal_reporter(reporter)?;
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2456,7 +2582,7 @@ impl FileWorkItemService {
 
     fn set_goal_node_unchecked(&self, goal_id: &str, node_id: &str) -> RefineResult<()> {
         let current = self.show_goal_summary(goal_id)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
@@ -2504,7 +2630,7 @@ impl FileWorkItemService {
 
     fn set_latest_round_assignee(&self, goal_id: &str, assignee: &str) -> RefineResult<()> {
         let assignee = Self::validate_goal_assignee(assignee)?;
-        let (goal_path, mut value) = self.read_goal_value(goal_id)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;

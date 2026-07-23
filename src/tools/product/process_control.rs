@@ -1,6 +1,8 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use chrono::Utc;
 use serde_json::{Map, Value, json};
 
 use crate::model::workflow::GoalStatus;
@@ -11,8 +13,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::tools::product::project_registry::FileProjectRegistryService;
-use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::{WorkflowClaimState, WorkflowEngine};
+use crate::tools::product::work_items::{FileWorkItemService, GoalCancellationExpectation};
+use crate::workflow::{WorkflowAutomationState, WorkflowClaimState, WorkflowEngine};
 
 const DEFAULT_AGENT_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -22,6 +24,12 @@ struct WorkflowGoalOwnership {
     claim_id: String,
     execution_id: String,
     round_idx: usize,
+}
+
+#[derive(Clone, Debug)]
+struct ProcessGoalFence {
+    goal: GoalCancellationExpectation,
+    workflow: Option<WorkflowGoalOwnership>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,11 +43,15 @@ enum WorkflowOwnershipPhase {
 /// Agent records are resolved across the port and nested agent registries, terminated with exact
 /// PID identity confirmation, and only then allowed to close linked chat state or cancel a Goal.
 /// Surfaces adapt this one result rather than composing process and workflow mutations themselves.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FileProcessControlService {
     runtime_root: PathBuf,
     refine_dir: Option<PathBuf>,
     agent_exit_timeout: Duration,
+    #[cfg(test)]
+    settlement_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+    #[cfg(test)]
+    post_exit_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl FileProcessControlService {
@@ -48,6 +60,10 @@ impl FileProcessControlService {
             runtime_root: runtime_root.into(),
             refine_dir: None,
             agent_exit_timeout: DEFAULT_AGENT_EXIT_TIMEOUT,
+            #[cfg(test)]
+            settlement_hook: None,
+            #[cfg(test)]
+            post_exit_hook: None,
         }
     }
 
@@ -59,12 +75,28 @@ impl FileProcessControlService {
             runtime_root: runtime_root.into(),
             refine_dir: Some(refine_dir.into()),
             agent_exit_timeout: DEFAULT_AGENT_EXIT_TIMEOUT,
+            #[cfg(test)]
+            settlement_hook: None,
+            #[cfg(test)]
+            post_exit_hook: None,
         }
     }
 
     #[cfg(test)]
     fn with_agent_exit_timeout(mut self, timeout: Duration) -> Self {
         self.agent_exit_timeout = timeout;
+        self
+    }
+
+    #[cfg(test)]
+    fn with_settlement_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
+        self.settlement_hook = Some(std::sync::Arc::new(hook));
+        self
+    }
+
+    #[cfg(test)]
+    fn with_post_exit_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
+        self.post_exit_hook = Some(std::sync::Arc::new(hook));
         self
     }
 
@@ -118,14 +150,14 @@ impl FileProcessControlService {
         } else {
             None
         };
-        let workflow_ownership = match (refine_dir.as_deref(), goal_id.as_deref()) {
-            (Some(refine_dir), Some(goal_id)) => preflight_goal_for_process(
+        let goal_fence = match (refine_dir.as_deref(), goal_id.as_deref()) {
+            (Some(refine_dir), Some(goal_id)) => Some(preflight_goal_for_process(
                 refine_dir,
                 &self.runtime_root,
                 goal_id,
                 &process,
                 WorkflowOwnershipPhase::BeforeTermination,
-            )?,
+            )?),
             _ => None,
         };
         if let (Some(refine_dir), Some(session_id)) =
@@ -139,6 +171,10 @@ impl FileProcessControlService {
             .map_err(|error| {
                 stop_failure_with_goal_context(error, &process.id, goal_id.as_deref())
             })?;
+        #[cfg(test)]
+        if let Some(hook) = &self.post_exit_hook {
+            hook();
+        }
 
         if let (Some(refine_dir), Some(session_id)) =
             (refine_dir.as_deref(), chat_session_id.as_deref())
@@ -147,17 +183,33 @@ impl FileProcessControlService {
         }
         let goal = match (refine_dir.as_deref(), goal_id.as_deref()) {
             (Some(refine_dir), Some(goal_id)) => {
-                validate_goal_cancellation(
+                let goal_fence = goal_fence.as_ref().ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} cancellation fence was lost after process exit"
+                    ))
+                })?;
+                let ownership = goal_fence
+                    .workflow
+                    .as_ref()
+                    .into_iter()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                match self.settle_goal_cancellation(
                     refine_dir,
-                    &self.runtime_root,
                     goal_id,
-                    workflow_ownership.as_ref(),
-                )?;
-                Some(
-                    FileWorkItemService::new(refine_dir)
-                        .cancel_goal_summary(goal_id)?
-                        .goal,
-                )
+                    &goal_fence.goal,
+                    &ownership,
+                ) {
+                    Ok(goal) => Some(goal.goal),
+                    Err(error) => {
+                        return Err(self.retain_post_exit_failure(
+                            &process.id,
+                            goal_id,
+                            json!(&termination),
+                            error,
+                        ));
+                    }
+                }
             }
             _ => None,
         };
@@ -194,9 +246,10 @@ impl FileProcessControlService {
             ChatAttachment::Goal(goal_id) => Some(goal_id.clone()),
             _ => None,
         };
-        if let Some(goal_id) = goal_id.as_deref() {
-            preflight_goal_state(&refine_dir, goal_id)?;
-        }
+        let mut goal_expectation = goal_id
+            .as_deref()
+            .map(|goal_id| preflight_goal_state(&refine_dir, goal_id))
+            .transpose()?;
 
         let managed = self.managed_processes_for_session(session_id)?;
         if managed.is_empty() && (session.in_flight || session.queue_dispatching) {
@@ -216,13 +269,17 @@ impl FileProcessControlService {
         let mut workflow_ownership = Vec::new();
         if let Some(goal_id) = goal_id.as_deref() {
             for (_, process) in &managed {
-                if let Some(ownership) = preflight_goal_for_process(
+                let fence = preflight_goal_for_process(
                     &refine_dir,
                     &self.runtime_root,
                     goal_id,
                     process,
                     WorkflowOwnershipPhase::BeforeTermination,
-                )? {
+                )?;
+                if goal_expectation.is_none() {
+                    goal_expectation = Some(fence.goal.clone());
+                }
+                if let Some(ownership) = fence.workflow {
                     workflow_ownership.push(ownership);
                 }
             }
@@ -237,24 +294,40 @@ impl FileProcessControlService {
                     })?,
             );
         }
+        #[cfg(test)]
+        if let Some(hook) = &self.post_exit_hook {
+            hook();
+        }
         let stopped_session = chat.stop(session_id)?;
         let goal = match goal_id.as_deref() {
             Some(goal_id) => {
-                preflight_goal_state(&refine_dir, goal_id)?;
-                for ownership in &workflow_ownership {
-                    validate_workflow_goal_ownership(
-                        &self.runtime_root,
-                        goal_id,
-                        ownership,
-                        WorkflowOwnershipPhase::BeforeCancellation,
-                    )?;
-                    validate_goal_round(&refine_dir, goal_id, ownership)?;
+                let expectation = goal_expectation.as_ref().ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} cancellation fence was lost after process exit"
+                    ))
+                })?;
+                match self.settle_goal_cancellation(
+                    &refine_dir,
+                    goal_id,
+                    expectation,
+                    &workflow_ownership,
+                ) {
+                    Ok(goal) => Some(goal.goal),
+                    Err(error) => {
+                        return Err(self.retain_post_exit_failure(
+                            process_id,
+                            goal_id,
+                            json!({
+                                "confirmed_exit": true,
+                                "registry_cleanup_completed": true,
+                                "identity_cleanup_completed": true,
+                                "managed_processes": &terminations,
+                                "already_idle": terminations.is_empty()
+                            }),
+                            error,
+                        ));
+                    }
                 }
-                Some(
-                    FileWorkItemService::new(&refine_dir)
-                        .cancel_goal_summary(goal_id)?
-                        .goal,
-                )
             }
             None => None,
         };
@@ -328,6 +401,100 @@ impl FileProcessControlService {
             })?;
         refine_dir_for_target_root(Path::new(&target_root))
     }
+
+    fn settle_goal_cancellation(
+        &self,
+        refine_dir: &Path,
+        goal_id: &str,
+        expectation: &GoalCancellationExpectation,
+        ownership: &[WorkflowGoalOwnership],
+    ) -> RefineResult<crate::tools::product::project_state::GoalSummaryProjection> {
+        let workflow = WorkflowEngine::new(&self.runtime_root);
+        let _workflow_lock = workflow.acquire_state_mutation_lock()?;
+        FileWorkItemService::new(refine_dir).cancel_goal_summary_if_current(
+            goal_id,
+            expectation,
+            || {
+                let state = workflow.load_state()?;
+                if ownership.is_empty() {
+                    ensure_goal_has_no_active_workflow_claim_in_state(
+                        &state,
+                        goal_id,
+                        "stopped process",
+                        WorkflowOwnershipPhase::BeforeCancellation,
+                    )?;
+                } else {
+                    for ownership in ownership {
+                        validate_workflow_goal_ownership_in_state(
+                            &state,
+                            goal_id,
+                            ownership,
+                            WorkflowOwnershipPhase::BeforeCancellation,
+                        )?;
+                        validate_expected_goal_round(
+                            expectation,
+                            goal_id,
+                            ownership,
+                            WorkflowOwnershipPhase::BeforeCancellation,
+                        )?;
+                    }
+                }
+                #[cfg(test)]
+                if let Some(hook) = &self.settlement_hook {
+                    hook();
+                }
+                Ok(())
+            },
+        )
+    }
+
+    fn retain_post_exit_failure(
+        &self,
+        process_id: &str,
+        goal_id: &str,
+        termination: Value,
+        cause: RefineError,
+    ) -> RefineError {
+        let confirmed_exit = termination_outcome_flag(&termination, "confirmed_exit");
+        let registry_cleanup = termination_outcome_flag(&termination, "registry_cleanup_completed");
+        let identity_cleanup = termination_outcome_flag(&termination, "identity_cleanup_completed");
+        let cause_message = cause.to_string();
+        let recovery = "inspect the retained receipt and current Goal round and workflow claims; if cancellation is still intended, request it through the current Goal owner";
+        let receipt = json!({
+            "state": "partial_failure",
+            "process_id": process_id,
+            "goal_id": goal_id,
+            "recorded_at": Utc::now().to_rfc3339(),
+            "termination": termination,
+            "confirmed_exit": confirmed_exit,
+            "registry_cleanup_completed": registry_cleanup,
+            "identity_cleanup_completed": identity_cleanup,
+            "goal_cancelled": false,
+            "cause": cause_message,
+            "recovery": recovery
+        });
+        let receipt_dir = self.runtime_root.join("process-stop-outcomes");
+        let receipt_path = receipt_dir.join(format!("{process_id}.json"));
+        let retained = write_json_receipt(&receipt_path, &receipt)
+            .map(|()| {
+                format!(
+                    "retained partial-outcome evidence at {}",
+                    receipt_path.display()
+                )
+            })
+            .unwrap_or_else(|error| {
+                format!(
+                    "failed to retain partial-outcome evidence at {}: {error}",
+                    receipt_path.display()
+                )
+            });
+        error_with_message(
+            cause,
+            format!(
+                "process stop reached a partial outcome for Goal {goal_id}: confirmed_exit={confirmed_exit}, registry_cleanup_completed={registry_cleanup}, identity_cleanup_completed={identity_cleanup}, goal_cancelled=false; post-exit ownership fence failed: {cause_message}; {retained}; supported recovery: {recovery}"
+            ),
+        )
+    }
 }
 
 fn managed_process_roots(runtime_root: &Path) -> [PathBuf; 2] {
@@ -355,14 +522,21 @@ fn is_agent_process(process: &ManagedProcess) -> bool {
         && value.get("provider").and_then(Value::as_str).is_some())
 }
 
-fn preflight_goal_state(refine_dir: &Path, goal_id: &str) -> RefineResult<()> {
+fn preflight_goal_state(
+    refine_dir: &Path,
+    goal_id: &str,
+) -> RefineResult<GoalCancellationExpectation> {
     let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
     if goal.goal.status == GoalStatus::Done {
         return Err(RefineError::InvalidInput(format!(
             "done Goal {goal_id} cannot be cancelled; its linked process was left running"
         )));
     }
-    Ok(())
+    Ok(GoalCancellationExpectation {
+        status: goal.goal.status,
+        round_count: goal.goal.round_count,
+        updated: goal.goal.updated,
+    })
 }
 
 fn preflight_goal_for_process(
@@ -371,8 +545,8 @@ fn preflight_goal_for_process(
     goal_id: &str,
     process: &ManagedProcess,
     phase: WorkflowOwnershipPhase,
-) -> RefineResult<Option<WorkflowGoalOwnership>> {
-    preflight_goal_state(refine_dir, goal_id)?;
+) -> RefineResult<ProcessGoalFence> {
+    let goal = preflight_goal_state(refine_dir, goal_id)?;
     let metadata = process_metadata(process);
     let has_workflow_identity = ["claim_id", "execution_id"]
         .iter()
@@ -380,7 +554,10 @@ fn preflight_goal_for_process(
     let state = WorkflowEngine::new(runtime_root).load_state()?;
     if !has_workflow_identity {
         ensure_goal_has_no_active_workflow_claim(runtime_root, goal_id, &process.id)?;
-        return Ok(None);
+        return Ok(ProcessGoalFence {
+            goal,
+            workflow: None,
+        });
     }
 
     let execution_id = metadata
@@ -433,8 +610,11 @@ fn preflight_goal_for_process(
         round_idx,
     };
     validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, phase)?;
-    validate_goal_round(refine_dir, goal_id, &ownership)?;
-    Ok(Some(ownership))
+    validate_expected_goal_round(&goal, goal_id, &ownership, phase)?;
+    Ok(ProcessGoalFence {
+        goal,
+        workflow: Some(ownership),
+    })
 }
 
 fn ensure_goal_has_no_active_workflow_claim(
@@ -443,6 +623,20 @@ fn ensure_goal_has_no_active_workflow_claim(
     process_id: &str,
 ) -> RefineResult<()> {
     let state = WorkflowEngine::new(runtime_root).load_state()?;
+    ensure_goal_has_no_active_workflow_claim_in_state(
+        &state,
+        goal_id,
+        process_id,
+        WorkflowOwnershipPhase::BeforeTermination,
+    )
+}
+
+fn ensure_goal_has_no_active_workflow_claim_in_state(
+    state: &WorkflowAutomationState,
+    goal_id: &str,
+    process_id: &str,
+    phase: WorkflowOwnershipPhase,
+) -> RefineResult<()> {
     if state.claims.iter().any(|claim| {
         claim.goal_id == goal_id
             && matches!(
@@ -450,28 +644,17 @@ fn ensure_goal_has_no_active_workflow_claim(
                 WorkflowClaimState::Claimed | WorkflowClaimState::Running
             )
     }) {
+        let outcome = match phase {
+            WorkflowOwnershipPhase::BeforeTermination => {
+                "termination was not requested and the Goal remains non-cancelled"
+            }
+            WorkflowOwnershipPhase::BeforeCancellation => {
+                "the process exit is confirmed, but the Goal remains non-cancelled"
+            }
+        };
         return Err(RefineError::Conflict(format!(
-            "managed process {process_id} has no workflow execution ownership, but Goal {goal_id} has an active claim; termination was not requested and the Goal remains non-cancelled"
+            "managed process {process_id} has no workflow execution ownership, but Goal {goal_id} has an active competing claim; {outcome}"
         )));
-    }
-    Ok(())
-}
-
-fn validate_goal_cancellation(
-    refine_dir: &Path,
-    runtime_root: &Path,
-    goal_id: &str,
-    ownership: Option<&WorkflowGoalOwnership>,
-) -> RefineResult<()> {
-    preflight_goal_state(refine_dir, goal_id)?;
-    if let Some(ownership) = ownership {
-        validate_workflow_goal_ownership(
-            runtime_root,
-            goal_id,
-            ownership,
-            WorkflowOwnershipPhase::BeforeCancellation,
-        )?;
-        validate_goal_round(refine_dir, goal_id, ownership)?;
     }
     Ok(())
 }
@@ -483,12 +666,21 @@ fn validate_workflow_goal_ownership(
     phase: WorkflowOwnershipPhase,
 ) -> RefineResult<()> {
     let state = WorkflowEngine::new(runtime_root).load_state()?;
+    validate_workflow_goal_ownership_in_state(&state, goal_id, ownership, phase)
+}
+
+fn validate_workflow_goal_ownership_in_state(
+    state: &WorkflowAutomationState,
+    goal_id: &str,
+    ownership: &WorkflowGoalOwnership,
+    phase: WorkflowOwnershipPhase,
+) -> RefineResult<()> {
     let claim = state
         .claims
         .iter()
         .find(|claim| claim.claim_id == ownership.claim_id)
         .ok_or_else(|| {
-            stale_workflow_ownership(goal_id, ownership, "claim is no longer present")
+            stale_workflow_ownership(goal_id, ownership, "claim is no longer present", phase)
         })?;
     if claim.goal_id != goal_id
         || claim.execution_id.as_deref() != Some(ownership.execution_id.as_str())
@@ -497,6 +689,7 @@ fn validate_workflow_goal_ownership(
             goal_id,
             ownership,
             "claim identity or execution changed",
+            phase,
         ));
     }
     let competing_active_claim = state.claims.iter().any(|candidate| {
@@ -512,6 +705,7 @@ fn validate_workflow_goal_ownership(
             goal_id,
             ownership,
             "a newer workflow claim owns the Goal",
+            phase,
         ));
     }
     if phase == WorkflowOwnershipPhase::BeforeTermination
@@ -521,26 +715,28 @@ fn validate_workflow_goal_ownership(
             goal_id,
             ownership,
             "the recorded workflow claim is not running",
+            phase,
         ));
     }
     Ok(())
 }
 
-fn validate_goal_round(
-    refine_dir: &Path,
+fn validate_expected_goal_round(
+    goal: &GoalCancellationExpectation,
     goal_id: &str,
     ownership: &WorkflowGoalOwnership,
+    phase: WorkflowOwnershipPhase,
 ) -> RefineResult<()> {
-    let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
-    if goal.goal.round_count != ownership.round_idx.saturating_add(1) {
+    if goal.round_count != ownership.round_idx.saturating_add(1) {
         return Err(stale_workflow_ownership(
             goal_id,
             ownership,
             &format!(
                 "process round {} is not the current Goal round {}",
                 ownership.round_idx + 1,
-                goal.goal.round_count
+                goal.round_count
             ),
+            phase,
         ));
     }
     Ok(())
@@ -550,9 +746,18 @@ fn stale_workflow_ownership(
     goal_id: &str,
     ownership: &WorkflowGoalOwnership,
     reason: &str,
+    phase: WorkflowOwnershipPhase,
 ) -> RefineError {
+    let outcome = match phase {
+        WorkflowOwnershipPhase::BeforeTermination => {
+            "termination was not requested and the Goal remains non-cancelled"
+        }
+        WorkflowOwnershipPhase::BeforeCancellation => {
+            "the process exit is confirmed, but the Goal remains non-cancelled"
+        }
+    };
     RefineError::Conflict(format!(
-        "managed process {} has stale workflow ownership for Goal {goal_id} (claim {}, execution {}, round {}): {reason}; termination was not requested and the Goal remains non-cancelled",
+        "managed process {} has stale workflow ownership for Goal {goal_id} (claim {}, execution {}, round {}): {reason}; {outcome}",
         ownership.process_id,
         ownership.claim_id,
         ownership.execution_id,
@@ -600,6 +805,10 @@ fn stop_failure_with_goal_context(
         .map(|goal_id| format!("; linked Goal {goal_id} remains non-cancelled"))
         .unwrap_or_default();
     let message = format!("{error}{goal_context}; retry process {process_id} after recovery");
+    error_with_message(error, message)
+}
+
+fn error_with_message(error: RefineError, message: String) -> RefineError {
     match error {
         RefineError::InvalidInput(_) => RefineError::InvalidInput(message),
         RefineError::NotFound(_) => RefineError::NotFound(message),
@@ -610,6 +819,53 @@ fn stop_failure_with_goal_context(
         RefineError::Serialization(_) => RefineError::Serialization(message),
         RefineError::NotImplemented(_) => RefineError::NotImplemented(message),
     }
+}
+
+fn termination_outcome_flag(termination: &Value, key: &str) -> bool {
+    if let Some(value) = termination.get(key).and_then(Value::as_bool) {
+        return value;
+    }
+    termination
+        .get("managed_processes")
+        .and_then(Value::as_array)
+        .is_some_and(|processes| {
+            processes
+                .iter()
+                .all(|process| process.get(key).and_then(Value::as_bool) == Some(true))
+        })
+}
+
+fn write_json_receipt(path: &Path, value: &Value) -> RefineResult<()> {
+    let parent = path.parent().ok_or_else(|| {
+        RefineError::InvalidInput(format!(
+            "partial process-stop receipt {} has no parent",
+            path.display()
+        ))
+    })?;
+    fs::create_dir_all(parent).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to create partial process-stop receipt directory {}: {error}",
+            parent.display()
+        ))
+    })?;
+    let encoded = serde_json::to_vec_pretty(value).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode partial process-stop receipt: {error}"
+        ))
+    })?;
+    let temp_path = path.with_extension("json.tmp");
+    fs::write(&temp_path, encoded).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to write partial process-stop receipt {}: {error}",
+            temp_path.display()
+        ))
+    })?;
+    fs::rename(&temp_path, path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to commit partial process-stop receipt {}: {error}",
+            path.display()
+        ))
+    })
 }
 
 fn validate_process_id(process_id: &str) -> RefineResult<()> {
@@ -625,12 +881,15 @@ fn validate_process_id(process_id: &str) -> RefineResult<()> {
 mod tests {
     use std::fs;
     use std::process::Command;
+    use std::sync::{Arc, Mutex, mpsc};
+    use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use serde_json::json;
 
     use super::*;
     use crate::process::subprocess::{ManagedProcessSpec, managed_pid_is_alive};
+    use crate::workflow::WorkflowAutomation;
 
     #[test]
     fn confirmed_agent_exit_precedes_linked_goal_cancellation() {
@@ -845,6 +1104,204 @@ mod tests {
         assert_eq!(result["termination"]["confirmed_exit"], true);
         assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
         assert_eq!(result["goal"]["status"], "cancelled");
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn ownership_change_after_confirmed_exit_retains_truthful_partial_outcome() {
+        let temp_root = unique_temp_dir("process-control-post-exit-ownership");
+        let runtime_root = temp_root.join("run/8080");
+        let refine_dir = temp_root.join(".refine");
+        create_in_progress_goal_with_rounds(&refine_dir, "GOAL-POST-EXIT", 1);
+        let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let process = launch_workflow_agent(
+            &supervisor,
+            "GOAL-POST-EXIT",
+            "claim-current",
+            "exec-current",
+            0,
+        );
+        let pid = process.pid.unwrap();
+        write_workflow_state(
+            &runtime_root,
+            json!([{
+                "claim_id": "claim-current",
+                "goal_id": "GOAL-POST-EXIT",
+                "execution_id": "exec-current",
+                "state": "running",
+                "created_at": "2026-07-23T00:00:00Z",
+                "updated_at": "2026-07-23T00:00:00Z"
+            }]),
+        );
+
+        let hook_runtime = runtime_root.clone();
+        let hook_target = temp_root.clone();
+        let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_post_exit_hook(move || {
+                WorkflowEngine::with_target_root(&hook_runtime, &hook_target)
+                    .retry("exec-current")
+                    .unwrap();
+            })
+            .stop(&process.id, "terminate")
+            .unwrap_err();
+
+        assert!(matches!(error, RefineError::Conflict(_)), "{error}");
+        let message = error.to_string();
+        assert!(message.contains("confirmed_exit=true"), "{message}");
+        assert!(
+            message.contains("registry_cleanup_completed=true"),
+            "{message}"
+        );
+        assert!(
+            message.contains("identity_cleanup_completed=true"),
+            "{message}"
+        );
+        assert!(message.contains("goal_cancelled=false"), "{message}");
+        assert!(
+            message.contains("claim identity or execution changed"),
+            "{message}"
+        );
+        assert!(message.contains("supported recovery"), "{message}");
+        assert!(
+            !message.contains("termination was not requested"),
+            "{message}"
+        );
+        assert!(!managed_pid_is_alive(pid).unwrap());
+        assert!(supervisor.inspect(&process.id).is_err());
+        assert!(
+            !runtime_root
+                .join("agents/process-identities")
+                .join(format!("{}.json", process.id))
+                .exists()
+        );
+        assert_eq!(
+            FileWorkItemService::new(&refine_dir)
+                .show_goal_summary("GOAL-POST-EXIT")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::InProgress
+        );
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(
+                runtime_root
+                    .join("process-stop-outcomes")
+                    .join(format!("{}.json", process.id)),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(receipt["state"], "partial_failure");
+        assert_eq!(receipt["confirmed_exit"], true);
+        assert_eq!(receipt["registry_cleanup_completed"], true);
+        assert_eq!(receipt["identity_cleanup_completed"], true);
+        assert_eq!(receipt["goal_cancelled"], false);
+        assert!(
+            receipt["cause"]
+                .as_str()
+                .unwrap()
+                .contains("claim identity or execution changed")
+        );
+        assert!(
+            receipt["recovery"]
+                .as_str()
+                .unwrap()
+                .contains("current Goal owner")
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn final_ownership_and_goal_fence_are_atomic_with_cancellation() {
+        let temp_root = unique_temp_dir("process-control-atomic-settlement");
+        let runtime_root = temp_root.join("run/8080");
+        let refine_dir = temp_root.join(".refine");
+        create_in_progress_goal_with_rounds(&refine_dir, "GOAL-ATOMIC", 1);
+        let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let process = launch_workflow_agent(
+            &supervisor,
+            "GOAL-ATOMIC",
+            "claim-current",
+            "exec-current",
+            0,
+        );
+        write_workflow_state(
+            &runtime_root,
+            json!([{
+                "claim_id": "claim-current",
+                "goal_id": "GOAL-ATOMIC",
+                "execution_id": "exec-current",
+                "state": "running",
+                "created_at": "2026-07-23T00:00:00Z",
+                "updated_at": "2026-07-23T00:00:00Z"
+            }]),
+        );
+
+        let (at_fence_tx, at_fence_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let release_rx = Arc::new(Mutex::new(release_rx));
+        let hook_release = Arc::clone(&release_rx);
+        let service = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_settlement_hook(move || {
+                at_fence_tx.send(()).unwrap();
+                hook_release.lock().unwrap().recv().unwrap();
+            });
+        let stopped_process_id = process.id.clone();
+        let stop_thread = thread::spawn(move || service.stop(&stopped_process_id, "terminate"));
+
+        at_fence_rx.recv().unwrap();
+        let (attempted_tx, attempted_rx) = mpsc::channel();
+        let round_refine_dir = refine_dir.clone();
+        let round_attempted = attempted_tx.clone();
+        let round_thread = thread::spawn(move || {
+            round_attempted.send("round").unwrap();
+            FileWorkItemService::new(round_refine_dir).append_goal_round_summary(
+                "GOAL-ATOMIC",
+                "Concurrent owner",
+                "Start a newer round",
+            )
+        });
+        let retry_runtime = runtime_root.clone();
+        let retry_target = temp_root.clone();
+        let retry_thread = thread::spawn(move || {
+            attempted_tx.send("retry").unwrap();
+            WorkflowEngine::with_target_root(retry_runtime, retry_target).retry("exec-current")
+        });
+        let mut attempted = vec![attempted_rx.recv().unwrap(), attempted_rx.recv().unwrap()];
+        attempted.sort_unstable();
+        assert_eq!(attempted, vec!["retry", "round"]);
+
+        release_tx.send(()).unwrap();
+        let stop_result = stop_thread.join().unwrap().unwrap();
+        let round_error = round_thread.join().unwrap().unwrap_err();
+        let retry_error = retry_thread.join().unwrap().unwrap_err();
+
+        assert_eq!(stop_result["termination"]["confirmed_exit"], true);
+        assert_eq!(stop_result["goal"]["status"], "cancelled");
+        assert!(
+            round_error.to_string().contains("not allowed"),
+            "{round_error}"
+        );
+        assert!(
+            retry_error
+                .to_string()
+                .contains("workflow execution cannot be retried"),
+            "{retry_error}"
+        );
+        let goal = FileWorkItemService::new(&refine_dir)
+            .show_goal_summary("GOAL-ATOMIC")
+            .unwrap();
+        assert_eq!(goal.goal.status, GoalStatus::Cancelled);
+        assert_eq!(goal.goal.round_count, 1);
+        let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
+        let claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.claim_id == "claim-current")
+            .unwrap();
+        assert_eq!(claim.execution_id.as_deref(), Some("exec-current"));
+
         fs::remove_dir_all(temp_root).unwrap();
     }
 

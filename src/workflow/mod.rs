@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 pub mod behavior;
@@ -9,6 +9,7 @@ pub mod context;
 pub mod promotion;
 
 use chrono::Utc;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -41,6 +42,7 @@ use crate::workflow::context::WorkflowContext;
 use crate::workflow::promotion::BacklogPromotionService;
 
 pub const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
+const WORKFLOW_AUTOMATION_STATE_LOCK_FILE: &str = ".workflow-automation-state.lock";
 const AUTOMATION_CONCURRENCY_LIMIT_REACHED: &str = "automation concurrency limit reached";
 const ACTIVE_WORK_REPLENISH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
@@ -152,6 +154,17 @@ pub struct WorkflowEngine {
     pub target_root: Option<PathBuf>,
 }
 
+#[derive(Debug)]
+pub(crate) struct WorkflowStateMutationLock {
+    file: File,
+}
+
+impl Drop for WorkflowStateMutationLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
 impl WorkflowEngine {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         let runtime_root = runtime_root.into();
@@ -204,6 +217,35 @@ impl WorkflowEngine {
 
     pub fn load_state(&self) -> RefineResult<WorkflowAutomationState> {
         read_state(&self.state_path())
+    }
+
+    pub(crate) fn acquire_state_mutation_lock(&self) -> RefineResult<WorkflowStateMutationLock> {
+        fs::create_dir_all(&self.runtime_root).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create workflow runtime root {}: {error}",
+                self.runtime_root.display()
+            ))
+        })?;
+        let path = self.runtime_root.join(WORKFLOW_AUTOMATION_STATE_LOCK_FILE);
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open workflow state mutation lock {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock workflow state mutations {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(WorkflowStateMutationLock { file })
     }
 
     fn save_state(&self, state: &mut WorkflowAutomationState) -> RefineResult<()> {
@@ -266,14 +308,18 @@ impl WorkflowEngine {
     }
 
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
-        let mut state = self.load_state()?;
-        state.policy = self.policy()?;
-        let runnable = match self.ensure_automation_running(&state) {
-            Ok(()) => true,
-            Err(RefineError::Conflict(_)) => false,
-            Err(error) => return Err(error),
+        let runnable = {
+            let _state_lock = self.acquire_state_mutation_lock()?;
+            let mut state = self.load_state()?;
+            state.policy = self.policy()?;
+            let runnable = match self.ensure_automation_running(&state) {
+                Ok(()) => true,
+                Err(RefineError::Conflict(_)) => false,
+                Err(error) => return Err(error),
+            };
+            self.save_state(&mut state)?;
+            runnable
         };
-        self.save_state(&mut state)?;
         if runnable { self.promote() } else { Ok(0) }
     }
 
@@ -922,6 +968,7 @@ impl WorkflowEngine {
         claim_id: &str,
         claim_state: WorkflowClaimState,
     ) -> RefineResult<()> {
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let Some(claim) = state
             .claims
@@ -946,6 +993,7 @@ impl WorkflowEngine {
     }
 
     fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
@@ -1010,6 +1058,7 @@ struct GovernanceEvaluation {
 
 impl WorkflowAutomation for WorkflowEngine {
     fn promote(&self) -> RefineResult<usize> {
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1085,6 +1134,7 @@ impl WorkflowAutomation for WorkflowEngine {
         if goal_id.is_empty() {
             return Err(RefineError::InvalidInput("Goal id is required".to_string()));
         }
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1143,6 +1193,7 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn start_claim(&self, claim_id: &str) -> RefineResult<String> {
         let claim_id = claim_id.trim();
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1206,12 +1257,14 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()> {
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         state.paused.insert(control);
         self.save_state(&mut state)
     }
 
     fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()> {
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         state.paused.remove(&control);
         self.save_state(&mut state)
@@ -1220,6 +1273,7 @@ impl WorkflowAutomation for WorkflowEngine {
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
         let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
@@ -1239,6 +1293,7 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn retry(&self, execution_id: &str) -> RefineResult<String> {
         let execution_id = execution_id.trim();
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1252,6 +1307,21 @@ impl WorkflowAutomation for WorkflowEngine {
                 "claim for execution {execution_id} was not found"
             )));
         };
+        if let Some(refine_dir) = self.refine_dir()? {
+            let goal_id = state.claims[claim_index].goal_id.clone();
+            match FileWorkItemService::new(refine_dir).show_goal_summary(&goal_id) {
+                Ok(goal)
+                    if matches!(goal.goal.status, GoalStatus::Cancelled | GoalStatus::Done) =>
+                {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {goal_id} is {}; its workflow execution cannot be retried",
+                        goal.goal.status.as_str()
+                    )));
+                }
+                Ok(_) | Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
         if self.signal_workflow_subprocesses(execution_id, "terminate")? > 0 {
             return Err(RefineError::Conflict(format!(
                 "execution {execution_id} is still stopping; retry after its managed agent process exits"
