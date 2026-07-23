@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:33:34Z",
+  "updated_at": "2026-07-23T18:35:54Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2196,6 +2196,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The serial full-library gate has now failed at compile time with six errors after the focused tests passed. The agent is still live and has not signaled completion, so I’m allowing it to diagnose and correct the broader-test integration; this is not being counted as a successful full gate."
+    },
+    {
+      "created_at": "2026-07-23T18:35:54Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831754123-105",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The transcript-race implementation is committed as `9b7d9d33`; Governance is actively evaluating it now. Focused lifecycle tests and checks passed, but the full library gate again has the same reproducible timing failure (470/471), and strict Clippy reports six existing lints. I’m preserving those failures and waiting for Governance rather than promoting the candidate myself."
     }
   ],
   "queued_messages": [
