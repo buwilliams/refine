@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:09:51Z",
+  "updated_at": "2026-07-23T11:10:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -516,6 +516,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Goal agent completed cleanly and reported full verification: 453 Rust library tests, all binaries, 32 browser tests, focused API/CLI/nested-process cases, formatting, assets, and diff checks all passed. Codex diagnostics are healthy. Refine has recorded candidate `8978757e`, but its independent Governance transition has not settled yet; I’m treating that as in-flight, not as approval or completion. A separate newly started Goal is visible and healthy, but I’m not widening into it unless it becomes actionable."
+    },
+    {
+      "created_at": "2026-07-23T11:10:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805003743-20",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Refine’s independent pipeline has now settled Round 2 at `review`: Governance passed and Quality is recorded as passed. I’m doing the final boundary checks now—whether Quality was substantive or a no-op, whether the candidate was published, whether it remains unmerged, and whether daemon/UI/Git health stayed intact."
     }
   ],
   "queued_messages": [
