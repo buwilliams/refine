@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:58:15Z",
+  "updated_at": "2026-07-23T10:59:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -468,6 +468,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Current live-worker evidence is coherent and non-stalled: the process is alive, its worktree is clean at the current `main` base, and no completion or input-needed signal exists yet. I’ll continue monitoring the workflow-owned run; I won’t send it speculative instructions or interrupt its cancellation boundary."
+    },
+    {
+      "created_at": "2026-07-23T10:59:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784804373549-12",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The worker has produced a clean commit (`1c9a7d4e`) and remains active, which is consistent with post-commit verification rather than a lost process. I’m inspecting the commit scope and waiting for the workflow’s own Governance/Quality transition before judging it."
     }
   ],
   "queued_messages": [
