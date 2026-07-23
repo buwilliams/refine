@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:31:49Z",
+  "updated_at": "2026-07-23T14:34:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -996,6 +996,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The agent has added deterministic concurrency and partial-outcome coverage in the same five-file scope; the worktree now shows roughly 563 insertions and 101 deletions. The Goal remains `in-progress`, with no provider failure or input request. I’m continuing through its required verification gates."
+    },
+    {
+      "created_at": "2026-07-23T14:34:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817293162-196",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The affected process intent page was updated to document the new atomic cancellation contract and retained partial-outcome receipt; this is directly tied to the behavior change. The implementation is still uncommitted and under agent verification, so it is not yet a review candidate."
     }
   ],
   "queued_messages": [
