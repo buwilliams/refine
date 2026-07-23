@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:22:13Z",
+  "updated_at": "2026-07-23T10:23:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -348,6 +348,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The candidate branches are clean and based on the current `main`, but all three overlap the dirty primary checkout (especially `web_server/tests.rs`, `toolbar.js`, and its browser test). State synchronization and GitHub reachability are currently healthy again; the unresolved boundary is the paused/stopped workflow-launch state, which I’m checking directly before deciding whether a recovery round can safely be queued."
+    },
+    {
+      "created_at": "2026-07-23T10:23:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784802198663-149",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Direct runtime evidence now shows workflow automation is not paused (`paused: []`, background launches enabled, runner live), so the failed Goal is actionable without overriding a cancellation boundary. I’m opening one narrow recovery round for `00000SZ3KJDDGGCK29J4N4Y001`; the two review Goals remain untouched pending your approval decision."
     }
   ],
   "queue_dispatching": true,

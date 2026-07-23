@@ -97,9 +97,32 @@
       "rule_state": "failed",
       "updated": "2026-07-23T10:19:05Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T10:23:23Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Governance rejected round 1 because nested agents are listed but their process output and control paths cannot address them. Preserve the existing implementation through commit 04177422192b760a5c0dafd613439d7e0df53aaa and close only these governance gaps. Make the shared Process capability resolve nested agent process IDs consistently for list, output streaming, and stop/cancellation across the API, browser, and CLI ps --stop paths; do not advertise actions that return not-found. Reuse one shared cross-platform resolver and the existing managed-agent registry rather than duplicating PID or path logic. Preserve foreground/background classification and keep ordinary terminals excluded. Add focused behavioral coverage that proves nested agent output streaming and stopping work through the production API/CLI paths, including not-found and cancellation feedback, and retain the existing enumeration/browser classification coverage. Run formatting and the smallest complete Rust/browser/static checks proportional to these process and cancellation changes. Commit the Goal-owned changes, leave the worktree clean and unmerged, and preserve all provider, authentication, cancellation, and review boundaries.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T10:23:23Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T10:19:05Z"
+  "updated": "2026-07-23T10:23:23Z"
 }
