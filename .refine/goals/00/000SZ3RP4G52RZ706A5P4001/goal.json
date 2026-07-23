@@ -127,9 +127,32 @@
       "rule_state": "failed",
       "updated": "2026-07-23T13:20:06Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T13:20:57Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover rejected candidate a1f6c2e6 from current main while preserving that candidate, its worktree, and all prior provider and Governance evidence. Fix only the five recorded Governance violations. Move the combined stop-agent-and-cancel-linked-Goal behavior into one authoritative shared product capability used consistently by browser, API, CLI system process stop, and MCP surfaces, leaving each surface thin and supporting managed, interactive, chat, and synthetic agent records. Do not remove supervision evidence or mark a linked Goal cancelled merely after requesting termination: retain the process record, confirm the exact owned process has exited, then persist cancellation; if termination is delayed, resisted, mismatched, or fails, keep the Goal non-cancelled and return visible causal failure and recovery evidence. Add focused shared-service and cross-surface coverage, including a termination-resistant or delayed process, identity mismatch, successful confirmed exit before Goal cancellation, and consistent CLI/API/browser behavior. Preserve authentication, cancellation, provider, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly. Re-run focused process tests, the full library and web suites, all-target check, formatting, and diff checks, and report exact results.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T13:20:57Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T13:20:06Z"
+  "updated": "2026-07-23T13:20:57Z"
 }
