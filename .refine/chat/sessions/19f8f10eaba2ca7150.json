@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:07:53Z",
+  "updated_at": "2026-07-23T19:08:23Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2769,6 +2769,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m reconciling the stall report against live process, Goal/Round, worktree, provider, and daemon evidence first. I’ll only initiate a supported recovery if the worker is genuinely lost and the existing Round cannot still settle safely."
+    },
+    {
+      "created_at": "2026-07-23T19:08:23Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784833703396-184",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied “no live worker” snapshot is stale: the live daemon, process API, and OS all now report a Goal agent for this exact Goal and Round 7. I’m checking whether it is genuinely progressing or merely a stale managed-process record before deciding whether any recovery is justified."
     }
   ],
   "queue_dispatching": true,
