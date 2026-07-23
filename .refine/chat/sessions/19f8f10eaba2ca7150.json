@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:13:31Z",
+  "updated_at": "2026-07-23T14:14:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -801,15 +801,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The performance candidate `7b67a8ef` passed Governance and reached `review`. Active work is now zero. I’m doing the final audit pass—candidate publication/ancestry, clean worktrees, daemon/UI health, and the exact Quality limitation—before handing you the required decisions."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8f38c1933b8b624",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"review\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"failed\", \"00000SZ3SFP4N10NXGAE5P4002\": \"review\", \"00000SZ3SHFHFK352VJT5P4003\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T13:44:49Z",
-      "updated_at": "2026-07-23T14:13:07Z",
-      "internal": true
+      "created_at": "2026-07-23T14:14:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816073570-163",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Active work is settled: **0 active, 0 queued, 1 failed**. No merge or approval was performed.\n\n| Goal | Candidate | State |\n|---|---|---|\n| Ready-Merge integration | `e789bd9f` | Review |\n| Controls-menu consistency | `ed0f6936` | Review |\n| Goal-Agent toolbar loading | `bcf9d063` | Review |\n| Goal creation under 50 ms | `7b67a8ef` | Review |\n| Agent stop/cancellation | `c9a92ee5` rejected; Round 3 prepared | Failed |\n\nAll four review candidates passed Governance, have clean published worktrees, and are not on `main`. Their Quality stage was a no-op: **“No Quality tests configured.”** Implementation-reported tests/builds passed.\n\nCurrent health: daemon healthy, UI/API return 200, `main` and `refine/state` are clean and remote-aligned, Codex authentication/diagnostics pass. The historical `operation-recovery-interrupted` degradation remains visible.\n\nDecision required:\n\n1. Do you authorize the confirmed failed→todo recovery operation for `00000SZ3RP4G52RZ706A5P4001`? I’ll first recheck"
+    },
+    {
+      "created_at": "2026-07-23T14:14:33Z",
+      "delivered": false,
+      "id": "evt-1784816073823-165",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Active work is settled: **0 active, 0 queued, 1 failed**. No merge or approval was performed.\n\n| Goal | Candidate | State |\n|---|---|---|\n| Ready-Merge integration | `e789bd9f` | Review |\n| Controls-menu consistency | `ed0f6936` | Review |\n| Goal-Agent toolbar loading | `bcf9d063` | Review |\n| Goal creation under 50 ms | `7b67a8ef` | Review |\n| Agent stop/cancellation | `c9a92ee5` rejected; Round 3 prepared | Failed |\n\nAll four review candidates passed Governance, have clean published worktrees, and are not on `main`. Their Quality stage was a no-op: **“No Quality tests configured.”** Implementation-reported tests/builds passed.\n\nCurrent health: daemon healthy, UI/API return 200, `main` and `refine/state` are clean and remote-aligned, Codex authentication/diagnostics pass. The historical `operation-recovery-interrupted` degradation remains visible.\n\nDecision required:\n\n1. Do you authorize the confirmed failed→todo recovery operation for `00000SZ3RP4G52RZ706A5P4001`? I’ll first recheck that it remains the sole failed Goal.\n2. Which review Goals, if any, should be approved? I recommend approving serially by Goal ID because approval is the merge boundary."
+    },
+    {
+      "created_at": "2026-07-23T14:14:33Z",
+      "delivered": false,
+      "id": "evt-1784816073823-166",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T14:14:33Z",
+      "delivered": false,
+      "id": "evt-1784816073836-168",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
