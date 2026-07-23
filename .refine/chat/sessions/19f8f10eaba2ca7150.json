@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:54:51Z",
+  "updated_at": "2026-07-23T19:04:32Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2661,8 +2661,27 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T19:04:26Z",
+      "delivered": false,
+      "id": "evt-1784833466541-164",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
+  "queued_messages": [
+    {
+      "id": "qm-19f905d79b452e9",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {\"00000SZ3RP4G52RZ706A5P4001\": \"Goal 00000SZ3RP4G52RZ706A5P4001 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.\"}",
+      "created_at": "2026-07-23T19:04:32Z",
+      "updated_at": "2026-07-23T19:04:32Z",
+      "internal": true
+    }
+  ],
+  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
