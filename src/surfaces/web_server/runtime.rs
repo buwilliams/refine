@@ -289,8 +289,7 @@ impl InProcessWebServer {
         if self.current_target_root()?.is_none() {
             return Ok(());
         }
-        self.rebuild_current_projection_cache()?;
-        self.current_projection_with_runtime().map(|_| ())
+        self.rebuild_current_projection_cache().map(|_| ())
     }
 
     pub(super) fn warm_current_projection_cache(&self) -> RefineResult<Option<ProjectionSnapshot>> {
@@ -311,14 +310,6 @@ impl InProcessWebServer {
     }
 
     pub(super) fn rebuild_current_projection_cache(&self) -> RefineResult<ProjectionSnapshot> {
-        let projection = self.rebuild_current_project_projection_cache()?;
-        let _ = self.refresh_runtime_projection_cache()?;
-        Ok(projection)
-    }
-
-    pub(super) fn rebuild_current_project_projection_cache(
-        &self,
-    ) -> RefineResult<ProjectionSnapshot> {
         let Some(runtime_root) = &self.runtime_root else {
             return Err(RefineError::InvalidInput(
                 "runtime root is required to rebuild projection cache".to_string(),
@@ -330,7 +321,8 @@ impl InProcessWebServer {
             ));
         };
         let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
-        let projection = store.rebuild_projection()?;
+        let mut projection = store.rebuild_projection()?;
+        projection.runtime = self.refresh_runtime_projection_cache()?;
         store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
         store_hot_projection(
             projection_cache_key(&refine_dir, runtime_root),

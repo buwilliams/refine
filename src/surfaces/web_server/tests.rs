@@ -102,6 +102,7 @@ fn web_server_routes_work_goal_queries_through_projection() {
                 json_path: "goals/02/GOAL2/goal.json".to_string(),
             },
             node_display_name: Some("Node B".to_string()),
+            latest_round_prompt: None,
             searchable_text: "Settings route Alice".to_string(),
             activity_ids: Vec::new(),
         },
@@ -1322,6 +1323,204 @@ fn web_server_handles_new_goal_duplicate_decisions() {
     });
     assert_eq!(list.status, 200);
     assert_eq!(list.body["page"]["total"], 2);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale() {
+    const GOAL_COUNT: usize = 50;
+    const MAX_REQUEST_TIME: Duration = Duration::from_millis(50);
+
+    let temp_root = unique_temp_dir("http-goal-create-performance");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    for index in 0..GOAL_COUNT {
+        let id = format!("GOAL{index:04}");
+        let goal_path = refine_dir
+            .join("goals")
+            .join(&id[..2])
+            .join(&id[2..])
+            .join("goal.json");
+        fs::create_dir_all(goal_path.parent().unwrap()).unwrap();
+        fs::write(
+            goal_path,
+            serde_json::to_vec_pretty(&json!({
+                "id": id,
+                "name": format!("Performance fixture {index}"),
+                "status": "backlog",
+                "priority": "low",
+                "reporter": "Performance",
+                "assignee": "Performance",
+                "branch_name": null,
+                "feature_id": null,
+                "feature_order": null,
+                "node_id": "default",
+                "created": "2026-07-23T12:00:00Z",
+                "updated": "2026-07-23T12:00:00Z",
+                "notes": [],
+                "rounds": [{
+                    "reporter": "Performance",
+                    "assignee": "Performance",
+                    "prompt": format!("Performance prompt {index}"),
+                    "created": "2026-07-23T12:00:00Z",
+                    "updated": "2026-07-23T12:00:00Z",
+                    "guidance_decision": null,
+                    "governance": null,
+                    "quality": null,
+                    "logs": []
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+    server.warm_current_projection_cache().unwrap();
+    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+
+    let duplicate_started = Instant::now();
+    let duplicate = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "reporter": "Performance",
+            "prompt": format!("Performance prompt {}", GOAL_COUNT - 1)
+        })),
+    });
+    let duplicate_elapsed = duplicate_started.elapsed();
+    assert_eq!(duplicate.status, 409);
+    assert_eq!(
+        duplicate.body["error"]["duplicate"]["match"]["id"],
+        format!("GOAL{:04}", GOAL_COUNT - 1)
+    );
+    assert_eq!(
+        FileProjectStateStore::rebuild_count(&refine_dir),
+        0,
+        "a warmed duplicate decision must not rebuild the projection"
+    );
+
+    let create_started = Instant::now();
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "reporter": "Performance",
+            "prompt": "A distinct warmed-cache Goal"
+        })),
+    });
+    let create_elapsed = create_started.elapsed();
+    assert_eq!(created.status, 201);
+    assert_eq!(created.body["goal"]["round_count"], 1);
+    assert_eq!(
+        FileProjectStateStore::rebuild_count(&refine_dir),
+        1,
+        "a successful create must rebuild the complete projection exactly once"
+    );
+
+    eprintln!(
+        "warmed POST /api/goals timings at {GOAL_COUNT} Goals: late duplicate={duplicate_elapsed:?}, create={create_elapsed:?}"
+    );
+    assert!(
+        duplicate_elapsed < MAX_REQUEST_TIME,
+        "late duplicate POST took {duplicate_elapsed:?}, expected < {MAX_REQUEST_TIME:?}"
+    );
+    assert!(
+        create_elapsed < MAX_REQUEST_TIME,
+        "successful create POST took {create_elapsed:?}, expected < {MAX_REQUEST_TIME:?}"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn warmed_goal_create_detects_an_external_latest_round_change() {
+    let temp_root = unique_temp_dir("http-goal-create-external-change");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+    server.warm_current_projection_cache().unwrap();
+
+    let external = FileWorkItemService::new(&refine_dir);
+    external
+        .create_goal_summary("Externally created", Some("EXT1"))
+        .unwrap();
+    external
+        .append_goal_round_summary("EXT1", "External daemon", "External duplicate prompt")
+        .unwrap();
+
+    let duplicate = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({
+            "reporter": "Performance",
+            "prompt": "External duplicate prompt"
+        })),
+    });
+
+    assert_eq!(duplicate.status, 409);
+    assert_eq!(duplicate.body["error"]["code"], "duplicate_goal");
+    assert_eq!(duplicate.body["error"]["duplicate"]["match"]["id"], "EXT1");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn concurrent_goal_create_requests_make_one_auditable_duplicate_decision() {
+    let temp_root = unique_temp_dir("http-goal-create-concurrent");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+    server.warm_current_projection_cache().unwrap();
+
+    let barrier = Arc::new(Barrier::new(3));
+    let mut handles = Vec::new();
+    for _ in 0..2 {
+        let server = server.clone();
+        let barrier = Arc::clone(&barrier);
+        handles.push(thread::spawn(move || {
+            barrier.wait();
+            server.handle(ApiRequest {
+                method: "POST".to_string(),
+                path: "/api/goals".to_string(),
+                body: Some(json!({
+                    "reporter": "Concurrent daemon",
+                    "prompt": "One coherent concurrent prompt"
+                })),
+            })
+        }));
+    }
+    barrier.wait();
+    let mut responses = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .collect::<Vec<_>>();
+    responses.sort_by_key(|response| response.status);
+
+    assert_eq!(responses[0].status, 201);
+    assert_eq!(responses[1].status, 409);
+    assert_eq!(responses[1].body["error"]["code"], "duplicate_goal");
+    let projection = FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    assert_eq!(projection.goals.len(), 1);
+    assert_eq!(
+        projection
+            .goals
+            .values()
+            .next()
+            .and_then(|goal| goal.latest_round_prompt.as_deref()),
+        Some("One coherent concurrent prompt")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -7768,6 +7967,7 @@ fn server_with_projection() -> InProcessWebServer {
                 json_path: "goals/01/GOAL1/goal.json".to_string(),
             },
             node_display_name: None,
+            latest_round_prompt: None,
             searchable_text: "Projection route".to_string(),
             activity_ids: Vec::new(),
         },

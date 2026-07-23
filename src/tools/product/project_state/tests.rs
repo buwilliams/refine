@@ -707,6 +707,7 @@ fn goal_projection(id: &str, status: GoalStatus, node_id: Option<&str>) -> GoalS
             json_path: format!("{id}/goal.json"),
         },
         node_display_name: None,
+        latest_round_prompt: None,
         searchable_text: id.to_string(),
         activity_ids: Vec::new(),
     }

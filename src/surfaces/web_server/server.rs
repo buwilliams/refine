@@ -950,6 +950,7 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     // The MCP surface refreshes the cache through the inner tool dispatch when a
     // tool actually mutates state, so the outer `/mcp` POST itself is exempt.
     !path.starts_with("/terminal/")
+        && path != "/work/goals"
         && path != "/project/sync"
         && !path.starts_with("/system/source/")
         && path != mcp::MCP_ROUTE
@@ -981,6 +982,7 @@ mod tests {
         assert!(!should_refresh_projection_after_mutation(
             "/api/project/sync"
         ));
+        assert!(!should_refresh_projection_after_mutation("/api/goals"));
         assert!(should_refresh_projection_after_mutation(
             "/api/goals/GOAL1/start"
         ));
