@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:08:37Z",
+  "updated_at": "2026-07-23T12:09:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -939,6 +939,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The apparent stall is actually an active Governance provider turn (Codex PID 3563110), not a lost implementation worker. I will leave it running. Its audit is already inspecting the candidate’s shared approval and work-item paths; no recovery action is warranted while that evidence is live."
+    },
+    {
+      "created_at": "2026-07-23T12:09:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808593620-91",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance has now found an additional concrete integrity problem: the recorded base `749923d9` is not an ancestor of candidate `c9afedb7` (merge base `57551ae7`). That candidate is stale by its own new Ready Merge rule, so it cannot safely advance even if the test suite passes. I’m keeping the worktree and candidate intact and awaiting Governance’s recorded verdict."
     }
   ],
   "queued_messages": [
