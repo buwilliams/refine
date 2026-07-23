@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:06:49Z",
+  "updated_at": "2026-07-23T14:07:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -717,6 +717,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Ready-Merge recovery `e789bd9f` has passed fresh Governance and reached `review`. It remains unmerged. That makes three human-review candidates; the process-stop recovery is still in Governance and the performance Goal is still implementing."
+    },
+    {
+      "created_at": "2026-07-23T14:07:56Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784815676563-149",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No further state change in the last minute. Both remaining processes are still registered and live; I’m not treating elapsed time alone as a failure while their supervised sessions remain healthy."
     }
   ],
   "queued_messages": [

@@ -132,23 +132,23 @@
       "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T13:20:57Z",
-      "governance_checked_at": "2026-07-23T13:49:09Z",
+      "governance_checked_at": "2026-07-23T14:08:01Z",
       "governance_details": {
         "configured": true,
         "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-2",
         "failed_actions": [
           {
-            "message": "For legacy or recovered process records lacking the new identity file, stop-time identity creation trusts the process currently occupying the recorded PID. After PID reuse, Refine can terminate an unrelated process and cancel the linked Goal without detecting an ownership mismatch.",
+            "message": "If the post-exit ownership check fails, the process has already exited and recover() has removed its registry and identity evidence, but the returned error incorrectly says termination was not requested and omits the confirmed-exit result. The partial outcome is therefore reported inaccurately without usable recovery evidence.",
             "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
             "rule_id": "rule-4"
           },
           {
-            "message": "Process stopping ignores the recorded execution_id, round, and workflow claim, then unconditionally cancels the Goal by ID. Stopping a stale process from an older execution can therefore cancel newer work that currently owns the same Goal.",
+            "message": "The final claim and round validation and cancel_goal_summary are separate, unlocked operations. A new round and claim can acquire the Goal after validation but before the unconditional cancellation write, allowing a stop from the previous execution to cancel newer work.",
             "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
             "rule_id": "rule-5"
           },
           {
-            "message": "Tests cover mismatches only when identity evidence already exists and cover only one current execution. They do not exercise legacy missing-identity PID reuse or stale-execution concurrency, despite changing process ownership, persistence, cancellation, and recovery semantics.",
+            "message": "The tests install stale claim or round state before stopping; none exercise ownership changing after confirmed process exit or between final validation and Goal cancellation, leaving the concurrency and partial-failure path unverified.",
             "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
             "rule_id": "rule-6"
           }
@@ -156,24 +156,24 @@
         "governance_configured": true,
         "phase": "post_implementation",
         "provider": "codex",
-        "raw_output": "{\"status\":\"failed\",\"message\":\"Process ownership migration and Goal-execution coordination remain unsafe.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"For legacy or recovered process records lacking the new identity file, stop-time identity creation trusts the process currently occupying the recorded PID. After PID reuse, Refine can terminate an unrelated process and cancel the linked Goal without detecting an ownership mismatch.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Process stopping ignores the recorded execution_id, round, and workflow claim, then unconditionally cancels the Goal by ID. Stopping a stale process from an older execution can therefore cancel newer work that currently owns the same Goal.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Tests cover mismatches only when identity evidence already exists and cover only one current execution. They do not exercise legacy missing-identity PID reuse or stale-execution concurrency, despite changing process ownership, persistence, cancellation, and recovery semantics.\"}]}",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Goal cancellation remains race-prone after process exit, with inaccurate failure evidence.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"If the post-exit ownership check fails, the process has already exited and recover() has removed its registry and identity evidence, but the returned error incorrectly says termination was not requested and omits the confirmed-exit result. The partial outcome is therefore reported inaccurately without usable recovery evidence.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The final claim and round validation and cancel_goal_summary are separate, unlocked operations. A new round and claim can acquire the Goal after validation but before the unconditional cancellation write, allowing a stop from the previous execution to cancel newer work.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The tests install stale claim or round state before stopping; none exercise ownership changing after confirmed process exit or between final validation and Goal cancellation, leaving the concurrency and partial-failure path unverified.\"}]}",
         "rules_checked": 8,
         "verdict": {
-          "message": "Process ownership migration and Goal-execution coordination remain unsafe.",
+          "message": "Goal cancellation remains race-prone after process exit, with inaccurate failure evidence.",
           "status": "failed",
           "violations": [
             {
-              "message": "For legacy or recovered process records lacking the new identity file, stop-time identity creation trusts the process currently occupying the recorded PID. After PID reuse, Refine can terminate an unrelated process and cancel the linked Goal without detecting an ownership mismatch.",
+              "message": "If the post-exit ownership check fails, the process has already exited and recover() has removed its registry and identity evidence, but the returned error incorrectly says termination was not requested and omits the confirmed-exit result. The partial outcome is therefore reported inaccurately without usable recovery evidence.",
               "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
               "rule_id": "rule-4"
             },
             {
-              "message": "Process stopping ignores the recorded execution_id, round, and workflow claim, then unconditionally cancels the Goal by ID. Stopping a stale process from an older execution can therefore cancel newer work that currently owns the same Goal.",
+              "message": "The final claim and round validation and cancel_goal_summary are separate, unlocked operations. A new round and claim can acquire the Goal after validation but before the unconditional cancellation write, allowing a stop from the previous execution to cancel newer work.",
               "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
               "rule_id": "rule-5"
             },
             {
-              "message": "Tests cover mismatches only when identity evidence already exists and cover only one current execution. They do not exercise legacy missing-identity PID reuse or stale-execution concurrency, despite changing process ownership, persistence, cancellation, and recovery semantics.",
+              "message": "The tests install stale claim or round state before stopping; none exercise ownership changing after confirmed process exit or between final validation and Goal cancellation, leaving the concurrency and partial-failure path unverified.",
               "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
               "rule_id": "rule-6"
             }
@@ -181,20 +181,20 @@
         },
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-2"
       },
-      "governance_message": "Process ownership migration and Goal-execution coordination remain unsafe.",
+      "governance_message": "Goal cancellation remains race-prone after process exit, with inaccurate failure evidence.",
       "governance_rule_actions": [
         {
-          "message": "For legacy or recovered process records lacking the new identity file, stop-time identity creation trusts the process currently occupying the recorded PID. After PID reuse, Refine can terminate an unrelated process and cancel the linked Goal without detecting an ownership mismatch.",
+          "message": "If the post-exit ownership check fails, the process has already exited and recover() has removed its registry and identity evidence, but the returned error incorrectly says termination was not requested and omits the confirmed-exit result. The partial outcome is therefore reported inaccurately without usable recovery evidence.",
           "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
           "rule_id": "rule-4"
         },
         {
-          "message": "Process stopping ignores the recorded execution_id, round, and workflow claim, then unconditionally cancels the Goal by ID. Stopping a stale process from an older execution can therefore cancel newer work that currently owns the same Goal.",
+          "message": "The final claim and round validation and cancel_goal_summary are separate, unlocked operations. A new round and claim can acquire the Goal after validation but before the unconditional cancellation write, allowing a stop from the previous execution to cancel newer work.",
           "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
           "rule_id": "rule-5"
         },
         {
-          "message": "Tests cover mismatches only when identity evidence already exists and cover only one current execution. They do not exercise legacy missing-identity PID reuse or stale-execution concurrency, despite changing process ownership, persistence, cancellation, and recovery semantics.",
+          "message": "The tests install stale claim or round state before stopping; none exercise ownership changing after confirmed process exit or between final validation and Goal cancellation, leaving the concurrency and partial-failure path unverified.",
           "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
           "rule_id": "rule-6"
         }
@@ -211,11 +211,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "failed",
-      "updated": "2026-07-23T14:03:29Z",
+      "updated": "2026-07-23T14:08:01Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T14:03:30Z"
+  "updated": "2026-07-23T14:08:01Z"
 }
