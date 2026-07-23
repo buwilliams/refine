@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:20:12Z",
+  "updated_at": "2026-07-23T10:20:36Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -324,6 +324,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prior Refine recovery guidance is directly applicable here, so I’m using its auditable-goal-recovery procedure: inspect first, use a fresh `goal round` only for a genuinely recoverable failed Goal, and never treat `review` as authorization to merge."
+    },
+    {
+      "created_at": "2026-07-23T10:20:36Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784802036624-145",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current evidence confirms the daemon is live on port 8082 and both HTTP surfaces return 200, but the primary `refine-next` checkout has substantial unstaged changes. That makes any approval/merge unsafe until ownership is resolved. I’m now narrowing the Goal records and candidate worktrees; I will not touch the dirty primary tree."
     }
   ],
   "queue_dispatching": true,
