@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
+use crate::process::agent_sessions::find_goal_agent_session;
 use crate::process::runner::FileRunnerWorkerService;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineError;
@@ -2560,6 +2561,28 @@ impl InProcessWebServer {
                 "unknown terminal profile {profile}"
             )));
         }
+        if profile == "goal" {
+            let Some(goal_id) = body
+                .get("goal_id")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            else {
+                return error_response(RefineError::InvalidInput(
+                    "goal_id is required to open a Goal Agent".to_string(),
+                ));
+            };
+            return match find_goal_agent_session(&runtime_root, goal_id).and_then(|snapshot| {
+                serde_json::to_value(snapshot).map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "failed to encode Goal Agent session: {error}"
+                    ))
+                })
+            }) {
+                Ok(value) => ApiResponse::json(200, value),
+                Err(error) => error_response(error),
+            };
+        }
 
         let refine_dir = match self.current_refine_dir() {
             Ok(Some(path)) => path,
@@ -2673,7 +2696,15 @@ impl InProcessWebServer {
         };
 
         match terminal_session_start_response(launch, cols, rows) {
-            Ok(value) => ApiResponse::json(200, value),
+            Ok(value) => {
+                if worktree_created
+                    && value.get("reattached").and_then(Value::as_bool) == Some(true)
+                    && let Some(worktree) = worktree.as_ref()
+                {
+                    cleanup_failed_terminal_worktree(&target_root, worktree);
+                }
+                ApiResponse::json(200, value)
+            }
             Err(error) => {
                 if worktree_created && let Some(worktree) = worktree.as_ref() {
                     cleanup_failed_terminal_worktree(&target_root, worktree);
@@ -2690,7 +2721,10 @@ impl InProcessWebServer {
     ) -> ApiResponse {
         let body = request.body.unwrap_or_else(|| json!({}));
         let data = body.get("data").and_then(Value::as_str).unwrap_or("");
-        match terminal_input_response(session_id, data) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("write terminal input");
+        };
+        match terminal_input_response(runtime_root, session_id, data) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -2712,21 +2746,30 @@ impl InProcessWebServer {
             .and_then(Value::as_u64)
             .and_then(|value| u16::try_from(value).ok())
             .unwrap_or(0);
-        match terminal_resize_response(session_id, cols, rows) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("resize terminal session");
+        };
+        match terminal_resize_response(runtime_root, session_id, cols, rows) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_terminal_stop(&self, session_id: &str) -> ApiResponse {
-        match terminal_stop_response(session_id) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("stop terminal session");
+        };
+        match terminal_stop_response(runtime_root, session_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_terminal_status(&self, session_id: &str) -> ApiResponse {
-        match terminal_status_response(session_id) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("read terminal session");
+        };
+        match terminal_status_response(runtime_root, session_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -2753,7 +2796,10 @@ impl InProcessWebServer {
         let after = query_param(raw_path, "after")
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(0);
-        match terminal_events_since(session_id, after) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("stream terminal session");
+        };
+        match terminal_events_since(runtime_root, session_id, after) {
             Ok(events) => ApiResponse::json(200, json!({ "events": events })),
             Err(error) => error_response(error),
         }

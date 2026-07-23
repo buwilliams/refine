@@ -1,7 +1,9 @@
 use serde_json::{Value, json};
 use std::path::Path;
+use std::time::Duration;
 
 use crate::model::workflow::GoalStatus;
+use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
 use crate::process::supervisor::config::FileGovernanceService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
@@ -139,16 +141,41 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(cwd) => cwd,
             Err(error) => return fail(ctx, "agent", error),
         };
-        let provider = HostAgentProviderService::with_runtime_root(ctx.runtime_root.join("agents"));
-        let provider_output = match provider.invoke(ProviderInvocation {
-            provider: ctx.provider.clone(),
-            prompt,
-            session_id: None,
-            cwd: Some(agent_cwd.display().to_string()),
-            process_metadata: ctx
-                .workflow_process_metadata("in-progress", "WorkflowImplementation"),
-        }) {
-            Ok(output) => output,
+        let mut process_metadata =
+            ctx.workflow_process_metadata("in-progress", "WorkflowImplementation");
+        process_metadata.insert(
+            "worktree".to_string(),
+            json!({"path": worktree_path, "branch": branch}),
+        );
+        let provider_output = match run_goal_agent(
+            GoalAgentLaunch {
+                runtime_root: ctx.runtime_root.to_path_buf(),
+                cwd: agent_cwd.clone(),
+                provider: ctx.provider.clone(),
+                prompt,
+                metadata: process_metadata,
+                idle_attention_after: Duration::from_secs(
+                    setting_string(&ctx.settings, "agent_idle_timeout_seconds", "900")
+                        .parse::<u64>()
+                        .ok()
+                        .filter(|seconds| *seconds > 0)
+                        .unwrap_or(900),
+                ),
+            },
+            |attention| {
+                let _ = ctx.log(
+                    "agent",
+                    "Goal Agent is waiting for user input",
+                    Some(json_object(json!({
+                        "provider": ctx.provider,
+                        "message": attention.message,
+                        "branch": branch,
+                        "worktree": worktree_path
+                    }))),
+                );
+            },
+        ) {
+            Ok(result) => result.output,
             Err(error) => return fail(ctx, "agent", error),
         };
         if let Err(error) = ctx

@@ -144,7 +144,7 @@ function browserRuntime(storage = new Map()) {
       click(tabId) { return activateToolbarTab(tabId, { toggleIfActive: true }); },
       draw: drawToolbar,
       ensurePlan: ensurePlanTab,
-      openGoal(goalId) { return openChatDock({ goalId }); },
+      openGoal(goalId) { return openAgentDock({ goalId }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       restore: loadChatStateFromStorage,
       reset: resetChatForProjectSwitch,
@@ -157,6 +157,7 @@ function browserRuntime(storage = new Map()) {
         chatState.activeTabId = tabId;
         return stopTerminalSession(chatState.tabs[tabId]);
       },
+      close(tabId) { return closeChatTab(tabId); },
       tab(tabId) { return chatState.tabs[tabId]; },
       terminal(tabId) {
         const value = terminalStateFor(tabId);
@@ -479,5 +480,31 @@ test("switching projects stops live terminal profiles before clearing the toolba
   assert.deepEqual(
     requests.filter((request) => request[1].endsWith("/stop")).map((request) => request[1]).sort(),
     ["/api/terminal/session-1/stop", "/api/terminal/session-2/stop"],
+  );
+});
+
+test("closing a Goal Agent tab detaches without stopping workflow-owned work", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    return {
+      id: "goal-session",
+      process_id: "goal-agent-process",
+      cwd: "/repo/worktree",
+      profile: body.profile,
+      provider: "codex",
+      goal_id: body.goal_id,
+    };
+  });
+
+  await browser.runtime.openGoal("GOAL1");
+  await browser.runtime.close("GOAL1");
+
+  assert.equal(browser.runtime.tab("GOAL1"), undefined);
+  assert.deepEqual(
+    requests.filter((request) => request[1].endsWith("/stop")),
+    [],
   );
 });

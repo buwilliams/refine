@@ -954,6 +954,17 @@ pub enum LogAction {
 pub enum AgentAction {
     /// Show the shared supervisor agent lifecycle, health, and recovery evidence.
     Supervisor,
+    /// Open a native agent TUI, attaching to the shared singleton or Goal instance.
+    Open {
+        /// Goal id whose running Goal Agent should be opened.
+        goal_id: Option<String>,
+        /// Agent role to open.
+        #[arg(long, value_enum, default_value_t = CliAgentProfile::Goal)]
+        profile: CliAgentProfile,
+        /// Optional starting context for Plan Mode.
+        #[arg(long)]
+        prompt: Option<String>,
+    },
     /// Detect which agent provider CLIs are installed and available on this host.
     Detect,
     /// Configure an agent provider so workflows can invoke it.
@@ -993,6 +1004,25 @@ pub enum AgentAction {
         #[arg(long, default_value = "claude")]
         provider: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum CliAgentProfile {
+    Supervisor,
+    Plan,
+    Standalone,
+    Goal,
+}
+
+impl CliAgentProfile {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Supervisor => "supervisor",
+            Self::Plan => "plan",
+            Self::Standalone => "standalone",
+            Self::Goal => "goal",
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]

@@ -700,6 +700,12 @@ Requirements:
 - Workflow claims survive daemon restart or are reconciled safely.
 - Agents, QA, merge, governance, and target-app build are tools invoked by
   workflow behaviors.
+- In-progress implementation launches one native, PTY-backed Goal Agent per
+  workflow claim. The runner waits on that session while CLI and browser
+  adapters may attach to its shared input and transcript channels.
+- Goal Agent completion advances the same workflow attempt. A needs-input signal
+  keeps both the process and claim active until an attached user answers; opening
+  an agent never creates a second implementation agent for that Goal.
 - Public automation controls pause or resume workflow automation; there is no
   public manual trigger command for starting workflow work.
 
@@ -721,13 +727,16 @@ Requirements:
 
 ### Process Supervision
 
-Module: `tools::host::process_supervision`; path: `src/tools/host/process_supervision/`.
+Modules: `process::subprocess`, `process::agent_sessions`; paths:
+`src/process/subprocess/`, `src/process/agent_sessions.rs`.
 
 Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
 Requirements:
 
-- The daemon owns all managed OS process lifecycle.
+- Refine's process substrate owns all managed OS process lifecycle. The daemon
+  remains the control plane while supervised runners may own their agent
+  children and publish shared lifecycle channels.
 - Surfaces never launch or kill managed target-app, agent, build, test, or
   helper processes directly.
 - Managed processes have typed ownership: daemon, runner, target app, agent,
@@ -756,6 +765,9 @@ Requirements:
   in process records.
 - Process groups, child cleanup, stdout/stderr streaming, stdin, exit status,
   resource limits, and cancellation are modeled explicitly.
+- Native Goal Agent PTYs expose instance-scoped transcript, input, resize,
+  attention, and stop behavior through the same daemon API used by every
+  attaching surface.
 - Resource isolation is capability-detected by OS backend.
 
 OS backends should cover:
@@ -860,9 +872,11 @@ Requirements:
   Supervisor, Plan, Goal, and Standalone profiles use the shared PTY terminal
   implementation; agent profiles launch the configured native CLI with concise
   role and durable-work context.
-- Selecting a stopped browser terminal profile starts it automatically. Sessions
-  retain Stop/Restart lifecycle, register in the ordinary daemon process registry,
-  and remain independently observable and stoppable from the Processes surface.
+- Selecting a stopped browser Terminal, Supervisor, Plan, or Standalone profile
+  starts it automatically. Selecting Goal resolves the workflow-owned session
+  and cannot launch a replacement. Sessions retain Stop/Restart or attachment
+  lifecycle, register in the ordinary process registry, and remain independently
+  observable and stoppable from the Processes surface.
 - Browser reload verifies persisted terminal sessions through daemon status and
   reattaches to live PTYs. A transport-level event-stream interruption must not
   be persisted as managed-process exit.
@@ -870,8 +884,8 @@ Requirements:
   background agents do, while preserving native interactive mode.
 - Standalone browser sessions run in a Refine-owned Git worktree. Stop preserves
   the worktree, and restart validates and reuses the recorded path and branch.
-- Goal-attached chat and standalone chat have explicit storage and resumption
-  semantics.
+- Workflow Goal Agents are instance-based and may run in parallel. Supervisor,
+  Plan Mode, and Standalone terminal profiles are role singletons.
 - Long-running provider priming or resume steps are observable.
 - Chat events can produce importable rounds, Goals, or Feature plans.
 - Chat records are persisted enough to survive daemon restart: Refine session id,

@@ -23,6 +23,12 @@ When a Goal is in-progress:
 - A node owns the active attempt.
 - Refine records the workflow claim, provider or actor, target app, and execution context.
 - Agents use guidance, governance, tools, files, terminal/process execution, and target-app lifecycle context to act on the work.
+- The implementing Goal Agent runs in a background PTY owned by this workflow
+  attempt. A user may attach through CLI or browser without creating a duplicate
+  agent or changing workflow ownership.
+- A Goal Agent that truly needs a user decision keeps its process and claim alive,
+  records an explicit needs-input state, and continues in the same session after
+  the user responds.
 - Process output, logs, changed files, agent output, and intermediate evidence should remain observable.
 - Other nodes should not silently duplicate the same active work.
 - On success, the work should produce a reviewable handoff and move toward ready-merge or another appropriate next state.

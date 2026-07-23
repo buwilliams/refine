@@ -195,7 +195,7 @@ fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
     json!({
         "id": format!("chat-session-{}", session.id),
         "kind": "chat",
-        "label": if session.mode == "goal" { "Goal chat" } else { "Standalone chat" },
+        "label": if session.mode == "goal" { "Goal agent session" } else { "Standalone chat" },
         "status": if session.in_flight || session.queue_dispatching { "running" } else { "idle" },
         "pid": null,
         "details": details,

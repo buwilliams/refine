@@ -271,9 +271,10 @@ function drawGoalDetail(goal) {
                              goal.status === "failed");
   const hasPreservedDraft = hasPreservedRoundFormDraft(goal.id);
   const cancelEnabled = !["done", "cancelled"].includes(goal.status);
-  // Chat is always available — the value is the Goal context the runner
-  // primes into the provider session. The chat runs in the Goal's worktree
-  // when one exists and falls back to the target root when it doesn't.
+  // The Goal Agent is the workflow-owned native CLI session. Open Agent
+  // attaches to that process while implementation is active; it never starts
+  // a second conversational agent for the same Goal.
+  const canOpenAgent = goal.status === "in-progress";
 
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
@@ -301,7 +302,9 @@ function drawGoalDetail(goal) {
         ${backBtn}
         ${forwardBtn}
         <div class="goal-action-group">
-          <button class="goal-action-primary" id="btn-chat" data-testid="goal-open-chat">Open Agent</button>
+          <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
+                  ${canOpenAgent ? "" : "disabled"}
+                  title="${canOpenAgent ? "Attach to the running Goal Agent" : "The Goal Agent is available while implementation is active"}">Open Agent</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu">
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
@@ -370,8 +373,7 @@ function drawGoalDetail(goal) {
       <details class="card notes-card" data-goal-id="${goal.id}" data-testid="goal-notes" style="margin-top:14px" ${notesOpen ? "open" : ""}>
         <summary class="notes-card-summary" data-testid="goal-notes-toggle">
           <span><strong>Notes (${(goal.notes || []).length})</strong></span>
-          <span class="muted small">Saved to goal.json and included in attached
-            Chat context.</span>
+          <span class="muted small">Saved to goal.json and included in Goal Agent context.</span>
           <span class="spacer"></span>
           <span id="goal-notes-status" class="muted small"></span>
         </summary>
@@ -397,8 +399,8 @@ function drawGoalDetail(goal) {
   `;
   recordFeatureBlockingNotice(goal, featureBlockingNotice);
 
-  $("#btn-chat")?.addEventListener("click", () => {
-    openChatDock({ goalId: goal.id, goalStatus: goal.status });
+  $("#btn-open-agent")?.addEventListener("click", () => {
+    openAgentDock({ goalId: goal.id, goalStatus: goal.status });
   });
   $("#btn-watch-logs")?.addEventListener("click", () => {
     closeGoalActionMenu();
@@ -1002,6 +1004,6 @@ function recordFeatureBlockingNotice(goal, notice) {
 }
 
 function bindFailureBannerActions(_goal) {
-  // No banner-level actions: Approve / Open Chat / Reopen / Rename / Cancel /
+  // No banner-level actions: Approve / Open Agent / Reopen / Rename / Cancel /
   // Delete all live in the unified action menu at the top of the page.
 }

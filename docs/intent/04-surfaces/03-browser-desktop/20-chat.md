@@ -20,10 +20,16 @@ This removes Refine's former custom browser chat UI from Supervisor, Plan Mode, 
 
 - Supervisor starts a configured agent prepared to observe and help with the active Refine workflow.
 - Plan Mode starts a configured agent prepared to explore a feature or Goal plan and use Refine's CLI to persist selected work.
-- Goal starts a configured agent with fresh durable Goal or Feature context.
+- Goal opens the configured agent that the workflow already started with fresh
+  durable Goal and Round context.
 - Standalone starts a configured agent inside an isolated, reusable worktree.
 
 Browser persistence is limited to what is needed to reconnect the terminal: its managed process/session identity, profile metadata, provider, working directory, and standalone worktree. Refine does not parse a native harness transcript to infer durable work. The agent or user creates and changes Refine work through the existing CLI, API, or product surfaces.
+
+Goal differs from the other profiles in ownership. The workflow starts one Goal
+Agent per active Goal, and Open Agent only attaches to it. Browser activation
+must not create a second Goal agent. Supervisor, Plan Mode, and Standalone remain
+role singletons.
 
 On reload, the browser checks the persisted terminal session against the daemon before deciding whether to show Restart. Event-stream connectivity and process liveness are separate: a transient SSE interruption reconnects to the existing PTY and cannot mark the managed process exited.
 

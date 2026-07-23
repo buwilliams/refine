@@ -194,7 +194,9 @@ Nav: Toolbar (bottom dock)
 			Stopping preserves the worktree; restart validates and reuses the same branch and path
 		Goal terminal (opened via Open Agent on a Goal)
 			Tab labeled "Goal {id}…", link to goal, Close tab
-			Configured agent CLI receives fresh durable Goal context at launch
+			Attaches to the workflow-owned agent already implementing that Goal; never launches a duplicate
+			Configured agent CLI receives fresh durable Goal and Round context from workflow launch
+			Shows explicit needs-input state while the same process and workflow claim remain active
 			Uses the same PTY input, output, resize, and lifecycle behavior as every terminal profile
 		Goal log tail (opened via Watch Logs on a Goal)
 			Tab labeled "Logs {id}…"; live indicator, Goal link, Open full logs, Refresh, Close tab
@@ -206,7 +208,8 @@ Nav: Toolbar (bottom dock)
 			Configured agent CLI receives planning and Refine CLI persistence guidance at launch
 		Shared terminal behavior
 			One xterm renderer and PTY API for Terminal, Supervisor, Plan, Goal, and Standalone profiles
-			Selecting a stopped terminal-profile tab starts it automatically; selecting an already-running active tab retains the dock toggle behavior
+			Selecting a stopped Terminal, Supervisor, Plan, or Standalone tab starts it automatically; Goal resolves its active workflow session; selecting an already-running active tab retains the dock toggle behavior
+			Supervisor, Plan, and Standalone sessions are role singletons; Goal Agent sessions are keyed by Goal and may run in parallel
 			Agent profiles pass the provider's background-agent-equivalent full-access flag while retaining native interactive mode
 			Each session registers as `interactive_session` in the daemon process registry and appears in Processes
 			Terminal output uses per-session SSE; input and resize use the terminal API
@@ -346,7 +349,7 @@ Implementation Internals (for e2e testing)
 		Status enum: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
 		Priority enum: low, medium, high
 	Interactive terminal sessions
-		POST /api/terminal/session with body { profile:"terminal"|"supervisor"|"plan"|"goal"|"standalone", goal_id?, feature_id?, initial_prompt?, worktree?, cols?, rows? }
+		POST /api/terminal/session with body { profile:"terminal"|"supervisor"|"plan"|"goal"|"standalone", goal_id?, feature_id?, initial_prompt?, worktree?, cols?, rows? }; profile "goal" resolves the running workflow session rather than starting one
 		GET /api/terminal/:id/status reports authoritative session liveness and metadata; GET /api/terminal/:id/events streams terminal_output, terminal_error, and terminal_exit events; POST /api/terminal/:id/input sends bytes; POST /api/terminal/:id/resize changes PTY size; POST /api/terminal/:id/stop terminates it
 		Start response includes terminal id, managed process id, profile, provider, cwd, and optional worktree; the process can also be stopped through POST /api/processes/:process_id/stop
 	Backend chat sessions
@@ -356,7 +359,7 @@ Implementation Internals (for e2e testing)
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab], #goal-log-tail, #btn-goal-log-refresh
 		Terminal profiles: [data-testid=toolbar-terminal-panel], [data-testid=terminal-start], [data-testid=terminal-stop], [data-testid=terminal-status], [data-testid=terminal-profile], [data-testid=terminal-worktree], [data-testid=terminal-output]
-		Goal modal: #btn-state-back, #btn-state-forward, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
+		Goal modal: #btn-state-back, #btn-state-forward, #btn-open-agent, #goal-action-menu, #goal-feature-blocking-banner, #btn-watch-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-goal-feature-assign, #btn-goal-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #goal-notes-status
 		Goals list: #goal-select-page, #goal-select-all (+ row checkboxes), #bulk-export-jira, table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)

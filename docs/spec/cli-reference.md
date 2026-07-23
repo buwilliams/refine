@@ -546,6 +546,14 @@ Manage coding agent providers (e.g. claude): detect, configure, authenticate, di
 
 Show the shared supervisor agent lifecycle, health, and recovery evidence
 
+### `refine agent open`
+
+Open a native agent TUI, attaching to the shared singleton or Goal instance
+
+- `<GOAL_ID>` — Goal id whose running Goal Agent should be opened
+- `--profile` — Agent role to open
+- `--prompt` — Optional starting context for Plan Mode
+
 ### `refine agent detect`
 
 Detect which agent provider CLIs are installed and available on this host

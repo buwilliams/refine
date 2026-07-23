@@ -357,7 +357,7 @@ impl InProcessWebServer {
             .and_then(|body| body.get("signal"))
             .and_then(|signal| signal.as_str())
             .unwrap_or("terminate");
-        match terminal_stop_process_response(process_id) {
+        match terminal_stop_process_response(runtime_root, process_id) {
             Ok(Some(value)) => return ApiResponse::json(200, value),
             Ok(None) => {}
             Err(error) => return error_response(error),

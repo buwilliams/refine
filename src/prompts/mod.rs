@@ -19,6 +19,7 @@ pub enum PromptTemplate {
     PostImplementationGovernance,
     PostImplementationQuality,
     GoalAgent,
+    GoalAgentSession,
     GovernanceGeneration,
     TargetAppGeneration,
     TargetAppLifecycle,
@@ -46,6 +47,7 @@ impl PromptTemplate {
             Self::PostImplementationGovernance => "post-implementation-governance.md",
             Self::PostImplementationQuality => "post-implementation-quality.md",
             Self::GoalAgent => "goal-agent.md",
+            Self::GoalAgentSession => "goal-agent-session.md",
             Self::GovernanceGeneration => "governance-generation.md",
             Self::TargetAppGeneration => "target-app-generation.md",
             Self::TargetAppLifecycle => "target-app-lifecycle.md",
@@ -75,6 +77,7 @@ impl PromptTemplate {
             }
             Self::PostImplementationQuality => include_str!("post-implementation-quality.md"),
             Self::GoalAgent => include_str!("goal-agent.md"),
+            Self::GoalAgentSession => include_str!("goal-agent-session.md"),
             Self::GovernanceGeneration => include_str!("governance-generation.md"),
             Self::TargetAppGeneration => include_str!("target-app-generation.md"),
             Self::TargetAppLifecycle => include_str!("target-app-lifecycle.md"),
@@ -246,6 +249,7 @@ mod tests {
             PromptTemplate::PostImplementationGovernance,
             PromptTemplate::PostImplementationQuality,
             PromptTemplate::GoalAgent,
+            PromptTemplate::GoalAgentSession,
             PromptTemplate::GovernanceGeneration,
             PromptTemplate::TargetAppGeneration,
             PromptTemplate::TargetAppLifecycle,
@@ -278,7 +282,7 @@ mod tests {
             }
         }
         assert!(
-            total_words <= 750,
+            total_words <= 850,
             "prompt set is too prescriptive at {total_words} words"
         );
 

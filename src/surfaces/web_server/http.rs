@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::process::agent_sessions::find_agent_session;
 #[cfg(not(test))]
 use crate::process::runner::{FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKFLOW_RUNNER};
 #[cfg(test)]
@@ -466,6 +467,7 @@ impl LocalHttpDaemon {
         }
         if request.method == "GET"
             && let Some(session_id) = terminal_events_route(&request.path)
+            && !terminal_events_snapshot_requested(&request.path)
         {
             return self.terminal_sse_response(session_id);
         }
@@ -876,11 +878,22 @@ impl LocalHttpDaemon {
 
     fn terminal_sse_response(&self, session_id: String) -> Response {
         let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
+        let runtime_root = self.server.runtime_root.clone();
         tokio::spawn(async move {
             let mut after = 0_u64;
+            let mut last_attention = None;
+            let mut attached = false;
             loop {
-                match terminal_events_since(&session_id, after) {
+                let Some(runtime_root) = runtime_root.as_deref() else {
+                    let event = Event::default()
+                        .event("terminal_error")
+                        .data(json!({"message": "runtime root is unavailable"}).to_string());
+                    let _ = tx.send(Ok(event)).await;
+                    return;
+                };
+                match terminal_events_since(runtime_root, &session_id, after) {
                     Ok(events) => {
+                        attached = true;
                         for payload in events {
                             let seq = payload.get("seq").and_then(Value::as_u64).unwrap_or(after);
                             let event = payload
@@ -901,6 +914,33 @@ impl LocalHttpDaemon {
                                 return;
                             }
                         }
+                        if let Ok(status) = find_agent_session(runtime_root, &session_id) {
+                            let attention = (
+                                status.attention_state.clone(),
+                                status.attention_message.clone(),
+                            );
+                            if last_attention.as_ref() != Some(&attention) {
+                                last_attention = Some(attention);
+                                let payload =
+                                    serde_json::to_value(status).unwrap_or_else(|_| json!({}));
+                                if tx
+                                    .send(Ok(Event::default()
+                                        .event("terminal_status")
+                                        .data(payload.to_string())))
+                                    .await
+                                    .is_err()
+                                {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    Err(RefineError::NotFound(_)) if attached => {
+                        let event = Event::default()
+                            .event("terminal_exit")
+                            .data(json!({"data": "closed"}).to_string());
+                        let _ = tx.send(Ok(event)).await;
+                        return;
                     }
                     Err(error) => {
                         let event = Event::default()
@@ -1036,6 +1076,32 @@ fn terminal_events_route(path: &str) -> Option<String> {
         return None;
     }
     Some(session_id.to_string())
+}
+
+fn terminal_events_snapshot_requested(path: &str) -> bool {
+    path.split_once('?')
+        .map(|(_, query)| {
+            query.split('&').any(|part| {
+                let (key, value) = part.split_once('=').unwrap_or((part, ""));
+                key == "snapshot" && value == "1"
+            })
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod terminal_event_route_tests {
+    use super::*;
+
+    #[test]
+    fn terminal_event_snapshot_query_uses_finite_json_transport() {
+        let path = "/api/terminal/session-1/events?snapshot=1&after=42";
+        assert_eq!(terminal_events_route(path).as_deref(), Some("session-1"));
+        assert!(terminal_events_snapshot_requested(path));
+        assert!(!terminal_events_snapshot_requested(
+            "/api/terminal/session-1/events?after=42"
+        ));
+    }
 }
 
 #[cfg(test)]

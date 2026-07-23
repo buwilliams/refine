@@ -81,6 +81,8 @@ function normalizeInteractiveTerminalTab(tab) {
   tab.processId = tab.processId || null;
   tab.provider = tab.provider || null;
   tab.cwd = tab.cwd || "";
+  tab.attentionState = tab.attentionState || "";
+  tab.attentionMessage = tab.attentionMessage || "";
   tab.exited = !!tab.exited;
   tab.initialPrompt = String(tab.initialPrompt || "");
   return tab;
@@ -93,9 +95,12 @@ function terminalStateFor(tabId = chatState.activeTabId) {
   if (!terminal) {
     terminal = {
       tabId,
+      mode: tab.mode,
       sessionId: tab.sessionId || "",
       processId: tab.processId || "",
       cwd: tab.cwd || "",
+      attentionState: tab.attentionState || "",
+      attentionMessage: tab.attentionMessage || "",
       display: "",
       term: null,
       inputBuffer: "",
@@ -238,6 +243,8 @@ function saveChatStateToStorage() {
         processId: t.processId || null,
         provider: t.provider || null,
         cwd: t.cwd || "",
+        attentionState: t.attentionState || "",
+        attentionMessage: t.attentionMessage || "",
         worktree: t.worktree || null,
         exited: !!t.exited,
         initialPrompt: String(t.initialPrompt || "").slice(-50_000),
@@ -323,7 +330,7 @@ function resetFilesState() {
 function resetTerminalState() {
   const stops = [];
   for (const terminal of terminalStates.values()) {
-    if (terminal.sessionId && terminal.connected) {
+    if (terminal.mode !== "goal" && terminal.sessionId && terminal.connected) {
       stops.push(
         api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/stop`)
           .catch(() => undefined),
@@ -382,7 +389,7 @@ function observeChatDockSize() { observeToolbarSize(); }
 
 // Opens the dock and (optionally) ensures a terminal launch profile for a Goal.
 // Activating an agent tab starts its configured terminal session on demand.
-function openChatDock({ goalId = null, goalStatus = null } = {}) {
+function openAgentDock({ goalId = null, goalStatus = null } = {}) {
   ensureStandaloneTab();
   let tabId = "standalone";
   if (goalId) {
@@ -1175,7 +1182,9 @@ function renderTerminalPanel(tab) {
       : terminal?.exited
         ? `${role} exited.`
         : terminal?.connected
-          ? terminal.cwd || `${role} active.`
+          ? terminal.attentionState === "needs_input"
+            ? terminal.attentionMessage || `${role} needs your input.`
+            : terminal.cwd || `${role} active.`
           : `${role} stopped.`;
   const action = terminal?.loading || terminal?.reattaching
     ? `<button type="button" class="secondary" data-terminal-action disabled>${terminal?.reattaching ? "Reattaching…" : "Starting…"}</button>`
@@ -1183,7 +1192,9 @@ function renderTerminalPanel(tab) {
       ? `<button type="button" class="danger" data-terminal-action="stop" data-testid="terminal-stop">Stop</button>`
       : terminal?.sessionId && !terminal?.statusChecked
         ? `<button type="button" class="secondary" data-terminal-action="reattach">Reconnect</button>`
-      : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${terminal?.exited ? "Restart" : "Start"}</button>`;
+      : tab.mode === "goal" && terminal?.exited
+        ? `<button type="button" class="secondary" disabled>Session ended</button>`
+        : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${tab.mode === "goal" ? "Open" : terminal?.exited ? "Restart" : "Start"}</button>`;
   const provider = tab.provider ? ` · ${htmlEscape(tab.provider)}` : "";
   const worktree = tab.worktree?.path
     ? `<span class="muted small" data-testid="terminal-worktree"> · Worktree: <code>${htmlEscape(tab.worktree.path)}</code></span>`
@@ -1242,6 +1253,8 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     terminal.sessionId = result.id || "";
     terminal.processId = result.process_id || "";
     terminal.cwd = result.cwd || "";
+    terminal.attentionState = result.attention_state || "";
+    terminal.attentionMessage = result.attention_message || "";
     terminal.connected = !!terminal.sessionId;
     terminal.exited = false;
     terminal.statusChecked = true;
@@ -1253,6 +1266,8 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     tab.sessionId = terminal.sessionId;
     tab.processId = terminal.processId;
     tab.cwd = terminal.cwd;
+    tab.attentionState = terminal.attentionState;
+    tab.attentionMessage = terminal.attentionMessage;
     tab.provider = result.provider || null;
     tab.worktree = result.worktree || null;
     tab.exited = false;
@@ -1323,8 +1338,12 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
       terminal.exited = !status.alive;
       terminal.processId = status.process_id || terminal.processId;
       terminal.cwd = status.cwd || terminal.cwd;
+      terminal.attentionState = status.attention_state || "";
+      terminal.attentionMessage = status.attention_message || "";
       tab.processId = terminal.processId;
       tab.cwd = terminal.cwd;
+      tab.attentionState = terminal.attentionState;
+      tab.attentionMessage = terminal.attentionMessage;
       tab.provider = status.provider || tab.provider || null;
       tab.worktree = status.worktree || tab.worktree || null;
       tab.exited = terminal.exited;
@@ -1370,6 +1389,17 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
   const source = new EventSource(`/api/terminal/${encodeURIComponent(terminal.sessionId)}/events`);
   terminal.eventSource = source;
   source.addEventListener("terminal_output", (event) => handleTerminalEvent(event, terminal));
+  source.addEventListener("terminal_status", (event) => {
+    try {
+      const status = JSON.parse(event.data || "{}");
+      terminal.attentionState = status.attention_state || "";
+      terminal.attentionMessage = status.attention_message || "";
+      tab.attentionState = terminal.attentionState;
+      tab.attentionMessage = terminal.attentionMessage;
+      saveChatStateToStorage();
+      if (chatState.activeTabId === tabId) drawToolbar();
+    } catch {}
+  });
   source.addEventListener("terminal_error", (event) => {
     handleTerminalEvent(event, terminal);
     terminal.error = "Terminal stream error.";
@@ -2555,7 +2585,7 @@ async function closeChatTab(tabId) {
   if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID || tabId === TERMINAL_TAB_ID) return;
   const t = chatState.tabs[tabId];
   if (!t) return;
-  if (t.sessionId) {
+  if (t.mode !== "goal" && t.sessionId) {
     try {
       await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
     } catch {}

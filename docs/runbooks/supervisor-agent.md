@@ -14,7 +14,7 @@ Read `lifecycle`, `health`, the active/queued/failed counts, and the newest even
 
 ## Ask for help
 
-Queued or active Goal work starts the configured CLI provider for the automated supervisor as needed. To investigate interactively, select the persistent Supervisor toolbar tab; Refine starts it automatically when stopped. The configured native agent harness launches in full-access mode in the target app checkout with monitoring, repair, and verification context. Its conversation stays inside the native CLI terminal and is distinct from the automated supervisor's backend session.
+Queued or active Goal work starts the configured CLI provider for the automated supervisor as needed. To investigate interactively, select the persistent Supervisor toolbar tab or run `refine agent open --profile supervisor`; both surfaces open the same role-singleton terminal. Refine starts it automatically when stopped. The configured native agent harness launches in full-access mode in the target app checkout with monitoring, repair, and verification context. Its conversation stays inside the native CLI terminal and is distinct from the automated supervisor's backend session.
 
 Both automated and interactive Supervisor sessions use the configured `agent_cli`; their launch APIs do not accept a provider override. Automated Supervisor and Goal turns share the configured agent concurrency caps. The interactive toolbar terminal is visible in the Processes surface as an `interactive_session` with Supervisor role and provider metadata.
 

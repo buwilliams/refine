@@ -64,7 +64,7 @@ function navigate() {
     // the dashboard so the URL no longer points at a removed screen.
     const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
     const goalId = hashQs.get("goal") || null;
-    openChatDock(goalId ? { goalId } : {});
+    openAgentDock(goalId ? { goalId } : {});
     location.hash = "#/";
     return;
   }

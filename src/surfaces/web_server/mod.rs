@@ -127,7 +127,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/terminal",
-        capability: "interactive terminal sessions",
+        capability: "interactive terminal and attachable native agent sessions",
     },
     ApiRouteGroup {
         prefix: "/diagnostics",

@@ -23,7 +23,7 @@ The toolbar should provide persistent assistance for work in progress:
 - Files lets users inspect project files and search source;
 - Terminal launches a standard interactive shell without an agent;
 - Plan Mode launches the configured agent with planning context and an optional starting prompt;
-- Goal launches the configured agent with current Goal or Feature context;
+- Goal attaches to the workflow-owned agent already implementing that Goal;
 - Standalone launches the configured agent in an isolated Git worktree for broad exploration or implementation;
 - Goal log tails show recent canonical Goal activity and append new entries from the shared event stream.
 
@@ -35,11 +35,18 @@ Current implementation details that matter to intent:
 - each terminal session is registered as an `interactive_session` in the daemon's ordinary process registry, so the toolbar and Processes surface share lifecycle truth;
 - the configured `agent_cli` selects the native agent executable and interactive prompt form for every agent profile;
 - agent profiles use the provider's full-access mode, matching background agents, so native harness permission prompts do not interrupt work;
+- Supervisor, Plan Mode, and Standalone are role singletons. Goal Agent sessions
+  are keyed by Goal and may run in parallel.
+- opening a Goal tab resolves the active workflow session and cannot create a
+  second Goal agent; an explicit needs-input state is shown in the terminal
+  status while the same agent waits for an attached answer.
 - terminal profile state is tab-specific, including process/session identifiers, provider, current directory, output, and standalone worktree identity;
 - terminal profiles use readable terminal typography and fill the available dock width; changes to the browser, dock, or terminal panel refit xterm columns and rows and propagate the new PTY size to the backend;
 - reload verifies the persisted session identifier against daemon process truth and reattaches to a live terminal; an interrupted browser event stream is not treated as process exit, while a stopped or lost session remains restartable;
 - stopping a standalone session preserves its worktree, and restarting it reuses the same validated Refine worktree;
-- changing target apps stops live toolbar terminals before clearing project-specific browser state;
+- changing target apps stops target-scoped singleton toolbar terminals before
+  clearing project-specific browser state; a Goal tab only detaches from its
+  workflow-owned agent and cannot stop that background workflow as a side effect;
 - toolbar layout can be expanded or resized without changing the main route.
 
 The toolbar should expose shared backend capability, not implement its own product rules or agent conversation protocol.

@@ -3,6 +3,42 @@ use super::dispatch::{
     system_ps_response, system_status_response,
 };
 use super::*;
+
+#[test]
+fn agent_open_parses_goal_instances_and_singleton_profiles() {
+    let goal = Cli::try_parse_from(["refine", "agent", "open", "GOAL1"]).unwrap();
+    assert!(matches!(
+        goal.command,
+        Commands::Agent {
+            action: AgentAction::Open {
+                goal_id: Some(ref goal_id),
+                profile: CliAgentProfile::Goal,
+                prompt: None,
+            }
+        } if goal_id == "GOAL1"
+    ));
+
+    let plan = Cli::try_parse_from([
+        "refine",
+        "agent",
+        "open",
+        "--profile",
+        "plan",
+        "--prompt",
+        "Design retries",
+    ])
+    .unwrap();
+    assert!(matches!(
+        plan.command,
+        Commands::Agent {
+            action: AgentAction::Open {
+                goal_id: None,
+                profile: CliAgentProfile::Plan,
+                prompt: Some(ref prompt),
+            }
+        } if prompt == "Design retries"
+    ));
+}
 use crate::model::log::LogEntry;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,

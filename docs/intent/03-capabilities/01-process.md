@@ -23,6 +23,9 @@ Current implementation details that matter to intent:
 - managed processes have owners such as daemon, runner, target app, agent, quality, import, maintenance, and user helper.
 - process records include pid, state, label, details, output paths, limits, start time, and exit code.
 - process metadata can attach workflow, Goal, session, mode, and runner context.
+- workflow Goal Agents run as PTY-backed managed processes with shared transcript,
+  input, resize, attention, and lifecycle state, so CLI and browser attachments
+  observe the same process.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.

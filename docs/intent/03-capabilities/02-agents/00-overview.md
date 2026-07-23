@@ -51,6 +51,8 @@ Current implementation details that matter to intent:
 - import extraction and draft review should use shared work item persistence;
 - quality, governance, logs, activity, and System notices should be reusable agent evidence;
 - worktrees isolate agent output and preserve merge handoff.
+- a workflow-owned Goal Agent runs in one native CLI terminal per active Goal;
+  supported surfaces attach to that process instead of launching another agent.
 
 The Agents capability should remain powerful. Refine's safety posture is mitigation greater than prevention: use Git, logs, governance, quality checks, review, process visibility, and durable state to make powerful actions recoverable and accountable.
 

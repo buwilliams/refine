@@ -27,6 +27,7 @@ use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::goal::{GoalIndexProjection, GoalPriority};
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GoalStatus;
+use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor, managed_pid_is_alive,
@@ -722,6 +723,20 @@ fn static_plan_mode_uses_managed_terminal_with_initial_context() {
     assert!(toolbar.contains("if (shouldStart) await startTerminalSession(tab)"));
     assert!(!toolbar.contains("renderChatPanel"));
     assert!(!toolbar.contains("/api/chat/start"));
+}
+
+#[test]
+fn static_goal_detail_opens_the_workflow_agent_instead_of_goal_chat() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let goal_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
+    let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
+
+    assert!(goal_detail.contains(r#"data-testid="goal-open-agent""#));
+    assert!(goal_detail.contains("Open Agent"));
+    assert!(goal_detail.contains("openAgentDock({ goalId: goal.id"));
+    assert!(toolbar.contains("function openAgentDock"));
+    assert!(!goal_detail.contains("goal-open-chat"));
+    assert!(!toolbar.contains("openChatDock"));
 }
 
 #[test]
@@ -5078,6 +5093,91 @@ fn web_server_runs_interactive_terminal_session() {
             .any(|process| process.id == second_process_id)
     );
 
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let temp_root = unique_temp_dir("http-goal-agent-session");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8082");
+    let provider = temp_root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\nprintf 'goal-agent-ready\\n'\nread answer\nprintf 'goal-agent-answer:%s\\n' \"$answer\"\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+    }
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let runtime_for_thread = runtime_root.clone();
+    let app_for_thread = app_root.clone();
+    let session_thread = thread::spawn(move || {
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("goal_id".to_string(), json!("GOAL1"));
+        run_goal_agent(
+            GoalAgentLaunch {
+                runtime_root: runtime_for_thread,
+                cwd: app_for_thread,
+                provider: "smoke-ai".to_string(),
+                prompt: "Implement Goal GOAL1".to_string(),
+                metadata,
+                idle_attention_after: Duration::from_secs(900),
+            },
+            |_| {},
+        )
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while FileProcessSupervisor::new(&runtime_root)
+        .list()
+        .unwrap()
+        .is_empty()
+    {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(20));
+    }
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "goal", "goal_id": "GOAL1"})),
+    });
+    assert_eq!(opened.status, 200, "{}", opened.body);
+    assert_eq!(opened.body["profile"], "goal");
+    assert_eq!(opened.body["goal_id"], "GOAL1");
+    let session_id = opened.body["id"].as_str().unwrap();
+    let input = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/input"),
+        body: Some(json!({"data": "attached\r"})),
+    });
+    assert_eq!(input.status, 200, "{}", input.body);
+    let result = session_thread.join().unwrap().unwrap();
+    assert!(result.output.contains("goal-agent-answer:attached"));
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
     fs::remove_dir_all(temp_root).unwrap();
 }
 

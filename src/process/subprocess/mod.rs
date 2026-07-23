@@ -141,6 +141,8 @@ impl ManagedProcess {
                 "provider",
                 "worktree",
                 "round_idx",
+                "attention_state",
+                "attention_message",
                 "worker_kind",
                 "operation_id",
             ] {

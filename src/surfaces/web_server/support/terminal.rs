@@ -12,6 +12,10 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+use crate::process::agent_sessions::{
+    agent_session_events_since, find_agent_session, resize_agent_session, send_agent_session_input,
+    stop_agent_session, stop_agent_session_process,
+};
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
@@ -52,6 +56,7 @@ struct TerminalSession {
 }
 
 static TERMINAL_SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<TerminalSession>>>> = OnceLock::new();
+static TERMINAL_SINGLETON_LAUNCH: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub(in crate::surfaces::web_server) struct TerminalLaunchSpec {
@@ -69,6 +74,38 @@ pub(in crate::surfaces::web_server) fn terminal_session_start_response(
     cols: u16,
     rows: u16,
 ) -> RefineResult<Value> {
+    let singleton_profile = matches!(
+        launch.profile.as_str(),
+        "supervisor" | "plan" | "standalone"
+    );
+    let _singleton_launch_guard = if singleton_profile {
+        Some(
+            TERMINAL_SINGLETON_LAUNCH
+                .get_or_init(|| Mutex::new(()))
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("terminal singleton launch lock was poisoned".to_string())
+                })?,
+        )
+    } else {
+        None
+    };
+    if singleton_profile
+        && let Some(existing) = sessions()
+            .lock()
+            .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
+            .values()
+            .find(|session| {
+                session.profile == launch.profile
+                    && session.supervisor.runtime_root == launch.runtime_root
+                    && !session.exited.load(Ordering::Acquire)
+            })
+            .cloned()
+    {
+        let mut response = existing.launch_json();
+        response["reattached"] = json!(true);
+        return Ok(response);
+    }
     let cwd = launch.cwd.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
             "terminal cwd {} is not available: {error}",
@@ -76,32 +113,18 @@ pub(in crate::surfaces::web_server) fn terminal_session_start_response(
         ))
     })?;
     let session = TerminalSession::spawn(launch, cwd, cols, rows)?;
+    let mut response = session.launch_json();
+    response["reattached"] = json!(false);
     let id = session.id.clone();
-    let process_id = session.process_id.clone();
-    let profile = session.profile.clone();
-    let provider = session.provider.clone();
-    let cwd = session.cwd.display().to_string();
-    let worktree = session
-        .process
-        .details
-        .as_deref()
-        .and_then(|details| serde_json::from_str::<Value>(details).ok())
-        .and_then(|details| details.get("worktree").cloned());
     sessions()
         .lock()
         .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
         .insert(id.clone(), session);
-    Ok(json!({
-        "id": id,
-        "process_id": process_id,
-        "profile": profile,
-        "provider": provider,
-        "cwd": cwd,
-        "worktree": worktree,
-    }))
+    Ok(response)
 }
 
 pub(in crate::surfaces::web_server) fn terminal_input_response(
+    runtime_root: &std::path::Path,
     session_id: &str,
     data: &str,
 ) -> RefineResult<Value> {
@@ -110,37 +133,57 @@ pub(in crate::surfaces::web_server) fn terminal_input_response(
             "terminal input is limited to {TERMINAL_INPUT_LIMIT} bytes"
         )));
     }
-    let session = terminal_session(session_id)?;
-    session.write_input(data.as_bytes())?;
+    if let Some(session) = local_terminal_session(session_id)? {
+        session.write_input(data.as_bytes())?;
+    } else {
+        send_agent_session_input(runtime_root, session_id, data)?;
+    }
     Ok(json!({"ok": true}))
 }
 
 pub(in crate::surfaces::web_server) fn terminal_resize_response(
+    runtime_root: &std::path::Path,
     session_id: &str,
     cols: u16,
     rows: u16,
 ) -> RefineResult<Value> {
-    let session = terminal_session(session_id)?;
-    session.resize(cols, rows)?;
+    if let Some(session) = local_terminal_session(session_id)? {
+        session.resize(cols, rows)?;
+    } else {
+        resize_agent_session(runtime_root, session_id, cols, rows)?;
+    }
     Ok(json!({"ok": true}))
 }
 
 pub(in crate::surfaces::web_server) fn terminal_status_response(
+    runtime_root: &std::path::Path,
     session_id: &str,
 ) -> RefineResult<Value> {
-    let session = terminal_session(session_id)?;
-    Ok(session.status_json())
+    if let Some(session) = local_terminal_session(session_id)? {
+        Ok(session.status_json())
+    } else {
+        serde_json::to_value(find_agent_session(runtime_root, session_id)?).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode Goal Agent session status: {error}"
+            ))
+        })
+    }
 }
 
 pub(in crate::surfaces::web_server) fn terminal_stop_response(
+    runtime_root: &std::path::Path,
     session_id: &str,
 ) -> RefineResult<Value> {
-    let session = terminal_session(session_id)?;
-    stop_terminal_session(&session)?;
+    if let Some(session) = local_terminal_session(session_id)? {
+        stop_terminal_session(&session)?;
+    } else {
+        stop_agent_session(runtime_root, session_id)?;
+    }
     Ok(json!({"ok": true}))
 }
 
 pub(in crate::surfaces::web_server) fn terminal_stop_process_response(
+    runtime_root: &std::path::Path,
     process_id: &str,
 ) -> RefineResult<Option<Value>> {
     let session = sessions()
@@ -150,7 +193,14 @@ pub(in crate::surfaces::web_server) fn terminal_stop_process_response(
         .find(|session| session.process_id == process_id)
         .cloned();
     let Some(session) = session else {
-        return Ok(None);
+        return Ok(
+            stop_agent_session_process(runtime_root, process_id)?.map(|process| {
+                json!({
+                    "stopped": true,
+                    "process": process.api_json(),
+                })
+            }),
+        );
     };
     stop_terminal_session(&session)?;
     let mut process = session.process.clone();
@@ -171,44 +221,63 @@ fn stop_terminal_session(session: &Arc<TerminalSession>) -> RefineResult<()> {
 }
 
 pub(in crate::surfaces::web_server) fn terminal_events_since(
+    runtime_root: &std::path::Path,
     session_id: &str,
     after: u64,
 ) -> RefineResult<Vec<Value>> {
-    let session = terminal_session(session_id)?;
-    let events = session.events_since(after)?;
-    Ok(events
-        .into_iter()
-        .map(|event| {
-            json!({
-                "seq": event.seq,
-                "event": event.event,
-                "data": event.data,
+    if let Some(session) = local_terminal_session(session_id)? {
+        let events = session.events_since(after)?;
+        Ok(events
+            .into_iter()
+            .map(|event| {
+                json!({
+                    "seq": event.seq,
+                    "event": event.event,
+                    "data": event.data,
+                })
             })
-        })
-        .collect())
+            .collect())
+    } else {
+        agent_session_events_since(runtime_root, session_id, after)
+    }
 }
 
 fn sessions() -> &'static Mutex<BTreeMap<String, Arc<TerminalSession>>> {
     TERMINAL_SESSIONS.get_or_init(|| Mutex::new(BTreeMap::new()))
 }
 
-fn terminal_session(session_id: &str) -> RefineResult<Arc<TerminalSession>> {
+fn local_terminal_session(session_id: &str) -> RefineResult<Option<Arc<TerminalSession>>> {
     if session_id.trim().is_empty() {
         return Err(RefineError::InvalidInput(
             "terminal session id is required".to_string(),
         ));
     }
-    sessions()
+    let session = sessions()
         .lock()
         .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
         .get(session_id)
-        .cloned()
-        .ok_or_else(|| {
-            RefineError::NotFound(format!("terminal session {session_id} was not found"))
-        })
+        .cloned();
+    Ok(session)
 }
 
 impl TerminalSession {
+    fn launch_json(&self) -> Value {
+        let worktree = self
+            .process
+            .details
+            .as_deref()
+            .and_then(|details| serde_json::from_str::<Value>(details).ok())
+            .and_then(|details| details.get("worktree").cloned());
+        json!({
+            "id": self.id,
+            "process_id": self.process_id,
+            "profile": self.profile,
+            "provider": self.provider,
+            "cwd": self.cwd.display().to_string(),
+            "worktree": worktree,
+        })
+    }
+
     fn spawn(
         launch: TerminalLaunchSpec,
         cwd: PathBuf,
@@ -534,5 +603,34 @@ fn pty_size(cols: u16, rows: u16) -> PtySize {
         },
         pixel_width: 0,
         pixel_height: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn singleton_agent_profiles_return_the_existing_live_session() {
+        let root =
+            std::env::temp_dir().join(format!("refine-terminal-singleton-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        for profile in ["supervisor", "plan", "standalone"] {
+            let launch = || TerminalLaunchSpec {
+                runtime_root: root.join("run"),
+                cwd: root.clone(),
+                profile: profile.to_string(),
+                provider: Some("test".to_string()),
+                command: "/bin/sh".to_string(),
+                args: vec!["-c".to_string(), "sleep 10".to_string()],
+                metadata: Map::new(),
+            };
+            let first = terminal_session_start_response(launch(), 80, 24).unwrap();
+            let second = terminal_session_start_response(launch(), 120, 36).unwrap();
+            assert_eq!(first["id"], second["id"], "{profile}");
+            assert_eq!(second["reattached"], true, "{profile}");
+            terminal_stop_response(&root.join("run"), first["id"].as_str().unwrap()).unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 }
