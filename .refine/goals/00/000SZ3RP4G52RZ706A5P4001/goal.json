@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-5",
-  "candidate_commit": null,
+  "candidate_commit": "18bac9080a09689263971e7ed648c6f516191e20",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -409,8 +409,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed Round 5 as 18bac9080a09689263971e7ed648c6f516191e20. Target-bound cancellation now fails closed when no managed-process record exists; a shared spawn-to-registration fence prevents workers from starting under settled claims; exact claim, capacity, and Goal writes are journaled and rolled back together on failure; confirmed-exit receipts retain ownership and support retry recovery. Added real-worker pre-registration coverage, post-cancellation launch rejection, and injected failures after claim persistence, capacity release, and Goal persistence with exact state and recovery assertions; updated process intent and shared-capacity coverage. Focused results: process_control 14/14, real pre-registration worker 1/1, real worker settlement 1/1, workflow replenishment 2/2, subprocess 11/11, agent sessions 3/3, web API 1/1, CLI 1/1, MCP 1/1, workflow metadata 1/1, browser process UI 4/4. Initial full library run: 470 passed, 2 failed (obsolete zero-process cancellation expectation; known quality-settings EOF race); both isolated reruns passed. Two subsequent unchanged-source full library runs passed 472/472, including the final run. Final web suite passed 37/37; cargo check --all-targets, cargo fmt --all -- --check, git diff --check, git diff --cached --check, and git show --check passed. Worktree is clean; all prior candidate commits and worktrees were preserved.",
+      "implementation_reported_at": "2026-07-23T15:29:28Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -421,11 +421,11 @@
       "quality_state": "unclassified",
       "reporter": "Supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T15:08:54Z",
+      "updated": "2026-07-23T15:29:28Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T15:09:05Z"
+  "updated": "2026-07-23T15:29:29Z"
 }
