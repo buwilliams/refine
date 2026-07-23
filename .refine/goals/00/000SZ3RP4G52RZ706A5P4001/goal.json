@@ -400,9 +400,32 @@
       "rule_state": "failed",
       "updated": "2026-07-23T15:08:26Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Supervisor",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T15:08:54Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover Governance-rejected candidate d81385dc from current main while preserving d81385dc, 2d0d226b, c9a92ee5, ea2103e3, all earlier candidates, worktrees, rounds, tests, and provider/Governance evidence. Fix only the three newly recorded violations in the authoritative shared cancellation capability. Fail closed when a target-bound running workflow claim has no managed-process record: an empty lookup during registration or lost-registry races is not proof of process exit and must not cancel the claim or Goal; coordinate registration and cancellation so a worker cannot remain or start under cancelled work. Make linked process exit, exact claim cancellation, Goal cancellation, and capacity settlement failure-atomic across their durable writes, with either one committed terminal outcome or truthful recoverable partial-failure evidence and no silently inconsistent active Goal, claim, or capacity state. Add deterministic production-path tests for cancellation before worker registration and injected failures between claim persistence, capacity release, and Goal persistence, asserting exact final durable states and supported recovery. Re-run the focused service, real workflow-worker, workflow scheduling, subprocess, agent-session, web API, CLI, MCP/browser, workflow metadata, full library and web suites, all-target check, formatting, and diff checks, reporting every initial failure and final result accurately. Preserve one shared capability across surfaces and all provider, authentication, cancellation, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Supervisor",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T15:08:54Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T15:08:26Z"
+  "updated": "2026-07-23T15:08:54Z"
 }
