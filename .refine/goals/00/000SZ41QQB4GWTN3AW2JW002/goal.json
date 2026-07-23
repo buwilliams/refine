@@ -1,7 +1,7 @@
 {
   "base_commit": "90c918a2152608515bccb9757cebfb2e05d4ed7d",
   "branch_name": "refine/00000SZ41QQB4GWTN3AW2JW002/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "9b7d9d332abd0445881775b99403ea59258026fb",
   "created": "2026-07-23T18:23:19Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Added a filesystem-backed process artifact handoff lease held from Goal Agent registration through PTY reader join, transcript read, and final SSE grace period. Dead-process recovery now persists truthful exited/interrupted state immediately but defers transcript/channel/registry deletion while the workflow owns the lease; release or owner exit makes cleanup available, preventing both NotFound transcript races and indefinite leaks. Added deterministic Goal Agent completion/recovery and deferred-cleanup lifecycle regressions. Verification: focused handoff tests passed (1/1 each); all Goal Agent session tests passed (4/4); completion-recovery and reaper lifecycle tests passed (1/1 each); cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff --check passed. Full cargo test --lib ran 471 tests: 470 passed and 1 unrelated timing test failed, warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale, at 126.462087ms versus <50ms; isolated rerun also failed at 139.95912ms. cargo clippy --all-targets -- -D warnings failed on six unrelated existing lints: missing_const_for_thread_local in coordination.rs; too_many_arguments twice in merging/mod.rs and once in work_items/service.rs; if_same_then_else and ptr_arg in quality/tests.rs. No merge, approval, force Git operation, history rewrite, worktree discard, or durable Goal-state edit was performed.",
+      "implementation_reported_at": "2026-07-23T18:35:17Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,11 +32,11 @@
       "quality_state": "unclassified",
       "reporter": "Refine Supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T18:23:19Z",
+      "updated": "2026-07-23T18:35:17Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T18:23:21Z"
+  "updated": "2026-07-23T18:35:18Z"
 }
