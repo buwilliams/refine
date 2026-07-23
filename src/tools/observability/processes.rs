@@ -141,11 +141,17 @@ pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
 }
 
 pub fn runtime_process_status_value(runtime: &RuntimeProjection) -> Value {
-    let mut summary = runtime.supervisor.clone().unwrap_or_default();
-    let current_processes = runtime
-        .processes
-        .iter()
-        .filter(|process| is_current_process_object(process))
+    process_status_value(&runtime_process_summary_value(runtime))
+}
+
+pub fn process_status_value(summary: &Value) -> Value {
+    let mut summary = summary.as_object().cloned().unwrap_or_default();
+    let current_processes = summary
+        .get("processes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|process| is_current_process_api_value(process))
         .collect::<Vec<_>>();
     let process_count = current_processes.len();
     let agent_count = current_processes

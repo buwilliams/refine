@@ -12,8 +12,10 @@ use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProvide
 use crate::tools::host::installation::InstallTarget;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
+#[cfg(test)]
+pub(in crate::surfaces::web_server) use crate::tools::observability::processes::runtime_process_status_value;
 pub(in crate::surfaces::web_server) use crate::tools::observability::processes::{
-    process_summary_value, process_summary_value_with_chat_sessions, runtime_process_status_value,
+    process_status_value, process_summary_value, process_summary_value_with_chat_sessions,
     runtime_process_summary_value,
 };
 use crate::tools::product::project_registry::registry_apps_array;
