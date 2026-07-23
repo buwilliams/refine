@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:03:45Z",
+  "updated_at": "2026-07-23T14:05:16Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -693,6 +693,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Two recovery implementations have completed and committed new preserved candidates:\n\n- Ready-Merge recovery: `e789bd9f`\n- Process-stop recovery: `c9a92ee5`\n\nBoth are now in live Governance, so the prior failures remain visible until fresh verdicts replace them. The performance agent is still implementing."
+    },
+    {
+      "created_at": "2026-07-23T14:05:16Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784815516966-145",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Fresh Governance is still running for both new candidates, and the performance provider has not requested input. No stage has lost its worker, so I’m continuing without intervention."
     }
   ],
   "queued_messages": [
