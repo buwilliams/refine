@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:40:01Z",
+  "updated_at": "2026-07-23T14:41:35Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1032,6 +1032,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Implementation completed and committed cleanly as `2d0d226b`. The agent reports 465/465 library tests, 37/37 web tests, focused process/control/API/CLI/MCP/browser checks, all-target check, formatting, and diff checks passing; it also disclosed an earlier 404 regression that was fixed before the unchanged final rerun. The workflow is now advancing to Governance."
+    },
+    {
+      "created_at": "2026-07-23T14:41:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817695218-202",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance is actively evaluating the committed Round 3 candidate in its worktree (live provider process confirmed). There is no provider or authentication failure; the Goal correctly remains `in-progress` until that verdict is durable."
     }
   ],
   "queued_messages": [
