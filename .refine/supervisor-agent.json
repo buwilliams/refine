@@ -62,11 +62,10 @@
     "00000SZ3RN3BS397T4SE5P4000": "in-progress"
   },
   "open_issues": {
-    "state_sync": "Refine state synchronization failed: background process launch is stopped",
     "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1"
   },
   "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:in-progress|live={}|quiet={}|issues=state_sync:Refine state synchronization failed: background process launch is stopped,workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
-  "updated_at": "2026-07-23T13:06:09.605465132+00:00",
+  "updated_at": "2026-07-23T13:06:20.718278951+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1878,6 +1877,15 @@
       "message": "Goal 00000SZ3RN3BS397T4SE5P4000 changed from todo to in-progress.",
       "created_at": "2026-07-23T13:06:09.480877382+00:00",
       "goal_id": "00000SZ3RN3BS397T4SE5P4000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:06:20.718254115+00:00-188",
+      "kind": "recovery",
+      "status": "complete",
+      "message": "Refine state synchronization: state synchronized and projection refreshed",
+      "created_at": "2026-07-23T13:06:20.718254115+00:00",
       "actionable": false,
       "retryable": false
     }
