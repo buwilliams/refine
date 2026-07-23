@@ -67,8 +67,8 @@
   "open_issues": {
     "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1"
   },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:todo,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:todo,00000SZ3SFP4N10NXGAE5P4002:todo,00000SZ3SHFHFK352VJT5P4003:todo|live={\"00000SZ3N803TK00E78AK4M000\"}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
-  "updated_at": "2026-07-23T13:39:11.777297189+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:todo,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:todo,00000SZ3SFP4N10NXGAE5P4002:todo,00000SZ3SHFHFK352VJT5P4003:todo|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
+  "updated_at": "2026-07-23T13:41:45.694534121+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",

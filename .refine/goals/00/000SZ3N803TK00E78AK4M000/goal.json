@@ -224,29 +224,92 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T12:59:58Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-23T13:41:45Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3N803TK00E78AK4M000-round-4",
+        "failed_actions": [
+          {
+            "message": "A successfully reconciled supervisor-agent.json is excluded from the computed delta after remote_state is replaced with the merged snapshot. When it is the only change, no commit or push occurs; the next sync restores the dirty state worktree and can discard the merged event and issue evidence.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "Cancellation can run its first operation scan after Ready Merge acquires the workflow lease but before it registers its operation. It then observes nothing and blocks on that lease while Ready Merge registers, launches, integrates, and transitions; the second scan occurs too late to cancel the succeeded operation.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The launch-cancellation test begins only after the Git child is visible, so it misses the pre-registration cancellation window. The disjoint supervisor merge test exercises only the value-merging helper and never verifies that sync commits, pushes, and preserves the merged snapshot across a later sync.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Cancellation and durable supervisor-state synchronization remain unsafe.\",\"violations\":[{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"A successfully reconciled supervisor-agent.json is excluded from the computed delta after remote_state is replaced with the merged snapshot. When it is the only change, no commit or push occurs; the next sync restores the dirty state worktree and can discard the merged event and issue evidence.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancellation can run its first operation scan after Ready Merge acquires the workflow lease but before it registers its operation. It then observes nothing and blocks on that lease while Ready Merge registers, launches, integrates, and transitions; the second scan occurs too late to cancel the succeeded operation.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The launch-cancellation test begins only after the Git child is visible, so it misses the pre-registration cancellation window. The disjoint supervisor merge test exercises only the value-merging helper and never verifies that sync commits, pushes, and preserves the merged snapshot across a later sync.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Cancellation and durable supervisor-state synchronization remain unsafe.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "A successfully reconciled supervisor-agent.json is excluded from the computed delta after remote_state is replaced with the merged snapshot. When it is the only change, no commit or push occurs; the next sync restores the dirty state worktree and can discard the merged event and issue evidence.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "Cancellation can run its first operation scan after Ready Merge acquires the workflow lease but before it registers its operation. It then observes nothing and blocks on that lease while Ready Merge registers, launches, integrates, and transitions; the second scan occurs too late to cancel the succeeded operation.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The launch-cancellation test begins only after the Git child is visible, so it misses the pre-registration cancellation window. The disjoint supervisor merge test exercises only the value-merging helper and never verifies that sync commits, pushes, and preserves the merged snapshot across a later sync.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3N803TK00E78AK4M000-round-4"
+      },
+      "governance_message": "Cancellation and durable supervisor-state synchronization remain unsafe.",
+      "governance_rule_actions": [
+        {
+          "message": "A successfully reconciled supervisor-agent.json is excluded from the computed delta after remote_state is replaced with the merged snapshot. When it is the only change, no commit or push occurs; the next sync restores the dirty state worktree and can discard the merged event and issue evidence.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "Cancellation can run its first operation scan after Ready Merge acquires the workflow lease but before it registers its operation. It then observes nothing and blocks on that lease while Ready Merge registers, launches, integrates, and transitions; the second scan occurs too late to cancel the succeeded operation.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The launch-cancellation test begins only after the Git child is visible, so it misses the pre-registration cancellation window. The disjoint supervisor merge test exercises only the value-merging helper and never verifies that sync commits, pushes, and preserves the merged snapshot across a later sync.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Committed 80ca16b8 (Close Ready Merge cancellation and sync races). Made workflow-owned Git launch/cancellation and operation settlement atomic, held the Ready Merge fence through Git effects, integration evidence, recovery, and transition, released capacity with causal cancellation evidence, and replaced the supervisor-agent.json overwrite exemption with explicit semantic reconciliation/conflict reporting plus fresh push-retry rechecks. Added separate-process launch, settlement, replacement/revision, retry/restart, capacity, evidence, and exactly-once coverage. Verification: focused state-sync 19/19 passed; serial library 463/463 passed; full workflow 1/1 passed; multi-instance 7/7 passed; cargo check --all-targets, cargo fmt --all -- --check, git diff --check, staged diff check, current-main ancestry, preserved-candidate ancestry, and clean-worktree checks passed.",
       "implementation_reported_at": "2026-07-23T13:37:18Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover failed candidate 6d04fbab from current main while preserving that candidate and all prior round and provider evidence. Fix the three recorded Governance violations narrowly: make subprocess launch registration and cancellation atomic enough that cancellation cannot miss a just-spawned Git child and always releases workflow capacity; keep the active claim, execution, node, round, status, candidate, decision version, and Goal revision fenced continuously across each Git side effect, integration evidence write, existing-integration recovery path, operation settlement, and subsequent workflow transition so cancelled or replaced work cannot integrate or settle; and add separate-daemon or separate-process production-path coverage for cancellation during launch, cancellation or replacement after the last pre-side-effect fence and before settlement, unequal concurrent revisions, capacity release, retry or restart, and exactly-once integration. Also remove the supervisor-agent.json conflict exemption introduced in round 2: unequal durable supervisor snapshots must not be silently overwritten or hidden. Reconcile disjoint remote records while retaining and explicitly reporting conflicting paths, or implement an evidence-preserving semantic merge for supervisor event history and open issues; on push retry, recheck original base and local state against the fresh remote before replay. Re-run the focused state-sync tests, full library suite, full workflow gate, and multi-instance gate, reporting exact results. Preserve configurable target branch and remote, pinned Quality timing, candidate ancestry, worktrees, and all provider, authentication, cancellation, Governance, Quality, and manual Review boundaries. Do not force merge, rewrite history, discard prior worktrees, bypass failures, or edit durable Goal state directly.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T13:37:18Z",
+      "rule_state": "failed",
+      "updated": "2026-07-23T13:41:45Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-23T13:37:53Z"
+  "updated": "2026-07-23T13:41:45Z"
 }
