@@ -56,13 +56,13 @@
     "00000SZ301MXF1Q5K4QDSJ6000": "done",
     "00000SZ3K92DJJT8PWF5AP8000": "done",
     "00000SZ3KH6A2G1JKVCWN4Y000": "done",
-    "00000SZ3KJDDGGCK29J4N4Y001": "review",
+    "00000SZ3KJDDGGCK29J4N4Y001": "done",
     "00000SZ3N803TK00E78AK4M000": "todo",
     "00000SZ3NBF861H3VJPTK4M001": "in-progress"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:review,00000SZ3N803TK00E78AK4M000:todo,00000SZ3NBF861H3VJPTK4M001:in-progress|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T11:10:33.709346818+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:todo,00000SZ3NBF861H3VJPTK4M001:in-progress|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T11:12:04.986550606+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1737,6 +1737,16 @@
       "message": "Goal 00000SZ3NBF861H3VJPTK4M001 entered workflow state in-progress.",
       "created_at": "2026-07-23T11:10:33.603856581+00:00",
       "goal_id": "00000SZ3NBF861H3VJPTK4M001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T11:12:04.912429240+00:00-174",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3KJDDGGCK29J4N4Y001 changed from review to done.",
+      "created_at": "2026-07-23T11:12:04.912429240+00:00",
+      "goal_id": "00000SZ3KJDDGGCK29J4N4Y001",
       "actionable": false,
       "retryable": false
     }

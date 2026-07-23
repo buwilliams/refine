@@ -144,7 +144,7 @@
       "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-23T11:09:49Z"
+  "updated": "2026-07-23T11:12:03Z"
 }
