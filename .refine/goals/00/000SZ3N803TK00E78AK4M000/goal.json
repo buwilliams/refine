@@ -1,7 +1,7 @@
 {
   "base_commit": "749923d99ffb4a326e0b48ea809ac35bad4d0538",
   "branch_name": "refine/00000SZ3N803TK00E78AK4M000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "c9afedb7995be266ebc9de219a7e92e3697b6ef5",
   "created": "2026-07-23T11:06:42Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed c9afedb7 (Make Ready Merge own candidate integration). Ready Merge now serializes exact candidate integration and configured-remote push, persists idempotent merge evidence, recovers safely after retry/restart/push failure, then runs optional rebuild on the integrated target and Quality in the round-pinned pre_merge or post_build order. Review approval only accepts the existing integration; decline requires a new auditable round. UI, CLI/API guards, docs, and tests were updated. Exact verification: fresh `cargo test --lib -- --test-threads=1` passed 457/457; `test-full-workflow` passed 1/1; `cargo check --all-targets`, `cargo fmt --all -- --check`, and `git diff --check` passed; the two formerly index-racy workflows passed in the fresh suite plus 30/30 and 20/20 stress reruns. Separate `test-multi-instance-sync` failed 0/1 twice because supervisor-state synchronization deleted the first daemon's new Goal before reconciliation; retained Git history showed that state-sync deletion, outside the Ready Merge integration path.",
+      "implementation_reported_at": "2026-07-23T12:05:03Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,11 +32,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T11:08:38Z",
+      "updated": "2026-07-23T12:05:03Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T11:13:15Z"
+  "updated": "2026-07-23T12:05:03Z"
 }
