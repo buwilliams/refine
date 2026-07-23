@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:52:06Z",
+  "updated_at": "2026-07-23T18:52:37Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2607,6 +2607,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m reconciling the changed snapshot against live Goal, process, round, and repository evidence. I’ll keep review candidates at review and won’t retry or mutate anything unless the supported evidence shows a genuinely lost worker or another actionable condition."
+    },
+    {
+      "created_at": "2026-07-23T18:52:37Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832757000-152",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first live API pass is reachable, but those endpoints wrap their payloads differently than the supplied snapshot; the null extraction is therefore not state evidence. I’m correcting for the live response schema and checking the daemon’s process registry plus OS liveness before drawing any conclusion about the “no live Goal IDs” field."
     }
   ],
   "queue_dispatching": true,
