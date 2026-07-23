@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:45:14Z",
+  "updated_at": "2026-07-23T14:47:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1092,6 +1092,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 4 is now actively owned by a live Goal agent in a new worktree; the four older candidates remain untouched at review. I’ll correlate its process, durable Goal record, Git state, and Governance result rather than relying on the status label alone."
+    },
+    {
+      "created_at": "2026-07-23T14:47:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784818060588-212",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The agent is still live and has not yet modified the Round 4 worktree; there is no stall or provider failure evidence. It appears to be mapping the shared cancellation paths before editing, which is proportionate to this concurrency-sensitive recovery."
     }
   ],
   "queued_messages": [
