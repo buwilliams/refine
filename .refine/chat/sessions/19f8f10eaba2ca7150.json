@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:43:21Z",
+  "updated_at": "2026-07-23T18:43:35Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2433,6 +2433,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll reconcile the three non-terminal Goals against current Goal records, live processes, transcripts, Git/worktrees, and daemon health. I’ll keep review as a confirmation boundary and won’t retry or terminate anything unless the evidence makes that action both necessary and authorized."
+    },
+    {
+      "created_at": "2026-07-23T18:43:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832215579-25",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is internally inconsistent: it says no live workflow-agent Goal IDs, while its process list shows two running Goal agents. I’m treating that as stale aggregation and checking the live daemon and OS directly before deciding whether either in-progress Goal is lost."
     }
   ],
   "queue_dispatching": true,
