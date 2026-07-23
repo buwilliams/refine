@@ -56,6 +56,8 @@ pub struct AgentSessionSnapshot {
     pub worktree: Option<Value>,
     pub attention_state: Option<String>,
     pub attention_message: Option<String>,
+    #[serde(default)]
+    pub transcript_bytes: u64,
     pub alive: bool,
     pub exited: bool,
 }
@@ -613,6 +615,15 @@ pub fn agent_session_events_since(
     session_id: &str,
     after: u64,
 ) -> RefineResult<Vec<Value>> {
+    agent_session_events_range(runtime_root, session_id, after, None)
+}
+
+pub fn agent_session_events_range(
+    runtime_root: &Path,
+    session_id: &str,
+    after: u64,
+    before: Option<u64>,
+) -> RefineResult<Vec<Value>> {
     let (process, _) = session_process(runtime_root, session_id)?;
     let path = process
         .stdout_path
@@ -626,7 +637,8 @@ pub fn agent_session_events_since(
         ))
     })?;
     let length = file.metadata().map(|metadata| metadata.len()).unwrap_or(0);
-    let start = after.min(length);
+    let end = before.unwrap_or(length).min(length);
+    let start = after.min(end);
     file.seek(SeekFrom::Start(start)).map_err(|error| {
         RefineError::Io(format!(
             "failed to seek Goal Agent transcript {}: {error}",
@@ -634,7 +646,7 @@ pub fn agent_session_events_since(
         ))
     })?;
     let mut bytes = Vec::new();
-    file.take(MAX_EVENT_BYTES as u64)
+    file.take((end - start).min(MAX_EVENT_BYTES as u64))
         .read_to_end(&mut bytes)
         .map_err(|error| {
             RefineError::Io(format!(
@@ -727,6 +739,12 @@ fn snapshot_from_process(
     metadata: &Map<String, Value>,
 ) -> RefineResult<AgentSessionSnapshot> {
     let alive = FileProcessSupervisor::process_is_alive(process)?;
+    let transcript_bytes = process
+        .stdout_path
+        .as_deref()
+        .and_then(|path| fs::metadata(path).ok())
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
     Ok(AgentSessionSnapshot {
         id: metadata
             .get("session_id")
@@ -761,6 +779,7 @@ fn snapshot_from_process(
             .get("attention_message")
             .and_then(Value::as_str)
             .map(str::to_string),
+        transcript_bytes,
         alive,
         exited: !alive,
     })
@@ -952,6 +971,32 @@ mod tests {
             thread::sleep(Duration::from_millis(20));
         };
         assert!(snapshot.alive);
+        let transcript = loop {
+            let events = agent_session_events_since(&runtime_root, &snapshot.id, 0).unwrap();
+            let transcript = events
+                .iter()
+                .filter_map(|event| event.get("data").and_then(Value::as_str))
+                .collect::<String>();
+            if transcript.contains("ready") {
+                break transcript;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(20));
+        };
+        let transcript_len = transcript.len() as u64;
+        let middle =
+            agent_session_events_range(&runtime_root, &snapshot.id, 1, Some(transcript_len - 1))
+                .unwrap();
+        assert_eq!(
+            middle[0]["data"].as_str().unwrap().as_bytes(),
+            &transcript.as_bytes()[1..transcript.len() - 1],
+        );
+        assert!(
+            find_agent_session(&runtime_root, &snapshot.id)
+                .unwrap()
+                .transcript_bytes
+                >= transcript_len
+        );
         let mut duplicate_metadata = Map::new();
         duplicate_metadata.insert("goal_id".to_string(), json!("GOAL1"));
         let duplicate = run_goal_agent(

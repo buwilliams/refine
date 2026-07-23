@@ -13,7 +13,7 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use crate::process::agent_sessions::{
-    agent_session_events_since, find_agent_session, resize_agent_session, send_agent_session_input,
+    agent_session_events_range, find_agent_session, resize_agent_session, send_agent_session_input,
     stop_agent_session, stop_agent_session_process,
 };
 use crate::process::subprocess::{
@@ -225,8 +225,20 @@ pub(in crate::surfaces::web_server) fn terminal_events_since(
     session_id: &str,
     after: u64,
 ) -> RefineResult<Vec<Value>> {
+    terminal_events_range(runtime_root, session_id, after, None)
+}
+
+pub(in crate::surfaces::web_server) fn terminal_events_range(
+    runtime_root: &std::path::Path,
+    session_id: &str,
+    after: u64,
+    before: Option<u64>,
+) -> RefineResult<Vec<Value>> {
     if let Some(session) = local_terminal_session(session_id)? {
-        let events = session.events_since(after)?;
+        let events = session
+            .events_since(after)?
+            .into_iter()
+            .filter(|event| before.is_none_or(|before| event.seq <= before));
         Ok(events
             .into_iter()
             .map(|event| {
@@ -238,7 +250,7 @@ pub(in crate::surfaces::web_server) fn terminal_events_since(
             })
             .collect())
     } else {
-        agent_session_events_since(runtime_root, session_id, after)
+        agent_session_events_range(runtime_root, session_id, after, before)
     }
 }
 

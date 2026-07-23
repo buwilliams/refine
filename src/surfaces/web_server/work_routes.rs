@@ -2838,10 +2838,11 @@ impl InProcessWebServer {
         let after = query_param(raw_path, "after")
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(0);
+        let before = query_param(raw_path, "before").and_then(|value| value.parse::<u64>().ok());
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("stream terminal session");
         };
-        match terminal_events_since(runtime_root, session_id, after) {
+        match terminal_events_range(runtime_root, session_id, after, before) {
             Ok(events) => ApiResponse::json(200, json!({ "events": events })),
             Err(error) => error_response(error),
         }

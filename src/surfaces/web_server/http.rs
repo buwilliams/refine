@@ -469,7 +469,10 @@ impl LocalHttpDaemon {
             && let Some(session_id) = terminal_events_route(&request.path)
             && !terminal_events_snapshot_requested(&request.path)
         {
-            return self.terminal_sse_response(session_id);
+            let after = query_param(&request.path, "after")
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(0);
+            return self.terminal_sse_response(session_id, after);
         }
         self.handle_wire_request(request).into_response()
     }
@@ -876,11 +879,11 @@ impl LocalHttpDaemon {
             .into_response()
     }
 
-    fn terminal_sse_response(&self, session_id: String) -> Response {
+    fn terminal_sse_response(&self, session_id: String, initial_after: u64) -> Response {
         let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
         let runtime_root = self.server.runtime_root.clone();
         tokio::spawn(async move {
-            let mut after = 0_u64;
+            let mut after = initial_after;
             let mut last_attention = None;
             let mut attached = false;
             loop {

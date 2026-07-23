@@ -418,6 +418,58 @@ test("terminal output and exit events remain scoped to their tab", async () => {
   assert.equal(browser.runtime.terminal("supervisor").exited, true);
 });
 
+test("Goal Agent opens on the latest transcript tail while earlier context loads in the background", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  let resolveHistory;
+  const history = new Promise((resolve) => { resolveHistory = resolve; });
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "goal-session",
+        process_id: "goal-agent-process",
+        cwd: "/repo/worktree",
+        profile: "goal",
+        provider: "codex",
+        goal_id: body.goal_id,
+        transcript_bytes: 120_000,
+      };
+    }
+    if (requestPath.includes("snapshot=1")) return history;
+    return { ok: true };
+  });
+
+  await browser.runtime.openGoal("GOAL1");
+
+  assert.equal(
+    browser.events()[0].url,
+    "/api/terminal/goal-session/events?after=104000",
+  );
+  browser.events()[0].emit("terminal_output", {
+    seq: 120_000,
+    data: "latest Goal Agent text\n",
+  });
+  assert.equal(
+    browser.runtime.terminal("GOAL1").display,
+    "latest Goal Agent text\n",
+  );
+
+  resolveHistory({
+    events: [{ seq: 104_000, event: "terminal_output", data: "earlier context\n" }],
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(
+    browser.runtime.terminal("GOAL1").display,
+    "earlier context\nlatest Goal Agent text\n",
+  );
+  assert.equal(
+    requests.find((request) => request.path.includes("snapshot=1")).path,
+    "/api/terminal/goal-session/events?snapshot=1&after=70000&before=104000",
+  );
+});
+
 test("stored custom-chat ids are discarded while managed terminal ids reattach", async () => {
   const storage = new Map();
   storage.set("refine_chat_tabs", JSON.stringify({
