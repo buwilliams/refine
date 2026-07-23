@@ -2,8 +2,8 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "degraded",
-  "active_work": 0,
-  "queued_work": 4,
+  "active_work": 4,
+  "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8f10eaba2ca7150",
@@ -57,18 +57,18 @@
     "00000SZ3K92DJJT8PWF5AP8000": "done",
     "00000SZ3KH6A2G1JKVCWN4Y000": "done",
     "00000SZ3KJDDGGCK29J4N4Y001": "done",
-    "00000SZ3N803TK00E78AK4M000": "todo",
+    "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "review",
-    "00000SZ3RP4G52RZ706A5P4001": "todo",
-    "00000SZ3SFP4N10NXGAE5P4002": "todo",
-    "00000SZ3SHFHFK352VJT5P4003": "todo"
+    "00000SZ3RP4G52RZ706A5P4001": "in-progress",
+    "00000SZ3SFP4N10NXGAE5P4002": "in-progress",
+    "00000SZ3SHFHFK352VJT5P4003": "in-progress"
   },
   "open_issues": {
-    "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1"
+    "workflow": "Workflow evaluation failed: Cancellation and durable supervisor-state synchronization remain unsafe."
   },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:todo,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:todo,00000SZ3SFP4N10NXGAE5P4002:todo,00000SZ3SHFHFK352VJT5P4003:todo|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
-  "updated_at": "2026-07-23T13:44:49.301386758+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:in-progress,00000SZ3SFP4N10NXGAE5P4002:in-progress,00000SZ3SHFHFK352VJT5P4003:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Cancellation and durable supervisor-state synchronization remain unsafe.",
+  "updated_at": "2026-07-23T13:49:20.055830889+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2027,6 +2027,35 @@
       "status": "info",
       "message": "Goal 00000SZ3SHFHFK352VJT5P4003 changed from cancelled to todo.",
       "created_at": "2026-07-23T13:38:48.216705204+00:00",
+      "goal_id": "00000SZ3SHFHFK352VJT5P4003",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:49:10.715131424+00:00-203",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: Cancellation and durable supervisor-state synchronization remain unsafe.",
+      "created_at": "2026-07-23T13:49:10.715131424+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-23T13:49:16.529260958+00:00-204",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from todo to in-progress.",
+      "created_at": "2026-07-23T13:49:16.529260958+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:49:19.918564448+00:00-205",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3SHFHFK352VJT5P4003 changed from todo to in-progress.",
+      "created_at": "2026-07-23T13:49:19.918564448+00:00",
       "goal_id": "00000SZ3SHFHFK352VJT5P4003",
       "actionable": false,
       "retryable": false
