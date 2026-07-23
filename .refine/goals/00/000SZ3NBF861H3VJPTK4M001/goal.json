@@ -1,0 +1,42 @@
+{
+  "base_commit": "57551ae709a983001dbb39175e4ae380f1b03bee",
+  "branch_name": "refine/00000SZ3NBF861H3VJPTK4M001/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-23T11:10:30Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ3NBF861H3VJPTK4M001",
+  "name": "Web UI > Goals > Filters & Bulk actions > Assign Reporter > Model list of Report",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T11:10:30Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Web UI > Goals > Filters & Bulk actions > Assign Reporter > Model list of Reporters is empty which is a bug.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T11:10:30Z",
+      "workflow_quality_timing": null
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-23T11:10:32Z"
+}
