@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:39:11Z",
+  "updated_at": "2026-07-23T13:41:29Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -462,6 +462,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A new coordination mismatch appeared during Governance: durable Goal states were reset to `todo` and the supervisor now reports 0 active/3 queued, while three exact owned processes are still running (two implementation agents and the Ready Merge Governance process). I am not retrying or cancelling anything—either would cross the ownership/cancellation boundary while live work exists. I’m tracing the state-sync failure and checking whether the mismatch self-recovers."
+    },
+    {
+      "created_at": "2026-07-23T13:41:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814089182-98",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The ownership audit confirms the three live executions were marked `interrupted` at 13:37:54 and their capacity leases were removed, even though their OS processes and worktrees remain active. That makes a retry unsafe and creates a duplicate-launch risk. Pausing all workflow automation would be the safe containment action, but it is global and would affect Goals you are actively creating/undoing, so I’m not taking it without your authority."
     }
   ],
   "queued_messages": [
