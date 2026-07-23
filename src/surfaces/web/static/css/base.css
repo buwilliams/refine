@@ -174,36 +174,7 @@ pre {
 }
 .topbar-actions select { width: 100%; }
 
-.nav-command-button {
-  font: inherit;
-}
-.nav-command-icon {
-  width: 13px;
-  height: 13px;
-  border: 2px solid currentColor;
-  border-radius: 999px;
-  position: relative;
-  display: inline-block;
-}
-.nav-command-icon::after {
-  content: "";
-  position: absolute;
-  width: 6px;
-  height: 2px;
-  right: -5px;
-  bottom: -3px;
-  background: currentColor;
-  transform: rotate(45deg);
-  border-radius: 999px;
-}
-.nav-command-shortcut {
-  color: var(--color-text-soft);
-  font-size: 11px;
-  font-weight: 650;
-}
-.nav-command-button:hover .nav-command-shortcut {
-  color: var(--color-text);
-}
+.nav-command-button { font: inherit; }
 .nav-issue-button {
   color: var(--color-text-muted);
 }
@@ -283,16 +254,22 @@ pre {
 .nav-context-summary {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
+  height: 34px;
   max-width: 150px;
-  padding: 0 28px 0 10px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--card);
   color: var(--color-text-muted);
   box-shadow: var(--shadow-sm);
-  position: relative;
+  overflow: hidden;
+}
+.nav-context-main {
+  height: 100%;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .nav-context-icon {
   width: 16px;
@@ -304,7 +281,17 @@ pre {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.nav-context-summary::after,
+.nav-context-more {
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  border-left: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.nav-context-more::after,
 .nav-create-more::after {
   content: "";
   width: 6px;
@@ -312,12 +299,6 @@ pre {
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg);
-}
-.nav-context-summary::after {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  color: var(--muted);
 }
 .nav-context-panel { min-width: 280px; }
 .nav-context-status {
@@ -337,13 +318,23 @@ pre {
 }
 .nav-control-item {
   width: 100%;
+  height: auto;
   border: 0;
   background: transparent;
   cursor: pointer;
+  justify-content: flex-start;
+  box-shadow: none;
+  font-weight: inherit;
+  line-height: inherit;
 }
 .nav-control-item:disabled {
   cursor: default;
   opacity: 0.65;
+}
+.nav-control-item:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  filter: none;
 }
 .nav-control-copy {
   min-width: 0;
@@ -523,8 +514,14 @@ h3 {
   }
   .nav-context-summary {
     max-width: 150px;
+  }
+  .nav-context-main {
     padding-left: 8px;
-    padding-right: 24px;
+    padding-right: 8px;
+  }
+  .nav-context-more {
+    width: 28px;
+    min-width: 28px;
   }
   .topbar-actions .nav-create-primary {
     padding-left: 10px;

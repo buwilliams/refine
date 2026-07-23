@@ -30,11 +30,14 @@
     <div class="topbar-actions">
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
         <summary class="nav-context-summary" aria-label="Open controls" data-testid="context-menu-toggle">
-          <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
-            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path>
-          </svg>
-          <span>Controls</span>
+          <span class="nav-context-main">
+            <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path>
+            </svg>
+            <span>Controls</span>
+          </span>
+          <span class="nav-context-more" aria-hidden="true"></span>
         </summary>
         <div class="nav-menu-panel nav-context-panel">
           <div class="nav-menu-label">Application</div>
@@ -64,13 +67,30 @@
               <span class="nav-control-status agent-status-label">Status unknown</span>
             </span>
           </a>
-          <button class="nav-menu-item nav-control-item nav-source-update-button" id="btn-source-update"
+          <button class="nav-menu-item nav-control-item nav-management-item nav-command-button" id="btn-command-palette"
+                  data-testid="command-palette-button"
+                  aria-label="Open command palette">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-4-4"></path>
+            </svg>
+            <span>Command palette</span>
+          </button>
+          <button class="nav-menu-item nav-control-item nav-management-item nav-issue-button" id="btn-refine-issue"
+                  data-testid="nav-refine-issue"
+                  aria-label="Request refine feature or bugfix"
+                  title="Request refine feature or bugfix">
+            <span class="nav-menu-icon nav-bug-icon" aria-hidden="true"></span>
+            <span>Report a bug</span>
+          </button>
+          <div class="nav-menu-label nav-context-section-label">Management</div>
+          <button class="nav-menu-item nav-control-item nav-management-item nav-source-update-button" id="btn-source-update"
                   data-testid="nav-source-update"
                   data-state="checking"
                   aria-label="Update running Refine from source"
                   title="Checking for Refine source updates"
                   hidden disabled>
-            <svg class="nav-source-update-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <svg class="nav-menu-icon nav-source-update-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <path d="M20 11a8 8 0 0 0-14.9-4"></path>
               <path d="M4 4v5h5"></path>
               <path d="M4 13a8 8 0 0 0 14.9 4"></path>
@@ -81,23 +101,6 @@
               <span class="nav-control-status nav-source-update-status">Checking for updates</span>
             </span>
           </button>
-          <button class="nav-menu-item nav-control-item nav-command-button" id="btn-command-palette"
-                  data-testid="command-palette-button"
-                  aria-label="Open command palette">
-            <span class="nav-command-icon" aria-hidden="true"></span>
-            <span class="nav-control-copy">
-              <span>Command palette</span>
-              <span class="nav-command-shortcut" data-command-shortcut>Ctrl+K</span>
-            </span>
-          </button>
-          <button class="nav-menu-item nav-control-item nav-issue-button" id="btn-refine-issue"
-                  data-testid="nav-refine-issue"
-                  aria-label="Request refine feature or bugfix"
-                  title="Request refine feature or bugfix">
-            <span class="nav-bug-icon" aria-hidden="true"></span>
-            <span>Report a bug</span>
-          </button>
-          <div class="nav-menu-label nav-context-section-label">Management</div>
           <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide" data-testid="nav-guide-open">
             <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <path d="M12 7v14"></path>
