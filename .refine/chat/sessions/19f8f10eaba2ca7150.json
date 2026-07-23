@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:37:44Z",
+  "updated_at": "2026-07-23T19:38:57Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3084,6 +3084,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The unchanged full-library rerun completed, and the agent is now stress-running `singleton_agent_profiles_return_the_existing_live_session` ten times before rechecking interactive terminal and browser Stop behavior. That indicates it is investigating another concurrency-sensitive signal rather than prematurely treating a green isolated retry as sufficient."
+    },
+    {
+      "created_at": "2026-07-23T19:38:57Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784835537848-240",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The concurrency investigation is now backed by a clean unchanged full-library run: 496 passed, 0 failed. The earlier replenishment and singleton-session signals remain part of the audit trail; the final green run does not erase them. The candidate still needs the web/all-target/format/diff and review handoff gates."
     }
   ],
   "queue_dispatching": true,
