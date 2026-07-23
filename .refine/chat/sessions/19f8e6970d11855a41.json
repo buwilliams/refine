@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:03:33Z",
+  "updated_at": "2026-07-23T10:03:43Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -105,6 +105,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The queued Goal already has a Round 1 worktree, while the primary target checkout contains unrelated uncommitted changes. I’m treating those changes as protected user/workflow state and will not sync, stash, reset, or reuse that checkout to “unstick” the queue. Next I’m checking whether the Round actually launched, what the Goal asks for, and whether provider/runner health permits a supported start."
+    },
+    {
+      "created_at": "2026-07-23T10:03:43Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801023410-8",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The evidence has now advanced: the Goal is genuinely `in-progress`, a live Codex Goal agent exists, the Round 1 worktree is clean, and the supervisor has recovered to healthy with no open issue. I am not issuing a retry—the earlier “background process launch is stopped” condition is no longer the operative state. I’ll watch the live agent and only intervene if it is lost, fails, or reaches a review boundary."
     }
   ],
   "queued_messages": [
