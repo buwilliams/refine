@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:49:23Z",
+  "updated_at": "2026-07-23T19:49:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3192,15 +3192,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The final correlation confirms the candidate is clean and still unmerged: Goal status is `review`, and the candidate is not an ancestor of either local or remote-tracking `main`. The supervisor-specific HTTP path has changed or is unavailable (`404`), so I’m treating the supported CLI plus live process API as authoritative rather than masking that discrepancy."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f9084e1e252eb",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T19:47:35Z",
-      "updated_at": "2026-07-23T19:47:36Z",
-      "internal": true
+      "created_at": "2026-07-23T19:49:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836184845-259",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Supervision complete. Goal `00000SZ3RP4G52RZ706A5P4001` is now at `review`; no Goal Agent remains active.\n\n- Candidate: `3511a6a119e3e53f46214552efb4835d0e2f4873`\n- Branch: `refine/00000SZ3RP4G52RZ706A5P4001/round-9`\n- Worktree is clean and the candidate is published.\n- Governance passed 8/8.\n- Verification passed: Rust 496/496, Node 38/38, formatting and compile checks.\n- Quality reported success, but explicitly as a no-op because no Quality tests are configured. Target-app build instructions are also absent.\n- Candidate is not merged into local or `origin/main`.\n- Daemon and workflow runner are healthy. The supervisor HTTP endpoint returned `404`, although the supported CLI and process API agree on the current state.\n\nNo approval, merge, retry, process termination, or worktree mutation was performed. Your decision is now required: approve or reject the review candidate."
+    },
+    {
+      "created_at": "2026-07-23T19:49:45Z",
+      "delivered": false,
+      "id": "evt-1784836185109-261",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Supervision complete. Goal `00000SZ3RP4G52RZ706A5P4001` is now at `review`; no Goal Agent remains active.\n\n- Candidate: `3511a6a119e3e53f46214552efb4835d0e2f4873`\n- Branch: `refine/00000SZ3RP4G52RZ706A5P4001/round-9`\n- Worktree is clean and the candidate is published.\n- Governance passed 8/8.\n- Verification passed: Rust 496/496, Node 38/38, formatting and compile checks.\n- Quality reported success, but explicitly as a no-op because no Quality tests are configured. Target-app build instructions are also absent.\n- Candidate is not merged into local or `origin/main`.\n- Daemon and workflow runner are healthy. The supervisor HTTP endpoint returned `404`, although the supported CLI and process API agree on the current state.\n\nNo approval, merge, retry, process termination, or worktree mutation was performed. Your decision is now required: approve or reject the review candidate."
+    },
+    {
+      "created_at": "2026-07-23T19:49:45Z",
+      "delivered": false,
+      "id": "evt-1784836185109-262",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T19:49:45Z",
+      "delivered": false,
+      "id": "evt-1784836185128-264",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
