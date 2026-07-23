@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:15:27Z",
+  "updated_at": "2026-07-23T18:16:47Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2052,6 +2052,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both claims are healthy and provider-backed: Codex diagnostics and authentication pass, the workflow runner is reachable, background launch is enabled, and both Goal/API endpoints return HTTP 200. The recovery is isolated in a new round-2 worktree; the preserved dirty round-1 worktree remains untouched. I’m watching for the next workflow transition rather than intervening in live agents."
+    },
+    {
+      "created_at": "2026-07-23T18:16:47Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830607254-74",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A new transition is occurring for `00000SZ412RXR0TQRHE82JW000`: its Goal Agent output file disappeared and the Goal timestamp advanced to 18:16:21 UTC. Because the earlier Goal failed on exactly a missing-transcript condition, I’m checking whether Refine settled this one normally or reproduced that infrastructure failure; I will preserve the evidence either way."
     }
   ],
   "queued_messages": [
