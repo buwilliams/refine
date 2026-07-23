@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:50:08Z",
+  "updated_at": "2026-07-23T18:50:21Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2520,6 +2520,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll correlate the three non-terminal Goals with durable Goal/Round evidence, live processes, worktrees, and runtime health. I’ll treat review as a confirmation boundary and won’t retry or transition anything unless the evidence establishes a lost worker or another supported recovery action."
+    },
+    {
+      "created_at": "2026-07-23T18:50:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832621381-137",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The prior runbook confirms the correct boundary: durable Goal state plus process and worktree evidence must agree before intervention, and a review candidate remains unmerged. I’m now checking the current runtime rather than relying on yesterday’s snapshot."
     }
   ],
   "queued_messages": [
