@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:58:47Z",
+  "updated_at": "2026-07-23T16:00:24Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1683,9 +1683,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live recommendation is now unambiguous: Refine reports zero active claims and exactly five Goals waiting on human review. I’m doing one final read-only mergeability check against current `main`; I will not invoke approval or alter any worktree."
+    },
+    {
+      "created_at": "2026-07-23T16:00:24Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784822424304-311",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No autonomous workflow action remains. Human review/approval is now the boundary.\n\n| Goal | Candidate |\n|---|---|\n| Ready Merge integration | `00000SZ3N803TK00E78AK4M000` · `e789bd9f` |\n| Controls dropdown UI | `00000SZ3RN3BS397T4SE5P4000` · `ed0f6936` |\n| Process stop/cancellation recovery | `00000SZ3RP4G52RZ706A5P4001` · `ebc7d269` |\n| Goal Agent toolbar loading | `00000SZ3SFP4N10NXGAE5P4002` · `bcf9d063` |\n| Goal creation under 50 ms | `00000SZ3SHFHFK352VJT5P4003` · `7b67a8ef` |\n\nLive verification:\n\n- All five are in `review` with Governance passing.\n- Quality “passed” only as a no-op: no Quality tests are configured.\n- All candidate branches exist remotely; their worktrees are clean and preserved.\n- None is merged into `main`.\n- `main` is clean and matches `origin/main` at `a413fac2`.\n- Each candidate currently simulates cleanly against `main` individually.\n- Most candidate pairs conflict with each other; only the Controls UI and Goal Agent toolbar candidates appear mutually confli"
+    },
+    {
+      "created_at": "2026-07-23T16:00:24Z",
+      "delivered": false,
+      "id": "evt-1784822424453-313",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No autonomous workflow action remains. Human review/approval is now the boundary.\n\n| Goal | Candidate |\n|---|---|\n| Ready Merge integration | `00000SZ3N803TK00E78AK4M000` · `e789bd9f` |\n| Controls dropdown UI | `00000SZ3RN3BS397T4SE5P4000` · `ed0f6936` |\n| Process stop/cancellation recovery | `00000SZ3RP4G52RZ706A5P4001` · `ebc7d269` |\n| Goal Agent toolbar loading | `00000SZ3SFP4N10NXGAE5P4002` · `bcf9d063` |\n| Goal creation under 50 ms | `00000SZ3SHFHFK352VJT5P4003` · `7b67a8ef` |\n\nLive verification:\n\n- All five are in `review` with Governance passing.\n- Quality “passed” only as a no-op: no Quality tests are configured.\n- All candidate branches exist remotely; their worktrees are clean and preserved.\n- None is merged into `main`.\n- `main` is clean and matches `origin/main` at `a413fac2`.\n- Each candidate currently simulates cleanly against `main` individually.\n- Most candidate pairs conflict with each other; only the Controls UI and Goal Agent toolbar candidates appear mutually conflict-free. Bulk approval would therefore be unsafe—approval should be serial, with remaining candidates rechecked after each merge.\n- Codex diagnostics and authentication pass; UI and Goals API return HTTP 200.\n- The existing `operation-recovery-interrupted` degradation remains visible. It maps to the running daemon rather than lost Goal work, so I did not restart or alter it.\n\nYour authority is required now: which Goal, if any, should be approved first? I will not merge, decline, or create reconciliation rounds without that decision."
+    },
+    {
+      "created_at": "2026-07-23T16:00:24Z",
+      "delivered": false,
+      "id": "evt-1784822424453-314",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
