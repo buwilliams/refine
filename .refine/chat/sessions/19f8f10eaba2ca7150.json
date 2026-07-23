@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:47:09Z",
+  "updated_at": "2026-07-23T19:47:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3144,6 +3144,27 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance is still actively evaluating (live PID, sustained CPU, no auth/provider error), so there is no actionable stall. The candidate remains unmerged and the Goal remains in progress while that independent review runs."
+    },
+    {
+      "created_at": "2026-07-23T19:47:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836058976-251",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance passed all configured checks: “No governance rule violations found,” with rule, constitution, meta-rule, and product states all passed. The Goal has not yet crossed into review, so I’m waiting for the workflow’s Quality/build settlement rather than approving it myself."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f9084e1e252eb",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "created_at": "2026-07-23T19:47:35Z",
+      "updated_at": "2026-07-23T19:47:36Z",
+      "internal": true
     }
   ],
   "queue_dispatching": true,
