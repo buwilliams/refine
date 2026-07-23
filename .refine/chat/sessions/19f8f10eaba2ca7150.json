@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:56:39Z",
+  "updated_at": "2026-07-23T15:56:55Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1623,6 +1623,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prior supervision record points to the auditable Goal-recovery procedure. I’m applying it here because these Goals are already at `review`; that procedure explicitly keeps approval/merge human-controlled and only permits a new round after a verified conflict or failed candidate."
+    },
+    {
+      "created_at": "2026-07-23T15:56:55Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784822215421-301",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The durable snapshot shows no worker loss or queued work, so I’m not starting any recovery. The remaining question is whether each `review` candidate has complete evidence and remains unmerged; I’m checking that now, along with current daemon/provider health."
     }
   ],
   "queue_dispatching": true,
