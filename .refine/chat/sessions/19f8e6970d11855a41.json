@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:10:09Z",
+  "updated_at": "2026-07-23T12:10:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -951,6 +951,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance has now found an additional concrete integrity problem: the recorded base `749923d9` is not an ancestor of candidate `c9afedb7` (merge base `57551ae7`). That candidate is stale by its own new Ready Merge rule, so it cannot safely advance even if the test suite passes. I’m keeping the worktree and candidate intact and awaiting Governance’s recorded verdict."
+    },
+    {
+      "created_at": "2026-07-23T12:10:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808648565-95",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance rejected the candidate on four auditable grounds: foundation/host coupling, unsupervised Git cancellation, missing execution/revision fencing plus stale ancestry, and inadequate multi-daemon evidence. The recovery skill now calls for a fresh narrow Goal round from current `main`; I’m using that supported path, preserving `c9afedb7` and its worktree as evidence."
     }
   ],
   "queued_messages": [
