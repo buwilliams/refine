@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:17:10Z",
+  "updated_at": "2026-07-23T19:17:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2889,15 +2889,45 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The edit was correctly rejected because automation claimed the latest Round before metadata could be amended; I’m preserving that refusal. I’ll deliver the omitted Round 8/current-main conflict evidence to the already-running Round 9 agent through its managed input channel, without changing the Goal or branch out from under the active claim."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f90679f5152ea",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T19:15:37Z",
-      "updated_at": "2026-07-23T19:16:50Z",
-      "internal": true
+      "created_at": "2026-07-23T19:17:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834273030-207",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Refine is actively recovering; no user decision is required now.\n\n- The reported stall was stale: Round 7 had a live worker and completed at `6f0f7c63`.\n- Round 7 passed 491/491 library and 38/38 web tests, but Governance rejected it for five issues: terminal-stop bypass, duplicate stop semantics, insufficient journal durability, incomplete rollback replay, and missing failure-path coverage. Quality remained unclassified.\n- A concurrent supervisor created Round 8 while I created Round 9. Both audit records were preserved. Automation claimed Round 9 before amendment, so the supported edit was rejected rather than bypassed.\n- Round 9 is now `in-progress` from current `main` `94273722`, with Goal agent PID `677097`. The missing Round 8 conflict/transcript evidence was delivered through the managed agent input API.\n- Supervisor is healthy: 1 active, 0 queued, 0 failed, no open issues.\n- Codex diagnostics and authentication pass. No merge, approval, force operation, worktree disposal, or di"
+    },
+    {
+      "created_at": "2026-07-23T19:17:53Z",
+      "delivered": false,
+      "id": "evt-1784834273323-209",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Refine is actively recovering; no user decision is required now.\n\n- The reported stall was stale: Round 7 had a live worker and completed at `6f0f7c63`.\n- Round 7 passed 491/491 library and 38/38 web tests, but Governance rejected it for five issues: terminal-stop bypass, duplicate stop semantics, insufficient journal durability, incomplete rollback replay, and missing failure-path coverage. Quality remained unclassified.\n- A concurrent supervisor created Round 8 while I created Round 9. Both audit records were preserved. Automation claimed Round 9 before amendment, so the supported edit was rejected rather than bypassed.\n- Round 9 is now `in-progress` from current `main` `94273722`, with Goal agent PID `677097`. The missing Round 8 conflict/transcript evidence was delivered through the managed agent input API.\n- Supervisor is healthy: 1 active, 0 queued, 0 failed, no open issues.\n- Codex diagnostics and authentication pass. No merge, approval, force operation, worktree disposal, or direct state edit occurred.\n\nHuman authority will next be required only if the candidate reaches `review`."
+    },
+    {
+      "created_at": "2026-07-23T19:17:53Z",
+      "delivered": false,
+      "id": "evt-1784834273323-210",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T19:17:53Z",
+      "delivered": false,
+      "id": "evt-1784834273343-212",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
