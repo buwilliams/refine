@@ -11,7 +11,7 @@ use crate::model::feature::{
     Feature, FeatureDetail, compare_feature_goal_order, failed_goal_feature_blocking_notice,
     is_ordered_feature_goal,
 };
-use crate::model::goal::{Goal, GoalPriority};
+use crate::model::goal::{Goal, GoalIndexProjection, GoalPriority};
 use crate::model::workflow::{
     FeatureOperation, GoalOperation, GoalStatus, feature_operation_allowed, goal_operation_allowed,
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
@@ -22,6 +22,7 @@ use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection, ProjectStateStore,
+    ProjectionSnapshot,
 };
 
 use super::types::*;
@@ -345,6 +346,7 @@ impl FileWorkItemService {
         feature_id: &str,
         request: FeatureGoalAuthoringRequest,
     ) -> RefineResult<FeatureGoalAuthoringResult> {
+        let snapshot = self.projection_snapshot()?;
         self.author_goal_with_context(
             GoalAuthoringRequest {
                 goal_id: request.goal_id,
@@ -359,17 +361,35 @@ impl FileWorkItemService {
                 ..GoalAuthoringRequest::default()
             },
             true,
+            Some(&snapshot),
+            false,
         )
     }
 
     pub fn author_goal(&self, request: GoalAuthoringRequest) -> RefineResult<GoalAuthoringResult> {
-        self.author_goal_with_context(request, false)
+        let snapshot = self.projection_snapshot()?;
+        self.author_goal_with_context(request, false, Some(&snapshot), false)
+    }
+
+    /// Authors a new Goal from a caller-validated coherent projection. The web
+    /// create route uses this with its process-hot snapshot so duplicate
+    /// detection and validation do not independently reload project state. New
+    /// Goal persistence is collapsed into one atomic record write; the caller
+    /// owns the single projection refresh after backlog promotion.
+    pub fn author_goal_from_projection(
+        &self,
+        request: GoalAuthoringRequest,
+        snapshot: &ProjectionSnapshot,
+    ) -> RefineResult<GoalAuthoringResult> {
+        self.author_goal_with_context(request, false, Some(snapshot), true)
     }
 
     fn author_goal_with_context(
         &self,
         request: GoalAuthoringRequest,
         feature_inline: bool,
+        snapshot: Option<&ProjectionSnapshot>,
+        direct_create: bool,
     ) -> RefineResult<GoalAuthoringResult> {
         let goal_id = request
             .goal_id
@@ -405,7 +425,14 @@ impl FileWorkItemService {
             .map(str::trim)
             .filter(|value| !value.is_empty());
         if let Some(feature_id) = feature_id {
-            let feature = self.show_feature_summary(feature_id)?;
+            let feature = match snapshot {
+                Some(snapshot) => snapshot.features.get(feature_id).cloned().ok_or_else(|| {
+                    RefineError::NotFound(format!(
+                        "Feature {feature_id} was not found in refine state"
+                    ))
+                })?,
+                None => self.show_feature_summary(feature_id)?,
+            };
             self.ensure_feature_owned(&feature)?;
         }
 
@@ -429,7 +456,12 @@ impl FileWorkItemService {
             .filter(|value| !value.is_empty());
 
         let current = goal_id
-            .map(|goal_id| self.show_goal_summary(goal_id))
+            .map(|goal_id| match snapshot {
+                Some(snapshot) => snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
+                    RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
+                }),
+                None => self.show_goal_summary(goal_id),
+            })
             .transpose()?;
         if let Some(current) = &current {
             self.ensure_goal_owned(current)?;
@@ -468,7 +500,10 @@ impl FileWorkItemService {
 
         if current.is_none()
             && id.is_none()
-            && let Some(duplicate) = self.latest_round_duplicate(prompt)?
+            && let Some(duplicate) = match snapshot {
+                Some(snapshot) => Self::latest_round_duplicate_in_snapshot(snapshot, prompt),
+                None => self.latest_round_duplicate(prompt)?,
+            }
         {
             match request.duplicate_decision.trim() {
                 "" => {
@@ -500,9 +535,27 @@ impl FileWorkItemService {
                             to: GoalStatus::Backlog,
                             reason: Some("already_backlog".to_string()),
                         }
-                    } else if self
-                        .transition_goal_status(&duplicate.id, GoalStatus::Backlog)
-                        .is_ok()
+                    } else if match (direct_create, snapshot) {
+                        (true, Some(snapshot)) => snapshot
+                            .goals
+                            .get(&duplicate.id)
+                            .ok_or_else(|| {
+                                RefineError::NotFound(format!(
+                                    "Goal {} was not found in refine state",
+                                    duplicate.id
+                                ))
+                            })
+                            .and_then(|goal| {
+                                self.transition_goal_status_from_projection(
+                                    goal,
+                                    GoalStatus::Backlog,
+                                )
+                            }),
+                        _ => self
+                            .transition_goal_status(&duplicate.id, GoalStatus::Backlog)
+                            .map(|_| ()),
+                    }
+                    .is_ok()
                     {
                         GoalAuthoringDuplicateMove {
                             moved: true,
@@ -570,27 +623,38 @@ impl FileWorkItemService {
         } else {
             let name = resolved_name
                 .ok_or_else(|| RefineError::InvalidInput("Goal name is required".to_string()))?;
-            let goal = self.create_goal_summary(&name, id)?;
-            self.update_goal_metadata_summary(
-                &goal.goal.id,
-                None,
-                (priority != "low").then_some(priority),
-                Some(reporter),
-                None,
-            )?;
-            if !reporter.is_empty() && !prompt.is_empty() {
-                self.append_goal_round_summary_with_assignee(
+            if direct_create {
+                self.create_authored_goal(
+                    &name, id, priority, reporter, assignee, prompt, feature_id,
+                )?
+                .goal
+            } else {
+                let goal = self.create_goal_summary(&name, id)?;
+                self.update_goal_metadata_summary(
                     &goal.goal.id,
-                    reporter,
-                    Some(assignee.unwrap_or(reporter)),
-                    prompt,
+                    None,
+                    (priority != "low").then_some(priority),
+                    Some(reporter),
+                    None,
                 )?;
+                if !reporter.is_empty() && !prompt.is_empty() {
+                    self.append_goal_round_summary_with_assignee(
+                        &goal.goal.id,
+                        reporter,
+                        Some(assignee.unwrap_or(reporter)),
+                        prompt,
+                    )?;
+                }
+                if let Some(feature_id) = feature_id {
+                    self.assign_goal_to_feature(feature_id, &goal.goal.id)?;
+                    self.apply_feature_goal_placement(
+                        feature_id,
+                        &goal.goal.id,
+                        &request.placement,
+                    )?;
+                }
+                self.show_goal_summary(&goal.goal.id)?.goal
             }
-            if let Some(feature_id) = feature_id {
-                self.assign_goal_to_feature(feature_id, &goal.goal.id)?;
-                self.apply_feature_goal_placement(feature_id, &goal.goal.id, &request.placement)?;
-            }
-            self.show_goal_summary(&goal.goal.id)?.goal
         };
 
         Ok(GoalAuthoringResult {
@@ -610,33 +674,142 @@ impl FileWorkItemService {
         if prompt.is_empty() {
             return Ok(None);
         }
-        for goal in self.list_goal_summaries()? {
-            if goal.goal.round_count == 0 {
-                continue;
-            }
-            let detail = self.show_goal_detail(&goal.goal.id)?;
-            let Some(round_prompt) = detail
-                .get("rounds")
-                .and_then(Value::as_array)
-                .and_then(|rounds| rounds.last())
-                .and_then(|round| round.get("prompt"))
-                .and_then(Value::as_str)
-                .map(str::trim)
-            else {
-                continue;
-            };
-            if round_prompt == prompt {
-                return Ok(Some(GoalAuthoringDuplicate {
-                    id: goal.goal.id,
-                    name: goal.goal.name,
-                    status: goal.goal.status,
-                    node_id: goal.goal.node_id,
-                    node_display_name: goal.node_display_name,
-                    prompt: round_prompt.to_string(),
-                }));
+        let snapshot = self.projection_snapshot()?;
+        Ok(Self::latest_round_duplicate_in_snapshot(&snapshot, prompt))
+    }
+
+    fn latest_round_duplicate_in_snapshot(
+        snapshot: &ProjectionSnapshot,
+        prompt: &str,
+    ) -> Option<GoalAuthoringDuplicate> {
+        if prompt.is_empty() {
+            return None;
+        }
+        for goal in snapshot.goals.values() {
+            if goal.latest_round_prompt.as_deref() == Some(prompt) {
+                return Some(GoalAuthoringDuplicate {
+                    id: goal.goal.id.clone(),
+                    name: goal.goal.name.clone(),
+                    status: goal.goal.status.clone(),
+                    node_id: goal.goal.node_id.clone(),
+                    node_display_name: goal.node_display_name.clone(),
+                    prompt: prompt.to_string(),
+                });
             }
         }
-        Ok(None)
+        None
+    }
+
+    fn create_authored_goal(
+        &self,
+        name: &str,
+        id: Option<&str>,
+        priority: &str,
+        reporter: &str,
+        assignee: Option<&str>,
+        prompt: &str,
+        feature_id: Option<&str>,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let goal_id = id
+            .map(|id| id.trim().to_uppercase())
+            .filter(|id| !id.is_empty())
+            .unwrap_or_else(new_ulid_like);
+        if goal_id.len() < 3 {
+            return Err(RefineError::InvalidInput(
+                "Goal id must be at least three characters".to_string(),
+            ));
+        }
+        let goal_path = goal_json_path(&self.refine_dir, &goal_id);
+        if goal_path.exists() {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} already exists"
+            )));
+        }
+
+        let node_id = self.active_node_id()?;
+        let now = now_timestamp();
+        let round_assignee = assignee.unwrap_or(reporter);
+        let latest_round_prompt =
+            (!reporter.is_empty() && !prompt.is_empty()).then(|| prompt.to_string());
+        let rounds = latest_round_prompt
+            .as_ref()
+            .map(|_| vec![new_round_value(reporter, round_assignee, prompt)])
+            .unwrap_or_default();
+        let mut object = Map::new();
+        object.insert("id".to_string(), Value::String(goal_id.clone()));
+        object.insert("name".to_string(), Value::String(name.to_string()));
+        object.insert("status".to_string(), Value::String("backlog".to_string()));
+        object.insert("priority".to_string(), Value::String(priority.to_string()));
+        object.insert(
+            "reporter".to_string(),
+            if reporter.is_empty() {
+                Value::Null
+            } else {
+                Value::String(reporter.to_string())
+            },
+        );
+        object.insert("branch_name".to_string(), Value::Null);
+        object.insert("target_branch".to_string(), Value::Null);
+        object.insert("base_commit".to_string(), Value::Null);
+        object.insert("candidate_commit".to_string(), Value::Null);
+        object.insert(
+            "feature_id".to_string(),
+            feature_id
+                .map(|feature_id| Value::String(feature_id.to_string()))
+                .unwrap_or(Value::Null),
+        );
+        object.insert("feature_order".to_string(), Value::Null);
+        object.insert("node_id".to_string(), Value::String(node_id.clone()));
+        object.insert("created".to_string(), Value::String(now.clone()));
+        object.insert("updated".to_string(), Value::String(now.clone()));
+        object.insert("notes".to_string(), Value::Array(Vec::new()));
+        object.insert("rounds".to_string(), Value::Array(rounds));
+        write_json_atomically(&goal_path, &Value::Object(object))?;
+
+        let json_path = goal_path
+            .strip_prefix(&self.refine_dir)
+            .map(|path| path.to_string_lossy().replace('\\', "/"))
+            .map_err(|error| {
+                RefineError::InvalidInput(format!(
+                    "Goal path {} is not under refine dir {}: {error}",
+                    goal_path.display(),
+                    self.refine_dir.display()
+                ))
+            })?;
+        let priority = GoalPriority::parse_wire(priority).ok_or_else(|| {
+            RefineError::InvalidInput("priority must be one of low, medium, or high".to_string())
+        })?;
+        let round_count = usize::from(latest_round_prompt.is_some());
+        let assignee = (round_count > 0).then(|| round_assignee.to_string());
+        let mut searchable_parts = vec![name.to_string(), reporter.to_string()];
+        if let Some(assignee) = &assignee {
+            searchable_parts.push(assignee.clone());
+        }
+        if let Some(prompt) = &latest_round_prompt {
+            searchable_parts.push(prompt.clone());
+        }
+        Ok(GoalSummaryProjection {
+            goal: GoalIndexProjection {
+                id: goal_id,
+                name: name.to_string(),
+                status: GoalStatus::Backlog,
+                priority,
+                reporter: (!reporter.is_empty()).then(|| reporter.to_string()),
+                assignee,
+                round_count,
+                created: now.clone(),
+                updated: now,
+                branch_name: None,
+                node_id: Some(node_id),
+                feature_id: feature_id.map(str::to_string),
+                feature_order: None,
+                json_path,
+            },
+            node_display_name: None,
+            latest_round_prompt,
+            searchable_text: searchable_parts.join("\n"),
+            activity_ids: Vec::new(),
+        })
     }
 
     fn validate_feature_goal_placement(
@@ -1767,9 +1940,24 @@ impl FileWorkItemService {
         target: GoalStatus,
     ) -> RefineResult<GoalSummaryProjection> {
         let snapshot = self.projection_snapshot()?;
-        let current = snapshot.goals.get(goal_id).ok_or_else(|| {
+        let current = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })?;
+        self.transition_goal_status_from_projection(&current, target)?;
+
+        let refreshed = self.projection_snapshot()?;
+        refreshed.goals.get(goal_id).cloned().ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} disappeared after transition"))
+        })
+    }
+
+    /// Applies a status transition against a summary from a caller-owned
+    /// coherent snapshot without loading or refreshing another projection.
+    pub(crate) fn transition_goal_status_from_projection(
+        &self,
+        current: &GoalSummaryProjection,
+        target: GoalStatus,
+    ) -> RefineResult<()> {
         self.ensure_goal_owned(current)?;
         validate_manual_goal_transition(&current.goal.status, &target)?;
 
@@ -1789,6 +1977,38 @@ impl FileWorkItemService {
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
+        let durable_status = object
+            .get("status")
+            .and_then(Value::as_str)
+            .and_then(GoalStatus::parse_wire)
+            .unwrap_or(GoalStatus::Backlog);
+        let durable_updated = object
+            .get("updated")
+            .and_then(Value::as_str)
+            .or_else(|| object.get("created").and_then(Value::as_str))
+            .map(str::to_string)
+            .unwrap_or_else(|| "unknown".to_string());
+        let durable_node_id = object
+            .get("node_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                object
+                    .get("instance_id")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.is_empty())
+            })
+            .map(str::to_string)
+            .unwrap_or_else(|| "default".to_string());
+        if durable_status != current.goal.status
+            || durable_updated != current.goal.updated
+            || Some(durable_node_id.as_str()) != current.goal.node_id.as_deref()
+        {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} changed after the projection snapshot was read",
+                current.goal.id
+            )));
+        }
         object.insert(
             "status".to_string(),
             Value::String(target.as_str().to_string()),
@@ -1796,11 +2016,7 @@ impl FileWorkItemService {
         object.insert("updated".to_string(), Value::String(now_timestamp()));
 
         write_json_atomically(&goal_path, &value)?;
-
-        let refreshed = self.projection_snapshot()?;
-        refreshed.goals.get(goal_id).cloned().ok_or_else(|| {
-            RefineError::NotFound(format!("Goal {goal_id} disappeared after transition"))
-        })
+        Ok(())
     }
 
     pub fn cancel_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {

@@ -3,6 +3,8 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(test)]
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
@@ -21,6 +23,8 @@ use super::helpers::*;
 use super::types::*;
 
 static PROJECTION_SNAPSHOT_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = OnceLock::new();
 
 pub trait ProjectStateStore {
     fn initialize(&self) -> RefineResult<()>;
@@ -62,6 +66,26 @@ impl FileProjectStateStore {
 
     pub fn snapshot_path(cache_dir: &Path) -> PathBuf {
         cache_dir.join(PROJECTION_SNAPSHOT_FILE)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reset_rebuild_count(refine_dir: &Path) {
+        PROJECTION_REBUILD_COUNTS
+            .get_or_init(|| Mutex::new(BTreeMap::new()))
+            .lock()
+            .unwrap()
+            .insert(refine_dir.to_path_buf(), 0);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn rebuild_count(refine_dir: &Path) -> u64 {
+        PROJECTION_REBUILD_COUNTS
+            .get_or_init(|| Mutex::new(BTreeMap::new()))
+            .lock()
+            .unwrap()
+            .get(refine_dir)
+            .copied()
+            .unwrap_or_default()
     }
 
     fn snapshot_temp_path(cache_dir: &Path) -> PathBuf {
@@ -211,6 +235,15 @@ impl FileProjectStateStore {
         let valid_rounds: Vec<&Value> = rounds.iter().filter(|round| round.is_object()).collect();
         let reporter = goal_reporter(object, &valid_rounds);
         let assignee = latest_round_assignee(object, &valid_rounds);
+        // Match the legacy detail-based duplicate decision exactly: inspect
+        // only the literal final array entry, require an object and a string
+        // prompt, then trim it.
+        let latest_round_prompt = rounds
+            .last()
+            .and_then(Value::as_object)
+            .and_then(|round| round.get("prompt"))
+            .and_then(Value::as_str)
+            .map(|prompt| prompt.trim().to_string());
         let notes = object
             .get("notes")
             .and_then(Value::as_array)
@@ -260,6 +293,7 @@ impl FileProjectStateStore {
                 json_path: rel_path,
             },
             node_display_name: None,
+            latest_round_prompt,
             searchable_text: searchable_parts.join("\n"),
             activity_ids: Vec::new(),
         }))
@@ -552,6 +586,15 @@ impl ProjectStateStore for FileProjectStateStore {
     }
 
     fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot> {
+        #[cfg(test)]
+        {
+            *PROJECTION_REBUILD_COUNTS
+                .get_or_init(|| Mutex::new(BTreeMap::new()))
+                .lock()
+                .unwrap()
+                .entry(self.refine_dir.clone())
+                .or_default() += 1;
+        }
         let mut source_fingerprints = BTreeMap::new();
         let mut goals = BTreeMap::new();
         let mut features = BTreeMap::new();

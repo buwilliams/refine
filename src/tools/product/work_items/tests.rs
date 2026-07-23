@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::model::workflow::GoalStatus;
+use crate::process::supervisor::errors::RefineError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -34,6 +35,33 @@ fn file_work_item_service_transitions_goal_via_refine_json() {
     assert!(written.contains("\"status\": \"todo\""));
     assert!(written.contains("\"updated\": \"20"));
     assert!(written.contains("Z\""));
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn projected_status_transition_rejects_an_external_revision_change() {
+    let temp_root = unique_temp_dir("work-item-projected-transition-conflict");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    let projected = service
+        .create_goal_summary("Concurrent transition", Some("GOAL1"))
+        .unwrap();
+    let goal_path = refine_dir.join(&projected.goal.json_path);
+    let mut durable: serde_json::Value =
+        serde_json::from_slice(&fs::read(&goal_path).unwrap()).unwrap();
+    durable["status"] = json!("review");
+    durable["updated"] = json!("2026-07-23T13:00:00Z");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&durable).unwrap()).unwrap();
+
+    let error = service
+        .transition_goal_status_from_projection(&projected, GoalStatus::Todo)
+        .unwrap_err();
+
+    assert!(matches!(error, RefineError::Conflict(_)));
+    let durable: serde_json::Value =
+        serde_json::from_slice(&fs::read(&goal_path).unwrap()).unwrap();
+    assert_eq!(durable["status"], "review");
+    assert_eq!(durable["updated"], "2026-07-23T13:00:00Z");
     fs::remove_dir_all(temp_root).unwrap();
 }
 

@@ -4,11 +4,14 @@ use chrono::{DateTime, Utc};
 
 use crate::model::JsonObject;
 use crate::model::feature::compare_feature_goal_order;
+use crate::model::goal::GoalIndexProjection;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
+use crate::tools::product::project_state::{
+    FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
+};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug)]
@@ -61,6 +64,65 @@ impl BacklogPromotionService {
             promoted += 1;
         }
         Ok(promoted)
+    }
+
+    /// Promotes from a caller-owned coherent project snapshot and an optional
+    /// newly persisted Goal. Status writes validate the projected revision and
+    /// deliberately do not refresh the projection; the caller performs one
+    /// rebuild after every mutation in the request is complete.
+    pub fn promote_backlog_to_todo_from_projection(
+        &self,
+        snapshot: &ProjectionSnapshot,
+        created_goal: Option<&GoalIndexProjection>,
+    ) -> RefineResult<usize> {
+        let settings =
+            FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).load()?;
+        let threshold = setting_i64(&settings, "backlog_promote_after_seconds", 3600);
+        if threshold < 0 {
+            return Ok(0);
+        }
+        let active_node_id =
+            FileNodeRegistryService::with_active_root(&self.refine_dir, &self.runtime_root)
+                .active_node_id()?;
+        let now = Utc::now();
+        let mut candidates = snapshot
+            .goals
+            .values()
+            .filter(|projection| projection.goal.status == GoalStatus::Backlog)
+            .filter(|projection| {
+                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
+            })
+            .filter(|projection| backlog_goal_age_seconds(projection, now) >= Some(threshold))
+            .cloned()
+            .collect::<Vec<_>>();
+        if let Some(created_goal) = created_goal
+            && created_goal.status == GoalStatus::Backlog
+            && created_goal.node_id.as_deref().unwrap_or("default") == active_node_id
+        {
+            let created_goal = GoalSummaryProjection {
+                goal: created_goal.clone(),
+                node_display_name: None,
+                latest_round_prompt: None,
+                searchable_text: String::new(),
+                activity_ids: Vec::new(),
+            };
+            if backlog_goal_age_seconds(&created_goal, now) >= Some(threshold) {
+                candidates.push(created_goal);
+            }
+        }
+        candidates.sort_by(|a, b| {
+            compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
+                .then_with(|| a.goal.updated.cmp(&b.goal.updated))
+                .then_with(|| a.goal.id.cmp(&b.goal.id))
+        });
+        let service = FileWorkItemService::with_projection_cache(
+            &self.refine_dir,
+            self.runtime_root.join("cache"),
+        );
+        for goal in &candidates {
+            service.transition_goal_status_from_projection(goal, GoalStatus::Todo)?;
+        }
+        Ok(candidates.len())
     }
 }
 

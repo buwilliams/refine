@@ -8,7 +8,7 @@ use crate::model::log::ActivityEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
-pub const PROJECTION_SNAPSHOT_VERSION: u64 = 1;
+pub const PROJECTION_SNAPSHOT_VERSION: u64 = 2;
 pub const PROJECTION_SNAPSHOT_FILE: &str = "projection-snapshot.json";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -53,6 +53,11 @@ pub struct GoalSummaryProjection {
     #[serde(flatten)]
     pub goal: GoalIndexProjection,
     pub node_display_name: Option<String>,
+    /// Trimmed prompt from the latest durable Round. Keeping this in the summary
+    /// projection lets exact duplicate detection use one coherent snapshot
+    /// without reopening every Goal and attaching its logs.
+    #[serde(default)]
+    pub latest_round_prompt: Option<String>,
     pub searchable_text: String,
     pub activity_ids: Vec<String>,
 }
