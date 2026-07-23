@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:13:53Z",
+  "updated_at": "2026-07-23T10:14:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -213,6 +213,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first Goal now has a clean committed candidate (`4444ec0a`) and an implementation report, but it has not yet reached Governance/Quality or review. Meanwhile, two additional Goals entered `in-progress`; because the request is to supervise Refine’s active work, I’m adding them to the evidence view without changing or approving any of them."
+    },
+    {
+      "created_at": "2026-07-23T10:14:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801688324-26",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "One candidate has reached the human review boundary, so I’m leaving it untouched. I’m checking the two remaining live workflows now: the controls-menu Governance pass and the agent-process visibility implementation."
     }
   ],
   "queued_messages": [
