@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:13:18Z",
+  "updated_at": "2026-07-23T11:13:35Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -627,6 +627,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The cancelled/undone Goal’s worker is not an inert remnant: it continued modifying six Goal-owned files after the cancellation transition. I’m stopping that specific stale execution through Refine’s supported process-control endpoint. This preserves the worktree and queued Goal record; it does not discard changes, retry the Goal, or approve anything."
+    },
+    {
+      "created_at": "2026-07-23T11:13:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805215262-39",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The stale execution stopped cleanly, its six-file worktree was preserved, and Refine immediately reclaimed the still-queued Goal as a new audited execution. Both workers now match `in-progress` Goal state, so there is no remaining cancellation violation to act on. I’m monitoring their transitions; the existing review candidate remains untouched."
     }
   ],
   "queued_messages": [
