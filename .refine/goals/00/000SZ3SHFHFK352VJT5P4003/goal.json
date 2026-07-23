@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": null,
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "assignee": "Refine",
@@ -83,5 +83,5 @@
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T14:13:05Z"
+  "updated": "2026-07-23T18:12:18Z"
 }
