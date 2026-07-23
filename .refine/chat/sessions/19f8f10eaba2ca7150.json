@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:09:08Z",
+  "updated_at": "2026-07-23T19:11:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2793,6 +2793,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker is real and active, not a stale record: PID 375463 owns a live `cargo test --lib` child, the Round 7 worktree is clean, and it just committed `6f0f7c63` after addressing the supervisor’s lock-order finding. No retry or new Round is warranted; that would duplicate live work and violate the audit boundary. I’m following the current verification to settlement."
+    },
+    {
+      "created_at": "2026-07-23T19:11:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784833878537-188",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A new external change landed on `main` during Round 7: `main`/`origin/main` are now `94273722`, merging the previously separate `9b7d9d33` transcript-handoff candidate that the Round instruction treated as unapproved. I’m notifying the live Goal agent through its managed input channel so it can refresh ancestry and verify compatibility; I will not merge, rebase, or alter either branch myself."
     }
   ],
   "queue_dispatching": true,
