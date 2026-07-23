@@ -60,7 +60,7 @@
     "00000SZ3N803TK00E78AK4M000": "done",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "done",
-    "00000SZ3RP4G52RZ706A5P4001": "review",
+    "00000SZ3RP4G52RZ706A5P4001": "done",
     "00000SZ3SFP4N10NXGAE5P4002": "done",
     "00000SZ3SHFHFK352VJT5P4003": "done",
     "00000SZ412RXR0TQRHE82JW000": "done",
@@ -69,7 +69,7 @@
     "00000SZ42710VGCA2VWG2JW003": "done"
   },
   "open_issues": {},
-  "updated_at": "2026-07-23T19:51:15.580929854+00:00",
+  "updated_at": "2026-07-23T20:38:22.942922101+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2479,6 +2479,16 @@
       "status": "info",
       "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from build to review.",
       "created_at": "2026-07-23T19:47:36.427524874+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T20:38:22.905169267+00:00-249",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from review to done.",
+      "created_at": "2026-07-23T20:38:22.905169267+00:00",
       "goal_id": "00000SZ3RP4G52RZ706A5P4001",
       "actionable": false,
       "retryable": false
