@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:39:27Z",
+  "updated_at": "2026-07-23T15:41:39Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1440,6 +1440,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Round 6 agent has implemented policy-preserving workflow persistence and journal-replay plumbing in four capability files. It remains live; the permanent child process is its code execution host, not a separate unsupervised worker."
+    },
+    {
+      "created_at": "2026-07-23T15:41:39Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821299786-270",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The replay and policy-preservation implementation is still being refined; no tests have been claimed yet. The diff remains confined to process control, work-item mutation, capacity, and workflow state."
     }
   ],
   "queued_messages": [
