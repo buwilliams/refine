@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:09:53Z",
+  "updated_at": "2026-07-23T14:11:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -765,6 +765,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new recovery round is recorded, but Refine’s only supported failed→todo restoration is the confirmed “Move failed Goals” operation. Its UI explicitly treats that as a confirmation boundary. I am not invoking it without your authority. The prepared round and rejected candidates remain preserved while I continue supervising the still-active performance Goal."
+    },
+    {
+      "created_at": "2026-07-23T14:11:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784815868798-157",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The performance Goal has now committed candidate `7b67a8ef` and entered fresh Governance. I’m waiting for that verdict; no provider or authentication failure has appeared."
     }
   ],
   "queued_messages": [
