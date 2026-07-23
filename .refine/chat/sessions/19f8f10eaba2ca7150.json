@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:41:48Z",
+  "updated_at": "2026-07-23T18:42:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2370,6 +2370,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The daemon and both runner workers are healthy, HTTP is available, and two Goal Agents are now genuinely active: the recovered Stop-button Round 7 and a new low-priority performance investigation created from the review candidate’s reproducible timing failure. The transcript-handoff candidate remains a clean, pushed branch at review and is not contained in `main` or `origin/main`; its known full-suite timing failure is being handled independently rather than concealed."
+    },
+    {
+      "created_at": "2026-07-23T18:42:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832133237-14",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Codex provider diagnostics are currently healthy. Round 7 is actively resolving the expected replay conflicts—two files remain unmerged at this instant—so there is no supervisor recovery action to take. I’ll continue observing for a real worker loss, failed gate, or review transition."
     }
   ],
   "queued_messages": [
