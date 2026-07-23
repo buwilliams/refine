@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:34:45Z",
+  "updated_at": "2026-07-23T12:36:36Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1239,6 +1239,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new multi-process tests now cover cancellation during a live managed `push`, stale-execution replacement, retry, restart recovery, and exactly-once merge evidence. They still do not exercise the pre-spawn cancellation gap I flagged, so that remains an open audit concern pending code/test completion."
+    },
+    {
+      "created_at": "2026-07-23T12:36:36Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784810196624-144",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The real cancellation test exposed a substantive failure: cancellation was issued while `push` was deliberately blocked, yet the merge still completed and reached `origin/main`. The worker is now debugging the process-registration/termination path; this candidate is not acceptable until that fails closed."
     }
   ],
   "queued_messages": [
