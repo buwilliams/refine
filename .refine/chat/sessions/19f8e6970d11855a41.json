@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:45:30Z",
+  "updated_at": "2026-07-23T11:48:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -819,6 +819,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker reproduced the Git index race, traced it to read-only inspection opportunistically locking the shared index during a serialized merge, and changed inspection to disable optional Git locks. Its new regression passed, as did 30 repeated concurrency-cap runs. A second 20-run replenishment stress loop is still running; no candidate has been declared."
+    },
+    {
+      "created_at": "2026-07-23T11:48:02Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784807282464-71",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The candidate is not ready yet: full serial library tests are now clean at 457/0 and full workflow passed, but the multi-instance synchronization gate timed out before reaching candidate integration. The worker is investigating and retaining that failure instead of masking it."
     }
   ],
   "queued_messages": [
