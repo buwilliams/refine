@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:17:48Z",
+  "updated_at": "2026-07-23T14:19:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -912,6 +912,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Recovery is active under a real workflow claim and a live Goal Agent for Round 3. The provider launch succeeded; I’m monitoring for implementation completion, Governance, and Quality. I will stop at `review` or report the exact failure—no approval will be attempted."
+    },
+    {
+      "created_at": "2026-07-23T14:19:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816370682-182",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 3 remains healthy and claimed. The agent is still in diagnosis with a clean recovery worktree; there is no `needs_input` signal, provider/authentication error, or cancellation event. The four review candidates remain unchanged and unmerged."
     }
   ],
   "queued_messages": [
