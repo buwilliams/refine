@@ -3,7 +3,7 @@
   "lifecycle": "observing",
   "health": "healthy",
   "active_work": 1,
-  "queued_work": 0,
+  "queued_work": 1,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8e6970d11855a41",
@@ -57,11 +57,11 @@
     "00000SZ3K92DJJT8PWF5AP8000": "done",
     "00000SZ3KH6A2G1JKVCWN4Y000": "done",
     "00000SZ3KJDDGGCK29J4N4Y001": "in-progress",
-    "00000SZ3N803TK00E78AK4M000": "cancelled"
+    "00000SZ3N803TK00E78AK4M000": "todo"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:in-progress|live={\"00000SZ3KJDDGGCK29J4N4Y001\"}|quiet={}|issues=",
-  "updated_at": "2026-07-23T11:07:36.298102148+00:00",
+  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:in-progress,00000SZ3N803TK00E78AK4M000:todo|live={\"00000SZ3KJDDGGCK29J4N4Y001\"}|quiet={}|issues=",
+  "updated_at": "2026-07-23T11:07:58.647972828+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1695,6 +1695,16 @@
       "status": "info",
       "message": "Goal 00000SZ3N803TK00E78AK4M000 changed from in-progress to cancelled.",
       "created_at": "2026-07-23T11:07:36.206255189+00:00",
+      "goal_id": "00000SZ3N803TK00E78AK4M000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T11:07:58.560428217+00:00-170",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3N803TK00E78AK4M000 changed from cancelled to todo.",
+      "created_at": "2026-07-23T11:07:58.560428217+00:00",
       "goal_id": "00000SZ3N803TK00E78AK4M000",
       "actionable": false,
       "retryable": false

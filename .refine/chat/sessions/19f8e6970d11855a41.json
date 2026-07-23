@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:07:36Z",
+  "updated_at": "2026-07-23T11:07:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -504,14 +504,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker has now committed the governance repair as `8978757e` on top of the preserved Round-1 content. Scope is narrow: the shared resolver plus API/CLI production-path tests, 145 additions and 9 deletions across four files; the worktree is clean and `git diff --check` passes. I’m waiting for the agent’s exact verification report and Refine’s independent Governance result."
+    },
+    {
+      "created_at": "2026-07-23T11:07:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784804879458-18",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The Goal agent completed cleanly and reported full verification: 453 Rust library tests, all binaries, 32 browser tests, focused API/CLI/nested-process cases, formatting, assets, and diff checks all passed. Codex diagnostics are healthy. Refine has recorded candidate `8978757e`, but its independent Governance transition has not settled yet; I’m treating that as in-flight, not as approval or completion. A separate newly started Goal is visible and healthy, but I’m not widening into it unless it becomes actionable."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f8e9f28892ca64a0",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3KJDDGGCK29J4N4Y001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {\"00000SZ3KJDDGGCK29J4N4Y001\"}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 1 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3KJDDGGCK29J4N4Y001\": \"in-progress\", \"00000SZ3N803TK00E78AK4M000\": \"todo\"}\nLive workflow-agent Goal IDs: {\"00000SZ3KJDDGGCK29J4N4Y001\"}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T10:57:03Z",
-      "updated_at": "2026-07-23T11:07:36Z",
+      "updated_at": "2026-07-23T11:07:58Z",
       "internal": true
     }
   ],

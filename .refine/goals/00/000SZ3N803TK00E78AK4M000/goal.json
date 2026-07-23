@@ -25,18 +25,18 @@
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
-      "prompt": "Implement and verify this Goal.",
+      "prompt": "Correct the Goal workflow implementation so it matches the canonical UI order and semantics: Backlog -> Todo -> In Progress -> QA -> Ready Merge -> Rebuild -> Review -> Done, with Failed and Cancelled remaining terminal alternatives.\n\nReady Merge is a merger-owned queue, not a candidate-preparation label. After a candidate passes QA and enters ready-merge, the system must serialize integration into the configured target branch. Use the recorded target branch and exact candidate commit, honor the configured Git remote, synchronize safely, merge and push exactly once through the existing repository and cross-process coordination boundaries, and persist auditable merge evidence. Advance out of ready-merge only after integration succeeds. A conflict, stale candidate, ownership race, revision mismatch, or push failure must abort safely, preserve the candidate and evidence, and use the supported failed/retry path; it must never advance while merely pretending the candidate was merged.\n\nAfter successful integration, run the optional target-app rebuild against the integrated target-branch checkout, not the isolated candidate worktree. If rebuild is not configured, record an explicit skip and continue. A successful rebuild or explicit skip advances the Goal to Review.\n\nReview is the post-integration manual acceptance boundary. Approving a reviewed Goal marks it Done and must not perform or repeat the Git merge. Requesting another round or otherwise declining acceptance must use the supported auditable workflow from the current target state without duplicate integration or hidden history rewriting.\n\nKeep CLI, browser, API, and background workers on shared product services. Preserve configurable target branches and remotes, repository locking, worktree isolation, multi-daemon ownership, crash/restart idempotency, and exact candidate identity. Correct transition guards and recovery behavior to use In Progress -> QA -> Ready Merge -> Rebuild -> Review.\n\nUpdate all affected intent and capability documentation so Ready Merge explicitly owns target-branch integration, Rebuild is optional and runs after integration, and Review is acceptance after merge rather than the merge trigger. Update misleading comments and surface descriptions as needed without changing the established UI ordering.\n\nReplace tests that assert the target branch remains unchanged in Review. End-to-end coverage must prove that the candidate is merged and pushed before Review, rebuild runs from the integrated target when configured, the no-rebuild path reaches Review, Review approval does not create a second merge or push, merge failures do not reach Rebuild or Review, and retry/restart/concurrent-daemon paths cannot integrate a candidate more than once.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T11:06:44Z",
+      "updated": "2026-07-23T11:07:56Z",
       "workflow_quality_timing": null
     }
   ],
-  "status": "cancelled",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-23T11:07:34Z"
+  "updated": "2026-07-23T11:07:56Z"
 }
