@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:16:01Z",
+  "updated_at": "2026-07-23T19:16:24Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2853,6 +2853,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance has now rejected Round 7; I’m not hiding that result or treating the passing test suite as sufficient. I’m extracting the exact rule violations and waiting for the workflow’s supported state transition to settle before deciding whether a fresh recovery Round is authorized and appropriate."
+    },
+    {
+      "created_at": "2026-07-23T19:16:24Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834184929-200",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The rejection is actionable without new user authority: it identifies five concrete defects, and the Goal is now durably `failed` with no live worker. I’m creating a fresh supported recovery Round—not restarting or editing state directly—scoped only to the recorded terminal-stop bypass, journal durability/replay defects, and missing production-path coverage. All prior candidates, worktrees, provider evidence, and the review boundary remain preserved."
     }
   ],
   "queued_messages": [
