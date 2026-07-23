@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:44:48Z",
+  "updated_at": "2026-07-23T18:46:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2457,6 +2457,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both in-progress Goals are genuinely live and producing output, so there is no lost-worker recovery to perform. The performance Goal has already isolated the slowdown to an aging test fixture that triggered 50 backlog promotions during the measured POST; it is now running repeated and broader gates without changing product behavior. The older cancellation-recovery Goal is actively reconciling its preserved candidate onto current main."
+    },
+    {
+      "created_at": "2026-07-23T18:46:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832368785-29",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "One issue remains deliberately visible: the cancellation-recovery agent’s first focused build hit a compile error (`E0063`) after replaying the older stack onto current main. The agent is still live and working the current-main versioning seam, so I’m not retrying or replacing it. The performance agent’s relevant web suite has passed 120/120 and broader verification is still running."
     }
   ],
   "queue_dispatching": true,
