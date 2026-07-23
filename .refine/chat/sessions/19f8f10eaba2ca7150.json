@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:38:15Z",
+  "updated_at": "2026-07-23T18:38:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2283,6 +2283,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The runtime is healthy and idle: both workflow workers are live, but there are no Goal Agent processes. The two remaining Goals have clean candidate worktrees and are waiting in review, so the next question is whether either review has unresolved evidence or is ready for an explicit human approval decision."
+    },
+    {
+      "created_at": "2026-07-23T18:38:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831925830-120",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both review candidates are preserved, clean, unmerged, and Governance-passed. One important caveat remains visible: the transcript-race candidate’s focused gates passed, but its full library run still had one reproducible, reported performance-test failure, and clippy reported six pre-existing lints; Quality itself was a no-op because no Quality commands are configured. I’m doing the final ancestry/branch check before handing the approval choice back to you."
     }
   ],
   "queue_dispatching": true,
