@@ -41,6 +41,19 @@ async function openBulkModal(field) {
   const countText = _selectionCountText("selected");
   const label = { priority: "Priority", status: "Status", reporter: "Reporter", assignee: "Assignee" }[field];
 
+  if (field === "reporter" || field === "assignee") {
+    try {
+      // The initial reporter refresh is intentionally deferred so the first
+      // screen can render quickly. A user can therefore reach this modal
+      // before that refresh finishes; load the node-scoped model explicitly
+      // instead of presenting an empty picker.
+      await refreshReporters();
+    } catch (e) {
+      await showActionError(e, `Could not load ${label.toLowerCase()}s`);
+      return;
+    }
+  }
+
   let valueControlHtml = "";
   if (field === "priority") {
     valueControlHtml = `
