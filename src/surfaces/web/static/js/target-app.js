@@ -103,14 +103,13 @@ function applyAgentStatusSnapshot(snap) {
   indicator.removeAttribute("target");
   indicator.removeAttribute("rel");
   const label = `Agents (${agentCount})`;
-  const compactLabel = String(agentCount);
   const statusLabel = {
     running: "running",
     paused: "paused",
     down: "process down",
   }[status];
   const lbl = indicator.querySelector(".agent-status-label");
-  if (lbl) lbl.textContent = compactLabel;
+  if (lbl) lbl.textContent = `${statusLabel} · ${agentCount}`;
   indicator.setAttribute("aria-label", `${label}: ${statusLabel}; click to view processes`);
   indicator.title = `${label}: ${statusLabel}`;
 }
@@ -123,10 +122,7 @@ function applyTargetAppSnapshot(snap) {
     ? "unknown"
     : snap.state || "unknown";
   indicator.dataset.state = appState;
-  const contextMenu = document.getElementById("nav-context-menu");
-  if (contextMenu) contextMenu.dataset.state = appState;
   const projectLabel = targetAppProjectLabel();
-  if (typeof updateNavAppContextLabel === "function") updateNavAppContextLabel(projectLabel);
   const stateLabel = {
     running: "running",
     degraded: "degraded",
@@ -137,6 +133,8 @@ function applyTargetAppSnapshot(snap) {
     failed: "failed",
     unknown: "unknown",
   }[appState] || "unknown";
+  const stateEl = indicator.querySelector(".target-app-state");
+  if (stateEl) stateEl.textContent = stateLabel;
   const checkAt = snap.last_check_at || snap.last_health_at || "";
   const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
   const appUrl = (snap.app_url || "").trim();

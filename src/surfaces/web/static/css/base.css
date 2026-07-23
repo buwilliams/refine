@@ -175,10 +175,7 @@ pre {
 .topbar-actions select { width: 100%; }
 
 .nav-command-button {
-  height: 30px;
-  padding: 0 8px;
-  gap: 6px;
-  box-shadow: var(--shadow-sm);
+  font: inherit;
 }
 .nav-command-icon {
   width: 13px;
@@ -208,24 +205,15 @@ pre {
   color: var(--color-text);
 }
 .nav-issue-button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
   color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
 }
 .nav-issue-button:hover:not(:disabled) {
   color: var(--color-text);
 }
 .nav-source-update-button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
+  font: inherit;
+  text-align: left;
 }
 .nav-source-update-button[hidden] { display: none; }
 .nav-source-update-button[data-state="available"] {
@@ -250,8 +238,9 @@ pre {
 }
 @keyframes nav-source-update-spin { to { transform: rotate(360deg); } }
 .nav-bug-icon {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   display: block;
   background: currentColor;
   mask: url("/static/images/bug.svg") center / contain no-repeat;
@@ -296,7 +285,7 @@ pre {
   align-items: center;
   gap: 6px;
   height: 30px;
-  max-width: 280px;
+  max-width: 150px;
   padding: 0 28px 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -304,6 +293,16 @@ pre {
   color: var(--color-text-muted);
   box-shadow: var(--shadow-sm);
   position: relative;
+}
+.nav-context-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .nav-context-summary::after,
 .nav-create-more::after {
@@ -320,17 +319,7 @@ pre {
   top: 10px;
   color: var(--muted);
 }
-.nav-context-app,
-.nav-context-reporter {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.nav-context-app { max-width: 120px; font-weight: 600; }
-.nav-context-reporter { max-width: 110px; color: var(--muted); }
-.nav-context-separator { color: var(--muted); }
-.nav-context-panel { min-width: 260px; }
+.nav-context-panel { min-width: 280px; }
 .nav-context-status {
   display: flex;
   align-items: center;
@@ -345,6 +334,33 @@ pre {
 .nav-context-status:hover,
 .nav-menu-item:hover {
   background: var(--color-surface-muted);
+}
+.nav-control-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.nav-control-item:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.nav-control-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nav-control-status {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .nav-create-group {
   display: inline-flex;
@@ -385,7 +401,8 @@ pre {
   color: var(--color-text-muted);
 }
 .nav-menu-icon path,
-.nav-menu-icon rect {
+.nav-menu-icon rect,
+.nav-menu-icon circle {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -393,27 +410,7 @@ pre {
   stroke-linejoin: round;
 }
 
-/* Runtime status indicators in the topbar and context menu. */
-.nav-status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--color-text-muted);
-  border-radius: 999px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 550;
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-}
-.nav-status-indicator:hover { background: var(--color-surface-muted); color: var(--color-text); }
-.agent-status-indicator {
-  min-width: 54px;
-  justify-content: center;
-}
+/* Runtime status indicators in the controls menu. */
 .target-app-dot {
   width: 8px;
   height: 8px;
@@ -423,23 +420,12 @@ pre {
   flex: 0 0 auto;
 }
 .target-app-indicator[data-state="running"] .target-app-dot { background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-soft); }
-.nav-context-menu[data-state="running"] .nav-context-summary-dot { background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-soft); }
 .target-app-indicator[data-state="degraded"] .target-app-dot { background: var(--color-warning); box-shadow: 0 0 0 3px var(--color-warning-soft); }
-.nav-context-menu[data-state="degraded"] .nav-context-summary-dot { background: var(--color-warning); box-shadow: 0 0 0 3px var(--color-warning-soft); }
 .target-app-indicator[data-state="stopped"] .target-app-dot,
 .target-app-indicator[data-state="failed"] .target-app-dot { background: var(--color-danger); box-shadow: 0 0 0 3px var(--color-danger-soft); }
-.nav-context-menu[data-state="stopped"] .nav-context-summary-dot,
-.nav-context-menu[data-state="failed"] .nav-context-summary-dot { background: var(--color-danger); box-shadow: 0 0 0 3px var(--color-danger-soft); }
 .target-app-indicator[data-state="starting"] .target-app-dot,
 .target-app-indicator[data-state="building"] .target-app-dot,
 .target-app-indicator[data-state="stopping"] .target-app-dot {
-  background: var(--color-warning);
-  box-shadow: 0 0 0 3px var(--color-warning-soft);
-  animation: target-app-pulse 1.1s ease-in-out infinite;
-}
-.nav-context-menu[data-state="starting"] .nav-context-summary-dot,
-.nav-context-menu[data-state="building"] .nav-context-summary-dot,
-.nav-context-menu[data-state="stopping"] .nav-context-summary-dot {
   background: var(--color-warning);
   box-shadow: 0 0 0 3px var(--color-warning-soft);
   animation: target-app-pulse 1.1s ease-in-out infinite;
@@ -536,15 +522,9 @@ h3 {
     padding-bottom: 2px;
   }
   .nav-context-summary {
-    max-width: 125px;
+    max-width: 150px;
     padding-left: 8px;
     padding-right: 24px;
-  }
-  .nav-context-app {
-    max-width: 58px;
-  }
-  .nav-context-reporter {
-    max-width: 48px;
   }
   .topbar-actions .nav-create-primary {
     padding-left: 10px;

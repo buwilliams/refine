@@ -146,6 +146,11 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
   }
 }
 
+function updateSourceUpdateNavLabel(button, label) {
+  const status = button?.querySelector(".nav-source-update-status");
+  if (status) status.textContent = label;
+}
+
 function applySourceUpdateNavStatus(result = {}) {
   const button = document.getElementById("btn-source-update");
   if (!button) return;
@@ -164,6 +169,7 @@ function applySourceUpdateNavStatus(result = {}) {
   button.dataset.updateAvailable = sourceUpdate.update_available ? "true" : "false";
   button.dataset.state = sourceUpdate.state || "unavailable";
   button.title = sourceUpdate.title || "Refine source update status is unavailable";
+  updateSourceUpdateNavLabel(button, button.title);
   if (sourceUpdate.state === "updating") {
     startSourceUpdateNavPolling();
   } else {
@@ -179,6 +185,7 @@ function markSourceUpdateNavUnavailable(error) {
   button.disabled = true;
   button.dataset.state = "unavailable";
   button.title = error?.message || "Refine source update status is unavailable";
+  updateSourceUpdateNavLabel(button, button.title);
   button.setAttribute("aria-label", button.title);
 }
 
@@ -194,6 +201,7 @@ async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {
     button.disabled = true;
     button.dataset.state = "checking";
     button.title = "Checking for Refine source updates";
+    updateSourceUpdateNavLabel(button, button.title);
   }
   _sourceUpdateNavRequest = (async () => {
     try {
@@ -237,6 +245,7 @@ function resetSourceUpdateNav() {
   button.hidden = true;
   button.disabled = true;
   button.dataset.state = "hidden";
+  updateSourceUpdateNavLabel(button, "Unavailable");
 }
 
 async function queueSourcePromotionFromUi() {
@@ -257,6 +266,7 @@ async function promoteSourceFromNav() {
     button.disabled = true;
     button.dataset.state = "updating";
     button.title = result.operation?.message || "Source promotion queued";
+    updateSourceUpdateNavLabel(button, button.title);
     button.setAttribute("aria-label", button.title);
     startSourceUpdateNavPolling();
     toast("Source promotion queued; Refine will reconnect after restart", "info");
