@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:23:18Z",
+  "updated_at": "2026-07-23T10:23:37Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -360,6 +360,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Direct runtime evidence now shows workflow automation is not paused (`paused: []`, background launches enabled, runner live), so the failed Goal is actionable without overriding a cancellation boundary. I’m opening one narrow recovery round for `00000SZ3KJDDGGCK29J4N4Y001`; the two review Goals remain untouched pending your approval decision."
+    },
+    {
+      "created_at": "2026-07-23T10:23:37Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784802217971-151",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery prompt was recorded as Round 2, but the Goal has not yet transitioned out of `failed`; I’m checking whether the scheduler adopts it normally. I will not use `goal start` or edit durable state directly if it does not."
     }
   ],
   "queue_dispatching": true,
