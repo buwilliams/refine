@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:24:34Z",
+  "updated_at": "2026-07-23T13:26:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -366,6 +366,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The alleged lost worker is not currently lost: the daemon’s live process registry and OS process table both show Goal `…K4M000` still owned by PID 3905391, and Goal `…5P4001` by PID 4077568. I’m checking their output and worktrees for forward progress before deciding whether either needs intervention; no retry has been issued."
+    },
+    {
+      "created_at": "2026-07-23T13:26:56Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813216935-74",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both agents are still live and emitting fresh output. The previously flagged Goal now has seven modified files in its preserved round-4 worktree, which is direct progress evidence; the newer stop-button recovery agent is still analyzing from a clean round-2 worktree. The controls-menu Goal remains at `review` with candidate `ed0f6936` not on `main`; Governance passed, but Quality was a no-op because no Quality tests were configured."
     }
   ],
   "queue_dispatching": true,
