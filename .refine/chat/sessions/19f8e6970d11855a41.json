@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:54:52Z",
+  "updated_at": "2026-07-23T11:58:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -855,6 +855,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker is still live and editing the newly discovered Review-decline path; there is no stall and no request for authority. I’m continuing to hold the boundary at implementation/verification—no approval or merge action from this supervisor."
+    },
+    {
+      "created_at": "2026-07-23T11:58:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784807888255-77",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The post-guard full rerun is not clean yet: 455 passed, 2 failed. One failure is a fixture that now violates the new Review transition guard; the other is a dashboard process-count assertion outside this workflow path. The worker is isolating both and has not declared a candidate."
     }
   ],
   "queued_messages": [
