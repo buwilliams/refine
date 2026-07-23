@@ -534,29 +534,122 @@
     },
     {
       "assignee": "Refine Supervisor",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T18:39:45Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-23T19:15:54Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-7",
+        "failed_actions": [
+          {
+            "message": "The terminal surface still implements agent stopping directly through terminal_stop_response and stop_agent_session instead of delegating Goal-linked termination and cancellation to the shared process-control capability.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Goal Agents have two stop implementations: /api/processes/:id/stop performs confirmed exit and linked Goal/claim/capacity settlement, while /api/terminal/:session/stop only signals or kills the session and leaves that settlement to other paths.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Cancellation recovery is incomplete: settlement journals use write-and-rename without file or directory synchronization, and a rollback_failed outcome after successful Goal restoration has a new Goal revision that prepare_goal_cancellation_replay rejects as neither journal before-state nor after-state.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Coverage verifies clean rollback and interruption replay but not rollback failure after Goal restoration, journal durability boundaries, or stopping a workflow Goal Agent through the browser terminal Stop control.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          },
+          {
+            "message": "The browser Goal-terminal Stop button calls the terminal-specific endpoint, so it can kill the same Goal Agent without the linked cancellation semantics used by the Processes UI, CLI, API process route, and MCP.",
+            "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+            "rule_id": "rule-8"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Agent stop semantics remain bypassable, and cancellation recovery is not reliably durable or replayable.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The terminal surface still implements agent stopping directly through terminal_stop_response and stop_agent_session instead of delegating Goal-linked termination and cancellation to the shared process-control capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"Goal Agents have two stop implementations: /api/processes/:id/stop performs confirmed exit and linked Goal/claim/capacity settlement, while /api/terminal/:session/stop only signals or kills the session and leaves that settlement to other paths.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancellation recovery is incomplete: settlement journals use write-and-rename without file or directory synchronization, and a rollback_failed outcome after successful Goal restoration has a new Goal revision that prepare_goal_cancellation_replay rejects as neither journal before-state nor after-state.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Coverage verifies clean rollback and interruption replay but not rollback failure after Goal restoration, journal durability boundaries, or stopping a workflow Goal Agent through the browser terminal Stop control.\"},{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"The browser Goal-terminal Stop button calls the terminal-specific endpoint, so it can kill the same Goal Agent without the linked cancellation semantics used by the Processes UI, CLI, API process route, and MCP.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Agent stop semantics remain bypassable, and cancellation recovery is not reliably durable or replayable.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The terminal surface still implements agent stopping directly through terminal_stop_response and stop_agent_session instead of delegating Goal-linked termination and cancellation to the shared process-control capability.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Goal Agents have two stop implementations: /api/processes/:id/stop performs confirmed exit and linked Goal/claim/capacity settlement, while /api/terminal/:session/stop only signals or kills the session and leaves that settlement to other paths.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Cancellation recovery is incomplete: settlement journals use write-and-rename without file or directory synchronization, and a rollback_failed outcome after successful Goal restoration has a new Goal revision that prepare_goal_cancellation_replay rejects as neither journal before-state nor after-state.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Coverage verifies clean rollback and interruption replay but not rollback failure after Goal restoration, journal durability boundaries, or stopping a workflow Goal Agent through the browser terminal Stop control.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            },
+            {
+              "message": "The browser Goal-terminal Stop button calls the terminal-specific endpoint, so it can kill the same Goal Agent without the linked cancellation semantics used by the Processes UI, CLI, API process route, and MCP.",
+              "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "rule_id": "rule-8"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-7"
+      },
+      "governance_message": "Agent stop semantics remain bypassable, and cancellation recovery is not reliably durable or replayable.",
+      "governance_rule_actions": [
+        {
+          "message": "The terminal surface still implements agent stopping directly through terminal_stop_response and stop_agent_session instead of delegating Goal-linked termination and cancellation to the shared process-control capability.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Goal Agents have two stop implementations: /api/processes/:id/stop performs confirmed exit and linked Goal/claim/capacity settlement, while /api/terminal/:session/stop only signals or kills the session and leaves that settlement to other paths.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Cancellation recovery is incomplete: settlement journals use write-and-rename without file or directory synchronization, and a rollback_failed outcome after successful Goal restoration has a new Goal revision that prepare_goal_cancellation_replay rejects as neither journal before-state nor after-state.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Coverage verifies clean rollback and interruption replay but not rollback failure after Goal restoration, journal durability boundaries, or stopping a workflow Goal Agent through the browser terminal Stop control.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        },
+        {
+          "message": "The browser Goal-terminal Stop button calls the terminal-specific endpoint, so it can kill the same Goal Agent without the linked cancellation semantics used by the Processes UI, CLI, API process route, and MCP.",
+          "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+          "rule_id": "rule-8"
+        }
+      ],
       "implementation_report": "Recovered Round 6 onto requested main 562abe5f as a reviewable eight-commit stack ending at 6f0f7c63. Preserved authoritative shared cancellation, confirmed-exit receipts, durable exact settlement replay, workflow policy/target identity, CLI/API/MCP/browser parity, current-main active Refine executable and ./r prompt guidance, cached live diagnostics, and all prior candidates/worktrees. Resolved current-main workflow/Goal revision and lock-order conflicts with monotonic workflow/claim/Goal revisions and coordination-before-state/Goal mutation; retained process-group signaling. Refreshed origin/main to 94273722: selectively included the independent 87029e72 benchmark-fixture patch while keeping transcript candidate 9b7d9d33 out as instructed. Initial focused build failed on three new WorkflowClaim fields; fixed. Initial process_control run had 13 pass, 2 fail, 1 hang from revision/lock integration; each was fixed and focused reruns passed. Initial default full library run had 489 pass, 2 fail: a warmed-create fixture failure also reproduced on untouched main, and a transient /proc identity disappearance whose isolated rerun passed. A tmpfs full rerun passed 491/491 before refreshed main; after selectively applying main's benchmark-fixture fix, the final default full library run passed 491/491. Final focused: process_control 16/16, subprocess 11/11, agent_sessions 4/4, real pre-registration worker 1/1, real worker settlement 1/1, workflow replenishment 2/2, web API 1/1, CLI 1/1, MCP 1/1, workflow metadata 1/1, browser processes 4/4, cached diagnostics 1/1, Ready Merge fence 1/1, managed-registry cancellation 1/1. Final web suite 38/38; cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff/check, cached diff/check, and commit whitespace checks passed. Worktree clean; no unresolved three-way conflict markers; 9b7d9d33 is not an ancestor.",
       "implementation_reported_at": "2026-07-23T19:10:29Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover the preserved Round 6 candidate ebc7d2699abcb6ffe26aaccac826197d2ccdb163 from current main 562abe5fff5c81713300bf7d539f5fc38e61aacb. A read-only three-way preview now shows 26 conflict markers because the candidate is 15 main commits behind, including real conflicts in src/process/agent_sessions.rs, src/process/subprocess/mod.rs, src/surfaces/web_server/support/terminal.rs, src/tools/product/work_items/mod.rs, and src/workflow/mod.rs, with overlapping changes also in CLI/web/process/work-item tests and routes. Preserve ebc7d269, all earlier rounds/candidates/worktrees, provider/Governance/Quality evidence, and the complete Round 6 intent: authoritative shared cancellation, durable settlement replay, exact workflow/Goal/claim/capacity outcomes, policy and target identity preservation, process receipts, and surface parity. Reconstruct or replay that intent on the current main rather than force-merging or deleting conflict evidence. Retain all already-merged main behavior, especially Goal Agent active Refine executable and ./r prompt guidance from 006f6652 and live cached diagnostics process health from fa0a43ff. The separate transcript handoff candidate 9b7d9d33 remains unapproved at review: do not cherry-pick, merge, or assume it; keep this recovery semantically compatible where practical without crossing that review boundary. Add or update focused conflict-sensitive tests, rerun the Round 6 focused suites plus full library/web/all-target/format/diff gates, and report every initial and final failure exactly. Before completion, refresh current main evidence and confirm the resulting candidate has no unresolved three-way conflict markers. Do not approve or merge, force Git, rewrite history, discard any worktree, hide provider/authentication/test failures, or edit durable Goal state directly.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine Supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T19:10:29Z",
+      "rule_state": "failed",
+      "updated": "2026-07-23T19:15:55Z",
       "workflow_quality_timing": null
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T19:10:30Z"
+  "updated": "2026-07-23T19:15:55Z"
 }
