@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:57:09Z",
+  "updated_at": "2026-07-23T14:59:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1140,6 +1140,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The new focused tests are now present. One initial filter invocation was malformed and failed before running the intended test; the corrected workflow-cancellation test then passed. I’ll keep that distinction visible and wait for the full verification and Governance pass."
+    },
+    {
+      "created_at": "2026-07-23T14:59:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784818780668-220",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The new real-worker test exposed additional issues during development and failed on its first attempts; the agent has revised the implementation and is now running formatting, diff checks, and the focused suite again. Those failures remain part of the audit trail—they are not being relabeled as successful evidence."
     }
   ],
   "queued_messages": [
