@@ -2,8 +2,8 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "healthy",
-  "active_work": 0,
-  "queued_work": 1,
+  "active_work": 1,
+  "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8e6970d11855a41",
@@ -57,12 +57,12 @@
     "00000SZ3K92DJJT8PWF5AP8000": "done",
     "00000SZ3KH6A2G1JKVCWN4Y000": "done",
     "00000SZ3KJDDGGCK29J4N4Y001": "done",
-    "00000SZ3N803TK00E78AK4M000": "todo",
+    "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:todo|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T12:13:40.831187977+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T12:15:06.615073853+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
