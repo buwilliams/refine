@@ -14,29 +14,51 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T11:10:30Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T11:15:48Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3NBF861H3VJPTK4M001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3NBF861H3VJPTK4M001-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Changed Goals bulk Reporter and Assignee actions to refresh the node-scoped reporter model before rendering the picker, so the deferred startup refresh can no longer produce an empty modal; reporter-load failures now show an action error instead of an empty list. Added focused regression coverage for successful hydration, HTML-safe reporter options, and load failure. Verification: node --test tests/web_goals_bulk_reporter.test.js: 2 passed, 0 failed; node --test tests/web_*.test.js: 33 passed, 0 failed; cargo fmt --all -- --check: passed; cargo check --all-targets: passed; node --check on both changed JavaScript files: passed; git diff --check: passed; live GET http://127.0.0.1:8082/api/reporters: HTTP success with reporter Buddy Williams.",
       "implementation_reported_at": "2026-07-23T11:14:45Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Web UI > Goals > Filters & Bulk actions > Assign Reporter > Model list of Reporters is empty which is a bug.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T11:15:51Z",
+      "quality_details": {
+        "candidate_commit": "b56afd61ccc0ab623c54fae86b84d097c3585b87",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f8eb061162ca7153",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T11:14:45Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T11:15:51Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T11:14:45Z"
+  "updated": "2026-07-23T11:15:52Z"
 }
