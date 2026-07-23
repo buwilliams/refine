@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:18:48Z",
+  "updated_at": "2026-07-23T19:21:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2964,6 +2964,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Live evidence now resolves the contradiction: Round 9 is genuinely active, PID 677097 is registered and alive, and it is currently running `cargo check --all-targets` in the preserved Round 9 worktree. There is no lost-worker recovery to perform, so I’m monitoring the agent through its current verification/settlement transition without interrupting it."
+    },
+    {
+      "created_at": "2026-07-23T19:21:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834470673-220",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The candidate branch is clean and contains the preserved seven-commit recovery stack; the Goal remains `in-progress` and its Round 9 governance fields are still unclassified. The worker has finished its visible compiler child and is still actively producing TUI output, so this is not yet a completion claim and I’m not advancing or merging it."
     }
   ],
   "queue_dispatching": true,
