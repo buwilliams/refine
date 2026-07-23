@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "lifecycle": "idle",
-  "health": "attention",
-  "active_work": 0,
+  "lifecycle": "observing",
+  "health": "healthy",
+  "active_work": 1,
   "queued_work": 0,
-  "failed_work": 1,
+  "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
   "session_id": "19f8f10eaba2ca7150",
   "provider": "codex",
@@ -60,7 +60,7 @@
     "00000SZ3N803TK00E78AK4M000": "done",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "done",
-    "00000SZ3RP4G52RZ706A5P4001": "failed",
+    "00000SZ3RP4G52RZ706A5P4001": "in-progress",
     "00000SZ3SFP4N10NXGAE5P4002": "done",
     "00000SZ3SHFHFK352VJT5P4003": "done",
     "00000SZ412RXR0TQRHE82JW000": "done",
@@ -69,8 +69,8 @@
     "00000SZ42710VGCA2VWG2JW003": "done"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:failed|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T19:15:57.710828760+00:00",
+  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:in-progress|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T19:16:50.492287401+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",

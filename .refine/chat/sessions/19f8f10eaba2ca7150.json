@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:16:24Z",
+  "updated_at": "2026-07-23T19:16:54Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2865,14 +2865,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The rejection is actionable without new user authority: it identifies five concrete defects, and the Goal is now durably `failed` with no live worker. I’m creating a fresh supported recovery Round—not restarting or editing state directly—scoped only to the recorded terminal-stop bypass, journal durability/replay defects, and missing production-path coverage. All prior candidates, worktrees, provider evidence, and the review boundary remain preserved."
+    },
+    {
+      "created_at": "2026-07-23T19:16:54Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834214264-203",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A concurrent supervisor turn appended Round 8 two seconds before my recovery command appended Round 9. I’m preserving both audit records and amending only the latest Round through the supported `--edit-latest` path to incorporate Round 8’s additional current-main conflict evidence. I will not delete either Round or let the newer prompt silently omit the approved transcript-handoff behavior now on `main`."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f90679f5152ea",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T19:15:37Z",
-      "updated_at": "2026-07-23T19:15:57Z",
+      "updated_at": "2026-07-23T19:16:50Z",
       "internal": true
     }
   ],
