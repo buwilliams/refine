@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T13:00:13Z",
+  "updated_at": "2026-07-23T13:02:09Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1395,20 +1395,52 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The recovery round is recorded, and Refine also appended its own synchronized recovery prompt milliseconds later; I’m using that latest canonical round rather than adding another. The Goal remains `failed`, so I’m moving it through the supported workflow transition back to `todo`—not editing durable state directly—so automation can claim Round 4."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8eaceb792ca64a1",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T11:12:04Z",
-      "updated_at": "2026-07-23T13:00:13Z",
-      "internal": true
+      "created_at": "2026-07-23T13:00:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784811628339-173",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 4 is now actively owned by execution `exec-42b39494-c4f8-42ea-bf56-db9603144b07` in a new preserved worktree. There is a live worker and no stall/loss evidence, so I’m monitoring its production-path changes and will intervene only if its evidence diverges from the recorded Governance requirements."
+    },
+    {
+      "created_at": "2026-07-23T13:00:44Z",
+      "delivered": false,
+      "id": "evt-1784811644128-26",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    },
+    {
+      "created_at": "2026-07-23T13:00:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "process_supervisor"
+      },
+      "id": "evt-1784811644182-175",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Managed provider process exited after cancellation."
+    },
+    {
+      "created_at": "2026-07-23T13:02:09Z",
+      "delivered": false,
+      "id": "evt-1784811729286-0",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Daemon restarted before the provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
-  "closed": false,
-  "interrupted": false,
-  "interruption_detail": null
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "Daemon restarted before the provider turn completed."
 }
