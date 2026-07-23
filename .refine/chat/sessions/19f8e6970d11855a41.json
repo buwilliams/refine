@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:06:12Z",
+  "updated_at": "2026-07-23T10:06:52Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -146,9 +146,9 @@
   "queued_messages": [
     {
       "id": "qm-19f8e6d4aac272a4f0",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3K92DJJT8PWF5AP8000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {\"00000SZ3K92DJJT8PWF5AP8000\"}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 2 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3K92DJJT8PWF5AP8000\": \"in-progress\", \"00000SZ3KH6A2G1JKVCWN4Y000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {\"00000SZ3K92DJJT8PWF5AP8000\", \"00000SZ3KH6A2G1JKVCWN4Y000\"}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T10:02:35Z",
-      "updated_at": "2026-07-23T10:03:33Z",
+      "updated_at": "2026-07-23T10:06:52Z",
       "internal": true
     }
   ],
