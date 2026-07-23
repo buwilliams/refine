@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:14:51Z",
+  "updated_at": "2026-07-23T14:15:21Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -864,6 +864,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The recovery skill keeps the failed Goal on the supported `goal round` path and explicitly excludes direct state edits or review approval. I’m first checking whether the supplied snapshot is still current and whether each review candidate has complete Governance/Quality/Git evidence; no mutation or approval is being attempted."
+    },
+    {
+      "created_at": "2026-07-23T14:15:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816121259-174",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The live snapshot matches the five non-terminal states and shows no workflow-agent process. One important limitation is already visible: at least one review Goal records Quality as “passed” even though evaluation was a no-op because no Quality tests were configured; I will report that as a limitation, not as fresh Quality validation."
     }
   ],
   "queue_dispatching": true,
