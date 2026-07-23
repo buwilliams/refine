@@ -13,7 +13,7 @@
   "reporter": "Buddy Williams",
   "rounds": [
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T18:00:27Z",
       "governance_checked_at": "2026-07-23T18:17:28Z",
@@ -54,11 +54,11 @@
       "quality_state": "passed",
       "reporter": "Refine",
       "rule_state": "passed",
-      "updated": "2026-07-23T18:17:32Z",
+      "updated": "2026-07-23T18:24:40Z",
       "workflow_quality_timing": "pre_merge"
     }
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T18:24:34Z"
+  "updated": "2026-07-23T18:24:40Z"
 }
