@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:45:43Z",
+  "updated_at": "2026-07-23T13:47:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -573,6 +573,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A second candidate, `00000SZ3RP4G52RZ706A5P4001` at `ea2103e3`, has just been committed and entered Governance. No retry action is justified while that worker is live. The earlier `bcf9d063` candidate remains fenced in `todo`; I’m preserving it and waiting for the serial runner to revisit it instead of manually forcing a transition."
+    },
+    {
+      "created_at": "2026-07-23T13:47:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814468420-120",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance for `ea2103e3` is still actively inspecting process control and cancellation paths; its captured output is advancing, so this is not a lost worker. The serial queue remains fenced behind it. No safe mutation is currently warranted."
     }
   ],
   "queued_messages": [
