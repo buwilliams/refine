@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:03:43Z",
+  "updated_at": "2026-07-23T10:05:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -117,6 +117,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The evidence has now advanced: the Goal is genuinely `in-progress`, a live Codex Goal agent exists, the Round 1 worktree is clean, and the supervisor has recovered to healthy with no open issue. I am not issuing a retry—the earlier “background process launch is stopped” condition is no longer the operative state. I’ll watch the live agent and only intervene if it is lost, fails, or reaches a review boundary."
+    },
+    {
+      "created_at": "2026-07-23T10:05:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801103730-10",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The apparent process disappearance was only a surface mismatch: the interactive process record closed, but the workflow-owned Codex process is still alive under the workflow runner, in the correct Goal worktree, with the matching durable execution claim. There is no lost-worker condition and no authority-requiring action yet."
     }
   ],
   "queued_messages": [
