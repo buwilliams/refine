@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:18:18Z",
+  "updated_at": "2026-07-23T19:18:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2952,6 +2952,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot is internally inconsistent: it reports no live workflow Goal IDs, but also contains a running Round 9 Goal Agent process. I’m resolving that against the live daemon and OS process table before deciding whether this is a stall, a retry, or simply stale supervisor projection."
+    },
+    {
+      "created_at": "2026-07-23T19:18:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834328790-218",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Live evidence now resolves the contradiction: Round 9 is genuinely active, PID 677097 is registered and alive, and it is currently running `cargo check --all-targets` in the preserved Round 9 worktree. There is no lost-worker recovery to perform, so I’m monitoring the agent through its current verification/settlement transition without interrupting it."
     }
   ],
   "queue_dispatching": true,
