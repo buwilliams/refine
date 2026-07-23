@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:59:42Z",
+  "updated_at": "2026-07-23T13:00:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1383,14 +1383,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance failed Round 2 with three recorded violations: a pre-registration cancellation race, post-fence settlement races, and missing separate-process evidence for those exact boundaries. This is now actionable without user approval, so I’m opening a supported recovery round that preserves both existing worktrees and carries forward the additional no-hidden-failure findings from the audit."
+    },
+    {
+      "created_at": "2026-07-23T13:00:09Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784811609273-170",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery round is recorded, and Refine also appended its own synchronized recovery prompt milliseconds later; I’m using that latest canonical round rather than adding another. The Goal remains `failed`, so I’m moving it through the supported workflow transition back to `todo`—not editing durable state directly—so automation can claim Round 4."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f8eaceb792ca64a1",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T11:12:04Z",
-      "updated_at": "2026-07-23T12:59:20Z",
+      "updated_at": "2026-07-23T13:00:13Z",
       "internal": true
     }
   ],
