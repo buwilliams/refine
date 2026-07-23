@@ -93,9 +93,34 @@ pub struct GoalRound {
     /// Quality ordering durably committed to this candidate round.
     #[serde(default)]
     pub workflow_quality_timing: Option<WorkflowQualityTiming>,
+    /// Git remote durably committed before publishing and integrating this candidate.
+    #[serde(default)]
+    pub workflow_git_remote: Option<String>,
+    /// Successful Ready Merge integration evidence for this exact candidate.
+    #[serde(default)]
+    pub workflow_integration: Option<RoundIntegration>,
     pub governance: Option<RoundGovernance>,
     pub quality: Option<RoundQuality>,
     pub logs: Vec<RoundLogEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct RoundIntegration {
+    pub candidate_commit: String,
+    pub target_branch: String,
+    pub target_commit: String,
+    pub remote: String,
+    pub pushed: bool,
+    pub integrated_at: Timestamp,
+    pub merge: MergeResult,
+}
+
+/// Durable, adapter-independent evidence for a Git merge decision.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MergeResult {
+    pub ok: bool,
+    pub conflicts: Vec<String>,
+    pub message: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -160,6 +185,8 @@ mod tests {
         });
         let legacy_round: GoalRound = serde_json::from_value(legacy).unwrap();
         assert_eq!(legacy_round.workflow_quality_timing, None);
+        assert_eq!(legacy_round.workflow_git_remote, None);
+        assert_eq!(legacy_round.workflow_integration, None);
 
         let mut current = serde_json::to_value(legacy_round).unwrap();
         current["workflow_quality_timing"] = serde_json::json!("post_build");

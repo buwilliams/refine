@@ -185,12 +185,7 @@ pub fn user_status_transition(from: &GoalStatus, to: &GoalStatus) -> TransitionD
 
     let allowed = matches!(
         (from, to),
-        (Backlog, Todo)
-            | (Todo, Backlog)
-            | (Review, Todo)
-            | (Done, Review)
-            | (Failed, Todo)
-            | (Cancelled, Todo)
+        (Backlog, Todo) | (Todo, Backlog) | (Done, Review) | (Failed, Todo) | (Cancelled, Todo)
     );
 
     if allowed {
@@ -205,7 +200,12 @@ pub fn user_status_transition(from: &GoalStatus, to: &GoalStatus) -> TransitionD
 pub fn is_bulk_target_allowed(status: &GoalStatus) -> bool {
     !matches!(
         status,
-        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge
+        GoalStatus::InProgress
+            | GoalStatus::Qa
+            | GoalStatus::ReadyMerge
+            | GoalStatus::Build
+            | GoalStatus::Review
+            | GoalStatus::Done
     )
 }
 
@@ -258,9 +258,9 @@ pub fn goal_operation_allowed(
         RetryAgent => matches!(status, Failed | InProgress),
         RetryQa => matches!(status, Qa | Failed),
         RetryMerge => matches!(status, ReadyMerge | Failed),
-        SubmitMerge => matches!(status, InProgress | Qa | ReadyMerge | Failed),
-        VerifyReview => matches!(status, Review | Qa),
-        Undo => matches!(status, Done | Review | Cancelled),
+        SubmitMerge => matches!(status, ReadyMerge),
+        VerifyReview => matches!(status, Review),
+        Undo => matches!(status, Done | Cancelled),
         AssignToFeature | RemoveFromFeature | ReorderInFeature => {
             !matches!(status, InProgress | Qa | ReadyMerge)
         }
@@ -307,7 +307,7 @@ mod tests {
     fn manual_user_transitions_match_spec() {
         assert!(user_status_transition(&GoalStatus::Backlog, &GoalStatus::Todo).allowed);
         assert!(user_status_transition(&GoalStatus::Todo, &GoalStatus::Backlog).allowed);
-        assert!(user_status_transition(&GoalStatus::Review, &GoalStatus::Todo).allowed);
+        assert!(!user_status_transition(&GoalStatus::Review, &GoalStatus::Todo).allowed);
         assert!(user_status_transition(&GoalStatus::Done, &GoalStatus::Review).allowed);
         assert!(user_status_transition(&GoalStatus::Failed, &GoalStatus::Todo).allowed);
         assert!(user_status_transition(&GoalStatus::Cancelled, &GoalStatus::Todo).allowed);
@@ -321,8 +321,10 @@ mod tests {
         assert!(!is_bulk_target_allowed(&GoalStatus::InProgress));
         assert!(!is_bulk_target_allowed(&GoalStatus::Qa));
         assert!(!is_bulk_target_allowed(&GoalStatus::ReadyMerge));
-        assert!(is_bulk_target_allowed(&GoalStatus::Build));
-        assert!(is_bulk_target_allowed(&GoalStatus::Done));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Build));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Review));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Done));
+        assert!(is_bulk_target_allowed(&GoalStatus::Todo));
     }
 
     #[test]

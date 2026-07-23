@@ -15,15 +15,17 @@ use uuid::Uuid;
 
 use crate::model::JsonObject;
 use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal};
-use crate::model::goal::GoalPriority;
+use crate::model::goal::{GoalPriority, RoundIntegration};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::git_sync::with_repository_git_lock;
-use crate::tools::host::git_worktrees::MergeResult;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -76,6 +78,12 @@ pub struct WorkflowClaim {
     pub target_app_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub round_idx: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_revision: Option<u64>,
+    #[serde(default)]
+    pub decision_version: u64,
     pub state: WorkflowClaimState,
     pub created_at: String,
     pub updated_at: String,
@@ -108,11 +116,24 @@ impl Default for WorkflowPolicy {
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowAutomationState {
+    #[serde(default)]
+    pub version: u64,
     pub paused: BTreeSet<WorkflowPauseControl>,
     #[serde(default)]
     pub policy: WorkflowPolicy,
     pub claims: Vec<WorkflowClaim>,
     pub updated_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorkflowExecutionFence {
+    pub claim_id: String,
+    pub execution_id: String,
+    pub goal_id: String,
+    pub node_id: String,
+    pub round_idx: usize,
+    pub goal_revision: u64,
+    pub decision_version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -202,14 +223,176 @@ impl WorkflowEngine {
             .transpose()
     }
 
+    fn coordination_root(&self) -> RefineResult<PathBuf> {
+        Ok(self
+            .refine_dir()?
+            .unwrap_or_else(|| self.runtime_root.clone()))
+    }
+
     pub fn load_state(&self) -> RefineResult<WorkflowAutomationState> {
         read_state(&self.state_path())
     }
 
     fn save_state(&self, state: &mut WorkflowAutomationState) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let current = read_state(&self.state_path())?;
+        if current.version != state.version {
+            return Err(RefineError::Conflict(format!(
+                "workflow authority changed after it was read (expected version {}, current version {})",
+                state.version, current.version
+            )));
+        }
         state.policy = self.policy()?;
         state.updated_at = Some(now_timestamp());
+        state.version = state.version.saturating_add(1);
         write_state(&self.state_path(), state)
+    }
+
+    /// Atomically commits the exact execution and Goal revision allowed to perform Ready Merge.
+    pub fn commit_ready_merge_fence(
+        &self,
+        claim_id: &str,
+        execution_id: &str,
+        goal_id: &str,
+        node_id: &str,
+        round_idx: usize,
+        goal_revision: u64,
+    ) -> RefineResult<WorkflowExecutionFence> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let mut state = self.load_state()?;
+        if let Some(other) = state.claims.iter().find(|claim| {
+            claim.goal_id == goal_id
+                && claim.claim_id != claim_id
+                && matches!(
+                    claim.state,
+                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
+                )
+        }) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} has unequal concurrent claims {claim_id} at revision {goal_revision} and {} at revision {}",
+                other.claim_id,
+                other.goal_revision.unwrap_or(0)
+            )));
+        }
+        let claim = state
+            .claims
+            .iter_mut()
+            .find(|claim| claim.claim_id == claim_id)
+            .ok_or_else(|| RefineError::NotFound(format!("claim {claim_id} was not found")))?;
+        if claim.goal_id != goal_id
+            || claim.node_id != node_id
+            || claim.execution_id.as_deref() != Some(execution_id)
+            || claim.state != WorkflowClaimState::Running
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {execution_id} no longer owns active claim {claim_id} for Goal {goal_id}"
+            )));
+        }
+        let commitment_changed =
+            claim.round_idx != Some(round_idx) || claim.goal_revision != Some(goal_revision);
+        if commitment_changed {
+            claim.round_idx = Some(round_idx);
+            claim.goal_revision = Some(goal_revision);
+            claim.decision_version = claim.decision_version.saturating_add(1);
+            claim.updated_at = now_timestamp();
+        }
+        let fence = WorkflowExecutionFence {
+            claim_id: claim.claim_id.clone(),
+            execution_id: execution_id.to_string(),
+            goal_id: goal_id.to_string(),
+            node_id: node_id.to_string(),
+            round_idx,
+            goal_revision,
+            decision_version: claim.decision_version,
+        };
+        if commitment_changed {
+            self.save_state(&mut state)?;
+        }
+        Ok(fence)
+    }
+
+    /// Revalidates Ready Merge authority immediately before a side effect or settlement.
+    pub fn verify_ready_merge_fence(&self, fence: &WorkflowExecutionFence) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let state = self.load_state()?;
+        if let Some(other) = state.claims.iter().find(|claim| {
+            claim.goal_id == fence.goal_id
+                && claim.claim_id != fence.claim_id
+                && matches!(
+                    claim.state,
+                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
+                )
+        }) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} has unequal concurrent claims {} at revision {} and {} at revision {}",
+                fence.goal_id,
+                fence.claim_id,
+                fence.goal_revision,
+                other.claim_id,
+                other.goal_revision.unwrap_or(0)
+            )));
+        }
+        let claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.claim_id == fence.claim_id)
+            .ok_or_else(|| {
+                RefineError::Conflict(format!("Ready Merge claim {} was replaced", fence.claim_id))
+            })?;
+        if claim.goal_id != fence.goal_id
+            || claim.node_id != fence.node_id
+            || claim.execution_id.as_deref() != Some(fence.execution_id.as_str())
+            || claim.round_idx != Some(fence.round_idx)
+            || claim.goal_revision != Some(fence.goal_revision)
+            || claim.decision_version != fence.decision_version
+            || claim.state != WorkflowClaimState::Running
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {} no longer owns Ready Merge claim {}",
+                fence.execution_id, fence.claim_id
+            )));
+        }
+        Ok(())
+    }
+
+    /// Advances a Ready Merge fence after the integration owner writes its durable evidence.
+    ///
+    /// The workflow coordination lease must cover both the evidence write and this update. That
+    /// keeps the claim's committed Goal revision equal to the actual record revision before
+    /// operation settlement and the Ready Merge transition.
+    pub fn advance_ready_merge_fence_revision(
+        &self,
+        fence: &mut WorkflowExecutionFence,
+        goal_revision: u64,
+    ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let mut state = self.load_state()?;
+        let claim = state
+            .claims
+            .iter_mut()
+            .find(|claim| claim.claim_id == fence.claim_id)
+            .ok_or_else(|| {
+                RefineError::Conflict(format!("Ready Merge claim {} was replaced", fence.claim_id))
+            })?;
+        if claim.goal_id != fence.goal_id
+            || claim.node_id != fence.node_id
+            || claim.execution_id.as_deref() != Some(fence.execution_id.as_str())
+            || claim.round_idx != Some(fence.round_idx)
+            || claim.goal_revision != Some(fence.goal_revision)
+            || claim.decision_version != fence.decision_version
+            || claim.state != WorkflowClaimState::Running
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {} no longer owns Ready Merge claim {}",
+                fence.execution_id, fence.claim_id
+            )));
+        }
+        claim.goal_revision = Some(goal_revision);
+        claim.decision_version = claim.decision_version.saturating_add(1);
+        claim.updated_at = now_timestamp();
+        fence.goal_revision = goal_revision;
+        fence.decision_version = claim.decision_version;
+        self.save_state(&mut state)
     }
 
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
@@ -266,6 +449,7 @@ impl WorkflowEngine {
     }
 
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         state.policy = self.policy()?;
         let runnable = match self.ensure_automation_running(&state) {
@@ -699,22 +883,26 @@ impl WorkflowEngine {
                             for claim_id in claim_ids {
                                 let order = launch_order;
                                 launch_order += 1;
-                                let preparation = match self.start_claim(&claim_id) {
-                                    Ok(execution_id) => {
-                                        self.prepare_started_claim(&claim_id, &execution_id)
-                                    }
+                                let execution_id = match self.start_claim(&claim_id) {
+                                    Ok(execution_id) => execution_id,
                                     Err(RefineError::Conflict(message))
                                         if message == AUTOMATION_CONCURRENCY_LIMIT_REACHED =>
                                     {
                                         continue;
                                     }
-                                    Err(error) => Err(error),
+                                    Err(error) => {
+                                        errors.push((order, error));
+                                        continue;
+                                    }
                                 };
+                                let preparation =
+                                    self.prepare_started_claim(&claim_id, &execution_id);
                                 match preparation {
                                     Ok(ctx) => {
                                         running += 1;
                                         launched_any = true;
                                         let outcome_tx = outcome_tx.clone();
+                                        let worker_execution_id = execution_id.clone();
                                         scope.spawn(move || {
                                             let outcome = std::panic::catch_unwind(
                                                 std::panic::AssertUnwindSafe(|| {
@@ -726,12 +914,18 @@ impl WorkflowEngine {
                                                     "workflow worker panicked for claim {claim_id}"
                                                 )))
                                             });
-                                            let _ = outcome_tx.send((order, claim_id, outcome));
+                                            let _ = outcome_tx.send((
+                                                order,
+                                                claim_id,
+                                                worker_execution_id,
+                                                outcome,
+                                            ));
                                         });
                                     }
                                     Err(error) => {
                                         let _ = self.mark_claim_state(
                                             &claim_id,
+                                            Some(&execution_id),
                                             WorkflowClaimState::Failed,
                                         );
                                         errors.push((order, error));
@@ -748,22 +942,27 @@ impl WorkflowEngine {
                 }
 
                 match outcome_rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok((order, claim_id, outcome)) => {
+                    Ok((order, claim_id, execution_id, outcome)) => {
                         running -= 1;
                         next_replenish = std::time::Instant::now();
                         match outcome {
                             Ok(result) => {
-                                if let Err(error) =
-                                    self.mark_claim_state(&claim_id, WorkflowClaimState::Completed)
-                                {
+                                if let Err(error) = self.mark_claim_state(
+                                    &claim_id,
+                                    Some(&execution_id),
+                                    WorkflowClaimState::Completed,
+                                ) {
                                     errors.push((order, error));
                                 } else {
                                     results.push((order, result));
                                 }
                             }
                             Err(error) => {
-                                let _ =
-                                    self.mark_claim_state(&claim_id, WorkflowClaimState::Failed);
+                                let _ = self.mark_claim_state(
+                                    &claim_id,
+                                    Some(&execution_id),
+                                    WorkflowClaimState::Failed,
+                                );
                                 errors.push((order, error));
                             }
                         }
@@ -818,26 +1017,42 @@ impl WorkflowEngine {
             settings,
             work_items,
         );
-        match WorkflowTodo.advance(&mut ctx)? {
-            WorkflowAdvanceOutcome::Transition {
-                to: GoalStatus::InProgress,
-                ..
-            } => Ok(ctx),
-            WorkflowAdvanceOutcome::Noop { reason }
-            | WorkflowAdvanceOutcome::Blocked { reason }
-            | WorkflowAdvanceOutcome::Failed { reason }
-            | WorkflowAdvanceOutcome::Completed { reason, .. }
-            | WorkflowAdvanceOutcome::Transition { reason, .. } => {
-                Err(RefineError::Conflict(reason))
-            }
+        let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
+        if current == GoalStatus::Todo {
+            return match WorkflowTodo.advance(&mut ctx)? {
+                WorkflowAdvanceOutcome::Transition {
+                    to: GoalStatus::InProgress,
+                    ..
+                } => Ok(ctx),
+                WorkflowAdvanceOutcome::Noop { reason }
+                | WorkflowAdvanceOutcome::Blocked { reason }
+                | WorkflowAdvanceOutcome::Failed { reason }
+                | WorkflowAdvanceOutcome::Completed { reason, .. }
+                | WorkflowAdvanceOutcome::Transition { reason, .. } => {
+                    Err(RefineError::Conflict(reason))
+                }
+            };
         }
+        if !matches!(
+            current,
+            GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+        ) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} cannot resume workflow from {}",
+                ctx.goal_id,
+                current.as_str()
+            )));
+        }
+        hydrate_retry_context(&mut ctx, current)?;
+        Ok(ctx)
     }
 
     fn execute_prepared_claim(
         &self,
         mut ctx: WorkflowContext<'_>,
     ) -> RefineResult<WorkflowStepResult> {
-        self.advance_claim_behaviors(&mut ctx, GoalStatus::InProgress)?;
+        let start_status = ctx.start_status.clone();
+        self.advance_claim_behaviors(&mut ctx, start_status)?;
         let execution_id = ctx.execution_id.clone();
         let branch = ctx
             .branch
@@ -920,8 +1135,10 @@ impl WorkflowEngine {
     fn mark_claim_state(
         &self,
         claim_id: &str,
+        expected_execution_id: Option<&str>,
         claim_state: WorkflowClaimState,
     ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         let Some(claim) = state
             .claims
@@ -932,6 +1149,15 @@ impl WorkflowEngine {
                 "claim {claim_id} was not found"
             )));
         };
+        if let Some(expected_execution_id) = expected_execution_id
+            && (claim.execution_id.as_deref() != Some(expected_execution_id)
+                || claim.state != WorkflowClaimState::Running)
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {expected_execution_id} no longer owns claim {claim_id}"
+            )));
+        }
+        claim.decision_version = claim.decision_version.saturating_add(1);
         claim.state = claim_state;
         claim.updated_at = now_timestamp();
         let terminal = !matches!(
@@ -946,6 +1172,7 @@ impl WorkflowEngine {
     }
 
     fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
@@ -958,6 +1185,7 @@ impl WorkflowEngine {
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
                 )
             {
+                claim.decision_version = claim.decision_version.saturating_add(1);
                 claim.state = WorkflowClaimState::Interrupted;
                 claim.updated_at = now.clone();
                 released_claim_ids.push(claim.claim_id.clone());
@@ -1010,6 +1238,7 @@ struct GovernanceEvaluation {
 
 impl WorkflowAutomation for WorkflowEngine {
     fn promote(&self) -> RefineResult<usize> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1026,7 +1255,12 @@ impl WorkflowAutomation for WorkflowEngine {
         let mut eligible = snapshot
             .goals
             .values()
-            .filter(|projection| projection.goal.status == GoalStatus::Todo)
+            .filter(|projection| {
+                matches!(
+                    projection.goal.status,
+                    GoalStatus::Todo | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+                )
+            })
             .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
             .filter(|projection| Self::priority_claim_eligible(&snapshot, projection))
             .cloned()
@@ -1068,6 +1302,9 @@ impl WorkflowAutomation for WorkflowEngine {
                 provider: metadata.provider,
                 target_app_id: metadata.target_app_id,
                 execution_id: None,
+                round_idx: None,
+                goal_revision: None,
+                decision_version: 1,
                 state: WorkflowClaimState::Claimed,
                 created_at: now.clone(),
                 updated_at: now,
@@ -1081,6 +1318,7 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn claim(&self, goal_id: &str) -> RefineResult<String> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let goal_id = goal_id.trim();
         if goal_id.is_empty() {
             return Err(RefineError::InvalidInput("Goal id is required".to_string()));
@@ -1131,6 +1369,9 @@ impl WorkflowAutomation for WorkflowEngine {
             provider: metadata.provider,
             target_app_id: metadata.target_app_id,
             execution_id: None,
+            round_idx: None,
+            goal_revision: None,
+            decision_version: 1,
             state: WorkflowClaimState::Claimed,
             created_at: now.clone(),
             updated_at: now,
@@ -1142,6 +1383,7 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn start_claim(&self, claim_id: &str) -> RefineResult<String> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let claim_id = claim_id.trim();
         let mut state = self.load_state()?;
         let policy = self.policy()?;
@@ -1196,6 +1438,7 @@ impl WorkflowAutomation for WorkflowEngine {
         let execution_id = new_execution_id();
         let claim = &mut state.claims[claim_index];
         claim.execution_id = Some(execution_id.clone());
+        claim.decision_version = claim.decision_version.saturating_add(1);
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
         if let Err(error) = self.save_state(&mut state) {
@@ -1206,12 +1449,14 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         state.paused.insert(control);
         self.save_state(&mut state)
     }
 
     fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         state.paused.remove(&control);
         self.save_state(&mut state)
@@ -1219,7 +1464,16 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
         let execution_id = execution_id.trim();
-        let signalled = self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let operations = FileOperationRegistry::new(&self.runtime_root);
+        // Cancel operation ownership first. Its mutation lock is also the managed-process launch
+        // barrier, so this responsive pass either blocks a late Git launch or terminates the
+        // durably registered child.
+        operations.cancel_workflow_execution_operations(execution_id)?;
+        self.signal_workflow_subprocesses(execution_id, "terminate")?;
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        // Repeat while workflow authority is locked. This covers an integration operation that
+        // was registered after the responsive pass but before cancellation acquired authority.
+        operations.cancel_workflow_execution_operations(execution_id)?;
         let mut state = self.load_state()?;
         if let Some(claim) = state
             .claims
@@ -1227,18 +1481,21 @@ impl WorkflowAutomation for WorkflowEngine {
             .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
         {
             let claim_id = claim.claim_id.clone();
+            claim.decision_version = claim.decision_version.saturating_add(1);
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now_timestamp();
             self.save_state(&mut state)?;
-            if signalled == 0 {
-                self.release_claim_capacity(&claim_id)?;
-            }
+            // A cancelled claim cannot launch further operation-owned work, so its scheduler slot
+            // is always released. Managed-process records remain visible until their real children
+            // exit and repository coordination still serializes any cleanup.
+            self.release_claim_capacity(&claim_id)?;
         }
         Ok(())
     }
 
     fn retry(&self, execution_id: &str) -> RefineResult<String> {
         let execution_id = execution_id.trim();
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1267,6 +1524,7 @@ impl WorkflowAutomation for WorkflowEngine {
         let claim = &mut state.claims[claim_index];
         let claim_id = claim.claim_id.clone();
         claim.execution_id = Some(retried_execution_id.clone());
+        claim.decision_version = claim.decision_version.saturating_add(1);
         claim.state = WorkflowClaimState::Running;
         claim.updated_at = now_timestamp();
         if let Err(error) = self.save_state(&mut state) {
@@ -1369,6 +1627,77 @@ fn ensure_workflow_round(work_items: &FileWorkItemService, goal_id: &str) -> Ref
         .round_count
         .checked_sub(1)
         .ok_or_else(|| RefineError::InvalidInput(format!("Goal {goal_id} has no rounds")))
+}
+
+fn hydrate_retry_context(ctx: &mut WorkflowContext<'_>, current: GoalStatus) -> RefineResult<()> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let branch = required_workflow_string(&detail, "branch_name", &ctx.goal_id)?;
+    let candidate = required_workflow_string(&detail, "candidate_commit", &ctx.goal_id)?;
+    let base = required_workflow_string(&detail, "base_commit", &ctx.goal_id)?;
+    let round = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {} has no round {} to resume",
+                ctx.goal_id,
+                ctx.round_idx + 1
+            ))
+        })?;
+    let worktree = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
+        .existing_worktree_for_branch(&branch)?;
+    ctx.branch = Some(branch.clone());
+    ctx.worktree_path = worktree.as_ref().map(|path| path.display().to_string());
+    ctx.agent_cwd = worktree;
+    ctx.provider_output = Some(
+        round
+            .get("implementation_report")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| "Resumed existing workflow candidate".to_string()),
+    );
+    ctx.commit = Some(candidate.clone());
+    ctx.implementation_changed = candidate != base;
+    ctx.merge = round
+        .get("workflow_integration")
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<RoundIntegration>(value.clone())
+                .map(|integration| integration.merge)
+                .map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "Goal {} has invalid Ready Merge evidence: {error}",
+                        ctx.goal_id
+                    ))
+                })
+        })
+        .transpose()?;
+    ctx.start_status = current.clone();
+    ctx.log(
+        "workflow",
+        &format!("Resumed workflow from {}", current.as_str()),
+        Some(json_object(json!({
+            "status": current.as_str(),
+            "branch": branch,
+            "candidate_commit": candidate,
+            "round": ctx.round_idx + 1
+        }))),
+    )
+}
+
+fn required_workflow_string(value: &Value, key: &str, goal_id: &str) -> RefineResult<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {goal_id} has no recorded {key} to resume workflow"
+            ))
+        })
 }
 
 fn implementation_branch_name(pattern: &str, goal_id: &str, round_idx: usize) -> String {
@@ -2262,15 +2591,16 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(claimed_goal_ids, vec!["FIRST", "UNORDERED"]);
 
-        work_items
-            .bulk_update_goals(
-                BulkGoalSelection {
-                    selected_ids: Some(vec!["FIRST".to_string()]),
-                    ..Default::default()
-                },
-                crate::tools::product::work_items::BulkGoalUpdate::Status("review".to_string()),
-            )
-            .unwrap();
+        for status in [
+            GoalStatus::InProgress,
+            GoalStatus::ReadyMerge,
+            GoalStatus::Build,
+            GoalStatus::Review,
+        ] {
+            work_items
+                .advance_automated_goal_status("FIRST", status)
+                .unwrap();
+        }
         let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
         assert_eq!(claim_automation.promote().unwrap(), 2);
         let state = claim_automation.load_state().unwrap();
@@ -2280,7 +2610,7 @@ mod tests {
             .find(|claim| claim.goal_id == "SECOND")
             .map(|claim| claim.claim_id.clone())
             .unwrap();
-        work_items
+        let rejected_bulk_reopen = work_items
             .bulk_update_goals(
                 BulkGoalSelection {
                     selected_ids: Some(vec!["FIRST".to_string()]),
@@ -2289,7 +2619,13 @@ mod tests {
                 crate::tools::product::work_items::BulkGoalUpdate::Status("todo".to_string()),
             )
             .unwrap();
-        assert!(claim_automation.start_claim(&second_claim).is_err());
+        assert_eq!(rejected_bulk_reopen.updated, 0);
+        assert_eq!(rejected_bulk_reopen.skipped, 1);
+        assert_eq!(
+            work_items.show_goal_summary("FIRST").unwrap().goal.status,
+            GoalStatus::Review
+        );
+        claim_automation.start_claim(&second_claim).unwrap();
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -2878,7 +3214,11 @@ mod tests {
             fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "agent precommitted implementation\n"
         );
-        assert!(!target_root.join("agent.txt").exists());
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "agent precommitted implementation\n"
+        );
+        assert!(result.steps[0].merge.as_ref().is_some_and(|merge| merge.ok));
         assert_eq!(
             git_stdout(&worktree_path, &["rev-parse", "HEAD"])
                 .unwrap()
@@ -2891,6 +3231,42 @@ mod tests {
                 .trim(),
             "agent precommit"
         );
+        let goal = work_items.show_goal_detail("GOAL1").unwrap();
+        let round = &goal["rounds"][0];
+        assert_eq!(round["workflow_quality_timing"], "pre_merge");
+        assert_eq!(
+            round["workflow_integration"]["candidate_commit"],
+            result.steps[0].commit
+        );
+        assert_eq!(
+            round["quality_details"]["evaluation_scope"],
+            "isolated_candidate"
+        );
+        assert_eq!(
+            round["quality_details"]["source_candidate_commit"],
+            result.steps[0].commit
+        );
+        let state_messages = round["logs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|log| log["category"] == "state")
+            .filter_map(|log| log["message"].as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            state_messages,
+            vec![
+                "Workflow status changed: todo -> in-progress",
+                "Workflow status changed: in-progress -> qa",
+                "Workflow status changed: qa -> ready-merge",
+                "Workflow status changed: ready-merge -> build",
+                "Workflow status changed: build -> review",
+            ]
+        );
+        assert!(round["logs"].as_array().unwrap().iter().any(|log| {
+            log["message"].as_str() == Some("Target app rebuild skipped")
+                && log["details"]["skipped"] == true
+        }));
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {
@@ -3094,7 +3470,11 @@ mod tests {
             fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "existing retry implementation\n"
         );
-        assert!(!target_root.join("agent.txt").exists());
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "existing retry implementation\n"
+        );
+        assert!(result.steps[0].merge.as_ref().is_some_and(|merge| merge.ok));
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {
@@ -3103,6 +3483,125 @@ mod tests {
                 std::env::remove_var("REFINE_SMOKE_AI_PATH");
             }
         }
+
+        fs::remove_dir_all(&worktree_path).ok();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_resumes_supported_ready_merge_retry_without_rerunning_implementation() {
+        let temp_root = unique_temp_dir("automation-ready-merge-retry");
+        let target_root = temp_root.clone();
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "base\n").unwrap();
+        git(&temp_root, &["init", "-q", "-b", "main"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        let base_commit = git_stdout(&target_root, &["rev-parse", "HEAD"]).unwrap();
+        let branch = "refine/GOAL1/round-1";
+        let worktree_path = temp_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
+        fs::create_dir_all(worktree_path.parent().unwrap()).unwrap();
+        git(
+            &target_root,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        fs::write(worktree_path.join("feature.txt"), "retry candidate\n").unwrap();
+        git(&worktree_path, &["add", "feature.txt"]).unwrap();
+        git(&worktree_path, &["commit", "-q", "-m", "retry candidate"]).unwrap();
+        let candidate_commit = git_stdout(&worktree_path, &["rev-parse", "HEAD"]).unwrap();
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Retry Ready Merge", Some("GOAL1"))
+            .unwrap();
+        work_items
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+            .unwrap();
+        work_items
+            .update_latest_goal_round_implementation_report(
+                "GOAL1",
+                "Implementation already completed",
+            )
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+            .unwrap();
+        work_items
+            .update_goal_git_refs(
+                "GOAL1",
+                branch,
+                "main",
+                base_commit.trim(),
+                Some(candidate_commit.trim()),
+            )
+            .unwrap();
+        work_items
+            .update_goal_round_evaluation_summary(
+                "GOAL1",
+                0,
+                &json!({
+                    "workflow_quality_timing": "pre_merge",
+                    "workflow_git_remote": "origin"
+                }),
+            )
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+            .unwrap();
+        work_items.retry_goal_merge_summary("GOAL1").unwrap();
+
+        let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+            .evaluate_workflow()
+            .unwrap();
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].commit, candidate_commit.trim());
+        assert_eq!(
+            result.steps[0].provider_output,
+            "Implementation already completed"
+        );
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Review
+        );
+        assert_eq!(
+            fs::read_to_string(target_root.join("feature.txt")).unwrap(),
+            "retry candidate\n"
+        );
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(
+            detail["rounds"][0]["workflow_integration"]["candidate_commit"],
+            candidate_commit.trim()
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| log["message"] == "Resumed workflow from ready-merge")
+        );
 
         fs::remove_dir_all(&worktree_path).ok();
         fs::remove_dir_all(temp_root).unwrap();
@@ -3266,6 +3765,58 @@ mod tests {
             Some(retried_execution_id.as_str())
         );
         assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn ready_merge_fence_rejects_cancellation_replacement_and_unequal_claims() {
+        let temp_root = unique_temp_dir("ready-merge-execution-fence");
+        let runtime_root = temp_root.join("run/8080");
+        let automation = WorkflowEngine::new(&runtime_root);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        let execution_id = automation.start_claim(&claim_id).unwrap();
+        let fence = automation
+            .commit_ready_merge_fence(&claim_id, &execution_id, "GOAL1", "default", 0, 7)
+            .unwrap();
+        automation.verify_ready_merge_fence(&fence).unwrap();
+
+        automation.cancel(&execution_id).unwrap();
+        assert!(
+            automation
+                .verify_ready_merge_fence(&fence)
+                .unwrap_err()
+                .to_string()
+                .contains("no longer owns")
+        );
+        let replacement_execution = automation.retry(&execution_id).unwrap();
+        let replacement = automation
+            .commit_ready_merge_fence(&claim_id, &replacement_execution, "GOAL1", "default", 0, 8)
+            .unwrap();
+        assert_ne!(replacement.execution_id, fence.execution_id);
+
+        let mut state = automation.load_state().unwrap();
+        state.claims.push(WorkflowClaim {
+            claim_id: "unequal-claim".to_string(),
+            goal_id: "GOAL1".to_string(),
+            node_id: "default".to_string(),
+            provider: "smoke-ai".to_string(),
+            target_app_id: "default".to_string(),
+            execution_id: Some("unequal-execution".to_string()),
+            round_idx: Some(0),
+            goal_revision: Some(9),
+            decision_version: 1,
+            state: WorkflowClaimState::Running,
+            created_at: now_timestamp(),
+            updated_at: now_timestamp(),
+        });
+        automation.save_state(&mut state).unwrap();
+        let error = automation
+            .verify_ready_merge_fence(&replacement)
+            .unwrap_err();
+        assert!(error.to_string().contains("unequal concurrent claims"));
+        assert!(error.to_string().contains("revision 8"));
+        assert!(error.to_string().contains("revision 9"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

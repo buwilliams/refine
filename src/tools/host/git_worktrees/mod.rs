@@ -6,8 +6,9 @@ use std::process::Command;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
+pub use crate::model::goal::MergeResult;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
@@ -33,13 +34,6 @@ pub struct GitChange {
 pub struct GitHeadRef {
     pub branch: Option<String>,
     pub commit: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MergeResult {
-    pub ok: bool,
-    pub conflicts: Vec<String>,
-    pub message: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -85,6 +79,7 @@ pub struct FileGitWorktreeService {
     pub root: PathBuf,
     pub runtime_root: Option<PathBuf>,
     operation_id: Option<String>,
+    process_metadata: Map<String, Value>,
 }
 
 impl FileGitWorktreeService {
@@ -93,6 +88,7 @@ impl FileGitWorktreeService {
             root: root.into(),
             runtime_root: None,
             operation_id: None,
+            process_metadata: Map::new(),
         }
     }
 
@@ -101,11 +97,17 @@ impl FileGitWorktreeService {
             root: root.into(),
             runtime_root: Some(runtime_root.into()),
             operation_id: None,
+            process_metadata: Map::new(),
         }
     }
 
     pub fn with_operation_id(mut self, operation_id: impl Into<String>) -> Self {
         self.operation_id = Some(operation_id.into());
+        self
+    }
+
+    pub fn with_process_metadata(mut self, metadata: Map<String, Value>) -> Self {
+        self.process_metadata = metadata;
         self
     }
 
@@ -274,6 +276,14 @@ impl FileGitWorktreeService {
         validate_commitish(commitish)?;
         stdout(self.git_output(&["rev-parse", "--verify", &format!("{commitish}^{{commit}}")])?)
             .map(|value| value.trim().to_string())
+    }
+
+    pub fn commit_is_ancestor(&self, ancestor: &str, descendant: &str) -> RefineResult<bool> {
+        validate_commitish(ancestor)?;
+        validate_commitish(descendant)?;
+        Ok(self
+            .git_raw(&["merge-base", "--is-ancestor", ancestor, descendant])?
+            .success)
     }
 
     pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
@@ -610,6 +620,16 @@ impl FileGitWorktreeService {
         }
         let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
         process_args.extend(args.iter().map(|arg| arg.to_string()));
+        let mut metadata = self.process_metadata.clone();
+        metadata.insert("kind".to_string(), json!("git"));
+        metadata.insert("isolated_process_group".to_string(), json!(true));
+        metadata.insert(
+            "git_command".to_string(),
+            json!(args.first().copied().unwrap_or("git")),
+        );
+        if let Some(operation_id) = self.operation_id.as_deref() {
+            metadata.insert("operation_id".to_string(), json!(operation_id));
+        }
         let output = FileProcessSupervisor::new(self.process_runtime_root()).run_to_completion(
             ManagedProcessSpec {
                 owner: ProcessOwner::Maintenance,
@@ -624,12 +644,7 @@ impl FileGitWorktreeService {
                 limits: None,
                 authorization_command: Some(format!("git {}", args.join(" "))),
                 sensitive: false,
-                metadata: serde_json::from_value(json!({
-                    "kind": "git",
-                    "git_command": args.first().copied().unwrap_or("git"),
-                    "operation_id": self.operation_id
-                }))
-                .unwrap_or_default(),
+                metadata,
             },
         )?;
         Ok(HostCommandOutput {
@@ -650,6 +665,10 @@ impl FileGitWorktreeService {
             .arg("-C")
             .arg(&self.root)
             .args(args)
+            // Read-only projection and inspection calls may overlap a serialized merge.
+            // Prevent commands such as `git status` from opportunistically refreshing the
+            // shared index and racing the integration owner's required index write.
+            .env("GIT_OPTIONAL_LOCKS", "0")
             .envs(env.iter().map(|(key, value)| (*key, *value)))
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
@@ -837,6 +856,7 @@ impl GitWorktreeService for FileGitWorktreeService {
             root: self.root_for(path),
             runtime_root: self.runtime_root.clone(),
             operation_id: self.operation_id.clone(),
+            process_metadata: self.process_metadata.clone(),
         };
         let root = stdout(service.git_output(&["rev-parse", "--show-toplevel"])?)?
             .trim()
@@ -1432,6 +1452,24 @@ mod tests {
         assert!(audit.contains("\"action\":\"revert\""));
         assert!(audit.contains("\"status\":\"ok\""));
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn read_only_inspection_does_not_contend_for_the_repository_index() {
+        let temp_root = unique_temp_dir("git-read-only-index");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "one\n", "initial");
+        fs::write(repo.join("app.txt"), "two\n").unwrap();
+
+        let index_lock = repo.join(".git/index.lock");
+        fs::write(&index_lock, "integration owner holds the index\n").unwrap();
+        let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
+        assert!(status.dirty_user_changes);
+
+        fs::remove_file(index_lock).unwrap();
         fs::remove_dir_all(temp_root).unwrap();
     }
 

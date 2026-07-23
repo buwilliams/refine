@@ -391,7 +391,9 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Walk a Goal's status backwards: done goes to review; review or cancelled goes to todo.
+    /// Walk a Goal's status backwards: done goes to review; cancelled goes to todo.
+    ///
+    /// To decline a reviewed Goal, submit a new auditable round instead.
     Undo {
         /// Goal id.
         id: String,

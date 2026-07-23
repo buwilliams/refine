@@ -9,9 +9,6 @@ const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
-  { value: "build", label: "build" },
-  { value: "review", label: "review" },
-  { value: "done", label: "done" },
   { value: "failed", label: "failed" },
   { value: "cancelled", label: "cancelled" },
 ];
@@ -67,8 +64,8 @@ async function openBulkModal(field) {
       </select>
       <p class="muted small" style="margin-top:6px">
         Last workflow state sends failed QA attempts back to qa, failed merge
-        attempts back to ready-merge, other failed or reviewable Goals back to todo, and leaves active
-        automation alone.
+        attempts back to ready-merge, other failed Goals back to todo, and leaves active
+        automation and Review alone. Decline Review by submitting a new round.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])

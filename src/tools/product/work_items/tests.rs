@@ -420,6 +420,26 @@ fn file_work_item_service_verifies_and_undoes_goal_workflow() {
         .create_goal_summary("Merge Goal", Some("GOAL1"))
         .unwrap();
     service
+        .append_goal_round_summary("GOAL1", "Implementer", "Initial implementation")
+        .unwrap();
+    service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({
+                "workflow_integration": {
+                    "candidate_commit": "candidate",
+                    "target_branch": "main",
+                    "target_commit": "target",
+                    "remote": "origin",
+                    "pushed": true,
+                    "integrated_at": "2026-07-23T12:00:00Z",
+                    "merge": {"ok": true, "conflicts": [], "message": "integrated"}
+                }
+            }),
+        )
+        .unwrap();
+    service
         .set_goal_status_unchecked("GOAL1", &GoalStatus::Review)
         .unwrap();
 
@@ -428,8 +448,24 @@ fn file_work_item_service_verifies_and_undoes_goal_workflow() {
 
     let undone = service.undo_goal_summary("GOAL1").unwrap();
     assert_eq!(undone.goal.status, GoalStatus::Review);
-    let undone = service.undo_goal_summary("GOAL1").unwrap();
-    assert_eq!(undone.goal.status, GoalStatus::Todo);
+    assert!(
+        service
+            .undo_goal_summary("GOAL1")
+            .unwrap_err()
+            .to_string()
+            .contains("submit a new round")
+    );
+    let revised = service
+        .append_goal_round_summary("GOAL1", "Reviewer", "Address review feedback")
+        .unwrap();
+    assert_eq!(revised.goal.status, GoalStatus::Todo);
+    assert_eq!(revised.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        detail["rounds"][0]["workflow_integration"]["candidate_commit"],
+        "candidate"
+    );
+    assert!(detail["rounds"][1]["workflow_integration"].is_null());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

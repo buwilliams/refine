@@ -196,7 +196,9 @@ Deprecated alias for approving a reviewed Goal
 
 ### `refine goal undo`
 
-Walk a Goal's status backwards: done goes to review; review or cancelled goes to todo
+Walk a Goal's status backwards: done goes to review; cancelled goes to todo.
+
+To decline a reviewed Goal, submit a new auditable round instead.
 
 - `<ID>` (required) — Goal id
 

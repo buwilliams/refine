@@ -40,6 +40,7 @@ fn agent_open_parses_goal_instances_and_singleton_profiles() {
     ));
 }
 use crate::model::log::LogEntry;
+use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor, managed_pid_is_alive,
@@ -1559,12 +1560,58 @@ fn goal_approve_and_undo_use_shared_file_work_item_service() {
     fs::write(worktree.join("approved.txt"), "approved\n").unwrap();
     run_git(&worktree, &["add", "approved.txt"]);
     run_git(&worktree, &["commit", "-m", "candidate"]);
+    let base_commit = run_git_stdout(&target_root, &["rev-parse", "main"]);
+    let candidate_commit = run_git_stdout(&worktree, &["rev-parse", "HEAD"]);
+    run_git(&target_root, &["merge", "--no-ff", "--no-edit", branch]);
+    let target_commit = run_git_stdout(&target_root, &["rev-parse", "HEAD"]);
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .append_goal_round_summary("GOAL1", "Buddy", "Implement")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .unwrap();
+    service
+        .update_goal_git_refs(
+            "GOAL1",
+            branch,
+            "main",
+            base_commit.trim(),
+            Some(candidate_commit.trim()),
+        )
+        .unwrap();
+    service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &serde_json::json!({
+                "workflow_quality_timing": "pre_merge",
+                "workflow_git_remote": "origin",
+                "workflow_integration": {
+                    "candidate_commit": candidate_commit.trim(),
+                    "target_branch": "main",
+                    "target_commit": target_commit.trim(),
+                    "remote": "origin",
+                    "pushed": false,
+                    "integrated_at": "2026-07-23T00:00:00Z",
+                    "merge": {"ok": true, "conflicts": [], "message": "test integration"}
+                }
+            }),
+        )
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Build)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Review)
+        .unwrap();
     let goal_path = refine_dir.join("goals/GO/AL1/goal.json");
-    let mut value: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&goal_path).unwrap()).unwrap();
-    value["status"] = serde_json::Value::String("review".to_string());
-    value["branch_name"] = serde_json::Value::String(branch.to_string());
-    fs::write(&goal_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
 
     dispatch(
         Cli::try_parse_from([
@@ -1616,6 +1663,22 @@ fn run_git(root: &std::path::Path, args: &[&str]) {
         args.join(" "),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+fn run_git_stdout(root: &std::path::Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 #[test]

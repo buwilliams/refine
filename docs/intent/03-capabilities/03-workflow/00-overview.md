@@ -11,7 +11,7 @@
 
 ## Purpose
 
-Workflow exists to move software work forward without turning each Goal into an ad hoc chat session. It gives Refine the ability to promote, claim, implement, quality-check, prepare for merge, build, review, retry, pause, resume, and recover work.
+Workflow exists to move software work forward without turning each Goal into an ad hoc chat session. It gives Refine the ability to promote, claim, implement, quality-check, integrate, optionally rebuild, review, retry, pause, resume, and recover work.
 
 The point is not scheduling for its own sake. The point is durable state advancement. Refine should know what can happen next, why it can happen, and which actor is responsible for doing it.
 
@@ -24,10 +24,10 @@ The workflow lifecycle is:
 - backlog: captured work waits until it is ready for action;
 - todo: actionable work becomes eligible for claiming;
 - in-progress: a node owns the active attempt and agents or processes act;
-- ready-merge: a reviewable change exists and needs handoff;
-- build: the target app is assembled or prepared when applicable;
-- qa: checks gather evidence that the work behaves as intended;
-- review: evidence and judgment decide whether the work is acceptable;
+- qa: checks gather evidence against the isolated candidate before integration or the integrated target after rebuild, according to the round's pinned Quality timing;
+- ready-merge: the merger-owned queue serializes exact candidate integration into the recorded target branch;
+- build: the integrated target app is rebuilt when configured, or records an explicit skip;
+- review: evidence and judgment accept or decline the already-integrated result;
 - done: the intended outcome is complete and evidence remains inspectable;
 - failed: the attempt did not complete, but evidence supports recovery;
 - cancelled: the work is intentionally stopped.

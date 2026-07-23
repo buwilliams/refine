@@ -3404,9 +3404,11 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         path: "/api/goals/GOAL1/verify".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(verified.status, 200);
-    assert_eq!(verified.body["ok"], true);
-    assert_eq!(verified.body["goal"]["status"], "done");
+    assert_eq!(verified.status, 400);
+    assert_eq!(
+        goal_actions.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Qa
+    );
 
     server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -3439,8 +3441,16 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         path: "/api/goals/GOAL4/submit-merge".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(submitted.status, 200);
-    assert_eq!(submitted.body["goal"]["status"], "ready-merge");
+    assert_eq!(submitted.status, 409);
+    assert!(
+        submitted.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("workflow-owned")
+    );
+    FileWorkItemService::new(&refine_dir)
+        .advance_automated_goal_status("GOAL4", GoalStatus::ReadyMerge)
+        .unwrap();
     let submitted_again = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals/GOAL4/submit-merge".to_string(),
@@ -7641,14 +7651,17 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         path: "/api/goals/GOAL3/rounds".to_string(),
         body: Some(json!({"reporter": "Bob", "prompt": "Works"})),
     });
-    server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/bulk".to_string(),
-        body: Some(json!({
-            "selected_ids": ["GOAL2"],
-            "update": {"status": "done"}
-        })),
-    });
+    // This dashboard fixture needs a historical terminal Goal. Product surfaces may only reach
+    // Done through reviewed integration approval, which is covered by the merger tests.
+    let done_goal_path = refine_dir.join("goals/GO/AL2/goal.json");
+    let mut done_goal: serde_json::Value =
+        serde_json::from_slice(&fs::read(&done_goal_path).unwrap()).unwrap();
+    done_goal["status"] = json!("done");
+    fs::write(
+        &done_goal_path,
+        format!("{}\n", serde_json::to_string_pretty(&done_goal).unwrap()),
+    )
+    .unwrap();
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals/bulk".to_string(),

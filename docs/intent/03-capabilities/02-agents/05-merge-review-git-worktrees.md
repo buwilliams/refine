@@ -6,7 +6,7 @@
 - **Review As Boundary**: review is a meaningful workflow state, not a decorative approval label.
 - **Worktree Isolation**: agent and standalone work should be isolated when that makes changes safer and easier to inspect.
 - **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Goal intent.
-- **Recoverable Handoff**: work should move from implementation to review to merge without losing context.
+- **Recoverable Handoff**: work should move from isolated implementation through integration and rebuild to acceptance without losing context.
 
 ## Purpose
 
@@ -19,9 +19,10 @@ Git is central because it is existing infrastructure users already trust. Refine
 This capability should connect workflow with the user's source repository:
 
 - implementation work can happen in an isolated branch or worktree;
-- ready-merge state should mean there is a reviewable change with enough evidence;
-- review should preserve human or agent judgment before final integration;
-- approval should integrate the isolated candidate and connect the result back to Goal and Feature intent;
+- ready-merge should be a serialized merger-owned queue with a reviewable exact candidate and enough evidence;
+- ready-merge should merge and push the isolated candidate exactly once before optionally rebuilding the composed target app;
+- review should preserve human or agent judgment over the integrated result;
+- approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;
 - standalone worktree output should be able to become structured ready-merge work.
 

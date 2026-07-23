@@ -791,7 +791,9 @@ impl InProcessWebServer {
                     )
                     .approve_reviewed_goal(goal_id)
                 }
-                Ok(_) => service.verify_goal_summary(goal_id),
+                Ok(_) => Err(RefineError::InvalidInput(
+                    "Goal approval is only available from review".to_string(),
+                )),
                 Err(error) => Err(error),
             },
             "merge" => {

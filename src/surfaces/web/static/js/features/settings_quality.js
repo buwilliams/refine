@@ -11,8 +11,8 @@ function renderSettingsQualityNodeSections(quality, settings = {}) {
       </p>
       <div class="form-row"><label>${renderSettingsGuideLabel("Quality timing", "quality-gate")}</label>
           <select id="s-quality-timing" aria-label="Quality timing" data-testid="quality-timing-select">
-            <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Quality before build</option>
-            <option value="post_build" ${qualityTiming === "post_build" ? "selected" : ""}>Quality after build</option>
+            <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Quality before Ready Merge</option>
+            <option value="post_build" ${qualityTiming === "post_build" ? "selected" : ""}>Quality after rebuild</option>
           </select>
       </div>
     </section>`;

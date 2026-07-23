@@ -17,6 +17,7 @@ use crate::model::workflow::{
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
     is_feature_protected_status, is_terminal_status, user_status_transition,
 };
+use crate::process::supervisor::coordination::{replace_file_durably, with_workflow_coordination};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -59,7 +60,9 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
     let allowed = matches!(
         (from, to),
         (GoalStatus::Todo, GoalStatus::InProgress)
+            | (GoalStatus::InProgress, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
+            | (GoalStatus::Qa, GoalStatus::ReadyMerge)
             | (GoalStatus::ReadyMerge, GoalStatus::Build)
             | (GoalStatus::ReadyMerge, GoalStatus::Qa)
             | (GoalStatus::Build, GoalStatus::Qa)
@@ -1329,7 +1332,8 @@ impl FileWorkItemService {
             };
             if !is_bulk_target_allowed(&status) {
                 return Err(RefineError::Conflict(
-                    "Bulk status updates cannot set in-progress, qa, or ready-merge".to_string(),
+                    "Bulk status updates cannot enter workflow-owned, review, or done states"
+                        .to_string(),
                 ));
             }
         }
@@ -1344,9 +1348,9 @@ impl FileWorkItemService {
             ));
         }
 
-        let skip_automated = field == "status" && raw_value != "__last_workflow_state";
+        let skip_workflow_owned = field == "status";
         let (goals, skipped_details) =
-            self.select_bulk_goal_summaries(&selection, skip_automated)?;
+            self.select_bulk_goal_summaries(&selection, skip_workflow_owned)?;
         let mut ids = Vec::new();
         for goal in goals {
             self.ensure_goal_owned(&goal)?;
@@ -1808,7 +1812,10 @@ impl FileWorkItemService {
         }
     }
 
-    pub fn verify_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+    pub(in crate::tools::product) fn verify_goal_summary(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::VerifyReview)?;
         self.set_goal_status_unchecked(goal_id, &GoalStatus::Done)?;
@@ -1837,20 +1844,28 @@ impl FileWorkItemService {
         if current.goal.status == GoalStatus::ReadyMerge {
             return Ok(current);
         }
-        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitMerge)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::ReadyMerge)?;
-        self.show_goal_summary(goal_id)
+        Err(RefineError::Conflict(
+            "Ready Merge is workflow-owned; queue or retry the Goal through its current stage"
+                .to_string(),
+        ))
     }
 
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
+        if current.goal.status == GoalStatus::Review {
+            return Err(RefineError::InvalidInput(
+                "submit a new round to decline review and preserve the integration history"
+                    .to_string(),
+            ));
+        }
         validate_goal_operation(&current.goal.status, &GoalOperation::Undo)?;
         let target = match current.goal.status {
             GoalStatus::Done => GoalStatus::Review,
-            GoalStatus::Review | GoalStatus::Cancelled => GoalStatus::Todo,
+            GoalStatus::Cancelled => GoalStatus::Todo,
             _ => {
                 return Err(RefineError::InvalidInput(
-                    "Goal undo is only available from done, review, or cancelled".to_string(),
+                    "Goal undo is only available from done or cancelled; submit a new round to decline review"
+                        .to_string(),
                 ));
             }
         };
@@ -2503,6 +2518,8 @@ impl FileWorkItemService {
             "quality_details",
             "quality_checked_at",
             "workflow_quality_timing",
+            "workflow_git_remote",
+            "workflow_integration",
         ] {
             if let Some(value) = fields.get(key) {
                 round.insert(key.to_string(), value.clone());
@@ -2800,7 +2817,7 @@ impl FileWorkItemService {
     fn select_bulk_goal_summaries(
         &self,
         selection: &BulkGoalSelection,
-        skip_automated: bool,
+        skip_workflow_owned: bool,
     ) -> RefineResult<(Vec<GoalSummaryProjection>, Vec<BulkSkippedDetail>)> {
         let excluded: BTreeSet<_> = selection
             .exclude_ids
@@ -2827,12 +2844,17 @@ impl FileWorkItemService {
         };
         goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));
         let mut skipped_details = Vec::new();
-        if skip_automated {
+        if skip_workflow_owned {
             let mut retained = Vec::new();
             for goal in goals {
                 if matches!(
                     goal.goal.status,
-                    GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge
+                    GoalStatus::InProgress
+                        | GoalStatus::Qa
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Review
+                        | GoalStatus::Done
                 ) {
                     skipped_details.push(BulkSkippedDetail {
                         id: goal.goal.id,
@@ -3241,29 +3263,81 @@ fn feature_json_path(refine_dir: &std::path::Path, feature_id: &str) -> PathBuf 
 }
 
 fn write_json_atomically(path: &std::path::Path, value: &Value) -> RefineResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create Goal directory {}: {error}",
-                parent.display()
+    let coordination_root = workflow_record_root(path);
+    with_workflow_coordination(&coordination_root, || {
+        let expected_revision = workflow_revision(value);
+        let current = match fs::read(path) {
+            Ok(bytes) => Some(serde_json::from_slice::<Value>(&bytes).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse current workflow record {}: {error}",
+                    path.display()
+                ))
+            })?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read current workflow record {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        match current.as_ref() {
+            Some(current) if workflow_revision(current) != expected_revision => {
+                return Err(RefineError::Conflict(format!(
+                    "workflow record {} changed after it was read (expected revision {}, current revision {})",
+                    path.display(),
+                    expected_revision,
+                    workflow_revision(current)
+                )));
+            }
+            Some(_) => {}
+            None if expected_revision != 0 => {
+                return Err(RefineError::Conflict(format!(
+                    "workflow record {} was removed after it was read",
+                    path.display()
+                )));
+            }
+            None => {}
+        }
+
+        let mut next = value.clone();
+        let object = next.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "workflow record {} is not a JSON object",
+                path.display()
             ))
         })?;
-    }
-    let temp_path = path.with_extension("json.tmp");
-    let encoded = serde_json::to_vec_pretty(value)
-        .map_err(|error| RefineError::Serialization(format!("failed to encode JSON: {error}")))?;
-    fs::write(&temp_path, encoded).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to write temp file {}: {error}",
-            temp_path.display()
-        ))
-    })?;
-    fs::rename(&temp_path, path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to commit JSON file {}: {error}",
-            path.display()
-        ))
+        object.insert(
+            "workflow_revision".to_string(),
+            Value::from(expected_revision.saturating_add(1)),
+        );
+        let encoded = serde_json::to_vec_pretty(&next).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode workflow JSON: {error}"))
+        })?;
+        replace_file_durably(path, &encoded)
     })
+}
+
+pub(crate) fn workflow_revision(value: &Value) -> u64 {
+    value
+        .get("workflow_revision")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+}
+
+fn workflow_record_root(path: &std::path::Path) -> PathBuf {
+    for ancestor in path.ancestors() {
+        if matches!(
+            ancestor.file_name().and_then(|name| name.to_str()),
+            Some("goals" | "features")
+        ) {
+            return ancestor
+                .parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| path.parent().unwrap_or(path).to_path_buf());
+        }
+    }
+    path.parent().unwrap_or(path).to_path_buf()
 }
 
 fn new_ulid_like() -> String {

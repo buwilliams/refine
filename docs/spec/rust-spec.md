@@ -402,10 +402,11 @@ Properties:
 - `AutomatedGoalStatus`: `in-progress`, `qa`, `ready-merge`, and
   `build`.
 - `UserStatusTransition`: currently `backlog -> todo`, `todo -> backlog`,
-  `review -> todo`, `done -> review`, `failed -> todo`, and
-  `cancelled -> todo`; same-status updates are no-ops.
-- `BulkStatusTarget`: any Goal status except `in-progress`, `qa`, and
-  `ready-merge`, plus the special `__last_workflow_state` restore operation.
+  `done -> review`, `failed -> todo`, and `cancelled -> todo`; same-status
+  updates are no-ops. Declining review submits a new auditable round.
+- `BulkStatusTarget`: `backlog`, `todo`, `failed`, or `cancelled`, plus the
+  special `__last_workflow_state` restore operation. Status updates skip
+  workflow-owned and acceptance-complete Goals.
 - `FeatureWorkflowTarget`: `backlog` or `todo`.
 - `FeatureProtectedStatus`: `review`, `done`, `ready-merge`, and
   `build`.

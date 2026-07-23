@@ -1,5 +1,4 @@
 use serde_json::{Value, json};
-use std::path::Path;
 
 use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
@@ -12,6 +11,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::{POST_BUILD, QualityCheckResult, QualityOperationRunner};
 use crate::tools::host::target_apps::FileTargetAppService;
+use crate::tools::product::merging::FileMergerService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
@@ -244,7 +244,10 @@ impl WorkflowBehavior for WorkflowImplementation {
             return fail(ctx, "governance", error);
         }
 
-        let remote = setting_string(&ctx.settings, "git_remote", "origin");
+        let remote = match ctx.git_remote() {
+            Ok(remote) => remote,
+            Err(error) => return fail(ctx, "git", error),
+        };
         if worktree_git.remote_exists(&remote)? {
             if let Err(error) =
                 with_repository_git_lock(ctx.target_root, || worktree_git.push(&remote, &branch))
@@ -266,10 +269,15 @@ impl WorkflowBehavior for WorkflowImplementation {
         ctx.provider_output = Some(provider_output);
         ctx.implementation_changed = commit.has_changes_since_base;
         ctx.commit = Some(commit.commit);
-        ctx.request_transition(GoalStatus::InProgress, GoalStatus::ReadyMerge)?;
+        let next = match ctx.quality_timing(GoalStatus::InProgress) {
+            Ok(timing) if timing == POST_BUILD => GoalStatus::ReadyMerge,
+            Ok(_) => GoalStatus::Qa,
+            Err(error) => return fail(ctx, "quality", error),
+        };
+        ctx.request_transition(GoalStatus::InProgress, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::InProgress,
-            to: GoalStatus::ReadyMerge,
+            to: next,
             reason: "Implementation completed".to_string(),
         })
     }
@@ -290,15 +298,14 @@ impl WorkflowBehavior for WorkflowQa {
                 ctx,
                 "quality",
                 RefineError::Conflict(
-                    "quality checks failed; the isolated candidate was preserved for recovery"
-                        .to_string(),
+                    "quality checks failed; evidence was preserved for recovery".to_string(),
                 ),
             );
         }
         let next = if ctx.quality_timing(GoalStatus::Qa)? == POST_BUILD {
             GoalStatus::Review
         } else {
-            GoalStatus::Build
+            GoalStatus::ReadyMerge
         };
         ctx.request_transition(GoalStatus::Qa, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
@@ -316,21 +323,56 @@ impl WorkflowBehavior for WorkflowReadyMerge {
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
-        ctx.log(
-            "review",
-            &format!("Prepared implementation candidate {branch} for validation"),
-            Some(json_object(json!({"branch": branch}))),
-        )?;
-        let next = if ctx.quality_timing(GoalStatus::ReadyMerge)? == POST_BUILD {
-            GoalStatus::Build
-        } else {
-            GoalStatus::Qa
+        let commit = ctx.require_commit()?.to_string();
+        let remote = ctx.git_remote()?;
+        let timing = ctx.quality_timing(GoalStatus::ReadyMerge)?;
+        let next = GoalStatus::Build;
+        let merger = FileMergerService::with_target_root(
+            ctx.runtime_root,
+            ctx.refine_dir(),
+            ctx.target_root,
+        );
+        let goal_id = ctx.goal_id.clone();
+        let claim_id = ctx.claim_id.clone();
+        let execution_id = ctx.execution_id.clone();
+        let node_id = ctx.node_id.clone();
+        let round_idx = ctx.round_idx;
+        let integration = match merger.integrate_workflow_candidate_and_settle(
+            &goal_id,
+            round_idx,
+            &claim_id,
+            &execution_id,
+            &node_id,
+            &branch,
+            &commit,
+            &remote,
+            |integration| {
+                ctx.log(
+                    "merge",
+                    &format!("Ready Merge integrated implementation candidate {branch}"),
+                    Some(json_object(json!({
+                        "branch": branch,
+                        "quality_timing": timing,
+                        "integration": integration
+                    }))),
+                )?;
+                ctx.request_transition(GoalStatus::ReadyMerge, next.clone())
+            },
+        ) {
+            Ok((integration, _)) => integration,
+            Err(error)
+                if error.to_string().contains("Ready Merge execution")
+                    && error.to_string().contains("was cancelled") =>
+            {
+                return Err(error);
+            }
+            Err(error) => return fail(ctx, "merge", error),
         };
-        ctx.request_transition(GoalStatus::ReadyMerge, next.clone())?;
+        ctx.merge = Some(integration.merge);
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::ReadyMerge,
             to: next,
-            reason: "Implementation candidate is ready for validation".to_string(),
+            reason: "Ready Merge integrated the implementation candidate".to_string(),
         })
     }
 }
@@ -341,9 +383,8 @@ impl WorkflowBehavior for WorkflowBuild {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        let candidate_root = Path::new(ctx.require_worktree_path()?);
         let target_app =
-            FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, candidate_root);
+            FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
         let build = match target_app
             .build_with_metadata(ctx.workflow_process_metadata("build", "WorkflowBuild"))
         {
@@ -359,10 +400,19 @@ impl WorkflowBehavior for WorkflowBuild {
             }
             Err(error) => return fail(ctx, "build", error),
         };
+        let skipped = build.last_operation.is_none();
         ctx.log(
             "build",
-            "Target app build passed",
-            Some(json_object(json!({"target_app": &build}))),
+            if skipped {
+                "Target app rebuild skipped"
+            } else {
+                "Target app rebuild passed"
+            },
+            Some(json_object(json!({
+                "target_app": &build,
+                "skipped": skipped,
+                "checkout": ctx.target_root.display().to_string()
+            }))),
         )?;
         let next = if ctx.quality_timing(GoalStatus::Build)? == POST_BUILD {
             GoalStatus::Qa
@@ -373,7 +423,11 @@ impl WorkflowBehavior for WorkflowBuild {
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Build,
             to: next,
-            reason: "Target app build passed".to_string(),
+            reason: if skipped {
+                "Target app rebuild was not configured".to_string()
+            } else {
+                "Target app rebuild passed".to_string()
+            },
         })
     }
 }

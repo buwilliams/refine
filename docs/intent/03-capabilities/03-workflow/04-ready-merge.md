@@ -2,17 +2,17 @@
 
 ## Key Ideas
 
-- **Reviewable Change**: ready-merge means work produced a change that can be inspected.
+- **Integration Queue**: ready-merge is the merger-owned queue for exact candidate integration.
 - **Evidence Handoff**: diffs, logs, quality output, and agent notes should travel with the Goal.
 - **Not Done Yet**: ready-merge is a handoff state, not completion.
 
 ## Purpose
 
-Ready-merge exists because implementation and integration are different responsibilities. Agents may produce changes, but Refine needs a state where those changes can be reviewed, checked, and prepared for merge.
+Ready-merge exists because implementation and integration are different responsibilities. Agents may produce changes in isolation, but Refine needs a state where those changes are integrated before the target app is rebuilt and the result is reviewed.
 
 ## Expected Role
 
-Ready-merge should connect the Goal to its Git branch or worktree, changed files, quality evidence, logs, and review context. It should make the next action obvious: inspect, build, QA, review, merge, request more work, or fail.
+Ready-merge should connect the Goal to its Git branch or worktree, exact candidate commit, recorded base and target branch, pinned remote, quality evidence, logs, and review context. It serializes integration; it is not a candidate-preparation label.
 
 This state is especially important for standalone and agent-generated work because it preserves handoff without losing the isolated change context.
 
@@ -22,9 +22,12 @@ When a Goal is ready-merge:
 
 - Refine has a reviewable change, usually in a branch or worktree.
 - The Goal should point to changed files, commits or diff context, agent output, logs, and source evidence.
-- The system prepares the work for build, QA, review, merge, or a new round.
+- Refine integrates the exact candidate under the repository coordination boundary after any configured pre-merge Quality checks.
+- Successful merge and push evidence is durable before the Goal advances. A retry or restart proves existing integration instead of merging or pushing the candidate twice.
+- Rebuild runs against the integrated target checkout when configured; otherwise Refine records an explicit skip.
+- Post-build Quality runs against the exact integrated target commit after rebuild, so review reflects the composed target app rather than only an isolated candidate.
 - Users and agents can inspect the change without losing the Goal's original intent.
-- If the handoff is incomplete, conflicted, or unsafe, the Goal should move to failed or request more work rather than pretending it is complete.
+- Conflicts, stale candidates, ownership or revision races, and push failures preserve the candidate and evidence and use the failed/retry path rather than advancing.
 
 ## Future Direction
 
