@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:44:20Z",
+  "updated_at": "2026-07-23T14:44:40Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1068,6 +1068,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance failed the candidate; I’m preserving that failure rather than treating the test report as approval. I’m extracting the exact violations now to determine whether a narrow, auditable recovery already exists."
+    },
+    {
+      "created_at": "2026-07-23T14:44:40Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817880391-208",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failure is narrow enough to recover without expanding scope: four specific Governance violations, all inside the existing stop/cancellation capability. I’m recording a fourth supported recovery round that preserves every prior candidate and requires real workflow-worker and cleanup-failure evidence."
     }
   ],
   "queued_messages": [
