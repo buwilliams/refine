@@ -137,20 +137,6 @@ function updatePageTitle(nodeLabel) {
   document.title = label && label !== "none" ? `${label} - refine` : "refine";
 }
 
-function updateNavReporterContext() {
-  const el = document.getElementById("nav-context-reporter-summary");
-  if (!el) return;
-  el.textContent = state.lastReporter || "No reporter";
-  el.title = el.textContent;
-}
-
-function updateNavAppContextLabel(label) {
-  const el = document.getElementById("nav-context-app-summary");
-  if (!el) return;
-  el.textContent = label || "Application";
-  el.title = el.textContent;
-}
-
 function hasAttachedProject() {
   return state.project?.attached === true;
 }
@@ -164,7 +150,6 @@ function clearProjectScopedUiState() {
   setLastReporter("");
   populateAllReporterDropdowns();
   updateActiveNodeLabel();
-  updateNavAppContextLabel("No app");
   if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
   if (typeof resetSourceUpdateNav === "function") resetSourceUpdateNav();
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
@@ -1522,7 +1507,6 @@ function populateAllReporterDropdowns() {
     const stillValid = state.reporters.some((r) => r.name === current);
     sel.value = stillValid ? current : "";
   }
-  updateNavReporterContext();
 }
 
 async function handleReporterAdd(sel) {
@@ -1552,7 +1536,6 @@ function setLastReporter(name) {
   else localStorage.removeItem("refine_last_reporter");
   const g = $("#global-reporter");
   if (g) g.value = name;
-  updateNavReporterContext();
   // Keep any in-page "Submitting as X" indicator in sync without re-rendering
   // the form (which would lose the user's typed-but-unsubmitted text).
   for (const el of $$(".js-reporter-name")) el.textContent = name;

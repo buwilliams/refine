@@ -418,6 +418,62 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
 }
 
 #[test]
+fn static_main_nav_consolidates_context_and_controls() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let target_app = fs::read_to_string(static_root.join("js/target-app.js")).unwrap();
+    let releases =
+        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+
+    let menu_start = index
+        .find(r#"<details class="nav-menu nav-context-menu" id="nav-context-menu">"#)
+        .expect("controls menu should exist");
+    let menu_end = menu_start
+        + index[menu_start..]
+            .find("</details>")
+            .expect("controls menu should close")
+        + "</details>".len();
+    let menu = &index[menu_start..menu_end];
+    let summary_end = menu
+        .find("</summary>")
+        .expect("controls summary should close");
+    let summary = &menu[..summary_end];
+
+    assert!(summary.contains(r#"aria-label="Open controls""#));
+    assert!(summary.contains(r#"class="nav-context-icon""#));
+    assert!(summary.contains("<span>Controls</span>"));
+    assert!(!summary.contains("target-app-dot"));
+    assert!(!summary.contains("context-app-name"));
+    assert!(!summary.contains("context-reporter-name"));
+
+    for control_id in [
+        r#"id="target-app-indicator""#,
+        r#"id="global-reporter""#,
+        r#"id="agent-status-indicator""#,
+        r#"id="btn-source-update""#,
+        r#"id="btn-command-palette""#,
+        r#"id="btn-refine-issue""#,
+    ] {
+        assert!(
+            menu.contains(control_id),
+            "{control_id} should be inside the controls menu"
+        );
+        assert_eq!(
+            index.matches(&format!(" {control_id}")).count(),
+            1,
+            "{control_id} should only appear once"
+        );
+    }
+
+    assert!(menu.contains(r#"class="nav-control-status target-app-state""#));
+    assert!(menu.contains(r#"class="nav-control-status agent-status-label""#));
+    assert!(menu.contains(r#"class="nav-control-status nav-source-update-status""#));
+    assert!(target_app.contains(r#"querySelector(".target-app-state")"#));
+    assert!(target_app.contains(r#"`${statusLabel} · ${agentCount}`"#));
+    assert!(releases.contains(r#"querySelector(".nav-source-update-status")"#));
+}
+
+#[test]
 fn source_update_status_integration_drives_browser_states_across_reconnect() {
     use crate::tools::host::source_promotion::{
         SOURCE_PROMOTION_STATE_FILE, SourcePromotionOperation,
