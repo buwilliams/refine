@@ -58,14 +58,16 @@ pub fn process_summary_value_with_chat_sessions(
     let pause_state = supervisor.pause_state()?;
     let mut process_values = Vec::new();
     let mut seen_process_ids = BTreeSet::new();
-    for process in supervisor.recover()? {
-        if !seen_process_ids.insert(process.id.clone()) {
-            continue;
-        }
-        let mut value = process.api_json();
-        apply_process_management_actions(&mut value, &pause_state);
-        if is_current_process_api_value(&value) {
-            process_values.push(value);
+    for process_root in managed_process_roots(runtime_root) {
+        for process in FileProcessSupervisor::new(process_root).recover()? {
+            if !seen_process_ids.insert(process.id.clone()) {
+                continue;
+            }
+            let mut value = process.api_json();
+            apply_process_management_actions(&mut value, &pause_state);
+            if is_current_process_api_value(&value) {
+                process_values.push(value);
+            }
         }
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
@@ -81,6 +83,10 @@ pub fn process_summary_value_with_chat_sessions(
             "process_model": "supervisor"
         }
     }))
+}
+
+fn managed_process_roots(runtime_root: &Path) -> [PathBuf; 2] {
+    [runtime_root.to_path_buf(), runtime_root.join("agents")]
 }
 
 pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {

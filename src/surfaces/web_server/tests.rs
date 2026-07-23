@@ -5596,6 +5596,22 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             exit_code: None,
         })
         .unwrap();
+    FileProcessSupervisor::new(runtime_root.join("agents"))
+        .register(ManagedProcess {
+            id: "background-agent-context".to_string(),
+            owner: crate::process::subprocess::ProcessOwner::Agent,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("Background agent context".to_string()),
+            details: Some(json!({"goal_id": "GOALBACKGROUND", "round_idx": 0}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
     supervisor
         .register(ManagedProcess {
             id: "chat-context".to_string(),
@@ -5710,6 +5726,17 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(agent_context["goal_id"], "GOALCTX");
     assert_eq!(agent_context["round_idx"], 1);
     assert_eq!(agent_context["management_actions"], json!(["cancel_agent"]));
+    let background_agent_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == "background-agent-context")
+        .unwrap();
+    assert_eq!(background_agent_context["kind"], "agent");
+    assert_eq!(background_agent_context["goal_id"], "GOALBACKGROUND");
+    assert_eq!(background_agent_context["round_idx"], 0);
+    assert_eq!(
+        background_agent_context["management_actions"],
+        json!(["cancel_agent"])
+    );
     let chat_context = listed_processes
         .iter()
         .find(|process| process["id"] == "chat-context")
@@ -5813,8 +5840,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         body: None,
     });
     assert_eq!(summary.status, 200);
-    assert_eq!(summary.body["agent_count"], 2);
-    assert_eq!(summary.body["process_count"], 7);
+    assert_eq!(summary.body["agent_count"], 3);
+    assert_eq!(summary.body["process_count"], 8);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))

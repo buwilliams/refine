@@ -190,7 +190,8 @@ function isCurrentSubprocessRecord(proc = {}) {
 }
 
 function isAgentProviderProcessRecord(proc = {}) {
-  return new Set(["agent", "chat"]).has(proc.kind);
+  return new Set(["agent", "chat"]).has(proc.kind)
+    || (proc.kind === "interactive_session" && !!proc.provider);
 }
 
 function isCurrentAgentProviderProcessRecord(proc = {}) {
@@ -321,6 +322,7 @@ function renderManagedProcessLabel(proc, rawLabel) {
 
 function renderAgentProcessRow(proc, anchorMs) {
   const kind = proc.kind || "agent";
+  const interactive = kind === "interactive_session";
   const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
   const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
     ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
@@ -337,6 +339,10 @@ function renderAgentProcessRow(proc, anchorMs) {
     ? proc.goal_id
       ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
       : "standalone"
+    : interactive
+    ? proc.goal_id
+      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
+      : htmlEscape(proc.profile || proc.role || "interactive")
     : proc.round_idx != null
     ? String(Number(proc.round_idx) + 1)
     : "";
