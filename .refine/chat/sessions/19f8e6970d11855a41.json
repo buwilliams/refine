@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:10:33Z",
+  "updated_at": "2026-07-23T11:11:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -528,20 +528,50 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Refine’s independent pipeline has now settled Round 2 at `review`: Governance passed and Quality is recorded as passed. I’m doing the final boundary checks now—whether Quality was substantive or a no-op, whether the candidate was published, whether it remains unmerged, and whether daemon/UI/Git health stayed intact."
-    }
-  ],
-  "queued_messages": [
+    },
     {
-      "id": "qm-19f8e9f28892ca64a0",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 1 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3KJDDGGCK29J4N4Y001\": \"review\", \"00000SZ3N803TK00E78AK4M000\": \"todo\", \"00000SZ3NBF861H3VJPTK4M001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
-      "created_at": "2026-07-23T10:57:03Z",
-      "updated_at": "2026-07-23T11:10:33Z",
-      "internal": true
+      "created_at": "2026-07-23T11:11:09Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805069810-22",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Goal `00000SZ3KJDDGGCK29J4N4Y001` is ready for human review; I did not merge it.\n\n- Candidate `8978757e` is published, clean, and not in `main`.\n- Governance passed all 8 rules.\n- Agent verification passed: 453 Rust tests, 32 browser tests, focused API/CLI process tests, formatting, assets, and diff checks.\n- Quality’s “passed” result was a no-op: no Quality tests were configured.\n- Daemon and UI are healthy; HTTP returned 200; `main` matches `origin/main`.\n- The other two review Goals became `done` externally while I observed; I did not approve them.\n\nOne new issue requires your authority: Goal `00000SZ3N803TK00E78AK4M000` was cancelled and returned to `todo`, but its original agent process `goal-agent-1a15fe6b-7ef5-49e4-948b-aebf2e1fac7c` is still running with stale `in-progress` metadata. Its worktree is currently clean. I left the process and worktree untouched.\n\nDo you authorize sending that process Refine’s normal `terminate` action?"
+    },
+    {
+      "created_at": "2026-07-23T11:11:09Z",
+      "delivered": false,
+      "id": "evt-1784805069999-24",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Goal `00000SZ3KJDDGGCK29J4N4Y001` is ready for human review; I did not merge it.\n\n- Candidate `8978757e` is published, clean, and not in `main`.\n- Governance passed all 8 rules.\n- Agent verification passed: 453 Rust tests, 32 browser tests, focused API/CLI process tests, formatting, assets, and diff checks.\n- Quality’s “passed” result was a no-op: no Quality tests were configured.\n- Daemon and UI are healthy; HTTP returned 200; `main` matches `origin/main`.\n- The other two review Goals became `done` externally while I observed; I did not approve them.\n\nOne new issue requires your authority: Goal `00000SZ3N803TK00E78AK4M000` was cancelled and returned to `todo`, but its original agent process `goal-agent-1a15fe6b-7ef5-49e4-948b-aebf2e1fac7c` is still running with stale `in-progress` metadata. Its worktree is currently clean. I left the process and worktree untouched.\n\nDo you authorize sending that process Refine’s normal `terminate` action?"
+    },
+    {
+      "created_at": "2026-07-23T11:11:09Z",
+      "delivered": false,
+      "id": "evt-1784805069999-25",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T11:11:10Z",
+      "delivered": false,
+      "id": "evt-1784805070016-27",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
     }
   ],
   "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
-  "interrupted": true,
-  "interruption_detail": "Daemon restarted before the provider turn completed."
+  "interrupted": false,
+  "interruption_detail": null
 }
