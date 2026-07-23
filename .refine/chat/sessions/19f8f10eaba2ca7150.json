@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:09:52Z",
+  "updated_at": "2026-07-23T13:10:56Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -180,9 +180,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "No intervention is currently authorized or needed: the daemon and workflow runner are healthy, the three agents are consuming CPU and updating their logs, and one UI Goal already has scoped edits. The stored supervisor issue (“Goal Agent exited unsuccessfully: 1”) is historical evidence from an earlier round, so I’m preserving it but not misclassifying the current workers as lost. I’ll watch for a real state transition, explicit input request, provider failure, or process disappearance."
+    },
+    {
+      "created_at": "2026-07-23T13:10:55Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812255952-36",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No intervention is actionable now.\n\n- All three Goals remain `in-progress`, each with a live workflow-owned Codex process and preserved worktree.\n- `00000SZ3RN…` has active scoped UI edits; the other agents are still working but have not recorded new candidates.\n- Daemon, workflow runner, API, and primary `main` checkout are healthy; `main` is clean and aligned with `origin/main`.\n- Degraded evidence remains visible: an earlier Goal-agent exit and an interrupted-operation recovery marker. Neither currently indicates worker loss.\n- No retry, cancellation, merge, approval, state edit, or worktree cleanup was performed. No user authority is presently required."
+    },
+    {
+      "created_at": "2026-07-23T13:10:56Z",
+      "delivered": false,
+      "id": "evt-1784812256293-38",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No intervention is actionable now.\n\n- All three Goals remain `in-progress`, each with a live workflow-owned Codex process and preserved worktree.\n- `00000SZ3RN…` has active scoped UI edits; the other agents are still working but have not recorded new candidates.\n- Daemon, workflow runner, API, and primary `main` checkout are healthy; `main` is clean and aligned with `origin/main`.\n- Degraded evidence remains visible: an earlier Goal-agent exit and an interrupted-operation recovery marker. Neither currently indicates worker loss.\n- No retry, cancellation, merge, approval, state edit, or worktree cleanup was performed. No user authority is presently required."
+    },
+    {
+      "created_at": "2026-07-23T13:10:56Z",
+      "delivered": false,
+      "id": "evt-1784812256293-39",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
