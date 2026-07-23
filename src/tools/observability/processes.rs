@@ -40,9 +40,32 @@ impl FileProcessStatusService {
         process_summary_value_with_chat_sessions(&self.runtime_root, self.refine_dir.as_deref())
     }
 
+    pub fn stream(&self, process_id: &str) -> RefineResult<String> {
+        self.resolve(process_id, |supervisor| supervisor.stream(process_id))
+    }
+
     pub fn stop(&self, process_id: &str, signal: &str) -> RefineResult<ManagedProcess> {
+        self.resolve(process_id, |supervisor| {
+            supervisor.signal(process_id, signal)
+        })
+    }
+
+    fn resolve<T>(
+        &self,
+        process_id: &str,
+        operation: impl Fn(&FileProcessSupervisor) -> RefineResult<T>,
+    ) -> RefineResult<T> {
         validate_process_id(process_id)?;
-        FileProcessSupervisor::new(&self.runtime_root).signal(process_id, signal)
+        for process_root in managed_process_roots(&self.runtime_root) {
+            match operation(&FileProcessSupervisor::new(process_root)) {
+                Ok(value) => return Ok(value),
+                Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Err(RefineError::NotFound(format!(
+            "Process {process_id} was not found"
+        )))
     }
 }
 
@@ -386,7 +409,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
 }
 
 fn validate_process_id(process_id: &str) -> RefineResult<()> {
-    if process_id.trim().is_empty() || process_id.contains('/') {
+    if process_id.trim().is_empty() || process_id.contains(['/', '\\']) {
         return Err(RefineError::InvalidInput(
             "process id is required".to_string(),
         ));

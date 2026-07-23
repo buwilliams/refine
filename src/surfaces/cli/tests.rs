@@ -1237,7 +1237,7 @@ fn connect_to_cli_test_daemon(port: u16) -> std::net::TcpStream {
 }
 
 #[test]
-fn system_ps_lists_and_stops_supervised_processes() {
+fn system_ps_lists_and_stops_nested_agent_processes() {
     let temp_root = unique_temp_dir("cli-system-ps");
     let runtime_root = temp_root.join("run");
     let port = 19091;
@@ -1246,6 +1246,7 @@ fn system_ps_lists_and_stops_supervised_processes() {
     }
     .port_root(port);
     let supervisor = FileProcessSupervisor::new(&port_root);
+    let agent_supervisor = FileProcessSupervisor::new(port_root.join("agents"));
     supervisor
         .register(ManagedProcess {
             id: "running-helper".to_string(),
@@ -1262,9 +1263,9 @@ fn system_ps_lists_and_stops_supervised_processes() {
             exit_code: None,
         })
         .unwrap();
-    let stoppable = supervisor
+    let stoppable = agent_supervisor
         .launch(ManagedProcessSpec {
-            owner: ProcessOwner::UserHelper,
+            owner: ProcessOwner::Agent,
             command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
             args: if cfg!(windows) {
                 vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
@@ -1277,7 +1278,10 @@ fn system_ps_lists_and_stops_supervised_processes() {
             limits: None,
             authorization_command: None,
             sensitive: false,
-            metadata: Default::default(),
+            metadata: serde_json::Map::from_iter([(
+                "goal_id".to_string(),
+                serde_json::json!("GOAL-NESTED"),
+            )]),
         })
         .unwrap();
 
@@ -1298,6 +1302,16 @@ fn system_ps_lists_and_stops_supervised_processes() {
             .any(|process| process["id"] == "running-helper"
                 && process["details"] == "{\"kind\":\"ui\"}")
     );
+    assert!(
+        listed["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|process| process["id"] == stoppable.id
+                && process["kind"] == "agent"
+                && process["goal_id"] == "GOAL-NESTED"
+                && process["port"] == port)
+    );
 
     let stopped = system_ps_response(
         runtime_root.clone(),
@@ -1308,7 +1322,24 @@ fn system_ps_lists_and_stops_supervised_processes() {
     .unwrap();
     assert_eq!(stopped["stopped"], true);
     assert_eq!(stopped["process"]["id"], stoppable.id);
-    assert!(supervisor.inspect(&stoppable.id).is_err());
+    assert_eq!(stopped["process"]["status"], "stopped");
+    assert!(agent_supervisor.inspect(&stoppable.id).is_err());
+
+    let missing = system_ps_response(
+        runtime_root.clone(),
+        Some(port),
+        Some(&stoppable.id),
+        "terminate",
+    )
+    .unwrap_err();
+    assert!(
+        matches!(
+            &missing,
+            crate::process::supervisor::errors::RefineError::NotFound(message)
+                if message.contains(&stoppable.id)
+        ),
+        "{missing}"
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -5993,6 +5993,88 @@ fn web_server_lists_processes_and_updates_pause_controls() {
 }
 
 #[test]
+fn web_server_resolves_nested_agent_process_stream_stop_and_not_found() {
+    let temp_root = unique_temp_dir("http-nested-agent-process");
+    let runtime_root = temp_root.join("run/8080");
+    let agent_supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let stdout_path = runtime_root.join("agents/processes/nested-agent.stdout.log");
+    let stderr_path = runtime_root.join("agents/processes/nested-agent.stderr.log");
+    fs::create_dir_all(stdout_path.parent().unwrap()).unwrap();
+    fs::write(&stdout_path, "nested agent stdout\n").unwrap();
+    fs::write(&stderr_path, "nested agent stderr\n").unwrap();
+    agent_supervisor
+        .register(ManagedProcess {
+            id: "nested-agent".to_string(),
+            owner: ProcessOwner::Agent,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("Nested agent".to_string()),
+            details: Some(json!({"goal_id": "GOAL-NESTED"}).to_string()),
+            stdout_path: Some(stdout_path.display().to_string()),
+            stderr_path: Some(stderr_path.display().to_string()),
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root);
+
+    let stream = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/processes/nested-agent/stream".to_string(),
+        body: None,
+    });
+    assert_eq!(stream.status, 200, "{}", stream.body);
+    assert_eq!(stream.body["process_id"], "nested-agent");
+    assert!(
+        stream.body["output"]
+            .as_str()
+            .unwrap()
+            .contains("nested agent stdout")
+    );
+    assert!(
+        stream.body["output"]
+            .as_str()
+            .unwrap()
+            .contains("nested agent stderr")
+    );
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/nested-agent/stop".to_string(),
+        body: Some(json!({"signal": "terminate"})),
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["stopped"], true);
+    assert_eq!(stopped.body["process"]["id"], "nested-agent");
+    assert_eq!(stopped.body["process"]["status"], "stopped");
+    assert!(agent_supervisor.inspect("nested-agent").is_err());
+
+    for (method, path) in [
+        ("GET", "/api/processes/nested-agent/stream"),
+        ("POST", "/api/processes/nested-agent/stop"),
+    ] {
+        let missing = server.handle(ApiRequest {
+            method: method.to_string(),
+            path: path.to_string(),
+            body: None,
+        });
+        assert_eq!(missing.status, 404, "{}", missing.body);
+        assert_eq!(missing.body["error"]["code"], "not_found");
+        assert!(
+            missing.body["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("nested-agent")
+        );
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let server = server_with_projection();
 
