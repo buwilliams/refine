@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:50:46Z",
+  "updated_at": "2026-07-23T19:51:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3267,9 +3267,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The candidate is clean, published, based exactly on current `main`, and not merged. Governance passed all eight rules; the built-in Quality phase was a no-op because no target-app checks are configured, but the Round’s retained implementation evidence reports the full Rust/web/check/fmt suites passing. I’m doing the last queue/doctor check before handing the approval decision back to you."
+    },
+    {
+      "created_at": "2026-07-23T19:51:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836275120-272",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current actionable state is human review only. I made no changes.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` is in `review`.\n- Round 9 candidate: `3511a6a1`, clean and published.\n- `main` is clean and matches `origin/main` at `94273722`.\n- Candidate is not merged; merge preview found no conflicts.\n- Governance passed 8/8 rules.\n- Recorded verification reports 496 Rust library tests and 38 web tests passing, plus check/fmt gates.\n- Caveat: Refine’s Quality phase was a no-op because no target-app tests are configured.\n- Daemon/UI/API are healthy; Codex authentication and diagnostics pass; there are no active claims or Goal agents.\n- `project doctor` reported `runner_reachable: false`, while the authoritative port-scoped process/status checks reported the workflow runner reachable and idle. I left this discrepancy visible; it does not currently indicate stalled work.\n- Earlier provider and workflow failures remain preserved in the audit history.\n\nYour authority is now required: should I approve"
+    },
+    {
+      "created_at": "2026-07-23T19:51:15Z",
+      "delivered": false,
+      "id": "evt-1784836275324-274",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "Current actionable state is human review only. I made no changes.\n\n- Goal `00000SZ3RP4G52RZ706A5P4001` is in `review`.\n- Round 9 candidate: `3511a6a1`, clean and published.\n- `main` is clean and matches `origin/main` at `94273722`.\n- Candidate is not merged; merge preview found no conflicts.\n- Governance passed 8/8 rules.\n- Recorded verification reports 496 Rust library tests and 38 web tests passing, plus check/fmt gates.\n- Caveat: Refine’s Quality phase was a no-op because no target-app tests are configured.\n- Daemon/UI/API are healthy; Codex authentication and diagnostics pass; there are no active claims or Goal agents.\n- `project doctor` reported `runner_reachable: false`, while the authoritative port-scoped process/status checks reported the workflow runner reachable and idle. I left this discrepancy visible; it does not currently indicate stalled work.\n- Earlier provider and workflow failures remain preserved in the audit history.\n\nYour authority is now required: should I approve Goal `00000SZ3RP4G52RZ706A5P4001` through Refine’s normal review/merge path, or leave it in review?"
+    },
+    {
+      "created_at": "2026-07-23T19:51:15Z",
+      "delivered": false,
+      "id": "evt-1784836275324-275",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
