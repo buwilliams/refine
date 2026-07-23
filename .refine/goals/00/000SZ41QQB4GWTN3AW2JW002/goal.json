@@ -1,0 +1,42 @@
+{
+  "base_commit": "90c918a2152608515bccb9757cebfb2e05d4ed7d",
+  "branch_name": "refine/00000SZ41QQB4GWTN3AW2JW002/round-1",
+  "candidate_commit": null,
+  "created": "2026-07-23T18:23:19Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ41QQB4GWTN3AW2JW002",
+  "name": "Prevent live process recovery from deleting Goal Agent transcripts before workflow consumption",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Refine Supervisor",
+  "rounds": [
+    {
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T18:23:19Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Fix the confirmed Goal Agent transcript handoff race without weakening process liveness or cleanup guarantees. Evidence: Round 1 of Goal 00000SZ41923HGWZSREC2JW001 failed with `failed to read Goal Agent transcript /home/buddy/projects/refine/run/8082/processes/goal-agent-2bfd9a9c-b7b9-425b-84d3-ac5874a5af9e.stdout.log: No such file or directory (os error 2)`. In `run_goal_agent_session`, a completed signal updates metadata and kills the PTY child, then joins the output reader and reads `stdout_path`. Concurrent `/api/processes` or diagnostics process summaries call `FileProcessSupervisor::recover`; `recover_running_process` observes the now-dead PID and calls `remove_process_artifacts`, deleting the same stdout file before the workflow-owned session consumes it. Add a deterministic regression that drives completion while live process recovery/status observation runs, and make artifact ownership/cleanup ordered so the workflow can always consume the flushed transcript before removal. Preserve truthful dead-process reconciliation, terminal reattachment/output behavior, provider/authentication errors, and process cleanup; do not paper over NotFound, disable liveness checks, leak artifacts indefinitely, approve or merge, force Git, rewrite history, discard worktrees, or edit durable Goal state directly. Run focused race/lifecycle tests plus relevant library, all-target, format, and diff gates; report every failure and final result exactly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine Supervisor",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T18:23:19Z",
+      "workflow_quality_timing": null
+    }
+  ],
+  "status": "in-progress",
+  "target_branch": "main",
+  "updated": "2026-07-23T18:23:21Z"
+}
