@@ -277,7 +277,7 @@ Implementation Internals (for e2e testing)
 	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
 			[crud] deterministic, assert directly: create/edit goals·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Approve, done↔review); reporter/node/cluster mgmt; settings edits; Undo
-			[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Goal / Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
+			[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/goal/plan); Draft Goal / Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and both pinned Workflow Engine chains: todo→in-progress→qa→ready-merge→build→review and todo→in-progress→ready-merge→build→qa→review (incl. auto-promote backlog→todo)
 		Preconditions — gated features; build the state first
 			Verify / Verify selected: a review goal assigned to the currently selected reporter
 			←QA / ←Merge buttons: only on failed goals in quality-retry / merge-retry context
@@ -338,12 +338,12 @@ Implementation Internals (for e2e testing)
 		Toolbar dock height clamp 120px–85vh (default 20vh)
 	Goal workflow state machine (GOAL_WORKFLOW; user buttons only where listed)
 		backlog → Todo → (forward: todo)
-		todo → ← Backlog (back: backlog) — agent then drives todo → in-progress → qa → ready-merge → build → review automatically
+		todo → ← Backlog (back: backlog) — agent then drives the round's pinned pre-merge or post-build Quality order automatically
 			in-progress: Workflow Engine-owned, no user buttons
 		qa: Quality-owned, no user buttons
 		ready-merge: merger-owned, no user buttons
 		build: target-app-build-owned, no user buttons
-		review → ← Todo (back: todo) | Approve → (forward: done, POST /api/goals/:id/approve)
+		review → Approve → (forward: done, POST /api/goals/:id/approve); decline by submitting a new round
 		done → ← Review (back: review)
 		failed → ← Todo (back: todo); if QA-retry context: ← QA (POST /api/goals/:id/retry-quality); if merge-retry context: ← Merge (POST /api/goals/:id/retry-merge)
 		cancelled → ← Todo (back: todo)

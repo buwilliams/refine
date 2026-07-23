@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::model::JsonObject;
 use crate::model::feature::{compare_feature_goal_order, is_ordered_feature_goal};
-use crate::model::goal::GoalPriority;
+use crate::model::goal::{GoalPriority, RoundIntegration};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
@@ -23,7 +23,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::git_sync::with_repository_git_lock;
-use crate::tools::host::git_worktrees::MergeResult;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -818,26 +818,42 @@ impl WorkflowEngine {
             settings,
             work_items,
         );
-        match WorkflowTodo.advance(&mut ctx)? {
-            WorkflowAdvanceOutcome::Transition {
-                to: GoalStatus::InProgress,
-                ..
-            } => Ok(ctx),
-            WorkflowAdvanceOutcome::Noop { reason }
-            | WorkflowAdvanceOutcome::Blocked { reason }
-            | WorkflowAdvanceOutcome::Failed { reason }
-            | WorkflowAdvanceOutcome::Completed { reason, .. }
-            | WorkflowAdvanceOutcome::Transition { reason, .. } => {
-                Err(RefineError::Conflict(reason))
-            }
+        let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
+        if current == GoalStatus::Todo {
+            return match WorkflowTodo.advance(&mut ctx)? {
+                WorkflowAdvanceOutcome::Transition {
+                    to: GoalStatus::InProgress,
+                    ..
+                } => Ok(ctx),
+                WorkflowAdvanceOutcome::Noop { reason }
+                | WorkflowAdvanceOutcome::Blocked { reason }
+                | WorkflowAdvanceOutcome::Failed { reason }
+                | WorkflowAdvanceOutcome::Completed { reason, .. }
+                | WorkflowAdvanceOutcome::Transition { reason, .. } => {
+                    Err(RefineError::Conflict(reason))
+                }
+            };
         }
+        if !matches!(
+            current,
+            GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+        ) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} cannot resume workflow from {}",
+                ctx.goal_id,
+                current.as_str()
+            )));
+        }
+        hydrate_retry_context(&mut ctx, current)?;
+        Ok(ctx)
     }
 
     fn execute_prepared_claim(
         &self,
         mut ctx: WorkflowContext<'_>,
     ) -> RefineResult<WorkflowStepResult> {
-        self.advance_claim_behaviors(&mut ctx, GoalStatus::InProgress)?;
+        let start_status = ctx.start_status.clone();
+        self.advance_claim_behaviors(&mut ctx, start_status)?;
         let execution_id = ctx.execution_id.clone();
         let branch = ctx
             .branch
@@ -1026,7 +1042,12 @@ impl WorkflowAutomation for WorkflowEngine {
         let mut eligible = snapshot
             .goals
             .values()
-            .filter(|projection| projection.goal.status == GoalStatus::Todo)
+            .filter(|projection| {
+                matches!(
+                    projection.goal.status,
+                    GoalStatus::Todo | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+                )
+            })
             .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
             .filter(|projection| Self::priority_claim_eligible(&snapshot, projection))
             .cloned()
@@ -1369,6 +1390,77 @@ fn ensure_workflow_round(work_items: &FileWorkItemService, goal_id: &str) -> Ref
         .round_count
         .checked_sub(1)
         .ok_or_else(|| RefineError::InvalidInput(format!("Goal {goal_id} has no rounds")))
+}
+
+fn hydrate_retry_context(ctx: &mut WorkflowContext<'_>, current: GoalStatus) -> RefineResult<()> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let branch = required_workflow_string(&detail, "branch_name", &ctx.goal_id)?;
+    let candidate = required_workflow_string(&detail, "candidate_commit", &ctx.goal_id)?;
+    let base = required_workflow_string(&detail, "base_commit", &ctx.goal_id)?;
+    let round = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {} has no round {} to resume",
+                ctx.goal_id,
+                ctx.round_idx + 1
+            ))
+        })?;
+    let worktree = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
+        .existing_worktree_for_branch(&branch)?;
+    ctx.branch = Some(branch.clone());
+    ctx.worktree_path = worktree.as_ref().map(|path| path.display().to_string());
+    ctx.agent_cwd = worktree;
+    ctx.provider_output = Some(
+        round
+            .get("implementation_report")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| "Resumed existing workflow candidate".to_string()),
+    );
+    ctx.commit = Some(candidate.clone());
+    ctx.implementation_changed = candidate != base;
+    ctx.merge = round
+        .get("workflow_integration")
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<RoundIntegration>(value.clone())
+                .map(|integration| integration.merge)
+                .map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "Goal {} has invalid Ready Merge evidence: {error}",
+                        ctx.goal_id
+                    ))
+                })
+        })
+        .transpose()?;
+    ctx.start_status = current.clone();
+    ctx.log(
+        "workflow",
+        &format!("Resumed workflow from {}", current.as_str()),
+        Some(json_object(json!({
+            "status": current.as_str(),
+            "branch": branch,
+            "candidate_commit": candidate,
+            "round": ctx.round_idx + 1
+        }))),
+    )
+}
+
+fn required_workflow_string(value: &Value, key: &str, goal_id: &str) -> RefineResult<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {goal_id} has no recorded {key} to resume workflow"
+            ))
+        })
 }
 
 fn implementation_branch_name(pattern: &str, goal_id: &str, round_idx: usize) -> String {
@@ -2262,15 +2354,16 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(claimed_goal_ids, vec!["FIRST", "UNORDERED"]);
 
-        work_items
-            .bulk_update_goals(
-                BulkGoalSelection {
-                    selected_ids: Some(vec!["FIRST".to_string()]),
-                    ..Default::default()
-                },
-                crate::tools::product::work_items::BulkGoalUpdate::Status("review".to_string()),
-            )
-            .unwrap();
+        for status in [
+            GoalStatus::InProgress,
+            GoalStatus::ReadyMerge,
+            GoalStatus::Build,
+            GoalStatus::Review,
+        ] {
+            work_items
+                .advance_automated_goal_status("FIRST", status)
+                .unwrap();
+        }
         let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
         assert_eq!(claim_automation.promote().unwrap(), 2);
         let state = claim_automation.load_state().unwrap();
@@ -2280,7 +2373,7 @@ mod tests {
             .find(|claim| claim.goal_id == "SECOND")
             .map(|claim| claim.claim_id.clone())
             .unwrap();
-        work_items
+        let rejected_bulk_reopen = work_items
             .bulk_update_goals(
                 BulkGoalSelection {
                     selected_ids: Some(vec!["FIRST".to_string()]),
@@ -2289,7 +2382,13 @@ mod tests {
                 crate::tools::product::work_items::BulkGoalUpdate::Status("todo".to_string()),
             )
             .unwrap();
-        assert!(claim_automation.start_claim(&second_claim).is_err());
+        assert_eq!(rejected_bulk_reopen.updated, 0);
+        assert_eq!(rejected_bulk_reopen.skipped, 1);
+        assert_eq!(
+            work_items.show_goal_summary("FIRST").unwrap().goal.status,
+            GoalStatus::Review
+        );
+        claim_automation.start_claim(&second_claim).unwrap();
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -2878,7 +2977,11 @@ mod tests {
             fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "agent precommitted implementation\n"
         );
-        assert!(!target_root.join("agent.txt").exists());
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "agent precommitted implementation\n"
+        );
+        assert!(result.steps[0].merge.as_ref().is_some_and(|merge| merge.ok));
         assert_eq!(
             git_stdout(&worktree_path, &["rev-parse", "HEAD"])
                 .unwrap()
@@ -2891,6 +2994,42 @@ mod tests {
                 .trim(),
             "agent precommit"
         );
+        let goal = work_items.show_goal_detail("GOAL1").unwrap();
+        let round = &goal["rounds"][0];
+        assert_eq!(round["workflow_quality_timing"], "pre_merge");
+        assert_eq!(
+            round["workflow_integration"]["candidate_commit"],
+            result.steps[0].commit
+        );
+        assert_eq!(
+            round["quality_details"]["evaluation_scope"],
+            "isolated_candidate"
+        );
+        assert_eq!(
+            round["quality_details"]["source_candidate_commit"],
+            result.steps[0].commit
+        );
+        let state_messages = round["logs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|log| log["category"] == "state")
+            .filter_map(|log| log["message"].as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            state_messages,
+            vec![
+                "Workflow status changed: todo -> in-progress",
+                "Workflow status changed: in-progress -> qa",
+                "Workflow status changed: qa -> ready-merge",
+                "Workflow status changed: ready-merge -> build",
+                "Workflow status changed: build -> review",
+            ]
+        );
+        assert!(round["logs"].as_array().unwrap().iter().any(|log| {
+            log["message"].as_str() == Some("Target app rebuild skipped")
+                && log["details"]["skipped"] == true
+        }));
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {
@@ -3094,7 +3233,11 @@ mod tests {
             fs::read_to_string(worktree_path.join("agent.txt")).unwrap(),
             "existing retry implementation\n"
         );
-        assert!(!target_root.join("agent.txt").exists());
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "existing retry implementation\n"
+        );
+        assert!(result.steps[0].merge.as_ref().is_some_and(|merge| merge.ok));
 
         unsafe {
             if let Some(previous) = previous_smoke_ai {
@@ -3103,6 +3246,125 @@ mod tests {
                 std::env::remove_var("REFINE_SMOKE_AI_PATH");
             }
         }
+
+        fs::remove_dir_all(&worktree_path).ok();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_resumes_supported_ready_merge_retry_without_rerunning_implementation() {
+        let temp_root = unique_temp_dir("automation-ready-merge-retry");
+        let target_root = temp_root.clone();
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "base\n").unwrap();
+        git(&temp_root, &["init", "-q", "-b", "main"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        let base_commit = git_stdout(&target_root, &["rev-parse", "HEAD"]).unwrap();
+        let branch = "refine/GOAL1/round-1";
+        let worktree_path = temp_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
+        fs::create_dir_all(worktree_path.parent().unwrap()).unwrap();
+        git(
+            &target_root,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        fs::write(worktree_path.join("feature.txt"), "retry candidate\n").unwrap();
+        git(&worktree_path, &["add", "feature.txt"]).unwrap();
+        git(&worktree_path, &["commit", "-q", "-m", "retry candidate"]).unwrap();
+        let candidate_commit = git_stdout(&worktree_path, &["rev-parse", "HEAD"]).unwrap();
+
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Retry Ready Merge", Some("GOAL1"))
+            .unwrap();
+        work_items
+            .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+            .unwrap();
+        work_items
+            .update_latest_goal_round_implementation_report(
+                "GOAL1",
+                "Implementation already completed",
+            )
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+            .unwrap();
+        work_items
+            .update_goal_git_refs(
+                "GOAL1",
+                branch,
+                "main",
+                base_commit.trim(),
+                Some(candidate_commit.trim()),
+            )
+            .unwrap();
+        work_items
+            .update_goal_round_evaluation_summary(
+                "GOAL1",
+                0,
+                &json!({
+                    "workflow_quality_timing": "pre_merge",
+                    "workflow_git_remote": "origin"
+                }),
+            )
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+            .unwrap();
+        work_items.retry_goal_merge_summary("GOAL1").unwrap();
+
+        let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+            .evaluate_workflow()
+            .unwrap();
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].commit, candidate_commit.trim());
+        assert_eq!(
+            result.steps[0].provider_output,
+            "Implementation already completed"
+        );
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Review
+        );
+        assert_eq!(
+            fs::read_to_string(target_root.join("feature.txt")).unwrap(),
+            "retry candidate\n"
+        );
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(
+            detail["rounds"][0]["workflow_integration"]["candidate_commit"],
+            candidate_commit.trim()
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| log["message"] == "Resumed workflow from ready-merge")
+        );
 
         fs::remove_dir_all(&worktree_path).ok();
         fs::remove_dir_all(temp_root).unwrap();

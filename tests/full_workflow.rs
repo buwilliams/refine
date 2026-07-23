@@ -24,6 +24,7 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
             "agent_cli": "smoke-ai",
             "quality_enabled": "1",
             "target_app_test_command": "printf target-tests-ok",
+            "target_app_build_command": "test \"$(git branch --show-current)\" = main && grep -q 'full workflow provider edit' app.py",
             "branch_name_pattern": "refine/{goal_id}"
         }),
     );
@@ -54,8 +55,8 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
         .join(branch.replace('/', "-"));
     let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
     assert!(
-        !app_py.contains("full workflow provider edit"),
-        "review modified the target branch before approval:\n{app_py}"
+        app_py.contains("full workflow provider edit"),
+        "review did not contain the integrated provider edit:\n{app_py}"
     );
     let candidate_py = fs::read_to_string(worktree.join("app.py")).unwrap();
     assert!(
@@ -78,6 +79,58 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     );
     let candidate_commit = git(&worktree, &["rev-parse", "HEAD"]).trim().to_string();
     assert_eq!(goal["goal"]["candidate_commit"], candidate_commit);
+    let reviewed_head = git(&fixture.app_root, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    assert_eq!(latest["workflow_quality_timing"], "post_build", "{goal:#}");
+    assert_eq!(
+        latest["workflow_integration"]["candidate_commit"], candidate_commit,
+        "{goal:#}"
+    );
+    assert_eq!(
+        latest["workflow_integration"]["target_commit"], reviewed_head,
+        "{goal:#}"
+    );
+    assert_eq!(
+        latest["quality_details"]["evaluation_scope"], "integrated_target",
+        "{goal:#}"
+    );
+    assert_eq!(
+        latest["quality_details"]["source_candidate_commit"], candidate_commit,
+        "{goal:#}"
+    );
+    assert_eq!(
+        latest["quality_details"]["candidate_commit"], reviewed_head,
+        "{goal:#}"
+    );
+    assert_eq!(
+        latest["quality_details"]["cwd"],
+        fixture.app_root.display().to_string(),
+        "{goal:#}"
+    );
+    let state_messages = latest["logs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|log| log["category"] == "state")
+        .filter_map(|log| log["message"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        state_messages,
+        vec![
+            "Workflow status changed: todo -> in-progress",
+            "Workflow status changed: in-progress -> ready-merge",
+            "Workflow status changed: ready-merge -> build",
+            "Workflow status changed: build -> qa",
+            "Workflow status changed: qa -> review",
+        ],
+        "{goal:#}"
+    );
+    assert!(latest["logs"].as_array().unwrap().iter().any(|log| {
+        log["message"] == "Target app rebuild passed"
+            && log["details"]["skipped"] == false
+            && log["details"]["checkout"] == fixture.app_root.display().to_string()
+    }));
     assert_eq!(latest["quality_state"], "passed", "{goal:#}");
     assert_eq!(latest["rule_state"], "passed", "{goal:#}");
     assert_eq!(
@@ -89,9 +142,21 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
         "{goal:#}"
     );
 
+    let audit_path = fixture.app_root.join(".git/refine-audit.jsonl");
+    let audit_before_approval = fs::read_to_string(&audit_path).unwrap();
     let approve = fixture.run_refine(&["goal", "approve", &goal_id]);
     fixture.assert_success("approve reviewed goal", &approve);
     wait_for_goal_status(&fixture, &goal_id, "done");
+    assert_eq!(
+        git(&fixture.app_root, &["rev-parse", "HEAD"]).trim(),
+        reviewed_head,
+        "approval reintegrated an already-integrated candidate"
+    );
+    let audit_after_approval = fs::read_to_string(&audit_path).unwrap();
+    assert_eq!(
+        audit_after_approval, audit_before_approval,
+        "review approval performed a Git operation"
+    );
     let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
     assert!(
         app_py.contains("full workflow provider edit"),

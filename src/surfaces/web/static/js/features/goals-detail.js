@@ -105,11 +105,12 @@ async function loadGoalDetail(goalId) {
 // User-driven workflow transitions for a Goal. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
 // `in-progress` (Workflow Engine owns), `qa` (Quality owns), `ready-merge`
-// (candidate preparation owns), and `build` (target-app build owns) have no user buttons
+// (merger queue owns), and `build` (target-app rebuild owns) have no user buttons
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → ready-merge → build → qa → review).
+// automatically in the order pinned by the current Goal round.
 // Forward from `review` goes through the dedicated /approve endpoint for
-// approval. No user action moves a Goal into `review`; successful build does.
+// approval. Declining review requires the new-round form so the next attempt
+// has a distinct identity and starts from the current integrated target.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
@@ -120,10 +121,9 @@ const GOAL_WORKFLOW = {
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
   // in-progress: no user buttons — Workflow Engine owns.
   // qa: no user buttons — Quality owns.
-  // ready-merge: no user buttons — candidate preparation owns.
+  // ready-merge: no user buttons — serialized integration owns.
   // build: no user buttons — target-app build owns.
-  review:       { back:    { label: "← Todo",     next: "todo"   },
-                  forward: { label: "Approve →",  next: "done", approve: true } },
+  review:       { forward: { label: "Approve →",  next: "done", approve: true } },
   done:         { back:    { label: "← Review",   next: "review" } },
   failed:       { back:    { label: "← Todo",     next: "todo"   } },
   cancelled:    { back:    { label: "← Todo",     next: "todo"   } },
@@ -279,8 +279,8 @@ function drawGoalDetail(goal) {
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
   // skips system-owned statuses. Forward from review goes through the
-  // `approve` endpoint; everything else is a bookkeeping status
-  // update via PATCH /api/goals/<id>.
+  // `approve` endpoint. Review rejection uses the new-round form rather than
+  // an unversioned status update.
   const workflow = workflowForGoal(goal, latest);
   const backBtn = workflow.back ? `
     <button id="btn-state-back" data-testid="goal-state-back">${htmlEscape(workflow.back.label)}</button>

@@ -19,6 +19,7 @@ pub struct WorkflowContext<'a> {
     pub target_root: &'a Path,
     pub claim_id: String,
     pub goal_id: String,
+    pub node_id: String,
     pub provider: String,
     pub execution_id: String,
     pub round_idx: usize,
@@ -32,7 +33,9 @@ pub struct WorkflowContext<'a> {
     pub implementation_changed: bool,
     pub merge: Option<MergeResult>,
     pub final_status: Option<GoalStatus>,
+    pub start_status: GoalStatus,
     quality_timing: Option<String>,
+    git_remote: Option<String>,
 }
 
 impl<'a> WorkflowContext<'a> {
@@ -50,6 +53,7 @@ impl<'a> WorkflowContext<'a> {
             target_root,
             claim_id: claim.claim_id,
             goal_id: claim.goal_id,
+            node_id: claim.node_id,
             provider: claim.provider,
             execution_id: execution_id.to_string(),
             round_idx,
@@ -63,7 +67,9 @@ impl<'a> WorkflowContext<'a> {
             implementation_changed: false,
             merge: None,
             final_status: None,
+            start_status: GoalStatus::InProgress,
             quality_timing: None,
+            git_remote: None,
         }
     }
 
@@ -80,8 +86,34 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn request_transition(&mut self, from: GoalStatus, to: GoalStatus) -> RefineResult<()> {
-        self.work_items
-            .advance_automated_goal_status(&self.goal_id, to.clone())?;
+        let current = self.work_items.show_goal_summary(&self.goal_id)?;
+        if current.goal.status == to {
+            return Ok(());
+        }
+        if current.goal.status != from {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} changed from expected {} to {} before workflow transition to {}",
+                self.goal_id,
+                from.as_str(),
+                current.goal.status.as_str(),
+                to.as_str()
+            )));
+        }
+        if let Err(error) = self
+            .work_items
+            .advance_automated_goal_status(&self.goal_id, to.clone())
+        {
+            if self
+                .work_items
+                .show_goal_summary(&self.goal_id)?
+                .goal
+                .status
+                == to
+            {
+                return Ok(());
+            }
+            return Err(error);
+        }
         self.log(
             "state",
             &format!(
@@ -206,7 +238,7 @@ impl<'a> WorkflowContext<'a> {
         // Build or QA therefore need a status/evidence based transition, not today's mutable
         // setting. These states unambiguously reveal the ordering that got the candidate there.
         let (timing, migrated) = match current_status {
-            GoalStatus::ReadyMerge => (
+            GoalStatus::InProgress | GoalStatus::ReadyMerge => (
                 FileQualityService::new(self.refine_dir())
                     .load_settings()?
                     .timing,
@@ -281,6 +313,50 @@ impl<'a> WorkflowContext<'a> {
         )?;
         self.quality_timing = Some(timing.as_str().to_string());
         Ok(timing.as_str().to_string())
+    }
+
+    /// Returns the Git remote committed to this candidate round.
+    ///
+    /// Candidate publication and Ready Merge integration must use one identity even if project
+    /// settings change while the candidate is in flight.
+    pub fn git_remote(&mut self) -> RefineResult<String> {
+        if let Some(remote) = &self.git_remote {
+            return Ok(remote.clone());
+        }
+        let detail = self.work_items.show_goal_detail(&self.goal_id)?;
+        let round = detail
+            .get("rounds")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|rounds| rounds.get(self.round_idx))
+            .ok_or_else(|| {
+                RefineError::NotFound(format!(
+                    "Goal {} has no round {}",
+                    self.goal_id,
+                    self.round_idx + 1
+                ))
+            })?;
+        if let Some(remote) = round
+            .get("workflow_git_remote")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|remote| !remote.is_empty())
+        {
+            self.git_remote = Some(remote.to_string());
+            return Ok(remote.to_string());
+        }
+        let remote = crate::workflow::setting_string(&self.settings, "git_remote", "origin");
+        self.work_items.update_goal_round_evaluation_summary(
+            &self.goal_id,
+            self.round_idx,
+            &json!({"workflow_git_remote": &remote}),
+        )?;
+        self.log(
+            "git",
+            "Committed Git remote for candidate integration",
+            Some(crate::workflow::json_object(json!({"remote": &remote}))),
+        )?;
+        self.git_remote = Some(remote.clone());
+        Ok(remote)
     }
 }
 

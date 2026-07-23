@@ -58,7 +58,9 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
     let allowed = matches!(
         (from, to),
         (GoalStatus::Todo, GoalStatus::InProgress)
+            | (GoalStatus::InProgress, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
+            | (GoalStatus::Qa, GoalStatus::ReadyMerge)
             | (GoalStatus::ReadyMerge, GoalStatus::Build)
             | (GoalStatus::ReadyMerge, GoalStatus::Qa)
             | (GoalStatus::Build, GoalStatus::Qa)
@@ -1156,7 +1158,8 @@ impl FileWorkItemService {
             };
             if !is_bulk_target_allowed(&status) {
                 return Err(RefineError::Conflict(
-                    "Bulk status updates cannot set in-progress, qa, or ready-merge".to_string(),
+                    "Bulk status updates cannot enter workflow-owned, review, or done states"
+                        .to_string(),
                 ));
             }
         }
@@ -1171,9 +1174,9 @@ impl FileWorkItemService {
             ));
         }
 
-        let skip_automated = field == "status" && raw_value != "__last_workflow_state";
+        let skip_workflow_owned = field == "status";
         let (goals, skipped_details) =
-            self.select_bulk_goal_summaries(&selection, skip_automated)?;
+            self.select_bulk_goal_summaries(&selection, skip_workflow_owned)?;
         let mut ids = Vec::new();
         for goal in goals {
             self.ensure_goal_owned(&goal)?;
@@ -1635,7 +1638,10 @@ impl FileWorkItemService {
         }
     }
 
-    pub fn verify_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+    pub(in crate::tools::product) fn verify_goal_summary(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::VerifyReview)?;
         self.set_goal_status_unchecked(goal_id, &GoalStatus::Done)?;
@@ -1664,20 +1670,28 @@ impl FileWorkItemService {
         if current.goal.status == GoalStatus::ReadyMerge {
             return Ok(current);
         }
-        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitMerge)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::ReadyMerge)?;
-        self.show_goal_summary(goal_id)
+        Err(RefineError::Conflict(
+            "Ready Merge is workflow-owned; queue or retry the Goal through its current stage"
+                .to_string(),
+        ))
     }
 
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
+        if current.goal.status == GoalStatus::Review {
+            return Err(RefineError::InvalidInput(
+                "submit a new round to decline review and preserve the integration history"
+                    .to_string(),
+            ));
+        }
         validate_goal_operation(&current.goal.status, &GoalOperation::Undo)?;
         let target = match current.goal.status {
             GoalStatus::Done => GoalStatus::Review,
-            GoalStatus::Review | GoalStatus::Cancelled => GoalStatus::Todo,
+            GoalStatus::Cancelled => GoalStatus::Todo,
             _ => {
                 return Err(RefineError::InvalidInput(
-                    "Goal undo is only available from done, review, or cancelled".to_string(),
+                    "Goal undo is only available from done or cancelled; submit a new round to decline review"
+                        .to_string(),
                 ));
             }
         };
@@ -2287,6 +2301,8 @@ impl FileWorkItemService {
             "quality_details",
             "quality_checked_at",
             "workflow_quality_timing",
+            "workflow_git_remote",
+            "workflow_integration",
         ] {
             if let Some(value) = fields.get(key) {
                 round.insert(key.to_string(), value.clone());
@@ -2584,7 +2600,7 @@ impl FileWorkItemService {
     fn select_bulk_goal_summaries(
         &self,
         selection: &BulkGoalSelection,
-        skip_automated: bool,
+        skip_workflow_owned: bool,
     ) -> RefineResult<(Vec<GoalSummaryProjection>, Vec<BulkSkippedDetail>)> {
         let excluded: BTreeSet<_> = selection
             .exclude_ids
@@ -2611,12 +2627,17 @@ impl FileWorkItemService {
         };
         goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));
         let mut skipped_details = Vec::new();
-        if skip_automated {
+        if skip_workflow_owned {
             let mut retained = Vec::new();
             for goal in goals {
                 if matches!(
                     goal.goal.status,
-                    GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge
+                    GoalStatus::InProgress
+                        | GoalStatus::Qa
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Review
+                        | GoalStatus::Done
                 ) {
                     skipped_details.push(BulkSkippedDetail {
                         id: goal.goal.id,

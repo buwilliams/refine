@@ -141,7 +141,7 @@ const GUIDE_CATEGORIES = [
         { hash: "#/node/target-app", selector: "#s-target-stop-instructions" }),
       guideItem("application-build", "Build", "Educate and configure",
         "Build instructions tell the configured agent how to rebuild the app, handle setup problems, and report blockers with evidence.",
-        "Default: blank unless the app needs a build before review.",
+        "Default: blank unless the integrated target app needs a rebuild before review.",
         { hash: "#/node/target-app", selector: "#s-target-build-instructions" }),
       guideItem("application-auto-build", "Automatic application build", "Educate and configure",
         "Automatic build controls when isolated candidate work is built before review.",

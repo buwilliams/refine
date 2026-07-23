@@ -87,6 +87,8 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
             node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
+            source_candidate_commit: Some(candidate_commit.clone()),
+            evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit: candidate_commit.clone(),
             process_metadata: quality_operation_metadata(&runtime_root),
         })
@@ -305,6 +307,8 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
             node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
+            source_candidate_commit: Some(candidate_commit.clone()),
+            evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
@@ -351,6 +355,8 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
             node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
+            source_candidate_commit: Some(candidate_commit.clone()),
+            evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
             process_metadata: quality_operation_metadata(&runtime_root),
         })

@@ -30,6 +30,10 @@ use super::types::*;
 
 pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 2;
 
+fn default_evaluation_scope() -> String {
+    "isolated_candidate".to_string()
+}
+
 #[derive(Clone, Debug)]
 pub struct FileQualityService {
     pub refine_dir: PathBuf,
@@ -326,6 +330,10 @@ pub struct QualityCheckRequest {
     pub node_id: String,
     pub provider: String,
     pub cwd: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_candidate_commit: Option<String>,
+    #[serde(default = "default_evaluation_scope")]
+    pub evaluation_scope: String,
     pub candidate_commit: String,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub process_metadata: Map<String, Value>,
@@ -511,7 +519,7 @@ impl QualityOperationRunner {
             )));
         }
         let detail = work_items.show_goal_detail(goal_id)?;
-        let candidate_commit = detail
+        let source_candidate_commit = detail
             .get("candidate_commit")
             .and_then(Value::as_str)
             .map(str::trim)
@@ -522,28 +530,82 @@ impl QualityOperationRunner {
                 ))
             })?
             .to_string();
-        let branch = summary.goal.branch_name.as_deref().ok_or_else(|| {
-            RefineError::Conflict(format!(
-                "Goal {goal_id} has no candidate branch for Quality evaluation"
-            ))
-        })?;
-        let cwd = FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root)
-            .existing_worktree_for_branch(branch)?
-            .ok_or_else(|| {
-                RefineError::Conflict(format!("Goal {goal_id} candidate worktree was not found"))
-            })?;
         let round_idx = summary.goal.round_count.checked_sub(1).ok_or_else(|| {
             RefineError::Conflict(format!(
                 "Goal {goal_id} has no round to record Quality evidence"
             ))
         })?;
+        let round = detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(round_idx))
+            .ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} has no round {} for Quality evaluation",
+                    round_idx + 1
+                ))
+            })?;
+        let post_build =
+            round.get("workflow_quality_timing").and_then(Value::as_str) == Some(POST_BUILD);
+        let (cwd, evaluated_commit, evaluation_scope) = if post_build {
+            let integration = round
+                .get("workflow_integration")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} cannot run post-build Quality without Ready Merge integration evidence"
+                    ))
+                })?;
+            let integrated_candidate = integration
+                .get("candidate_commit")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} integration evidence has no candidate commit"
+                    ))
+                })?;
+            if integrated_candidate != source_candidate_commit {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {goal_id} post-build Quality candidate changed from {integrated_candidate} to {source_candidate_commit}"
+                )));
+            }
+            let target_commit = integration
+                .get("target_commit")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} integration evidence has no target commit"
+                    ))
+                })?
+                .to_string();
+            (self.target_root.clone(), target_commit, "integrated_target")
+        } else {
+            let branch = summary.goal.branch_name.as_deref().ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} has no candidate branch for Quality evaluation"
+                ))
+            })?;
+            let cwd =
+                FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root)
+                    .existing_worktree_for_branch(branch)?
+                    .ok_or_else(|| {
+                        RefineError::Conflict(format!(
+                            "Goal {goal_id} candidate worktree was not found"
+                        ))
+                    })?;
+            (cwd, source_candidate_commit.clone(), "isolated_candidate")
+        };
         let request = QualityCheckRequest {
             owner_id: goal_id.to_string(),
             round_idx,
             node_id: node_id.to_string(),
             provider: provider.to_string(),
             cwd: cwd.display().to_string(),
-            candidate_commit,
+            source_candidate_commit: Some(source_candidate_commit.clone()),
+            evaluation_scope: evaluation_scope.to_string(),
+            candidate_commit: evaluated_commit,
             process_metadata,
         };
         let registry = FileOperationRegistry::new(&self.runtime_root);
@@ -557,6 +619,8 @@ impl QualityOperationRunner {
                 "provider": provider,
                 "cwd": request.cwd,
                 "candidate_commit": request.candidate_commit,
+                "source_candidate_commit": source_candidate_commit,
+                "evaluation_scope": evaluation_scope,
                 "target_root": self.target_root.display().to_string(),
                 "refine_dir": self.refine_dir.display().to_string(),
                 "defer_cancellation_terminal": true
@@ -571,7 +635,9 @@ impl QualityOperationRunner {
                 Some(json!({
                     "provider": provider,
                     "cwd": request.cwd,
-                    "candidate_commit": request.candidate_commit
+                    "candidate_commit": request.candidate_commit,
+                    "source_candidate_commit": source_candidate_commit,
+                    "evaluation_scope": evaluation_scope
                 })),
             ),
         )?;
@@ -722,6 +788,9 @@ impl QualityOperationRunner {
         let details = json!({
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit,
+            "source_candidate_commit": request.source_candidate_commit,
+            "evaluation_scope": request.evaluation_scope,
+            "cwd": request.cwd,
             "results": result.results,
             "diagnostics": result.diagnostics
         });
@@ -925,6 +994,17 @@ impl QualityOperationRunner {
             },
             provider: required_operation_request_string(operation, "provider")?,
             cwd: required_operation_request_string(operation, "cwd")?,
+            source_candidate_commit: operation
+                .request
+                .get("source_candidate_commit")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            evaluation_scope: operation
+                .request
+                .get("evaluation_scope")
+                .and_then(Value::as_str)
+                .unwrap_or("isolated_candidate")
+                .to_string(),
             candidate_commit: required_operation_request_string(operation, "candidate_commit")?,
             process_metadata: Map::new(),
         };

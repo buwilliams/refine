@@ -276,6 +276,14 @@ impl FileGitWorktreeService {
             .map(|value| value.trim().to_string())
     }
 
+    pub fn commit_is_ancestor(&self, ancestor: &str, descendant: &str) -> RefineResult<bool> {
+        validate_commitish(ancestor)?;
+        validate_commitish(descendant)?;
+        Ok(self
+            .git_raw(&["merge-base", "--is-ancestor", ancestor, descendant])?
+            .success)
+    }
+
     pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
         validate_commitish(commit)?;
         let output = self.git_raw(&["merge", "--no-ff", "--no-edit", commit])?;
@@ -650,6 +658,10 @@ impl FileGitWorktreeService {
             .arg("-C")
             .arg(&self.root)
             .args(args)
+            // Read-only projection and inspection calls may overlap a serialized merge.
+            // Prevent commands such as `git status` from opportunistically refreshing the
+            // shared index and racing the integration owner's required index write.
+            .env("GIT_OPTIONAL_LOCKS", "0")
             .envs(env.iter().map(|(key, value)| (*key, *value)))
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
@@ -1432,6 +1444,24 @@ mod tests {
         assert!(audit.contains("\"action\":\"revert\""));
         assert!(audit.contains("\"status\":\"ok\""));
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn read_only_inspection_does_not_contend_for_the_repository_index() {
+        let temp_root = unique_temp_dir("git-read-only-index");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "one\n", "initial");
+        fs::write(repo.join("app.txt"), "two\n").unwrap();
+
+        let index_lock = repo.join(".git/index.lock");
+        fs::write(&index_lock, "integration owner holds the index\n").unwrap();
+        let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
+        assert!(status.dirty_user_changes);
+
+        fs::remove_file(index_lock).unwrap();
         fs::remove_dir_all(temp_root).unwrap();
     }
 
