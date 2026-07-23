@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "c9a92ee55f09f89b7b8a0b68ccde0c371d7c7d80",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -199,8 +199,8 @@
           "rule_id": "rule-6"
         }
       ],
-      "implementation_report": "Committed reviewable Round 2 candidate ea2103e3. Added one shared product process-control capability used by web/API, CLI system ps --stop, browser Agents controls, and MCP; it supports managed, interactive, chat, and synthetic agents, persists exact OS PID identity evidence, retains supervision records until confirmed exit, cancels linked Goals only after exit, and returns causal retained-evidence failures for resistance, delay, signal failure, registry replacement, and identity mismatch. Every active Agents row now has a process-specific Stop button. Focused verification: cargo test --lib process_control: 4 passed, 0 failed; web API managed/synthetic stop: 1 passed, 0 failed; CLI system process stop: 1 passed, 0 failed. Initial cargo test --lib exposed one plain-terminal classification regression (458 passed, 1 failed); narrowed agent classification and verified that test 1 passed, 0 failed; clean full rerun: 459 passed, 0 failed. node --test tests/*.test.js: 37 passed, 0 failed. cargo check --all-targets: passed. cargo fmt -- --check: passed. git diff --check and git diff --cached --check: passed. Rejected a1f6c2e6 and its Round 1 worktree remain preserved and separate.",
-      "implementation_reported_at": "2026-07-23T13:45:07Z",
+      "implementation_report": "Committed reviewable recovery c9a92ee5 on top of preserved Round 2 candidate ea2103e3. PID identity is now created only at a process's first registration; legacy or recovered records missing registration-time identity fail closed without signaling, synthesizing evidence, or cancelling a Goal. Workflow agent metadata now records claim_id with execution_id and round_idx, and the shared process-control capability validates the exact claim, execution, current Goal round, and absence of competing active claims both before termination and before Goal cancellation. Added focused success, missing-identity/PID-reuse, stale-execution concurrency, stale-round, mismatch, and resistant-process coverage plus the affected process intent update. Verification: cargo test --lib process_control: 8 passed, 0 failed; cargo test --lib subprocess: 10 passed, 0 failed; cargo test --lib agent_sessions: 3 passed, 0 failed; focused web API stop: 1 passed, 0 failed; focused CLI stop: 1 passed, 0 failed; workflow metadata: 1 passed, 0 failed; focused browser process UI: 4 passed, 0 failed; final cargo test --lib: 463 passed, 0 failed; node --test tests/*.test.js: 37 passed, 0 failed; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; git diff --check, git diff --cached --check, and git show --check: passed. Two earlier full-library attempts exposed a transient interactive-terminal status failure at 462 passed, 1 failed; its isolated rerun passed 1/1 and the final unchanged-source full rerun passed 463/463.",
+      "implementation_reported_at": "2026-07-23T14:03:29Z",
       "logs": [],
       "meta_rule_state": "passed",
       "product_state": "passed",
@@ -211,11 +211,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "failed",
-      "updated": "2026-07-23T13:49:10Z",
+      "updated": "2026-07-23T14:03:29Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T13:49:14Z"
+  "updated": "2026-07-23T14:03:30Z"
 }
