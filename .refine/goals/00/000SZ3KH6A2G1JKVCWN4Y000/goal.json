@@ -1,7 +1,7 @@
 {
   "base_commit": "1ff4d51efcc231fbbf724a3ef43437804c471d1f",
   "branch_name": "refine/00000SZ3KH6A2G1JKVCWN4Y000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "624447d3e6c767127548eba7ec02d6863ec78180",
   "created": "2026-07-23T10:06:51Z",
   "feature_id": null,
   "feature_order": null,
@@ -20,8 +20,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented Goal `00000SZ3KH6A2G1JKVCWN4Y000` and left it reviewable in commit `624447d3`.\n\nWhat changed:\n\n- Removed unconditional `scrollToBottom()` after terminal output in [toolbar.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3KH6A2G1JKVCWN4Y000-round-1/src/surfaces/web/static/js/features/toolbar.js:1487).\n- xterm now follows output while at the bottom, preserves position when the user scrolls into history, and resumes following after returning to bottom.\n- Added shared regression coverage for Supervisor, Plan, Goal, and Standalone terminals in [web_supervisor_toolbar.test.js](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3KH6A2G1JKVCWN4Y000-round-1/tests/web_supervisor_toolbar.test.js:243).\n\nVerification:\n\n- Focused terminal suite: `10/10 passed`.\n- Complete browser suite: `30/30 passed`.\n- Static assets: `54 files`, `static_assets_present: true`.\n- `cargo run --manifest-path xtask/Cargo.toml -- check`: passed, including API contract, browser tests, static assets, and runtime layout.\n- `git diff --check`, staged diff check, and commit integrity check: passed.\n- Initial focused run was `9/10` due solely to cross-realm strict equality in the VM test harness; snapshots were normalized and the rerun passed `10/10`.\n- Worktree is clean on `refine/00000SZ3KH6A2G1JKVCWN4Y000/round-1`. No merge or Goal-state mutation was performed.",
+      "implementation_reported_at": "2026-07-23T10:12:03Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -32,11 +32,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T10:06:51Z",
+      "updated": "2026-07-23T10:12:03Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T10:06:51Z"
+  "updated": "2026-07-23T10:12:03Z"
 }
