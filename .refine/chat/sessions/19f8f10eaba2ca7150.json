@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:50:07Z",
+  "updated_at": "2026-07-23T14:54:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1116,6 +1116,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The recovery is making scoped changes in the process and workflow layers; it has not touched the four review worktrees or main. I’m watching especially for the required claim-settlement behavior and real-worker failure-path tests before accepting any completion signal."
+    },
+    {
+      "created_at": "2026-07-23T14:54:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784818491946-216",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The focused suite still passes after the refactor. The agent is now adding the missing evidence Governance called out: a registered real workflow worker, final claim-state assertions, and injected registry/identity cleanup failures. No confirmation or additional authority is currently needed."
     }
   ],
   "queued_messages": [
