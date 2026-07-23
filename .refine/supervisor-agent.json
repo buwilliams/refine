@@ -54,13 +54,13 @@
     "00000SZ2SWWPEJZZHS4CXC4000": "cancelled",
     "00000SZ2TPQM61AGWJW8XC4001": "done",
     "00000SZ301MXF1Q5K4QDSJ6000": "done",
-    "00000SZ3K92DJJT8PWF5AP8000": "review",
-    "00000SZ3KH6A2G1JKVCWN4Y000": "review",
+    "00000SZ3K92DJJT8PWF5AP8000": "done",
+    "00000SZ3KH6A2G1JKVCWN4Y000": "done",
     "00000SZ3KJDDGGCK29J4N4Y001": "in-progress"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3K92DJJT8PWF5AP8000:review,00000SZ3KH6A2G1JKVCWN4Y000:review,00000SZ3KJDDGGCK29J4N4Y001:in-progress|live={}|quiet={}|issues=",
-  "updated_at": "2026-07-23T10:57:03.114366157+00:00",
+  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:in-progress|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T11:00:02.917755868+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1655,6 +1655,26 @@
       "message": "Goal 00000SZ3KJDDGGCK29J4N4Y001 changed from todo to in-progress.",
       "created_at": "2026-07-23T10:57:03.031609862+00:00",
       "goal_id": "00000SZ3KJDDGGCK29J4N4Y001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T10:59:57.469690195+00:00-166",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3K92DJJT8PWF5AP8000 changed from review to done.",
+      "created_at": "2026-07-23T10:59:57.469690195+00:00",
+      "goal_id": "00000SZ3K92DJJT8PWF5AP8000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T11:00:02.835589160+00:00-167",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3KH6A2G1JKVCWN4Y000 changed from review to done.",
+      "created_at": "2026-07-23T11:00:02.835589160+00:00",
+      "goal_id": "00000SZ3KH6A2G1JKVCWN4Y000",
       "actionable": false,
       "retryable": false
     }
