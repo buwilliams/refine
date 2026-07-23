@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:22:17Z",
+  "updated_at": "2026-07-23T11:26:19Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -699,6 +699,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker has moved into compile/test validation after additional coordination edits. It remains active and the provider session is healthy; no stall or hidden failure is present. I’m continuing to the next workflow transition."
+    },
+    {
+      "created_at": "2026-07-23T11:26:19Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805979371-51",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The initial focused workflow tests passed. The worker found and is now extending missing Quality provenance coverage so post-build Quality is tied to the integrated target commit; this is substantive progress, not a stall. No intervention is warranted."
     }
   ],
   "queued_messages": [
