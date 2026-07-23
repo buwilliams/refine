@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:12:30Z",
+  "updated_at": "2026-07-23T18:12:44Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1992,6 +1992,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll reconcile the current Goal records, process liveness, worktrees/commits, and recent workflow evidence. I’ll treat review as a confirmation boundary and won’t retry the failed Goal unless the supported evidence makes that recovery unambiguous."
+    },
+    {
+      "created_at": "2026-07-23T18:12:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830364572-59",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is internally consistent on one important point: no live workflow-agent owns either the active or failed Goal. I’m checking whether that still holds in the runtime and whether the active Goal has durable worker-exit evidence that makes a supported recovery actionable."
     }
   ],
   "queue_dispatching": true,
