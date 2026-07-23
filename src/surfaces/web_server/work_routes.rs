@@ -2801,7 +2801,11 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("stop terminal session");
         };
-        match terminal_stop_response(runtime_root, session_id) {
+        let refine_dir = match self.current_refine_dir() {
+            Ok(refine_dir) => refine_dir,
+            Err(error) => return error_response(error),
+        };
+        match terminal_stop_response(runtime_root, refine_dir.as_deref(), session_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }

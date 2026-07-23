@@ -1,10 +1,12 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+use uuid::Uuid;
 
 use crate::model::workflow::GoalStatus;
 #[cfg(test)]
@@ -18,6 +20,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::tools::product::project_registry::FileProjectRegistryService;
+#[cfg(test)]
+use crate::tools::product::work_items::workflow_revision;
 use crate::tools::product::work_items::{FileWorkItemService, GoalCancellationExpectation};
 use crate::workflow::capacity::AgentCapacityState;
 use crate::workflow::{WorkflowAutomationState, WorkflowClaimState, WorkflowEngine};
@@ -57,6 +61,19 @@ enum CancellationSettlementFailureStage {
     AfterGoalPersistence,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CancellationRollbackFailureStage {
+    CapacityRestore,
+    ClaimRestore,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DurableReceiptBoundary {
+    FileSyncedBeforeRename,
+    RenamedBeforeDirectorySync,
+    DirectorySynced,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct CancellationSettlementJournal {
     schema_version: u32,
@@ -78,6 +95,18 @@ struct CancellationSettlementJournal {
     cause: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rollback_failure: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rollback_goal_restored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rollback_capacity_restored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rollback_claim_restored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rollback_goal_state: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    replay_goal_before: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    replay_goal_after: Option<Value>,
     recovery: String,
 }
 
@@ -101,6 +130,8 @@ pub struct FileProcessControlService {
     settlement_failure: Option<CancellationSettlementFailureStage>,
     #[cfg(test)]
     settlement_interruption: Option<CancellationSettlementFailureStage>,
+    #[cfg(test)]
+    rollback_failure: Option<CancellationRollbackFailureStage>,
 }
 
 impl FileProcessControlService {
@@ -119,6 +150,8 @@ impl FileProcessControlService {
             settlement_failure: None,
             #[cfg(test)]
             settlement_interruption: None,
+            #[cfg(test)]
+            rollback_failure: None,
         }
     }
 
@@ -140,6 +173,8 @@ impl FileProcessControlService {
             settlement_failure: None,
             #[cfg(test)]
             settlement_interruption: None,
+            #[cfg(test)]
+            rollback_failure: None,
         }
     }
 
@@ -176,6 +211,12 @@ impl FileProcessControlService {
     #[cfg(test)]
     fn with_settlement_interruption(mut self, stage: CancellationSettlementFailureStage) -> Self {
         self.settlement_interruption = Some(stage);
+        self
+    }
+
+    #[cfg(test)]
+    fn with_rollback_failure(mut self, stage: CancellationRollbackFailureStage) -> Self {
+        self.rollback_failure = Some(stage);
         self
     }
 
@@ -908,12 +949,21 @@ impl FileProcessControlService {
         goal_cancelled: bool,
         claim_cancelled: bool,
     ) -> RefineResult<()> {
+        let workflow = fs::read(
+            self.runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("{process_id}.json")),
+        )
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|receipt| receipt.get("workflow").cloned());
         self.write_outcome_receipt(
             process_id,
             json!({
                 "state": "completed",
                 "process_id": process_id,
                 "goal_id": goal_id,
+                "workflow": workflow,
                 "recorded_at": Utc::now().to_rfc3339(),
                 "termination": termination,
                 "confirmed_exit": termination.confirmed_exit,
@@ -1014,6 +1064,12 @@ impl FileProcessControlService {
             capacity_released: false,
             cause: None,
             rollback_failure: None,
+            rollback_goal_restored: None,
+            rollback_capacity_restored: None,
+            rollback_claim_restored: None,
+            rollback_goal_state: None,
+            replay_goal_before: None,
+            replay_goal_after: None,
             recovery: cancellation_settlement_recovery("prepared").to_string(),
         };
         self.write_cancellation_settlement_journal(&receipt_path, &journal)?;
@@ -1067,14 +1123,35 @@ impl FileProcessControlService {
         if let Err(cause) = settlement {
             let cause_message = cause.to_string();
             let mut rollback_failures = Vec::new();
-            if let Err(error) = goal_transaction.restore() {
-                rollback_failures.push(format!("Goal restore failed: {error}"));
+            match goal_transaction.restore() {
+                Ok(restored) => {
+                    journal.rollback_goal_restored = Some(true);
+                    journal.rollback_goal_state = Some(restored);
+                }
+                Err(error) => {
+                    journal.rollback_goal_restored = Some(false);
+                    rollback_failures.push(format!("Goal restore failed: {error}"));
+                }
             }
-            if let Err(error) = capacity.restore() {
-                rollback_failures.push(format!("capacity restore failed: {error}"));
+            let capacity_restore = self
+                .inject_rollback_failure(CancellationRollbackFailureStage::CapacityRestore)
+                .and_then(|()| capacity.restore());
+            match capacity_restore {
+                Ok(()) => journal.rollback_capacity_restored = Some(true),
+                Err(error) => {
+                    journal.rollback_capacity_restored = Some(false);
+                    rollback_failures.push(format!("capacity restore failed: {error}"));
+                }
             }
-            if let Err(error) = workflow.restore_state_locked(&original_state) {
-                rollback_failures.push(format!("claim restore failed: {error}"));
+            let claim_restore = self
+                .inject_rollback_failure(CancellationRollbackFailureStage::ClaimRestore)
+                .and_then(|()| workflow.restore_state_locked(&original_state));
+            match claim_restore {
+                Ok(()) => journal.rollback_claim_restored = Some(true),
+                Err(error) => {
+                    journal.rollback_claim_restored = Some(false);
+                    rollback_failures.push(format!("claim restore failed: {error}"));
+                }
             }
             let rollback_state = if rollback_failures.is_empty() {
                 "rolled_back"
@@ -1133,11 +1210,31 @@ impl FileProcessControlService {
         let workflow = WorkflowEngine::new(&self.runtime_root);
         let _workflow_lock = workflow.acquire_state_mutation_lock()?;
         let work_items = FileWorkItemService::new(refine_dir);
+        let replay_goal_before = journal
+            .replay_goal_before
+            .as_ref()
+            .unwrap_or(&journal.goal_before)
+            .clone();
+        let replay_goal_after = journal
+            .replay_goal_after
+            .as_ref()
+            .unwrap_or(&journal.goal_after)
+            .clone();
         let mut goal_transaction = work_items.prepare_goal_cancellation_replay(
             &journal.goal_id,
-            &journal.goal_before,
-            &journal.goal_after,
+            &replay_goal_before,
+            &replay_goal_after,
+            journal.rollback_goal_state.as_ref(),
         )?;
+        let exact_replay_before = goal_transaction.original_value();
+        let exact_replay_after = goal_transaction.cancelled_value();
+        if journal.replay_goal_before.as_ref() != Some(&exact_replay_before)
+            || journal.replay_goal_after.as_ref() != Some(&exact_replay_after)
+        {
+            journal.replay_goal_before = Some(exact_replay_before);
+            journal.replay_goal_after = Some(exact_replay_after);
+            self.write_cancellation_settlement_journal(&receipt_path, &journal)?;
+        }
         let mut capacity = workflow
             .capacity_service_for_settlement()
             .begin_cancellation_settlement()?;
@@ -1399,8 +1496,12 @@ impl FileProcessControlService {
         );
         journal.capacity_released =
             matches!(state, "capacity_released" | "goal_persisted" | "committed");
-        journal.cause = cause.map(str::to_string);
-        journal.rollback_failure = rollback_failure.map(str::to_string);
+        if let Some(cause) = cause {
+            journal.cause = Some(cause.to_string());
+        }
+        if let Some(rollback_failure) = rollback_failure {
+            journal.rollback_failure = Some(rollback_failure.to_string());
+        }
         journal.recovery = cancellation_settlement_recovery(state).to_string();
         self.write_cancellation_settlement_journal(path, journal)
     }
@@ -1421,6 +1522,22 @@ impl FileProcessControlService {
             return Err(RefineError::Io(format!(
                 "injected cancellation settlement failure after {}",
                 cancellation_settlement_stage_label(stage)
+            )));
+        }
+        #[cfg(not(test))]
+        let _ = stage;
+        Ok(())
+    }
+
+    fn inject_rollback_failure(&self, stage: CancellationRollbackFailureStage) -> RefineResult<()> {
+        #[cfg(test)]
+        if self.rollback_failure == Some(stage) {
+            return Err(RefineError::Io(format!(
+                "injected cancellation rollback failure during {}",
+                match stage {
+                    CancellationRollbackFailureStage::CapacityRestore => "capacity restore",
+                    CancellationRollbackFailureStage::ClaimRestore => "claim restore",
+                }
             )));
         }
         #[cfg(not(test))]
@@ -1875,6 +1992,14 @@ fn termination_outcome_flag(termination: &Value, key: &str) -> bool {
 }
 
 fn write_json_receipt(path: &Path, value: &Value) -> RefineResult<()> {
+    write_json_receipt_with_boundary(path, value, |_| Ok(()))
+}
+
+fn write_json_receipt_with_boundary(
+    path: &Path,
+    value: &Value,
+    mut boundary: impl FnMut(DurableReceiptBoundary) -> RefineResult<()>,
+) -> RefineResult<()> {
     let parent = path.parent().ok_or_else(|| {
         RefineError::InvalidInput(format!(
             "partial process-stop receipt {} has no parent",
@@ -1892,19 +2017,65 @@ fn write_json_receipt(path: &Path, value: &Value) -> RefineResult<()> {
             "failed to encode partial process-stop receipt: {error}"
         ))
     })?;
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, encoded).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to write partial process-stop receipt {}: {error}",
-            temp_path.display()
-        ))
-    })?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("process-stop-receipt");
+    let temp_path = parent.join(format!(".{file_name}.{}.tmp", Uuid::new_v4()));
+    let write_result = (|| -> RefineResult<()> {
+        let mut temp = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temp_path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to create partial process-stop receipt {}: {error}",
+                    temp_path.display()
+                ))
+            })?;
+        temp.write_all(&encoded).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write partial process-stop receipt {}: {error}",
+                temp_path.display()
+            ))
+        })?;
+        temp.sync_all().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to sync partial process-stop receipt {}: {error}",
+                temp_path.display()
+            ))
+        })?;
+        boundary(DurableReceiptBoundary::FileSyncedBeforeRename)
+    })();
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&temp_path);
+        return Err(error);
+    }
     fs::rename(&temp_path, path).map_err(|error| {
+        let _ = fs::remove_file(&temp_path);
         RefineError::Io(format!(
             "failed to commit partial process-stop receipt {}: {error}",
             path.display()
         ))
-    })
+    })?;
+    boundary(DurableReceiptBoundary::RenamedBeforeDirectorySync)?;
+    sync_receipt_directory(parent).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to sync partial process-stop receipt directory {}: {error}",
+            parent.display()
+        ))
+    })?;
+    boundary(DurableReceiptBoundary::DirectorySynced)
+}
+
+#[cfg(unix)]
+fn sync_receipt_directory(path: &Path) -> std::io::Result<()> {
+    fs::File::open(path)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_receipt_directory(_path: &Path) -> std::io::Result<()> {
+    Ok(())
 }
 
 fn validate_process_id(process_id: &str) -> RefineResult<()> {
@@ -2370,6 +2541,218 @@ mod tests {
 
             fs::remove_dir_all(temp_root).unwrap();
         }
+    }
+
+    #[test]
+    fn rollback_failed_after_goal_restore_replays_from_exact_restored_revision() {
+        let temp_root = unique_temp_dir("process-control-rollback-failed-replay");
+        let runtime_root = temp_root.join("run/8080");
+        let refine_dir = temp_root.join(".refine");
+        let goal_id = "GOAL-ROLLBACK-REPLAY";
+        let claim_id = "claim-rollback-replay";
+        let execution_id = "exec-rollback-replay";
+        let policy = non_default_workflow_policy();
+        create_in_progress_goal_with_rounds(&refine_dir, goal_id, 1);
+        let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let process = launch_workflow_agent(&supervisor, goal_id, claim_id, execution_id, 0);
+        write_workflow_state_with_policy(
+            &runtime_root,
+            json!([{
+                "claim_id": claim_id,
+                "goal_id": goal_id,
+                "node_id": policy.active_node_id,
+                "provider": policy.provider,
+                "target_app_id": policy.target_app_id,
+                "execution_id": execution_id,
+                "state": "running",
+                "created_at": "2026-07-23T00:00:00Z",
+                "updated_at": "2026-07-23T00:00:00Z"
+            }]),
+            &policy,
+        );
+        reserve_workflow_capacity_with_policy(&runtime_root, claim_id, &policy);
+        let policy_bytes = serde_json::to_vec(&policy).unwrap();
+
+        let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_settlement_failure(CancellationSettlementFailureStage::AfterGoalPersistence)
+            .with_rollback_failure(CancellationRollbackFailureStage::CapacityRestore)
+            .stop(&process.id, "terminate")
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("injected cancellation rollback failure during capacity restore"),
+            "{error}"
+        );
+        assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+        assert_eq!(
+            FileWorkItemService::new(&refine_dir)
+                .show_goal_summary(goal_id)
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::InProgress
+        );
+
+        let journal_path = runtime_root
+            .join("process-stop-outcomes")
+            .join(format!("workflow-cancellation-{goal_id}-{claim_id}.json"));
+        let failed: CancellationSettlementJournal =
+            serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+        assert_eq!(failed.state, "rollback_failed");
+        assert_eq!(failed.rollback_goal_restored, Some(true));
+        assert_eq!(failed.rollback_capacity_restored, Some(false));
+        assert_eq!(failed.rollback_claim_restored, Some(true));
+        let restored_goal = failed.rollback_goal_state.as_ref().unwrap();
+        assert_ne!(
+            workflow_revision(restored_goal),
+            workflow_revision(&failed.goal_before)
+        );
+        assert_eq!(
+            restored_goal.get("status"),
+            failed.goal_before.get("status")
+        );
+
+        let replayed = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .cancel_workflow_execution(execution_id)
+            .unwrap();
+        assert_eq!(replayed["cancelled"], true);
+        assert_eq!(replayed["replayed_settlement"], true);
+        assert_eq!(replayed["goal"]["status"], "cancelled");
+        let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
+        assert_eq!(serde_json::to_vec(&state.policy).unwrap(), policy_bytes);
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
+        let committed: CancellationSettlementJournal =
+            serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+        assert_eq!(committed.state, "committed");
+        assert_eq!(committed.rollback_goal_restored, Some(true));
+        assert_eq!(committed.rollback_capacity_restored, Some(false));
+        assert_eq!(committed.rollback_claim_restored, Some(true));
+        assert_eq!(
+            workflow_revision(committed.replay_goal_before.as_ref().unwrap()),
+            workflow_revision(restored_goal)
+        );
+        assert_eq!(
+            workflow_revision(committed.replay_goal_after.as_ref().unwrap()),
+            workflow_revision(restored_goal).saturating_add(1)
+        );
+        assert!(
+            committed
+                .rollback_failure
+                .as_deref()
+                .is_some_and(|failure| failure.contains("capacity restore"))
+        );
+        let process_receipt: Value = serde_json::from_slice(
+            &fs::read(
+                runtime_root
+                    .join("process-stop-outcomes")
+                    .join(format!("{}.json", process.id)),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(process_receipt["state"], "completed");
+        assert_eq!(process_receipt["goal_cancelled"], true);
+        assert_eq!(process_receipt["claim_cancelled"], true);
+        let repeated = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .cancel_workflow_execution(execution_id)
+            .unwrap();
+        assert_eq!(repeated["cancelled"], true);
+        assert_eq!(repeated["replayed_settlement"], true);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn cancellation_journal_writer_exposes_synced_atomic_boundaries() {
+        let temp_root = unique_temp_dir("process-control-journal-durability");
+        let journal_path = temp_root
+            .join("process-stop-outcomes")
+            .join("workflow-cancellation-GOAL-claim.json");
+        write_json_receipt(&journal_path, &json!({"state": "prepared"})).unwrap();
+
+        let before_rename = write_json_receipt_with_boundary(
+            &journal_path,
+            &json!({"state": "claim_persisted"}),
+            |boundary| {
+                if boundary == DurableReceiptBoundary::FileSyncedBeforeRename {
+                    Err(RefineError::Io(
+                        "injected crash after journal file sync".to_string(),
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .unwrap_err();
+        assert!(
+            before_rename
+                .to_string()
+                .contains("injected crash after journal file sync")
+        );
+        let retained: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+        assert_eq!(retained["state"], "prepared");
+
+        let after_rename = write_json_receipt_with_boundary(
+            &journal_path,
+            &json!({"state": "capacity_released"}),
+            |boundary| {
+                if boundary == DurableReceiptBoundary::RenamedBeforeDirectorySync {
+                    Err(RefineError::Io(
+                        "injected crash before journal directory sync".to_string(),
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .unwrap_err();
+        assert!(
+            after_rename
+                .to_string()
+                .contains("injected crash before journal directory sync")
+        );
+        let replaced: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+        assert_eq!(replaced["state"], "capacity_released");
+
+        let mut boundaries = Vec::new();
+        write_json_receipt_with_boundary(
+            &journal_path,
+            &json!({"state": "committed"}),
+            |boundary| {
+                boundaries.push(boundary);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            boundaries,
+            vec![
+                DurableReceiptBoundary::FileSyncedBeforeRename,
+                DurableReceiptBoundary::RenamedBeforeDirectorySync,
+                DurableReceiptBoundary::DirectorySynced,
+            ]
+        );
+        let committed: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+        assert_eq!(committed["state"], "committed");
+        assert!(
+            fs::read_dir(journal_path.parent().unwrap())
+                .unwrap()
+                .all(|entry| !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .ends_with(".tmp"))
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]

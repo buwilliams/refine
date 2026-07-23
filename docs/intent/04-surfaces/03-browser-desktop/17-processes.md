@@ -24,6 +24,9 @@ Current implementation details that matter to intent:
 - chat, workflow, runner, target-app, and UI contexts should be surfaced where available;
 - every active agent row exposes a process-specific Stop action through the shared
   process capability; linked Goals cancel only after confirmed process exit;
+- the Goal terminal Stop control resolves the attached managed process and uses
+  the same confirmed-exit, Goal, claim, and capacity settlement response as the
+  Processes API rather than a terminal-specific Goal-Agent signal path;
 - process pause/resume controls affect background work and agents;
 - settings/processes views should avoid overfetching unrelated settings data.
 

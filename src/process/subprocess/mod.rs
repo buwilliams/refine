@@ -439,16 +439,49 @@ impl FileProcessSupervisor {
     where
         F: FnMut(ProcessCleanupStage) -> RefineResult<()>,
     {
-        for path in [
-            expected.stdout_path.as_deref(),
-            expected.stderr_path.as_deref(),
-            expected.stdin_path.as_deref(),
-        ]
-        .into_iter()
-        .flatten()
+        let handoff_path = self.artifact_handoff_path(&expected.id);
+        let handoff = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&handoff_path)
         {
-            if let Err(error) = remove_file_if_present(Path::new(path), "process artifact") {
-                return Err(ConfirmedProcessCleanupFailure { outcome, error });
+            Ok(file) => match file.try_lock_exclusive() {
+                Ok(()) => Some(file),
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => None,
+                Err(error) => {
+                    return Err(ConfirmedProcessCleanupFailure {
+                        outcome,
+                        error: RefineError::Io(format!(
+                            "failed to inspect process artifact handoff {}: {error}",
+                            handoff_path.display()
+                        )),
+                    });
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(ConfirmedProcessCleanupFailure {
+                    outcome,
+                    error: RefineError::Io(format!(
+                        "failed to open process artifact handoff {}: {error}",
+                        handoff_path.display()
+                    )),
+                });
+            }
+        };
+        let artifacts_deferred = handoff.is_none() && handoff_path.exists();
+        if !artifacts_deferred {
+            for path in [
+                expected.stdout_path.as_deref(),
+                expected.stderr_path.as_deref(),
+                expected.stdin_path.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if let Err(error) = remove_file_if_present(Path::new(path), "process artifact") {
+                    return Err(ConfirmedProcessCleanupFailure { outcome, error });
+                }
             }
         }
 
@@ -471,6 +504,12 @@ impl FileProcessSupervisor {
             return Err(ConfirmedProcessCleanupFailure { outcome, error });
         }
         outcome.identity_cleanup_completed = true;
+        drop(handoff);
+        if !artifacts_deferred
+            && let Err(error) = remove_file_if_present(&handoff_path, "process artifact handoff")
+        {
+            return Err(ConfirmedProcessCleanupFailure { outcome, error });
+        }
         Ok(outcome)
     }
 
@@ -532,6 +571,11 @@ impl FileProcessSupervisor {
     }
 
     pub(crate) fn finish_artifact_handoff(&self, handoff: fs::File) -> RefineResult<()> {
+        FileExt::unlock(&handoff).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to unlock process artifact handoff: {error}"
+            ))
+        })?;
         drop(handoff);
         Ok(())
     }

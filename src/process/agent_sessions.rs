@@ -538,9 +538,10 @@ where
         "failed".to_string()
     };
     process.exit_code = i32::try_from(status.exit_code()).ok();
-    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
     let _ = supervisor.register(process);
     cleanup_session_artifacts(&command_path, &signal_path);
+    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+    let _ = supervisor.recover_owner(ProcessOwner::Agent);
 
     if !status.success() && !completed_by_signal {
         return Err(RefineError::Degraded(format!(
@@ -630,12 +631,6 @@ pub fn resize_agent_session(
         session_id,
         AgentSessionCommand::Resize { cols, rows },
     )
-}
-
-pub fn stop_agent_session(runtime_root: &Path, session_id: &str) -> RefineResult<()> {
-    let (process, _) = session_process(runtime_root, session_id)?;
-    FileProcessSupervisor::new(runtime_root).request_termination(&process.id, "terminate")?;
-    Ok(())
 }
 
 pub fn agent_session_events_since(

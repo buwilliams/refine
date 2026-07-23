@@ -74,14 +74,25 @@ impl GoalCancellationTransaction {
         Ok(())
     }
 
-    pub(crate) fn restore(&mut self) -> RefineResult<()> {
+    pub(crate) fn restore(&mut self) -> RefineResult<Value> {
         if self.committed {
             let mut expected = self.original.clone();
             set_workflow_revision(&mut expected, workflow_revision(&self.cancelled))?;
             write_json_atomically(&self.goal_path, &expected)?;
             self.committed = false;
         }
-        Ok(())
+        let bytes = fs::read(&self.goal_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read restored Goal {}: {error}",
+                self.goal_path.display()
+            ))
+        })?;
+        serde_json::from_slice(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse restored Goal {}: {error}",
+                self.goal_path.display()
+            ))
+        })
     }
 
     pub(crate) fn projection(&self) -> RefineResult<GoalSummaryProjection> {
@@ -93,7 +104,14 @@ impl GoalCancellationTransaction {
     }
 
     pub(crate) fn cancelled_value(&self) -> Value {
-        self.cancelled.clone()
+        let mut cancelled = self.cancelled.clone();
+        if let Some(object) = cancelled.as_object_mut() {
+            object.insert(
+                "workflow_revision".to_string(),
+                Value::from(workflow_revision(&self.original).saturating_add(1)),
+            );
+        }
+        cancelled
     }
 }
 
@@ -2226,22 +2244,29 @@ impl FileWorkItemService {
         goal_id: &str,
         original: &Value,
         cancelled: &Value,
+        restored: Option<&Value>,
     ) -> RefineResult<GoalCancellationTransaction> {
         let goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let (goal_path, current_value) = self.read_goal_value_unchecked_locked(&current)?;
-        if &current_value != original && &current_value != cancelled {
+        let replay_original = if &current_value == original {
+            original
+        } else if restored.is_some_and(|restored| current_value == *restored) {
+            restored.expect("restored Goal replay state was checked")
+        } else if &current_value == cancelled {
+            original
+        } else {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} changed outside the interrupted cancellation settlement; replay did not overwrite the newer Goal state"
             )));
-        }
+        };
         Ok(GoalCancellationTransaction {
             service: self.clone(),
             _lock: goal_lock,
             goal_id: goal_id.to_string(),
             goal_path,
-            original: original.clone(),
+            original: replay_original.clone(),
             cancelled: cancelled.clone(),
             committed: current_value == *cancelled,
         })

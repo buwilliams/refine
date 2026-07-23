@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, VecDeque};
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
@@ -14,12 +15,12 @@ use uuid::Uuid;
 
 use crate::process::agent_sessions::{
     agent_session_events_range, find_agent_session, resize_agent_session, send_agent_session_input,
-    stop_agent_session,
 };
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::product::process_control::FileProcessControlService;
 
 const TERMINAL_INPUT_LIMIT: usize = 16_000;
 const TERMINAL_EVENT_BACKLOG: usize = 1_000;
@@ -171,15 +172,44 @@ pub(in crate::surfaces::web_server) fn terminal_status_response(
 }
 
 pub(in crate::surfaces::web_server) fn terminal_stop_response(
-    runtime_root: &std::path::Path,
+    runtime_root: &Path,
+    refine_dir: Option<&Path>,
     session_id: &str,
 ) -> RefineResult<Value> {
     if let Some(session) = local_terminal_session(session_id)? {
-        stop_terminal_session(&session)?;
+        let goal_linked = session
+            .process
+            .api_json()
+            .get("goal_id")
+            .and_then(Value::as_str)
+            .is_some_and(|goal_id| !goal_id.trim().is_empty());
+        if goal_linked {
+            let service = match refine_dir {
+                Some(refine_dir) => {
+                    FileProcessControlService::with_refine_dir(runtime_root, refine_dir)
+                }
+                None => FileProcessControlService::new(runtime_root),
+            };
+            let result = service.stop(&session.process_id, "terminate")?;
+            sessions()
+                .lock()
+                .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
+                .remove(&session.id);
+            Ok(result)
+        } else {
+            stop_terminal_session(&session)?;
+            Ok(json!({"ok": true}))
+        }
     } else {
-        stop_agent_session(runtime_root, session_id)?;
+        let snapshot = find_agent_session(runtime_root, session_id)?;
+        let service = match refine_dir {
+            Some(refine_dir) => {
+                FileProcessControlService::with_refine_dir(runtime_root, refine_dir)
+            }
+            None => FileProcessControlService::new(runtime_root),
+        };
+        service.stop(&snapshot.process_id, "terminate")
     }
-    Ok(json!({"ok": true}))
 }
 
 fn stop_terminal_session(session: &Arc<TerminalSession>) -> RefineResult<()> {
@@ -440,9 +470,9 @@ impl TerminalSession {
                 .as_ref()
                 .map(|status| format!("{status:?}"))
                 .unwrap_or_else(|| "closed".to_string());
-            reader_session.exited.store(true, Ordering::Release);
             reader_session.finish_process(exit.as_ref());
             reader_session.push_event("terminal_exit", status);
+            reader_session.exited.store(true, Ordering::Release);
         });
         Ok(session)
     }
@@ -489,6 +519,16 @@ impl TerminalSession {
                     ))
                 })?;
             }
+        }
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !self.exited.load(Ordering::Acquire) && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
+        if !self.exited.load(Ordering::Acquire) {
+            return Err(RefineError::Degraded(format!(
+                "interactive {} session did not finish cleanup within 2000 ms after termination",
+                self.profile
+            )));
         }
         Ok(())
     }
@@ -612,7 +652,7 @@ mod tests {
             let second = terminal_session_start_response(launch(), 120, 36).unwrap();
             assert_eq!(first["id"], second["id"], "{profile}");
             assert_eq!(second["reattached"], true, "{profile}");
-            terminal_stop_response(&root.join("run"), first["id"].as_str().unwrap()).unwrap();
+            terminal_stop_response(&root.join("run"), None, first["id"].as_str().unwrap()).unwrap();
         }
         fs::remove_dir_all(root).unwrap();
     }
