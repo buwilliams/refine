@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:50:59Z",
+  "updated_at": "2026-07-23T12:54:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1323,6 +1323,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The baseline fix removed the destructive deletion, but exposed the second half of the bug: a persistent conflict in `supervisor-agent.json` aborts the whole sync, so a disjoint remote Goal never reaches the second daemon. I’ve sent the narrower required behavior: retain and report the unequal conflicting path while still reconciling non-conflicting paths, with the baseline advancing only for paths actually copied."
+    },
+    {
+      "created_at": "2026-07-23T12:54:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784811290746-158",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The candidate is now committed as `6d04fbab`, with its worktree preserved and clean. Although all declared test gates passed, I am not accepting it yet: the implementation currently exempts unequal `supervisor-agent.json` revisions from conflict detection, which can overwrite failure/open-issue evidence, and the cancellation test still does not close the pre-process-launch race. I’m waiting for the independent Governance decision; no merge or approval has been attempted."
     }
   ],
   "queued_messages": [
