@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:23:30Z",
+  "updated_at": "2026-07-23T19:25:17Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3000,6 +3000,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 9 is making forward progress: after the initial clean verification pass, it has now begun the targeted remediation in four relevant files (`agent_sessions`, terminal/work routes, and shared process control). This confirms the earlier quiet interval was model work, not a lost worker; no supervisory intervention is warranted."
+    },
+    {
+      "created_at": "2026-07-23T19:25:17Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784834717450-226",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The remediation is still advancing and remains tightly scoped: five files, with most new coverage/logic accumulating in the authoritative process-control service. The Goal Agent remains registered and healthy; there is still no completion, failure, or input request to act on."
     }
   ],
   "queue_dispatching": true,
