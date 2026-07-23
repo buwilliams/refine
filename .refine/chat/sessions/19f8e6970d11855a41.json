@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:02:35Z",
+  "updated_at": "2026-07-23T10:02:44Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -81,6 +81,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T10:02:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800964220-4",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m correlating the queued Goal with live process, durable Goal/round evidence, Git/worktree state, and daemon health before deciding whether any retry is justified. I’ll use the prior auditable-recovery guidance because this is a live Refine supervision case; it preserves the explicit retry and review boundaries."
     }
   ],
   "queued_messages": [

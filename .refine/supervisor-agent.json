@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "observing",
-  "health": "degraded",
+  "health": "healthy",
   "active_work": 1,
   "queued_work": 0,
   "failed_work": 0,
@@ -56,11 +56,9 @@
     "00000SZ301MXF1Q5K4QDSJ6000": "done",
     "00000SZ3K92DJJT8PWF5AP8000": "in-progress"
   },
-  "open_issues": {
-    "state_sync": "Refine state synchronization failed: background process launch is stopped"
-  },
+  "open_issues": {},
   "last_context_key": "goals=00000SZ3K92DJJT8PWF5AP8000:in-progress|live={\"00000SZ3K92DJJT8PWF5AP8000\"}|quiet={}|issues=state_sync:Refine state synchronization failed: background process launch is stopped",
-  "updated_at": "2026-07-23T10:02:35.053071255+00:00",
+  "updated_at": "2026-07-23T10:02:42.528929700+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
