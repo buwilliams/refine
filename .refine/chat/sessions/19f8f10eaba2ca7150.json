@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:38:04Z",
+  "updated_at": "2026-07-23T15:39:27Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1428,6 +1428,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 6 is still live and inspecting the journal, policy context, and restart construction points before editing. The clean worktree and advancing process output show analysis rather than a lost worker."
+    },
+    {
+      "created_at": "2026-07-23T15:39:27Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821167064-268",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The Round 6 agent has implemented policy-preserving workflow persistence and journal-replay plumbing in four capability files. It remains live; the permanent child process is its code execution host, not a separate unsupervised worker."
     }
   ],
   "queued_messages": [
