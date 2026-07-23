@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:07:20Z",
+  "updated_at": "2026-07-23T18:07:31Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1893,6 +1893,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T18:07:31Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830051039-39",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll correlate the two active Goals and five review candidates against durable Goal/Round records, live processes, Git/worktrees, provider evidence, and runtime health. I’ll keep review as a confirmation boundary and only intervene if current evidence shows a lost worker or another actionable failure."
     }
   ],
   "queue_dispatching": true,
