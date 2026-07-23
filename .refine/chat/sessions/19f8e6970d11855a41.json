@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:05:03Z",
+  "updated_at": "2026-07-23T10:06:12Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -129,6 +129,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The apparent process disappearance was only a surface mismatch: the interactive process record closed, but the workflow-owned Codex process is still alive under the workflow runner, in the correct Goal worktree, with the matching durable execution claim. There is no lost-worker condition and no authority-requiring action yet."
+    },
+    {
+      "created_at": "2026-07-23T10:06:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801172730-12",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The worker is making scoped UI changes in the Round worktree. One patch hunk against `common.js` failed verification because the expected context had drifted; that failure is visible in the provider log, and the agent continued by re-reading the actual code. I’m leaving the worker in control rather than editing around it or masking the failed hunk."
     }
   ],
   "queued_messages": [
