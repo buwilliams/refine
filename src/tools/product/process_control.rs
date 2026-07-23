@@ -13,6 +13,7 @@ use crate::process::subprocess::{
     ConfirmedProcessExit, FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
     acquire_workflow_process_registration_lock,
 };
+use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
@@ -941,6 +942,7 @@ impl FileProcessControlService {
         expectation: &GoalCancellationExpectation,
         ownership: &[WorkflowGoalOwnership],
     ) -> RefineResult<crate::tools::product::project_state::GoalSummaryProjection> {
+        let _coordination = acquire_workflow_coordination(refine_dir)?;
         let workflow = WorkflowEngine::new(&self.runtime_root);
         let _workflow_lock = workflow.acquire_state_mutation_lock()?;
         let work_items = FileWorkItemService::new(refine_dir);
@@ -1127,6 +1129,7 @@ impl FileProcessControlService {
             return Ok(None);
         }
 
+        let _coordination = acquire_workflow_coordination(refine_dir)?;
         let workflow = WorkflowEngine::new(&self.runtime_root);
         let _workflow_lock = workflow.acquire_state_mutation_lock()?;
         let work_items = FileWorkItemService::new(refine_dir);
@@ -1190,6 +1193,7 @@ impl FileProcessControlService {
             if current_workflow.updated_at == journal.workflow_before.updated_at {
                 current_workflow.updated_at = journal.workflow_after.updated_at.clone();
             }
+            current_workflow.version = current_workflow.version.saturating_add(1);
             workflow.persist_state_preserving_policy_locked(&current_workflow)?;
         }
         self.update_cancellation_settlement_journal(
@@ -1257,6 +1261,7 @@ impl FileProcessControlService {
         goal_id: &str,
         ownership: &[WorkflowGoalOwnership],
     ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.runtime_root)?;
         let workflow = WorkflowEngine::new(&self.runtime_root);
         let _workflow_lock = workflow.acquire_state_mutation_lock()?;
         let mut state = workflow.load_state()?;
@@ -2411,6 +2416,8 @@ mod tests {
         let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
         assert_eq!(serde_json::to_vec(&state.policy).unwrap(), policy_bytes);
         assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
+        assert_eq!(state.version, 1);
+        assert_eq!(state.claims[0].decision_version, 1);
         assert_eq!(state.claims[0].node_id, "node-policy");
         assert_eq!(state.claims[0].provider, "provider-policy");
         assert_eq!(state.claims[0].target_app_id, "/srv/non-default-target");
@@ -2482,11 +2489,15 @@ mod tests {
                 provider: policy.provider.clone(),
                 target_app_id: policy.target_app_id.clone(),
                 execution_id: None,
+                round_idx: None,
+                goal_revision: None,
+                decision_version: 1,
                 state: WorkflowClaimState::Claimed,
                 created_at: "2026-07-23T00:03:00Z".to_string(),
                 updated_at: "2026-07-23T00:03:00Z".to_string(),
             });
             concurrent_workflow.updated_at = Some("2026-07-23T00:03:00Z".to_string());
+            concurrent_workflow.version = concurrent_workflow.version.saturating_add(1);
             WorkflowEngine::new(&runtime_root)
                 .persist_state_preserving_policy_locked(&concurrent_workflow)
                 .unwrap();
@@ -2519,6 +2530,8 @@ mod tests {
                 serde_json::to_vec(&interrupted_journal.workflow_after.policy).unwrap(),
                 policy_bytes
             );
+            assert_eq!(interrupted_journal.workflow_before.version, 0);
+            assert_eq!(interrupted_journal.workflow_after.version, 1);
 
             let replayed = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
                 .cancel_workflow_execution(&execution_id)
@@ -2532,6 +2545,7 @@ mod tests {
             assert_eq!(committed.state, "committed");
             let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
             assert_eq!(serde_json::to_vec(&state.policy).unwrap(), policy_bytes);
+            assert_eq!(state.version, 2);
             assert_eq!(
                 state
                     .claims
@@ -2540,6 +2554,15 @@ mod tests {
                     .unwrap()
                     .state,
                 WorkflowClaimState::Cancelled
+            );
+            assert_eq!(
+                state
+                    .claims
+                    .iter()
+                    .find(|claim| claim.claim_id == claim_id)
+                    .unwrap()
+                    .decision_version,
+                1
             );
             assert_eq!(
                 state

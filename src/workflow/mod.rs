@@ -290,10 +290,12 @@ impl WorkflowEngine {
                         "workflow claim {claim_id} disappeared before cancellation settlement"
                     ))
                 })?;
+            claim.decision_version = claim.decision_version.saturating_add(1);
             claim.state = WorkflowClaimState::Cancelled;
             claim.updated_at = now.clone();
         }
         cancelled.updated_at = Some(now);
+        cancelled.version = cancelled.version.saturating_add(1);
         Ok(cancelled)
     }
 
@@ -301,11 +303,25 @@ impl WorkflowEngine {
         &self,
         state: &WorkflowAutomationState,
     ) -> RefineResult<()> {
+        let current = read_state(&self.state_path())?;
+        if current == *state {
+            return Ok(());
+        }
+        let expected_version = current.version.saturating_add(1);
+        if state.version != expected_version {
+            return Err(RefineError::Conflict(format!(
+                "workflow cancellation settlement expected to advance version {} to {}, received {}",
+                current.version, expected_version, state.version
+            )));
+        }
         write_state(&self.state_path(), state)
     }
 
     pub(crate) fn restore_state_locked(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
-        self.persist_state_preserving_policy_locked(state)
+        let current = read_state(&self.state_path())?;
+        let mut restored = state.clone();
+        restored.version = current.version.saturating_add(1);
+        self.persist_state_preserving_policy_locked(&restored)
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
@@ -380,6 +396,7 @@ impl WorkflowEngine {
         goal_revision: u64,
     ) -> RefineResult<WorkflowExecutionFence> {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         if let Some(other) = state.claims.iter().find(|claim| {
             claim.goal_id == goal_id
@@ -435,6 +452,7 @@ impl WorkflowEngine {
     /// Revalidates Ready Merge authority immediately before a side effect or settlement.
     pub fn verify_ready_merge_fence(&self, fence: &WorkflowExecutionFence) -> RefineResult<()> {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let state = self.load_state()?;
         if let Some(other) = state.claims.iter().find(|claim| {
             claim.goal_id == fence.goal_id
@@ -487,6 +505,7 @@ impl WorkflowEngine {
         goal_revision: u64,
     ) -> RefineResult<()> {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let claim = state
             .claims
@@ -571,8 +590,8 @@ impl WorkflowEngine {
 
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
         let runnable = {
-            let _state_lock = self.acquire_state_mutation_lock()?;
             let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+            let _state_lock = self.acquire_state_mutation_lock()?;
             let mut state = self.load_state()?;
             state.policy = self.policy()?;
             let runnable = match self.ensure_automation_running(&state) {
@@ -1267,8 +1286,8 @@ impl WorkflowEngine {
         expected_execution_id: Option<&str>,
         claim_state: WorkflowClaimState,
     ) -> RefineResult<()> {
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let Some(claim) = state
             .claims
@@ -1308,8 +1327,8 @@ impl WorkflowEngine {
     }
 
     fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
         let mut state = self.load_state()?;
         let mut changed = false;
@@ -1375,8 +1394,8 @@ struct GovernanceEvaluation {
 
 impl WorkflowAutomation for WorkflowEngine {
     fn promote(&self) -> RefineResult<usize> {
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();
@@ -1589,16 +1608,16 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()> {
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         state.paused.insert(control);
         self.save_state(&mut state)
     }
 
     fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()> {
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         state.paused.remove(&control);
         self.save_state(&mut state)
@@ -1625,8 +1644,8 @@ impl WorkflowAutomation for WorkflowEngine {
 
     fn retry(&self, execution_id: &str) -> RefineResult<String> {
         let execution_id = execution_id.trim();
-        let _state_lock = self.acquire_state_mutation_lock()?;
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
         let policy = self.policy()?;
         state.policy = policy.clone();

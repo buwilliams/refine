@@ -18,7 +18,10 @@ use crate::model::workflow::{
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
     is_feature_protected_status, is_terminal_status, user_status_transition,
 };
-use crate::process::supervisor::coordination::{replace_file_durably, with_workflow_coordination};
+use crate::process::supervisor::coordination::{
+    WorkflowCoordinationLease, acquire_workflow_coordination, replace_file_durably,
+    with_workflow_coordination,
+};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -38,8 +41,8 @@ pub(crate) struct GoalCancellationExpectation {
     pub updated: String,
 }
 
-#[derive(Debug)]
 struct GoalMutationLock {
+    _coordination: WorkflowCoordinationLease,
     file: File,
 }
 
@@ -61,14 +64,21 @@ pub(crate) struct GoalCancellationTransaction {
 
 impl GoalCancellationTransaction {
     pub(crate) fn commit(&mut self) -> RefineResult<()> {
-        write_json_atomically(&self.goal_path, &self.cancelled)?;
+        if self.committed {
+            return Ok(());
+        }
+        let mut expected = self.cancelled.clone();
+        set_workflow_revision(&mut expected, workflow_revision(&self.original))?;
+        write_json_atomically(&self.goal_path, &expected)?;
         self.committed = true;
         Ok(())
     }
 
     pub(crate) fn restore(&mut self) -> RefineResult<()> {
         if self.committed {
-            write_json_atomically(&self.goal_path, &self.original)?;
+            let mut expected = self.original.clone();
+            set_workflow_revision(&mut expected, workflow_revision(&self.cancelled))?;
+            write_json_atomically(&self.goal_path, &expected)?;
             self.committed = false;
         }
         Ok(())
@@ -206,6 +216,7 @@ impl FileWorkItemService {
     }
 
     fn acquire_goal_mutation_lock(&self) -> RefineResult<GoalMutationLock> {
+        let coordination = acquire_workflow_coordination(&self.refine_dir)?;
         fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create Refine state directory {}: {error}",
@@ -231,7 +242,10 @@ impl FileWorkItemService {
                 path.display()
             ))
         })?;
-        Ok(GoalMutationLock { file })
+        Ok(GoalMutationLock {
+            _coordination: coordination,
+            file,
+        })
     }
 
     fn active_node_id(&self) -> RefineResult<String> {
@@ -2192,6 +2206,10 @@ impl FileWorkItemService {
             Value::String(GoalStatus::Cancelled.as_str().to_string()),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
+        set_workflow_revision(
+            &mut cancelled,
+            workflow_revision(&original).saturating_add(1),
+        )?;
         Ok(GoalCancellationTransaction {
             service: self.clone(),
             _lock: goal_lock,
@@ -3539,6 +3557,14 @@ pub(crate) fn workflow_revision(value: &Value) -> u64 {
         .get("workflow_revision")
         .and_then(Value::as_u64)
         .unwrap_or(0)
+}
+
+fn set_workflow_revision(value: &mut Value, revision: u64) -> RefineResult<()> {
+    let object = value.as_object_mut().ok_or_else(|| {
+        RefineError::Serialization("workflow record is not a JSON object".to_string())
+    })?;
+    object.insert("workflow_revision".to_string(), Value::from(revision));
+    Ok(())
 }
 
 fn workflow_record_root(path: &std::path::Path) -> PathBuf {

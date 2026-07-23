@@ -376,8 +376,7 @@ impl FileProcessSupervisor {
         }
 
         if let Some(pid) = expected.pid
-            && let Some(message) =
-                signal_os_process(pid, signal, process_owns_group(expected))?
+            && let Some(message) = signal_os_process(pid, signal, process_owns_group(expected))?
         {
             match self.owned_process_state(expected, &identity)? {
                 OwnedProcessState::Exited => {}
