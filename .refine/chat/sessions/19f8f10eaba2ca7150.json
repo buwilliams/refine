@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:07:13Z",
+  "updated_at": "2026-07-23T13:07:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -93,6 +93,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live evidence has already superseded the supplied snapshot: both queued Goals are now `in-progress` with distinct running Codex Goal Agents and isolated worktrees. The daemon and UI are healthy; I’m checking progress/output and current provider health now, without restarting or signalling either worker."
+    },
+    {
+      "created_at": "2026-07-23T13:07:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812048506-20",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A third Goal started while I was checking (`00000SZ3RP4G52RZ706A5P4001`). All three claims are live and the scheduler reports steady state, so there is still no supported intervention. Historical degradation remains visible: `operation-recovery-interrupted` and the prior Goal Agent exit are still recorded, although state sync has recovered and Codex authentication currently passes."
     }
   ],
   "queued_messages": [
