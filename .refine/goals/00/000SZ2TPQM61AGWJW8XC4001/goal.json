@@ -1,7 +1,7 @@
 {
-  "base_commit": "003a011ce99bbdca232a29bd7ad2c822043eee15",
-  "branch_name": "refine/00000SZ2TPQM61AGWJW8XC4001/round-2",
-  "candidate_commit": "cf73aa4a344343a028172b7093aec53ab43311a8",
+  "base_commit": "b6ca46183eb718282c25afbc3d28db99eec11b54",
+  "branch_name": "refine/00000SZ2TPQM61AGWJW8XC4001/round-7",
+  "candidate_commit": "f5a34d104d1056961853e822cbf1c93b4683a58d",
   "created": "2026-07-22T19:39:05Z",
   "feature_id": null,
   "feature_order": null,
@@ -271,9 +271,342 @@
       "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T21:11:39Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-22T22:48:57Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Resolve only the four remaining round-2 governance findings on candidate cf73aa4a, preserving all already implemented Quality behavior and evidence guarantees. 1. Make Quality timing truly authoritative. Remove the independent quality_timing value from FileSettingsService persistence and defaults, and either compatibly delegate legacy /settings reads and writes to FileQualityService quality/settings.json or reject legacy writes with an explicit migration response. Dashboard, workflow, API, CLI, UI, and desktop must observe the same value. Add a cross-surface regression proving a legacy update cannot succeed without changing effective workflow timing. 2. Make legacy Quality migration project-wide across the complete Node registry, not active-Node-only. Before recording SETTINGS_MIGRATION_VERSION, inspect every Node that can contain enabled target-app test settings, preserve all enforced commands without silent omission, deduplicate identical commands, and fail visibly rather than mark migration complete if divergent legacy state cannot be represented safely. Cover an inactive Node with enabled commands and retry after an injected migration failure. 3. Close cancellation launch races. Use a race-safe shared launch/cancel barrier or equivalent operation/process handshake so cancellation before provider launch, between provider and commands, and between commands prevents any later supervised process from starting. Recheck terminal state at each boundary, associate every process with operation_id before it can escape cancellation, terminate a process that loses the race, and persist cancelled Goal evidence. Add deterministic barrier-based tests rather than timing-only sleeps. 4. Persist authoritative Goal-round Quality summary and Goal log before making the operation terminal. An evidence-write or log-write failure must not leave a succeeded or failed terminal operation paired with stale Goal evidence. Preserve cancellation authority and provider or parsing errors verbatim. Add failure-injection tests for summary and log persistence plus restart recovery of the nonterminal operation. Keep handlers thin and reuse the shared Quality capability. Run focused settings, migration, operation, cancellation, cross-surface, and production workflow tests, plus cargo fmt --all -- --check and git diff --check. Do not broaden scope, force merges, delete worktrees, discard changes, or weaken authentication, confirmation, audit, provider-failure, cancellation, candidate-integrity, or observed-execution boundaries.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-22T22:48:57Z"
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-22T22:51:00Z",
+      "governance_checked_at": "2026-07-22T23:22:28Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-4",
+        "failed_actions": [
+          {
+            "message": "Cancellation marks the operation terminal before the Quality worker durably records cancelled Goal-round evidence and its Goal log. A crash or persistence failure in that window leaves stale Goal evidence, and restart recovery skips the terminal operation, so the inconsistency is unrecoverable.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"One cancellation-recovery violation remains.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancellation marks the operation terminal before the Quality worker durably records cancelled Goal-round evidence and its Goal log. A crash or persistence failure in that window leaves stale Goal evidence, and restart recovery skips the terminal operation, so the inconsistency is unrecoverable.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "One cancellation-recovery violation remains.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Cancellation marks the operation terminal before the Quality worker durably records cancelled Goal-round evidence and its Goal log. A crash or persistence failure in that window leaves stale Goal evidence, and restart recovery skips the terminal operation, so the inconsistency is unrecoverable.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-4"
+      },
+      "governance_message": "One cancellation-recovery violation remains.",
+      "governance_rule_actions": [
+        {
+          "message": "Cancellation marks the operation terminal before the Quality worker durably records cancelled Goal-round evidence and its Goal log. A crash or persistence failure in that window leaves stale Goal evidence, and restart recovery skips the terminal operation, so the inconsistency is unrecoverable.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
+      "implementation_report": "Round 4 is complete and reviewable at commit `2f0fd2bb`. The worktree is clean; no further edits were necessary after auditing the existing candidate.\n\nWhat changed:\n\n- Quality timing now uses `quality/settings.json` across legacy settings, workflow, dashboard, and Quality APIs.\n- Migration examines every Node, deduplicates enabled legacy commands, stages data before advancing the migration version, and supports retry after failure.\n- Supervised launches share a race-safe barrier with cancellation, preventing provider or command launches after cancellation.\n- Exact Goal-round evidence and logs are persisted before success/failure settlement. Persistence failures remain nonterminal and recover as interrupted.\n- Existing provider-error visibility, candidate integrity, observed execution evidence, and ownership serialization remain intact.\n\nKey implementation: [Quality service](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-4/src/tools/host/quality/service.rs), [operation coordination](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-4/src/process/supervisor/operations/mod.rs), [settings adapter](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-4/src/process/supervisor/config/mod.rs).\n\nVerification:\n\n- Quality regressions: 15 passed, 0 failed\n- Operation/cancellation regressions: 7 passed, 0 failed\n- Settings regressions: 4 passed, 0 failed\n- Cross-surface Quality test: 1 passed, 0 failed\n- Production full workflow: 1 passed, 0 failed\n- Complete library suite: 429 passed, 0 failed\n- Browser JavaScript tests: 26 passed, 0 failed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` and committed-diff check — passed\n- Final Git status — clean",
+      "implementation_reported_at": "2026-07-22T23:18:04Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Remediate the four persisted Round 2 governance findings without weakening the audit gate or broadening scope. Make Quality timing truly authoritative across legacy /settings, workflow, dashboard, and quality/settings.json through one shared source or a compatible adapter; legacy updates must not report success while having no effect. Migrate enabled target-app Quality commands for all Nodes before marking the project migration complete so no Node silently loses enforced QA. Close cancellation race windows by rechecking terminal/cancelled operation state immediately before provider launch and before each supervised test command, ensuring cancellation prevents later work from starting. Persist exact Goal-round evidence and Goal logs before terminal operation settlement, with failure/recovery ordering that cannot report success while authoritative evidence remains stale. Preserve provider and authentication failures verbatim, candidate/worktree integrity checks, supervised execution evidence, ownership serialization, existing confirmation boundaries, and the current clean Round 2 candidate. Add focused regression tests for each finding and affected cross-surface behavior. Do not force merges, delete worktrees, discard changes, or hide failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-22T23:22:28Z"
+    },
+    {
+      "assignee": "Refine",
+      "constitution_state": "passed",
+      "created": "2026-07-22T23:23:04Z",
+      "governance_checked_at": "2026-07-22T23:40:27Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5",
+        "failed_actions": [
+          {
+            "message": "Quality timing is re-read independently in ReadyMerge, Build, and QA instead of being preserved with the candidate workflow commitment. Changing timing between stages or before retry can skip Build or skip Quality entirely.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "When startup cannot terminate a process owned by a deferred Quality cancellation, generic recovery leaves the operation Cancelling but returns success; Quality recovery then settles it as Cancelled without checking that the process exited, allowing live work behind a terminal operation.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Quality cancellation operations are port-wide but do not retain target-app state identity. Startup scans all operations using only the currently attached app's .refine directory, so switching apps can write evidence to the wrong Goal, abort daemon startup, or leave the original cancellation unsettled.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The manual Quality API starts provider work through an exclusive operation only; it does not validate Goal Node ownership or acquire shared workflow capacity. It can therefore execute a foreign Node's Goal with the active Node's provider settings and oversubscribe agent capacity.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "The committed cancellation-recovery tests invoke the registry and Quality runner directly. They do not exercise real daemon startup after process-termination failure or after a target-app switch, leaving both production recovery defects unverified.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Five committed governance violations found.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"Quality timing is re-read independently in ReadyMerge, Build, and QA instead of being preserved with the candidate workflow commitment. Changing timing between stages or before retry can skip Build or skip Quality entirely.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"When startup cannot terminate a process owned by a deferred Quality cancellation, generic recovery leaves the operation Cancelling but returns success; Quality recovery then settles it as Cancelled without checking that the process exited, allowing live work behind a terminal operation.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Quality cancellation operations are port-wide but do not retain target-app state identity. Startup scans all operations using only the currently attached app's .refine directory, so switching apps can write evidence to the wrong Goal, abort daemon startup, or leave the original cancellation unsettled.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The manual Quality API starts provider work through an exclusive operation only; it does not validate Goal Node ownership or acquire shared workflow capacity. It can therefore execute a foreign Node's Goal with the active Node's provider settings and oversubscribe agent capacity.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The committed cancellation-recovery tests invoke the registry and Quality runner directly. They do not exercise real daemon startup after process-termination failure or after a target-app switch, leaving both production recovery defects unverified.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Five committed governance violations found.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Quality timing is re-read independently in ReadyMerge, Build, and QA instead of being preserved with the candidate workflow commitment. Changing timing between stages or before retry can skip Build or skip Quality entirely.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "When startup cannot terminate a process owned by a deferred Quality cancellation, generic recovery leaves the operation Cancelling but returns success; Quality recovery then settles it as Cancelled without checking that the process exited, allowing live work behind a terminal operation.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Quality cancellation operations are port-wide but do not retain target-app state identity. Startup scans all operations using only the currently attached app's .refine directory, so switching apps can write evidence to the wrong Goal, abort daemon startup, or leave the original cancellation unsettled.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The manual Quality API starts provider work through an exclusive operation only; it does not validate Goal Node ownership or acquire shared workflow capacity. It can therefore execute a foreign Node's Goal with the active Node's provider settings and oversubscribe agent capacity.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "The committed cancellation-recovery tests invoke the registry and Quality runner directly. They do not exercise real daemon startup after process-termination failure or after a target-app switch, leaving both production recovery defects unverified.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5"
+      },
+      "governance_message": "Five committed governance violations found.",
+      "governance_rule_actions": [
+        {
+          "message": "Quality timing is re-read independently in ReadyMerge, Build, and QA instead of being preserved with the candidate workflow commitment. Changing timing between stages or before retry can skip Build or skip Quality entirely.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "When startup cannot terminate a process owned by a deferred Quality cancellation, generic recovery leaves the operation Cancelling but returns success; Quality recovery then settles it as Cancelled without checking that the process exited, allowing live work behind a terminal operation.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Quality cancellation operations are port-wide but do not retain target-app state identity. Startup scans all operations using only the currently attached app's .refine directory, so switching apps can write evidence to the wrong Goal, abort daemon startup, or leave the original cancellation unsettled.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The manual Quality API starts provider work through an exclusive operation only; it does not validate Goal Node ownership or acquire shared workflow capacity. It can therefore execute a foreign Node's Goal with the active Node's provider settings and oversubscribe agent capacity.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "The committed cancellation-recovery tests invoke the registry and Quality runner directly. They do not exercise real daemon startup after process-termination failure or after a target-app switch, leaving both production recovery defects unverified.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "implementation_report": "Implemented and committed Round 5 at `7d2e58d0`. The worktree is clean and reviewable; merge commit `ba26389f` preserves Round 4 commit `2f0fd2bb`.\n\nWhat changed:\n\n- Quality cancellation now remains `Cancelling` until Goal-round summary and log evidence are durably persisted.\n- Cancellation evidence writes are idempotent, preventing duplicate logs during recovery.\n- Restart recovery preserves incomplete cancellations, terminates owned processes, retries persistence, then settles `Cancelled`.\n- Ordinary restart interruption remains distinct and resolves to `Interrupted`.\n- Added failure-injection coverage for both summary and log persistence failures.\n- Compacted the Quality prompt without changing its execution/evidence contract to satisfy the merged prompt budget.\n\nKey files: [operation settlement](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5/src/process/supervisor/operations/mod.rs:752), [Quality recovery](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5/src/tools/host/quality/service.rs:750), [restart hook](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5/src/surfaces/web_server/http.rs:208), and [failure-injection test](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-5/src/tools/host/quality/tests.rs:546).\n\nVerification:\n\n- Quality tests: 16 passed, 0 failed\n- Operation/cancellation tests: 7 passed, 0 failed\n- Complete library suite: 436 passed, 0 failed\n- Production full workflow: 1 passed, 0 failed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` — passed\n- Final Git status — clean\n\nGoal usage: 169,012 tokens over approximately 10m 50s.",
+      "implementation_reported_at": "2026-07-22T23:34:26Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Preserve the complete clean Round 4 candidate at commit 2f0fd2bb and remediate only the remaining governance finding: cancellation must not make a Quality operation terminal before cancelled Goal-round evidence and its Goal log are durably recorded, and a crash or persistence failure in that window must remain recoverable on restart rather than being skipped as terminal. Keep cancellation responsive and idempotent, preserve supervised process ownership and provider/authentication failures verbatim, and do not weaken governance, Quality, candidate integrity, or confirmation boundaries. Add focused failure-injection and restart coverage for cancelled evidence and log persistence. Do not force merges, delete worktrees, discard changes, or hide failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "failed",
+      "updated": "2026-07-22T23:40:27Z"
+    },
+    {
+      "assignee": "Refine",
+      "constitution_state": "passed",
+      "created": "2026-07-22T23:41:15Z",
+      "governance_checked_at": "2026-07-23T00:04:31Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6",
+        "failed_actions": [
+          {
+            "message": "workflow_quality_timing is authoritative candidate workflow state, but it is absent from model::goal::GoalRound and the canonical Goal Model specification. Workflow instead reads raw JSON while the work-items evaluation-summary allowlist writes the ad hoc field.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Existing in-flight Goal rounds have no pinned Quality timing or migration. A candidate already at Build or QA lazily pins the current setting on retry rather than the ordering previously selected at ReadyMerge; for example, a candidate sent to Build under post_build can later pin pre_merge and advance directly to Review without Quality.",
+            "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+            "rule_id": "rule-3"
+          },
+          {
+            "message": "Cancellation recovery records terminal Goal-round quality_state=cancelled before settle_cancellation verifies that owned processes exited. The committed daemon test explicitly leaves the operation Cancelling and its provider PID alive while Goal evidence already reports cancelled.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Manual Quality validates Node ownership using the runtime active-node selection, but result, error, and cancellation evidence use FileWorkItemService::new(refine_dir), which resolves active-node state from the Refine directory and defaults to default. Quality for an active non-default Node can run and then fail to persist or recover its Goal evidence.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Four committed governance violations found.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"workflow_quality_timing is authoritative candidate workflow state, but it is absent from model::goal::GoalRound and the canonical Goal Model specification. Workflow instead reads raw JSON while the work-items evaluation-summary allowlist writes the ad hoc field.\"},{\"rule_id\":\"rule-3\",\"rule\":\"Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.\",\"message\":\"Existing in-flight Goal rounds have no pinned Quality timing or migration. A candidate already at Build or QA lazily pins the current setting on retry rather than the ordering previously selected at ReadyMerge; for example, a candidate sent to Build under post_build can later pin pre_merge and advance directly to Review without Quality.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancellation recovery records terminal Goal-round quality_state=cancelled before settle_cancellation verifies that owned processes exited. The committed daemon test explicitly leaves the operation Cancelling and its provider PID alive while Goal evidence already reports cancelled.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Manual Quality validates Node ownership using the runtime active-node selection, but result, error, and cancellation evidence use FileWorkItemService::new(refine_dir), which resolves active-node state from the Refine directory and defaults to default. Quality for an active non-default Node can run and then fail to persist or recover its Goal evidence.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Four committed governance violations found.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "workflow_quality_timing is authoritative candidate workflow state, but it is absent from model::goal::GoalRound and the canonical Goal Model specification. Workflow instead reads raw JSON while the work-items evaluation-summary allowlist writes the ad hoc field.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Existing in-flight Goal rounds have no pinned Quality timing or migration. A candidate already at Build or QA lazily pins the current setting on retry rather than the ordering previously selected at ReadyMerge; for example, a candidate sent to Build under post_build can later pin pre_merge and advance directly to Review without Quality.",
+              "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "rule_id": "rule-3"
+            },
+            {
+              "message": "Cancellation recovery records terminal Goal-round quality_state=cancelled before settle_cancellation verifies that owned processes exited. The committed daemon test explicitly leaves the operation Cancelling and its provider PID alive while Goal evidence already reports cancelled.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Manual Quality validates Node ownership using the runtime active-node selection, but result, error, and cancellation evidence use FileWorkItemService::new(refine_dir), which resolves active-node state from the Refine directory and defaults to default. Quality for an active non-default Node can run and then fail to persist or recover its Goal evidence.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6"
+      },
+      "governance_message": "Four committed governance violations found.",
+      "governance_rule_actions": [
+        {
+          "message": "workflow_quality_timing is authoritative candidate workflow state, but it is absent from model::goal::GoalRound and the canonical Goal Model specification. Workflow instead reads raw JSON while the work-items evaluation-summary allowlist writes the ad hoc field.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Existing in-flight Goal rounds have no pinned Quality timing or migration. A candidate already at Build or QA lazily pins the current setting on retry rather than the ordering previously selected at ReadyMerge; for example, a candidate sent to Build under post_build can later pin pre_merge and advance directly to Review without Quality.",
+          "rule": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+          "rule_id": "rule-3"
+        },
+        {
+          "message": "Cancellation recovery records terminal Goal-round quality_state=cancelled before settle_cancellation verifies that owned processes exited. The committed daemon test explicitly leaves the operation Cancelling and its provider PID alive while Goal evidence already reports cancelled.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Manual Quality validates Node ownership using the runtime active-node selection, but result, error, and cancellation evidence use FileWorkItemService::new(refine_dir), which resolves active-node state from the Refine directory and defaults to default. Quality for an active non-default Node can run and then fail to persist or recover its Goal evidence.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        }
+      ],
+      "implementation_report": "Implemented Round 6 and committed it as `8afa09f0` (`Harden Quality workflow recovery`). The worktree is clean and Round 5 remains its direct parent.\n\nWhat changed:\n\n- Candidate rounds now durably pin Quality timing, preventing setting changes or retries from skipping Build or QA.\n- Cancellation remains nonterminal until every owned process is confirmed exited; termination failures remain visible and retryable.\n- Quality operations persist their original target-app and Refine-state paths. Startup recovery routes evidence to that app even after switching projects.\n- Manual Quality validates Node ownership and uses the shared workflow agent-capacity policy.\n- Added real daemon-startup coverage for termination failure, app switching, durable evidence replay, correct routing, and idempotent settlement.\n- Updated the affected Quality and workflow contracts.\n\nKey files: [workflow timing](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6/src/workflow/context.rs:172), [cancellation settlement](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6/src/process/supervisor/operations/mod.rs:757), [manual capacity and recovery routing](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6/src/tools/host/quality/service.rs:417), [daemon regression](/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-6/src/surfaces/web_server/tests.rs:1711).\n\nVerification:\n\n- Quality tests: 18 passed, 0 failed\n- Operation/cancellation tests: 7 passed, 0 failed\n- Timing commitment regression: 1 passed, 0 failed\n- Web Quality/startup regressions: 3 passed, 0 failed\n- Complete library suite: 440 passed, 0 failed\n- Production full workflow: 1 passed, 0 failed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` and committed-diff check — passed\n- Final Git status — clean",
+      "implementation_reported_at": "2026-07-22T23:57:42Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Preserve the complete clean Round 5 candidate at commit 7d2e58d0 and remediate exactly the five persisted governance findings without weakening gates or broadening destructive authority. Persist one authoritative Quality timing decision with the candidate workflow commitment so changes between ready-merge, build, QA, or retry cannot skip Build or Quality. A deferred cancellation must not settle Cancelled unless every owned process is confirmed exited; termination failure must remain visible and recoverable. Persist target-app/refine-state identity with each Quality operation and recover against that original app even after project switching, without writing evidence to the current unrelated app or aborting daemon startup. Manual Goal Quality must validate Node ownership and acquire the same shared workflow/agent capacity policy as automated Quality. Add real daemon-startup and target-app-switch failure-path coverage, including termination failure, durable evidence replay, correct app routing, and idempotent settlement. Preserve provider/authentication failures verbatim, candidate/worktree integrity, supervised execution evidence, and confirmation boundaries. Do not force merges, delete worktrees, discard changes, or hide failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "failed",
+      "updated": "2026-07-23T00:04:31Z"
+    },
+    {
+      "assignee": "Refine",
+      "constitution_state": "passed",
+      "created": "2026-07-23T00:05:26Z",
+      "governance_checked_at": "2026-07-23T00:19:01Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-7",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ2TPQM61AGWJW8XC4001-round-7"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "implementation_report": "Completed Round 7 and committed it as `f5a34d10`. Round 6 commit `8afa09f0` is preserved via merge commit `da40719a`; the worktree is clean.\n\nWhat changed:\n\n- Promoted `workflow_quality_timing` into canonical `GoalRound` with compatible serialization and specification coverage.\n- Added deterministic migration for in-flight Build/QA candidates in both timing directions, preserving ordering across retries.\n- Cancellation now waits for all owned processes to exit before persisting terminal Goal evidence.\n- Captured Node identity once and reused it for settings, ownership, result/error/cancellation persistence, and restart recovery.\n- Added non-default Node, termination-failure, app-switch, and idempotent recovery regressions.\n\nVerification:\n\n- Goal model tests: 1 passed\n- Workflow timing tests: 2 passed\n- Quality tests: 19 passed\n- Operation/cancellation tests: 7 passed\n- Settings tests: 5 passed\n- Real daemon recovery test: 1 passed\n- Complete library suite: 444 passed\n- Production full workflow: 1 passed\n- `cargo check --all-targets --quiet` — passed\n- `cargo fmt --all -- --check` — passed\n- `git diff --check` and committed-diff check — passed",
+      "implementation_reported_at": "2026-07-23T00:15:45Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Preserve the complete clean Round 6 candidate at commit 8afa09f0bbcb691faa78891fd6f22decf1e1598a and remediate exactly the four persisted Round 6 governance findings without weakening gates or broadening destructive authority. Promote workflow_quality_timing into the canonical GoalRound model and Goal Model specification, with durable serialization compatible with the raw Goal store. Provide an explicit compatible transition for already in-flight candidate rounds at Build or QA so their previously selected ordering cannot be changed on retry to skip Build or Quality; add regression coverage for both timing directions and retries. Cancellation must keep Goal Quality evidence nonterminal until every owned process is confirmed exited; termination failure must remain visible, recoverable, and idempotent through real daemon startup. Resolve active Node identity once and use that same non-default Node context for ownership validation, Goal result/error/cancellation persistence, and restart recovery. Preserve original target-app/state identity, shared workflow capacity, provider and authentication failures verbatim, candidate/worktree integrity, supervised execution evidence, and confirmation boundaries. Do not force merges, delete worktrees, discard changes, or hide failures.",
+      "quality_checked_at": "2026-07-23T00:19:04Z",
+      "quality_details": {
+        "diagnostics": [
+          "Quality checks disabled."
+        ]
+      },
+      "quality_message": "Quality checks passed",
+      "quality_state": "passed",
+      "reporter": "Refine",
+      "rule_state": "passed",
+      "updated": "2026-07-23T00:19:04Z"
     }
   ],
-  "status": "failed",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-22T21:11:40Z"
+  "updated": "2026-07-23T09:52:10Z"
 }

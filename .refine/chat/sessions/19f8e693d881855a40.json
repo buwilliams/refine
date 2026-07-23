@@ -1,0 +1,57 @@
+{
+  "id": "19f8e693d881855a40",
+  "mode": "supervisor",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "supervisor",
+  "created_at": "2026-07-23T09:58:09Z",
+  "updated_at": "2026-07-23T09:58:21Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-23T09:58:09Z",
+      "delivered": false,
+      "id": "evt-1784800689553-341",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T09:58:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800698480-343",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m checking the queued Goal against its durable record, live process state, and current Refine CLI/daemon health. I’ll use the stored auditable-recovery guidance because it defines the safe retry boundary; I won’t treat the provider/state-sync failures as resolved unless current evidence proves that."
+    },
+    {
+      "created_at": "2026-07-23T09:58:21Z",
+      "delivered": false,
+      "id": "evt-1784800701806-22",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "stopped"
+    },
+    {
+      "created_at": "2026-07-23T09:58:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "process_supervisor"
+      },
+      "id": "evt-1784800701810-345",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Managed provider process exited after cancellation."
+    }
+  ],
+  "importable_artifacts": [],
+  "closed": true,
+  "interrupted": true,
+  "interruption_detail": "stopped"
+}

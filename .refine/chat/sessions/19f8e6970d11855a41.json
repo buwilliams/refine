@@ -1,0 +1,100 @@
+{
+  "id": "19f8e6970d11855a41",
+  "mode": "supervisor",
+  "provider": "codex",
+  "provider_session_id": null,
+  "attachment": "supervisor",
+  "created_at": "2026-07-23T09:58:22Z",
+  "updated_at": "2026-07-23T10:02:35Z",
+  "transcript_events": [
+    {
+      "created_at": "2026-07-23T09:58:22Z",
+      "delivered": false,
+      "id": "evt-1784800702682-351",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T09:58:29Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800709523-353",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll reconcile the queued Goal against current daemon, process, Goal-round, Git, and provider evidence before deciding whether any recovery is actually authorized. I’ll keep the workflow paused unless the evidence supports a narrow, auditable action."
+    },
+    {
+      "created_at": "2026-07-23T09:58:35Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800715720-355",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The prior recovery guidance is directly relevant: queued/todo work can be started normally, while failed or conflict-blocked work must use a fresh Goal round and preserve earlier evidence. I’m applying that distinction now; no recovery command has been issued yet."
+    },
+    {
+      "created_at": "2026-07-23T09:58:57Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800737436-357",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The queued Goal is not currently executing, and the workflow is explicitly paused with background launches stopped. The target checkout also has uncommitted changes on `main`, so I will not unpause or start work until I establish whether those edits belong to this Goal and whether a supported start would preserve them."
+    },
+    {
+      "created_at": "2026-07-23T09:59:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800755547-359",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "There is additional live evidence not reflected in the supplied `live={}` snapshot: a source-promotion helper and build are running, and a Codex provider process is active through the workflow runner. I’m treating those as concurrent system work, not as permission to start the queued Goal, and will wait for their terminal state before recommending any workflow change."
+    },
+    {
+      "created_at": "2026-07-23T09:59:21Z",
+      "delivered": false,
+      "id": "evt-1784800761306-2",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "system",
+      "text": "Daemon restarted before the provider turn completed."
+    },
+    {
+      "created_at": "2026-07-23T10:02:33Z",
+      "delivered": false,
+      "id": "evt-1784800953932-2",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Sent 1 queued message to the provider."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f8e6d4aac272a4f0",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3K92DJJT8PWF5AP8000\": \"in-progress\"}\nLive workflow-agent Goal IDs: {\"00000SZ3K92DJJT8PWF5AP8000\"}\nActionable stall/loss evidence: {}",
+      "created_at": "2026-07-23T10:02:35Z",
+      "updated_at": "2026-07-23T10:02:35Z",
+      "internal": true
+    }
+  ],
+  "queue_dispatching": true,
+  "importable_artifacts": [],
+  "closed": false,
+  "interrupted": true,
+  "interruption_detail": "Daemon restarted before the provider turn completed."
+}
