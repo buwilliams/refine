@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:08:33Z",
+  "updated_at": "2026-07-23T15:08:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1200,6 +1200,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance rejected Round 4 as well. I’m extracting the precise remaining violations before deciding whether another recovery is justified; I will not loop it blindly or suppress the repeated failure."
+    },
+    {
+      "created_at": "2026-07-23T15:08:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784819330067-230",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Three concrete issues remain, and they are materially narrower: an empty process lookup is incorrectly accepted as proof of exit, settlement can partially persist, and those failure boundaries lack tests. That is still actionable within the existing Goal, so I’m recording one more constrained recovery round—without merging, deleting, or widening authority."
     }
   ],
   "queued_messages": [
