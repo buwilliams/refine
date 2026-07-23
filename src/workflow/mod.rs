@@ -170,10 +170,22 @@ pub trait WorkflowAutomation {
     fn retry(&self, execution_id: &str) -> RefineResult<String>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WorkflowEngine {
     pub runtime_root: PathBuf,
     pub target_root: Option<PathBuf>,
+    #[cfg(test)]
+    before_worker_prepare_hook: Option<std::sync::Arc<dyn Fn(&str, &str) + Send + Sync>>,
+}
+
+impl std::fmt::Debug for WorkflowEngine {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("WorkflowEngine")
+            .field("runtime_root", &self.runtime_root)
+            .field("target_root", &self.target_root)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug)]
@@ -193,6 +205,8 @@ impl WorkflowEngine {
         Self {
             runtime_root,
             target_root: None,
+            #[cfg(test)]
+            before_worker_prepare_hook: None,
         }
     }
 
@@ -204,7 +218,18 @@ impl WorkflowEngine {
         Self {
             runtime_root,
             target_root: Some(target_root.into()),
+            #[cfg(test)]
+            before_worker_prepare_hook: None,
         }
+    }
+
+    #[cfg(test)]
+    fn with_before_worker_prepare_hook(
+        mut self,
+        hook: impl Fn(&str, &str) + Send + Sync + 'static,
+    ) -> Self {
+        self.before_worker_prepare_hook = Some(std::sync::Arc::new(hook));
+        self
     }
 
     pub fn state_path(&self) -> PathBuf {
@@ -213,6 +238,10 @@ impl WorkflowEngine {
 
     fn capacity_service(&self) -> AgentCapacityService {
         AgentCapacityService::new(&self.runtime_root)
+    }
+
+    pub(crate) fn capacity_service_for_settlement(&self) -> AgentCapacityService {
+        self.capacity_service()
     }
 
     fn claim_capacity_request(claim: &WorkflowClaim) -> AgentCapacityRequest {
@@ -230,7 +259,7 @@ impl WorkflowEngine {
             .release(&format!("workflow:{claim_id}"))
     }
 
-    pub(crate) fn settle_claims_cancelled_locked(
+    pub(crate) fn persist_claims_cancelled_locked(
         &self,
         state: &mut WorkflowAutomationState,
         claim_ids: &[String],
@@ -253,14 +282,11 @@ impl WorkflowEngine {
             claim.updated_at = now.clone();
         }
         self.save_state(state)?;
-        for claim_id in claim_ids {
-            self.release_claim_capacity(claim_id).map_err(|error| {
-                RefineError::Degraded(format!(
-                    "workflow claim {claim_id} is cancelled but its capacity release failed: {error}"
-                ))
-            })?;
-        }
         Ok(())
+    }
+
+    pub(crate) fn restore_state_locked(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
+        write_state(&self.state_path(), state)
     }
 
     fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
@@ -975,6 +1001,10 @@ impl WorkflowEngine {
                                         continue;
                                     }
                                 };
+                                #[cfg(test)]
+                                if let Some(hook) = &self.before_worker_prepare_hook {
+                                    hook(&claim_id, &execution_id);
+                                }
                                 let preparation =
                                     self.prepare_started_claim(&claim_id, &execution_id);
                                 match preparation {
@@ -1662,9 +1692,16 @@ fn write_state(path: &Path, state: &WorkflowAutomationState) -> RefineResult<()>
     let encoded = serde_json::to_vec_pretty(state).map_err(|error| {
         RefineError::Serialization(format!("failed to encode automation state: {error}"))
     })?;
-    fs::write(path, encoded).map_err(|error| {
+    let temp_path = path.with_extension(format!("json.{}.tmp", Uuid::new_v4()));
+    fs::write(&temp_path, encoded).map_err(|error| {
         RefineError::Io(format!(
             "failed to write automation state {}: {error}",
+            temp_path.display()
+        ))
+    })?;
+    fs::rename(&temp_path, path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to publish automation state {}: {error}",
             path.display()
         ))
     })
@@ -3977,6 +4014,200 @@ mod tests {
             WorkflowClaimState::Running
         );
         automation.release_claim_capacity(&claim_id).unwrap();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn real_workflow_cancellation_before_registration_fails_closed_then_stops_registered_worker() {
+        let temp_root = unique_temp_dir("workflow-cancel-before-registration");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::write(target_root.join("app.txt"), "initial\n").unwrap();
+        git(
+            &target_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&target_root, &["add", "app.txt"]).unwrap();
+        git(&target_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             trap 'exit 143' TERM\n\
+             while :; do sleep 0.05; done\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_goal_summary("Cancel before registration", Some("GOAL-PRE-REGISTER"))
+            .unwrap();
+        work_items
+            .append_goal_round_summary("GOAL-PRE-REGISTER", "Reporter", "Wait until cancelled")
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL-PRE-REGISTER", GoalStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let release_rx = std::sync::Arc::new(std::sync::Mutex::new(release_rx));
+        let hook_release = std::sync::Arc::clone(&release_rx);
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+            .with_before_worker_prepare_hook(move |claim_id, execution_id| {
+                started_tx
+                    .send((claim_id.to_string(), execution_id.to_string()))
+                    .unwrap();
+                hook_release.lock().unwrap().recv().unwrap();
+            });
+        automation.claim("GOAL-PRE-REGISTER").unwrap();
+        let worker_automation = automation.clone();
+        let worker = std::thread::spawn(move || worker_automation.execute_claimed_work());
+        let (claim_id, execution_id) = started_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("real workflow worker did not reach the pre-registration boundary");
+
+        let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .cancel_workflow_execution(&execution_id)
+            .unwrap_err();
+        assert!(matches!(error, RefineError::Conflict(_)), "{error}");
+        assert!(
+            error
+                .to_string()
+                .contains("empty lookup is not confirmed process exit"),
+            "{error}"
+        );
+        assert!(
+            FileProcessSupervisor::new(&runtime_root)
+                .list()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            FileProcessSupervisor::new(runtime_root.join("agents"))
+                .list()
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            work_items
+                .show_goal_summary("GOAL-PRE-REGISTER")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::Todo
+        );
+        let state = automation.load_state().unwrap();
+        let claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.claim_id == claim_id)
+            .unwrap();
+        assert_eq!(claim.state, WorkflowClaimState::Running);
+        assert_eq!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .len(),
+            1
+        );
+
+        release_tx.send(()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let registered = [&runtime_root, &runtime_root.join("agents")]
+                .into_iter()
+                .any(|root| {
+                    FileProcessSupervisor::new(root)
+                        .list()
+                        .unwrap()
+                        .iter()
+                        .any(|process| {
+                            process
+                                .details
+                                .as_deref()
+                                .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                                .and_then(|details| {
+                                    details
+                                        .get("execution_id")
+                                        .and_then(Value::as_str)
+                                        .map(str::to_string)
+                                })
+                                .as_deref()
+                                == Some(execution_id.as_str())
+                        })
+                });
+            if registered {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "real workflow worker did not register after cancellation failed closed"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let cancelled = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .cancel_workflow_execution(&execution_id)
+            .unwrap();
+        assert_eq!(cancelled["cancelled"], true);
+        assert!(worker.join().unwrap().is_err());
+        assert_eq!(
+            work_items
+                .show_goal_summary("GOAL-PRE-REGISTER")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::Cancelled
+        );
+        assert_eq!(
+            automation
+                .load_state()
+                .unwrap()
+                .claims
+                .iter()
+                .find(|claim| claim.claim_id == claim_id)
+                .unwrap()
+                .state,
+            WorkflowClaimState::Cancelled
+        );
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
         fs::remove_dir_all(temp_root).unwrap();
     }
 

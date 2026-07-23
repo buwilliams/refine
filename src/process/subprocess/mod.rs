@@ -16,6 +16,8 @@ use crate::process::supervisor::operations::{FileOperationRegistry, OperationLau
 use crate::process::supervisor::security::FileSecurityService;
 
 const PROCESS_IDENTITIES_DIR: &str = "process-identities";
+const WORKFLOW_PROCESS_REGISTRATION_LOCK_FILE: &str = ".workflow-process-registration.lock";
+const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -245,7 +247,35 @@ pub struct FileProcessSupervisor {
     pub allowed_commands: BTreeSet<String>,
 }
 
+#[derive(Debug)]
+pub(crate) struct WorkflowProcessRegistrationLock {
+    file: fs::File,
+}
+
+impl Drop for WorkflowProcessRegistrationLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
 impl FileProcessSupervisor {
+    /// Serializes target-bound workflow cancellation with the complete spawn-to-registration
+    /// window. A cancellation cannot mistake a not-yet-registered worker for an exited worker,
+    /// and a delayed workflow step cannot launch after its exact claim has settled.
+    pub(crate) fn workflow_process_registration_guard(
+        &self,
+        spec: &ManagedProcessSpec,
+    ) -> RefineResult<Option<WorkflowProcessRegistrationLock>> {
+        let Some((claim_id, execution_id, goal_id)) = workflow_process_identity(&spec.metadata)
+        else {
+            return Ok(None);
+        };
+        let workflow_root = workflow_runtime_root(&self.runtime_root);
+        let guard = acquire_workflow_process_registration_lock(&workflow_root)?;
+        validate_running_workflow_claim(&workflow_root, claim_id, execution_id, goal_id)?;
+        Ok(Some(guard))
+    }
+
     /// Requests termination without removing the managed-process record. The process runner owns
     /// final reaping and artifact cleanup, so callers can keep capacity reserved until the real
     /// child has exited.
@@ -924,6 +954,7 @@ impl FileProcessSupervisor {
     {
         self.validate_launch(&spec)?;
         let launch_guard = self.operation_launch_guard(&spec)?;
+        let workflow_registration_guard = self.workflow_process_registration_guard(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -1000,6 +1031,7 @@ impl FileProcessSupervisor {
             let _ = self.remove_process_artifacts(&process);
             return Err(error);
         }
+        drop(workflow_registration_guard);
         drop(launch_guard);
 
         let stdout = child.stdout.take().ok_or_else(|| {
@@ -1173,6 +1205,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
     fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
         self.validate_launch(&spec)?;
         let launch_guard = self.operation_launch_guard(&spec)?;
+        let workflow_registration_guard = self.workflow_process_registration_guard(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -1263,6 +1296,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             let _ = self.remove_process_artifacts(&process);
             return Err(error);
         }
+        drop(workflow_registration_guard);
         drop(launch_guard);
         let reaper = self.clone();
         let reaped_process = process.clone();
@@ -1470,6 +1504,106 @@ fn is_background_owner(owner: &ProcessOwner) -> bool {
             | ProcessOwner::Import
             | ProcessOwner::Maintenance
     )
+}
+
+pub(crate) fn acquire_workflow_process_registration_lock(
+    runtime_root: &Path,
+) -> RefineResult<WorkflowProcessRegistrationLock> {
+    fs::create_dir_all(runtime_root).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to create workflow process registration root {}: {error}",
+            runtime_root.display()
+        ))
+    })?;
+    let path = runtime_root.join(WORKFLOW_PROCESS_REGISTRATION_LOCK_FILE);
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to open workflow process registration lock {}: {error}",
+                path.display()
+            ))
+        })?;
+    file.lock_exclusive().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to lock workflow process registration {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(WorkflowProcessRegistrationLock { file })
+}
+
+fn workflow_process_identity(metadata: &Map<String, Value>) -> Option<(&str, &str, &str)> {
+    let claim_id = metadata
+        .get("claim_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let execution_id = metadata
+        .get("execution_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let goal_id = metadata
+        .get("goal_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Some((claim_id, execution_id, goal_id))
+}
+
+fn workflow_runtime_root(process_root: &Path) -> PathBuf {
+    if process_root.join(WORKFLOW_AUTOMATION_STATE_FILE).exists() {
+        return process_root.to_path_buf();
+    }
+    process_root
+        .parent()
+        .filter(|parent| parent.join(WORKFLOW_AUTOMATION_STATE_FILE).exists())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| process_root.to_path_buf())
+}
+
+fn validate_running_workflow_claim(
+    runtime_root: &Path,
+    claim_id: &str,
+    execution_id: &str,
+    goal_id: &str,
+) -> RefineResult<()> {
+    let path = runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE);
+    let bytes = fs::read(&path).map_err(|error| {
+        RefineError::Conflict(format!(
+            "workflow process launch for Goal {goal_id} could not validate claim {claim_id} execution {execution_id} against {}: {error}; the process was not started",
+            path.display()
+        ))
+    })?;
+    let state: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to parse workflow process launch state {}: {error}",
+            path.display()
+        ))
+    })?;
+    let running = state
+        .get("claims")
+        .and_then(Value::as_array)
+        .is_some_and(|claims| {
+            claims.iter().any(|claim| {
+                claim.get("claim_id").and_then(Value::as_str) == Some(claim_id)
+                    && claim.get("execution_id").and_then(Value::as_str) == Some(execution_id)
+                    && claim.get("goal_id").and_then(Value::as_str) == Some(goal_id)
+                    && claim.get("state").and_then(Value::as_str) == Some("running")
+            })
+        });
+    if running {
+        Ok(())
+    } else {
+        Err(RefineError::Conflict(format!(
+            "workflow process launch for Goal {goal_id} no longer owns running claim {claim_id} execution {execution_id}; the process was not started"
+        )))
+    }
 }
 
 fn process_command_line(spec: &ManagedProcessSpec) -> String {
@@ -2339,6 +2473,53 @@ mod tests {
 
         assert_eq!(output.stdout, "unset:unset");
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancelled_workflow_claim_cannot_spawn_before_process_registration() {
+        let runtime_root = unique_temp_dir("workflow-registration-fence");
+        let marker = runtime_root.join("started");
+        fs::create_dir_all(&runtime_root).unwrap();
+        fs::write(
+            runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
+            serde_json::to_vec_pretty(&json!({
+                "paused": [],
+                "claims": [{
+                    "claim_id": "claim-cancelled",
+                    "goal_id": "GOAL-CANCELLED",
+                    "execution_id": "exec-cancelled",
+                    "state": "cancelled",
+                    "created_at": "2026-07-23T00:00:00Z",
+                    "updated_at": "2026-07-23T00:01:00Z"
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let error = FileProcessSupervisor::new(runtime_root.join("agents"))
+            .run_to_completion(ManagedProcessSpec {
+                owner: ProcessOwner::Agent,
+                command: "sh".to_string(),
+                args: vec!["-c".to_string(), format!("touch {}", marker.display())],
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+                metadata: Map::from_iter([
+                    ("kind".to_string(), json!("workflow")),
+                    ("claim_id".to_string(), json!("claim-cancelled")),
+                    ("goal_id".to_string(), json!("GOAL-CANCELLED")),
+                    ("execution_id".to_string(), json!("exec-cancelled")),
+                ]),
+            })
+            .unwrap_err();
+        assert!(matches!(error, RefineError::Conflict(_)), "{error}");
+        assert!(error.to_string().contains("process was not started"));
+        assert!(!marker.exists());
+        fs::remove_dir_all(runtime_root).unwrap();
     }
 
     fn shell_binary() -> &'static str {
