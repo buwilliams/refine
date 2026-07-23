@@ -30,9 +30,13 @@ Current implementation details that matter to intent:
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
   capability that retains ownership evidence, confirms exact process exit, and
-  only then cancels a linked Goal; missing registration-time PID identity,
-  mismatched or stale workflow execution/claim/round ownership, and failed or
-  resisted stops leave the process supervised and the Goal active.
+  only then atomically validates the exact claim, execution, round, Goal
+  revision/status, and absence of a competing owner with cancellation of the
+  linked Goal; missing registration-time PID identity, mismatched or stale
+  workflow ownership, and failed or resisted stops leave the process supervised
+  and the Goal active, while post-exit ownership failures retain a partial
+  outcome receipt with exit, registry/identity cleanup, Goal, cause, and
+  supported recovery evidence.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 
 Process management should favor visibility and recovery over hiding execution behind polished UI messages. If something is running, failing, or waiting, Refine should be able to show it.

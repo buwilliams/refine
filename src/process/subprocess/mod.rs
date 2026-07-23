@@ -123,6 +123,8 @@ pub struct ConfirmedProcessExit {
     pub os_identity: Option<String>,
     pub confirmed_exit: bool,
     pub registry_retained_until_exit: bool,
+    pub registry_cleanup_completed: bool,
+    pub identity_cleanup_completed: bool,
     pub waited_ms: u128,
 }
 
@@ -315,7 +317,7 @@ impl FileProcessSupervisor {
         self.ensure_expected_registration(expected, &identity)?;
         match self.owned_process_state(expected, &identity)? {
             OwnedProcessState::Exited => {
-                let _ = self.recover();
+                self.recover()?;
                 return Ok(confirmed_process_exit(expected, signal, &identity, started));
             }
             OwnedProcessState::IdentityMismatch(actual) => {
@@ -354,7 +356,7 @@ impl FileProcessSupervisor {
         loop {
             match self.owned_process_state(expected, &identity)? {
                 OwnedProcessState::Exited => {
-                    let _ = self.recover();
+                    self.recover()?;
                     return Ok(confirmed_process_exit(expected, signal, &identity, started));
                 }
                 OwnedProcessState::IdentityMismatch(actual) => {
@@ -1621,6 +1623,8 @@ fn confirmed_process_exit(
         os_identity: identity.os_identity.clone(),
         confirmed_exit: true,
         registry_retained_until_exit: true,
+        registry_cleanup_completed: true,
+        identity_cleanup_completed: true,
         waited_ms: started.elapsed().as_millis(),
     }
 }
