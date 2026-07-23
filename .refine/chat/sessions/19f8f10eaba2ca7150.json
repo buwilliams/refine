@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:48:05Z",
+  "updated_at": "2026-07-23T19:49:10Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3168,6 +3168,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The Goal has reached `review` at Round 9. I’m doing the final read-only handoff audit now: candidate/worktree cleanliness, non-ancestry to `main`, remote branch presence, daemon/HTTP health, provider diagnostics, and the supervisor’s active-work count. I will not approve or merge it."
+    },
+    {
+      "created_at": "2026-07-23T19:49:10Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836150027-255",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The implementation has reached the human-review boundary. I’m doing one final read-only correlation of Goal state, supervisor health, and the candidate ref; I won’t approve, merge, retry, or alter any worktree."
     }
   ],
   "queued_messages": [
