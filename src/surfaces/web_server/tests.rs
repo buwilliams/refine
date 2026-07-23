@@ -1361,6 +1361,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
     let temp_root = unique_temp_dir("http-goal-create-performance");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let fixture_timestamp = Utc::now().to_rfc3339();
     for index in 0..GOAL_COUNT {
         let id = format!("GOAL{index:04}");
         let goal_path = refine_dir
@@ -1382,15 +1383,15 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
                 "feature_id": null,
                 "feature_order": null,
                 "node_id": "default",
-                "created": "2026-07-23T12:00:00Z",
-                "updated": "2026-07-23T12:00:00Z",
+                "created": fixture_timestamp,
+                "updated": fixture_timestamp,
                 "notes": [],
                 "rounds": [{
                     "reporter": "Performance",
                     "assignee": "Performance",
                     "prompt": format!("Performance prompt {index}"),
-                    "created": "2026-07-23T12:00:00Z",
-                    "updated": "2026-07-23T12:00:00Z",
+                    "created": fixture_timestamp,
+                    "updated": fixture_timestamp,
                     "guidance_decision": null,
                     "governance": null,
                     "quality": null,
@@ -1445,6 +1446,17 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
         FileProjectStateStore::rebuild_count(&refine_dir),
         1,
         "a successful create must rebuild the complete projection exactly once"
+    );
+    let projection = server.current_projection().unwrap();
+    assert_eq!(
+        projection
+            .goals
+            .values()
+            .filter(|goal| goal.goal.id.starts_with("GOAL"))
+            .filter(|goal| goal.goal.status == GoalStatus::Backlog)
+            .count(),
+        GOAL_COUNT,
+        "fresh performance fixtures must not turn the create benchmark into a bulk promotion test"
     );
 
     eprintln!(
