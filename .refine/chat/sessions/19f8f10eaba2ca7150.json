@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:15:03Z",
+  "updated_at": "2026-07-23T18:15:27Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2040,6 +2040,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Recovery is now underway through Refine’s supported workflow: `00000SZ41923HGWZSREC2JW001` moved from failed to in-progress at 18:14:08 UTC, so there are now two active claims and no failed work. I did not force or directly edit state. The earlier transcript-read failure remains preserved in the Goal log and recovery Round."
+    },
+    {
+      "created_at": "2026-07-23T18:15:27Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830527097-72",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both claims are healthy and provider-backed: Codex diagnostics and authentication pass, the workflow runner is reachable, background launch is enabled, and both Goal/API endpoints return HTTP 200. The recovery is isolated in a new round-2 worktree; the preserved dirty round-1 worktree remains untouched. I’m watching for the next workflow transition rather than intervening in live agents."
     }
   ],
   "queued_messages": [
