@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:16:37Z",
+  "updated_at": "2026-07-23T11:18:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -675,6 +675,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Goal `00000SZ3NBF…` is now at the human-review boundary: Governance passed, but the configured Quality stage was a no-op and target-app build instructions are absent. I will not approve or merge it. Goal `00000SZ3N803…` remains actively working with no input request, so observation continues."
+    },
+    {
+      "created_at": "2026-07-23T11:18:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805533281-47",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The remaining worker is still live, its output is fresh, and the worktree now contains a coherent nine-file candidate under active verification. There is no stall or authority question yet; I’m leaving it undisturbed and waiting for its reported verification/Governance boundary."
     }
   ],
   "queued_messages": [
