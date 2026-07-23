@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:38:45Z",
+  "updated_at": "2026-07-23T18:39:20Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2295,9 +2295,38 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Both review candidates are preserved, clean, unmerged, and Governance-passed. One important caveat remains visible: the transcript-race candidate’s focused gates passed, but its full library run still had one reproducible, reported performance-test failure, and clippy reported six pre-existing lints; Quality itself was a no-op because no Quality commands are configured. I’m doing the final ancestry/branch check before handing the approval choice back to you."
+    },
+    {
+      "created_at": "2026-07-23T18:39:20Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831960378-122",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "No automatic work is actionable. Runtime, HTTP, Codex diagnostics, and authentication are healthy; there are no live Goal Agents, stalls, or failed Goals.\n\nHuman review is required for:\n\n- `00000SZ3RP4G52RZ706A5P4001` at `ebc7d269`: Governance passed and all final reported gates passed. Quality was a no-op. Candidate is clean, remote, unmerged, and 15 commits behind `main`.\n- `00000SZ41QQB4GWTN3AW2JW002` at `9b7d9d33`: Governance and focused gates passed. Quality was a no-op. Full library testing retained one reproducible performance-test failure, and clippy retained six reported pre-existing lints. Candidate is clean, remote, unmerged, and 4 commits behind `main`.\n\nNo approval or merge was performed. Please decide whether to approve either candidate; I recommend treating the second candidate’s red full-suite result as an explicit acceptance decision."
+    },
+    {
+      "created_at": "2026-07-23T18:39:20Z",
+      "delivered": false,
+      "id": "evt-1784831960544-124",
+      "progress": false,
+      "provider_session_id": null,
+      "role": "assistant",
+      "text": "No automatic work is actionable. Runtime, HTTP, Codex diagnostics, and authentication are healthy; there are no live Goal Agents, stalls, or failed Goals.\n\nHuman review is required for:\n\n- `00000SZ3RP4G52RZ706A5P4001` at `ebc7d269`: Governance passed and all final reported gates passed. Quality was a no-op. Candidate is clean, remote, unmerged, and 15 commits behind `main`.\n- `00000SZ41QQB4GWTN3AW2JW002` at `9b7d9d33`: Governance and focused gates passed. Quality was a no-op. Full library testing retained one reproducible performance-test failure, and clippy retained six reported pre-existing lints. Candidate is clean, remote, unmerged, and 4 commits behind `main`.\n\nNo approval or merge was performed. Please decide whether to approve either candidate; I recommend treating the second candidate’s red full-suite result as an explicit acceptance decision."
+    },
+    {
+      "created_at": "2026-07-23T18:39:20Z",
+      "delivered": false,
+      "id": "evt-1784831960544-125",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Provider turn completed."
     }
   ],
-  "queue_dispatching": true,
   "importable_artifacts": [],
   "closed": false,
   "interrupted": false,
