@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:44:58Z",
+  "updated_at": "2026-07-23T13:45:43Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -561,6 +561,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "`00000SZ3SFP4N10NXGAE5P4002` has now passed all eight Governance rules and published candidate `bcf9d063`, but its durable status still says `todo`. I’m giving the workflow runner a short settlement window and will only intervene if the candidate remains unclaimed with no live process. The review Goal remains untouched because its Quality result was explicitly a no-op (“No Quality tests configured”)."
+    },
+    {
+      "created_at": "2026-07-23T13:45:43Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814343095-118",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A second candidate, `00000SZ3RP4G52RZ706A5P4001` at `ea2103e3`, has just been committed and entered Governance. No retry action is justified while that worker is live. The earlier `bcf9d063` candidate remains fenced in `todo`; I’m preserving it and waiting for the serial runner to revisit it instead of manually forcing a transition."
     }
   ],
   "queued_messages": [
