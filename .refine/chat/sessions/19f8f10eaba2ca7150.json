@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:13:31Z",
+  "updated_at": "2026-07-23T18:14:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2016,14 +2016,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Live evidence has already changed again: Goal `00000SZ412RXR0TQRHE82JW000` now has a running Codex Goal Agent (PID 35952) in its managed round-1 worktree. I will not classify it as lost or restart it. I’m narrowing the remaining supervision to its recent output and the failed Goal’s durable failure/round evidence."
+    },
+    {
+      "created_at": "2026-07-23T18:14:05Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830445671-67",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The failed Goal now contains a second, explicitly scoped recovery Round preserving the transcript failure and dirty worktree. That supplies implementation intent, but the Goal remains failed and no worker owns it; I’m checking Refine’s supported recommendation/transition before deciding whether recovery can be queued without crossing a user authority boundary."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f902e9af552e4",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"review\", \"00000SZ412RXR0TQRHE82JW000\": \"in-progress\", \"00000SZ41923HGWZSREC2JW001\": \"failed\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 2 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3RP4G52RZ706A5P4001\": \"review\", \"00000SZ412RXR0TQRHE82JW000\": \"in-progress\", \"00000SZ41923HGWZSREC2JW001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T18:13:21Z",
-      "updated_at": "2026-07-23T18:13:31Z",
+      "updated_at": "2026-07-23T18:14:08Z",
       "internal": true
     }
   ],

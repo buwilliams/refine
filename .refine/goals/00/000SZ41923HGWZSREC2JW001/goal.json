@@ -1,6 +1,6 @@
 {
-  "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
-  "branch_name": "refine/00000SZ41923HGWZSREC2JW001/round-1",
+  "base_commit": "90c918a2152608515bccb9757cebfb2e05d4ed7d",
+  "branch_name": "refine/00000SZ41923HGWZSREC2JW001/round-2",
   "candidate_commit": null,
   "created": "2026-07-23T18:07:18Z",
   "feature_id": null,
@@ -59,7 +59,7 @@
       "workflow_quality_timing": null
     }
   ],
-  "status": "failed",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T18:13:11Z"
+  "updated": "2026-07-23T18:14:07Z"
 }
