@@ -473,6 +473,8 @@ fn integrate_workflow_candidate(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
     let integration = match merger.integrate_workflow_candidate(
         &ctx.goal_id,
         ctx.round_idx,
+        &ctx.claim_id,
+        &ctx.execution_id,
         &ctx.node_id,
         &branch,
         &commit,

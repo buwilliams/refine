@@ -6,12 +6,16 @@ use serde_json::{Value, json};
 use crate::model::JsonObject;
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
+use crate::process::subprocess::workflow_subprocess_metadata;
+use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationState};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::GoalSummaryProjection;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
+use crate::workflow::{WorkflowEngine, WorkflowExecutionFence};
 
 #[derive(Clone, Debug)]
 pub struct FileMergerService {
@@ -50,6 +54,8 @@ impl FileMergerService {
         &self,
         goal_id: &str,
         round_idx: usize,
+        claim_id: &str,
+        execution_id: &str,
         node_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
@@ -59,17 +65,83 @@ impl FileMergerService {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
-        with_repository_git_lock(&target_root, || {
+        let fence = {
+            let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
+            let detail = FileWorkItemService::for_node(&self.refine_dir, node_id)
+                .show_goal_detail(goal_id)?;
+            let goal_revision = workflow_revision(&detail);
+            WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
+                .commit_ready_merge_fence(
+                    claim_id,
+                    execution_id,
+                    goal_id,
+                    node_id,
+                    round_idx,
+                    goal_revision,
+                )?
+        };
+        let operations = FileOperationRegistry::new(&self.runtime_root);
+        let operation = operations.register_exclusive_with_request(
+            &format!("merger:{goal_id}:{}", round_idx + 1),
+            json!({
+                "goal_id": goal_id,
+                "round_idx": round_idx,
+                "claim_id": claim_id,
+                "execution_id": execution_id,
+                "node_id": node_id,
+                "goal_revision": fence.goal_revision,
+                "candidate_commit": expected_candidate,
+                "branch": expected_branch,
+                "remote": expected_remote
+            }),
+        )?;
+        let result = with_repository_git_lock(&target_root, || {
             self.integrate_workflow_candidate_locked(
                 &target_root,
                 goal_id,
                 round_idx,
-                node_id,
+                &fence,
+                &operation.id,
                 expected_branch,
                 expected_candidate,
                 expected_remote,
             )
-        })
+        });
+        match result {
+            Ok(integration) => {
+                operations.succeed_with_result_and_progress(
+                    &operation.id,
+                    json!({"stage": "settled"}),
+                    json!({"integration": &integration}),
+                )?;
+                Ok(integration)
+            }
+            Err(error) => {
+                let state = WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
+                    .load_state()
+                    .ok()
+                    .and_then(|state| {
+                        state
+                            .claims
+                            .into_iter()
+                            .find(|claim| claim.claim_id == claim_id)
+                            .map(|claim| claim.state)
+                    });
+                if matches!(state, Some(crate::workflow::WorkflowClaimState::Cancelled)) {
+                    let _ = operations.finish(&operation.id, OperationState::Cancelled);
+                } else {
+                    let _ = operations.fail_with_error(
+                        &operation.id,
+                        json!({
+                            "code": "ready_merge_integration_failed",
+                            "message": error.to_string(),
+                            "execution_id": execution_id
+                        }),
+                    );
+                }
+                Err(error)
+            }
+        }
     }
 
     /// Accept a reviewed integration without performing Git integration again.
@@ -149,17 +221,26 @@ impl FileMergerService {
         target_root: &Path,
         goal_id: &str,
         round_idx: usize,
-        node_id: &str,
+        fence: &WorkflowExecutionFence,
+        operation_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
         expected_remote: &str,
     ) -> RefineResult<RoundIntegration> {
-        let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, &fence.node_id);
+        self.verify_integration_fence(
+            &work_items,
+            fence,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+        )?;
         let goal = work_items.show_goal_summary(goal_id)?;
         let goal_node = goal.goal.node_id.as_deref().unwrap_or("default");
-        if goal_node != node_id {
+        if goal_node != fence.node_id {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} is owned by node {goal_node}, not integration worker node {node_id}"
+                "Goal {goal_id} is owned by node {goal_node}, not integration worker node {}",
+                fence.node_id
             )));
         }
         let detail = work_items.show_goal_detail(goal_id)?;
@@ -191,8 +272,24 @@ impl FileMergerService {
                 )));
             }
         }
+        let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root)
+            .with_operation_id(operation_id)
+            .with_process_metadata(workflow_subprocess_metadata(
+                &fence.execution_id,
+                goal_id,
+                "ready-merge",
+                "WorkflowReadyMerge",
+                Some(round_idx),
+            ));
         if let Some(existing) = round_integration(round)? {
-            self.verify_existing_integration(target_root, &existing)?;
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
+            self.verify_existing_integration(&git, &existing)?;
             return Ok(existing);
         }
         if goal.goal.status != GoalStatus::ReadyMerge {
@@ -201,10 +298,23 @@ impl FileMergerService {
                 goal.goal.status.as_str()
             )));
         }
-        let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root);
         let remote_configured = git.remote_exists(&remote)?;
         if remote_configured {
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             git.fetch_branch(&remote, &branch_name)?;
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             git.ensure_branch_from_remote(&remote, &branch_name)?;
             let published = git.resolve_commit(&format!("{remote}/{branch_name}"))?;
             if published != candidate_commit {
@@ -212,10 +322,31 @@ impl FileMergerService {
                     "Published candidate {branch_name} is {published}, expected {candidate_commit}"
                 )));
             }
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             git.fetch_branch(&remote, &target_branch)?;
             let published_target = git.resolve_commit(&format!("{remote}/{target_branch}"))?;
             if git.commit_is_ancestor(&candidate_commit, &published_target)? {
+                self.verify_integration_fence(
+                    &work_items,
+                    fence,
+                    expected_branch,
+                    expected_candidate,
+                    expected_remote,
+                )?;
                 git.switch(&target_branch)?;
+                self.verify_integration_fence(
+                    &work_items,
+                    fence,
+                    expected_branch,
+                    expected_candidate,
+                    expected_remote,
+                )?;
                 git.fast_forward_from_remote(&remote, &target_branch)?;
                 let recovered = RoundIntegration {
                     candidate_commit,
@@ -233,6 +364,13 @@ impl FileMergerService {
                         ),
                     },
                 };
+                self.verify_integration_fence(
+                    &work_items,
+                    fence,
+                    expected_branch,
+                    expected_candidate,
+                    expected_remote,
+                )?;
                 self.persist_integration(&work_items, goal_id, round_idx, &recovered)?;
                 return Ok(recovered);
             }
@@ -250,6 +388,13 @@ impl FileMergerService {
             )));
         }
 
+        self.verify_integration_fence(
+            &work_items,
+            fence,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+        )?;
         git.switch(&target_branch)?;
         if remote_configured {
             let remote_target = git.resolve_commit(&format!("{remote}/{target_branch}"))?;
@@ -257,6 +402,13 @@ impl FileMergerService {
             if local_target != remote_target
                 && !git.commit_is_ancestor(&remote_target, &local_target)?
             {
+                self.verify_integration_fence(
+                    &work_items,
+                    fence,
+                    expected_branch,
+                    expected_candidate,
+                    expected_remote,
+                )?;
                 let synchronized = git.merge_commit_no_ff(&remote_target)?;
                 if !synchronized.ok {
                     let _ = git.recover();
@@ -275,6 +427,13 @@ impl FileMergerService {
                 ),
             }
         } else {
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             let merge = git.merge_commit_no_ff(&candidate_commit)?;
             if !merge.ok {
                 let _ = git.recover();
@@ -284,6 +443,13 @@ impl FileMergerService {
         };
         let target_commit = git.resolve_commit(&target_branch)?;
         if remote_configured {
+            self.verify_integration_fence(
+                &work_items,
+                fence,
+                expected_branch,
+                expected_candidate,
+                expected_remote,
+            )?;
             git.push(&remote, &target_branch)?;
         }
         let integration = RoundIntegration {
@@ -295,8 +461,85 @@ impl FileMergerService {
             integrated_at: Utc::now().to_rfc3339(),
             merge,
         };
+        self.verify_integration_fence(
+            &work_items,
+            fence,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+        )?;
         self.persist_integration(&work_items, goal_id, round_idx, &integration)?;
         Ok(integration)
+    }
+
+    fn verify_integration_fence(
+        &self,
+        work_items: &FileWorkItemService,
+        fence: &WorkflowExecutionFence,
+        expected_branch: &str,
+        expected_candidate: &str,
+        expected_remote: &str,
+    ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
+        let target_root = match &self.target_root {
+            Some(target_root) => target_root.clone(),
+            None => target_root(&self.refine_dir)?,
+        };
+        WorkflowEngine::with_target_root(&self.runtime_root, target_root)
+            .verify_ready_merge_fence(fence)?;
+        let detail = work_items.show_goal_detail(&fence.goal_id)?;
+        let actual_revision = workflow_revision(&detail);
+        if actual_revision != fence.goal_revision {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} changed from Ready Merge revision {} to {}",
+                fence.goal_id, fence.goal_revision, actual_revision
+            )));
+        }
+        if detail.get("status").and_then(Value::as_str) != Some(GoalStatus::ReadyMerge.as_str()) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} is no longer ready-merge",
+                fence.goal_id
+            )));
+        }
+        let rounds = detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                RefineError::Conflict(format!("Goal {} has no rounds", fence.goal_id))
+            })?;
+        if rounds.len() != fence.round_idx + 1 {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} round changed before Ready Merge integration",
+                fence.goal_id
+            )));
+        }
+        for (label, recorded, expected) in [
+            (
+                "branch",
+                detail.get("branch_name").and_then(Value::as_str),
+                expected_branch,
+            ),
+            (
+                "candidate",
+                detail.get("candidate_commit").and_then(Value::as_str),
+                expected_candidate,
+            ),
+            (
+                "remote",
+                rounds[fence.round_idx]
+                    .get("workflow_git_remote")
+                    .and_then(Value::as_str),
+                expected_remote,
+            ),
+        ] {
+            if recorded != Some(expected) {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {} {label} changed before Ready Merge integration",
+                    fence.goal_id
+                )));
+            }
+        }
+        Ok(())
     }
 
     fn persist_integration(
@@ -316,10 +559,9 @@ impl FileMergerService {
 
     fn verify_existing_integration(
         &self,
-        target_root: &Path,
+        git: &FileGitWorktreeService,
         integration: &RoundIntegration,
     ) -> RefineResult<()> {
-        let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root);
         let target = if integration.pushed {
             git.fetch_branch(&integration.remote, &integration.target_branch)?;
             git.resolve_commit(&format!(
@@ -404,7 +646,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use crate::tools::host::project_layout::prepare_refine_dir;
     use crate::tools::product::work_items::FileWorkItemService;
+    use crate::workflow::WorkflowAutomation;
 
     #[test]
     fn ready_merge_integrates_once_and_review_approval_only_accepts() {
@@ -416,6 +660,7 @@ mod tests {
         let remote = temp_root.join("remote.git");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
+        let refine_dir = prepare_refine_dir(&repo).unwrap();
         commit_file(&repo, "app.txt", "base\n", "initial");
         git(
             &temp_root,
@@ -479,26 +724,31 @@ mod tests {
             .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
             .unwrap();
 
+        let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
+        let wrong_round = merger
+            .integrate_workflow_candidate(
+                "GOAL1",
+                1,
+                &claim_id,
+                &execution_id,
+                "default",
+                branch,
+                &candidate_commit,
+                "origin",
+            )
+            .unwrap_err();
         assert!(
-            merger
-                .integrate_workflow_candidate(
-                    "GOAL1",
-                    1,
-                    "default",
-                    branch,
-                    &candidate_commit,
-                    "origin",
-                )
-                .unwrap_err()
-                .to_string()
-                .contains("candidate round changed")
+            wrong_round.to_string().contains("round changed"),
+            "{wrong_round}"
         );
         assert!(
             merger
                 .integrate_workflow_candidate(
                     "GOAL1",
                     0,
+                    &claim_id,
+                    &execution_id,
                     "other-node",
                     branch,
                     &candidate_commit,
@@ -506,15 +756,17 @@ mod tests {
                 )
                 .unwrap_err()
                 .to_string()
-                .contains("owned by node default")
+                .contains("no longer owns active claim")
         );
         let first = merger.clone();
         let second = merger.clone();
-        let (integrated, concurrent) = thread::scope(|scope| {
+        let (first_result, second_result) = thread::scope(|scope| {
             let first = scope.spawn(|| {
                 first.integrate_workflow_candidate(
                     "GOAL1",
                     0,
+                    &claim_id,
+                    &execution_id,
                     "default",
                     branch,
                     &candidate_commit,
@@ -525,23 +777,32 @@ mod tests {
                 second.integrate_workflow_candidate(
                     "GOAL1",
                     0,
+                    &claim_id,
+                    &execution_id,
                     "default",
                     branch,
                     &candidate_commit,
                     "origin",
                 )
             });
-            (
-                first.join().unwrap().unwrap(),
-                second.join().unwrap().unwrap(),
-            )
+            (first.join().unwrap(), second.join().unwrap())
         });
+        let (integrated, concurrent_error) = match (first_result, second_result) {
+            (Ok(integrated), Err(error)) | (Err(error), Ok(integrated)) => (integrated, error),
+            unexpected => panic!("expected one serialized integration owner: {unexpected:?}"),
+        };
         assert!(integrated.merge.ok);
-        assert_eq!(concurrent, integrated);
+        assert!(
+            concurrent_error
+                .to_string()
+                .contains("already owns merger:GOAL1:1")
+        );
         let repeated = merger
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
+                &claim_id,
+                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
@@ -560,6 +821,8 @@ mod tests {
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
+                &claim_id,
+                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
@@ -655,6 +918,7 @@ mod tests {
         let remote = temp_root.join("remote.git");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
+        let refine_dir = prepare_refine_dir(&repo).unwrap();
         commit_file(&repo, "app.txt", "base\n", "initial");
         let base_commit = git_stdout(&repo, &["rev-parse", "HEAD"]);
         git(
@@ -720,17 +984,23 @@ mod tests {
             .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
             .unwrap();
 
+        let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
         let error = FileMergerService::new(&runtime_root, &refine_dir)
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
+                &claim_id,
+                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
                 "origin",
             )
             .unwrap_err();
-        assert!(error.to_string().contains("candidate integration failed"));
+        assert!(
+            error.to_string().contains("candidate integration failed"),
+            "{error}"
+        );
         assert_eq!(
             work_items.show_goal_summary("GOAL1").unwrap().goal.status,
             GoalStatus::ReadyMerge
@@ -786,6 +1056,7 @@ mod tests {
         let remote = temp_root.join("remote.git");
         fs::create_dir_all(&refine_dir).unwrap();
         init_repo(&repo);
+        let refine_dir = prepare_refine_dir(&repo).unwrap();
         commit_file(&repo, "app.txt", "base\n", "initial");
         let base_commit = git_stdout(&repo, &["rev-parse", "HEAD"]);
         git(
@@ -860,18 +1131,24 @@ mod tests {
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
             .unwrap();
+        let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
         let merger = FileMergerService::new(&runtime_root, &refine_dir);
         let error = merger
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
+                &claim_id,
+                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
                 "origin",
             )
             .unwrap_err();
-        assert!(error.to_string().contains("pre-receive hook declined"));
+        assert!(
+            error.to_string().contains("pre-receive hook declined"),
+            "{error}"
+        );
         let integrated_head = git_stdout(&repo, &["rev-parse", "HEAD"]);
         assert!(git_succeeds(
             &repo,
@@ -901,6 +1178,8 @@ mod tests {
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
+                &claim_id,
+                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
@@ -945,6 +1224,13 @@ mod tests {
         git(repo, &["init", "-b", "main"]).unwrap();
         git(repo, &["config", "user.email", "test@example.com"]).unwrap();
         git(repo, &["config", "user.name", "Test User"]).unwrap();
+    }
+
+    fn start_ready_merge_claim(runtime_root: &Path, repo: &Path) -> (String, String) {
+        let automation = WorkflowEngine::with_target_root(runtime_root, repo);
+        let claim_id = automation.claim("GOAL1").unwrap();
+        let execution_id = automation.start_claim(&claim_id).unwrap();
+        (claim_id, execution_id)
     }
 
     fn commit_file(repo: &Path, path: &str, contents: &str, message: &str) {

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use crate::model::log::RoundLogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
-use crate::tools::host::git_worktrees::MergeResult;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -114,6 +113,14 @@ pub struct RoundIntegration {
     pub pushed: bool,
     pub integrated_at: Timestamp,
     pub merge: MergeResult,
+}
+
+/// Durable, adapter-independent evidence for a Git merge decision.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MergeResult {
+    pub ok: bool,
+    pub conflicts: Vec<String>,
+    pub message: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

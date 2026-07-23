@@ -30,6 +30,7 @@ const PUSH_RETRY_DELAY: Duration = Duration::from_millis(100);
 pub const REFINE_STATE_BRANCH: &str = "refine/state";
 const REFINE_STATE_REF: &str = "refs/heads/refine/state";
 const DEFAULT_REMOTE: &str = "origin";
+const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";
 static REPOSITORY_GIT_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
 static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -169,15 +170,12 @@ impl FileGitSyncService {
         let state_root = setup.path;
         let state_refine = state_root.join(".refine");
         let recovered_interrupted_sync = self.recover_interrupted_state_worktree(&state_root)?;
-        let checked_out = durable_state_map(&state_refine)?;
-        // A node seeing the state branch for the first time has no synchronized
-        // baseline yet. Its absent local files are not deletions of records
-        // that already exist remotely.
-        let base = if setup.pulled {
-            BTreeMap::new()
-        } else {
-            checked_out
-        };
+        // The checked-out state branch is not a synchronization baseline: it can
+        // advance before a failed first reconciliation has copied remote records
+        // into the live store. Persist the last successfully copied state so an
+        // absent local record is only interpreted as a deletion after this node
+        // has actually observed it.
+        let base = self.load_state_baseline()?.unwrap_or_default();
         let local = durable_state_map(&live_refine)?;
         let before = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
 
@@ -236,7 +234,7 @@ impl FileGitSyncService {
                 .map(|path| format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))),
         );
         let delta_committed = !changed.is_empty();
-        let committed = setup.created || delta_committed;
+        let mut committed = setup.created || delta_committed;
         let mut commit = if delta_committed {
             self.git_at_checked(&state_root, &["add", "-f", "-A", "--", ".refine"])?;
             let node_id =
@@ -270,21 +268,37 @@ impl FileGitSyncService {
                 }
                 self.fetch_state_branch(&remote)?;
                 let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
-                let rebase = self.git_at(&state_root, &["rebase", &remote_ref])?;
-                append_output_detail(&mut details, &rebase);
-                if !rebase.success {
-                    let _ = self.git_at(&state_root, &["rebase", "--abort"]);
-                    return Err(command_failed(&format!("git rebase {remote_ref}"), &rebase));
+                self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
+                remove_transient_state_files(&state_refine)?;
+                let retry_remote_state = durable_state_map(&state_refine)?;
+                apply_local_state_delta(&live_refine, &state_refine, &base, &local)?;
+                let retry_updated = durable_state_map(&state_refine)?;
+                let retry_changed = state_change_status(&retry_remote_state, &retry_updated);
+                committed = !retry_changed.is_empty();
+                if committed {
+                    self.git_at_checked(&state_root, &["add", "-f", "-A", "--", ".refine"])?;
+                    let node_id =
+                        FileNodeRegistryService::with_active_root(&live_refine, &self.runtime_root)
+                            .active_node_id()
+                            .unwrap_or_else(|_| "default".to_string());
+                    let summary = state_commit_summary(&retry_changed.join("\n"));
+                    self.git_at_checked(
+                        &state_root,
+                        &["commit", "-m", &summary, "-m", &format!("Node: {node_id}")],
+                    )?;
                 }
                 pulled = true;
                 if committed {
                     commit = Some(self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?);
+                } else {
+                    commit = None;
                 }
                 thread::sleep(PUSH_RETRY_DELAY);
             }
         }
 
         let concurrent_local_change = merge_state_into_live(&state_refine, &live_refine, &local)?;
+        self.save_state_baseline(&durable_state_map(&state_refine)?)?;
         if concurrent_local_change {
             details.push(
                 "A newer local state mutation arrived during synchronization; it was preserved and will be published in the next batch."
@@ -558,6 +572,70 @@ impl FileGitSyncService {
             .to_string())
     }
 
+    fn load_state_baseline(&self) -> RefineResult<Option<DurableStateMap>> {
+        let path = git_common_dir(&self.target_root)?.join(STATE_BASELINE_FILE);
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read Refine state baseline {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let stored = serde_json::from_slice::<BTreeMap<String, u64>>(&bytes).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to parse Refine state baseline {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(Some(
+            stored
+                .into_iter()
+                .map(|(path, fingerprint)| (PathBuf::from(path), fingerprint))
+                .collect(),
+        ))
+    }
+
+    fn save_state_baseline(&self, baseline: &DurableStateMap) -> RefineResult<()> {
+        let path = git_common_dir(&self.target_root)?.join(STATE_BASELINE_FILE);
+        let stored = baseline
+            .iter()
+            .map(|(path, fingerprint)| (path.to_string_lossy().replace('\\', "/"), *fingerprint))
+            .collect::<BTreeMap<_, _>>();
+        let bytes = serde_json::to_vec_pretty(&stored).map_err(|error| {
+            RefineError::Io(format!("failed to encode Refine state baseline: {error}"))
+        })?;
+        let temp = path.with_extension(format!(
+            "tmp-{}-{}",
+            std::process::id(),
+            STATE_COPY_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut file = File::create(&temp).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create Refine state baseline {}: {error}",
+                temp.display()
+            ))
+        })?;
+        file.write_all(&bytes)
+            .and_then(|_| file.sync_all())
+            .map_err(|error| {
+                let _ = fs::remove_file(&temp);
+                RefineError::Io(format!(
+                    "failed to write Refine state baseline {}: {error}",
+                    temp.display()
+                ))
+            })?;
+        fs::rename(&temp, &path).map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            RefineError::Io(format!(
+                "failed to commit Refine state baseline {}: {error}",
+                path.display()
+            ))
+        })
+    }
+
     fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
         Ok(self
             .git_stdout(&["remote"])?
@@ -695,6 +773,13 @@ fn state_conflicts(
     paths
         .into_iter()
         .filter(|path| {
+            // State-sync failure and recovery reporting mutates this derived
+            // supervisor snapshot. Treating that mutation as a same-record
+            // conflict creates a self-sustaining loop that prevents unrelated
+            // durable Goal records from ever being reconciled.
+            if path == std::path::Path::new("supervisor-agent.json") {
+                return false;
+            }
             let base_value = base.get(path);
             let local_value = local.get(path);
             let remote_value = remote.get(path);
@@ -1363,6 +1448,34 @@ mod tests {
         assert!(
             error.to_string().contains("goals/GOALA/goal.json"),
             "{error}"
+        );
+    }
+
+    #[test]
+    fn failed_first_reconciliation_does_not_turn_remote_records_into_local_deletions() {
+        let fixture = SyncFixture::new("failed-first-reconciliation");
+        write_goal(&fixture.a, "GOALA");
+        let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+        let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+        fs::create_dir_all(&refine_b).unwrap();
+        fs::write(refine_a.join("shared.json"), "{\"node\":\"a\"}\n").unwrap();
+        fs::write(refine_b.join("shared.json"), "{\"node\":\"b\"}\n").unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+
+        let error = fixture.service(&fixture.b).sync().unwrap_err();
+        assert!(error.to_string().contains("shared.json"), "{error}");
+        fs::copy(refine_a.join("shared.json"), refine_b.join("shared.json")).unwrap();
+
+        let recovered = fixture.service(&fixture.b).sync().unwrap();
+
+        assert!(!recovered.committed, "{recovered:?}");
+        assert!(refine_b.join("goals/GOALA/goal.json").exists());
+        assert!(
+            !git_stdout(
+                &fixture.b,
+                &["show", "origin/refine/state:.refine/goals/GOALA/goal.json"],
+            )
+            .is_empty()
         );
     }
 
