@@ -403,29 +403,92 @@
     },
     {
       "assignee": "Supervisor",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T15:08:54Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-23T15:33:50Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-5",
+        "failed_actions": [
+          {
+            "message": "The settlement journal has no replay path. If execution stops after claim persistence or capacity release but before Goal persistence, a retry sees the cancelled claim and returns already_cancelled without consulting the journal, leaving the Goal and capacity inconsistent and unrecoverable through the shared capability.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Successful settlement uses a WorkflowEngine without target-app context; persisting the cancelled claim therefore replaces the stored workflow policy with defaults, silently discarding configured limits, Node, provider, and target-app identity.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "The tests cover in-process errors that execute rollback, but do not cover interruption and restart between durable writes or assert preservation of a non-default workflow policy, leaving both persistence defects unverified.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Cancellation can corrupt workflow policy and cannot recover an interrupted settlement.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"The settlement journal has no replay path. If execution stops after claim persistence or capacity release but before Goal persistence, a retry sees the cancelled claim and returns already_cancelled without consulting the journal, leaving the Goal and capacity inconsistent and unrecoverable through the shared capability.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Successful settlement uses a WorkflowEngine without target-app context; persisting the cancelled claim therefore replaces the stored workflow policy with defaults, silently discarding configured limits, Node, provider, and target-app identity.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The tests cover in-process errors that execute rollback, but do not cover interruption and restart between durable writes or assert preservation of a non-default workflow policy, leaving both persistence defects unverified.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Cancellation can corrupt workflow policy and cannot recover an interrupted settlement.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The settlement journal has no replay path. If execution stops after claim persistence or capacity release but before Goal persistence, a retry sees the cancelled claim and returns already_cancelled without consulting the journal, leaving the Goal and capacity inconsistent and unrecoverable through the shared capability.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Successful settlement uses a WorkflowEngine without target-app context; persisting the cancelled claim therefore replaces the stored workflow policy with defaults, silently discarding configured limits, Node, provider, and target-app identity.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "The tests cover in-process errors that execute rollback, but do not cover interruption and restart between durable writes or assert preservation of a non-default workflow policy, leaving both persistence defects unverified.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-5"
+      },
+      "governance_message": "Cancellation can corrupt workflow policy and cannot recover an interrupted settlement.",
+      "governance_rule_actions": [
+        {
+          "message": "The settlement journal has no replay path. If execution stops after claim persistence or capacity release but before Goal persistence, a retry sees the cancelled claim and returns already_cancelled without consulting the journal, leaving the Goal and capacity inconsistent and unrecoverable through the shared capability.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Successful settlement uses a WorkflowEngine without target-app context; persisting the cancelled claim therefore replaces the stored workflow policy with defaults, silently discarding configured limits, Node, provider, and target-app identity.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "The tests cover in-process errors that execute rollback, but do not cover interruption and restart between durable writes or assert preservation of a non-default workflow policy, leaving both persistence defects unverified.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Committed Round 5 as 18bac9080a09689263971e7ed648c6f516191e20. Target-bound cancellation now fails closed when no managed-process record exists; a shared spawn-to-registration fence prevents workers from starting under settled claims; exact claim, capacity, and Goal writes are journaled and rolled back together on failure; confirmed-exit receipts retain ownership and support retry recovery. Added real-worker pre-registration coverage, post-cancellation launch rejection, and injected failures after claim persistence, capacity release, and Goal persistence with exact state and recovery assertions; updated process intent and shared-capacity coverage. Focused results: process_control 14/14, real pre-registration worker 1/1, real worker settlement 1/1, workflow replenishment 2/2, subprocess 11/11, agent sessions 3/3, web API 1/1, CLI 1/1, MCP 1/1, workflow metadata 1/1, browser process UI 4/4. Initial full library run: 470 passed, 2 failed (obsolete zero-process cancellation expectation; known quality-settings EOF race); both isolated reruns passed. Two subsequent unchanged-source full library runs passed 472/472, including the final run. Final web suite passed 37/37; cargo check --all-targets, cargo fmt --all -- --check, git diff --check, git diff --cached --check, and git show --check passed. Worktree is clean; all prior candidate commits and worktrees were preserved.",
       "implementation_reported_at": "2026-07-23T15:29:28Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover Governance-rejected candidate d81385dc from current main while preserving d81385dc, 2d0d226b, c9a92ee5, ea2103e3, all earlier candidates, worktrees, rounds, tests, and provider/Governance evidence. Fix only the three newly recorded violations in the authoritative shared cancellation capability. Fail closed when a target-bound running workflow claim has no managed-process record: an empty lookup during registration or lost-registry races is not proof of process exit and must not cancel the claim or Goal; coordinate registration and cancellation so a worker cannot remain or start under cancelled work. Make linked process exit, exact claim cancellation, Goal cancellation, and capacity settlement failure-atomic across their durable writes, with either one committed terminal outcome or truthful recoverable partial-failure evidence and no silently inconsistent active Goal, claim, or capacity state. Add deterministic production-path tests for cancellation before worker registration and injected failures between claim persistence, capacity release, and Goal persistence, asserting exact final durable states and supported recovery. Re-run the focused service, real workflow-worker, workflow scheduling, subprocess, agent-session, web API, CLI, MCP/browser, workflow metadata, full library and web suites, all-target check, formatting, and diff checks, reporting every initial failure and final result accurately. Preserve one shared capability across surfaces and all provider, authentication, cancellation, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T15:29:28Z",
+      "rule_state": "failed",
+      "updated": "2026-07-23T15:33:50Z",
       "workflow_quality_timing": null
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T15:29:29Z"
+  "updated": "2026-07-23T15:33:50Z"
 }
