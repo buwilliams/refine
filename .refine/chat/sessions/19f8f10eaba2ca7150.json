@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:17:59Z",
+  "updated_at": "2026-07-23T18:19:21Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2088,6 +2088,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "`00000SZ412RXR0TQRHE82JW000` has reached `review` with Quality and Governance passed. I’m stopping at that human confirmation boundary—no approval or merge. The recovery Goal remains actively owned by a live Codex process, so I’m continuing to observe it without interfering."
+    },
+    {
+      "created_at": "2026-07-23T18:19:21Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830761229-82",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery agent has reconstructed only the intended two-file prompt/session change in round 2 and its focused tests are passing. It is still running the broader verification gates; no provider/authentication or process-liveness issue is present, so there is nothing safe to interrupt or retry."
     }
   ],
   "queued_messages": [
