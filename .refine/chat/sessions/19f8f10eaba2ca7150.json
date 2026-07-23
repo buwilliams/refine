@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:40:36Z",
+  "updated_at": "2026-07-23T18:41:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2358,6 +2358,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live state changed again during reconciliation: the queued Stop-button Goal has now been claimed by a real workflow worker (PID 375463, launched by the workflow runner), so it is no longer a lost/idle item and I will not retry it. I’m checking its current Round and the separate review candidate while the worker proceeds."
+    },
+    {
+      "created_at": "2026-07-23T18:41:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832108971-12",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The daemon and both runner workers are healthy, HTTP is available, and two Goal Agents are now genuinely active: the recovered Stop-button Round 7 and a new low-priority performance investigation created from the review candidate’s reproducible timing failure. The transcript-handoff candidate remains a clean, pushed branch at review and is not contained in `main` or `origin/main`; its known full-suite timing failure is being handled independently rather than concealed."
     }
   ],
   "queued_messages": [
