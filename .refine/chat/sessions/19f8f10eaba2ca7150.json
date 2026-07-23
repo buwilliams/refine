@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:07:31Z",
+  "updated_at": "2026-07-23T18:07:44Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1905,6 +1905,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll correlate the two active Goals and five review candidates against durable Goal/Round records, live processes, Git/worktrees, provider evidence, and runtime health. I’ll keep review as a confirmation boundary and only intervene if current evidence shows a lost worker or another actionable failure."
+    },
+    {
+      "created_at": "2026-07-23T18:07:44Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830064245-41",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The supplied snapshot is internally cautious but incomplete: it reports two active Goals while exposing no managed-process records, yet it also says there is no stall/loss evidence. I’m checking the authoritative live surfaces before deciding whether either Goal needs recovery; the five review Goals will remain untouched unless the user explicitly asks to approve them."
     }
   ],
   "queue_dispatching": true,
