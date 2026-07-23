@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:34:28Z",
+  "updated_at": "2026-07-23T15:35:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1404,6 +1404,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 6 is now live in a new worktree. Its acceptance bar is explicit: restart replay must repair interrupted settlement, and a non-default workflow policy must survive unchanged."
+    },
+    {
+      "created_at": "2026-07-23T15:35:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784820953124-264",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first direct replay hit a documentation conflict. The agent did not force it or discard work; it recovered by replaying the complete preserved candidate stack onto current main, producing a clean Round 6 ancestry. No unresolved files remain."
     }
   ],
   "queued_messages": [
