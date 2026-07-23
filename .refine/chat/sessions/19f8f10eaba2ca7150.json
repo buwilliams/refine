@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:17:35Z",
+  "updated_at": "2026-07-23T18:17:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2076,6 +2076,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The missing output was normal settlement, not a repeated transcript failure: Goal `00000SZ412RXR0TQRHE82JW000` recorded its implementation report, cleanly committed `fa0a43ff`, and preserved an earlier transient test failure alongside the successful 455/455 rerun. Its Goal Agent exited; Refine is now responsible for downstream workflow stages."
+    },
+    {
+      "created_at": "2026-07-23T18:17:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830679569-80",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "`00000SZ412RXR0TQRHE82JW000` has reached `review` with Quality and Governance passed. I’m stopping at that human confirmation boundary—no approval or merge. The recovery Goal remains actively owned by a live Codex process, so I’m continuing to observe it without interfering."
     }
   ],
   "queued_messages": [
