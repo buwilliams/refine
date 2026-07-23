@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "lifecycle": "observing",
+  "lifecycle": "idle",
   "health": "healthy",
-  "active_work": 1,
+  "active_work": 0,
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -64,11 +64,11 @@
     "00000SZ3SFP4N10NXGAE5P4002": "done",
     "00000SZ3SHFHFK352VJT5P4003": "done",
     "00000SZ412RXR0TQRHE82JW000": "review",
-    "00000SZ41923HGWZSREC2JW001": "in-progress"
+    "00000SZ41923HGWZSREC2JW001": "review"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:review,00000SZ41923HGWZSREC2JW001:in-progress|live={\"00000SZ41923HGWZSREC2JW001\"}|quiet={}|issues=",
-  "updated_at": "2026-07-23T18:21:34.297975693+00:00",
+  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:review,00000SZ412RXR0TQRHE82JW000:review,00000SZ41923HGWZSREC2JW001:review|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T18:23:02.400843170+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2273,6 +2273,35 @@
       "message": "Goal 00000SZ412RXR0TQRHE82JW000 changed from qa to review.",
       "created_at": "2026-07-23T18:17:34.926868708+00:00",
       "goal_id": "00000SZ412RXR0TQRHE82JW000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T18:23:01.282113002+00:00-228",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ41923HGWZSREC2JW001 changed from in-progress to qa.",
+      "created_at": "2026-07-23T18:23:01.282113002+00:00",
+      "goal_id": "00000SZ41923HGWZSREC2JW001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T18:23:02.180725761+00:00-229",
+      "kind": "failure",
+      "status": "error",
+      "message": "Workflow evaluation failed: failed to read Goal Agent transcript /home/buddy/projects/refine/run/8082/processes/goal-agent-2bfd9a9c-b7b9-425b-84d3-ac5874a5af9e.stdout.log: No such file or directory (os error 2)",
+      "created_at": "2026-07-23T18:23:02.180725761+00:00",
+      "actionable": true,
+      "retryable": true
+    },
+    {
+      "id": "supervisor-2026-07-23T18:23:03.206350914+00:00-230",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ41923HGWZSREC2JW001 changed from qa to review.",
+      "created_at": "2026-07-23T18:23:03.206350914+00:00",
+      "goal_id": "00000SZ41923HGWZSREC2JW001",
       "actionable": false,
       "retryable": false
     }

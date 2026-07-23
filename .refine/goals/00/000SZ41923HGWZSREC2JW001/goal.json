@@ -37,29 +37,51 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T18:13:11Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T18:22:57Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ41923HGWZSREC2JW001-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ41923HGWZSREC2JW001-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Recovered and refined the preserved Round 1 implementation in only src/process/agent_sessions.rs and src/prompts/goal-agent-session.md: Goal Agent launch now resolves and canonicalizes the running Refine executable, prefers the checkout containing that executable with existing checkout discovery as fallback, and renders both paths with explicit checkout-local ./r guidance while retaining autonomy, completion, and needs-input boundaries. Added focused rendered-prompt assertions for the executable, PATH absence, ./r checkout fallback, completion signal, and unresolved placeholders. Verification: focused rendered-prompt test passed 1/1; focused prompt-contract test passed 1/1; cargo check --all-targets passed; final cargo fmt --all -- --check passed; final git diff --check passed. The initial format check failed only because rustfmt required one line wrap; cargo fmt --all corrected it and the rerun passed. cargo test --lib completed with 469 passed and 1 failed: unrelated surfaces::web_server::tests::warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale measured create=129.828394ms against <50ms; isolated rerun also failed at create=131.663621ms (0 passed, 1 failed). Preserved infrastructure failure remains exact and visible: failed to read Goal Agent transcript /home/buddy/projects/refine/run/8082/processes/goal-agent-2bfd9a9c-b7b9-425b-84d3-ac5874a5af9e.stdout.log: No such file or directory (os error 2). Round 1's dirty two-file worktree and durable provider/process evidence were not modified, and nothing was approved, merged, force-written, history-rewritten, discarded, or directly edited in durable Goal state.",
       "implementation_reported_at": "2026-07-23T18:20:48Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover the preserved Round 1 implementation after the workflow infrastructure failed with `failed to read Goal Agent transcript ...goal-agent-2bfd9a9c-b7b9-425b-84d3-ac5874a5af9e.stdout.log: No such file or directory (os error 2)`. Preserve Round 1, its dirty worktree at `/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ41923HGWZSREC2JW001-round-1`, all provider/process evidence, and the exact failure. Reuse or reconstruct only the intended two-file changes in `src/process/agent_sessions.rs` and `src/prompts/goal-agent-session.md`: injected Goal Agent guidance must identify the active Refine executable robustly and explain the checkout `./r` fallback so agents can invoke Refine even when it is absent from PATH, without hard-coding a stale machine-specific path or weakening existing Goal/session boundaries. Review the preserved diff rather than starting from assumptions. Add/retain focused tests for rendered prompt behavior, run the relevant focused tests plus the library/all-target/format/diff gates appropriate to this small prompt change, and report every failure and final result accurately. Do not approve or merge, force Git, rewrite history, discard either worktree, edit durable Goal state directly, or hide the transcript/provider/authentication failure.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T18:23:00Z",
+      "quality_details": {
+        "candidate_commit": "006f6652cac28d8eb52dd4f80a0d100def0017f4",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f9037731656d1",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T18:20:48Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T18:23:01Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T18:20:48Z"
+  "updated": "2026-07-23T18:23:01Z"
 }
