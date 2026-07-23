@@ -488,7 +488,7 @@
       "workflow_quality_timing": null
     },
     {
-      "assignee": "Supervisor",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T15:34:13Z",
       "governance_checked_at": "2026-07-23T15:54:14Z",
@@ -529,11 +529,11 @@
       "quality_state": "passed",
       "reporter": "Supervisor",
       "rule_state": "passed",
-      "updated": "2026-07-23T15:54:18Z",
+      "updated": "2026-07-23T18:24:51Z",
       "workflow_quality_timing": "pre_merge"
     }
   ],
   "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T15:54:19Z"
+  "updated": "2026-07-23T18:24:51Z"
 }
