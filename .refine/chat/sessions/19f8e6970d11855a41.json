@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:31:26Z",
+  "updated_at": "2026-07-23T11:34:02Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -771,6 +771,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A broad 28-test workflow run exposed one integration-conflict failure; the exact test passed immediately when isolated. I’m keeping that visible as possible race/flakiness evidence rather than counting the suite as clean, and I’m letting the worker continue its remaining focused checks."
+    },
+    {
+      "created_at": "2026-07-23T11:34:02Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784806442111-63",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I found a concrete audit-boundary risk in the live patch: Ready Merge checks state before Git, then can merge/push and persist evidence without fencing the expected execution, status, or revision again. A concurrent cancellation or retry could therefore lose the race after the irreversible Git side effect. I’m sending that narrow finding to the worker through its supported session input; this does not approve, merge, or alter Goal state."
     }
   ],
   "queued_messages": [
