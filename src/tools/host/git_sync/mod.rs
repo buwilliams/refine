@@ -216,7 +216,7 @@ impl FileGitSyncService {
             .into_iter()
             .filter(|path| tracked_transient.contains(path))
             .collect::<Vec<_>>();
-        let mut remote_state = durable_state_map(&state_refine)?;
+        let remote_state = durable_state_map(&state_refine)?;
         let supervisor_merge = reconcile_supervisor_snapshot(
             &live_refine,
             &state_refine,
@@ -224,9 +224,6 @@ impl FileGitSyncService {
             &local,
             &remote_state,
         )?;
-        if supervisor_merge.resolved {
-            remote_state = durable_state_map(&state_refine)?;
-        }
         let resolved_paths = supervisor_merge.resolved_paths();
         let mut conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         conflicts.extend(supervisor_merge.conflicts);
@@ -282,7 +279,7 @@ impl FileGitSyncService {
                 let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
                 self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
                 remove_transient_state_files(&state_refine)?;
-                let mut retry_remote_state = durable_state_map(&state_refine)?;
+                let retry_remote_state = durable_state_map(&state_refine)?;
                 // A rejected push means both the remote and the live store may have advanced
                 // since the original reconciliation. Re-evaluate the original observed base
                 // against both fresh sides before replaying any local delta.
@@ -294,9 +291,6 @@ impl FileGitSyncService {
                     &retry_local,
                     &retry_remote_state,
                 )?;
-                if supervisor_retry.resolved {
-                    retry_remote_state = durable_state_map(&state_refine)?;
-                }
                 let retry_resolved_paths = supervisor_retry.resolved_paths();
                 let mut retry_conflicts = state_conflicts(
                     &base,
@@ -1899,6 +1893,95 @@ mod tests {
         assert_eq!(merged["open_issues"]["goal"], "review conflict");
         assert_eq!(merged["events"].as_array().unwrap().len(), 2);
         assert_eq!(merged["health"], "degraded");
+    }
+
+    #[test]
+    fn sync_commits_pushes_and_retains_reconciled_supervisor_snapshot() {
+        let fixture = SyncFixture::new("supervisor-snapshot-durable-merge");
+        let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+        let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+        fs::create_dir_all(&refine_a).unwrap();
+        let baseline = json!({
+            "version": 2,
+            "updated_at": "2026-07-23T12:00:00Z",
+            "initialized": true,
+            "provider": "smoke-ai",
+            "session_id": "session-1",
+            "goal_states": {},
+            "open_issues": {},
+            "events": [{"id": "baseline", "created_at": "2026-07-23T12:00:00Z", "message": "observed"}]
+        });
+        fs::write(
+            refine_a.join(SUPERVISOR_AGENT_STATE_PATH),
+            serde_json::to_vec_pretty(&baseline).unwrap(),
+        )
+        .unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+
+        let node_a = json!({
+            "version": 2,
+            "updated_at": "2026-07-23T12:00:01Z",
+            "initialized": true,
+            "provider": "smoke-ai",
+            "session_id": "session-1",
+            "goal_states": {"GOALA": "review"},
+            "open_issues": {"provider": "authentication failed"},
+            "events": [
+                {"id": "baseline", "created_at": "2026-07-23T12:00:00Z", "message": "observed"},
+                {"id": "event-a", "created_at": "2026-07-23T12:00:01Z", "message": "auth"}
+            ]
+        });
+        let node_b = json!({
+            "version": 2,
+            "updated_at": "2026-07-23T12:00:02Z",
+            "initialized": true,
+            "provider": "smoke-ai",
+            "session_id": "session-1",
+            "goal_states": {"GOALB": "failed"},
+            "open_issues": {"goal": "review conflict"},
+            "events": [
+                {"id": "baseline", "created_at": "2026-07-23T12:00:00Z", "message": "observed"},
+                {"id": "event-b", "created_at": "2026-07-23T12:00:02Z", "message": "goal"}
+            ]
+        });
+        fs::write(
+            refine_a.join(SUPERVISOR_AGENT_STATE_PATH),
+            serde_json::to_vec_pretty(&node_a).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            refine_b.join(SUPERVISOR_AGENT_STATE_PATH),
+            serde_json::to_vec_pretty(&node_b).unwrap(),
+        )
+        .unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+
+        let reconciled = fixture.service(&fixture.b).sync().unwrap();
+        assert!(reconciled.committed && reconciled.pushed, "{reconciled:?}");
+        let remote: Value = serde_json::from_str(&git_stdout(
+            &fixture.b,
+            &["show", "origin/refine/state:.refine/supervisor-agent.json"],
+        ))
+        .unwrap();
+        assert_eq!(remote["goal_states"]["GOALA"], "review");
+        assert_eq!(remote["goal_states"]["GOALB"], "failed");
+        assert_eq!(remote["open_issues"]["provider"], "authentication failed");
+        assert_eq!(remote["open_issues"]["goal"], "review conflict");
+        assert_eq!(remote["events"].as_array().unwrap().len(), 3);
+
+        let later = fixture.service(&fixture.b).sync().unwrap();
+        assert!(!later.committed && !later.pushed, "{later:?}");
+        let retained: Value =
+            serde_json::from_slice(&fs::read(refine_b.join(SUPERVISOR_AGENT_STATE_PATH)).unwrap())
+                .unwrap();
+        assert_eq!(retained, remote);
+
+        fixture.service(&fixture.a).sync().unwrap();
+        let copied_back: Value =
+            serde_json::from_slice(&fs::read(refine_a.join(SUPERVISOR_AGENT_STATE_PATH)).unwrap())
+                .unwrap();
+        assert_eq!(copied_back, remote);
     }
 
     #[cfg(unix)]

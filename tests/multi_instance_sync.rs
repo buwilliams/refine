@@ -7,11 +7,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use fs2::FileExt;
 use serde_json::{Value, json};
 
 use refine::model::workflow::GoalStatus;
 use refine::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use refine::process::supervisor::coordination::WORKFLOW_COORDINATION_LOCK;
 use refine::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
+use refine::tools::host::git_sync::FileGitSyncService;
 use refine::tools::host::project_layout::prepare_refine_dir;
 use refine::tools::product::merging::FileMergerService;
 use refine::tools::product::work_items::FileWorkItemService;
@@ -45,6 +48,16 @@ fn two_daemons_sync_refine_state_through_shared_git_remote() {
     configure_repo(&app_b);
 
     let mut instance_a = RefineInstance::start("a", &runtime_a, &app_a, &artifacts);
+    let published_bootstrap = FileGitSyncService::new(&app_a, &runtime_a).sync().unwrap();
+    assert!(
+        published_bootstrap.pushed,
+        "first node did not publish bootstrap state: {published_bootstrap:?}"
+    );
+    let observed_bootstrap = FileGitSyncService::new(&app_b, &runtime_b).sync().unwrap();
+    assert!(
+        observed_bootstrap.pulled,
+        "second node did not observe bootstrap state: {observed_bootstrap:?}"
+    );
     let mut instance_b = RefineInstance::start("b", &runtime_b, &app_b, &artifacts);
 
     let first_label = format!("multi-instance first {}", now_millis());
@@ -249,51 +262,65 @@ fn ready_merge_multi_process_cancellation_replacement_retry_is_exactly_once() {
 }
 
 #[test]
-#[ignore = "multi-process Ready Merge launch/cancellation gate; run through xtask"]
-fn ready_merge_multi_process_cancellation_during_git_launch_is_atomic() {
+#[ignore = "multi-process Ready Merge pre-registration cancellation gate; run through xtask"]
+fn ready_merge_multi_process_cancellation_before_operation_registration_is_atomic() {
     let fixture = ready_merge_fixture("ready-merge-process-launch-cancel");
-    let wrapper = fixture.root.join("git-wrapper");
-    let marker = fixture.root.join("git-child-spawned");
-    let resume = fixture.root.join("git-child-resume");
-    fs::create_dir_all(&wrapper).unwrap();
-    let script = wrapper.join("git");
-    fs::write(
-        &script,
-        "#!/bin/sh\nif test \"$3\" = remote && test \"$4\" = get-url; then\n  : > \"$REFINE_LAUNCH_MARKER\"\n  while test ! -f \"$REFINE_LAUNCH_RESUME\"; do sleep 0.01; done\nfi\nexec /usr/bin/git \"$@\"\n",
-    )
-    .unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&script).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&script, permissions).unwrap();
-    }
+    let operations_dir = fixture.runtime_root.join("operations");
+    fs::create_dir_all(&operations_dir).unwrap();
+    let operation_mutation_path = operations_dir.join(".mutations.lock");
+    let operation_mutation = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&operation_mutation_path)
+        .unwrap();
+    operation_mutation.lock_exclusive().unwrap();
+    let coordination_path = fixture
+        .refine_dir
+        .parent()
+        .unwrap()
+        .join(WORKFLOW_COORDINATION_LOCK);
+    let coordination = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&coordination_path)
+        .unwrap();
+    coordination.lock_exclusive().unwrap();
+
+    // Queue cancellation at the operation-registration barrier first. Ready Merge then acquires
+    // workflow authority and blocks before registering its operation. Releasing the mutation
+    // barrier reproduces the exact pre-registration window: cancellation must tombstone the
+    // execution before the already-authoritative worker can register or launch Git.
+    let automation = fixture.automation();
+    let execution_id = fixture.execution_id.clone();
+    let (cancel_started_tx, cancel_started_rx) = std::sync::mpsc::channel();
+    let cancellation = thread::spawn(move || {
+        cancel_started_tx.send(()).unwrap();
+        automation.cancel(&execution_id)
+    });
+    cancel_started_rx.recv().unwrap();
+    thread::sleep(Duration::from_millis(100));
 
     let output = fixture.root.join("launch-cancel.json");
-    let mut child = spawn_ready_merge_child_with_env(
-        &fixture,
-        &fixture.execution_id,
-        &output,
-        &[
-            (
-                "PATH",
-                format!(
-                    "{}:{}",
-                    wrapper.display(),
-                    std::env::var("PATH").unwrap_or_default()
-                ),
-            ),
-            ("REFINE_LAUNCH_MARKER", marker.display().to_string()),
-            ("REFINE_LAUNCH_RESUME", resume.display().to_string()),
-        ],
-    );
-    wait_for_path(&marker, "just-spawned managed Git child");
+    let mut child = spawn_ready_merge_child(&fixture, &fixture.execution_id, &output);
+    FileExt::unlock(&coordination).unwrap();
+    wait_for_exclusive_lock_holder(&coordination_path, "Ready Merge workflow lease");
+    FileExt::unlock(&operation_mutation).unwrap();
 
-    fixture.automation().cancel(&fixture.execution_id).unwrap();
+    cancellation.join().unwrap().unwrap();
     assert!(child.wait().unwrap().success());
     let cancelled = read_json(&output);
     assert_eq!(cancelled["ok"], false, "{cancelled:#}");
+    assert!(
+        cancelled["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cancelled before operation registration"),
+        "{cancelled:#}"
+    );
     assert!(!git_succeeds(
         &fixture.repo,
         &[
@@ -304,12 +331,21 @@ fn ready_merge_multi_process_cancellation_during_git_launch_is_atomic() {
         ],
     ));
     let operations = merger_operations(&fixture.runtime_root);
+    assert!(operations.is_empty(), "{operations:#?}");
+    let cancellation_evidence = fs::read_dir(operations_dir.join(".workflow-cancellations"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| read_json(&entry.path()))
+        .collect::<Vec<_>>();
+    assert_eq!(cancellation_evidence.len(), 1);
+    assert_eq!(
+        cancellation_evidence[0]["error"]["code"],
+        "workflow_execution_cancelled"
+    );
     assert!(
-        operations.iter().any(|operation| {
-            operation["state"] == "Cancelled"
-                && operation["error"]["code"] == "workflow_execution_cancelled"
-        }),
-        "{operations:#?}"
+        cancellation_evidence[0]["error"]["message"]
+            .as_str()
+            .is_some_and(|message| !message.trim().is_empty())
     );
     assert!(
         AgentCapacityService::new(&fixture.runtime_root)
@@ -903,6 +939,28 @@ fn wait_for_path(path: &Path, label: &str) {
         thread::sleep(Duration::from_millis(10));
     }
     panic!("{label} was not observed at {}", path.display());
+}
+
+fn wait_for_exclusive_lock_holder(path: &Path, label: &str) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        let probe = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(path)
+            .unwrap();
+        match probe.try_lock_exclusive() {
+            Ok(()) => {
+                FileExt::unlock(&probe).unwrap();
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return,
+            Err(error) => panic!("failed to inspect {label} lock {}: {error}", path.display()),
+        }
+    }
+    panic!("timed out waiting for {label} lock {}", path.display());
 }
 
 fn merger_operations(runtime_root: &Path) -> Vec<Value> {

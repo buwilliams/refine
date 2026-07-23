@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess};
+use crate::process::supervisor::coordination::replace_file_durably;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 const RECOVERY_PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -111,6 +112,72 @@ impl FileOperationRegistry {
     fn log_path(&self, operation_id: &str) -> PathBuf {
         self.operations_dir()
             .join(format!("{operation_id}.logs.jsonl"))
+    }
+
+    fn workflow_cancellation_path(&self, execution_id: &str) -> PathBuf {
+        let encoded = execution_id
+            .as_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        self.operations_dir()
+            .join(".workflow-cancellations")
+            .join(format!("{encoded}.json"))
+    }
+
+    fn workflow_cancellation(&self, execution_id: &str) -> RefineResult<Option<Value>> {
+        let path = self.workflow_cancellation_path(execution_id);
+        match fs::read(&path) {
+            Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse workflow cancellation {}: {error}",
+                    path.display()
+                ))
+            }),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(RefineError::Io(format!(
+                "failed to read workflow cancellation {}: {error}",
+                path.display()
+            ))),
+        }
+    }
+
+    fn ensure_request_execution_active(&self, request: &Value) -> RefineResult<()> {
+        let Some(execution_id) = request
+            .get("execution_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|execution_id| !execution_id.is_empty())
+        else {
+            return Ok(());
+        };
+        if self.workflow_cancellation(execution_id)?.is_some() {
+            return Err(RefineError::Conflict(format!(
+                "Workflow execution {execution_id} was cancelled before operation registration"
+            )));
+        }
+        Ok(())
+    }
+
+    fn persist_workflow_cancellation(&self, execution_id: &str) -> RefineResult<Value> {
+        let cancellation = json!({
+            "execution_id": execution_id,
+            "cancelled_at": now_timestamp(),
+            "error": {
+                "code": "workflow_execution_cancelled",
+                "message": format!(
+                    "Workflow execution {execution_id} was cancelled before or while an operation was active"
+                ),
+                "execution_id": execution_id
+            }
+        });
+        let encoded = serde_json::to_vec_pretty(&cancellation).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode workflow cancellation for {execution_id}: {error}"
+            ))
+        })?;
+        replace_file_durably(&self.workflow_cancellation_path(execution_id), &encoded)?;
+        Ok(cancellation)
     }
 
     fn mutation_lock(&self) -> RefineResult<fs::File> {
@@ -394,6 +461,8 @@ impl FileOperationRegistry {
         owner: &str,
         request: Value,
     ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        self.ensure_request_execution_active(&request)?;
         let handle = OperationHandle {
             id: new_operation_id(),
             owner: owner.to_string(),
@@ -404,6 +473,7 @@ impl FileOperationRegistry {
             error: None,
         };
         self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
         self.append_log(
             &handle.id,
             operation_log_entry(&handle, "info", "Operation registered", None),
@@ -422,6 +492,7 @@ impl FileOperationRegistry {
         request: Value,
     ) -> RefineResult<OperationHandle> {
         let lock = self.mutation_lock()?;
+        self.ensure_request_execution_active(&request)?;
         if let Some(active) = self
             .recover()?
             .into_iter()
@@ -694,16 +765,30 @@ impl FileOperationRegistry {
     /// Cancels every active operation durably owned by one workflow execution.
     ///
     /// Ready Merge uses this before changing the workflow claim. Operation cancellation and
-    /// managed-process launch share the mutation lock, so cancellation either prevents a new
-    /// child from launching or observes its durable registration and terminates it. Repeating the
-    /// call is intentional: the workflow coordination lock closes registration races between the
-    /// first responsive cancellation pass and the authoritative claim update.
+    /// registration share the mutation lock. A durable execution tombstone is written even when
+    /// no operation exists yet, so a worker that already holds workflow authority cannot register
+    /// and launch after cancellation's first scan. Repeating the call remains intentional because
+    /// the workflow coordination lock orders the tombstone with the authoritative claim update.
     pub fn cancel_workflow_execution_operations(
         &self,
         execution_id: &str,
     ) -> RefineResult<Vec<OperationHandle>> {
         let execution_id = execution_id.trim();
-        let operation_ids = self
+        if execution_id.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Workflow execution id is required for cancellation".to_string(),
+            ));
+        }
+        let lock = self.mutation_lock()?;
+        let cancellation = self.persist_workflow_cancellation(execution_id)?;
+        let error = cancellation.get("error").cloned().unwrap_or_else(|| {
+            json!({
+                "code": "workflow_execution_cancelled",
+                "message": format!("Workflow execution {execution_id} was cancelled"),
+                "execution_id": execution_id
+            })
+        });
+        let mut cancelled = self
             .recover()?
             .into_iter()
             .filter(|operation| {
@@ -714,49 +799,29 @@ impl FileOperationRegistry {
                     == Some(execution_id)
                     && operation_active(&operation.state)
             })
-            .map(|operation| operation.id)
             .collect::<Vec<_>>();
-        let mut cancelled = Vec::new();
-        for operation_id in operation_ids {
-            let operation = self.cancel_with_error(
-                &operation_id,
-                json!({
-                    "code": "workflow_execution_cancelled",
-                    "message": format!(
-                        "Workflow execution {execution_id} was cancelled while the operation was active"
-                    ),
-                    "execution_id": execution_id
-                }),
+        for operation in &mut cancelled {
+            operation.state = OperationState::Cancelled;
+            operation.error = Some(error.clone());
+            self.write(operation)?;
+        }
+        FileExt::unlock(&lock).ok();
+
+        for operation in &cancelled {
+            self.append_log(
+                &operation.id,
+                operation_log_entry(operation, "warning", "Workflow operation cancelled", None),
             )?;
-            if let Err(error) = self.terminate_associated_processes(&operation_id) {
+            if let Err(error) = self.terminate_associated_processes(&operation.id) {
                 self.persist_cancellation_failure(
-                    &operation_id,
+                    &operation.id,
                     "operation_process_termination_failed",
                     &error,
                 )?;
                 return Err(error);
             }
-            cancelled.push(operation);
         }
         Ok(cancelled)
-    }
-
-    fn cancel_with_error(&self, operation_id: &str, error: Value) -> RefineResult<OperationHandle> {
-        let lock = self.mutation_lock()?;
-        let mut handle = self.status(operation_id)?;
-        if operation_terminal(&handle.state) {
-            FileExt::unlock(&lock).ok();
-            return Ok(handle);
-        }
-        handle.state = OperationState::Cancelled;
-        handle.error = Some(error);
-        self.write(&handle)?;
-        FileExt::unlock(&lock).ok();
-        self.append_log(
-            &handle.id,
-            operation_log_entry(&handle, "warning", "Workflow operation cancelled", None),
-        )?;
-        Ok(handle)
     }
 
     fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
@@ -1402,6 +1467,66 @@ mod tests {
             registry
                 .register_exclusive_with_request("quality:GOAL1:abc", json!({"source": "manual"}))
                 .is_ok()
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn workflow_cancellation_tombstone_blocks_late_operation_registration() {
+        let temp_root = unique_temp_dir("operations-workflow-cancellation-tombstone");
+        let registry = FileOperationRegistry::new(&temp_root);
+
+        assert!(
+            registry
+                .cancel_workflow_execution_operations("execution-cancelled-before-registration")
+                .unwrap()
+                .is_empty()
+        );
+        let exclusive = registry
+            .register_exclusive_with_request(
+                "merger:GOAL1:1",
+                json!({"execution_id": "execution-cancelled-before-registration"}),
+            )
+            .unwrap_err();
+        assert!(
+            exclusive
+                .to_string()
+                .contains("cancelled before operation registration"),
+            "{exclusive}"
+        );
+        let ordinary = registry
+            .register_with_request(
+                "workflow:test",
+                json!({"execution_id": "execution-cancelled-before-registration"}),
+            )
+            .unwrap_err();
+        assert!(
+            ordinary
+                .to_string()
+                .contains("cancelled before operation registration"),
+            "{ordinary}"
+        );
+        assert!(
+            registry
+                .register_exclusive_with_request(
+                    "merger:GOAL1:1",
+                    json!({"execution_id": "replacement-execution"}),
+                )
+                .is_ok()
+        );
+
+        let cancellations = fs::read_dir(registry.operations_dir().join(".workflow-cancellations"))
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+        assert_eq!(cancellations.len(), 1);
+        let evidence: Value =
+            serde_json::from_slice(&fs::read(cancellations[0].path()).unwrap()).unwrap();
+        assert_eq!(evidence["error"]["code"], "workflow_execution_cancelled");
+        assert!(
+            evidence["error"]["message"]
+                .as_str()
+                .is_some_and(|message| !message.trim().is_empty())
         );
         fs::remove_dir_all(temp_root).unwrap();
     }
