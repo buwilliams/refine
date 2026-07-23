@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:19:21Z",
+  "updated_at": "2026-07-23T18:20:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2100,6 +2100,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The recovery agent has reconstructed only the intended two-file prompt/session change in round 2 and its focused tests are passing. It is still running the broader verification gates; no provider/authentication or process-liveness issue is present, so there is nothing safe to interrupt or retry."
+    },
+    {
+      "created_at": "2026-07-23T18:20:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830828082-84",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery’s full library gate produced a test failure after its focused tests passed. The agent is explicitly capturing the assertion and rerunning it in isolation; I’m keeping that failure visible and will not treat the work as reviewable unless the final evidence accounts for it."
     }
   ],
   "queued_messages": [
