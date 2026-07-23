@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:53:33Z",
+  "updated_at": "2026-07-23T13:55:06Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -621,6 +621,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "`00000SZ3SFP4N10NXGAE5P4002` has now reached `review` at preserved candidate `bcf9d063`; I have not approved or merged it. Three implementation agents remain active. I’ll finish reconciling their outcomes before handing the two review decisions to you."
+    },
+    {
+      "created_at": "2026-07-23T13:55:06Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814906658-133",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The remaining three agents are still live with `attention_state: working`; there is no stall/loss evidence yet. The supervisor’s degraded flag is still tied to the visible Governance failure, not a hidden provider/authentication problem—Codex diagnosis and authentication both passed in this run."
     }
   ],
   "queued_messages": [
