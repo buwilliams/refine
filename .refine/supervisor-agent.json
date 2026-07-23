@@ -1,7 +1,7 @@
 {
   "version": 2,
   "lifecycle": "observing",
-  "health": "degraded",
+  "health": "healthy",
   "active_work": 1,
   "queued_work": 0,
   "failed_work": 0,
@@ -60,11 +60,9 @@
     "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done"
   },
-  "open_issues": {
-    "workflow_stall:00000SZ3N803TK00E78AK4M000": "Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost."
-  },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress|live={}|quiet={}|issues=workflow_stall:00000SZ3N803TK00E78AK4M000:Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.",
-  "updated_at": "2026-07-23T12:50:21.997782788+00:00",
+  "open_issues": {},
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress|live={\"00000SZ3N803TK00E78AK4M000\"}|quiet={}|issues=",
+  "updated_at": "2026-07-23T12:55:15.927591415+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
