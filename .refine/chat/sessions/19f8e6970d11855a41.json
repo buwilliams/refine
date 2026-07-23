@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:50:21Z",
+  "updated_at": "2026-07-23T12:50:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1311,6 +1311,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The first reconciliation patch did not clear the gate: the separate-daemon test still fails with the second daemon seeing zero Goals. I also found a concrete retry-path regression—an unequal same-file remote revision could be replayed over without a second conflict check—and sent that evidence to the worker. The round remains in progress; nothing is eligible for review or approval yet."
+    },
+    {
+      "created_at": "2026-07-23T12:50:59Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784811059036-156",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The baseline fix removed the destructive deletion, but exposed the second half of the bug: a persistent conflict in `supervisor-agent.json` aborts the whole sync, so a disjoint remote Goal never reaches the second daemon. I’ve sent the narrower required behavior: retain and report the unequal conflicting path while still reconciling non-conflicting paths, with the baseline advancing only for paths actually copied."
     }
   ],
   "queued_messages": [
