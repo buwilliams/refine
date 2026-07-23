@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:12:36Z",
+  "updated_at": "2026-07-23T10:12:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -201,6 +201,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The broader gates are green: 445/445 unit/bin tests passed, the repository check (including browser/static checks) passed, JavaScript syntax checks passed, and formatting/diff hygiene is clean. The worker is now at the narrow-scope review/commit stage; no merge or approval has been authorized."
+    },
+    {
+      "created_at": "2026-07-23T10:12:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784801565078-24",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first Goal now has a clean committed candidate (`4444ec0a`) and an implementation report, but it has not yet reached Governance/Quality or review. Meanwhile, two additional Goals entered `in-progress`; because the request is to supervise Refine’s active work, I’m adding them to the evidence view without changing or approving any of them."
     }
   ],
   "queued_messages": [
