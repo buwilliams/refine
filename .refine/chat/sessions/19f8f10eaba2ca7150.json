@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:43:25Z",
+  "updated_at": "2026-07-23T19:44:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3120,6 +3120,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 9 has completed its implementation handoff at commit `3511a6a1`; the Goal Agent exited cleanly and its report preserves every initial failure and final result. The Goal is still momentarily `in-progress` with governance unclassified, so I’m waiting for the workflow evaluator rather than treating the just-finished worker as lost or manually retrying it."
+    },
+    {
+      "created_at": "2026-07-23T19:44:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784835870444-246",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The post-implementation Governance evaluator is now live as its own supervised Codex process for this Goal. I’m waiting on that verdict; approving or merging before it finishes would cross the audit boundary."
     }
   ],
   "queue_dispatching": true,
