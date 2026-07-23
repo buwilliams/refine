@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:57:05Z",
+  "updated_at": "2026-07-23T10:57:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -420,6 +420,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T10:57:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784804233033-4",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’ll correlate the three non-terminal Goals with their durable records, candidate commits/worktrees, live processes, and current daemon health. I’ll keep the two review Goals at the human-confirmation boundary and only intervene if the queued Goal shows concrete loss or retryable failure."
     }
   ],
   "queued_messages": [
