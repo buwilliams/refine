@@ -1,7 +1,7 @@
 {
-  "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
-  "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-6",
-  "candidate_commit": "ebc7d2699abcb6ffe26aaccac826197d2ccdb163",
+  "base_commit": "562abe5fff5c81713300bf7d539f5fc38e61aacb",
+  "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-7",
+  "candidate_commit": null,
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -531,9 +531,32 @@
       "rule_state": "passed",
       "updated": "2026-07-23T18:24:51Z",
       "workflow_quality_timing": "pre_merge"
+    },
+    {
+      "assignee": "Refine Supervisor",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T18:39:45Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the preserved Round 6 candidate ebc7d2699abcb6ffe26aaccac826197d2ccdb163 from current main 562abe5fff5c81713300bf7d539f5fc38e61aacb. A read-only three-way preview now shows 26 conflict markers because the candidate is 15 main commits behind, including real conflicts in src/process/agent_sessions.rs, src/process/subprocess/mod.rs, src/surfaces/web_server/support/terminal.rs, src/tools/product/work_items/mod.rs, and src/workflow/mod.rs, with overlapping changes also in CLI/web/process/work-item tests and routes. Preserve ebc7d269, all earlier rounds/candidates/worktrees, provider/Governance/Quality evidence, and the complete Round 6 intent: authoritative shared cancellation, durable settlement replay, exact workflow/Goal/claim/capacity outcomes, policy and target identity preservation, process receipts, and surface parity. Reconstruct or replay that intent on the current main rather than force-merging or deleting conflict evidence. Retain all already-merged main behavior, especially Goal Agent active Refine executable and ./r prompt guidance from 006f6652 and live cached diagnostics process health from fa0a43ff. The separate transcript handoff candidate 9b7d9d33 remains unapproved at review: do not cherry-pick, merge, or assume it; keep this recovery semantically compatible where practical without crossing that review boundary. Add or update focused conflict-sensitive tests, rerun the Round 6 focused suites plus full library/web/all-target/format/diff gates, and report every initial and final failure exactly. Before completion, refresh current main evidence and confirm the resulting candidate has no unresolved three-way conflict markers. Do not approve or merge, force Git, rewrite history, discard any worktree, hide provider/authentication/test failures, or edit durable Goal state directly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine Supervisor",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T18:39:45Z",
+      "workflow_quality_timing": null
     }
   ],
-  "status": "review",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T18:24:51Z"
+  "updated": "2026-07-23T18:39:48Z"
 }

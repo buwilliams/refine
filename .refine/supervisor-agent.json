@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "lifecycle": "idle",
+  "lifecycle": "observing",
   "health": "healthy",
-  "active_work": 0,
+  "active_work": 1,
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -60,7 +60,7 @@
     "00000SZ3N803TK00E78AK4M000": "done",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "done",
-    "00000SZ3RP4G52RZ706A5P4001": "review",
+    "00000SZ3RP4G52RZ706A5P4001": "in-progress",
     "00000SZ3SFP4N10NXGAE5P4002": "done",
     "00000SZ3SHFHFK352VJT5P4003": "done",
     "00000SZ412RXR0TQRHE82JW000": "done",
@@ -68,7 +68,8 @@
     "00000SZ41QQB4GWTN3AW2JW002": "review"
   },
   "open_issues": {},
-  "updated_at": "2026-07-23T18:39:20.677523633+00:00",
+  "last_context_key": "goals=00000SZ3RP4G52RZ706A5P4001:in-progress,00000SZ41QQB4GWTN3AW2JW002:review|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T18:39:48.179177815+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -2352,6 +2353,16 @@
       "message": "Goal 00000SZ41QQB4GWTN3AW2JW002 changed from in-progress to review.",
       "created_at": "2026-07-23T18:36:37.015327895+00:00",
       "goal_id": "00000SZ41QQB4GWTN3AW2JW002",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T18:39:46.670313367+00:00-236",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from review to todo.",
+      "created_at": "2026-07-23T18:39:46.670313367+00:00",
+      "goal_id": "00000SZ3RP4G52RZ706A5P4001",
       "actionable": false,
       "retryable": false
     }
