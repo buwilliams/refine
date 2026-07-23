@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:15:06Z",
+  "updated_at": "2026-07-23T12:15:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1107,6 +1107,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The explicit retry created a running claim and capacity lease but no managed worker; direct process and state evidence confirm it is an orphaned retry claim. I’m cancelling that claim through Refine’s supported execution-cancel endpoint so its lease is released; the Goal remains `todo`, allowing the scheduler to create a fresh execution for Round 2."
+    },
+    {
+      "created_at": "2026-07-23T12:15:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808928132-122",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 2 is now correctly active on a fresh audited execution and worktree. Its recorded base is current `main`/`origin/main` (`a413fac2`), ancestry check passes, candidate is reset to null, and the rejected Round 1 worktree remains preserved. I’ll watch the new worker for provider, test, and boundary evidence."
     }
   ],
   "queued_messages": [
