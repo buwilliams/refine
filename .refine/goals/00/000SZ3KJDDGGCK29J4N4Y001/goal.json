@@ -1,7 +1,7 @@
 {
   "base_commit": "926c81198c8116aeb9efb7c9c647caa0b033f613",
   "branch_name": "refine/00000SZ3KJDDGGCK29J4N4Y001/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "8978757e9dbc0db96ea5dfbd43adbd9a6492dbac",
   "created": "2026-07-23T10:08:11Z",
   "feature_id": null,
   "feature_order": null,
@@ -106,8 +106,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Preserved round 1 as commit 1c9a7d4e (matching patch-id for 04177422) and committed round 2 as 8978757e. FileProcessStatusService now uses one ordered cross-platform resolver for the port and agents registries, so list, API output streaming, API/browser stop, and CLI ps --stop resolve nested agent IDs consistently; invalid path separators are rejected and missing IDs return explicit not_found feedback. Added production API coverage for nested stdout/stderr streaming, stop status, cleanup, and repeated 404s, plus CLI coverage for nested enumeration, real-process termination feedback, cleanup, and repeated NotFound. Preserved foreground/background classification and ordinary-terminal exclusion. Verification: focused nested API 1 passed/0 failed; focused nested CLI 1 passed/0 failed; retained API enumeration 1 passed/0 failed; focused browser classification 2 passed/0 failed; full Rust 453 library tests passed/0 failed plus 0 binary failures; full browser 32 passed/0 failed; cargo fmt check passed; static assets 54 files valid; git diff --check passed. Worktree is clean and candidate is unmerged.",
+      "implementation_reported_at": "2026-07-23T11:06:11Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -118,11 +118,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T10:23:23Z",
+      "updated": "2026-07-23T11:06:11Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T10:57:03Z"
+  "updated": "2026-07-23T11:06:12Z"
 }
