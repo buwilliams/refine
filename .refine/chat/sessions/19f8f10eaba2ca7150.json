@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:17:36Z",
+  "updated_at": "2026-07-23T14:17:48Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -900,6 +900,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The failed Goal’s recovery intent is already explicit in its newest Round, so no new product-scope decision is needed. I’m using Refine’s validated `failed → todo` transition endpoint to requeue that existing Round—without editing state files, changing the prompt, or touching any worktree—and will monitor its audited execution. Review approvals remain untouched."
+    },
+    {
+      "created_at": "2026-07-23T14:17:48Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816268614-180",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Recovery is active under a real workflow claim and a live Goal Agent for Round 3. The provider launch succeeded; I’m monitoring for implementation completion, Governance, and Quality. I will stop at `review` or report the exact failure—no approval will be attempted."
     }
   ],
   "queued_messages": [
