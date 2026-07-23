@@ -498,6 +498,7 @@ function processActionIds(proc) {
 
 function isSupportedProcessActionId(proc, actionId) {
   if (["pause_workflow", "unpause_workflow", "hard_reset_worktree"].includes(actionId)) return true;
+  if (actionId === "stop_agent") return isAgentProviderProcessRecord(proc) && !!proc.id;
   if (actionId === "cancel_agent") return proc.kind === "agent" && !!proc.goal_id;
   if (actionId === "stop_chat" || actionId === "stop") return proc.kind === "chat" && !!proc.session_id;
   return false;
@@ -506,6 +507,9 @@ function isSupportedProcessActionId(proc, actionId) {
 function renderProcessActions(proc) {
   const actionIds = processActionIds(proc);
   if (actionIds) return renderProcessActionButtons(proc, actionIds);
+  if (isAgentProviderProcessRecord(proc) && proc.id) {
+    return renderStopAgentButton(proc);
+  }
   if (proc.kind === "agent" && proc.goal_id) {
     return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
   }
@@ -549,6 +553,9 @@ function renderProcessActionButton(proc, actionId) {
     const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
     return `<button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${disabled ? "disabled" : ""}>Hard reset worktree</button>`;
   }
+  if (actionId === "stop_agent" && isAgentProviderProcessRecord(proc) && proc.id) {
+    return renderStopAgentButton(proc);
+  }
   if (actionId === "cancel_agent" && proc.kind === "agent" && proc.goal_id) {
     return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
   }
@@ -556,6 +563,13 @@ function renderProcessActionButton(proc, actionId) {
     return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
   }
   return "";
+}
+
+function renderStopAgentButton(proc) {
+  const goal = proc.goal_id
+    ? ` data-stop-agent-goal="${htmlEscape(proc.goal_id)}"`
+    : "";
+  return `<button class="danger" data-testid="process-stop-agent" data-stop-agent="${htmlEscape(proc.id)}"${goal}>Stop</button>`;
 }
 
 function workflowToggleDisabled(proc) {
@@ -908,6 +922,28 @@ function bindSettingsProcessesTab(s) {
     });
   });
   bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
+  $$("[data-stop-agent]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const processId = b.dataset.stopAgent;
+      const goalId = b.dataset.stopAgentGoal;
+      const ok = await modalConfirm(
+        goalId
+          ? "Stop this agent process? Its Goal will be cancelled only after the exact process exits."
+          : "Stop this agent process?",
+        { title: "Stop agent", okLabel: "Stop agent", danger: true,
+          cancelLabel: "Keep running" },
+      );
+      if (!ok) return;
+      await withButtonBusy(b, "Stopping…", async () => {
+        try {
+          await api("POST", `/api/processes/${encodeURIComponent(processId)}/stop`, {
+            signal: "terminate",
+          });
+          await refreshProcessesSettingsTab();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
   $$("[data-cancel-agent]").forEach((b) => {
     b.addEventListener("click", async () => {
       const id = b.dataset.cancelAgent;

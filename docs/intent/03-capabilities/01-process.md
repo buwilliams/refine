@@ -28,7 +28,38 @@ Current implementation details that matter to intent:
   observe the same process.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
+- stopping any managed, interactive, chat, or synthetic agent uses one shared
+  capability, including Workflow execution cancellation, rather than splitting
+  process and Workflow semantics. It retains ownership evidence, confirms exact
+  process exit, and records that outcome before registry or identity cleanup.
+  Workflow spawn-to-registration and cancellation share one execution fence:
+  an empty target-bound process lookup is never treated as exit evidence, and a
+  delayed worker cannot launch after its exact claim has settled.
+  Only then does it atomically validate and cancel the exact claim and linked
+  Goal, release claim capacity, and preserve the execution, round, Goal
+  revision/status, and competing-owner fences. Claim, capacity, and Goal writes
+  are journaled with their exact before/after states as one settlement. A write
+  failure restores the exact semantic pre-settlement state while advancing
+  monotonic workflow, claim-decision, and Goal revisions to record the attempted
+  settlement and rollback. An interruption is replayed before terminal-state
+  shortcuts after restart. Settlement journals synchronize their temporary file
+  before atomic replacement and synchronize the containing directory after the
+  rename. Rollback evidence records each Goal, claim, and capacity restore
+  outcome plus the exact restored Goal value, so replay can accept the
+  restoration's monotonic revision without weakening its ownership fence or
+  overwriting newer work. Workflow coordination is acquired before workflow
+  and Goal mutation locks, including concurrent Ready Merge work, so settlement
+  cannot deadlock or bypass those fences. Both normal persistence and replay
+  preserve the complete existing workflow policy and target-app context, and
+  confirmed process exit remains explicit. Missing registration-time PID
+  identity, mismatched or stale workflow ownership, failed or resisted stops,
+  and cleanup failures keep the Goal active, while every post-exit failure
+  retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,
+  cause, and supported recovery evidence.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
+- the browser Goal terminal resolves its session to the managed Goal Agent and
+  delegates Stop to this same capability; only non-Goal local terminals retain
+  process-only terminal shutdown behavior.
 
 Process management should favor visibility and recovery over hiding execution behind polished UI messages. If something is running, failing, or waiting, Refine should be able to show it.
 

@@ -241,6 +241,15 @@ where
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
     }
+    let workflow_registration_guard =
+        match supervisor.workflow_process_registration_guard(&managed_spec) {
+            Ok(guard) => guard,
+            Err(error) => {
+                cleanup_session_artifacts(&command_path, &signal_path);
+                let _ = fs::remove_file(&stdout_path);
+                return Err(error);
+            }
+        };
 
     let pty_system = native_pty_system();
     let pair = match pty_system.openpty(pty_size(DEFAULT_COLS, DEFAULT_ROWS)) {
@@ -357,6 +366,7 @@ where
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
     }
+    drop(workflow_registration_guard);
     let _ = FileExt::unlock(&launch_lock);
     drop(launch_lock);
 
@@ -528,9 +538,10 @@ where
         "failed".to_string()
     };
     process.exit_code = i32::try_from(status.exit_code()).ok();
-    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
     let _ = supervisor.register(process);
     cleanup_session_artifacts(&command_path, &signal_path);
+    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+    let _ = supervisor.recover_owner(ProcessOwner::Agent);
 
     if !status.success() && !completed_by_signal {
         return Err(RefineError::Degraded(format!(
@@ -620,34 +631,6 @@ pub fn resize_agent_session(
         session_id,
         AgentSessionCommand::Resize { cols, rows },
     )
-}
-
-pub fn stop_agent_session(runtime_root: &Path, session_id: &str) -> RefineResult<()> {
-    let (process, _) = session_process(runtime_root, session_id)?;
-    FileProcessSupervisor::new(runtime_root).request_termination(&process.id, "terminate")?;
-    Ok(())
-}
-
-pub fn stop_agent_session_process(
-    runtime_root: &Path,
-    process_id: &str,
-) -> RefineResult<Option<ManagedProcess>> {
-    let supervisor = FileProcessSupervisor::new(runtime_root);
-    let process = supervisor.list()?.into_iter().find(|process| {
-        process.id == process_id
-            && process_metadata(process).is_some_and(|metadata| {
-                metadata
-                    .get("command_path")
-                    .and_then(Value::as_str)
-                    .is_some_and(|path| Path::new(path).is_file())
-            })
-    });
-    let Some(mut process) = process else {
-        return Ok(None);
-    };
-    supervisor.request_termination(&process.id, "terminate")?;
-    process.state = "stopping".to_string();
-    Ok(Some(process))
 }
 
 pub fn agent_session_events_since(

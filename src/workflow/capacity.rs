@@ -113,6 +113,18 @@ impl AgentCapacityService {
         Ok(state)
     }
 
+    pub(crate) fn begin_cancellation_settlement(&self) -> RefineResult<AgentCapacitySettlement> {
+        let guard = self.acquire_lock()?;
+        let original = self.load_state()?;
+        Ok(AgentCapacitySettlement {
+            service: self.clone(),
+            _guard: guard,
+            current: original.clone(),
+            original,
+            changed: false,
+        })
+    }
+
     fn load_state(&self) -> RefineResult<AgentCapacityState> {
         let path = self.state_path();
         if !path.exists() {
@@ -245,6 +257,91 @@ struct AgentCapacityLock {
 impl Drop for AgentCapacityLock {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+pub(crate) struct AgentCapacitySettlement {
+    service: AgentCapacityService,
+    _guard: AgentCapacityLock,
+    original: AgentCapacityState,
+    current: AgentCapacityState,
+    changed: bool,
+}
+
+impl AgentCapacitySettlement {
+    pub(crate) fn original_state(&self) -> AgentCapacityState {
+        self.original.clone()
+    }
+
+    pub(crate) fn state_after_releasing_claims(&self, claim_ids: &[String]) -> AgentCapacityState {
+        let owners = claim_ids
+            .iter()
+            .map(|claim_id| format!("workflow:{claim_id}"))
+            .collect::<Vec<_>>();
+        let mut state = self.current.clone();
+        state
+            .leases
+            .retain(|lease| !owners.contains(&lease.owner_id));
+        state
+    }
+
+    pub(crate) fn release_claims(&mut self, claim_ids: &[String]) -> RefineResult<()> {
+        let next = self.state_after_releasing_claims(claim_ids);
+        self.changed = next != self.current;
+        self.current = next;
+        if self.changed {
+            self.service.write_state(&self.current)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn replay_exact(
+        &mut self,
+        expected: &AgentCapacityState,
+        claim_ids: &[String],
+    ) -> RefineResult<()> {
+        let owners = claim_ids
+            .iter()
+            .map(|claim_id| format!("workflow:{claim_id}"))
+            .collect::<Vec<_>>();
+        let expected_claim_leases = expected
+            .leases
+            .iter()
+            .filter(|lease| owners.contains(&lease.owner_id))
+            .collect::<Vec<_>>();
+        let current_claim_leases = self
+            .current
+            .leases
+            .iter()
+            .filter(|lease| owners.contains(&lease.owner_id))
+            .collect::<Vec<_>>();
+        if current_claim_leases
+            .iter()
+            .any(|lease| !expected_claim_leases.contains(lease))
+        {
+            return Err(RefineError::Conflict(
+                "linked agent capacity ownership changed outside the interrupted cancellation settlement"
+                    .to_string()
+            ));
+        }
+        let before = self.current.clone();
+        self.current
+            .leases
+            .retain(|lease| !owners.contains(&lease.owner_id));
+        if self.current != before {
+            self.service.write_state(&self.current)?;
+            self.changed = self.current != self.original;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn restore(&mut self) -> RefineResult<()> {
+        if self.changed {
+            self.service.write_state(&self.original)?;
+            self.current = self.original.clone();
+            self.changed = false;
+        }
+        Ok(())
     }
 }
 

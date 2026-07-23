@@ -49,6 +49,7 @@ use crate::tools::product::imports::FileImportService;
 use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
 use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
@@ -2078,15 +2079,17 @@ fn stop_system_process(
     let mut misses = Vec::new();
     for port in ports {
         let port_root = runtime.port_root(port);
-        let service = FileProcessStatusService::new(&port_root);
+        let service = FileProcessControlService::new(&port_root);
         match service.stop(process_id, signal) {
-            Ok(process) => {
-                return Ok(json!({
-                    "stopped": true,
-                    "port": port,
-                    "runtime_root": port_root.display().to_string(),
-                    "process": process.api_json()
-                }));
+            Ok(mut result) => {
+                if let Some(object) = result.as_object_mut() {
+                    object.insert("port".to_string(), json!(port));
+                    object.insert(
+                        "runtime_root".to_string(),
+                        json!(port_root.display().to_string()),
+                    );
+                }
+                return Ok(result);
             }
             Err(RefineError::NotFound(message)) => misses.push(message),
             Err(error) => return Err(error),

@@ -4,9 +4,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
-use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ProcessPauseState, ProcessSupervisor,
-};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
@@ -42,12 +40,6 @@ impl FileProcessStatusService {
 
     pub fn stream(&self, process_id: &str) -> RefineResult<String> {
         self.resolve(process_id, |supervisor| supervisor.stream(process_id))
-    }
-
-    pub fn stop(&self, process_id: &str, signal: &str) -> RefineResult<ManagedProcess> {
-        self.resolve(process_id, |supervisor| {
-            supervisor.signal(process_id, signal)
-        })
     }
 
     fn resolve<T>(
@@ -244,7 +236,7 @@ fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
         "cpu_priority": {"label": "-"},
         "max_memory": {"label": "-"},
         "isolation": "in_process",
-        "management_actions": ["stop_chat"],
+        "management_actions": ["stop_agent"],
         "actions": ["stop"]
     })
 }
@@ -276,11 +268,12 @@ fn process_management_actions(value: &Value, pause_state: &ProcessPauseState) ->
         "workflow_automation" | "agent_automation" | "background_processes" => {
             vec![workflow_toggle, "hard_reset_worktree"]
         }
-        "agent" if process.get("goal_id").and_then(Value::as_str).is_some() => {
-            vec!["cancel_agent"]
-        }
+        "agent" => vec!["stop_agent"],
         "chat" if process.get("session_id").and_then(Value::as_str).is_some() => {
-            vec!["stop_chat"]
+            vec!["stop_agent"]
+        }
+        "interactive_session" if process.get("provider").and_then(Value::as_str).is_some() => {
+            vec!["stop_agent"]
         }
         _ => Vec::new(),
     }
