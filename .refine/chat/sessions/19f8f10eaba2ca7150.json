@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:03:24Z",
+  "updated_at": "2026-07-23T18:04:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1830,6 +1830,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The supplied snapshot is internally consistent: one Goal has both an `in-progress` record and a live Codex workflow process, so there is no stall/loss condition to recover. I’m refreshing that evidence now and checking whether its agent output shows a concrete blocker or request for authority."
+    },
+    {
+      "created_at": "2026-07-23T18:04:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784829858726-25",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A concrete scope risk is visible in the in-flight patch: it currently refreshes cached provider data even though the Goal says provider data should stay cached, and its regression test only adds one generic process rather than proving workflow/git-sync runner health plus stale/paused handling. I’m checking the supported managed-session input path before sending that narrow corrective guidance; no restart, cancellation, or Git action is justified."
     }
   ],
   "queue_dispatching": true,
