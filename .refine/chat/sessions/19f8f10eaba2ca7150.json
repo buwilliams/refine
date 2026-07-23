@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:46:13Z",
+  "updated_at": "2026-07-23T15:48:24Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1488,6 +1488,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 6’s restart and policy tests have completed, and the full library suite is green at 474/474. `cargo check --all-targets` passed with one warning; the agent is reviewing the final diff and warning before committing."
+    },
+    {
+      "created_at": "2026-07-23T15:48:24Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784821704466-278",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The agent is still live after the verification run and has not emitted a completion or failure signal. I’m leaving it undisturbed because the provider is actively processing; there is no evidence of worker loss or a confirmation request."
     }
   ],
   "queued_messages": [
