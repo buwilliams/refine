@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:33:56Z",
+  "updated_at": "2026-07-23T15:34:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1380,6 +1380,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance has rejected Round 5. I’m checking whether this is another narrow implementation defect or whether the recovery has reached a point where further automation would need your direction."
+    },
+    {
+      "created_at": "2026-07-23T15:34:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784820847098-260",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The remaining defects are still concrete and in scope: journal replay after interruption, preservation of the existing workflow policy, and restart-level coverage. They do not require merge authority or a product choice, so I’m continuing with a sixth narrow recovery round while preserving every failed candidate and its evidence."
     }
   ],
   "queued_messages": [
