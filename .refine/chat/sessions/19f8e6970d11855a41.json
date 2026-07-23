@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:48:02Z",
+  "updated_at": "2026-07-23T11:49:54Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -831,6 +831,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The candidate is not ready yet: full serial library tests are now clean at 457/0 and full workflow passed, but the multi-instance synchronization gate timed out before reaching candidate integration. The worker is investigating and retaining that failure instead of masking it."
+    },
+    {
+      "created_at": "2026-07-23T11:49:54Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784807394874-73",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The multi-instance gate has now failed twice on daemon-to-daemon state propagation, so it remains a real blocking verification result even though it occurs before integration. I’m also re-surfacing the unresolved cancellation/revision fence finding at this command boundary so it cannot be silently omitted from the candidate report."
     }
   ],
   "queued_messages": [
