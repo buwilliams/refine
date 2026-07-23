@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:50:43Z",
+  "updated_at": "2026-07-23T18:51:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2544,6 +2544,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The live snapshot has already diverged from the supplied evidence: Refine now reports one active workflow item, and Goal `…5P4001` does have a live managed Goal Agent (PID 375463) running Round 7 verification. So its earlier “no live agent” appearance is stale and is not grounds for retry. I’m narrowing the other two states now, especially whether `…2JW003` is genuinely building or only awaiting settlement."
+    },
+    {
+      "created_at": "2026-07-23T18:51:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832673109-141",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Both previously listed build/review items are now at review with published candidates; neither should be auto-approved. The only active item is healthy and visibly working. I’m doing one final read-only check of its transcript/progress, candidate worktree cleanliness, merge relationship to current `main`, and current Codex authentication so the handoff distinguishes “ready for your decision” from “blocked by infrastructure.”"
     }
   ],
   "queued_messages": [
