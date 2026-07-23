@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:02:44Z",
+  "updated_at": "2026-07-23T10:03:04Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -93,6 +93,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m correlating the queued Goal with live process, durable Goal/round evidence, Git/worktree state, and daemon health before deciding whether any retry is justified. I’ll use the prior auditable-recovery guidance because this is a live Refine supervision case; it preserves the explicit retry and review boundaries."
+    },
+    {
+      "created_at": "2026-07-23T10:03:04Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784800984018-6",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The queued Goal already has a Round 1 worktree, while the primary target checkout contains unrelated uncommitted changes. I’m treating those changes as protected user/workflow state and will not sync, stash, reset, or reuse that checkout to “unstick” the queue. Next I’m checking whether the Round actually launched, what the Goal asks for, and whether provider/runner health permits a supported start."
     }
   ],
   "queued_messages": [
