@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:15:28Z",
+  "updated_at": "2026-07-23T12:17:38Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1119,6 +1119,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 2 is now correctly active on a fresh audited execution and worktree. Its recorded base is current `main`/`origin/main` (`a413fac2`), ancestry check passes, candidate is reset to null, and the rejected Round 1 worktree remains preserved. I’ll watch the new worker for provider, test, and boundary evidence."
+    },
+    {
+      "created_at": "2026-07-23T12:17:38Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809058784-124",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 2 has replayed the rejected implementation onto current `main` as `dcae5e7a` and is tracing the four defects before editing. It has not yet claimed a passing candidate, and no provider or authentication failure is present."
     }
   ],
   "queued_messages": [
