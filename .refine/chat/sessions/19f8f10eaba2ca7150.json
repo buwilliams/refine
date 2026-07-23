@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:26:53Z",
+  "updated_at": "2026-07-23T14:28:49Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -972,6 +972,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The implementation remains scoped to the shared work-item capability and workflow orchestration—three files, about 218 added/changed lines. This is the correct layer for making ownership validation and the Goal cancellation write atomic; the agent is still live and has not signaled completion or failure."
+    },
+    {
+      "created_at": "2026-07-23T14:28:49Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816929302-192",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The patch now covers the full narrow chain Governance required: process exit evidence, the shared process-control capability, atomic work-item transition support, and workflow fencing. It is five files with no surface-specific duplication. Tests are likely being added inline; I’m waiting for the agent’s exact verification and Governance result rather than treating the diff as success."
     }
   ],
   "queued_messages": [
