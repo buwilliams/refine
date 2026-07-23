@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:49:51Z",
+  "updated_at": "2026-07-23T19:50:03Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3243,6 +3243,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll reconcile the lone review Goal against its durable Goal/Round evidence, current processes, Git/worktree state, and live runtime health. I’ll stop at the review boundary unless the evidence shows a safe, supported recovery action is needed."
+    },
+    {
+      "created_at": "2026-07-23T19:50:03Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836203879-268",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The historical guidance matches the present boundary: a Goal at `review` is a human handoff, not authority to approve or merge. I’m now checking whether the candidate is genuinely ready and whether any current runtime/provider failure changes that handoff."
     }
   ],
   "queue_dispatching": true,
