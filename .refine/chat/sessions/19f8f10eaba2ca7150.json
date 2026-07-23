@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:20:09Z",
+  "updated_at": "2026-07-23T13:20:34Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -279,6 +279,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "No recovery action is warranted: Codex diagnostics are healthy, both live workers are making progress, and neither has signaled `needs_input`. The earlier `Goal Agent exited unsuccessfully: 1` remains visible as recovered historical evidence for `…N803…`; its current Round 4 is actively exercising the exact cancellation/state-sync race tests that Governance required."
+    },
+    {
+      "created_at": "2026-07-23T13:20:34Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812834746-58",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A genuinely actionable failure appeared for `…RP4…`: Governance rejected candidate `a1f6c2e6` because stopping remains surface-specific and can mark a Goal cancelled before the owned agent is confirmed exited. I’m applying the supported auditable recovery path: first verify the failed candidate/worktree is preserved, then create a narrowly scoped new Round from current `main`; I will not retry by editing state or bypass Governance."
     }
   ],
   "queued_messages": [
