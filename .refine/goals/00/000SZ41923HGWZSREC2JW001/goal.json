@@ -34,9 +34,32 @@
       "rule_state": "unclassified",
       "updated": "2026-07-23T18:07:18Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T18:13:11Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the preserved Round 1 implementation after the workflow infrastructure failed with `failed to read Goal Agent transcript ...goal-agent-2bfd9a9c-b7b9-425b-84d3-ac5874a5af9e.stdout.log: No such file or directory (os error 2)`. Preserve Round 1, its dirty worktree at `/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ41923HGWZSREC2JW001-round-1`, all provider/process evidence, and the exact failure. Reuse or reconstruct only the intended two-file changes in `src/process/agent_sessions.rs` and `src/prompts/goal-agent-session.md`: injected Goal Agent guidance must identify the active Refine executable robustly and explain the checkout `./r` fallback so agents can invoke Refine even when it is absent from PATH, without hard-coding a stale machine-specific path or weakening existing Goal/session boundaries. Review the preserved diff rather than starting from assumptions. Add/retain focused tests for rendered prompt behavior, run the relevant focused tests plus the library/all-target/format/diff gates appropriate to this small prompt change, and report every failure and final result accurately. Do not approve or merge, force Git, rewrite history, discard either worktree, edit durable Goal state directly, or hide the transcript/provider/authentication failure.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T18:13:11Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T18:12:22Z"
+  "updated": "2026-07-23T18:13:11Z"
 }
