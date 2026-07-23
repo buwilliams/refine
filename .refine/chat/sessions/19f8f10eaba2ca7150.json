@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:34:59Z",
+  "updated_at": "2026-07-23T13:36:28Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -414,6 +414,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Forward progress continues: the stop-button recovery expanded from one to three modified files, while the Ready Merge recovery remains actively owned with its eight-file patch intact. I’m preserving both worktrees and waiting for the agents’ own commit/verification handoff rather than treating elapsed time as failure."
+    },
+    {
+      "created_at": "2026-07-23T13:36:28Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784813788266-84",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The stop-button recovery has reached a 14-file cross-surface patch, including a new shared product capability plus CLI, MCP, web, documentation, and test changes—the shape matches the five recorded Governance failures. It is still uncommitted and unverified, so I’m not treating it as a candidate yet."
     }
   ],
   "queued_messages": [
