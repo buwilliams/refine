@@ -2,7 +2,7 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "degraded",
-  "active_work": 2,
+  "active_work": 3,
   "queued_work": 0,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -60,14 +60,15 @@
     "00000SZ3N803TK00E78AK4M000": "in-progress",
     "00000SZ3NBF861H3VJPTK4M001": "done",
     "00000SZ3RN3BS397T4SE5P4000": "review",
-    "00000SZ3RP4G52RZ706A5P4001": "in-progress"
+    "00000SZ3RP4G52RZ706A5P4001": "in-progress",
+    "00000SZ3SFP4N10NXGAE5P4002": "in-progress"
   },
   "open_issues": {
     "workflow": "Workflow evaluation failed: Goal Agent exited unsuccessfully: 1",
     "workflow_stall:00000SZ3N803TK00E78AK4M000": "Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost."
   },
-  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1,workflow_stall:00000SZ3N803TK00E78AK4M000:Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.",
-  "updated_at": "2026-07-23T13:23:08.348647561+00:00",
+  "last_context_key": "goals=00000SZ3N803TK00E78AK4M000:in-progress,00000SZ3RN3BS397T4SE5P4000:review,00000SZ3RP4G52RZ706A5P4001:in-progress,00000SZ3SFP4N10NXGAE5P4002:in-progress|live={}|quiet={}|issues=workflow:Workflow evaluation failed: Goal Agent exited unsuccessfully: 1,workflow_stall:00000SZ3N803TK00E78AK4M000:Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.",
+  "updated_at": "2026-07-23T13:34:59.990742540+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1947,6 +1948,26 @@
       "message": "Goal 00000SZ3RP4G52RZ706A5P4001 changed from failed to in-progress.",
       "created_at": "2026-07-23T13:23:08.266367829+00:00",
       "goal_id": "00000SZ3RP4G52RZ706A5P4001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:34:56.617790143+00:00-195",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3SFP4N10NXGAE5P4002 entered workflow state todo.",
+      "created_at": "2026-07-23T13:34:56.617790143+00:00",
+      "goal_id": "00000SZ3SFP4N10NXGAE5P4002",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T13:34:59.850890392+00:00-196",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3SFP4N10NXGAE5P4002 changed from todo to in-progress.",
+      "created_at": "2026-07-23T13:34:59.850890392+00:00",
+      "goal_id": "00000SZ3SFP4N10NXGAE5P4002",
       "actionable": false,
       "retryable": false
     }

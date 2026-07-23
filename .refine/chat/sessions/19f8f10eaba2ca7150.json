@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:34:06Z",
+  "updated_at": "2026-07-23T13:34:59Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -414,6 +414,15 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Forward progress continues: the stop-button recovery expanded from one to three modified files, while the Ready Merge recovery remains actively owned with its eight-file patch intact. I’m preserving both worktrees and waiting for the agents’ own commit/verification handoff rather than treating elapsed time as failure."
+    }
+  ],
+  "queued_messages": [
+    {
+      "id": "qm-19f8f2fb6b83b8b623",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 3 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"in-progress\", \"00000SZ3SFP4N10NXGAE5P4002\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {\"00000SZ3N803TK00E78AK4M000\": \"Goal 00000SZ3N803TK00E78AK4M000 is in progress without a live workflow-agent process; inspect existing workflow evidence and retry explicitly if the worker was lost.\"}",
+      "created_at": "2026-07-23T13:34:56Z",
+      "updated_at": "2026-07-23T13:34:59Z",
+      "internal": true
     }
   ],
   "queue_dispatching": true,
