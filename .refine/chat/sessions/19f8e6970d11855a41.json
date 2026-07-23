@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:11:10Z",
+  "updated_at": "2026-07-23T11:11:22Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -567,6 +567,30 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Sent 1 queued message to the provider."
+    },
+    {
+      "created_at": "2026-07-23T11:11:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805078520-29",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m reconciling the three non-terminal Goals against live process, worktree, Git, and Goal-record evidence. I’ll act only on a confirmed worker loss or a supported review/recovery path, and I’ll leave review approval and any destructive choices with you."
+    },
+    {
+      "created_at": "2026-07-23T11:11:22Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805082283-31",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m using the prior Refine auditable-recovery guidance because this live topology has review and round-transition boundaries that are easy to mishandle. It constrains any recovery to supported Goal rounds and keeps human approval separate from implementation."
     }
   ],
   "queue_dispatching": true,
