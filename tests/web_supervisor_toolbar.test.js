@@ -176,6 +176,41 @@ function browserRuntime(storage = new Map()) {
       installTerminalResizer(tabId, resize) {
         terminalStateFor(tabId).term = { resize };
       },
+      installTerminalScrollModel(tabId) {
+        const terminal = terminalStateFor(tabId);
+        const buffer = { baseY: 0, viewportY: 0 };
+        let forcedScrolls = 0;
+        terminal.term = {
+          buffer: { active: buffer },
+          write() {
+            const wasAtBottom = buffer.viewportY === buffer.baseY;
+            buffer.baseY += 1;
+            if (wasAtBottom) buffer.viewportY = buffer.baseY;
+          },
+          scrollToBottom() {
+            forcedScrolls += 1;
+            buffer.viewportY = buffer.baseY;
+          },
+        };
+        return {
+          position() {
+            return {
+              baseY: buffer.baseY,
+              viewportY: buffer.viewportY,
+              forcedScrolls,
+            };
+          },
+          scrollUp(lines = 1) {
+            buffer.viewportY = Math.max(0, buffer.viewportY - lines);
+          },
+          scrollToBottom() {
+            buffer.viewportY = buffer.baseY;
+          },
+        };
+      },
+      receive(tabId, text) {
+        terminalReceiveOutput(text, terminalStateFor(tabId));
+      },
       resizeOutput(width, height) {
         const output = document.querySelector(".terminal-output");
         output.clientWidth = width;
@@ -203,6 +238,27 @@ test("Supervisor, Plan, Goal, and Standalone render the shared terminal surface"
     assert.match(browser.html(), /data-testid="terminal-start"/);
     assert.doesNotMatch(browser.html(), /id="chat-input"/);
     assert.doesNotMatch(browser.html(), /data-testid="toolbar-supervisor-panel"/);
+  }
+});
+
+test("agent terminals follow at the bottom and preserve user scrollback until returned", async () => {
+  const browser = browserRuntime();
+  await browser.runtime.openPlan("Design a retry queue");
+  await browser.runtime.openGoal("GOAL1");
+
+  for (const tabId of ["supervisor", "plan", "GOAL1", "standalone"]) {
+    const scroll = browser.runtime.installTerminalScrollModel(tabId);
+
+    browser.runtime.receive(tabId, "first line\n");
+    assert.deepEqual({ ...scroll.position() }, { baseY: 1, viewportY: 1, forcedScrolls: 0 });
+
+    scroll.scrollUp();
+    browser.runtime.receive(tabId, "second line\n");
+    assert.deepEqual({ ...scroll.position() }, { baseY: 2, viewportY: 0, forcedScrolls: 0 });
+
+    scroll.scrollToBottom();
+    browser.runtime.receive(tabId, "third line\n");
+    assert.deepEqual({ ...scroll.position() }, { baseY: 3, viewportY: 3, forcedScrolls: 0 });
   }
 });
 

@@ -1525,7 +1525,9 @@ function terminalReceiveOutput(text, terminal = terminalStateFor()) {
   if (terminal.term) {
     terminal.term.write(text || "");
   }
-  scrollTerminalOutputToEnd(terminal);
+  // xterm keeps following output while its viewport is at the bottom and
+  // preserves the viewport once the user scrolls into history. Do not force
+  // the viewport back down here or incoming agent output becomes unreadable.
 }
 
 function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
@@ -1689,18 +1691,6 @@ function focusTerminalSoon(tab = currentToolbarTab()) {
     } else if (output && document.activeElement !== output) {
       output.focus({ preventScroll: true });
     }
-  });
-}
-
-function scrollTerminalOutputToEnd(terminal = terminalStateFor()) {
-  if (terminal?.term && typeof terminal.term.scrollToBottom === "function") {
-    terminal.term.scrollToBottom();
-    return;
-  }
-  const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
-  schedule(() => {
-    const output = document.querySelector(".terminal-output");
-    if (output) output.scrollTop = output.scrollHeight;
   });
 }
 
