@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:10:48Z",
+  "updated_at": "2026-07-23T12:12:08Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -963,6 +963,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance rejected the candidate on four auditable grounds: foundation/host coupling, unsupervised Git cancellation, missing execution/revision fencing plus stale ancestry, and inadequate multi-daemon evidence. The recovery skill now calls for a fresh narrow Goal round from current `main`; I’m using that supported path, preserving `c9afedb7` and its worktree as evidence."
+    },
+    {
+      "created_at": "2026-07-23T12:12:08Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808728778-97",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The fresh round is recorded, and Refine intentionally leaves failed state intact until an explicit workflow-execution retry. I’m now using that supported retry endpoint for execution `exec-6e9f…`; this preserves the prior round/candidate and creates a new audited execution instead of editing Goal state."
     }
   ],
   "queued_messages": [
