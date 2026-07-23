@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:02:48Z",
+  "updated_at": "2026-07-23T12:05:12Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -903,6 +903,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The worker’s repaired full library suite now passes 457/457. That is useful but not sufficient: the cancellation/CAS warning is queued through Refine’s audited terminal channel, and the earlier two multi-instance failures remain visible until there is fresh production-path evidence or an explicit unresolved report."
+    },
+    {
+      "created_at": "2026-07-23T12:05:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808312383-85",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A candidate commit now exists (`c9afedb7`), but it still contains the pre-Git check/post-Git unfenced persistence sequence I flagged. I am therefore treating it only as a candidate—not a pass—and waiting for its completion signal and Governance evaluation without approving it."
     }
   ],
   "queued_messages": [
