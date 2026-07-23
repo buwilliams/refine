@@ -213,11 +213,32 @@ impl WorkflowEngine {
     }
 
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
+        let Some(target_root) = &self.target_root else {
+            return Ok(WorkflowPolicy::default());
+        };
+        let refine_dir = prepare_refine_dir(target_root)?;
+        self.policy_for_refine_dir(&refine_dir)
+    }
+
+    /// Resolves the workflow/agent capacity policy for an already-established target-app state
+    /// directory. Manual agent capabilities use this entry point so they share the scheduler's
+    /// exact limits without rediscovering or relocating state.
+    pub fn policy_for_refine_dir(&self, refine_dir: &Path) -> RefineResult<WorkflowPolicy> {
+        let active_node_id =
+            FileNodeRegistryService::with_active_root(refine_dir, &self.runtime_root)
+                .active_node_id()?;
+        self.policy_for_refine_dir_and_node(refine_dir, &active_node_id)
+    }
+
+    /// Loads Node-scoped workflow policy using a previously resolved ownership identity.
+    pub fn policy_for_refine_dir_and_node(
+        &self,
+        refine_dir: &Path,
+        node_id: &str,
+    ) -> RefineResult<WorkflowPolicy> {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
-            let refine_dir = prepare_refine_dir(target_root)?;
-            let settings =
-                FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
+            let settings = FileSettingsService::for_node(refine_dir, node_id).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
@@ -239,9 +260,7 @@ impl WorkflowEngine {
             );
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
             policy.target_app_id = target_root.display().to_string();
-            policy.active_node_id =
-                FileNodeRegistryService::with_active_root(&refine_dir, &self.runtime_root)
-                    .active_node_id()?;
+            policy.active_node_id = node_id.to_string();
         }
         Ok(policy)
     }
@@ -1753,6 +1772,7 @@ mod tests {
     use crate::process::subprocess::ManagedProcess;
     use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
     use crate::tools::host::agent_providers::smoke_ai_env_lock;
+    use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
     use crate::tools::product::nodes::FileNodeRegistryService;
     use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
     use std::process::Command;
@@ -3109,8 +3129,18 @@ mod tests {
         fs::write(
             &smoke_ai,
             "#!/bin/sh\n\
-             printf 'qa should fail\\n' > fail-qa\n\
-             printf '%s\\n' 'smoke-ai goal-agent response'\n",
+             case \"$*\" in\n\
+             *\"Post-implementation Quality evaluation\"*)\n\
+               printf '%s\\n' '{\"ok\":false,\"summary\":\"Candidate marker check failed.\",\"results\":[{\"test\":\"The candidate has no fail-qa marker.\",\"status\":\"failed\",\"evidence\":\"fail-qa exists\",\"command\":\"test ! -f fail-qa\"}]}'\n\
+               ;;\n\
+             *\"governance\"*)\n\
+               printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
+               ;;\n\
+             *)\n\
+               printf 'qa should fail\\n' > fail-qa\n\
+               printf '%s\\n' 'smoke-ai goal-agent response'\n\
+               ;;\n\
+             esac\n",
         )
         .unwrap();
         {
@@ -3146,11 +3176,17 @@ mod tests {
         FileSettingsService::new(&refine_dir)
             .update(&json!({
                 "agent_cli": "smoke-ai",
-                "quality_enabled": "1",
-                "target_app_build_command": "printf build-ok",
+                "quality_enabled": "0",
+                "target_app_build_command": "printf build-ran > build-ran",
                 "target_app_test_command": "test ! -f fail-qa",
                 "allowed_commands": "printf, test"
             }))
+            .unwrap();
+        FileQualityService::new(&refine_dir)
+            .save_settings(QualitySettingsPatch {
+                tests: Some(vec!["The candidate has no fail-qa marker.".to_string()]),
+                ..QualitySettingsPatch::default()
+            })
             .unwrap();
 
         let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
@@ -3163,6 +3199,16 @@ mod tests {
         assert!(!target_root.join("fail-qa").exists());
         assert!(worktree_path.exists());
         assert!(worktree_path.join("fail-qa").exists());
+        assert!(
+            !worktree_path.join("build-ran").exists(),
+            "pre-merge Quality must fail before the target-app build"
+        );
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], "failed");
+        assert_eq!(
+            detail["rounds"][0]["quality_details"]["results"][0]["test"],
+            "The candidate has no fail-qa marker."
+        );
         assert_eq!(
             git_stdout(&target_root, &["rev-parse", "HEAD"])
                 .unwrap()

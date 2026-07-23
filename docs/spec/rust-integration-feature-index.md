@@ -128,10 +128,10 @@ Nav & Guide: Manage Drop-down
 				Constitution (markdown field)
 				Rules: list (text input + Remove per rule), Add rule, Generate rules (needs product + constitution), autosave
 			Quality
-				Quality gate: QA enabled toggle, timing (pre_merge / post_build)
-				Target-app tests: enabled/disabled CLI command list using the shared edit/save config control
-				Business requirements + Instructions (markdown fields)
-				Incomplete warning banner if requirements/instructions missing
+				Quality is active for every Goal candidate; the candidate round pins whether pre_merge runs before Build or post_build runs after Build
+				Business requirements + agent instructions (markdown fields)
+				Tests: one project-wide plain-text outcome per line; the agent proposes a command and Refine records the observed supervised execution
+				Legacy transition: formerly enabled target-app QA commands remain enforced until replaced by non-empty plain-text tests
 			Guidance
 				Table: name, status pill (Enabled/Disabled), rule excerpt; click row to edit
 				Add guidance
@@ -153,7 +153,7 @@ Nav: Command Palette
 		Logs: clear filters
 		System: Pause/unpause agents, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
 		Application: target app start/stop/build/test/sync/check status
-		Quality: configure QA gate and target-app tests
+		Quality: configure candidate-evaluation context and plain-text tests
 		Runtime: re-check auth
 		Settings: copy application/runtime settings from node
 		Support: Request refine feature/bugfix

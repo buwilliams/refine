@@ -60,8 +60,11 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
         (GoalStatus::Todo, GoalStatus::InProgress)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
             | (GoalStatus::ReadyMerge, GoalStatus::Build)
+            | (GoalStatus::ReadyMerge, GoalStatus::Qa)
             | (GoalStatus::Build, GoalStatus::Qa)
+            | (GoalStatus::Build, GoalStatus::Review)
             | (GoalStatus::Qa, GoalStatus::Review)
+            | (GoalStatus::Qa, GoalStatus::Build)
             | (GoalStatus::InProgress, GoalStatus::Failed)
             | (GoalStatus::Qa, GoalStatus::Failed)
             | (GoalStatus::ReadyMerge, GoalStatus::Failed)
@@ -83,6 +86,7 @@ pub struct FileWorkItemService {
     pub refine_dir: PathBuf,
     pub projection_cache_dir: Option<PathBuf>,
     pub active_node_root: Option<PathBuf>,
+    pub active_node_id_override: Option<String>,
 }
 
 impl FileWorkItemService {
@@ -91,6 +95,19 @@ impl FileWorkItemService {
             refine_dir: refine_dir.into(),
             projection_cache_dir: None,
             active_node_root: None,
+            active_node_id_override: None,
+        }
+    }
+
+    /// Uses one already-resolved Node identity for all ownership checks performed by this
+    /// service. Long-running capability work uses this instead of re-reading mutable runtime
+    /// selection state between validation and durable persistence.
+    pub fn for_node(refine_dir: impl Into<PathBuf>, node_id: impl Into<String>) -> Self {
+        Self {
+            refine_dir: refine_dir.into(),
+            projection_cache_dir: None,
+            active_node_root: None,
+            active_node_id_override: Some(node_id.into()),
         }
     }
 
@@ -104,6 +121,7 @@ impl FileWorkItemService {
             refine_dir: refine_dir.into(),
             projection_cache_dir: Some(cache_dir),
             active_node_root,
+            active_node_id_override: None,
         }
     }
 
@@ -125,6 +143,9 @@ impl FileWorkItemService {
     }
 
     fn active_node_id(&self) -> RefineResult<String> {
+        if let Some(node_id) = &self.active_node_id_override {
+            return Ok(node_id.clone());
+        }
         self.node_registry_service().active_node_id()
     }
 
@@ -2215,6 +2236,21 @@ impl FileWorkItemService {
         evaluation: &Value,
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
+        let round_idx = current
+            .goal
+            .round_count
+            .checked_sub(1)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+        self.update_goal_round_evaluation_summary(goal_id, round_idx, evaluation)
+    }
+
+    pub fn update_goal_round_evaluation_summary(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        evaluation: &Value,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let fields = evaluation.as_object().ok_or_else(|| {
             RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
@@ -2228,14 +2264,13 @@ impl FileWorkItemService {
             .get_mut("rounds")
             .and_then(Value::as_array_mut)
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = rounds
-            .iter_mut()
-            .rev()
-            .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = latest.as_object_mut().ok_or_else(|| {
+        let round = rounds.get_mut(round_idx).ok_or_else(|| {
+            RefineError::NotFound(format!("Goal {goal_id} has no round {}", round_idx + 1))
+        })?;
+        let round = round.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
-                "latest round for Goal {goal_id} is not a JSON object"
+                "round {} for Goal {goal_id} is not a JSON object",
+                round_idx + 1
             ))
         })?;
         for key in [
@@ -2251,13 +2286,14 @@ impl FileWorkItemService {
             "quality_message",
             "quality_details",
             "quality_checked_at",
+            "workflow_quality_timing",
         ] {
             if let Some(value) = fields.get(key) {
-                latest.insert(key.to_string(), value.clone());
+                round.insert(key.to_string(), value.clone());
             }
         }
         let now = now_timestamp();
-        latest.insert("updated".to_string(), Value::String(now.clone()));
+        round.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)
@@ -2897,6 +2933,7 @@ fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     round.insert("logs".to_string(), Value::Array(Vec::new()));
     round.insert("implementation_report".to_string(), Value::Null);
     round.insert("implementation_reported_at".to_string(), Value::Null);
+    round.insert("workflow_quality_timing".to_string(), Value::Null);
     round.insert(
         "rule_state".to_string(),
         Value::String("unclassified".to_string()),
