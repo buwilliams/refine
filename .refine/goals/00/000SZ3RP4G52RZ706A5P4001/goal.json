@@ -213,9 +213,32 @@
       "rule_state": "failed",
       "updated": "2026-07-23T14:08:01Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T14:08:40Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover Governance-rejected candidate c9a92ee5 from current main while preserving c9a92ee5, ea2103e3, all earlier candidates, worktrees, rounds, and provider/Governance evidence. Fix only the three newly recorded violations in the shared process-stop capability. After exact process exit is confirmed, retain and report truthful partial-outcome evidence if the post-exit ownership fence fails: do not claim termination was unrequested, and include confirmed-exit, registry/identity cleanup, Goal-not-cancelled, causal ownership mismatch, and supported recovery details. Make the final exact claim, execution, round, Goal revision/status, and absence-of-competing-owner validation atomic with the linked Goal cancellation write, so a newer round or claim cannot appear between validation and cancellation and stale process work can never cancel newer Goal work. Add deterministic production-path concurrency coverage that changes ownership after confirmed process exit and specifically between the last validation and cancellation settlement, plus assertions for accurate retained partial-failure evidence. Re-run focused process-control, subprocess, agent-session, web API, CLI, MCP/browser, workflow metadata, full library and web suites, all-target check, formatting, and diff checks, reporting exact results. Preserve one shared capability across surfaces and all provider, authentication, cancellation, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T14:08:40Z",
+      "workflow_quality_timing": null
     }
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T14:08:02Z"
+  "updated": "2026-07-23T14:08:40Z"
 }
