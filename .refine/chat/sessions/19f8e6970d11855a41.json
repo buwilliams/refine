@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:30:52Z",
+  "updated_at": "2026-07-23T11:31:26Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -759,6 +759,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The completion trail confirms both reviewed candidates are now ancestors of `main`, but the accessible activity log does not preserve a successful approval event—only failed approval attempts are audited there. I’m treating that provenance gap explicitly; I did not approve either Goal. The remaining worker is still alive with fresh output and is adding exact-candidate and concurrency coverage."
+    },
+    {
+      "created_at": "2026-07-23T11:31:26Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784806286802-61",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "A broad 28-test workflow run exposed one integration-conflict failure; the exact test passed immediately when isolated. I’m keeping that visible as possible race/flakiness evidence rather than counting the suite as clean, and I’m letting the worker continue its remaining focused checks."
     }
   ],
   "queued_messages": [
