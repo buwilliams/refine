@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:36:36Z",
+  "updated_at": "2026-07-23T12:37:09Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1251,6 +1251,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The real cancellation test exposed a substantive failure: cancellation was issued while `push` was deliberately blocked, yet the merge still completed and reached `origin/main`. The worker is now debugging the process-registration/termination path; this candidate is not acceptable until that fails closed."
+    },
+    {
+      "created_at": "2026-07-23T12:37:09Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784810229264-146",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Cancellation now prevents completion, but the child receives an empty error string. That hides the termination cause, so simply weakening the assertion would violate the audit boundary. I’m requiring a non-empty cancellation/termination error and durable operation evidence."
     }
   ],
   "queued_messages": [
