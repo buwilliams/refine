@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:14:41Z",
+  "updated_at": "2026-07-23T14:14:51Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -852,6 +852,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll reconcile the five non-terminal Goals against current durable Goal records, workflow/process evidence, and Git/worktree state. I’ll use the Refine auditable-recovery guidance because one Goal is failed, and I’ll stop at review/merge or cancellation decisions that require your authority."
+    },
+    {
+      "created_at": "2026-07-23T14:14:51Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784816091422-172",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery skill keeps the failed Goal on the supported `goal round` path and explicitly excludes direct state edits or review approval. I’m first checking whether the supplied snapshot is still current and whether each review candidate has complete Governance/Quality/Git evidence; no mutation or approval is being attempted."
     }
   ],
   "queue_dispatching": true,
