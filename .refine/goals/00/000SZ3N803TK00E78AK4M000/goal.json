@@ -1,5 +1,5 @@
 {
-  "base_commit": "57551ae709a983001dbb39175e4ae380f1b03bee",
+  "base_commit": "749923d99ffb4a326e0b48ea809ac35bad4d0538",
   "branch_name": "refine/00000SZ3N803TK00E78AK4M000/round-1",
   "candidate_commit": null,
   "created": "2026-07-23T11:06:42Z",
@@ -36,7 +36,7 @@
       "workflow_quality_timing": null
     }
   ],
-  "status": "todo",
+  "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T11:08:38Z"
+  "updated": "2026-07-23T11:13:15Z"
 }

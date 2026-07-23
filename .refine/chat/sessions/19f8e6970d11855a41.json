@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:12:10Z",
+  "updated_at": "2026-07-23T11:13:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -615,14 +615,26 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "One concrete issue is emerging: Goal `00000SZ3N803…` was cancelled and returned to `todo`, yet its original worker is still alive and working. I’m checking whether it is actually producing output or merely an unreaped process before deciding whether a cancellation-preserving stop is warranted. The other active worker has a matching `in-progress` Goal and should be left alone."
+    },
+    {
+      "created_at": "2026-07-23T11:13:12Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784805192460-37",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The cancelled/undone Goal’s worker is not an inert remnant: it continued modifying six Goal-owned files after the cancellation transition. I’m stopping that specific stale execution through Refine’s supported process-control endpoint. This preserves the worktree and queued Goal record; it does not discard changes, retry the Goal, or approve anything."
     }
   ],
   "queued_messages": [
     {
       "id": "qm-19f8eaceb792ca64a1",
-      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 1 active, 1 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"todo\", \"00000SZ3NBF861H3VJPTK4M001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
+      "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 2 active, 0 queued, 0 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"in-progress\", \"00000SZ3NBF861H3VJPTK4M001\": \"in-progress\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T11:12:04Z",
-      "updated_at": "2026-07-23T11:12:04Z",
+      "updated_at": "2026-07-23T11:13:18Z",
       "internal": true
     }
   ],
