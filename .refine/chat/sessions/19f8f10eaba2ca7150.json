@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:26:36Z",
+  "updated_at": "2026-07-23T15:28:50Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1320,6 +1320,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Focused verification is green across the requested layers. The first full library run produced 470 passes and two failures: one obsolete cancellation expectation that must change for fail-closed behavior, and the known quality-settings EOF race. The agent is updating only the obsolete assertion and will rerun both plus the unchanged full suite."
+    },
+    {
+      "created_at": "2026-07-23T15:28:50Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784820530778-250",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The obsolete assertion and the isolated race case both pass, and the next full library run is green at 472/472. A final combined unchanged-source run is now executing before commit and Governance."
     }
   ],
   "queued_messages": [
