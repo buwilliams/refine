@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:20:36Z",
+  "updated_at": "2026-07-23T10:22:13Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -336,6 +336,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Current evidence confirms the daemon is live on port 8082 and both HTTP surfaces return 200, but the primary `refine-next` checkout has substantial unstaged changes. That makes any approval/merge unsafe until ownership is resolved. I’m now narrowing the Goal records and candidate worktrees; I will not touch the dirty primary tree."
+    },
+    {
+      "created_at": "2026-07-23T10:22:13Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784802133669-147",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The candidate branches are clean and based on the current `main`, but all three overlap the dirty primary checkout (especially `web_server/tests.rs`, `toolbar.js`, and its browser test). State synchronization and GitHub reachability are currently healthy again; the unresolved boundary is the paused/stopped workflow-launch state, which I’m checking directly before deciding whether a recovery round can safely be queued."
     }
   ],
   "queue_dispatching": true,
