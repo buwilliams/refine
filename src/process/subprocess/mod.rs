@@ -157,6 +157,8 @@ impl ManagedProcess {
                 "goal_id",
                 "feature_id",
                 "session_id",
+                "claim_id",
+                "execution_id",
                 "mode",
                 "profile",
                 "role",
@@ -308,7 +310,7 @@ impl FileProcessSupervisor {
             )));
         }
         let started = Instant::now();
-        let identity = self.ensure_process_identity(expected)?;
+        let identity = self.load_process_identity(expected)?;
         self.ensure_expected_registration(expected, &identity)?;
         match self.owned_process_state(expected, &identity)? {
             OwnedProcessState::Exited => {
@@ -554,7 +556,22 @@ impl FileProcessSupervisor {
         )
     }
 
-    fn ensure_process_identity(
+    fn create_process_identity(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcessIdentity> {
+        let identity = ManagedProcessIdentity {
+            process_id: process.id.clone(),
+            owner: process.owner.clone(),
+            pid: process.pid,
+            os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
+            registered_at: now_millis_string(),
+        };
+        self.write_process_identity(&identity)?;
+        Ok(identity)
+    }
+
+    fn load_process_identity(
         &self,
         process: &ManagedProcess,
     ) -> RefineResult<ManagedProcessIdentity> {
@@ -571,15 +588,10 @@ impl FileProcessSupervisor {
                 Ok(identity)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                let identity = ManagedProcessIdentity {
-                    process_id: process.id.clone(),
-                    owner: process.owner.clone(),
-                    pid: process.pid,
-                    os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
-                    registered_at: now_millis_string(),
-                };
-                self.write_process_identity(&identity)?;
-                Ok(identity)
+                Err(RefineError::Conflict(format!(
+                    "managed process {} has no registration-time PID identity evidence; termination was not requested because the recorded PID may have been reused, and its legacy process record was retained for recovery",
+                    process.id
+                )))
             }
             Err(error) => Err(RefineError::Io(format!(
                 "failed to read process identity {}: {error}",
@@ -593,15 +605,7 @@ impl FileProcessSupervisor {
         expected: &ManagedProcess,
         identity: &ManagedProcessIdentity,
     ) -> RefineResult<()> {
-        if identity.process_id != expected.id
-            || identity.owner != expected.owner
-            || identity.pid != expected.pid
-        {
-            return Err(RefineError::Conflict(format!(
-                "managed process {} identity evidence does not match its registry record; termination was not requested and both records were retained for recovery",
-                expected.id
-            )));
-        }
+        self.ensure_identity_matches_process(expected, identity)?;
         match self.inspect(&expected.id) {
             Ok(current)
                 if current.id == expected.id
@@ -626,6 +630,23 @@ impl FileProcessSupervisor {
             },
             Err(error) => Err(error),
         }
+    }
+
+    fn ensure_identity_matches_process(
+        &self,
+        process: &ManagedProcess,
+        identity: &ManagedProcessIdentity,
+    ) -> RefineResult<()> {
+        if identity.process_id != process.id
+            || identity.owner != process.owner
+            || identity.pid != process.pid
+        {
+            return Err(RefineError::Conflict(format!(
+                "managed process {} identity evidence does not match its registry record; termination was not requested and both records were retained for recovery",
+                process.id
+            )));
+        }
+        Ok(())
     }
 
     fn owned_process_state(
@@ -698,8 +719,28 @@ impl FileProcessSupervisor {
             self.remove_process_artifacts(&process)?;
             return Ok(process);
         }
+        let existing = match self.inspect(&process.id) {
+            Ok(existing) => Some(existing),
+            Err(RefineError::NotFound(_)) => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(existing) = existing {
+            if existing.owner != process.owner
+                || existing.pid != process.pid
+                || existing.started_at != process.started_at
+            {
+                return Err(RefineError::Conflict(format!(
+                    "managed process {} registration changed ownership identity; its existing process record and identity evidence were retained",
+                    process.id
+                )));
+            }
+            let identity = self.load_process_identity(&existing)?;
+            self.ensure_identity_matches_process(&existing, &identity)?;
+            self.write_process(&process)?;
+            return Ok(process);
+        }
         self.write_process(&process)?;
-        if let Err(error) = self.ensure_process_identity(&process) {
+        if let Err(error) = self.create_process_identity(&process) {
             let _ = self.remove_process_artifacts(&process);
             return Err(error);
         }
@@ -799,7 +840,7 @@ impl FileProcessSupervisor {
             let _ = child.wait();
             return Err(error);
         }
-        if let Err(error) = self.ensure_process_identity(&process) {
+        if let Err(error) = self.create_process_identity(&process) {
             let _ = child.kill();
             let _ = child.wait();
             let _ = self.remove_process_artifacts(&process);
@@ -1062,7 +1103,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             let _ = child.wait();
             return Err(error);
         }
-        if let Err(error) = self.ensure_process_identity(&process) {
+        if let Err(error) = self.create_process_identity(&process) {
             let _ = child.kill();
             let _ = child.wait();
             let _ = self.remove_process_artifacts(&process);

@@ -132,13 +132,15 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn workflow_process_metadata(&self, workflow_state: &str, behavior: &str) -> JsonObject {
-        workflow_subprocess_metadata(
+        let mut metadata = workflow_subprocess_metadata(
             &self.execution_id,
             &self.goal_id,
             workflow_state,
             behavior,
             Some(self.round_idx),
-        )
+        );
+        metadata.insert("claim_id".to_string(), json!(&self.claim_id));
+        metadata
     }
 
     pub fn require_branch(&self) -> RefineResult<&str> {
@@ -338,6 +340,11 @@ mod tests {
             JsonObject::new(),
             work_items.clone(),
         );
+        let process_metadata =
+            first.workflow_process_metadata("in-progress", "WorkflowImplementation");
+        assert_eq!(process_metadata["claim_id"], "claim-1");
+        assert_eq!(process_metadata["execution_id"], "exec-1");
+        assert_eq!(process_metadata["round_idx"], 0);
         assert_eq!(
             first.quality_timing(GoalStatus::ReadyMerge).unwrap(),
             POST_BUILD
