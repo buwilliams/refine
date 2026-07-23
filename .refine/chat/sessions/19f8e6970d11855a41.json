@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:29:40Z",
+  "updated_at": "2026-07-23T12:34:45Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1227,6 +1227,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A remaining race is concrete: each fence check releases the coordination lock before spawning the Git subprocess. Cancellation can change authority in that gap, miss a not-yet-created process, and the stale execution can still begin the mutation. I’m sending that exact TOCTOU finding now, before the worker finalizes."
+    },
+    {
+      "created_at": "2026-07-23T12:34:45Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784810085923-142",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The new multi-process tests now cover cancellation during a live managed `push`, stale-execution replacement, retry, restart recovery, and exactly-once merge evidence. They still do not exercise the pre-spawn cancellation gap I flagged, so that remains an open audit concern pending code/test completion."
     }
   ],
   "queued_messages": [
