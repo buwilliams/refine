@@ -29,14 +29,16 @@ Current implementation details that matter to intent:
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
-  capability that retains ownership evidence, confirms exact process exit, and
-  only then atomically validates the exact claim, execution, round, Goal
-  revision/status, and absence of a competing owner with cancellation of the
-  linked Goal; missing registration-time PID identity, mismatched or stale
-  workflow ownership, and failed or resisted stops leave the process supervised
-  and the Goal active, while post-exit ownership failures retain a partial
-  outcome receipt with exit, registry/identity cleanup, Goal, cause, and
-  supported recovery evidence.
+  capability, including Workflow execution cancellation, rather than splitting
+  process and Workflow semantics. It retains ownership evidence, confirms exact
+  process exit, and records that outcome before registry or identity cleanup.
+  Only then does it atomically validate and cancel the exact claim and linked
+  Goal, release claim capacity, and preserve the execution, round, Goal
+  revision/status, and competing-owner fences. Missing registration-time PID
+  identity, mismatched or stale workflow ownership, failed or resisted stops,
+  and cleanup failures keep the Goal active, while every post-exit failure
+  retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,
+  cause, and supported recovery evidence.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 
 Process management should favor visibility and recovery over hiding execution behind polished UI messages. If something is running, failing, or waiting, Refine should be able to show it.

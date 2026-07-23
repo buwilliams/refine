@@ -6,8 +6,10 @@ use chrono::Utc;
 use serde_json::{Map, Value, json};
 
 use crate::model::workflow::GoalStatus;
+#[cfg(test)]
+use crate::process::subprocess::ProcessCleanupStage;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+    ConfirmedProcessExit, FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
@@ -23,7 +25,7 @@ struct WorkflowGoalOwnership {
     process_id: String,
     claim_id: String,
     execution_id: String,
-    round_idx: usize,
+    round_idx: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,6 +54,8 @@ pub struct FileProcessControlService {
     settlement_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
     #[cfg(test)]
     post_exit_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+    #[cfg(test)]
+    cleanup_failure: Option<ProcessCleanupStage>,
 }
 
 impl FileProcessControlService {
@@ -64,6 +68,8 @@ impl FileProcessControlService {
             settlement_hook: None,
             #[cfg(test)]
             post_exit_hook: None,
+            #[cfg(test)]
+            cleanup_failure: None,
         }
     }
 
@@ -79,6 +85,8 @@ impl FileProcessControlService {
             settlement_hook: None,
             #[cfg(test)]
             post_exit_hook: None,
+            #[cfg(test)]
+            cleanup_failure: None,
         }
     }
 
@@ -89,14 +97,20 @@ impl FileProcessControlService {
     }
 
     #[cfg(test)]
-    fn with_settlement_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
+    pub(crate) fn with_settlement_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
         self.settlement_hook = Some(std::sync::Arc::new(hook));
         self
     }
 
     #[cfg(test)]
-    fn with_post_exit_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
+    pub(crate) fn with_post_exit_hook(mut self, hook: impl Fn() + Send + Sync + 'static) -> Self {
         self.post_exit_hook = Some(std::sync::Arc::new(hook));
+        self
+    }
+
+    #[cfg(test)]
+    fn with_cleanup_failure(mut self, stage: ProcessCleanupStage) -> Self {
+        self.cleanup_failure = Some(stage);
         self
     }
 
@@ -124,6 +138,131 @@ impl FileProcessControlService {
         Err(RefineError::NotFound(format!(
             "Process {process_id} was not found"
         )))
+    }
+
+    pub fn cancel_workflow_execution(&self, execution_id: &str) -> RefineResult<Value> {
+        let execution_id = execution_id.trim();
+        if execution_id.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "workflow execution id is required".to_string(),
+            ));
+        }
+        let state = WorkflowEngine::new(&self.runtime_root).load_state()?;
+        let claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
+            .cloned()
+            .ok_or_else(|| {
+                RefineError::NotFound(format!("claim for execution {execution_id} was not found"))
+            })?;
+        if claim.state == WorkflowClaimState::Cancelled {
+            return Ok(json!({
+                "cancelled": true,
+                "execution_id": execution_id,
+                "claim_id": claim.claim_id,
+                "goal_id": claim.goal_id,
+                "already_cancelled": true
+            }));
+        }
+        if claim.state != WorkflowClaimState::Running {
+            return Err(RefineError::Conflict(format!(
+                "workflow execution {execution_id} is {}; only a running execution can be cancelled",
+                workflow_claim_state_label(&claim.state)
+            )));
+        }
+
+        let managed = self.managed_processes_for_execution(execution_id)?;
+        let refine_dir = self.refine_dir.as_deref();
+        let expectation = refine_dir
+            .map(|refine_dir| preflight_goal_state(refine_dir, &claim.goal_id))
+            .transpose()?;
+        let mut ownership = Vec::new();
+        if let Some(refine_dir) = refine_dir {
+            for (_, process) in &managed {
+                let fence = preflight_goal_for_process(
+                    refine_dir,
+                    &self.runtime_root,
+                    &claim.goal_id,
+                    process,
+                    WorkflowOwnershipPhase::BeforeTermination,
+                )?;
+                let process_ownership = fence.workflow.ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "managed process {} has no exact workflow ownership; termination was not requested",
+                        process.id
+                    ))
+                })?;
+                if process_ownership.claim_id != claim.claim_id
+                    || process_ownership.execution_id != execution_id
+                {
+                    return Err(stale_workflow_ownership(
+                        &claim.goal_id,
+                        &process_ownership,
+                        "the process does not belong to the requested workflow execution",
+                        WorkflowOwnershipPhase::BeforeTermination,
+                    ));
+                }
+                ownership.push(process_ownership);
+            }
+        } else {
+            ownership.push(WorkflowGoalOwnership {
+                process_id: format!("workflow execution {execution_id}"),
+                claim_id: claim.claim_id.clone(),
+                execution_id: execution_id.to_string(),
+                round_idx: None,
+            });
+        }
+        if ownership.is_empty() {
+            ownership.push(WorkflowGoalOwnership {
+                process_id: format!("workflow execution {execution_id}"),
+                claim_id: claim.claim_id.clone(),
+                execution_id: execution_id.to_string(),
+                round_idx: None,
+            });
+        }
+
+        let mut terminations = Vec::new();
+        for (supervisor, process) in managed {
+            terminations.push(self.terminate_with_retained_outcome(
+                &supervisor,
+                &process,
+                "terminate",
+                Some(&claim.goal_id),
+            )?);
+        }
+        #[cfg(test)]
+        if let Some(hook) = &self.post_exit_hook {
+            hook();
+        }
+
+        let goal = match (refine_dir, expectation.as_ref()) {
+            (Some(refine_dir), Some(expectation)) => Some(
+                self.settle_goal_cancellation(refine_dir, &claim.goal_id, expectation, &ownership)?
+                    .goal,
+            ),
+            _ => {
+                self.settle_claim_cancellation_only(&claim.goal_id, &ownership)?;
+                None
+            }
+        };
+        for termination in &terminations {
+            self.complete_outcome_receipt(
+                &termination.process_id,
+                Some(&claim.goal_id),
+                termination,
+                goal.is_some(),
+                true,
+            )?;
+        }
+        Ok(json!({
+            "cancelled": true,
+            "execution_id": execution_id,
+            "claim_id": claim.claim_id,
+            "goal_id": claim.goal_id,
+            "processes": terminations,
+            "goal": goal
+        }))
     }
 
     fn stop_managed_agent(
@@ -166,11 +305,12 @@ impl FileProcessControlService {
             preflight_chat(refine_dir, &self.runtime_root, session_id)?;
         }
 
-        let termination = supervisor
-            .terminate_owned_and_confirm_exit(&process, signal, self.agent_exit_timeout)
-            .map_err(|error| {
-                stop_failure_with_goal_context(error, &process.id, goal_id.as_deref())
-            })?;
+        let termination = self.terminate_with_retained_outcome(
+            &supervisor,
+            &process,
+            signal,
+            goal_id.as_deref(),
+        )?;
         #[cfg(test)]
         if let Some(hook) = &self.post_exit_hook {
             hook();
@@ -204,7 +344,7 @@ impl FileProcessControlService {
                     Err(error) => {
                         return Err(self.retain_post_exit_failure(
                             &process.id,
-                            goal_id,
+                            Some(goal_id),
                             json!(&termination),
                             error,
                         ));
@@ -213,6 +353,16 @@ impl FileProcessControlService {
             }
             _ => None,
         };
+        self.complete_outcome_receipt(
+            &process.id,
+            goal_id.as_deref(),
+            &termination,
+            goal.is_some(),
+            goal_fence
+                .as_ref()
+                .and_then(|fence| fence.workflow.as_ref())
+                .is_some(),
+        )?;
 
         let mut stopped_process = process;
         stopped_process.state = "stopped".to_string();
@@ -286,13 +436,12 @@ impl FileProcessControlService {
         }
         let mut terminations = Vec::new();
         for (supervisor, process) in managed {
-            terminations.push(
-                supervisor
-                    .terminate_owned_and_confirm_exit(&process, signal, self.agent_exit_timeout)
-                    .map_err(|error| {
-                        stop_failure_with_goal_context(error, process_id, goal_id.as_deref())
-                    })?,
-            );
+            terminations.push(self.terminate_with_retained_outcome(
+                &supervisor,
+                &process,
+                signal,
+                goal_id.as_deref(),
+            )?);
         }
         #[cfg(test)]
         if let Some(hook) = &self.post_exit_hook {
@@ -316,7 +465,7 @@ impl FileProcessControlService {
                     Err(error) => {
                         return Err(self.retain_post_exit_failure(
                             process_id,
-                            goal_id,
+                            Some(goal_id),
                             json!({
                                 "confirmed_exit": true,
                                 "registry_cleanup_completed": true,
@@ -331,6 +480,15 @@ impl FileProcessControlService {
             }
             None => None,
         };
+        for termination in &terminations {
+            self.complete_outcome_receipt(
+                &termination.process_id,
+                goal_id.as_deref(),
+                termination,
+                goal.is_some(),
+                !workflow_ownership.is_empty(),
+            )?;
+        }
         let already_idle = terminations.is_empty();
         let mut result = json!({
             "stopped": true,
@@ -385,6 +543,26 @@ impl FileProcessControlService {
         Ok(matches)
     }
 
+    fn managed_processes_for_execution(
+        &self,
+        execution_id: &str,
+    ) -> RefineResult<Vec<(FileProcessSupervisor, ManagedProcess)>> {
+        let mut matches = Vec::new();
+        for root in managed_process_roots(&self.runtime_root) {
+            let supervisor = FileProcessSupervisor::new(root);
+            for process in supervisor.list()? {
+                if process_metadata(&process)
+                    .get("execution_id")
+                    .and_then(Value::as_str)
+                    == Some(execution_id)
+                {
+                    matches.push((supervisor.clone(), process));
+                }
+            }
+        }
+        Ok(matches)
+    }
+
     fn resolve_refine_dir(&self) -> RefineResult<PathBuf> {
         if let Some(refine_dir) = &self.refine_dir {
             return Ok(refine_dir.clone());
@@ -402,6 +580,126 @@ impl FileProcessControlService {
         refine_dir_for_target_root(Path::new(&target_root))
     }
 
+    fn terminate_with_retained_outcome(
+        &self,
+        supervisor: &FileProcessSupervisor,
+        process: &ManagedProcess,
+        signal: &str,
+        goal_id: Option<&str>,
+    ) -> RefineResult<ConfirmedProcessExit> {
+        let confirmed = supervisor
+            .terminate_owned_and_confirm_exit(process, signal, self.agent_exit_timeout)
+            .map_err(|error| stop_failure_with_goal_context(error, &process.id, goal_id))?;
+        self.write_outcome_receipt(
+            &process.id,
+            json!({
+                "state": "confirmed_exit_cleanup_pending",
+                "process_id": process.id,
+                "goal_id": goal_id,
+                "recorded_at": Utc::now().to_rfc3339(),
+                "termination": &confirmed,
+                "confirmed_exit": true,
+                "registry_cleanup_completed": false,
+                "identity_cleanup_completed": false,
+                "goal_cancelled": false,
+                "claim_cancelled": false,
+                "recovery": "the exact process exit is confirmed; retry cleanup and cancellation from the retained process-stop receipt"
+            }),
+        )
+        .map_err(|error| {
+            self.retain_post_exit_failure(
+                &process.id,
+                goal_id,
+                json!(&confirmed),
+                error,
+            )
+        })?;
+
+        #[cfg(test)]
+        let cleanup =
+            supervisor.cleanup_confirmed_exit_with(process, confirmed, |stage| {
+                match self.cleanup_failure {
+                    Some(injected) if injected == stage => Err(RefineError::Io(format!(
+                        "injected {} cleanup failure",
+                        match stage {
+                            ProcessCleanupStage::Registry => "registry",
+                            ProcessCleanupStage::Identity => "identity",
+                        }
+                    ))),
+                    _ => Ok(()),
+                }
+            });
+        #[cfg(not(test))]
+        let cleanup = supervisor.cleanup_confirmed_exit(process, confirmed);
+
+        let cleaned = match cleanup {
+            Ok(cleaned) => cleaned,
+            Err(failure) => {
+                return Err(self.retain_post_exit_failure(
+                    &process.id,
+                    goal_id,
+                    json!(&failure.outcome),
+                    failure.error,
+                ));
+            }
+        };
+        self.write_outcome_receipt(
+            &process.id,
+            json!({
+                "state": "confirmed_exit_settlement_pending",
+                "process_id": process.id,
+                "goal_id": goal_id,
+                "recorded_at": Utc::now().to_rfc3339(),
+                "termination": &cleaned,
+                "confirmed_exit": true,
+                "registry_cleanup_completed": true,
+                "identity_cleanup_completed": true,
+                "goal_cancelled": false,
+                "claim_cancelled": false,
+                "recovery": "cleanup is complete; retry the fenced cancellation settlement from the retained process-stop receipt"
+            }),
+        )
+        .map_err(|error| {
+            self.retain_post_exit_failure(&process.id, goal_id, json!(&cleaned), error)
+        })?;
+        Ok(cleaned)
+    }
+
+    fn complete_outcome_receipt(
+        &self,
+        process_id: &str,
+        goal_id: Option<&str>,
+        termination: &ConfirmedProcessExit,
+        goal_cancelled: bool,
+        claim_cancelled: bool,
+    ) -> RefineResult<()> {
+        self.write_outcome_receipt(
+            process_id,
+            json!({
+                "state": "completed",
+                "process_id": process_id,
+                "goal_id": goal_id,
+                "recorded_at": Utc::now().to_rfc3339(),
+                "termination": termination,
+                "confirmed_exit": termination.confirmed_exit,
+                "registry_cleanup_completed": termination.registry_cleanup_completed,
+                "identity_cleanup_completed": termination.identity_cleanup_completed,
+                "goal_cancelled": goal_cancelled,
+                "claim_cancelled": claim_cancelled
+            }),
+        )
+    }
+
+    fn write_outcome_receipt(&self, process_id: &str, receipt: Value) -> RefineResult<()> {
+        write_json_receipt(
+            &self
+                .runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("{process_id}.json")),
+            &receipt,
+        )
+    }
+
     fn settle_goal_cancellation(
         &self,
         refine_dir: &Path,
@@ -415,7 +713,8 @@ impl FileProcessControlService {
             goal_id,
             expectation,
             || {
-                let state = workflow.load_state()?;
+                let mut state = workflow.load_state()?;
+                let mut claim_ids = Vec::new();
                 if ownership.is_empty() {
                     ensure_goal_has_no_active_workflow_claim_in_state(
                         &state,
@@ -437,21 +736,47 @@ impl FileProcessControlService {
                             ownership,
                             WorkflowOwnershipPhase::BeforeCancellation,
                         )?;
+                        claim_ids.push(ownership.claim_id.clone());
                     }
                 }
                 #[cfg(test)]
                 if let Some(hook) = &self.settlement_hook {
                     hook();
                 }
-                Ok(())
+                claim_ids.sort();
+                claim_ids.dedup();
+                workflow.settle_claims_cancelled_locked(&mut state, &claim_ids)
             },
         )
+    }
+
+    fn settle_claim_cancellation_only(
+        &self,
+        goal_id: &str,
+        ownership: &[WorkflowGoalOwnership],
+    ) -> RefineResult<()> {
+        let workflow = WorkflowEngine::new(&self.runtime_root);
+        let _workflow_lock = workflow.acquire_state_mutation_lock()?;
+        let mut state = workflow.load_state()?;
+        let mut claim_ids = Vec::new();
+        for ownership in ownership {
+            validate_workflow_goal_ownership_in_state(
+                &state,
+                goal_id,
+                ownership,
+                WorkflowOwnershipPhase::BeforeCancellation,
+            )?;
+            claim_ids.push(ownership.claim_id.clone());
+        }
+        claim_ids.sort();
+        claim_ids.dedup();
+        workflow.settle_claims_cancelled_locked(&mut state, &claim_ids)
     }
 
     fn retain_post_exit_failure(
         &self,
         process_id: &str,
-        goal_id: &str,
+        goal_id: Option<&str>,
         termination: Value,
         cause: RefineError,
     ) -> RefineError {
@@ -491,7 +816,10 @@ impl FileProcessControlService {
         error_with_message(
             cause,
             format!(
-                "process stop reached a partial outcome for Goal {goal_id}: confirmed_exit={confirmed_exit}, registry_cleanup_completed={registry_cleanup}, identity_cleanup_completed={identity_cleanup}, goal_cancelled=false; post-exit ownership fence failed: {cause_message}; {retained}; supported recovery: {recovery}"
+                "process stop reached a partial outcome{}: confirmed_exit={confirmed_exit}, registry_cleanup_completed={registry_cleanup}, identity_cleanup_completed={identity_cleanup}, goal_cancelled=false; post-exit settlement failed: {cause_message}; {retained}; supported recovery: {recovery}",
+                goal_id
+                    .map(|goal_id| format!(" for Goal {goal_id}"))
+                    .unwrap_or_default()
             ),
         )
     }
@@ -607,7 +935,7 @@ fn preflight_goal_for_process(
         process_id: process.id.clone(),
         claim_id: claim.claim_id.clone(),
         execution_id,
-        round_idx,
+        round_idx: Some(round_idx),
     };
     validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, phase)?;
     validate_expected_goal_round(&goal, goal_id, &ownership, phase)?;
@@ -727,13 +1055,16 @@ fn validate_expected_goal_round(
     ownership: &WorkflowGoalOwnership,
     phase: WorkflowOwnershipPhase,
 ) -> RefineResult<()> {
-    if goal.round_count != ownership.round_idx.saturating_add(1) {
+    let Some(round_idx) = ownership.round_idx else {
+        return Ok(());
+    };
+    if goal.round_count != round_idx.saturating_add(1) {
         return Err(stale_workflow_ownership(
             goal_id,
             ownership,
             &format!(
                 "process round {} is not the current Goal round {}",
-                ownership.round_idx + 1,
+                round_idx + 1,
                 goal.round_count
             ),
             phase,
@@ -761,8 +1092,22 @@ fn stale_workflow_ownership(
         ownership.process_id,
         ownership.claim_id,
         ownership.execution_id,
-        ownership.round_idx + 1
+        ownership
+            .round_idx
+            .map(|round_idx| (round_idx + 1).to_string())
+            .unwrap_or_else(|| "unrecorded".to_string())
     ))
+}
+
+fn workflow_claim_state_label(state: &WorkflowClaimState) -> &'static str {
+    match state {
+        WorkflowClaimState::Claimed => "claimed",
+        WorkflowClaimState::Running => "running",
+        WorkflowClaimState::Completed => "completed",
+        WorkflowClaimState::Failed => "failed",
+        WorkflowClaimState::Cancelled => "cancelled",
+        WorkflowClaimState::Interrupted => "interrupted",
+    }
 }
 
 fn preflight_chat(
@@ -1078,7 +1423,7 @@ mod tests {
         let refine_dir = temp_root.join(".refine");
         create_in_progress_goal_with_rounds(&refine_dir, "GOAL-CURRENT", 1);
         let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
-        let process = launch_workflow_agent(
+        let process = register_workflow_agent(
             &supervisor,
             "GOAL-CURRENT",
             "claim-current",
@@ -1104,6 +1449,169 @@ mod tests {
         assert_eq!(result["termination"]["confirmed_exit"], true);
         assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
         assert_eq!(result["goal"]["status"], "cancelled");
+        let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
+        assert!(
+            crate::workflow::capacity::AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn registry_cleanup_failure_retains_confirmed_exit_before_goal_settlement() {
+        let temp_root = unique_temp_dir("process-control-registry-cleanup-failure");
+        let runtime_root = temp_root.join("run/8080");
+        let refine_dir = temp_root.join(".refine");
+        create_in_progress_goal_with_rounds(&refine_dir, "GOAL-REGISTRY-CLEANUP", 1);
+        let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let process = register_workflow_agent(
+            &supervisor,
+            "GOAL-REGISTRY-CLEANUP",
+            "claim-current",
+            "exec-current",
+            0,
+        );
+        write_workflow_state(
+            &runtime_root,
+            json!([{
+                "claim_id": "claim-current",
+                "goal_id": "GOAL-REGISTRY-CLEANUP",
+                "execution_id": "exec-current",
+                "state": "running",
+                "created_at": "2026-07-23T00:00:00Z",
+                "updated_at": "2026-07-23T00:00:00Z"
+            }]),
+        );
+
+        let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_cleanup_failure(ProcessCleanupStage::Registry)
+            .stop(&process.id, "terminate")
+            .unwrap_err();
+
+        let message = error.to_string();
+        assert!(message.contains("confirmed_exit=true"), "{message}");
+        assert!(
+            message.contains("registry_cleanup_completed=false"),
+            "{message}"
+        );
+        assert!(
+            message.contains("identity_cleanup_completed=false"),
+            "{message}"
+        );
+        assert!(message.contains("goal_cancelled=false"), "{message}");
+        assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+        assert!(supervisor.inspect(&process.id).is_ok());
+        assert!(
+            runtime_root
+                .join("agents/process-identities")
+                .join(format!("{}.json", process.id))
+                .exists()
+        );
+        assert_partial_cleanup_receipt(
+            &runtime_root,
+            &process.id,
+            false,
+            false,
+            "injected registry cleanup failure",
+        );
+        assert_eq!(
+            FileWorkItemService::new(&refine_dir)
+                .show_goal_summary("GOAL-REGISTRY-CLEANUP")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::InProgress
+        );
+        assert_eq!(
+            WorkflowEngine::new(&runtime_root)
+                .load_state()
+                .unwrap()
+                .claims[0]
+                .state,
+            WorkflowClaimState::Running
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn identity_cleanup_failure_retains_registry_result_and_confirmed_exit() {
+        let temp_root = unique_temp_dir("process-control-identity-cleanup-failure");
+        let runtime_root = temp_root.join("run/8080");
+        let refine_dir = temp_root.join(".refine");
+        create_in_progress_goal_with_rounds(&refine_dir, "GOAL-IDENTITY-CLEANUP", 1);
+        let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+        let process = register_workflow_agent(
+            &supervisor,
+            "GOAL-IDENTITY-CLEANUP",
+            "claim-current",
+            "exec-current",
+            0,
+        );
+        write_workflow_state(
+            &runtime_root,
+            json!([{
+                "claim_id": "claim-current",
+                "goal_id": "GOAL-IDENTITY-CLEANUP",
+                "execution_id": "exec-current",
+                "state": "running",
+                "created_at": "2026-07-23T00:00:00Z",
+                "updated_at": "2026-07-23T00:00:00Z"
+            }]),
+        );
+
+        let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_cleanup_failure(ProcessCleanupStage::Identity)
+            .stop(&process.id, "terminate")
+            .unwrap_err();
+
+        let message = error.to_string();
+        assert!(message.contains("confirmed_exit=true"), "{message}");
+        assert!(
+            message.contains("registry_cleanup_completed=true"),
+            "{message}"
+        );
+        assert!(
+            message.contains("identity_cleanup_completed=false"),
+            "{message}"
+        );
+        assert!(message.contains("goal_cancelled=false"), "{message}");
+        assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+        assert!(supervisor.inspect(&process.id).is_err());
+        assert!(
+            runtime_root
+                .join("agents/process-identities")
+                .join(format!("{}.json", process.id))
+                .exists()
+        );
+        assert_partial_cleanup_receipt(
+            &runtime_root,
+            &process.id,
+            true,
+            false,
+            "injected identity cleanup failure",
+        );
+        assert_eq!(
+            FileWorkItemService::new(&refine_dir)
+                .show_goal_summary("GOAL-IDENTITY-CLEANUP")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::InProgress
+        );
+        assert_eq!(
+            WorkflowEngine::new(&runtime_root)
+                .load_state()
+                .unwrap()
+                .claims[0]
+                .state,
+            WorkflowClaimState::Running
+        );
+
         fs::remove_dir_all(temp_root).unwrap();
     }
 
@@ -1301,6 +1809,14 @@ mod tests {
             .find(|claim| claim.claim_id == "claim-current")
             .unwrap();
         assert_eq!(claim.execution_id.as_deref(), Some("exec-current"));
+        assert_eq!(claim.state, WorkflowClaimState::Cancelled);
+        assert!(
+            crate::workflow::capacity::AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1438,6 +1954,49 @@ mod tests {
         )
     }
 
+    fn register_workflow_agent(
+        supervisor: &FileProcessSupervisor,
+        goal_id: &str,
+        claim_id: &str,
+        execution_id: &str,
+        round_idx: usize,
+    ) -> ManagedProcess {
+        let child = if cfg!(windows) {
+            Command::new("cmd")
+                .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+                .spawn()
+                .unwrap()
+        } else {
+            Command::new("sleep").arg("30").spawn().unwrap()
+        };
+        supervisor
+            .register(ManagedProcess {
+                id: format!("registered-{goal_id}"),
+                owner: ProcessOwner::Agent,
+                pid: Some(child.id()),
+                state: "running".to_string(),
+                label: Some("registered workflow agent".to_string()),
+                details: Some(
+                    json!({
+                        "kind": "workflow",
+                        "goal_id": goal_id,
+                        "claim_id": claim_id,
+                        "execution_id": execution_id,
+                        "round_idx": round_idx,
+                        "workflow_state": "in-progress"
+                    })
+                    .to_string(),
+                ),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: "registered-for-process-control-test".to_string(),
+                exit_code: None,
+            })
+            .unwrap()
+    }
+
     fn launch_agent_with_metadata(
         supervisor: &FileProcessSupervisor,
         goal_id: &str,
@@ -1530,6 +2089,42 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
+    }
+
+    fn assert_partial_cleanup_receipt(
+        runtime_root: &Path,
+        process_id: &str,
+        registry_cleanup_completed: bool,
+        identity_cleanup_completed: bool,
+        cause: &str,
+    ) {
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(
+                runtime_root
+                    .join("process-stop-outcomes")
+                    .join(format!("{process_id}.json")),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(receipt["state"], "partial_failure");
+        assert_eq!(receipt["confirmed_exit"], true);
+        assert_eq!(
+            receipt["registry_cleanup_completed"],
+            registry_cleanup_completed
+        );
+        assert_eq!(
+            receipt["identity_cleanup_completed"],
+            identity_cleanup_completed
+        );
+        assert_eq!(receipt["goal_cancelled"], false);
+        assert!(receipt["cause"].as_str().unwrap().contains(cause));
+        assert!(
+            receipt["recovery"]
+                .as_str()
+                .unwrap()
+                .contains("current Goal owner")
+        );
     }
 
     fn wait_for_exit(pid: u32) {

@@ -1945,6 +1945,23 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
+    pub(crate) fn fail_automated_goal_if_active(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let current = self.show_goal_summary(goal_id)?;
+        if matches!(
+            current.goal.status,
+            GoalStatus::Cancelled | GoalStatus::Done
+        ) {
+            return Ok(current);
+        }
+        validate_automated_goal_transition(&current.goal.status, &GoalStatus::Failed)?;
+        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Failed)?;
+        self.show_goal_summary(goal_id)
+    }
+
     pub fn rollback_in_progress_goal_to_todo(
         &self,
         goal_id: &str,
