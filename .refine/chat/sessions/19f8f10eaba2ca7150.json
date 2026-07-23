@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:43:42Z",
+  "updated_at": "2026-07-23T14:44:14Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1044,6 +1044,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance is actively evaluating the committed Round 3 candidate in its worktree (live provider process confirmed). There is no provider or authentication failure; the Goal correctly remains `in-progress` until that verdict is durable."
+    },
+    {
+      "created_at": "2026-07-23T14:44:14Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817854031-204",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The recovery candidate is committed and clean at `2d0d226b`; Governance is still the active gate. I’m continuing to watch that evaluation and will stop at the human review boundary if it passes."
     }
   ],
   "queued_messages": [
