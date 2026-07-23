@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T11:49:54Z",
+  "updated_at": "2026-07-23T11:54:52Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -843,6 +843,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The multi-instance gate has now failed twice on daemon-to-daemon state propagation, so it remains a real blocking verification result even though it occurs before integration. I’m also re-surfacing the unresolved cancellation/revision fence finding at this command boundary so it cannot be silently omitted from the candidate report."
+    },
+    {
+      "created_at": "2026-07-23T11:54:52Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784807692446-75",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The worker is still live and editing the newly discovered Review-decline path; there is no stall and no request for authority. I’m continuing to hold the boundary at implementation/verification—no approval or merge action from this supervisor."
     }
   ],
   "queued_messages": [
