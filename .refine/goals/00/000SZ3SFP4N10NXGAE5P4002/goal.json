@@ -14,29 +14,44 @@
   "rounds": [
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T13:34:55Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T13:44:03Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3SFP4N10NXGAE5P4002-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3SFP4N10NXGAE5P4002-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
       "governance_rule_actions": [],
       "implementation_report": "Goal Agent toolbar attachment now starts its SSE stream at the latest 16 KB transcript tail, immediately renders current output, and backfills the earlier retained 50 KB context through a bounded snapshot request without blocking live output. Added transcript byte metadata, resumable SSE offsets, bounded before/after transcript reads, and regression coverage. Verification: node --test tests/web_*.test.js passed 36/36; cargo test --lib passed 454/454; cargo clippy --lib -- -D warnings passed; cargo fmt --check passed; git diff --check passed.",
       "implementation_reported_at": "2026-07-23T13:42:10Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Loading Goal Agent into the toolbar should not require the user to watch the stream of previous text to load, it should immediately show the latest text and load the history of context in the background appending to the UI has it is loaded.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T13:42:10Z",
+      "rule_state": "passed",
+      "updated": "2026-07-23T13:44:03Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-23T13:42:11Z"
+  "updated": "2026-07-23T13:44:03Z"
 }
