@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:22:00Z",
+  "updated_at": "2026-07-23T12:26:18Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1191,6 +1191,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The reminder was accepted through the audited terminal-input path. The agent has begun a scoped change in the model, workflow engine, and Git host; I’ll inspect the resulting diff for the same four Governance failures before treating its tests as sufficient."
+    },
+    {
+      "created_at": "2026-07-23T12:26:18Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809578457-136",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The current draft now fences claim settlement by execution ID and prevents a replaced/cancelled execution from marking itself complete. I’m still withholding acceptance: the merge path itself has not yet been wired to revalidate the durable Goal revision around Git side effects."
     }
   ],
   "queued_messages": [
