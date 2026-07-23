@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "ea2103e3d7c837276d2e3ba6f8ccf31043e1fb05",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -136,8 +136,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed reviewable Round 2 candidate ea2103e3. Added one shared product process-control capability used by web/API, CLI system ps --stop, browser Agents controls, and MCP; it supports managed, interactive, chat, and synthetic agents, persists exact OS PID identity evidence, retains supervision records until confirmed exit, cancels linked Goals only after exit, and returns causal retained-evidence failures for resistance, delay, signal failure, registry replacement, and identity mismatch. Every active Agents row now has a process-specific Stop button. Focused verification: cargo test --lib process_control: 4 passed, 0 failed; web API managed/synthetic stop: 1 passed, 0 failed; CLI system process stop: 1 passed, 0 failed. Initial cargo test --lib exposed one plain-terminal classification regression (458 passed, 1 failed); narrowed agent classification and verified that test 1 passed, 0 failed; clean full rerun: 459 passed, 0 failed. node --test tests/*.test.js: 37 passed, 0 failed. cargo check --all-targets: passed. cargo fmt -- --check: passed. git diff --check and git diff --cached --check: passed. Rejected a1f6c2e6 and its Round 1 worktree remain preserved and separate.",
+      "implementation_reported_at": "2026-07-23T13:45:07Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -148,11 +148,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T13:20:57Z",
+      "updated": "2026-07-23T13:45:07Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-23T13:37:53Z"
+  "updated": "2026-07-23T13:45:08Z"
 }
