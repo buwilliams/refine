@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:11:08Z",
+  "updated_at": "2026-07-23T14:12:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -777,6 +777,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The performance Goal has now committed candidate `7b67a8ef` and entered fresh Governance. I’m waiting for that verdict; no provider or authentication failure has appeared."
+    },
+    {
+      "created_at": "2026-07-23T14:12:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784815935202-159",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance is still live and its process remains registered. I have not touched the failed process-stop Goal’s status while awaiting your confirmation boundary."
     }
   ],
   "queued_messages": [
