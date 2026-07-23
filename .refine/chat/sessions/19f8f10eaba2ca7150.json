@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T14:44:14Z",
+  "updated_at": "2026-07-23T14:44:20Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1056,6 +1056,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The recovery candidate is committed and clean at `2d0d226b`; Governance is still the active gate. I’m continuing to watch that evaluation and will stop at the human review boundary if it passes."
+    },
+    {
+      "created_at": "2026-07-23T14:44:20Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784817860553-206",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance failed the candidate; I’m preserving that failure rather than treating the test report as approval. I’m extracting the exact violations now to determine whether a narrow, auditable recovery already exists."
     }
   ],
   "queued_messages": [
