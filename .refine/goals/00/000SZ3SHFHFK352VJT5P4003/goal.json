@@ -37,29 +37,51 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T13:38:48Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T14:13:00Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3SHFHFK352VJT5P4003-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found in committed round 2.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "No governance rule violations found in committed round 2.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3SHFHFK352VJT5P4003-round-2"
+      },
+      "governance_message": "No governance rule violations found in committed round 2.",
       "governance_rule_actions": [],
       "implementation_report": "Goal creation now uses one fingerprint-validated hot projection with an exact latest-Round prompt field for duplicate detection, writes a complete Goal atomically once, serializes concurrent daemon creates under the repository lock, applies revision-checked backlog promotion from the same snapshot, and rebuilds/persists the projection exactly once. Warm 50-Goal POST /api/goals timings: before late duplicate 227.940547 ms and successful explicit-ID create 917.437242 ms; after late duplicate 6.65488 ms and successful non-duplicate create 24.324711 ms. The regression asserts 0 full rebuilds for the duplicate and exactly 1 for create. Verification: cargo fmt --all -- --check passed; cargo check --all-targets passed; focused performance, external cache invalidation, concurrent create (one 201 and one duplicate 409), stale revision conflict, idempotency, duplicate decisions, and instant backlog promotion tests passed; cargo test --lib --bins -- --test-threads=1 passed 458 tests with 0 failures; git diff --check passed.",
       "implementation_reported_at": "2026-07-23T14:09:03Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Make browser UI Goal creation complete in less than 50 ms under the current project scale by using the existing hot projection cache effectively. Remove the per-Goal duplicate-detection pattern that repeatedly fingerprints all Refine state files, reloads and deserializes the projection snapshot, and loads full Goal details and logs. Duplicate detection must operate from one coherent cached snapshot or an equivalent indexed latest-round prompt projection while preserving exact existing duplicate decisions, Node ownership, idempotency, and cross-process cache invalidation semantics. Ensure a successful create performs no redundant full projection rebuilds; refresh or update the projection exactly once while keeping the created Goal immediately visible and backlog auto-promotion correct. Add focused performance regression coverage with at least the current scale of 50 Goals that measures the complete POST /api/goals request and requires it to finish below 50 ms for both a late duplicate match and a successful non-duplicate creation on a warmed cache. Preserve correctness under external state changes and concurrent daemon mutations; do not trade freshness or auditability for speed. Report before-and-after timings and exact test results.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T14:13:04Z",
+      "quality_details": {
+        "candidate_commit": "7b67a8ef0438c756c00ca1d7fe40e2a6d9a10c53",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f8f529fab3b969e3",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T14:09:03Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T14:13:04Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T14:09:04Z"
+  "updated": "2026-07-23T14:13:05Z"
 }
