@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:40:04Z",
+  "updated_at": "2026-07-23T18:40:36Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2346,6 +2346,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll reconcile the two non-terminal Goals against durable Goal/Round records, live processes, worktrees, and the running service. I’ll keep the review candidate at the confirmation boundary and won’t retry the queued Goal unless the evidence shows an actual lost worker or supported recovery need."
+    },
+    {
+      "created_at": "2026-07-23T18:40:36Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784832036346-10",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The live state changed again during reconciliation: the queued Stop-button Goal has now been claimed by a real workflow worker (PID 375463, launched by the workflow runner), so it is no longer a lost/idle item and I will not retry it. I’m checking its current Round and the separate review candidate while the worker proceeds."
     }
   ],
   "queued_messages": [
