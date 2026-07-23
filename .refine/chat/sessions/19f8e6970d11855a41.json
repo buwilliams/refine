@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:17:38Z",
+  "updated_at": "2026-07-23T12:18:34Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1131,6 +1131,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Round 2 has replayed the rejected implementation onto current `main` as `dcae5e7a` and is tracing the four defects before editing. It has not yet claimed a passing candidate, and no provider or authentication failure is present."
+    },
+    {
+      "created_at": "2026-07-23T12:18:34Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784809114975-126",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Round 2 is still the only actionable item. I’m checking its live worker, candidate state, and provider transcript now; I’ll intervene only if it reaches a concrete failure or loses its worker."
     }
   ],
   "queued_messages": [
