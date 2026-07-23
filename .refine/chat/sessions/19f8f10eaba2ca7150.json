@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:08:30Z",
+  "updated_at": "2026-07-23T13:08:55Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -156,6 +156,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’ll correlate the three Goal records with current processes, worktrees, runtime/HTTP health, and provider evidence before deciding whether any intervention is justified. I’m using the Refine auditable-recovery guidance because stale “in-progress” state must not be retried or rewritten without confirming worker loss and the supported recovery path."
+    },
+    {
+      "created_at": "2026-07-23T13:08:55Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784812135194-32",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current evidence contradicts the stale `live={}` summary: all three Goal agents are presently alive under the workflow runner, each in its preserved worktree. I’m treating that as active work—not worker loss—and will inspect their latest output and authoritative Goal/runtime state without retrying, cancelling, merging, or touching worktrees."
     }
   ],
   "queue_dispatching": true,
