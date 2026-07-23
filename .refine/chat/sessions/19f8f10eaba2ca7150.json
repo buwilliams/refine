@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:16:47Z",
+  "updated_at": "2026-07-23T18:17:01Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2064,6 +2064,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A new transition is occurring for `00000SZ412RXR0TQRHE82JW000`: its Goal Agent output file disappeared and the Goal timestamp advanced to 18:16:21 UTC. Because the earlier Goal failed on exactly a missing-transcript condition, I’m checking whether Refine settled this one normally or reproduced that infrastructure failure; I will preserve the evidence either way."
+    },
+    {
+      "created_at": "2026-07-23T18:17:01Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784830621860-76",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The missing output was normal settlement, not a repeated transcript failure: Goal `00000SZ412RXR0TQRHE82JW000` recorded its implementation report, cleanly committed `fa0a43ff`, and preserved an earlier transient test failure alongside the successful 455/455 rerun. Its Goal Agent exited; Refine is now responsible for downstream workflow stages."
     }
   ],
   "queued_messages": [
