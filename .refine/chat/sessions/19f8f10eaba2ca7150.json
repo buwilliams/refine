@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T19:49:10Z",
+  "updated_at": "2026-07-23T19:49:23Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -3180,6 +3180,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The implementation has reached the human-review boundary. I’m doing one final read-only correlation of Goal state, supervisor health, and the candidate ref; I won’t approve, merge, retry, or alter any worktree."
+    },
+    {
+      "created_at": "2026-07-23T19:49:23Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784836163630-257",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The final correlation confirms the candidate is clean and still unmerged: Goal status is `review`, and the candidate is not an ancestor of either local or remote-tracking `main`. The supervisor-specific HTTP path has changed or is unavailable (`404`), so I’m treating the supported CLI plus live process API as authoritative rather than masking that discrepancy."
     }
   ],
   "queued_messages": [
