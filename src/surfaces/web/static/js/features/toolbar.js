@@ -26,6 +26,7 @@ const FILES_SEARCH_MAX_RESULTS = 20;
 const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
 const TERMINAL_OUTPUT_MAX_CHARS = 50_000;
+const GOAL_TERMINAL_INITIAL_TAIL_BYTES = 16_000;
 const TERMINAL_FONT_SIZE = 15;
 const TERMINAL_LINE_HEIGHT = 1.35;
 let filesSearchTimer = null;
@@ -116,6 +117,11 @@ function terminalStateFor(tabId = chatState.activeTabId) {
       statusChecked: !tab.sessionId,
       reattaching: !!tab.sessionId,
       attachmentPromise: null,
+      historyInitialized: false,
+      historyLoading: false,
+      historyLoaded: false,
+      historyStart: 0,
+      historyEnd: 0,
       error: "",
       eventSource: null,
       outputResizeObserver: null,
@@ -1260,6 +1266,11 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     terminal.statusChecked = true;
     terminal.reattaching = false;
     terminal.lastSeq = 0;
+    terminal.historyInitialized = false;
+    terminal.historyLoading = false;
+    terminal.historyLoaded = false;
+    terminal.historyStart = 0;
+    terminal.historyEnd = 0;
     terminal.lastCols = size.cols;
     terminal.lastRows = size.rows;
     terminal.loading = false;
@@ -1272,6 +1283,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     tab.worktree = result.worktree || null;
     tab.exited = false;
     saveChatStateToStorage();
+    prepareGoalTerminalHistory(tab, terminal, result.transcript_bytes);
     connectTerminalEvents(tab);
     refreshProcessesTabForChatChange();
     drawToolbar();
@@ -1349,6 +1361,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
       tab.exited = terminal.exited;
       saveChatStateToStorage();
       if (terminal.connected) {
+        prepareGoalTerminalHistory(tab, terminal, status.transcript_bytes);
         connectTerminalEvents(tab);
       } else {
         terminal.eventSource?.close();
@@ -1386,8 +1399,13 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
   const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
   const terminal = terminalStateFor(tabId);
   if (!terminal?.sessionId || terminal.exited || terminal.eventSource) return;
-  const source = new EventSource(`/api/terminal/${encodeURIComponent(terminal.sessionId)}/events`);
+  const after = Math.max(0, Number(terminal.lastSeq || 0));
+  const query = after ? `?after=${encodeURIComponent(after)}` : "";
+  const source = new EventSource(
+    `/api/terminal/${encodeURIComponent(terminal.sessionId)}/events${query}`,
+  );
   terminal.eventSource = source;
+  loadGoalTerminalHistory(tab, terminal);
   source.addEventListener("terminal_output", (event) => handleTerminalEvent(event, terminal));
   source.addEventListener("terminal_status", (event) => {
     try {
@@ -1429,6 +1447,63 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
     void reattachTerminalSession(tab, terminal);
     if (chatState.activeTabId === tabId) drawToolbar();
   };
+}
+
+function prepareGoalTerminalHistory(tab, terminal, transcriptBytes) {
+  if (tab?.mode !== "goal" || !terminal || terminal.historyInitialized) return;
+  const transcriptSize = Math.max(0, Number(transcriptBytes || 0));
+  const retainedStart = Math.max(0, transcriptSize - TERMINAL_OUTPUT_MAX_CHARS);
+  const tailStart = Math.max(
+    retainedStart,
+    transcriptSize - GOAL_TERMINAL_INITIAL_TAIL_BYTES,
+  );
+  terminal.historyInitialized = true;
+  terminal.historyStart = retainedStart;
+  terminal.historyEnd = tailStart;
+  terminal.historyLoaded = retainedStart >= tailStart;
+  terminal.lastSeq = Math.max(terminal.lastSeq, tailStart);
+}
+
+async function loadGoalTerminalHistory(tab, terminal) {
+  if (
+    tab?.mode !== "goal"
+    || !terminal?.sessionId
+    || !terminal.historyInitialized
+    || terminal.historyLoaded
+    || terminal.historyLoading
+  ) {
+    return;
+  }
+  const sessionId = terminal.sessionId;
+  const historyStart = terminal.historyStart;
+  const historyEnd = terminal.historyEnd;
+  terminal.historyLoading = true;
+  try {
+    const params = new URLSearchParams({
+      snapshot: "1",
+      after: String(historyStart),
+      before: String(historyEnd),
+    });
+    const snapshot = await api(
+      "GET",
+      `/api/terminal/${encodeURIComponent(sessionId)}/events?${params}`,
+      undefined,
+      { cache: false },
+    );
+    if (terminal.sessionId !== sessionId) return;
+    const history = Array.isArray(snapshot?.events)
+      ? snapshot.events.map((event) => String(event?.data || "")).join("")
+      : "";
+    if (history) terminalPrependOutput(history, terminal);
+    terminal.historyLoaded = true;
+  } catch (error) {
+    if (terminal.sessionId === sessionId) {
+      terminal.error = `Unable to load earlier terminal context: ${error?.message || String(error)}`;
+      if (chatState.activeTabId === terminal.tabId) drawToolbar();
+    }
+  } finally {
+    terminal.historyLoading = false;
+  }
 }
 
 function handleTerminalEvent(event, terminal = terminalStateFor()) {
@@ -1528,6 +1603,18 @@ function terminalReceiveOutput(text, terminal = terminalStateFor()) {
   // xterm keeps following output while its viewport is at the bottom and
   // preserves the viewport once the user scrolls into history. Do not force
   // the viewport back down here or incoming agent output becomes unreadable.
+}
+
+function terminalPrependOutput(text, terminal = terminalStateFor()) {
+  if (!terminal || !text) return;
+  terminal.display = `${text}${terminal.display || ""}`;
+  if (terminal.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
+    terminal.display = terminal.display.slice(-TERMINAL_OUTPUT_MAX_CHARS);
+  }
+  if (typeof terminal.term?.reset !== "function") return;
+  const replay = terminal.display;
+  terminal.term.reset();
+  terminal.term.write(replay, () => terminal.term?.scrollToBottom?.());
 }
 
 function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
