@@ -1,7 +1,7 @@
 {
   "base_commit": "a413fac21148d9b45264a0802ac5796d6635893b",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-6",
-  "candidate_commit": null,
+  "candidate_commit": "ebc7d2699abcb6ffe26aaccac826197d2ccdb163",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -495,8 +495,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed reviewable Round 6 as ebc7d269 after replaying the preserved Round 5 stack onto current main. Cancellation journals now durably store exact workflow, capacity, and Goal before/after states; a recreated shared service replays them before any already-cancelled short circuit, finishes only the linked claim/lease/Goal changes, preserves unrelated concurrent claims and capacity, and completes retained process receipts. Cancellation persistence no longer uses target-less default policy: successful and recovered settlement preserve non-default limits, Node, provider, and target identity byte-for-byte. Added deterministic restart tests for interruption after claim persistence, capacity release, and Goal persistence plus successful non-default-policy coverage; updated process intent. Verification: process_control 16/16; real pre-registration worker 1/1; real worker settlement 1/1; workflow replenishment 2/2; subprocess 11/11; agent sessions 3/3; web API 1/1; CLI 1/1; MCP 1/1; workflow metadata 1/1; focused browser processes 4/4; final full library 474/474; final web suite 37/37; cargo check --all-targets, cargo fmt --all -- --check, git diff --check, git diff --cached --check, and git show --check passed. Initial full-library verification exposed an unrelated interactive-terminal cleanup race (473 passed, 1 failed); its isolated rerun passed and an unchanged-source rerun passed 474/474. A later full run exposed a new policy-test-only /proc disappearance race (473 passed, 1 failed); the unnecessary subprocess was removed from that success-only test while real restart tests retained process-exit coverage, focused reruns passed, and the final full run passed 474/474. Worktree is clean; original 18bac908 and all prior worktrees remain preserved.",
+      "implementation_reported_at": "2026-07-23T15:50:34Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -507,11 +507,11 @@
       "quality_state": "unclassified",
       "reporter": "Supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T15:34:13Z",
+      "updated": "2026-07-23T15:50:34Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T15:34:23Z"
+  "updated": "2026-07-23T15:50:34Z"
 }
