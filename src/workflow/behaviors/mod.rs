@@ -276,7 +276,7 @@ impl WorkflowBehavior for WorkflowQa {
                 ),
             );
         }
-        let next = if ctx.quality_timing()? == POST_BUILD {
+        let next = if ctx.quality_timing(GoalStatus::Qa)? == POST_BUILD {
             GoalStatus::Review
         } else {
             GoalStatus::Build
@@ -302,7 +302,7 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             &format!("Prepared implementation candidate {branch} for validation"),
             Some(json_object(json!({"branch": branch}))),
         )?;
-        let next = if ctx.quality_timing()? == POST_BUILD {
+        let next = if ctx.quality_timing(GoalStatus::ReadyMerge)? == POST_BUILD {
             GoalStatus::Build
         } else {
             GoalStatus::Qa
@@ -345,7 +345,7 @@ impl WorkflowBehavior for WorkflowBuild {
             "Target app build passed",
             Some(json_object(json!({"target_app": &build}))),
         )?;
-        let next = if ctx.quality_timing()? == POST_BUILD {
+        let next = if ctx.quality_timing(GoalStatus::Build)? == POST_BUILD {
             GoalStatus::Qa
         } else {
             GoalStatus::Review

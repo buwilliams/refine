@@ -224,10 +224,21 @@ impl WorkflowEngine {
     /// directory. Manual agent capabilities use this entry point so they share the scheduler's
     /// exact limits without rediscovering or relocating state.
     pub fn policy_for_refine_dir(&self, refine_dir: &Path) -> RefineResult<WorkflowPolicy> {
+        let active_node_id =
+            FileNodeRegistryService::with_active_root(refine_dir, &self.runtime_root)
+                .active_node_id()?;
+        self.policy_for_refine_dir_and_node(refine_dir, &active_node_id)
+    }
+
+    /// Loads Node-scoped workflow policy using a previously resolved ownership identity.
+    pub fn policy_for_refine_dir_and_node(
+        &self,
+        refine_dir: &Path,
+        node_id: &str,
+    ) -> RefineResult<WorkflowPolicy> {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
-            let settings =
-                FileSettingsService::with_active_root(refine_dir, &self.runtime_root).load()?;
+            let settings = FileSettingsService::for_node(refine_dir, node_id).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
@@ -249,9 +260,7 @@ impl WorkflowEngine {
             );
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
             policy.target_app_id = target_root.display().to_string();
-            policy.active_node_id =
-                FileNodeRegistryService::with_active_root(refine_dir, &self.runtime_root)
-                    .active_node_id()?;
+            policy.active_node_id = node_id.to_string();
         }
         Ok(policy)
     }

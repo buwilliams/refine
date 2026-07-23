@@ -323,6 +323,7 @@ impl Default for StoredQualitySettings {
 pub struct QualityCheckRequest {
     pub owner_id: String,
     pub round_idx: usize,
+    pub node_id: String,
     pub provider: String,
     pub cwd: String,
     pub candidate_commit: String,
@@ -433,7 +434,7 @@ impl QualityOperationRunner {
         }
 
         let engine = WorkflowEngine::with_target_root(&self.runtime_root, &self.target_root);
-        let policy = engine.policy_for_refine_dir(&self.refine_dir)?;
+        let policy = engine.policy_for_refine_dir_and_node(&self.refine_dir, &active_node)?;
         let capacity = AgentCapacityService::new(&self.runtime_root);
         let lease_owner = format!(
             "quality-manual:{}:{}",
@@ -456,14 +457,18 @@ impl QualityOperationRunner {
             ));
         }
 
-        let (operation, request) =
-            match self.register_goal_checks(goal_id, provider, process_metadata) {
-                Ok(registered) => registered,
-                Err(error) => {
-                    let _ = capacity.release(&lease_owner);
-                    return Err(error);
-                }
-            };
+        let (operation, request) = match self.register_goal_checks_for_node(
+            goal_id,
+            provider,
+            process_metadata,
+            Some(&active_node),
+        ) {
+            Ok(registered) => registered,
+            Err(error) => {
+                let _ = capacity.release(&lease_owner);
+                return Err(error);
+            }
+        };
         let runner = self.clone();
         let operation_id = operation.id.clone();
         thread::spawn(move || {
@@ -479,6 +484,16 @@ impl QualityOperationRunner {
         provider: &str,
         process_metadata: Map<String, Value>,
     ) -> RefineResult<(OperationHandle, QualityCheckRequest)> {
+        self.register_goal_checks_for_node(goal_id, provider, process_metadata, None)
+    }
+
+    fn register_goal_checks_for_node(
+        &self,
+        goal_id: &str,
+        provider: &str,
+        process_metadata: Map<String, Value>,
+        expected_node_id: Option<&str>,
+    ) -> RefineResult<(OperationHandle, QualityCheckRequest)> {
         let goal_id = goal_id.trim();
         if goal_id.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -487,6 +502,14 @@ impl QualityOperationRunner {
         }
         let work_items = FileWorkItemService::new(&self.refine_dir);
         let summary = work_items.show_goal_summary(goal_id)?;
+        let node_id = summary.goal.node_id.as_deref().unwrap_or("default");
+        if let Some(expected_node_id) = expected_node_id
+            && node_id != expected_node_id
+        {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} is owned by node {node_id}, not active node {expected_node_id}"
+            )));
+        }
         let detail = work_items.show_goal_detail(goal_id)?;
         let candidate_commit = detail
             .get("candidate_commit")
@@ -517,6 +540,7 @@ impl QualityOperationRunner {
         let request = QualityCheckRequest {
             owner_id: goal_id.to_string(),
             round_idx,
+            node_id: node_id.to_string(),
             provider: provider.to_string(),
             cwd: cwd.display().to_string(),
             candidate_commit,
@@ -529,6 +553,7 @@ impl QualityOperationRunner {
             json!({
                 "goal_id": goal_id,
                 "round_idx": round_idx,
+                "node_id": node_id,
                 "provider": provider,
                 "cwd": request.cwd,
                 "candidate_commit": request.candidate_commit,
@@ -700,16 +725,17 @@ impl QualityOperationRunner {
             "results": result.results,
             "diagnostics": result.diagnostics
         });
-        FileWorkItemService::new(&self.refine_dir).update_goal_round_evaluation_summary(
-            &request.owner_id,
-            request.round_idx,
-            &json!({
-                "quality_state": if result.ok { "passed" } else { "failed" },
-                "quality_message": result.summary,
-                "quality_details": details,
-                "quality_checked_at": now_timestamp()
-            }),
-        )?;
+        FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
+            .update_goal_round_evaluation_summary(
+                &request.owner_id,
+                request.round_idx,
+                &json!({
+                    "quality_state": if result.ok { "passed" } else { "failed" },
+                    "quality_message": result.summary,
+                    "quality_details": details,
+                    "quality_checked_at": now_timestamp()
+                }),
+            )?;
         self.append_goal_log(
             request,
             if result.ok { "info" } else { "error" },
@@ -730,16 +756,17 @@ impl QualityOperationRunner {
             "candidate_commit": request.candidate_commit,
             "error": message
         });
-        FileWorkItemService::new(&self.refine_dir).update_goal_round_evaluation_summary(
-            &request.owner_id,
-            request.round_idx,
-            &json!({
-                "quality_state": "failed",
-                "quality_message": message,
-                "quality_details": details,
-                "quality_checked_at": now_timestamp()
-            }),
-        )?;
+        FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
+            .update_goal_round_evaluation_summary(
+                &request.owner_id,
+                request.round_idx,
+                &json!({
+                    "quality_state": "failed",
+                    "quality_message": message,
+                    "quality_details": details,
+                    "quality_checked_at": now_timestamp()
+                }),
+            )?;
         self.append_goal_log(request, "error", &message, details)
     }
 
@@ -753,7 +780,7 @@ impl QualityOperationRunner {
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit
         });
-        let work_items = FileWorkItemService::new(&self.refine_dir);
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, &request.node_id);
         let detail = work_items.show_goal_detail(&request.owner_id)?;
         let summary_persisted = detail
             .get("rounds")
@@ -803,11 +830,16 @@ impl QualityOperationRunner {
         request: &QualityCheckRequest,
         operation_id: &str,
     ) -> RefineResult<OperationHandle> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        // Goal evidence must not report terminal cancellation while owned work remains alive.
+        // The operation launch barrier prevents new owned processes after Cancelling, so once
+        // this check passes it is safe to persist evidence before the final idempotent settle.
+        registry.ensure_cancellation_processes_exited(operation_id)?;
         if let Err(error) = self.record_cancelled(request, operation_id) {
             self.record_persistence_failure(operation_id, request, &error);
             return Err(error);
         }
-        FileOperationRegistry::new(&self.runtime_root).settle_cancellation(operation_id)
+        registry.settle_cancellation(operation_id)
     }
 
     /// Replays incomplete Quality cancellation settlement after generic process recovery has
@@ -880,6 +912,17 @@ impl QualityOperationRunner {
                         operation.id
                     ))
                 })?,
+            node_id: match operation.request.get("node_id").and_then(Value::as_str) {
+                Some(node_id) if !node_id.trim().is_empty() => node_id.to_string(),
+                _ => {
+                    let goal_id = required_operation_request_string(operation, "goal_id")?;
+                    FileWorkItemService::new(&self.refine_dir)
+                        .show_goal_summary(&goal_id)?
+                        .goal
+                        .node_id
+                        .unwrap_or_else(|| "default".to_string())
+                }
+            },
             provider: required_operation_request_string(operation, "provider")?,
             cwd: required_operation_request_string(operation, "cwd")?,
             candidate_commit: required_operation_request_string(operation, "candidate_commit")?,

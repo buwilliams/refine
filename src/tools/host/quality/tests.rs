@@ -84,6 +84,7 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
         .run_checks(QualityCheckRequest {
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
+            node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
             candidate_commit: candidate_commit.clone(),
@@ -301,6 +302,7 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
         .run_checks(QualityCheckRequest {
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
+            node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
             candidate_commit,
@@ -346,6 +348,7 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
         .run_checks(QualityCheckRequest {
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
+            node_id: "default".to_string(),
             provider: "smoke-ai".to_string(),
             cwd: candidate_root.display().to_string(),
             candidate_commit,
@@ -511,6 +514,43 @@ fn manual_quality_uses_shared_workflow_agent_capacity() {
     );
     capacity.release("workflow:existing").unwrap();
     fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn quality_uses_one_non_default_node_for_result_and_error_persistence() {
+    for (case, provider_body, expected_state) in [
+        (
+            "result",
+            "printf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf ok\"}]}'",
+            "passed",
+        ),
+        ("error", "printf '%s\\n' 'not-json'", "failed"),
+    ] {
+        let fixture =
+            goal_quality_fixture(&format!("quality-non-default-node-{case}"), provider_body);
+        set_fixture_goal_node(&fixture, "node-b");
+        let _guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
+
+        let runner = fixture.runner();
+        let (operation, request) = runner
+            .register_goal_checks("GOAL1", "smoke-ai", Default::default())
+            .unwrap();
+        assert_eq!(request.node_id, "node-b");
+        assert_eq!(operation.request["node_id"], "node-b");
+        // Runtime selection remains default; persistence must use the identity captured above.
+        let _ = runner.run_registered(&operation.id, request);
+        let detail = FileWorkItemService::new(&fixture.refine_dir)
+            .show_goal_detail("GOAL1")
+            .unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], expected_state);
+
+        restore_smoke_ai(previous);
+        fs::remove_dir_all(fixture.temp_root).unwrap();
+    }
 }
 
 #[test]
@@ -979,6 +1019,16 @@ fn goal_quality_fixture(prefix: &str, provider_body: &str) -> GoalQualityFixture
         runtime_root,
         smoke_ai,
     }
+}
+
+fn set_fixture_goal_node(fixture: &GoalQualityFixture, node_id: &str) {
+    let summary = FileWorkItemService::new(&fixture.refine_dir)
+        .show_goal_summary("GOAL1")
+        .unwrap();
+    let path = fixture.refine_dir.join(summary.goal.json_path);
+    let mut value: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["node_id"] = json!(node_id);
+    fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
 }
 
 fn wait_for_operation_process(

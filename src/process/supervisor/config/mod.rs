@@ -29,6 +29,7 @@ pub trait ConfigService {
 pub struct FileSettingsService {
     pub refine_dir: PathBuf,
     pub active_root: Option<PathBuf>,
+    pub active_node_id_override: Option<String>,
 }
 
 impl FileSettingsService {
@@ -36,6 +37,7 @@ impl FileSettingsService {
         Self {
             refine_dir: refine_dir.into(),
             active_root: None,
+            active_node_id_override: None,
         }
     }
 
@@ -46,6 +48,15 @@ impl FileSettingsService {
         Self {
             refine_dir: refine_dir.into(),
             active_root: Some(active_root.into()),
+            active_node_id_override: None,
+        }
+    }
+
+    pub fn for_node(refine_dir: impl Into<PathBuf>, node_id: impl Into<String>) -> Self {
+        Self {
+            refine_dir: refine_dir.into(),
+            active_root: None,
+            active_node_id_override: Some(node_id.into()),
         }
     }
 
@@ -106,7 +117,7 @@ impl FileSettingsService {
 
     fn write(&self, settings: &JsonObject) -> RefineResult<()> {
         let service = self.node_registry_service();
-        let active_node_id = service.active_node_id()?;
+        let active_node_id = self.active_node_id()?;
         let mut registry = service.load_registry()?;
         let now = now_timestamp();
         if !registry.nodes.iter().any(|node| node.id == active_node_id) {
@@ -136,6 +147,13 @@ impl FileSettingsService {
             }
             None => FileNodeRegistryService::new(&self.refine_dir),
         }
+    }
+
+    fn active_node_id(&self) -> RefineResult<String> {
+        if let Some(node_id) = &self.active_node_id_override {
+            return Ok(node_id.clone());
+        }
+        self.node_registry_service().active_node_id()
     }
 
     fn legacy_path(&self) -> PathBuf {
@@ -212,7 +230,7 @@ impl FileSettingsService {
 impl ConfigService for FileSettingsService {
     fn load(&self) -> RefineResult<JsonObject> {
         let service = self.node_registry_service();
-        let active_node_id = service.active_node_id()?;
+        let active_node_id = self.active_node_id()?;
         let registry = service.load_registry()?;
         let stored = registry
             .nodes
@@ -1242,6 +1260,43 @@ mod tests {
         assert!(service.path().exists());
         assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_settings_service_can_hold_one_resolved_non_default_node_identity() {
+        let temp_root = unique_temp_dir("settings-fixed-node");
+        let refine_dir = temp_root.join(".refine");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::write(
+            refine_dir.join("nodes.json"),
+            serde_json::to_vec_pretty(&json!({
+                "nodes": [
+                    {
+                        "id": "default",
+                        "display_name": "Default",
+                        "created_at": "2026-07-22T00:00:00Z",
+                        "updated_at": "2026-07-22T00:00:00Z",
+                        "settings": {"agent_cli": "claude", "parallel_run_cap": "2"}
+                    },
+                    {
+                        "id": "node-b",
+                        "display_name": "Node B",
+                        "created_at": "2026-07-22T00:00:00Z",
+                        "updated_at": "2026-07-22T00:00:00Z",
+                        "settings": {"agent_cli": "smoke-ai", "parallel_run_cap": "1"}
+                    }
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let settings = FileSettingsService::for_node(&refine_dir, "node-b")
+            .load()
+            .unwrap();
+        assert_eq!(settings["agent_cli"], "smoke-ai");
+        assert_eq!(settings["parallel_run_cap"], "1");
         fs::remove_dir_all(temp_root).unwrap();
     }
 

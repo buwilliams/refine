@@ -1732,6 +1732,12 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
     work_items_a
         .append_goal_round_summary("GOAL1", "Buddy", "Cancel safely")
         .unwrap();
+    let goal_summary = work_items_a.show_goal_summary("GOAL1").unwrap();
+    let goal_path = refine_a.join(goal_summary.goal.json_path);
+    let mut goal_value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&goal_path).unwrap()).unwrap();
+    goal_value["node_id"] = json!("node-a");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&goal_value).unwrap()).unwrap();
 
     let registry = FileOperationRegistry::new(&runtime_root);
     let operation = registry
@@ -1740,6 +1746,7 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
             json!({
                 "goal_id": "GOAL1",
                 "round_idx": 0,
+                "node_id": "node-a",
                 "provider": "smoke-ai",
                 "cwd": app_a.display().to_string(),
                 "candidate_commit": "candidate-a",
@@ -1774,7 +1781,10 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
     );
     assert!(managed_pid_is_alive(pid).unwrap());
     let detail_a = work_items_a.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(detail_a["rounds"][0]["quality_state"], "cancelled");
+    assert_eq!(
+        detail_a["rounds"][0]["quality_state"], "unclassified",
+        "terminal cancellation evidence must wait until every owned process exits"
+    );
     assert!(
         FileWorkItemService::new(&refine_b)
             .show_goal_detail("GOAL1")
@@ -1796,6 +1806,8 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
         registry.status(&operation.id).unwrap().state,
         OperationState::Cancelled
     );
+    let detail_a = work_items_a.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail_a["rounds"][0]["quality_state"], "cancelled");
     daemon.recover_runtime_state().unwrap();
     let cancelled_logs = FileLogService::new(&refine_a)
         .all_round_logs("GOAL1")

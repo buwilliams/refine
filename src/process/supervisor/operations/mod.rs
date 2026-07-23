@@ -768,17 +768,7 @@ impl FileOperationRegistry {
                 handle.state.as_api_status()
             )));
         }
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        let mut live = Vec::new();
-        for process in supervisor
-            .list()?
-            .into_iter()
-            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
-        {
-            if FileProcessSupervisor::process_is_alive(&process)? {
-                live.push(json!({"id": process.id, "pid": process.pid}));
-            }
-        }
+        let live = self.live_owned_processes(operation_id)?;
         if !live.is_empty() {
             let error = RefineError::Degraded(format!(
                 "Quality cancellation cannot settle while {} owned managed process(es) remain alive",
@@ -824,6 +814,53 @@ impl FileOperationRegistry {
             operation_log_entry(&handle, "warning", "Operation cancelled", None),
         )?;
         Ok(handle)
+    }
+
+    /// Verifies the process half of a deferred cancellation before capability evidence is made
+    /// terminal. Cancellation and supervised launch share the operation mutation barrier, so no
+    /// later operation-owned launch can appear after this returns successfully.
+    pub fn ensure_cancellation_processes_exited(
+        &self,
+        operation_id: &str,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let handle = self.status(operation_id)?;
+        if matches!(handle.state, OperationState::Cancelled) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        if !matches!(handle.state, OperationState::Cancelling) {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} is {}; only cancelling operations can verify process exit",
+                handle.state.as_api_status()
+            )));
+        }
+        let live = self.live_owned_processes(operation_id)?;
+        FileExt::unlock(&lock).ok();
+        if live.is_empty() {
+            Ok(handle)
+        } else {
+            Err(RefineError::Degraded(format!(
+                "Quality cancellation cannot persist terminal evidence while {} owned managed process(es) remain alive",
+                live.len()
+            )))
+        }
+    }
+
+    fn live_owned_processes(&self, operation_id: &str) -> RefineResult<Vec<Value>> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        let mut live = Vec::new();
+        for process in supervisor
+            .list()?
+            .into_iter()
+            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+        {
+            if FileProcessSupervisor::process_is_alive(&process)? {
+                live.push(json!({"id": process.id, "pid": process.pid}));
+            }
+        }
+        Ok(live)
     }
 
     /// Records a startup/capability recovery failure without making a deferred cancellation

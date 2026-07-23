@@ -86,6 +86,7 @@ pub struct FileWorkItemService {
     pub refine_dir: PathBuf,
     pub projection_cache_dir: Option<PathBuf>,
     pub active_node_root: Option<PathBuf>,
+    pub active_node_id_override: Option<String>,
 }
 
 impl FileWorkItemService {
@@ -94,6 +95,19 @@ impl FileWorkItemService {
             refine_dir: refine_dir.into(),
             projection_cache_dir: None,
             active_node_root: None,
+            active_node_id_override: None,
+        }
+    }
+
+    /// Uses one already-resolved Node identity for all ownership checks performed by this
+    /// service. Long-running capability work uses this instead of re-reading mutable runtime
+    /// selection state between validation and durable persistence.
+    pub fn for_node(refine_dir: impl Into<PathBuf>, node_id: impl Into<String>) -> Self {
+        Self {
+            refine_dir: refine_dir.into(),
+            projection_cache_dir: None,
+            active_node_root: None,
+            active_node_id_override: Some(node_id.into()),
         }
     }
 
@@ -107,6 +121,7 @@ impl FileWorkItemService {
             refine_dir: refine_dir.into(),
             projection_cache_dir: Some(cache_dir),
             active_node_root,
+            active_node_id_override: None,
         }
     }
 
@@ -128,6 +143,9 @@ impl FileWorkItemService {
     }
 
     fn active_node_id(&self) -> RefineResult<String> {
+        if let Some(node_id) = &self.active_node_id_override {
+            return Ok(node_id.clone());
+        }
         self.node_registry_service().active_node_id()
     }
 
@@ -2915,6 +2933,7 @@ fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     round.insert("logs".to_string(), Value::Array(Vec::new()));
     round.insert("implementation_report".to_string(), Value::Null);
     round.insert("implementation_reported_at".to_string(), Value::Null);
+    round.insert("workflow_quality_timing".to_string(), Value::Null);
     round.insert(
         "rule_state".to_string(),
         Value::String("unclassified".to_string()),

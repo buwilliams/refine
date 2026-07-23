@@ -332,8 +332,11 @@ Properties:
 - `GoalNote`: `id`, `author`, `body`, `created`, and `updated`.
 - `GoalRound`: `reporter`, optional `assignee`, `prompt`, `created`, `updated`,
   optional `guidance_decision`, `implementation_report`,
-  `implementation_reported_at`, `governance`, and `quality`, plus derived
-  `logs` when a response hydrates sidecar round logs.
+  `implementation_reported_at`, `workflow_quality_timing`, `governance`, and
+  `quality`, plus derived `logs` when a response hydrates sidecar round logs.
+- `WorkflowQualityTiming`: `pre_merge` or `post_build`; once candidate validation
+  starts, the selected value is serialized on the round and reused by Build,
+  Quality, and retries.
 - `RoundGovernance`: `rule_state`, `meta_rule_state`, `product_state`,
   `constitution_state`, `governance_message`, `governance_details`,
   `governance_checked_at`, and `governance_rule_actions`.
