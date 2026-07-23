@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:20:13Z",
+  "updated_at": "2026-07-23T15:21:53Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1284,6 +1284,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The boundary tests are now written and the focused Rust suite is running. The change remains isolated to the Round 5 worktree; the agent has not requested authority or attempted any merge."
+    },
+    {
+      "created_at": "2026-07-23T15:21:53Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784820113186-244",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first focused run found a test failure in the new settlement path. The agent is revising both the rollback receipt and assertions; that failure is preserved and no broader verification has started yet."
     }
   ],
   "queued_messages": [
