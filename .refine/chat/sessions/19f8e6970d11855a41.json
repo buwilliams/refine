@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:55:15Z",
+  "updated_at": "2026-07-23T12:57:30Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -1335,6 +1335,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The candidate is now committed as `6d04fbab`, with its worktree preserved and clean. Although all declared test gates passed, I am not accepting it yet: the implementation currently exempts unequal `supervisor-agent.json` revisions from conflict detection, which can overwrite failure/open-issue evidence, and the cancellation test still does not close the pre-process-launch race. I’m waiting for the independent Governance decision; no merge or approval has been attempted."
+    },
+    {
+      "created_at": "2026-07-23T12:57:30Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784811450318-160",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "I’m continuing at the live Governance boundary for Goal `00000SZ3N803TK00E78AK4M000`. The Round 2 candidate is still unapproved; I’m checking the independent verdict and current process/Goal state before taking any recovery action."
     }
   ],
   "queued_messages": [
