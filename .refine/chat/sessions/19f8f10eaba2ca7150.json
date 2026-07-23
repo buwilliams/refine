@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T18:37:54Z",
+  "updated_at": "2026-07-23T18:38:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -2271,6 +2271,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "I’m checking the current durable Goal records, runtime processes, and recent review evidence for the two non-terminal Goals. I’ll keep both at the review boundary unless the evidence supports a user-facing decision."
+    },
+    {
+      "created_at": "2026-07-23T18:38:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784831895708-118",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The runtime is healthy and idle: both workflow workers are live, but there are no Goal Agent processes. The two remaining Goals have clean candidate worktrees and are waiting in review, so the next question is whether either review has unresolved evidence or is ready for an explicit human approval decision."
     }
   ],
   "queue_dispatching": true,
