@@ -20,6 +20,7 @@ use crate::tools::host::source_promotion::{
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
+use crate::tools::product::process_control::FileProcessControlService;
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 
 use super::support::*;
@@ -357,15 +358,15 @@ impl InProcessWebServer {
             .and_then(|body| body.get("signal"))
             .and_then(|signal| signal.as_str())
             .unwrap_or("terminate");
-        match terminal_stop_process_response(runtime_root, process_id) {
-            Ok(Some(value)) => return ApiResponse::json(200, value),
-            Ok(None) => {}
-            Err(error) => return error_response(error),
-        }
-        match FileProcessStatusService::new(runtime_root).stop(process_id, signal) {
-            Ok(process) => {
-                ApiResponse::json(200, json!({"stopped": true, "process": process.api_json()}))
+        let service = match self.current_refine_dir() {
+            Ok(Some(refine_dir)) => {
+                FileProcessControlService::with_refine_dir(runtime_root, refine_dir)
             }
+            Ok(None) => FileProcessControlService::new(runtime_root),
+            Err(error) => return error_response(error),
+        };
+        match service.stop(process_id, signal) {
+            Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }

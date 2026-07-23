@@ -22,6 +22,8 @@ Current implementation details that matter to intent:
 - `/api/processes` exposes managed process state;
 - process rows can include owner, pid, state, label, details, output availability, resource labels, and actions;
 - chat, workflow, runner, target-app, and UI contexts should be surfaced where available;
+- every active agent row exposes a process-specific Stop action through the shared
+  process capability; linked Goals cancel only after confirmed process exit;
 - process pause/resume controls affect background work and agents;
 - settings/processes views should avoid overfetching unrelated settings data.
 

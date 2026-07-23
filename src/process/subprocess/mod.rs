@@ -14,6 +14,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationLaunchGuard};
 use crate::process::supervisor::security::FileSecurityService;
 
+const PROCESS_IDENTITIES_DIR: &str = "process-identities";
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessOwner {
@@ -101,6 +103,26 @@ pub struct ManagedProcessOutput {
 pub enum ManagedProcessOutputStream {
     Stdout,
     Stderr,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct ManagedProcessIdentity {
+    process_id: String,
+    owner: ProcessOwner,
+    pid: Option<u32>,
+    os_identity: Option<String>,
+    registered_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ConfirmedProcessExit {
+    pub process_id: String,
+    pub pid: Option<u32>,
+    pub signal: String,
+    pub os_identity: Option<String>,
+    pub confirmed_exit: bool,
+    pub registry_retained_until_exit: bool,
+    pub waited_ms: u128,
 }
 
 impl ManagedProcessOutput {
@@ -271,6 +293,85 @@ impl FileProcessSupervisor {
         Ok(())
     }
 
+    /// Signals the exact process registration supplied by the caller and waits until that owned
+    /// OS process exits. PID reuse, registry replacement, and delayed termination are causal
+    /// failures: the process record and its identity evidence remain available for recovery.
+    pub fn terminate_owned_and_confirm_exit(
+        &self,
+        expected: &ManagedProcess,
+        signal: &str,
+        timeout: Duration,
+    ) -> RefineResult<ConfirmedProcessExit> {
+        if !matches!(signal, "stop" | "terminate" | "kill") {
+            return Err(RefineError::InvalidInput(format!(
+                "unsupported termination signal {signal}"
+            )));
+        }
+        let started = Instant::now();
+        let identity = self.ensure_process_identity(expected)?;
+        self.ensure_expected_registration(expected, &identity)?;
+        match self.owned_process_state(expected, &identity)? {
+            OwnedProcessState::Exited => {
+                let _ = self.recover();
+                return Ok(confirmed_process_exit(expected, signal, &identity, started));
+            }
+            OwnedProcessState::IdentityMismatch(actual) => {
+                return Err(process_identity_mismatch(
+                    expected,
+                    &identity,
+                    actual.as_deref(),
+                ));
+            }
+            OwnedProcessState::Alive => {}
+        }
+
+        if let Some(pid) = expected.pid
+            && let Some(message) = signal_os_process(pid, signal)?
+        {
+            match self.owned_process_state(expected, &identity)? {
+                OwnedProcessState::Exited => {}
+                OwnedProcessState::IdentityMismatch(actual) => {
+                    return Err(process_identity_mismatch(
+                        expected,
+                        &identity,
+                        actual.as_deref(),
+                    ));
+                }
+                OwnedProcessState::Alive => {
+                    return Err(RefineError::Degraded(format!(
+                        "failed to signal managed process {}: {message}; its process record and identity evidence were retained for recovery",
+                        expected.id
+                    )));
+                }
+            }
+        }
+
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.owned_process_state(expected, &identity)? {
+                OwnedProcessState::Exited => {
+                    let _ = self.recover();
+                    return Ok(confirmed_process_exit(expected, signal, &identity, started));
+                }
+                OwnedProcessState::IdentityMismatch(actual) => {
+                    return Err(process_identity_mismatch(
+                        expected,
+                        &identity,
+                        actual.as_deref(),
+                    ));
+                }
+                OwnedProcessState::Alive if Instant::now() >= deadline => {
+                    return Err(RefineError::Degraded(format!(
+                        "managed process {} did not exit within {} ms after {signal}; its process record and identity evidence were retained for recovery",
+                        expected.id,
+                        timeout.as_millis()
+                    )));
+                }
+                OwnedProcessState::Alive => std::thread::sleep(Duration::from_millis(10)),
+            }
+        }
+    }
+
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
@@ -293,6 +394,15 @@ impl FileProcessSupervisor {
 
     pub fn processes_dir(&self) -> PathBuf {
         self.runtime_root.join("processes")
+    }
+
+    fn process_identities_dir(&self) -> PathBuf {
+        self.runtime_root.join(PROCESS_IDENTITIES_DIR)
+    }
+
+    fn process_identity_path(&self, process_id: &str) -> PathBuf {
+        self.process_identities_dir()
+            .join(format!("{process_id}.json"))
     }
 
     pub fn pause_state_path(&self) -> PathBuf {
@@ -427,6 +537,118 @@ impl FileProcessSupervisor {
         write_json_atomically(&path, &encoded, "process")
     }
 
+    fn write_process_identity(&self, identity: &ManagedProcessIdentity) -> RefineResult<()> {
+        fs::create_dir_all(self.process_identities_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process identity registry {}: {error}",
+                self.process_identities_dir().display()
+            ))
+        })?;
+        let encoded = serde_json::to_vec_pretty(identity).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode process identity: {error}"))
+        })?;
+        write_json_atomically(
+            &self.process_identity_path(&identity.process_id),
+            &encoded,
+            "process identity",
+        )
+    }
+
+    fn ensure_process_identity(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcessIdentity> {
+        let path = self.process_identity_path(&process.id);
+        match fs::read(&path) {
+            Ok(bytes) => {
+                let identity =
+                    serde_json::from_slice::<ManagedProcessIdentity>(&bytes).map_err(|error| {
+                        RefineError::Serialization(format!(
+                            "failed to parse process identity {}: {error}",
+                            path.display()
+                        ))
+                    })?;
+                Ok(identity)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let identity = ManagedProcessIdentity {
+                    process_id: process.id.clone(),
+                    owner: process.owner.clone(),
+                    pid: process.pid,
+                    os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
+                    registered_at: now_millis_string(),
+                };
+                self.write_process_identity(&identity)?;
+                Ok(identity)
+            }
+            Err(error) => Err(RefineError::Io(format!(
+                "failed to read process identity {}: {error}",
+                path.display()
+            ))),
+        }
+    }
+
+    fn ensure_expected_registration(
+        &self,
+        expected: &ManagedProcess,
+        identity: &ManagedProcessIdentity,
+    ) -> RefineResult<()> {
+        if identity.process_id != expected.id
+            || identity.owner != expected.owner
+            || identity.pid != expected.pid
+        {
+            return Err(RefineError::Conflict(format!(
+                "managed process {} identity evidence does not match its registry record; termination was not requested and both records were retained for recovery",
+                expected.id
+            )));
+        }
+        match self.inspect(&expected.id) {
+            Ok(current)
+                if current.id == expected.id
+                    && current.owner == expected.owner
+                    && current.pid == expected.pid
+                    && current.started_at == expected.started_at =>
+            {
+                Ok(())
+            }
+            Ok(_) => Err(RefineError::Conflict(format!(
+                "managed process {} registry identity changed before termination; termination was not requested and current evidence was retained for recovery",
+                expected.id
+            ))),
+            Err(RefineError::NotFound(_)) => match self.owned_process_state(expected, identity)? {
+                OwnedProcessState::Exited => Ok(()),
+                OwnedProcessState::Alive | OwnedProcessState::IdentityMismatch(_) => {
+                    Err(RefineError::Conflict(format!(
+                        "managed process {} is alive without its expected registry record; termination was not requested and identity evidence was retained for recovery",
+                        expected.id
+                    )))
+                }
+            },
+            Err(error) => Err(error),
+        }
+    }
+
+    fn owned_process_state(
+        &self,
+        process: &ManagedProcess,
+        identity: &ManagedProcessIdentity,
+    ) -> RefineResult<OwnedProcessState> {
+        let Some(pid) = process.pid else {
+            return Ok(OwnedProcessState::Exited);
+        };
+        if !pid_alive(pid)? {
+            return Ok(OwnedProcessState::Exited);
+        }
+        let actual = os_process_identity(pid)?;
+        match (&identity.os_identity, &actual) {
+            (Some(expected), Some(actual)) if expected != actual => {
+                Ok(OwnedProcessState::IdentityMismatch(Some(actual.clone())))
+            }
+            (Some(_), None) => Ok(OwnedProcessState::IdentityMismatch(None)),
+            _ => Ok(OwnedProcessState::Alive),
+        }
+    }
+
     fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
         for path in [
             process.stdout_path.as_deref(),
@@ -457,6 +679,17 @@ impl FileProcessSupervisor {
                 )));
             }
         }
+        let identity_path = self.process_identity_path(&process.id);
+        match fs::remove_file(&identity_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to remove process identity {}: {error}",
+                    identity_path.display()
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -466,6 +699,10 @@ impl FileProcessSupervisor {
             return Ok(process);
         }
         self.write_process(&process)?;
+        if let Err(error) = self.ensure_process_identity(&process) {
+            let _ = self.remove_process_artifacts(&process);
+            return Err(error);
+        }
         Ok(process)
     }
 
@@ -560,6 +797,12 @@ impl FileProcessSupervisor {
         if let Err(error) = self.write_process(&process) {
             let _ = child.kill();
             let _ = child.wait();
+            return Err(error);
+        }
+        if let Err(error) = self.ensure_process_identity(&process) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = self.remove_process_artifacts(&process);
             return Err(error);
         }
         drop(launch_guard);
@@ -817,6 +1060,12 @@ impl ProcessSupervisor for FileProcessSupervisor {
         if let Err(error) = self.write_process(&process) {
             let _ = child.kill();
             let _ = child.wait();
+            return Err(error);
+        }
+        if let Err(error) = self.ensure_process_identity(&process) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = self.remove_process_artifacts(&process);
             return Err(error);
         }
         drop(launch_guard);
@@ -1215,6 +1464,113 @@ fn new_process_id() -> String {
         std::process::id(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
     )
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum OwnedProcessState {
+    Alive,
+    Exited,
+    IdentityMismatch(Option<String>),
+}
+
+fn confirmed_process_exit(
+    process: &ManagedProcess,
+    signal: &str,
+    identity: &ManagedProcessIdentity,
+    started: Instant,
+) -> ConfirmedProcessExit {
+    ConfirmedProcessExit {
+        process_id: process.id.clone(),
+        pid: process.pid,
+        signal: signal.to_string(),
+        os_identity: identity.os_identity.clone(),
+        confirmed_exit: true,
+        registry_retained_until_exit: true,
+        waited_ms: started.elapsed().as_millis(),
+    }
+}
+
+fn process_identity_mismatch(
+    process: &ManagedProcess,
+    expected: &ManagedProcessIdentity,
+    actual: Option<&str>,
+) -> RefineError {
+    RefineError::Conflict(format!(
+        "managed process {} PID identity mismatch (expected {}, observed {}); termination was not requested, and its process record and identity evidence were retained for recovery",
+        process.id,
+        expected.os_identity.as_deref().unwrap_or("unavailable"),
+        actual.unwrap_or("unavailable")
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn os_process_identity(pid: u32) -> RefineResult<Option<String>> {
+    let stat_path = PathBuf::from(format!("/proc/{pid}/stat"));
+    let stat = match fs::read_to_string(&stat_path) {
+        Ok(stat) => stat,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(RefineError::Io(format!(
+                "failed to read process identity {}: {error}",
+                stat_path.display()
+            )));
+        }
+    };
+    let end = stat.rfind(')').ok_or_else(|| {
+        RefineError::Serialization(format!(
+            "failed to parse process identity {}: missing command terminator",
+            stat_path.display()
+        ))
+    })?;
+    let start_ticks = stat[end + 1..].split_whitespace().nth(19).ok_or_else(|| {
+        RefineError::Serialization(format!(
+            "failed to parse process identity {}: missing start time",
+            stat_path.display()
+        ))
+    })?;
+    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    Ok(Some(format!("linux:{boot_id}:{start_ticks}")))
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn os_process_identity(pid: u32) -> RefineResult<Option<String>> {
+    let output = Command::new("ps")
+        .args(["-o", "lstart=", "-p", &pid.to_string()])
+        .output()
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to inspect process identity {pid} with ps: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let started = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok((!started.is_empty()).then(|| format!("unix:{started}")))
+}
+
+#[cfg(windows)]
+fn os_process_identity(pid: u32) -> RefineResult<Option<String>> {
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!("(Get-Process -Id {pid} -ErrorAction SilentlyContinue).StartTime.Ticks"),
+        ])
+        .output()
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to inspect process identity {pid} with PowerShell: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let started = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok((!started.is_empty()).then(|| format!("windows:{started}")))
 }
 
 fn signal_os_process(pid: u32, signal: &str) -> RefineResult<Option<String>> {

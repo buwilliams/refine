@@ -52,9 +52,27 @@ fn tools_list_exposes_the_catalog() {
     assert!(names.contains(&"refine_list_goals"));
     assert!(names.contains(&"refine_draft_goal"));
     assert!(names.contains(&"refine_export_goal_jira"));
+    assert!(names.contains(&"refine_stop_process"));
     assert!(names.contains(&"refine_request"));
     // Every advertised tool must carry an input schema.
     assert!(tools.iter().all(|tool| tool["inputSchema"].is_object()));
+}
+
+#[test]
+fn stop_process_tool_maps_to_shared_process_control_route() {
+    let response = call(json!({
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+            "name": "refine_stop_process",
+            "arguments": {"process_id": "proc-agent-1"},
+        },
+    }));
+    let echoed = &response["result"]["structuredContent"];
+    assert_eq!(echoed["method"], "POST");
+    assert_eq!(echoed["path"], "/processes/proc-agent-1/stop");
+    assert!(echoed["body"].is_null());
 }
 
 #[test]

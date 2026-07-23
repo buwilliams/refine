@@ -199,6 +199,16 @@ pub fn tool_catalog() -> Vec<McpTool> {
             },
         },
         McpTool {
+            name: "refine_stop_process",
+            description: "Stop one managed agent or other process through the shared process-control capability. Linked Goals are cancelled only after exact process exit is confirmed.",
+            input_schema: process_id_schema,
+            binding: ToolBinding::Api {
+                method: "POST",
+                path: "/processes/{process_id}/stop",
+                path_params: &["process_id"],
+            },
+        },
+        McpTool {
             name: "refine_export_goal_jira",
             description: "Export a Goal's SOC 2 delivery evidence as Jira-importable CSV, including implementation reports and commits.",
             input_schema: goal_id_schema,
@@ -267,6 +277,20 @@ fn goal_id_schema() -> Value {
             },
         },
         "required": ["goal_id"],
+        "additionalProperties": false,
+    })
+}
+
+fn process_id_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "process_id": {
+                "type": "string",
+                "description": "Managed or synthetic process identifier",
+            },
+        },
+        "required": ["process_id"],
         "additionalProperties": false,
     })
 }
