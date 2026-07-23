@@ -34,9 +34,32 @@
       "rule_state": "unclassified",
       "updated": "2026-07-23T13:36:53Z",
       "workflow_quality_timing": null
+    },
+    {
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-23T13:38:48Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Make browser UI Goal creation complete in less than 50 ms under the current project scale by using the existing hot projection cache effectively. Remove the per-Goal duplicate-detection pattern that repeatedly fingerprints all Refine state files, reloads and deserializes the projection snapshot, and loads full Goal details and logs. Duplicate detection must operate from one coherent cached snapshot or an equivalent indexed latest-round prompt projection while preserving exact existing duplicate decisions, Node ownership, idempotency, and cross-process cache invalidation semantics. Ensure a successful create performs no redundant full projection rebuilds; refresh or update the projection exactly once while keeping the created Goal immediately visible and backlog auto-promotion correct. Add focused performance regression coverage with at least the current scale of 50 Goals that measures the complete POST /api/goals request and requires it to finish below 50 ms for both a late duplicate match and a successful non-duplicate creation on a warmed cache. Preserve correctness under external state changes and concurrent daemon mutations; do not trade freshness or auditability for speed. Report before-and-after timings and exact test results.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-23T13:38:48Z",
+      "workflow_quality_timing": null
     }
   ],
-  "status": "in-progress",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-07-23T13:36:54Z"
+  "updated": "2026-07-23T13:38:48Z"
 }
