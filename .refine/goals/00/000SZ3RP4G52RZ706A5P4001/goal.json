@@ -1,7 +1,7 @@
 {
   "base_commit": "94273722bcbfe4d14b669f21403f4615ff6b9ce4",
   "branch_name": "refine/00000SZ3RP4G52RZ706A5P4001/round-9",
-  "candidate_commit": null,
+  "candidate_commit": "3511a6a119e3e53f46214552efb4835d0e2f4873",
   "created": "2026-07-23T13:07:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -679,8 +679,8 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed reviewable Round 9 as 3511a6a119e3e53f46214552efb4835d0e2f4873 on exact main 94273722bcbfe4d14b669f21403f4615ff6b9ce4. Replayed the seven unique Round 7 commits while retaining main's already-approved duplicate fixture change and transcript handoff behavior; original 6f0f7c63, ebc7d269, and all earlier objects/worktrees remain preserved. Browser terminal Stop now delegates workflow Goal Agents to the authoritative shared process-control capability and retains process-only behavior for unlinked terminals. Cancellation receipts now use synced temporary-file write, atomic rename, and parent-directory sync; rollback_failed replay records and accepts only the exact restored Goal state/revision while preserving exact claim, capacity, execution, round, ownership, and competing-claim fences. Transcript handoff leases now defer only leased artifact cleanup while allowing confirmed-exit settlement, and local terminal stop waits for durable reader cleanup. Added deterministic browser real-workflow-agent stop, journal durability-boundary, rollback/recreated-service replay, transcript cleanup, and final Goal/claim/capacity/receipt parity coverage; updated affected intent docs. Final verification: cargo test --lib --no-fail-fast 496 passed, 0 failed; node --test tests/*.test.js 38 passed, 0 failed; cargo check --all-targets passed warning-free; cargo fmt --all -- --check passed; git diff --check, cached diff check, commit whitespace check, conflict-marker scan, exact-main ancestry, and supported three-tree merge preview passed; worktree clean. Focused final results: process_control 18/18, subprocess 12/12, agent_sessions 5/5, terminal support 1/1, browser terminal workflow stop 1/1, real pre-registration worker 1/1, real worker settlement 1/1, web API 1/1, CLI 1/1, MCP 1/1, workflow managed cancellation 1/1, Ready Merge fence 1/1, browser Processes 4/4; transcript handoff and singleton terminal cleanup each passed 10 consecutive isolated reruns. Initial failures retained: browser terminal stop 0/1 exposed missing workflow metadata in a completed receipt; agent_sessions 4/5 exposed premature leased-artifact cleanup; one compile attempt failed because recover was not in scope; real pre-registration worker 0/1 exposed settlement blocked behind the transcript lease; the combined replenishment run was 1/2 because quality/settings.json returned transient EOF and the failed test passed 1/1 isolated; the first full library run was 495/496 on handoff cleanup and the second was 495/496 on singleton terminal DirectoryNotEmpty cleanup, with both fixed and stressed before the final 496/496 run. An initial format check requested import ordering and passed after cargo fmt. This Git version rejected merge-tree --write-tree as an unknown revision, so the supported three-tree form was used and passed with no conflict markers. No merge, approval, force operation, history rewrite, worktree disposal, authentication bypass, or direct durable Goal edit was performed.",
+      "implementation_reported_at": "2026-07-23T19:42:53Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -691,11 +691,11 @@
       "quality_state": "unclassified",
       "reporter": "Refine Supervisor",
       "rule_state": "unclassified",
-      "updated": "2026-07-23T19:16:35Z",
+      "updated": "2026-07-23T19:42:53Z",
       "workflow_quality_timing": null
     }
   ],
   "status": "in-progress",
   "target_branch": "main",
-  "updated": "2026-07-23T19:16:50Z"
+  "updated": "2026-07-23T19:42:54Z"
 }
