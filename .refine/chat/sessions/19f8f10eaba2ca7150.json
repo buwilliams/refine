@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T13:43:17Z",
+  "updated_at": "2026-07-23T13:43:54Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -537,6 +537,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The prior recovery record points to the auditable Goal-recovery guidance. I’m using it to keep any retry on `goal round`/supported transitions and to stop at review rather than approving or merging."
+    },
+    {
+      "created_at": "2026-07-23T13:43:54Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784814234379-113",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The first live pass found real work despite the supplied `active_work: 0`: Governance is running for `00000SZ3SFP4N10NXGAE5P4002`, and an interactive Goal agent is still attached to `00000SZ3RP4G52RZ706A5P4001`. I’m treating the aggregate counts as stale and checking each process/round before deciding whether anything is lost or retryable."
     }
   ],
   "queue_dispatching": true,
