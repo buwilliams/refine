@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T10:57:36Z",
+  "updated_at": "2026-07-23T10:58:15Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -456,6 +456,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "The queued Goal has now legitimately started: `00000SZ3KJDDGGCK29J4N4Y001` is in Round 2 with a live Codex process, an owned worktree, and a matching execution ID. That supersedes the stale “0 active / 1 queued” snapshot, so no retry is warranted. The two review Goals remain untouched; I’m checking their exact candidate/verification state while monitoring the live worker."
+    },
+    {
+      "created_at": "2026-07-23T10:58:15Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784804295841-10",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Current live-worker evidence is coherent and non-stalled: the process is alive, its worktree is clean at the current `main` base, and no completion or input-needed signal exists yet. I’ll continue monitoring the workflow-owned run; I won’t send it speculative instructions or interrupt its cancellation boundary."
     }
   ],
   "queued_messages": [
