@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T09:58:22Z",
-  "updated_at": "2026-07-23T12:06:25Z",
+  "updated_at": "2026-07-23T12:07:07Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T09:58:22Z",
@@ -915,6 +915,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "A candidate commit now exists (`c9afedb7`), but it still contains the pre-Git check/post-Git unfenced persistence sequence I flagged. I am therefore treating it only as a candidate—not a pass—and waiting for its completion signal and Governance evaluation without approving it."
+    },
+    {
+      "created_at": "2026-07-23T12:07:07Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784808427188-87",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "The Goal agent completed cleanly and its candidate/evidence were recorded, but Refine has not yet advanced the Goal from `in-progress`; there is no live Goal-agent process now. I’m checking the workflow runner’s own evidence before deciding whether this is normal reconciliation lag or a lost-worker recovery case."
     }
   ],
   "queued_messages": [
