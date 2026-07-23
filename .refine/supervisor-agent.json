@@ -2,7 +2,7 @@
   "version": 2,
   "lifecycle": "observing",
   "health": "healthy",
-  "active_work": 1,
+  "active_work": 0,
   "queued_work": 1,
   "failed_work": 0,
   "supervisor_process": "ordinary CLI agent via the shared provider/process path",
@@ -56,12 +56,12 @@
     "00000SZ301MXF1Q5K4QDSJ6000": "done",
     "00000SZ3K92DJJT8PWF5AP8000": "done",
     "00000SZ3KH6A2G1JKVCWN4Y000": "done",
-    "00000SZ3KJDDGGCK29J4N4Y001": "in-progress",
+    "00000SZ3KJDDGGCK29J4N4Y001": "review",
     "00000SZ3N803TK00E78AK4M000": "todo"
   },
   "open_issues": {},
-  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:in-progress,00000SZ3N803TK00E78AK4M000:todo|live={\"00000SZ3KJDDGGCK29J4N4Y001\"}|quiet={}|issues=",
-  "updated_at": "2026-07-23T11:07:58.647972828+00:00",
+  "last_context_key": "goals=00000SZ3KJDDGGCK29J4N4Y001:review,00000SZ3N803TK00E78AK4M000:todo|live={}|quiet={}|issues=",
+  "updated_at": "2026-07-23T11:09:51.811484645+00:00",
   "events": [
     {
       "id": "supervisor-2026-07-22T09:45:16.803071525+00:00-1",
@@ -1706,6 +1706,26 @@
       "message": "Goal 00000SZ3N803TK00E78AK4M000 changed from cancelled to todo.",
       "created_at": "2026-07-23T11:07:58.560428217+00:00",
       "goal_id": "00000SZ3N803TK00E78AK4M000",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T11:09:48.965316809+00:00-171",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3KJDDGGCK29J4N4Y001 changed from in-progress to qa.",
+      "created_at": "2026-07-23T11:09:48.965316809+00:00",
+      "goal_id": "00000SZ3KJDDGGCK29J4N4Y001",
+      "actionable": false,
+      "retryable": false
+    },
+    {
+      "id": "supervisor-2026-07-23T11:09:51.720608978+00:00-172",
+      "kind": "observation",
+      "status": "info",
+      "message": "Goal 00000SZ3KJDDGGCK29J4N4Y001 changed from qa to review.",
+      "created_at": "2026-07-23T11:09:51.720608978+00:00",
+      "goal_id": "00000SZ3KJDDGGCK29J4N4Y001",
       "actionable": false,
       "retryable": false
     }

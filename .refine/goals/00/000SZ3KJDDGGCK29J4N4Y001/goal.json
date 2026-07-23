@@ -100,29 +100,51 @@
     },
     {
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T10:23:23Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-07-23T11:09:45Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3KJDDGGCK29J4N4Y001-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Round 2 closes the nested-agent process gaps; all proportional checks pass.\",\"violations\":[]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Round 2 closes the nested-agent process gaps; all proportional checks pass.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3KJDDGGCK29J4N4Y001-round-2"
+      },
+      "governance_message": "Round 2 closes the nested-agent process gaps; all proportional checks pass.",
       "governance_rule_actions": [],
       "implementation_report": "Preserved round 1 as commit 1c9a7d4e (matching patch-id for 04177422) and committed round 2 as 8978757e. FileProcessStatusService now uses one ordered cross-platform resolver for the port and agents registries, so list, API output streaming, API/browser stop, and CLI ps --stop resolve nested agent IDs consistently; invalid path separators are rejected and missing IDs return explicit not_found feedback. Added production API coverage for nested stdout/stderr streaming, stop status, cleanup, and repeated 404s, plus CLI coverage for nested enumeration, real-process termination feedback, cleanup, and repeated NotFound. Preserved foreground/background classification and ordinary-terminal exclusion. Verification: focused nested API 1 passed/0 failed; focused nested CLI 1 passed/0 failed; retained API enumeration 1 passed/0 failed; focused browser classification 2 passed/0 failed; full Rust 453 library tests passed/0 failed plus 0 binary failures; full browser 32 passed/0 failed; cargo fmt check passed; static assets 54 files valid; git diff --check passed. Worktree is clean and candidate is unmerged.",
       "implementation_reported_at": "2026-07-23T11:06:11Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Governance rejected round 1 because nested agents are listed but their process output and control paths cannot address them. Preserve the existing implementation through commit 04177422192b760a5c0dafd613439d7e0df53aaa and close only these governance gaps. Make the shared Process capability resolve nested agent process IDs consistently for list, output streaming, and stop/cancellation across the API, browser, and CLI ps --stop paths; do not advertise actions that return not-found. Reuse one shared cross-platform resolver and the existing managed-agent registry rather than duplicating PID or path logic. Preserve foreground/background classification and keep ordinary terminals excluded. Add focused behavioral coverage that proves nested agent output streaming and stopping work through the production API/CLI paths, including not-found and cancellation feedback, and retain the existing enumeration/browser classification coverage. Run formatting and the smallest complete Rust/browser/static checks proportional to these process and cancellation changes. Commit the Goal-owned changes, leave the worktree clean and unmerged, and preserve all provider, authentication, cancellation, and review boundaries.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-07-23T11:09:49Z",
+      "quality_details": {
+        "candidate_commit": "8978757e9dbc0db96ea5dfbd43adbd9a6492dbac",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "operation_id": "19f8eaad8772ca7151",
+        "results": []
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T11:06:11Z",
-      "workflow_quality_timing": null
+      "rule_state": "passed",
+      "updated": "2026-07-23T11:09:49Z",
+      "workflow_quality_timing": "pre_merge"
     }
   ],
-  "status": "in-progress",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-07-23T11:06:12Z"
+  "updated": "2026-07-23T11:09:49Z"
 }
