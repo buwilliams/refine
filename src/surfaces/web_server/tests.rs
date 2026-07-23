@@ -6140,7 +6140,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     assert_eq!(agent_context["goal_id"], "GOALCTX");
     assert_eq!(agent_context["round_idx"], 1);
-    assert_eq!(agent_context["management_actions"], json!(["cancel_agent"]));
+    assert_eq!(agent_context["management_actions"], json!(["stop_agent"]));
     let background_agent_context = listed_processes
         .iter()
         .find(|process| process["id"] == "background-agent-context")
@@ -6150,7 +6150,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(background_agent_context["round_idx"], 0);
     assert_eq!(
         background_agent_context["management_actions"],
-        json!(["cancel_agent"])
+        json!(["stop_agent"])
     );
     let chat_context = listed_processes
         .iter()
@@ -6159,7 +6159,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(chat_context["kind"], "chat");
     assert_eq!(chat_context["session_id"], "chat-context-session");
     assert_eq!(chat_context["mode"], "standalone");
-    assert_eq!(chat_context["management_actions"], json!(["stop_chat"]));
+    assert_eq!(chat_context["management_actions"], json!(["stop_agent"]));
     let standalone_context = listed_processes
         .iter()
         .find(|process| process["id"] == format!("chat-session-{}", standalone_chat.id))
@@ -6167,6 +6167,10 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(standalone_context["kind"], "chat");
     assert_eq!(standalone_context["session_id"], standalone_chat.id);
     assert_eq!(standalone_context["mode"], "standalone");
+    assert_eq!(
+        standalone_context["management_actions"],
+        json!(["stop_agent"])
+    );
     let goal_chat_context = listed_processes
         .iter()
         .find(|process| process["id"] == format!("chat-session-{}", goal_chat.id))
@@ -6424,7 +6428,7 @@ fn web_server_resolves_nested_agent_process_stream_stop_and_not_found() {
             pid: None,
             state: "running".to_string(),
             label: Some("Nested agent".to_string()),
-            details: Some(json!({"goal_id": "GOAL-NESTED"}).to_string()),
+            details: None,
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path: None,
@@ -6485,6 +6489,173 @@ fn web_server_resolves_nested_agent_process_stream_stop_and_not_found() {
                 .contains("nested-agent")
         );
     }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
+    let temp_root = unique_temp_dir("http-stop-goal-agent");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
+    let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Stop selected agent", Some("GOAL-STOP-AGENT"))
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-STOP-AGENT", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-STOP-AGENT", GoalStatus::InProgress)
+        .unwrap();
+
+    let agent_supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = agent_supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
+            } else {
+                vec!["30".to_string()]
+            },
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::Map::from_iter([
+                ("kind".to_string(), json!("interactive_session")),
+                ("provider".to_string(), json!("smoke-ai")),
+                ("profile".to_string(), json!("goal")),
+                ("session_id".to_string(), json!("goal-agent-session")),
+                ("goal_id".to_string(), json!("GOAL-STOP-AGENT")),
+            ]),
+        })
+        .unwrap();
+    let pid = process.pid.unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let listed = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/processes".to_string(),
+        body: None,
+    });
+    assert_eq!(listed.status, 200, "{}", listed.body);
+    let listed_process = listed.body["processes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|listed| listed["id"] == process.id)
+        .unwrap();
+    assert_eq!(listed_process["kind"], "interactive_session");
+    assert_eq!(listed_process["management_actions"], json!(["stop_agent"]));
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/processes/{}/stop", process.id),
+        body: Some(json!({"signal": "terminate"})),
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["stopped"], true);
+    assert_eq!(stopped.body["process"]["id"], process.id);
+    assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
+    assert_eq!(stopped.body["goal"]["id"], "GOAL-STOP-AGENT");
+    assert_eq!(stopped.body["goal"]["status"], "cancelled");
+    assert!(!managed_pid_is_alive(pid).unwrap());
+    assert!(agent_supervisor.inspect(&process.id).is_err());
+
+    work_items
+        .create_goal_summary("Stop Goal chat", Some("GOAL-STOP-CHAT"))
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-STOP-CHAT", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-STOP-CHAT", GoalStatus::InProgress)
+        .unwrap();
+    let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
+    let session = chat
+        .start_with_options(
+            ChatAttachment::Goal("GOAL-STOP-CHAT".to_string()),
+            Some("smoke-ai"),
+            Some("goal"),
+        )
+        .unwrap();
+    let stopped_chat = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/processes/chat-session-{}/stop", session.id),
+        body: None,
+    });
+    assert_eq!(stopped_chat.status, 200, "{}", stopped_chat.body);
+    assert_eq!(stopped_chat.body["process"]["status"], "stopped");
+    assert_eq!(stopped_chat.body["termination"]["confirmed_exit"], true);
+    assert_eq!(stopped_chat.body["termination"]["already_idle"], true);
+    assert_eq!(stopped_chat.body["goal"]["id"], "GOAL-STOP-CHAT");
+    assert_eq!(stopped_chat.body["goal"]["status"], "cancelled");
+    assert!(
+        chat.list_sessions()
+            .unwrap()
+            .iter()
+            .find(|listed| listed.id == session.id)
+            .unwrap()
+            .closed
+    );
+
+    work_items
+        .create_goal_summary("Stop through MCP", Some("GOAL-STOP-MCP"))
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-STOP-MCP", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-STOP-MCP", GoalStatus::InProgress)
+        .unwrap();
+    let mcp_process = agent_supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
+            } else {
+                vec!["30".to_string()]
+            },
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::Map::from_iter([("goal_id".to_string(), json!("GOAL-STOP-MCP"))]),
+        })
+        .unwrap();
+    let through_mcp = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/mcp".to_string(),
+        body: Some(json!({
+            "jsonrpc": "2.0",
+            "id": 42,
+            "method": "tools/call",
+            "params": {
+                "name": "refine_stop_process",
+                "arguments": {"process_id": mcp_process.id}
+            }
+        })),
+    });
+    assert_eq!(through_mcp.status, 200, "{}", through_mcp.body);
+    assert_eq!(through_mcp.body["result"]["isError"], false);
+    assert_eq!(
+        through_mcp.body["result"]["structuredContent"]["termination"]["confirmed_exit"],
+        true
+    );
+    assert_eq!(
+        through_mcp.body["result"]["structuredContent"]["goal"]["status"],
+        "cancelled"
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

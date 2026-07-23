@@ -628,28 +628,6 @@ pub fn stop_agent_session(runtime_root: &Path, session_id: &str) -> RefineResult
     Ok(())
 }
 
-pub fn stop_agent_session_process(
-    runtime_root: &Path,
-    process_id: &str,
-) -> RefineResult<Option<ManagedProcess>> {
-    let supervisor = FileProcessSupervisor::new(runtime_root);
-    let process = supervisor.list()?.into_iter().find(|process| {
-        process.id == process_id
-            && process_metadata(process).is_some_and(|metadata| {
-                metadata
-                    .get("command_path")
-                    .and_then(Value::as_str)
-                    .is_some_and(|path| Path::new(path).is_file())
-            })
-    });
-    let Some(mut process) = process else {
-        return Ok(None);
-    };
-    supervisor.request_termination(&process.id, "terminate")?;
-    process.state = "stopping".to_string();
-    Ok(Some(process))
-}
-
 pub fn agent_session_events_since(
     runtime_root: &Path,
     session_id: &str,

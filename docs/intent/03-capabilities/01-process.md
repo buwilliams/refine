@@ -28,6 +28,9 @@ Current implementation details that matter to intent:
   observe the same process.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
+- stopping any managed, interactive, chat, or synthetic agent uses one shared
+  capability that retains ownership evidence, confirms exact process exit, and
+  only then cancels a linked Goal; failed or resisted stops leave the Goal active.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 
 Process management should favor visibility and recovery over hiding execution behind polished UI messages. If something is running, failing, or waiting, Refine should be able to show it.

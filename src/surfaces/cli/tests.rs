@@ -57,6 +57,7 @@ use crate::tools::product::project_state::PROJECTION_SNAPSHOT_FILE;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
 use crate::tools::product::work_items::FileWorkItemService;
 use clap::Parser;
+use serde_json::json;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, TcpListener};
@@ -1241,11 +1242,35 @@ fn connect_to_cli_test_daemon(port: u16) -> std::net::TcpStream {
 fn system_ps_lists_and_stops_nested_agent_processes() {
     let temp_root = unique_temp_dir("cli-system-ps");
     let runtime_root = temp_root.join("run");
+    let target_root = temp_root.join("target");
+    fs::create_dir_all(&target_root).unwrap();
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("CLI process stop", Some("GOAL-NESTED"))
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-NESTED", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-NESTED", GoalStatus::InProgress)
+        .unwrap();
     let port = 19091;
     let port_root = RuntimeRoot {
         root: runtime_root.clone(),
     }
     .port_root(port);
+    fs::create_dir_all(&port_root).unwrap();
+    fs::write(
+        port_root.join("apps.json"),
+        serde_json::to_vec_pretty(&json!({
+            "version": 1,
+            "active_app": target_root.display().to_string(),
+            "apps": {}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let supervisor = FileProcessSupervisor::new(&port_root);
     let agent_supervisor = FileProcessSupervisor::new(port_root.join("agents"));
     supervisor
@@ -1324,7 +1349,18 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
     assert_eq!(stopped["stopped"], true);
     assert_eq!(stopped["process"]["id"], stoppable.id);
     assert_eq!(stopped["process"]["status"], "stopped");
+    assert_eq!(stopped["termination"]["confirmed_exit"], true);
+    assert_eq!(stopped["goal"]["id"], "GOAL-NESTED");
+    assert_eq!(stopped["goal"]["status"], "cancelled");
     assert!(agent_supervisor.inspect(&stoppable.id).is_err());
+    assert_eq!(
+        work_items
+            .show_goal_summary("GOAL-NESTED")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
 
     let missing = system_ps_response(
         runtime_root.clone(),

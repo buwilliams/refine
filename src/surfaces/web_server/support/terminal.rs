@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::process::agent_sessions::{
     agent_session_events_range, find_agent_session, resize_agent_session, send_agent_session_input,
-    stop_agent_session, stop_agent_session_process,
+    stop_agent_session,
 };
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
@@ -180,35 +180,6 @@ pub(in crate::surfaces::web_server) fn terminal_stop_response(
         stop_agent_session(runtime_root, session_id)?;
     }
     Ok(json!({"ok": true}))
-}
-
-pub(in crate::surfaces::web_server) fn terminal_stop_process_response(
-    runtime_root: &std::path::Path,
-    process_id: &str,
-) -> RefineResult<Option<Value>> {
-    let session = sessions()
-        .lock()
-        .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
-        .values()
-        .find(|session| session.process_id == process_id)
-        .cloned();
-    let Some(session) = session else {
-        return Ok(
-            stop_agent_session_process(runtime_root, process_id)?.map(|process| {
-                json!({
-                    "stopped": true,
-                    "process": process.api_json(),
-                })
-            }),
-        );
-    };
-    stop_terminal_session(&session)?;
-    let mut process = session.process.clone();
-    process.state = "stopping".to_string();
-    Ok(Some(json!({
-        "stopped": true,
-        "process": process.api_json(),
-    })))
 }
 
 fn stop_terminal_session(session: &Arc<TerminalSession>) -> RefineResult<()> {
