@@ -6,7 +6,7 @@
 - **Native Harness**: Refine launches the configured frontier-lab CLI in its own PTY and leaves the provider's TUI, tools, and conversation behavior intact.
 - **Background By Default**: the agent works without requiring an attached user; CLI and browser surfaces may attach to the same live terminal when useful.
 - **Instance Based**: every active Goal may have its own Goal Agent, so parallel Goals have distinct sessions, worktrees, process records, and evidence.
-- **Automation With Escalation**: routine judgment remains autonomous. A genuine missing decision or authority becomes an explicit needs-input state without replacing or failing the running agent.
+- **Automation With Escalation**: routine judgment and uncertainty remain autonomous. Only work that is impossible without a missing decision or authority becomes an explicit needs-input state.
 - **One Agent Truth**: opening a Goal Agent never launches a second conversational agent for that Goal.
 
 ## Purpose
@@ -29,13 +29,12 @@ When a Goal enters implementation, Refine:
 
 The completion and needs-input signals are control state, not a replacement transcript protocol. Durable product truth remains in Goal records, Git changes, logs, governance, quality evidence, and workflow state.
 
-A user attachment is optional. The agent should make reasonable implementation decisions autonomously and only request input for a real product decision, missing authority, or unavailable fact. When input is required, Refine should expose the question through process and activity state. The user answers directly in the native TUI, after which the same agent continues.
+A user attachment is optional. The agent should make reasonable implementation decisions autonomously and only request input when work is impossible without a real product decision, missing authority, or unavailable fact. When input is required, Refine should expose the question through process and activity state. The user answers directly in the native TUI, after which the same agent continues.
 
-If a provider does not emit the explicit needs-input signal and produces no
-terminal output for the configured agent idle window, Refine should surface an
-actionable attention state without killing the process. This is a fallback
-diagnostic, not proof that the agent is blocked; the user can attach and inspect
-before deciding whether to answer, wait, or cancel.
+Silence is ordinary execution, not an implicit request for help. Refine must not
+infer needs-input from elapsed time or lack of terminal output. A silent Goal
+Agent remains working and should make the best decision supported by its current
+context.
 
 Supervisor, Plan Mode, and Standalone agent profiles are singletons for their role. Goal Agents are keyed by Goal instance because several Goals may be implemented in parallel.
 

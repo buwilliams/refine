@@ -1,6 +1,5 @@
 use serde_json::{Value, json};
 use std::path::Path;
-use std::time::Duration;
 
 use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
@@ -154,13 +153,6 @@ impl WorkflowBehavior for WorkflowImplementation {
                 provider: ctx.provider.clone(),
                 prompt,
                 metadata: process_metadata,
-                idle_attention_after: Duration::from_secs(
-                    setting_string(&ctx.settings, "agent_idle_timeout_seconds", "900")
-                        .parse::<u64>()
-                        .ok()
-                        .filter(|seconds| *seconds > 0)
-                        .unwrap_or(900),
-                ),
             },
             |attention| {
                 let _ = ctx.log(

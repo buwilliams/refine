@@ -29,6 +29,8 @@ When a Goal is in-progress:
 - A Goal Agent that truly needs a user decision keeps its process and claim alive,
   records an explicit needs-input state, and continues in the same session after
   the user responds.
+- Silence does not become needs-input; the Goal Agent remains autonomous and
+  makes the best decision supported by its current context.
 - Process output, logs, changed files, agent output, and intermediate evidence should remain observable.
 - Other nodes should not silently duplicate the same active work.
 - On success, the work should produce a reviewable handoff and move toward ready-merge or another appropriate next state.

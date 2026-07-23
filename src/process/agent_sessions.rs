@@ -1,7 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -32,7 +31,6 @@ pub struct GoalAgentLaunch {
     pub provider: String,
     pub prompt: String,
     pub metadata: Map<String, Value>,
-    pub idle_attention_after: Duration,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -333,8 +331,6 @@ where
     drop(launch_lock);
 
     let reader_path = stdout_path.clone();
-    let last_output_at = Arc::new(Mutex::new(std::time::Instant::now()));
-    let reader_last_output_at = Arc::clone(&last_output_at);
     let reader_thread = thread::spawn(move || -> RefineResult<()> {
         let mut output = OpenOptions::new()
             .append(true)
@@ -350,9 +346,6 @@ where
             match reader.read(&mut buffer) {
                 Ok(0) => return Ok(()),
                 Ok(count) => {
-                    if let Ok(mut last_output_at) = reader_last_output_at.lock() {
-                        *last_output_at = std::time::Instant::now();
-                    }
                     output.write_all(&buffer[..count]).map_err(|error| {
                         RefineError::Io(format!(
                             "failed to append Goal Agent transcript {}: {error}",
@@ -391,9 +384,6 @@ where
                                     "failed to send attached input to Goal Agent: {error}"
                                 ))
                             })?;
-                        if let Ok(mut last_output_at) = last_output_at.lock() {
-                            *last_output_at = std::time::Instant::now();
-                        }
                         if metadata.get("attention_state").and_then(Value::as_str)
                             == Some("needs_input")
                         {
@@ -443,24 +433,6 @@ where
                         )));
                     }
                 }
-            }
-
-            if metadata.get("attention_state").and_then(Value::as_str) == Some("working")
-                && last_output_at
-                    .lock()
-                    .ok()
-                    .is_some_and(|last| last.elapsed() >= launch.idle_attention_after)
-            {
-                let message = format!(
-                    "Goal Agent has produced no terminal output for {} seconds. It may be waiting for input; attach to inspect before cancelling the workflow.",
-                    launch.idle_attention_after.as_secs()
-                );
-                metadata.insert("attention_state".to_string(), json!("needs_input"));
-                metadata.insert("attention_message".to_string(), json!(&message));
-                metadata.insert("attention_reason".to_string(), json!("idle"));
-                process.details = Some(encode_metadata(&metadata)?);
-                supervisor.register(process.clone())?;
-                on_attention(GoalAgentAttention { message });
             }
 
             if let Some(status) = child.try_wait().map_err(|error| {
@@ -966,7 +938,6 @@ mod tests {
                     provider: "smoke-ai".to_string(),
                     prompt: "test".to_string(),
                     metadata,
-                    idle_attention_after: Duration::from_secs(900),
                 },
                 |_| {},
             )
@@ -990,7 +961,6 @@ mod tests {
                 provider: "smoke-ai".to_string(),
                 prompt: "duplicate".to_string(),
                 metadata: duplicate_metadata,
-                idle_attention_after: Duration::from_secs(900),
             },
             |_| {},
         );
@@ -1054,7 +1024,6 @@ mod tests {
                     provider: "smoke-ai".to_string(),
                     prompt: "test".to_string(),
                     metadata,
-                    idle_attention_after: Duration::from_secs(900),
                 },
                 |attention| {
                     let _ = attention_tx.send(attention);
@@ -1088,7 +1057,7 @@ mod tests {
     }
 
     #[test]
-    fn silent_goal_agent_becomes_actionable_after_the_configured_idle_window() {
+    fn silent_goal_agent_remains_autonomous_without_requesting_input() {
         let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -1097,7 +1066,11 @@ mod tests {
         let app_root = root.join("app");
         let provider = root.join("smoke-ai");
         fs::create_dir_all(&app_root).unwrap();
-        fs::write(&provider, "#!/bin/sh\nsleep 10\n").unwrap();
+        fs::write(
+            &provider,
+            "#!/bin/sh\nsleep 0.2\nprintf 'made-the-best-decision\\n'\n",
+        )
+        .unwrap();
         let mut permissions = fs::metadata(&provider).unwrap().permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(&provider, permissions).unwrap();
@@ -1106,33 +1079,22 @@ mod tests {
             std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
         }
 
-        let runtime_for_thread = runtime_root.clone();
-        let app_for_thread = app_root.clone();
-        let (attention_tx, attention_rx) = std::sync::mpsc::channel();
-        let run = thread::spawn(move || {
-            let mut metadata = Map::new();
-            metadata.insert("goal_id".to_string(), json!("GOAL3"));
-            run_goal_agent(
-                GoalAgentLaunch {
-                    runtime_root: runtime_for_thread,
-                    cwd: app_for_thread,
-                    provider: "smoke-ai".to_string(),
-                    prompt: "test".to_string(),
-                    metadata,
-                    idle_attention_after: Duration::from_millis(80),
-                },
-                |attention| {
-                    let _ = attention_tx.send(attention);
-                },
-            )
-        });
-
-        let attention = attention_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert!(attention.message.contains("no terminal output"));
-        let snapshot = find_goal_agent_session(&runtime_root, "GOAL3").unwrap();
-        assert_eq!(snapshot.attention_state.as_deref(), Some("needs_input"));
-        stop_agent_session(&runtime_root, &snapshot.id).unwrap();
-        assert!(run.join().unwrap().is_err());
+        let mut metadata = Map::new();
+        metadata.insert("goal_id".to_string(), json!("GOAL3"));
+        let mut attention = Vec::new();
+        let result = run_goal_agent(
+            GoalAgentLaunch {
+                runtime_root,
+                cwd: app_root,
+                provider: "smoke-ai".to_string(),
+                prompt: "test".to_string(),
+                metadata,
+            },
+            |request| attention.push(request),
+        )
+        .unwrap();
+        assert!(attention.is_empty());
+        assert!(result.output.contains("made-the-best-decision"));
 
         unsafe {
             if let Some(previous) = previous {

@@ -197,6 +197,7 @@ Nav: Toolbar (bottom dock)
 			Attaches to the workflow-owned agent already implementing that Goal; never launches a duplicate
 			Configured agent CLI receives fresh durable Goal and Round context from workflow launch
 			Shows explicit needs-input state while the same process and workflow claim remain active
+			Silence remains ordinary autonomous work and never creates needs-input state
 			Uses the same PTY input, output, resize, and lifecycle behavior as every terminal profile
 		Goal log tail (opened via Watch Logs on a Goal)
 			Tab labeled "Logs {id}…"; live indicator, Goal link, Open full logs, Refresh, Close tab

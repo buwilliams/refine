@@ -706,6 +706,8 @@ Requirements:
 - Goal Agent completion advances the same workflow attempt. A needs-input signal
   keeps both the process and claim active until an attached user answers; opening
   an agent never creates a second implementation agent for that Goal.
+- Silence or missing terminal output never implies needs-input. The agent remains
+  autonomous and makes the best decision supported by available context.
 - Public automation controls pause or resume workflow automation; there is no
   public manual trigger command for starting workflow work.
 

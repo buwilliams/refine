@@ -5135,7 +5135,6 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
                 provider: "smoke-ai".to_string(),
                 prompt: "Implement Goal GOAL1".to_string(),
                 metadata,
-                idle_attention_after: Duration::from_secs(900),
             },
             |_| {},
         )
