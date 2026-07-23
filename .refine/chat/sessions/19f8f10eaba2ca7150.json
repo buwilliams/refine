@@ -5,7 +5,7 @@
   "provider_session_id": null,
   "attachment": "supervisor",
   "created_at": "2026-07-23T13:01:18Z",
-  "updated_at": "2026-07-23T15:07:25Z",
+  "updated_at": "2026-07-23T15:08:33Z",
   "transcript_events": [
     {
       "created_at": "2026-07-23T13:01:18Z",
@@ -1188,6 +1188,18 @@
       "provider_session_id": null,
       "role": "progress",
       "text": "Governance is still actively inspecting `d81385dc`; the provider process is live and has not reported an authentication or execution failure. Publication has not happened yet, which is expected before the gate settles."
+    },
+    {
+      "created_at": "2026-07-23T15:08:33Z",
+      "delivered": false,
+      "extra": {
+        "source": "provider_output"
+      },
+      "id": "evt-1784819313349-228",
+      "progress": true,
+      "provider_session_id": null,
+      "role": "progress",
+      "text": "Governance rejected Round 4 as well. I’m extracting the precise remaining violations before deciding whether another recovery is justified; I will not loop it blindly or suppress the repeated failure."
     }
   ],
   "queued_messages": [
@@ -1195,7 +1207,7 @@
       "id": "qm-19f8f56c7323b969e1",
       "text": "The workflow evidence changed. Supervise only work that is actionable now; ask the user when their decision or authority is required.\n\nDo not hide provider failures, force merges, discard worktrees, or bypass confirmation, authentication, or cancellation boundaries.\n\nCurrent counts: 0 active, 0 queued, 1 failed.\nNon-terminal Goal states: {\"00000SZ3N803TK00E78AK4M000\": \"review\", \"00000SZ3RN3BS397T4SE5P4000\": \"review\", \"00000SZ3RP4G52RZ706A5P4001\": \"failed\", \"00000SZ3SFP4N10NXGAE5P4002\": \"review\", \"00000SZ3SHFHFK352VJT5P4003\": \"review\"}\nLive workflow-agent Goal IDs: {}\nActionable stall/loss evidence: {}",
       "created_at": "2026-07-23T14:17:36Z",
-      "updated_at": "2026-07-23T14:43:42Z",
+      "updated_at": "2026-07-23T15:08:28Z",
       "internal": true
     }
   ],

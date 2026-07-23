@@ -317,29 +317,92 @@
     },
     {
       "assignee": "Supervisor",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-07-23T14:44:44Z",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
+      "governance_checked_at": "2026-07-23T15:08:25Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-4",
+        "failed_actions": [
+          {
+            "message": "cancel_workflow_execution treats an empty managed-process lookup as valid ownership and cancels the running claim and linked Goal without confirming process exit. During worker registration races or lost registry evidence, the worker can remain or start running under a cancelled Goal.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Cancellation settlement is not failure-atomic: it persists the claim as cancelled and releases capacity before writing the Goal cancellation. Capacity-release or Goal-write failure can leave a cancelled claim with an active Goal and either retained or prematurely released capacity.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "The added tests cover a registered worker, ownership races, and registry/identity cleanup failures, but do not cover target-bound cancellation before worker registration or failures between claim persistence, capacity release, and the Goal write.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Cancellation can bypass process exit and can persist inconsistent Goal, claim, and capacity state.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"cancel_workflow_execution treats an empty managed-process lookup as valid ownership and cancels the running claim and linked Goal without confirming process exit. During worker registration races or lost registry evidence, the worker can remain or start running under a cancelled Goal.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Cancellation settlement is not failure-atomic: it persists the claim as cancelled and releases capacity before writing the Goal cancellation. Capacity-release or Goal-write failure can leave a cancelled claim with an active Goal and either retained or prematurely released capacity.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"The added tests cover a registered worker, ownership races, and registry/identity cleanup failures, but do not cover target-bound cancellation before worker registration or failures between claim persistence, capacity release, and the Goal write.\"}]}",
+        "rules_checked": 8,
+        "verdict": {
+          "message": "Cancellation can bypass process exit and can persist inconsistent Goal, claim, and capacity state.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "cancel_workflow_execution treats an empty managed-process lookup as valid ownership and cancels the running claim and linked Goal without confirming process exit. During worker registration races or lost registry evidence, the worker can remain or start running under a cancelled Goal.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Cancellation settlement is not failure-atomic: it persists the claim as cancelled and releases capacity before writing the Goal cancellation. Capacity-release or Goal-write failure can leave a cancelled claim with an active Goal and either retained or prematurely released capacity.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "The added tests cover a registered worker, ownership races, and registry/identity cleanup failures, but do not cover target-bound cancellation before worker registration or failures between claim persistence, capacity release, and the Goal write.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ3RP4G52RZ706A5P4001-round-4"
+      },
+      "governance_message": "Cancellation can bypass process exit and can persist inconsistent Goal, claim, and capacity state.",
+      "governance_rule_actions": [
+        {
+          "message": "cancel_workflow_execution treats an empty managed-process lookup as valid ownership and cancels the running claim and linked Goal without confirming process exit. During worker registration races or lost registry evidence, the worker can remain or start running under a cancelled Goal.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Cancellation settlement is not failure-atomic: it persists the claim as cancelled and releases capacity before writing the Goal cancellation. Capacity-release or Goal-write failure can leave a cancelled claim with an active Goal and either retained or prematurely released capacity.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "The added tests cover a registered worker, ownership races, and registry/identity cleanup failures, but do not cover target-bound cancellation before worker registration or failures between claim persistence, capacity release, and the Goal write.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
       "implementation_report": "Committed d81385dc on Round 4 after preserving and replaying the Round 3 stack. WorkflowEngine::cancel now delegates to the authoritative FileProcessControlService; confirmed process exit is durably recorded before registry/identity cleanup; cleanup failures retain accurate partial receipts; exact claim cancellation, Goal cancellation, and capacity release settle under the workflow/Goal fences; terminal worker failure cannot overwrite cancelled claim/Goal state. Added real workflow-worker cancellation/race coverage, registry and identity cleanup fault injection, final claim/capacity assertions, and updated process intent. Verification: process_control 12 passed, 0 failed; real workflow worker 1 passed, 0 failed; subprocess 10 passed, 0 failed; agent_sessions 3 passed, 0 failed; web API 1 passed, 0 failed; CLI 1 passed, 0 failed; MCP 1 passed, 0 failed; workflow metadata 1 passed, 0 failed; browser process UI 4 passed, 0 failed; final cargo test --lib 468 passed, 0 failed; node --test tests/*.test.js 37 passed, 0 failed; cargo check --all-targets passed; cargo fmt --all -- --check passed; git diff --check, git diff --cached --check, and git show --check passed. Earlier full-library attempts each exposed the same pre-existing intra-test quality-settings EOF race in one of two live-replenishment tests (467 passed, 1 failed); both isolated reruns passed, the overly broad timing change was narrowed, and the final unchanged-source default full run passed 468/468.",
       "implementation_reported_at": "2026-07-23T15:05:38Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover Governance-rejected candidate 2d0d226b from current main while preserving 2d0d226b, c9a92ee5, ea2103e3, all earlier candidates, worktrees, rounds, and provider/Governance evidence. Fix only the four newly recorded violations in the shared process-stop capability. Establish one authoritative cancellation implementation shared by WorkflowEngine::cancel and FileProcessControlService instead of split semantics. After confirmed process exit, construct and retain truthful partial-outcome evidence before cleanup so registry or identity cleanup failure cannot become an ordinary stop error or erase confirmed-exit and recovery details. Atomically settle the exact workflow claim as cancelled together with the fenced Goal cancellation so successful stop cannot leave a running claim or retained capacity, while preserving exact execution, round, Goal revision/status, and competing-owner protections. Add deterministic production-path coverage using a real workflow worker stopped through the shared capability; assert final Goal and claim state, cover the worker-failure race, and inject registry and identity cleanup failures with accurate durable partial-failure receipts. Re-run focused process-control, subprocess, agent-session, web API, CLI, MCP/browser, workflow metadata, full library and web suites, all-target check, formatting, and diff checks, reporting exact results. Preserve one shared capability across surfaces and all provider, authentication, cancellation, worktree, Governance, Quality, and human Review boundaries. Do not force merge, rewrite history, discard worktrees, hide failures, or edit durable Goal state directly.",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Supervisor",
-      "rule_state": "unclassified",
-      "updated": "2026-07-23T15:05:38Z",
+      "rule_state": "failed",
+      "updated": "2026-07-23T15:08:26Z",
       "workflow_quality_timing": null
     }
   ],
-  "status": "in-progress",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-07-23T15:05:38Z"
+  "updated": "2026-07-23T15:08:26Z"
 }
