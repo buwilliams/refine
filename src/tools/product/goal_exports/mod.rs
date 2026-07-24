@@ -9,6 +9,14 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitChange};
 use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
 
 const JIRA_DESCRIPTION_LIMIT: usize = 30_000;
+const IDENTITY_RESERVE: usize = 2_500;
+const TRACEABILITY_RESERVE: usize = 3_000;
+const COMMIT_RESERVE: usize = 3_500;
+const OUTCOME_RESERVE: usize = 7_000;
+const REQUEST_RESERVE: usize = 5_000;
+const IMPLEMENTATION_RESERVE: usize = 5_000;
+const GUIDANCE_RESERVE: usize = 1_200;
+const NOTES_RESERVE: usize = 1_800;
 const JIRA_HEADERS: [&str; 10] = [
     "Summary",
     "Description",
@@ -223,8 +231,9 @@ fn jira_row(goal: &Value, commits: &[GitChange]) -> RefineResult<String> {
     let summary = required_string(goal, "name")?;
     let description = jira_description(goal, commits);
     if description.chars().count() > JIRA_DESCRIPTION_LIMIT {
-        return Err(RefineError::InvalidInput(format!(
-            "Goal {goal_id} Jira description exceeds Jira's {JIRA_DESCRIPTION_LIMIT} character limit"
+        return Err(RefineError::Serialization(format!(
+            "Goal {goal_id} Jira description could not be rendered within Jira's \
+             {JIRA_DESCRIPTION_LIMIT} character limit; report this renderer invariant failure"
         )));
     }
 
@@ -249,36 +258,88 @@ fn jira_row(goal: &Value, commits: &[GitChange]) -> RefineResult<String> {
 }
 
 fn jira_description(goal: &Value, commits: &[GitChange]) -> String {
-    let mut sections = Vec::new();
-    let mut overview = vec![
-        "Refine delivery evidence".to_string(),
-        format!("Goal ID: {}", string_or(goal, "id", "Unknown")),
-        format!("Status: {}", string_or(goal, "status", "Unknown")),
-        format!("Priority: {}", string_or(goal, "priority", "Unknown")),
-        format!("Reporter: {}", string_or(goal, "reporter", "Unreported")),
-        format!("Assignee: {}", string_or(goal, "assignee", "Unassigned")),
-        format!("Created: {}", string_or(goal, "created", "Unknown")),
-        format!("Updated: {}", string_or(goal, "updated", "Unknown")),
-    ];
-    push_optional_line(&mut overview, "Feature", goal, "feature_id");
-    push_optional_line(&mut overview, "Node", goal, "node_id");
-    sections.push(overview.join("\n"));
+    let mut sections = Vec::<EvidenceSection>::new();
+    let mut overview = vec!["Refine delivery evidence".to_string()];
+    push_bounded_line(
+        &mut overview,
+        "Goal ID",
+        string_or(goal, "id", "Unknown"),
+        256,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Status",
+        string_or(goal, "status", "Unknown"),
+        128,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Priority",
+        string_or(goal, "priority", "Unknown"),
+        128,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Reporter",
+        string_or(goal, "reporter", "Unreported"),
+        256,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Assignee",
+        string_or(goal, "assignee", "Unassigned"),
+        256,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Created",
+        string_or(goal, "created", "Unknown"),
+        128,
+    );
+    push_bounded_line(
+        &mut overview,
+        "Updated",
+        string_or(goal, "updated", "Unknown"),
+        128,
+    );
+    push_bounded_optional_line(&mut overview, "Feature", goal, "feature_id", 256);
+    push_bounded_optional_line(&mut overview, "Node", goal, "node_id", 256);
+    sections.push(EvidenceSection::new(
+        "Goal identity",
+        overview.join("\n"),
+        IDENTITY_RESERVE,
+    ));
 
-    let mut commit_evidence = vec!["Commit evidence".to_string()];
-    push_optional_line(&mut commit_evidence, "Target branch", goal, "target_branch");
-    push_optional_line(
-        &mut commit_evidence,
+    let mut traceability = vec!["Branches and commit anchors".to_string()];
+    push_bounded_optional_line(
+        &mut traceability,
+        "Target branch",
+        goal,
+        "target_branch",
+        600,
+    );
+    push_bounded_optional_line(
+        &mut traceability,
         "Implementation branch",
         goal,
         "branch_name",
+        600,
     );
-    push_optional_line(&mut commit_evidence, "Base commit", goal, "base_commit");
-    push_optional_line(
-        &mut commit_evidence,
+    push_bounded_optional_line(&mut traceability, "Base commit", goal, "base_commit", 600);
+    push_bounded_optional_line(
+        &mut traceability,
         "Candidate commit",
         goal,
         "candidate_commit",
+        600,
     );
+    sections.push(EvidenceSection::new(
+        "branch and commit anchor evidence",
+        traceability.join("\n"),
+        TRACEABILITY_RESERVE,
+    ));
+
+    let mut commit_evidence = vec!["Delivered commits".to_string()];
     if commits.is_empty() {
         commit_evidence.push("Commits delivered: None recorded".to_string());
     } else {
@@ -290,67 +351,103 @@ fn jira_description(goal: &Value, commits: &[GitChange]) -> String {
             ));
         }
     }
-    sections.push(commit_evidence.join("\n"));
+    sections.push(EvidenceSection::new(
+        "delivered commit evidence",
+        commit_evidence.join("\n"),
+        COMMIT_RESERVE,
+    ));
 
     if let Some(rounds) = goal.get("rounds").and_then(Value::as_array) {
+        let round_count = rounds.len().max(1);
+        let request_limit = (12_000 / round_count).max(512);
+        let implementation_limit = (8_000 / round_count).max(512);
+        let guidance_limit = (2_000 / round_count).max(256);
+        let mut outcomes = vec!["Round outcomes, Quality, and governance".to_string()];
+        let mut requested_work = vec!["Round requested work".to_string()];
+        let mut implementation = vec!["Round implementation outcomes".to_string()];
+        let mut guidance = vec!["Round guidance decisions".to_string()];
         for (index, round) in rounds.iter().enumerate() {
-            let mut lines = vec![format!("Round {}", index + 1)];
-            push_optional_line(&mut lines, "Reporter", round, "reporter");
-            push_optional_line(&mut lines, "Assignee", round, "assignee");
-            push_optional_line(&mut lines, "Created", round, "created");
-            push_optional_line(&mut lines, "Updated", round, "updated");
-            push_optional_block(&mut lines, "Requested work", round, "prompt");
-            push_optional_block(&mut lines, "Guidance decision", round, "guidance_decision");
-            push_optional_block(
-                &mut lines,
-                "What changed and verification",
-                round,
-                "implementation_report",
-            );
-            push_optional_line(
-                &mut lines,
+            let round_number = index + 1;
+            outcomes.push(format!("Round {round_number}"));
+            push_bounded_optional_line(&mut outcomes, "Reporter", round, "reporter", 256);
+            push_bounded_optional_line(&mut outcomes, "Assignee", round, "assignee", 256);
+            push_bounded_optional_line(&mut outcomes, "Created", round, "created", 128);
+            push_bounded_optional_line(&mut outcomes, "Updated", round, "updated", 128);
+            push_bounded_optional_line(
+                &mut outcomes,
                 "Implementation reported at",
                 round,
                 "implementation_reported_at",
+                128,
             );
-            push_optional_line(&mut lines, "Quality state", round, "quality_state");
-            push_optional_block(&mut lines, "Quality result", round, "quality_message");
-            push_optional_json(&mut lines, "Quality details", round, "quality_details");
-            push_optional_line(
-                &mut lines,
-                "Quality checked at",
-                round,
-                "quality_checked_at",
-            );
-            push_optional_line(&mut lines, "Rule state", round, "rule_state");
-            push_optional_line(&mut lines, "Product state", round, "product_state");
-            push_optional_line(
-                &mut lines,
-                "Constitution state",
-                round,
-                "constitution_state",
-            );
-            push_optional_line(&mut lines, "Meta rule state", round, "meta_rule_state");
-            push_optional_block(&mut lines, "Governance result", round, "governance_message");
-            push_optional_json(
-                &mut lines,
-                "Governance details",
-                round,
-                "governance_details",
-            );
-            push_optional_json(
-                &mut lines,
-                "Governance rule actions",
-                round,
-                "governance_rule_actions",
-            );
-            push_optional_line(
-                &mut lines,
+            push_quality_summary(&mut outcomes, round);
+            push_bounded_optional_line(
+                &mut outcomes,
                 "Governance checked at",
                 round,
                 "governance_checked_at",
+                128,
             );
-            sections.push(lines.join("\n"));
+            push_governance_summary(&mut outcomes, round);
+
+            if let Some(prompt) = nonempty_string(round, "prompt") {
+                requested_work.push(format!(
+                    "Round {round_number}:\n{}",
+                    truncate_with_marker(
+                        prompt,
+                        request_limit,
+                        &format!("Round {round_number} requested work")
+                    )
+                ));
+            }
+            if let Some(report) = nonempty_string(round, "implementation_report") {
+                implementation.push(format!(
+                    "Round {round_number}:\n{}",
+                    truncate_with_marker(
+                        report,
+                        implementation_limit,
+                        &format!("Round {round_number} implementation outcome")
+                    )
+                ));
+            }
+            if let Some(decision) = nonempty_string(round, "guidance_decision") {
+                guidance.push(format!(
+                    "Round {round_number}:\n{}",
+                    truncate_with_marker(
+                        decision,
+                        guidance_limit,
+                        &format!("Round {round_number} guidance decision")
+                    )
+                ));
+            }
+        }
+        if outcomes.len() > 1 {
+            sections.push(EvidenceSection::new(
+                "round outcome, Quality, and governance evidence",
+                outcomes.join("\n"),
+                OUTCOME_RESERVE,
+            ));
+        }
+        if requested_work.len() > 1 {
+            sections.push(EvidenceSection::new(
+                "round requested work",
+                requested_work.join("\n\n"),
+                REQUEST_RESERVE,
+            ));
+        }
+        if implementation.len() > 1 {
+            sections.push(EvidenceSection::new(
+                "round implementation outcomes",
+                implementation.join("\n\n"),
+                IMPLEMENTATION_RESERVE,
+            ));
+        }
+        if guidance.len() > 1 {
+            sections.push(EvidenceSection::new(
+                "round guidance decisions",
+                guidance.join("\n\n"),
+                GUIDANCE_RESERVE,
+            ));
         }
     }
 
@@ -364,10 +461,83 @@ fn jira_description(goal: &Value, commits: &[GitChange]) -> String {
             let body = string_or(note, "body", "");
             lines.push(format!("- {created} | {author} | {body}"));
         }
-        sections.push(lines.join("\n"));
+        sections.push(EvidenceSection::new(
+            "Goal notes",
+            lines.join("\n"),
+            NOTES_RESERVE,
+        ));
     }
 
-    sections.join("\n\n")
+    render_budgeted_sections(&sections, JIRA_DESCRIPTION_LIMIT)
+}
+
+#[derive(Debug)]
+struct EvidenceSection {
+    omission_label: &'static str,
+    text: String,
+    reserve: usize,
+}
+
+impl EvidenceSection {
+    fn new(omission_label: &'static str, text: String, reserve: usize) -> Self {
+        Self {
+            omission_label,
+            text,
+            reserve,
+        }
+    }
+}
+
+fn render_budgeted_sections(sections: &[EvidenceSection], limit: usize) -> String {
+    let mut rendered = String::new();
+    for (index, section) in sections.iter().enumerate() {
+        let separator_len = usize::from(index > 0) * 2;
+        let later_reserve = sections[index + 1..]
+            .iter()
+            .map(|later| {
+                let full_len = later.text.chars().count() + 2;
+                full_len.min(later.reserve)
+            })
+            .sum::<usize>();
+        let used = rendered.chars().count();
+        let available = limit.saturating_sub(used).saturating_sub(later_reserve);
+        if available <= separator_len {
+            continue;
+        }
+        if separator_len > 0 {
+            rendered.push_str("\n\n");
+        }
+        let content_limit = available - separator_len;
+        rendered.push_str(&truncate_with_marker(
+            &section.text,
+            content_limit,
+            section.omission_label,
+        ));
+    }
+    rendered
+}
+
+fn truncate_with_marker(value: &str, limit: usize, label: &str) -> String {
+    let total = value.chars().count();
+    if total <= limit {
+        return value.to_string();
+    }
+
+    let shortest_marker = format!("[omitted: {label}]");
+    if shortest_marker.chars().count() > limit {
+        return shortest_marker.chars().take(limit).collect();
+    }
+
+    let mut retained = limit.saturating_sub(shortest_marker.chars().count());
+    loop {
+        let omitted = total.saturating_sub(retained);
+        let marker = format!("\n[shortened: {label}; {omitted} characters omitted]");
+        let next_retained = limit.saturating_sub(marker.chars().count());
+        if next_retained == retained {
+            return value.chars().take(retained).chain(marker.chars()).collect();
+        }
+        retained = next_retained;
+    }
 }
 
 fn required_string<'a>(value: &'a Value, key: &str) -> RefineResult<&'a str> {
@@ -388,32 +558,228 @@ fn string_or<'a>(value: &'a Value, key: &str, fallback: &'a str) -> &'a str {
     nonempty_string(value, key).unwrap_or(fallback)
 }
 
-fn push_optional_line(lines: &mut Vec<String>, label: &str, value: &Value, key: &str) {
+fn push_bounded_optional_line(
+    lines: &mut Vec<String>,
+    label: &str,
+    value: &Value,
+    key: &str,
+    value_limit: usize,
+) {
     if let Some(value) = nonempty_string(value, key) {
-        lines.push(format!("{label}: {value}"));
+        push_bounded_line(lines, label, value, value_limit);
     }
 }
 
-fn push_optional_block(lines: &mut Vec<String>, label: &str, value: &Value, key: &str) {
-    if let Some(value) = nonempty_string(value, key) {
-        lines.push(format!("{label}:\n{value}"));
-    }
+fn push_bounded_line(lines: &mut Vec<String>, label: &str, value: &str, value_limit: usize) {
+    lines.push(format!(
+        "{label}: {}",
+        truncate_with_marker(value, value_limit, label)
+    ));
 }
 
-fn push_optional_json(lines: &mut Vec<String>, label: &str, value: &Value, key: &str) {
-    let Some(value) = value.get(key).filter(|value| !value.is_null()) else {
+fn push_quality_summary(lines: &mut Vec<String>, round: &Value) {
+    push_bounded_optional_line(lines, "Quality state", round, "quality_state", 128);
+    push_bounded_optional_line(lines, "Quality result", round, "quality_message", 768);
+    push_bounded_optional_line(
+        lines,
+        "Quality checked at",
+        round,
+        "quality_checked_at",
+        128,
+    );
+
+    let Some(details) = round
+        .get("quality_details")
+        .filter(|value| !value.is_null())
+    else {
         return;
     };
-    if value.as_str().is_some_and(|value| value.trim().is_empty()) {
+    if let Some(detail) = compact_scalar(details) {
+        push_unique_line(
+            lines,
+            format!(
+                "Quality detail: {}",
+                truncate_with_marker(&detail, 768, "Quality detail")
+            ),
+        );
         return;
     }
-    if value.as_array().is_some_and(Vec::is_empty)
-        || value.as_object().is_some_and(serde_json::Map::is_empty)
+    for (key, label) in [
+        ("evaluation_scope", "scope"),
+        ("command", "command"),
+        ("exit_code", "exit code"),
+        ("cwd", "working directory"),
+        ("source_candidate_commit", "source candidate"),
+        ("candidate_commit", "evaluated commit"),
+        ("operation_id", "operation"),
+    ] {
+        if let Some(value) = details.get(key).and_then(compact_scalar) {
+            push_unique_line(
+                lines,
+                format!(
+                    "Quality {label}: {}",
+                    truncate_with_marker(&value, 768, &format!("Quality {label}"))
+                ),
+            );
+        }
+    }
+    if let Some(results) = details.get("results").and_then(Value::as_array)
+        && !results.is_empty()
     {
-        return;
+        let mut states = BTreeMap::<String, usize>::new();
+        for result in results {
+            let state = ["status", "state", "result"]
+                .iter()
+                .find_map(|key| result.get(key).and_then(compact_scalar))
+                .unwrap_or_else(|| "recorded".to_string());
+            *states.entry(state).or_default() += 1;
+        }
+        let counts = states
+            .into_iter()
+            .map(|(state, count)| format!("{state}={count}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        push_unique_line(
+            lines,
+            format!("Quality checks: {} ({counts})", results.len()),
+        );
     }
-    let rendered = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
-    lines.push(format!("{label}:\n{rendered}"));
+}
+
+fn push_governance_summary(lines: &mut Vec<String>, round: &Value) {
+    let states = [
+        ("rule_state", "rule"),
+        ("product_state", "product"),
+        ("constitution_state", "constitution"),
+        ("meta_rule_state", "meta-rule"),
+    ]
+    .into_iter()
+    .filter_map(|(key, label)| {
+        nonempty_string(round, key).map(|value| {
+            format!(
+                "{label}={}",
+                truncate_with_marker(value, 128, &format!("{label} governance state"))
+            )
+        })
+    })
+    .collect::<Vec<_>>();
+    if !states.is_empty() {
+        lines.push(format!("Governance states: {}", states.join(", ")));
+    }
+    push_bounded_optional_line(lines, "Governance result", round, "governance_message", 768);
+
+    let details = round
+        .get("governance_details")
+        .filter(|value| !value.is_null());
+    if let Some(detail) = details.and_then(compact_scalar) {
+        push_unique_line(
+            lines,
+            format!(
+                "Governance detail: {}",
+                truncate_with_marker(&detail, 768, "Governance detail")
+            ),
+        );
+    } else if let Some(details) = details {
+        for (key, label) in [
+            ("phase", "phase"),
+            ("configured", "configured"),
+            ("rules_checked", "rules checked"),
+        ] {
+            if let Some(value) = details.get(key).and_then(compact_scalar) {
+                push_unique_line(
+                    lines,
+                    format!(
+                        "Governance {label}: {}",
+                        truncate_with_marker(&value, 256, &format!("Governance {label}"))
+                    ),
+                );
+            }
+        }
+    }
+
+    let explicit_actions = round
+        .get("governance_rule_actions")
+        .and_then(Value::as_array)
+        .filter(|actions| !actions.is_empty());
+    let actions = explicit_actions.or_else(|| {
+        details.and_then(|details| {
+            ["failed_actions", "violations", "rule_violations"]
+                .iter()
+                .find_map(|key| {
+                    details
+                        .get(key)
+                        .and_then(Value::as_array)
+                        .filter(|actions| !actions.is_empty())
+                })
+                .or_else(|| {
+                    details.get("verdict").and_then(|verdict| {
+                        ["failed_actions", "violations", "rule_violations"]
+                            .iter()
+                            .find_map(|key| {
+                                verdict
+                                    .get(key)
+                                    .and_then(Value::as_array)
+                                    .filter(|actions| !actions.is_empty())
+                            })
+                    })
+                })
+        })
+    });
+    let Some(actions) = actions else {
+        return;
+    };
+    let mut seen = BTreeSet::new();
+    for action in actions {
+        let rendered = compact_governance_action(action);
+        if !rendered.is_empty() && seen.insert(rendered.clone()) {
+            lines.push(format!(
+                "Governance action: {}",
+                truncate_with_marker(&rendered, 1_200, "governance action")
+            ));
+        }
+    }
+}
+
+fn compact_governance_action(action: &Value) -> String {
+    if let Some(value) = compact_scalar(action) {
+        return value;
+    }
+    [
+        ("rule_id", "rule"),
+        ("action", "action"),
+        ("status", "status"),
+        ("message", "message"),
+        ("reason", "reason"),
+        ("summary", "summary"),
+        ("text", "text"),
+        ("rule", "requirement"),
+    ]
+    .into_iter()
+    .filter_map(|(key, label)| {
+        action
+            .get(key)
+            .and_then(compact_scalar)
+            .map(|value| format!("{label}={value}"))
+    })
+    .collect::<Vec<_>>()
+    .join("; ")
+}
+
+fn compact_scalar(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => {
+            let value = value.trim();
+            (!value.is_empty()).then(|| value.to_string())
+        }
+        Value::Bool(_) | Value::Number(_) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn push_unique_line(lines: &mut Vec<String>, line: String) {
+    if !lines.iter().any(|existing| existing == &line) {
+        lines.push(line);
+    }
 }
 
 fn title_case(value: &str) -> String {
@@ -522,6 +888,168 @@ mod tests {
     }
 
     #[test]
+    fn budgeted_renderer_handles_exact_boundary_overflow_and_unicode() {
+        let exact = vec![EvidenceSection::new(
+            "exact-boundary evidence",
+            "x".repeat(JIRA_DESCRIPTION_LIMIT),
+            JIRA_DESCRIPTION_LIMIT,
+        )];
+        let exact_rendered = render_budgeted_sections(&exact, JIRA_DESCRIPTION_LIMIT);
+        assert_eq!(exact_rendered.chars().count(), JIRA_DESCRIPTION_LIMIT);
+        assert_eq!(exact_rendered, exact[0].text);
+        assert!(!exact_rendered.contains("[shortened:"));
+
+        let over = vec![EvidenceSection::new(
+            "Unicode narrative",
+            "界".repeat(JIRA_DESCRIPTION_LIMIT + 500),
+            JIRA_DESCRIPTION_LIMIT,
+        )];
+        let first = render_budgeted_sections(&over, JIRA_DESCRIPTION_LIMIT);
+        let second = render_budgeted_sections(&over, JIRA_DESCRIPTION_LIMIT);
+        assert_eq!(first, second);
+        assert_eq!(first.chars().count(), JIRA_DESCRIPTION_LIMIT);
+        assert!(first.contains("[shortened: Unicode narrative;"));
+        assert!(first.ends_with("characters omitted]"));
+        assert!(first.is_char_boundary(first.len()));
+    }
+
+    #[test]
+    fn large_multi_round_goal_is_bounded_auditable_and_csv_round_trips() {
+        let verbose_raw_output = format!(
+            "RAW_PROVIDER_OUTPUT_MUST_NOT_BE_REPLAYED {}",
+            "判定".repeat(2_500)
+        );
+        let rounds = (1..=6)
+            .map(|round| {
+                json!({
+                    "reporter": "Buddy Williams",
+                    "assignee": "Delivery Agent",
+                    "created": format!("2026-07-{round:02}T10:00:00Z"),
+                    "updated": format!("2026-07-{round:02}T11:00:00Z"),
+                    "prompt": format!(
+                        "ROUND-{round}-REQUEST preserve Jira evidence.\n{}",
+                        "large requested work with Unicode 🧭, commas, and \"quotes\". ".repeat(75)
+                    ),
+                    "implementation_report": format!(
+                        "ROUND-{round}-OUTCOME verified shared export behavior. {}",
+                        "implementation evidence passed. ".repeat(25)
+                    ),
+                    "implementation_reported_at": format!("2026-07-{round:02}T11:00:00Z"),
+                    "quality_state": "passed",
+                    "quality_message": format!("Round {round} Quality passed"),
+                    "quality_checked_at": format!("2026-07-{round:02}T11:10:00Z"),
+                    "quality_details": {
+                        "evaluation_scope": "source_candidate",
+                        "command": "cargo test --lib",
+                        "exit_code": 0,
+                        "candidate_commit": "candidate456",
+                        "results": [
+                            {"test": "unit", "status": "passed", "output": verbose_raw_output},
+                            {"test": "browser", "status": "passed", "output": verbose_raw_output}
+                        ],
+                        "raw_output": verbose_raw_output
+                    },
+                    "rule_state": "passed",
+                    "product_state": "passed",
+                    "constitution_state": "passed",
+                    "meta_rule_state": "passed",
+                    "governance_message": format!("Round {round} governance passed"),
+                    "governance_checked_at": format!("2026-07-{round:02}T11:20:00Z"),
+                    "governance_details": {
+                        "phase": "post_implementation",
+                        "configured": true,
+                        "rules_checked": 9,
+                        "raw_output": verbose_raw_output,
+                        "verdict": {
+                            "status": "passed",
+                            "message": format!("Round {round} governance passed"),
+                            "provider_payload": verbose_raw_output
+                        },
+                        "failed_actions": [{
+                            "rule_id": "rule-6",
+                            "action": "record",
+                            "message": "Verification evidence retained"
+                        }]
+                    },
+                    "governance_rule_actions": [{
+                        "rule_id": "rule-6",
+                        "action": "record",
+                        "message": "Verification evidence retained"
+                    }]
+                })
+            })
+            .collect::<Vec<_>>();
+        let goal = json!({
+            "id": "00000SZ1T921F15X91MBZWE000",
+            "name": "Large Jira \"evidence\", export",
+            "status": "review",
+            "priority": "high",
+            "reporter": "Buddy Williams",
+            "assignee": "Delivery Agent",
+            "feature_id": "FEATURE-AUDIT",
+            "node_id": "default",
+            "target_branch": "main",
+            "branch_name": "refine/large-jira/round-6",
+            "base_commit": "base123",
+            "candidate_commit": "candidate456",
+            "created": "2026-07-01T10:00:00Z",
+            "updated": "2026-07-06T11:20:00Z",
+            "rounds": rounds,
+            "notes": [{
+                "author": "Reviewer",
+                "created": "2026-07-06T11:30:00Z",
+                "body": format!("Review note: {}", "retain audit context. ".repeat(100))
+            }]
+        });
+        let commits = vec![GitChange {
+            commit: "candidate456".to_string(),
+            committed_time: "2026-07-06T11:00:00Z".to_string(),
+            subject: "Keep Jira evidence importable".to_string(),
+            branch: Some("refine/large-jira/round-6".to_string()),
+        }];
+
+        let description = jira_description(&goal, &commits);
+        assert!(description.chars().count() <= JIRA_DESCRIPTION_LIMIT);
+        for evidence in [
+            "Goal ID: 00000SZ1T921F15X91MBZWE000",
+            "Status: review",
+            "Priority: high",
+            "Reporter: Buddy Williams",
+            "Assignee: Delivery Agent",
+            "Feature: FEATURE-AUDIT",
+            "Node: default",
+            "Target branch: main",
+            "Implementation branch: refine/large-jira/round-6",
+            "Base commit: base123",
+            "Candidate commit: candidate456",
+            "Keep Jira evidence importable",
+            "ROUND-6-OUTCOME verified shared export behavior",
+            "Quality checks: 2 (passed=2)",
+            "Governance action: rule=rule-6",
+        ] {
+            assert!(description.contains(evidence), "missing {evidence}");
+        }
+        assert!(description.contains("[shortened: Round 1 requested work;"));
+        assert!(description.contains("characters omitted]"));
+        assert!(!description.contains("RAW_PROVIDER_OUTPUT_MUST_NOT_BE_REPLAYED"));
+        assert_eq!(
+            description
+                .matches("Governance action: rule=rule-6")
+                .count(),
+            6,
+            "the explicit action must not be duplicated from governance details"
+        );
+        assert_eq!(description, jira_description(&goal, &commits));
+
+        let row = jira_row(&goal, &commits).unwrap();
+        let parsed = parse_csv_row(&row);
+        assert_eq!(parsed.len(), JIRA_HEADERS.len());
+        assert_eq!(parsed[0], "Large Jira \"evidence\", export");
+        assert_eq!(parsed[1], description);
+        assert_eq!(parsed[5], "00000SZ1T921F15X91MBZWE000");
+    }
+
+    #[test]
     fn bulk_jira_export_uses_shared_selection_and_stable_goal_order() {
         let root = unique_temp_dir("jira-bulk-export");
         let refine_dir = root.join(".refine");
@@ -536,6 +1064,17 @@ mod tests {
                 .append_goal_round_summary(id, "Auditor", &format!("Implement {id}"))
                 .unwrap();
         }
+        work_items
+            .edit_latest_goal_round_summary(
+                "GOAL1",
+                None,
+                None,
+                Some(&format!(
+                    "Oversized valid request {}",
+                    "evidence ".repeat(5_000)
+                )),
+            )
+            .unwrap();
 
         let service = FileGoalExportService::new(&refine_dir, &root);
         let selected = service
@@ -556,6 +1095,7 @@ mod tests {
             selected.csv.find("Selected first").unwrap()
                 < selected.csv.find("Selected second").unwrap()
         );
+        assert!(selected.csv.contains("[shortened: Round 1 requested work;"));
         assert!(!selected.csv.contains("Ignored Goal"));
 
         let all_matching_except_one = service
@@ -584,6 +1124,29 @@ mod tests {
         );
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    fn parse_csv_row(record: &str) -> Vec<String> {
+        let mut fields = Vec::new();
+        let mut field = String::new();
+        let mut chars = record.chars().peekable();
+        let mut quoted = false;
+        while let Some(ch) = chars.next() {
+            match ch {
+                '"' if quoted && chars.peek() == Some(&'"') => {
+                    field.push('"');
+                    chars.next();
+                }
+                '"' => quoted = !quoted,
+                ',' if !quoted => {
+                    fields.push(std::mem::take(&mut field));
+                }
+                _ => field.push(ch),
+            }
+        }
+        assert!(!quoted, "CSV row ended inside a quoted field");
+        fields.push(field);
+        fields
     }
 
     fn unique_temp_dir(label: &str) -> PathBuf {
