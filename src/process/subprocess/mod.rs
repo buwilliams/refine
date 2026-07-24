@@ -225,10 +225,35 @@ pub fn workflow_subprocess_metadata(
     metadata
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct ProcessPauseState {
-    pub background_processes_stopped: bool,
-    pub agents_paused: bool,
+    pub workflow_paused: bool,
+}
+
+impl<'de> Deserialize<'de> for ProcessPauseState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct WireState {
+            #[serde(default)]
+            workflow_paused: Option<bool>,
+            #[serde(default)]
+            paused: Option<bool>,
+            #[serde(default)]
+            background_processes_stopped: bool,
+            #[serde(default)]
+            agents_paused: bool,
+        }
+
+        let wire = WireState::deserialize(deserializer)?;
+        let workflow_paused = wire
+            .workflow_paused
+            .or(wire.paused)
+            .unwrap_or(wire.background_processes_stopped || wire.agents_paused);
+        Ok(Self { workflow_paused })
+    }
 }
 
 pub trait ProcessSupervisor {
@@ -681,19 +706,10 @@ impl FileProcessSupervisor {
         })
     }
 
-    pub fn set_background_processes_stopped(
-        &self,
-        stopped: bool,
-    ) -> RefineResult<ProcessPauseState> {
-        let mut state = self.pause_state()?;
-        state.background_processes_stopped = stopped;
-        self.write_pause_state(&state)?;
-        Ok(state)
-    }
-
-    pub fn set_agents_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
-        let mut state = self.pause_state()?;
-        state.agents_paused = paused;
+    pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
+        let state = ProcessPauseState {
+            workflow_paused: paused,
+        };
         self.write_pause_state(&state)?;
         Ok(state)
     }
@@ -1195,17 +1211,6 @@ impl FileProcessSupervisor {
     }
 
     fn validate_launch(&self, spec: &ManagedProcessSpec) -> RefineResult<()> {
-        let pause_state = self.pause_state()?;
-        if pause_state.agents_paused && spec.owner == ProcessOwner::Agent {
-            return Err(RefineError::Conflict(
-                "agent process launch is paused".to_string(),
-            ));
-        }
-        if pause_state.background_processes_stopped && is_background_owner(&spec.owner) {
-            return Err(RefineError::Conflict(
-                "background process launch is stopped".to_string(),
-            ));
-        }
         if spec.command.trim().is_empty() {
             return Err(RefineError::InvalidInput(
                 "managed process command is required".to_string(),
@@ -1535,18 +1540,6 @@ impl FileProcessSupervisor {
         }
         Ok(true)
     }
-}
-
-fn is_background_owner(owner: &ProcessOwner) -> bool {
-    matches!(
-        owner,
-        ProcessOwner::Runner
-            | ProcessOwner::TargetApp
-            | ProcessOwner::Agent
-            | ProcessOwner::Quality
-            | ProcessOwner::Import
-            | ProcessOwner::Maintenance
-    )
 }
 
 pub(crate) fn acquire_workflow_process_registration_lock(
@@ -2145,11 +2138,26 @@ mod tests {
         assert_eq!(process.api_json()["kind"], "agent");
         assert_eq!(process.state, "running");
 
-        let stopped = supervisor.set_background_processes_stopped(true).unwrap();
-        assert!(stopped.background_processes_stopped);
-        let paused = supervisor.set_agents_paused(true).unwrap();
-        assert!(paused.agents_paused);
+        let paused = supervisor.set_workflow_paused(true).unwrap();
+        assert!(paused.workflow_paused);
         assert!(supervisor.pause_state_path().exists());
+        let stored: Value =
+            serde_json::from_slice(&fs::read(supervisor.pause_state_path()).unwrap()).unwrap();
+        assert_eq!(stored, json!({"workflow_paused": true}));
+
+        fs::write(
+            supervisor.pause_state_path(),
+            serde_json::to_vec_pretty(&json!({
+                "background_processes_stopped": true,
+                "agents_paused": false
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(
+            supervisor.pause_state().unwrap().workflow_paused,
+            "legacy split pause state must migrate to the single workflow gate"
+        );
 
         let stopped = supervisor.signal(&process.id, "stop").unwrap();
         assert_eq!(stopped.state, "stopped");
@@ -2335,24 +2343,28 @@ mod tests {
     }
 
     #[test]
-    fn file_process_supervisor_applies_pause_gates_and_recovers_stale_processes() {
+    fn file_process_supervisor_keeps_process_launch_separate_from_workflow_pause_and_recovers_stale_processes()
+     {
         let temp_root = unique_temp_dir("process-recover");
         let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));
-        supervisor.set_agents_paused(true).unwrap();
-        let rejected = supervisor.launch(ManagedProcessSpec {
-            owner: ProcessOwner::Agent,
-            command: shell_binary().to_string(),
-            args: shell_args("printf blocked").to_vec(),
-            cwd: None,
-            env: Vec::new(),
-            stdin: None,
-            limits: None,
-            authorization_command: None,
-            sensitive: false,
-            metadata: Default::default(),
-        });
-        assert!(rejected.is_err());
-        supervisor.set_agents_paused(false).unwrap();
+        supervisor.set_workflow_paused(true).unwrap();
+        let launched = supervisor
+            .launch(ManagedProcessSpec {
+                owner: ProcessOwner::Agent,
+                command: shell_binary().to_string(),
+                args: long_running_shell_args().to_vec(),
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+                metadata: Default::default(),
+            })
+            .unwrap();
+        assert_eq!(launched.state, "running");
+        supervisor.set_workflow_paused(false).unwrap();
+        supervisor.signal(&launched.id, "terminate").unwrap();
 
         supervisor
             .register(ManagedProcess {
@@ -2527,7 +2539,6 @@ mod tests {
         fs::write(
             runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
             serde_json::to_vec_pretty(&json!({
-                "paused": [],
                 "claims": [{
                     "claim_id": "claim-cancelled",
                     "goal_id": "GOAL-CANCELLED",

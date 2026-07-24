@@ -3,12 +3,7 @@
 let supervisorProcessExpanded = false;
 
 function renderProcessesTab(processData, settings, diag, dash) {
-  const backgroundStopped = typeof processData.background_processes_stopped === "boolean"
-    ? processData.background_processes_stopped
-    : settings.paused === "1";
-  const agentsPaused = typeof processData.agents_paused === "boolean"
-    ? processData.agents_paused
-    : settings.agents_paused === "1";
+  const workflowPaused = workflowPausedFor(processData);
   const backend = processData.backend || diag.backend || dash.backend || {};
   const processes = (processData.processes || []).map(normalizeManagedProcess);
   const runnerWork = processData.runner_work || [];
@@ -17,7 +12,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     : !!diag.reachable;
   const anchorMs = Date.now();
   const rows = buildManagedProcessRows(
-    processes, { backgroundStopped, agentsPaused }, backend, runnerReachable, diag,
+    processes, workflowPaused, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
   const agentRows = (processes || [])
     .filter(isCurrentAgentProviderProcessRecord)
@@ -96,9 +91,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>`;
 }
 
-function buildManagedProcessRows(processes, pauseState, backend, runnerReachable, diag) {
-  const backgroundStopped = !!pauseState.backgroundStopped;
-  const agentsPaused = !!pauseState.agentsPaused;
+function buildManagedProcessRows(processes, workflowPaused, backend, runnerReachable, diag) {
   const rows = (processes || [])
     .filter(isCurrentLongLivedManagedProcess)
     .map((proc) => {
@@ -113,19 +106,17 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
   if (!rows.some((proc) => proc.kind === "target_app")) {
     rows.push(syntheticTargetAppProcess());
   }
-  const workflowPaused = backgroundStopped || agentsPaused;
   const workflowAutomation = {
     id: "workflow-automation",
     kind: "workflow_automation",
     label: "Workflow automation",
-    status: backgroundStopped || agentsPaused ? "paused" : "active",
+    status: workflowPaused ? "paused" : "active",
     runner_reachable: runnerReachable,
     pid: null,
     details: workflowPaused
-      ? "Workflow automation is paused; Goal agents, QA, and builds wait."
+      ? "Workflow admission is paused; active executions continue and new work waits."
       : "Workflow automation can run Goal agents, QA, and builds.",
-    agents_paused: agentsPaused,
-    background_processes_stopped: backgroundStopped,
+    paused: workflowPaused,
     actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
@@ -238,8 +229,7 @@ function orderManagedProcessRows(rows, workflowAutomation, supervised) {
   return [
     {
       ...supervisor,
-      agents_paused: workflowAutomation.agents_paused,
-      background_processes_stopped: workflowAutomation.background_processes_stopped,
+      paused: workflowAutomation.paused,
       runner_reachable: workflowAutomation.runner_reachable,
       supervisor_parent: true,
       supervisor_expanded: supervisorProcessExpanded,
@@ -475,6 +465,12 @@ function workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggl
   return actions;
 }
 
+function workflowPausedFor(value = {}) {
+  if (typeof value.paused === "boolean") return value.paused;
+  if (typeof value.workflow_paused === "boolean") return value.workflow_paused;
+  return !!value.background_processes_stopped || !!value.agents_paused;
+}
+
 function processActionIds(proc) {
   if (Array.isArray(proc.management_actions)) return proc.management_actions;
   if (Array.isArray(proc.actions)) {
@@ -482,16 +478,16 @@ function processActionIds(proc) {
     if (supported.length) return supported;
   }
   if (proc.kind === "supervisor") {
-    const workflowPaused = !!proc.background_processes_stopped || !!proc.agents_paused;
+    const workflowPaused = workflowPausedFor(proc);
     return [workflowPaused ? "unpause_workflow" : "pause_workflow"];
   }
   if (proc.kind === "workflow_automation" || proc.kind === "agent_automation") {
-    const workflowPaused = !!proc.background_processes_stopped || !!proc.agents_paused;
+    const workflowPaused = workflowPausedFor(proc);
     return [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
   }
   if (proc.kind === "background_processes") {
-    const stopped = !!proc.background_processes_stopped;
-    return [stopped ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
+    const workflowPaused = workflowPausedFor(proc);
+    return [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
   }
   return null;
 }
@@ -578,7 +574,7 @@ function workflowToggleDisabled(proc) {
 
 function hardResetWorktreeDisabled(proc) {
   if (proc.kind === "background_processes") return proc.status === "paused";
-  return !!proc.background_processes_stopped || !!proc.agents_paused;
+  return workflowPausedFor(proc);
 }
 
 function targetAppShowsStopAction(state) {
@@ -906,7 +902,7 @@ function bindSettingsProcessesTab(s) {
       const shouldPause = b.dataset.toggleWorkflow === "pause";
       const ok = shouldPause
         ? await modalConfirm(
-            "Pause workflow automation? Refine will stop launching Goal agents, QA, builds, and merges until you unpause.",
+            "Pause workflow automation? Refine will stop admitting new Goal work until you unpause. Active executions continue; use Stop on an Agent to interrupt it.",
             { title: "Pause Workflow", okLabel: "Pause Workflow", danger: true },
           )
         : true;

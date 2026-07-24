@@ -84,9 +84,10 @@ impl InProcessWebServer {
             .pause_state()
             .ok()?;
         Some(json!({
-            "paused": pause_state.agents_paused || pause_state.background_processes_stopped,
-            "agents_paused": pause_state.agents_paused,
-            "background_processes_stopped": pause_state.background_processes_stopped,
+            "paused": pause_state.workflow_paused,
+            "workflow_paused": pause_state.workflow_paused,
+            "agents_paused": pause_state.workflow_paused,
+            "background_processes_stopped": pause_state.workflow_paused,
             "runtime_root": runtime_root.display().to_string()
         }))
     }

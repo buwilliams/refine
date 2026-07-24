@@ -373,13 +373,13 @@ impl InProcessWebServer {
             Ok(state) => state,
             Err(error) => return error_response(error),
         };
-        let stopped = request
+        let paused = request
             .body
             .as_ref()
             .and_then(|body| body.get("stopped"))
             .and_then(|stopped| stopped.as_bool())
-            .unwrap_or(!current.background_processes_stopped);
-        self.set_workflow_paused_response(stopped)
+            .unwrap_or(!current.workflow_paused);
+        self.set_workflow_paused_response(paused)
     }
 
     pub(super) fn handle_processes_agents(&self, request: ApiRequest) -> ApiResponse {
@@ -395,7 +395,7 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("paused"))
             .and_then(|paused| paused.as_bool())
-            .unwrap_or(!current.agents_paused);
+            .unwrap_or(!current.workflow_paused);
         self.set_workflow_paused_response(paused)
     }
 
@@ -412,7 +412,7 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("paused"))
             .and_then(|paused| paused.as_bool())
-            .unwrap_or(!(current.agents_paused || current.background_processes_stopped));
+            .unwrap_or(!current.workflow_paused);
         self.set_workflow_paused_response(paused)
     }
 
@@ -427,18 +427,7 @@ impl InProcessWebServer {
         let result = if let Some(target_root) = target_root {
             WorkflowEngine::with_target_root(runtime_root, target_root).set_workflow_paused(paused)
         } else {
-            let supervisor = FileProcessSupervisor::new(runtime_root);
-            if paused {
-                if let Err(error) = supervisor.set_agents_paused(true) {
-                    return error_response(error);
-                }
-                supervisor.set_background_processes_stopped(true)
-            } else {
-                if let Err(error) = supervisor.set_background_processes_stopped(false) {
-                    return error_response(error);
-                }
-                supervisor.set_agents_paused(false)
-            }
+            FileProcessSupervisor::new(runtime_root).set_workflow_paused(paused)
         };
         match result {
             Ok(_) => self.handle_processes("/processes"),

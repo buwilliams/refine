@@ -1234,7 +1234,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_settings_update(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "update settings");
-        let body = request.body.unwrap_or_else(|| json!({}));
+        let mut body = request.body.unwrap_or_else(|| json!({}));
         if let Some(paused) = body.get("paused").map(runtime_bool_setting)
             && let Some(runtime_root) = &self.runtime_root
         {
@@ -1247,27 +1247,27 @@ impl InProcessWebServer {
                     }
                 }
                 Ok(None) => {
-                    let supervisor = FileProcessSupervisor::new(runtime_root);
-                    if paused {
-                        if let Err(error) = supervisor.set_agents_paused(true) {
-                            return error_response(error);
-                        }
-                        if let Err(error) = supervisor.set_background_processes_stopped(true) {
-                            return error_response(error);
-                        }
-                    } else {
-                        if let Err(error) = supervisor.set_background_processes_stopped(false) {
-                            return error_response(error);
-                        }
-                        if let Err(error) = supervisor.set_agents_paused(false) {
-                            return error_response(error);
-                        }
+                    if let Err(error) =
+                        FileProcessSupervisor::new(runtime_root).set_workflow_paused(paused)
+                    {
+                        return error_response(error);
                     }
                 }
                 Err(error) => return error_response(error),
             }
         }
-        match self.settings_service(&refine_dir).update(&body) {
+        if let Some(body) = body.as_object_mut() {
+            body.remove("paused");
+        }
+        let settings = self.settings_service(&refine_dir);
+        let updated = if body.as_object().is_some_and(|body| body.is_empty()) {
+            settings
+                .load()
+                .map(|settings| json!({"ok": true, "settings": settings}))
+        } else {
+            settings.update(&body)
+        };
+        match updated {
             Ok(value) => {
                 if let Err(error) = self.apply_current_runtime_settings() {
                     return error_response(error);

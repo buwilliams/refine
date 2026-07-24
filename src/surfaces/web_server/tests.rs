@@ -535,8 +535,7 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     git(&seed, &["push", "origin", "main"]).unwrap();
 
     let supervisor = FileProcessSupervisor::new(&runtime_root);
-    supervisor.set_agents_paused(true).unwrap();
-    supervisor.set_background_processes_stopped(true).unwrap();
+    supervisor.set_workflow_paused(true).unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(target_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -2094,8 +2093,7 @@ fn diagnostics_cache_keeps_process_health_live_after_startup_warming() {
         .unwrap(),
     )
     .unwrap();
-    supervisor.set_background_processes_stopped(true).unwrap();
-    supervisor.set_agents_paused(true).unwrap();
+    supervisor.set_workflow_paused(true).unwrap();
 
     let live = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2109,6 +2107,7 @@ fn diagnostics_cache_keeps_process_health_live_after_startup_warming() {
     assert_eq!(live.body["processes"]["background_processes_stopped"], true);
     assert_eq!(live.body["processes"]["agents_paused"], true);
     assert_eq!(live.body["processes"]["paused"], true);
+    assert_eq!(live.body["processes"]["workflow_paused"], true);
     assert_eq!(live.body["processes"]["processes"], json!([]));
     assert_eq!(live.body["provider"], warmed_provider);
     assert_eq!(live.body["doctor"], warmed_doctor);
@@ -6513,9 +6512,24 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(stopped.body["process"]["id"], "stop-test");
     assert!(supervisor.inspect("stop-test").is_err());
 
+    let legacy_background_pause = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/background".to_string(),
+        body: Some(json!({"stopped": true})),
+    });
+    assert_eq!(legacy_background_pause.status, 200);
+    assert_eq!(legacy_background_pause.body["workflow_paused"], true);
+    let legacy_agent_resume = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/agents".to_string(),
+        body: Some(json!({"paused": false})),
+    });
+    assert_eq!(legacy_agent_resume.status, 200);
+    assert_eq!(legacy_agent_resume.body["workflow_paused"], false);
+
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
-        .create_goal_summary("Pause workflow rollback", Some("GOAL-WORKFLOW"))
+        .create_goal_summary("Pause workflow drain", Some("GOAL-WORKFLOW"))
         .unwrap();
     work_items
         .transition_goal_status("GOAL-WORKFLOW", GoalStatus::Todo)
@@ -6529,6 +6543,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         body: Some(json!({"paused": true})),
     });
     assert_eq!(paused.status, 200);
+    assert_eq!(paused.body["paused"], true);
+    assert_eq!(paused.body["workflow_paused"], true);
     assert_eq!(paused.body["background_processes_stopped"], true);
     assert_eq!(paused.body["agents_paused"], true);
     let paused_supervisor = paused.body["processes"]
@@ -6547,7 +6563,11 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .unwrap()
             .goal
             .status,
-        GoalStatus::Todo
+        GoalStatus::InProgress
+    );
+    assert_eq!(
+        supervisor.inspect(&launched_agent.id).unwrap().state,
+        "running"
     );
     assert!(
         paused.body["runner_work"]
@@ -6563,6 +6583,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         body: Some(json!({"paused": false})),
     });
     assert_eq!(resumed.status, 200);
+    assert_eq!(resumed.body["paused"], false);
+    assert_eq!(resumed.body["workflow_paused"], false);
     assert_eq!(resumed.body["background_processes_stopped"], false);
     assert_eq!(resumed.body["agents_paused"], false);
     assert!(runtime_root.join("process-control.json").exists());
@@ -6571,7 +6593,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        cached.runtime.supervisor.unwrap()["agents_paused"],
+        cached.runtime.supervisor.unwrap()["workflow_paused"],
         json!(false)
     );
 
@@ -7714,7 +7736,9 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(updated.status, 200);
     assert_eq!(updated.body["settings"]["agent_cli"], "smoke-ai");
     assert_eq!(updated.body["settings"]["parallel_run_cap"], "3");
-    assert_eq!(updated.body["settings"]["paused"], "1");
+    assert!(updated.body["settings"].get("paused").is_none());
+    assert_eq!(updated.body["runtime"]["paused"], true);
+    assert_eq!(updated.body["runtime"]["workflow_paused"], true);
     assert_eq!(updated.body["runtime"]["agents_paused"], true);
     assert_eq!(
         updated.body["runtime"]["background_processes_stopped"],
@@ -8405,8 +8429,8 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
 }
 
 #[test]
-fn web_server_target_app_status_is_passive_when_background_launches_are_stopped() {
-    let temp_root = unique_temp_dir("http-target-status-passive");
+fn web_server_target_app_health_remains_available_while_workflow_is_paused() {
+    let temp_root = unique_temp_dir("http-target-status-while-paused");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&temp_root).unwrap();
 
@@ -8422,7 +8446,7 @@ fn web_server_target_app_status_is_passive_when_background_launches_are_stopped(
         })),
     });
     FileProcessSupervisor::new(&runtime_root)
-        .set_background_processes_stopped(true)
+        .set_workflow_paused(true)
         .unwrap();
 
     let status = server.handle(ApiRequest {
@@ -8440,11 +8464,9 @@ fn web_server_target_app_status_is_passive_when_background_launches_are_stopped(
         path: "/api/target-app/health".to_string(),
         body: None,
     });
-    assert_eq!(health.status, 409);
-    assert_eq!(
-        health.body["error"]["message"],
-        "background process launch is stopped"
-    );
+    assert_eq!(health.status, 200);
+    assert_eq!(health.body["state"], "running");
+    assert_eq!(health.body["last_health_ok"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -352,7 +352,7 @@ const GUIDE_CATEGORIES = [
         { hash: "#/node/processes", selector: ".managed-process-table, [data-toggle-workflow]" },
         { canUseDefault: false }),
       guideItem("process-pause-workflow", "Pause or unpause workflow", "Educate",
-        "Pausing workflow automation keeps the UI running while agents, queued builds, QA, and active background operations wait.",
+        "Pausing workflow automation keeps the UI and active executions running while new Goal work waits for admission. Stop an Agent separately when you need to interrupt active work.",
         "Default: workflow unpaused.",
         { hash: "#/node/processes", selector: "[data-toggle-workflow]" }),
       guideItem("process-agent-processes", "Agents", "Educate",

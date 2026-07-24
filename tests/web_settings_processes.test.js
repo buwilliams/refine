@@ -22,10 +22,25 @@ function processSettingsRuntime() {
     globalThis.processSettingsTest = {
       isAgent: isCurrentAgentProviderProcessRecord,
       renderActions: renderProcessActions,
+      workflowPausedFor,
     };
   `, context);
   return context.processSettingsTest;
 }
+
+test("workflow controls use one canonical pause gate", () => {
+  const processes = processSettingsRuntime();
+
+  assert.equal(processes.workflowPausedFor({ paused: true }), true);
+  assert.equal(processes.workflowPausedFor({
+    paused: false,
+    workflow_paused: true,
+    agents_paused: true,
+    background_processes_stopped: true,
+  }), false);
+  assert.equal(processes.workflowPausedFor({ workflow_paused: true }), true);
+  assert.equal(processes.workflowPausedFor({ agents_paused: true }), true);
+});
 
 test("Agents includes background and foreground provider processes", () => {
   const processes = processSettingsRuntime();

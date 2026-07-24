@@ -89,11 +89,13 @@ pub fn process_summary_value_with_chat_sessions(
     let runner_reachable = required_runner_workers_reachable(&process_values);
     Ok(json!({
         "runner_reachable": runner_reachable,
-        "paused": pause_state.background_processes_stopped || pause_state.agents_paused,
-        "background_processes_stopped": pause_state.background_processes_stopped,
-        "agents_paused": pause_state.agents_paused,
+        "paused": pause_state.workflow_paused,
+        "workflow_paused": pause_state.workflow_paused,
+        // Wire-compatible aliases. Both are derived from the single workflow gate.
+        "background_processes_stopped": pause_state.workflow_paused,
+        "agents_paused": pause_state.workflow_paused,
         "processes": process_values,
-        "runner_work": runner_work_summary(runtime_root, pause_state.background_processes_stopped),
+        "runner_work": runner_work_summary(runtime_root, pause_state.workflow_paused),
         "backend": {
             "process_model": "supervisor"
         }
@@ -258,7 +260,7 @@ fn process_management_actions(value: &Value, pause_state: &ProcessPauseState) ->
         return Vec::new();
     };
     let kind = process.get("kind").and_then(Value::as_str).unwrap_or("");
-    let workflow_toggle = if pause_state.background_processes_stopped || pause_state.agents_paused {
+    let workflow_toggle = if pause_state.workflow_paused {
         "unpause_workflow"
     } else {
         "pause_workflow"
@@ -281,14 +283,20 @@ fn process_management_actions(value: &Value, pause_state: &ProcessPauseState) ->
 
 fn process_pause_state_from_summary(summary: &JsonObject) -> ProcessPauseState {
     ProcessPauseState {
-        background_processes_stopped: summary
-            .get("background_processes_stopped")
+        workflow_paused: summary
+            .get("workflow_paused")
+            .or_else(|| summary.get("paused"))
             .and_then(Value::as_bool)
-            .unwrap_or(false),
-        agents_paused: summary
-            .get("agents_paused")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
+            .unwrap_or_else(|| {
+                summary
+                    .get("background_processes_stopped")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+                    || summary
+                        .get("agents_paused")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false)
+            }),
     }
 }
 

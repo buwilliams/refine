@@ -331,7 +331,7 @@ Control the agent automation engine that advances Goals through their workflow (
 
 ### `refine workflow pause`
 
-Pause the agent automation engine: no new Goal work is claimed until resumed
+Pause the agent automation engine: no new Goal work is claimed until resumed. Active executions continue to completion and can be stopped separately
 
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 

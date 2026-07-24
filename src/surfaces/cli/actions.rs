@@ -592,7 +592,7 @@ pub enum FeatureAction {
 
 #[derive(Debug, Subcommand)]
 pub enum WorkflowAction {
-    /// Pause the agent automation engine: no new Goal work is claimed until resumed.
+    /// Pause the agent automation engine: no new Goal work is claimed until resumed. Active executions continue to completion and can be stopped separately.
     Pause {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]

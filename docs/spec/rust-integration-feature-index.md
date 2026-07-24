@@ -99,7 +99,7 @@ Nav & Guide: Manage Drop-down
 				List with counts; Rename (cascades rounds), Merge (move goals to destination), Remove (danger, keeps history), Add reporter
 			Processes
 				Process management table: name (supervisor parent/child expand), status, PID, CPU priority, max memory, details
-					Actions by kind: Pause/Unpause agents, Stop/Start background, Hard reset worktree, Cancel (agent), Stop (chat), target app Start/Stop/Build/Sync/Check
+					Actions by kind: Pause/Unpause workflow admission, Hard reset worktree, Stop (agent/chat), target app Start/Stop/Build/Sync/Check
 				Subprocesses table: name, status, PID, CPU priority, max memory, elapsed (live), details
 					Actions: Rebuild, Generate, Clean up (days dropdown, danger)
 				Projection cache rebuild progress
@@ -151,7 +151,7 @@ Nav: Command Palette
 		Goals: clear filters, select page, bulk status/priority/reporter/feature/transfer node/delete, move all by status, move failed back one step
 		Changes: clear filters
 		Logs: clear filters
-		System: Pause/unpause agents, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
+		System: Pause/unpause workflow admission, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
 		Application: target app start/stop/build/test/sync/check status
 		Quality: configure candidate-evaluation context and plain-text tests
 		Runtime: re-check auth

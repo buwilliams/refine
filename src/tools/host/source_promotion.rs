@@ -488,7 +488,7 @@ impl FileSourcePromotionService {
         }
         let supervisor = FileProcessSupervisor::new(&self.port_runtime_root);
         let pause_state = supervisor.pause_state()?;
-        if !pause_state.agents_paused || !pause_state.background_processes_stopped {
+        if !pause_state.workflow_paused {
             active.push("workflow automation is not paused".to_string());
         }
         for process in supervisor.list()? {

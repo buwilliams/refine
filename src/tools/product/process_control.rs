@@ -3631,7 +3631,6 @@ mod tests {
         fs::write(
             runtime_root.join(crate::workflow::WORKFLOW_AUTOMATION_STATE_FILE),
             serde_json::to_vec_pretty(&json!({
-                "paused": [],
                 "policy": policy,
                 "claims": claims,
                 "updated_at": "2026-07-23T00:02:00Z"

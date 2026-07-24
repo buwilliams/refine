@@ -548,9 +548,7 @@ registerCommand({
   aliases: ["pause-workflow", "unpause-workflow", "resume-workflow", "pause-agents", "unpause-agents", "resume-agents"],
   run: async ({ button, settings } = {}) => {
     const settingsPayload = settings || (await api("GET", "/api/settings"));
-    const workflowPaused = !!settingsPayload.runtime?.agents_paused ||
-      !!settingsPayload.runtime?.background_processes_stopped ||
-      settingsPayload.settings?.paused === "1";
+    const workflowPaused = !!settingsPayload.runtime?.paused;
     await withButtonBusy(button, workflowPaused ? "Unpausing..." : "Pausing...", async () => {
       await api("POST", "/api/workflow/pause", { paused: !workflowPaused });
       if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });

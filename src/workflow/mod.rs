@@ -49,14 +49,6 @@ const WORKFLOW_AUTOMATION_STATE_LOCK_FILE: &str = ".workflow-automation-state.lo
 const AUTOMATION_CONCURRENCY_LIMIT_REACHED: &str = "automation concurrency limit reached";
 const ACTIVE_WORK_REPLENISH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WorkflowPauseControl {
-    Agents,
-    TargetApp,
-    AllAutomation,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowClaimState {
@@ -121,7 +113,6 @@ impl Default for WorkflowPolicy {
 pub struct WorkflowAutomationState {
     #[serde(default)]
     pub version: u64,
-    pub paused: BTreeSet<WorkflowPauseControl>,
     #[serde(default)]
     pub policy: WorkflowPolicy,
     pub claims: Vec<WorkflowClaim>,
@@ -164,8 +155,6 @@ pub trait WorkflowAutomation {
     fn promote(&self) -> RefineResult<usize>;
     fn claim(&self, goal_id: &str) -> RefineResult<String>;
     fn start_claim(&self, claim_id: &str) -> RefineResult<String>;
-    fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()>;
-    fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()>;
     fn cancel(&self, execution_id: &str) -> RefineResult<()>;
     fn retry(&self, execution_id: &str) -> RefineResult<String>;
 }
@@ -617,52 +606,7 @@ impl WorkflowEngine {
     }
 
     pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        let state = if paused {
-            supervisor.set_agents_paused(true)?;
-            let state = supervisor.set_background_processes_stopped(true)?;
-            self.rollback_in_progress_goals_to_todo()?;
-            self.pause(WorkflowPauseControl::AllAutomation)?;
-            state
-        } else {
-            supervisor.set_background_processes_stopped(false)?;
-            let state = supervisor.set_agents_paused(false)?;
-            self.resume(WorkflowPauseControl::AllAutomation)?;
-            self.resume(WorkflowPauseControl::Agents)?;
-            self.resume(WorkflowPauseControl::TargetApp)?;
-            state
-        };
-        Ok(state)
-    }
-
-    pub fn set_agent_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
-        self.set_workflow_paused(paused)
-    }
-
-    pub fn rollback_in_progress_goals_to_todo(&self) -> RefineResult<usize> {
-        let Some(refine_dir) = self.refine_dir()? else {
-            return Ok(0);
-        };
-        let snapshot = self.projection_snapshot(&refine_dir)?;
-        let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
-        let goal_ids = snapshot
-            .goals
-            .values()
-            .filter(|projection| projection.goal.status == GoalStatus::InProgress)
-            .filter(|projection| {
-                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
-            })
-            .map(|projection| projection.goal.id.clone())
-            .collect::<Vec<_>>();
-        if goal_ids.is_empty() {
-            return Ok(0);
-        }
-        let work_items = FileWorkItemService::new(refine_dir);
-        for goal_id in &goal_ids {
-            work_items.rollback_in_progress_goal_to_todo(goal_id)?;
-        }
-        self.interrupt_active_claims(&goal_ids)?;
-        Ok(goal_ids.len())
+        FileProcessSupervisor::new(&self.runtime_root).set_workflow_paused(paused)
     }
 
     pub fn fail_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
@@ -762,17 +706,13 @@ impl WorkflowEngine {
         Ok(signalled)
     }
 
-    fn ensure_automation_running(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
-        if state.paused.contains(&WorkflowPauseControl::AllAutomation)
-            || state.paused.contains(&WorkflowPauseControl::Agents)
-            || state.paused.contains(&WorkflowPauseControl::TargetApp)
-        {
-            return Err(RefineError::Conflict(
-                "workflow automation is paused".to_string(),
-            ));
-        }
+    fn workflow_paused(&self) -> RefineResult<bool> {
         let pause_state = FileProcessSupervisor::new(&self.runtime_root).pause_state()?;
-        if pause_state.background_processes_stopped || pause_state.agents_paused {
+        Ok(pause_state.workflow_paused)
+    }
+
+    fn ensure_automation_running(&self, _state: &WorkflowAutomationState) -> RefineResult<()> {
+        if self.workflow_paused()? {
             return Err(RefineError::Conflict(
                 "workflow automation is paused".to_string(),
             ));
@@ -1011,13 +951,24 @@ impl WorkflowEngine {
                 if launched_any && running == 0 {
                     break;
                 }
-                if scheduler_error.is_none() && std::time::Instant::now() >= next_replenish {
+                let workflow_paused = match self.workflow_paused() {
+                    Ok(paused) => paused,
+                    Err(error) => {
+                        scheduler_error = Some(error);
+                        false
+                    }
+                };
+                if workflow_paused {
+                    // A pause is an admission gate, not a scheduler failure. Keep active
+                    // executions draining and retry promotion immediately after resume.
+                    next_replenish = std::time::Instant::now();
+                } else if scheduler_error.is_none() && std::time::Instant::now() >= next_replenish {
                     if let Err(error) = self.promote() {
                         scheduler_error = Some(error);
                     }
                     next_replenish = std::time::Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
                 }
-                if scheduler_error.is_none() {
+                if scheduler_error.is_none() && !workflow_paused {
                     let launchable = self.load_state().and_then(|state| {
                         self.policy()
                             .map(|policy| Self::launchable_claim_ids(&state, &policy))
@@ -1605,22 +1556,6 @@ impl WorkflowAutomation for WorkflowEngine {
             return Err(error);
         }
         Ok(execution_id)
-    }
-
-    fn pause(&self, control: WorkflowPauseControl) -> RefineResult<()> {
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        state.paused.insert(control);
-        self.save_state(&mut state)
-    }
-
-    fn resume(&self, control: WorkflowPauseControl) -> RefineResult<()> {
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        state.paused.remove(&control);
-        self.save_state(&mut state)
     }
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
@@ -2561,7 +2496,6 @@ mod tests {
         fs::write(
             runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
             serde_json::to_vec_pretty(&json!({
-                "paused": [],
                 "claims": [{
                     "claim_id": "res-legacy",
                     "gap_id": "GOAL1",
@@ -3054,7 +2988,7 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_replenishes_new_todo_goals_during_active_work() {
+    fn file_automation_draining_pause_preserves_active_work_and_replenishes_after_resume() {
         let temp_root = unique_temp_dir("automation-live-queue-replenish");
         let target_root = temp_root.join("target");
         let refine_dir = test_refine_dir(&target_root);
@@ -3150,6 +3084,18 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert_eq!(fs::read_dir(&marker_root).unwrap().count(), 1);
+        automation.set_workflow_paused(true).unwrap();
+        assert_eq!(
+            work_items
+                .show_goal_summary("FEATURE_FIRST")
+                .unwrap()
+                .goal
+                .status,
+            GoalStatus::InProgress
+        );
+        assert!(automation.load_state().unwrap().claims.iter().any(|claim| {
+            claim.goal_id == "FEATURE_FIRST" && claim.state == WorkflowClaimState::Running
+        }));
 
         for goal_id in ["STANDALONE_ONE", "STANDALONE_TWO", "FEATURE_SECOND"] {
             work_items
@@ -3169,6 +3115,20 @@ mod tests {
             .order_goal_in_feature("FEAT1", "FEATURE_SECOND")
             .unwrap();
 
+        std::thread::sleep(ACTIVE_WORK_REPLENISH_INTERVAL + Duration::from_millis(250));
+        assert_eq!(
+            fs::read_dir(&marker_root).unwrap().count(),
+            1,
+            "paused workflow launched newly queued Goals"
+        );
+        for goal_id in ["STANDALONE_ONE", "STANDALONE_TWO", "FEATURE_SECOND"] {
+            assert_eq!(
+                work_items.show_goal_summary(goal_id).unwrap().goal.status,
+                GoalStatus::Todo
+            );
+        }
+
+        automation.set_workflow_paused(false).unwrap();
         let replenish_deadline = std::time::Instant::now() + Duration::from_secs(10);
         while fs::read_dir(&marker_root).unwrap().count() < 3
             && std::time::Instant::now() < replenish_deadline
@@ -3902,24 +3862,13 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_pauses_cancels_and_retries_executions() {
+    fn file_automation_pause_gate_blocks_new_claims_and_keeps_explicit_cancellation_separate() {
         let temp_root = unique_temp_dir("automation-controls");
         let automation = WorkflowEngine::new(temp_root.join("run/8080"));
 
-        automation
-            .pause(WorkflowPauseControl::AllAutomation)
-            .unwrap();
+        automation.set_workflow_paused(true).unwrap();
         assert!(automation.claim("GOAL1").is_err());
-        automation
-            .resume(WorkflowPauseControl::AllAutomation)
-            .unwrap();
-        FileProcessSupervisor::new(temp_root.join("run/8080"))
-            .set_agents_paused(true)
-            .unwrap();
-        assert!(automation.claim("GOAL1").is_err());
-        FileProcessSupervisor::new(temp_root.join("run/8080"))
-            .set_agents_paused(false)
-            .unwrap();
+        automation.set_workflow_paused(false).unwrap();
 
         let claim_id = automation.claim("GOAL1").unwrap();
         assert_eq!(automation.claim("GOAL1").unwrap(), claim_id);
@@ -4427,8 +4376,8 @@ mod tests {
     }
 
     #[test]
-    fn file_automation_pause_moves_in_progress_goals_back_to_todo() {
-        let temp_root = unique_temp_dir("automation-pause-rollback");
+    fn file_automation_pause_preserves_in_progress_goal_and_claim() {
+        let temp_root = unique_temp_dir("automation-pause-drain");
         let target_root = temp_root.join("target");
         let refine_dir = test_refine_dir(&target_root);
         let runtime_root = temp_root.join("run/8080");
@@ -4447,22 +4396,17 @@ mod tests {
             .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
             .unwrap();
 
-        let pause_state = automation.set_agent_workflow_paused(true).unwrap();
-        assert!(pause_state.agents_paused);
-        assert!(pause_state.background_processes_stopped);
-        assert!(
-            automation
-                .load_state()
-                .unwrap()
-                .paused
-                .contains(&WorkflowPauseControl::AllAutomation)
-        );
+        let pause_state = automation.set_workflow_paused(true).unwrap();
+        assert!(pause_state.workflow_paused);
         assert_eq!(
             work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-            GoalStatus::Todo
+            GoalStatus::InProgress
         );
         let state = automation.load_state().unwrap();
-        assert_eq!(state.claims[0].state, WorkflowClaimState::Interrupted);
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Running);
+
+        automation.set_workflow_paused(false).unwrap();
+        assert!(!automation.workflow_paused().unwrap());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

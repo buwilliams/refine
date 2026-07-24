@@ -242,7 +242,10 @@ impl ConfigService for FileSettingsService {
         let mut migrated = false;
         self.remove_legacy_settings()?;
         for (key, value) in stored {
-            if allowed_settings().contains(key.as_str()) {
+            if key == "paused" {
+                // Pause is runtime process control, not durable project configuration.
+                migrated = true;
+            } else if allowed_settings().contains(key.as_str()) {
                 settings.insert(key.clone(), Value::String(normalize_setting(&key, &value)?));
             } else if let Some(new_key) = legacy_setting_key(&key) {
                 settings.insert(
@@ -556,7 +559,6 @@ fn default_settings() -> JsonObject {
         ("quality_enabled", "0"),
         ("allowed_commands", ""),
         ("agent_cli", "claude"),
-        ("paused", "0"),
         ("target_app_start_instructions", ""),
         ("target_app_stop_instructions", ""),
         ("target_app_build_instructions", ""),
@@ -615,7 +617,6 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "quality_timing",
         "allowed_commands",
         "agent_cli",
-        "paused",
         "target_app_start_instructions",
         "target_app_stop_instructions",
         "target_app_build_instructions",
@@ -672,9 +673,7 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
                 ))
             }
         }
-        "quality_enabled" | "paused" => {
-            Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string())
-        }
+        "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
         "quality_timing" => {
             let value = as_string(value);
             if matches!(value.trim(), "post_build" | "post_rebuild") {
@@ -1250,13 +1249,12 @@ mod tests {
             .update(&serde_json::json!({
                 "agent_cli": "smoke-ai",
                 "parallel_run_cap": 4,
-                "paused": true,
                 "target_app_env_json": {"PORT": 3000}
             }))
             .unwrap();
         assert_eq!(updated["settings"]["agent_cli"], "smoke-ai");
         assert_eq!(updated["settings"]["parallel_run_cap"], "4");
-        assert_eq!(updated["settings"]["paused"], "1");
+        assert!(updated["settings"].get("paused").is_none());
         assert!(service.path().exists());
         assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
@@ -1284,7 +1282,11 @@ mod tests {
                         "display_name": "Node B",
                         "created_at": "2026-07-22T00:00:00Z",
                         "updated_at": "2026-07-22T00:00:00Z",
-                        "settings": {"agent_cli": "smoke-ai", "parallel_run_cap": "1"}
+                        "settings": {
+                            "agent_cli": "smoke-ai",
+                            "parallel_run_cap": "1",
+                            "paused": "1"
+                        }
                     }
                 ]
             }))
@@ -1297,6 +1299,12 @@ mod tests {
             .unwrap();
         assert_eq!(settings["agent_cli"], "smoke-ai");
         assert_eq!(settings["parallel_run_cap"], "1");
+        assert!(settings.get("paused").is_none());
+        assert!(
+            !fs::read_to_string(refine_dir.join("nodes.json"))
+                .unwrap()
+                .contains("\"paused\"")
+        );
         fs::remove_dir_all(temp_root).unwrap();
     }
 
