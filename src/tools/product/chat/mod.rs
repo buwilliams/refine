@@ -795,7 +795,16 @@ impl FileChatService {
             ) {
                 continue;
             }
-            let mut record = self.load_record(session_id)?;
+            let mut record = match self.load_record(session_id) {
+                Ok(record) => record,
+                Err(RefineError::NotFound(_)) => {
+                    if !matches!(operation.state, OperationState::Interrupted) {
+                        registry.finish(&operation.id, OperationState::Interrupted)?;
+                    }
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             if record.interrupted && record.interruption_detail.as_deref() == Some(message) {
                 continue;
             }
@@ -2212,6 +2221,37 @@ mod tests {
                 .unwrap_or("")
                 .contains("daemon restarted")
         }));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_chat_service_ignores_orphaned_operations_for_purged_supervisor_sessions() {
+        let temp_root = unique_temp_dir("chat-purged-supervisor-recovery");
+        init_git_app(&temp_root);
+        let refine_dir = temp_root.join(".refine");
+        let service = FileChatService::new(&refine_dir);
+        let session = service
+            .start_record_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+        let registry = FileOperationRegistry::new(&service.runtime_root);
+        let operation = registry.register(&format!("chat:{}", session.id)).unwrap();
+
+        assert_eq!(service.purge_supervisor_sessions().unwrap(), 1);
+        assert!(
+            service
+                .recover_interrupted_turns("daemon restarted during provider turn")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Interrupted
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
