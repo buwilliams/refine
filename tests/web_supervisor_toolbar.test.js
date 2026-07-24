@@ -203,6 +203,8 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
           exited: value?.exited,
           statusChecked: value?.statusChecked,
           reattaching: value?.reattaching,
+          loading: value?.loading,
+          stopping: value?.stopping,
           display: value?.display,
         };
       },
@@ -580,6 +582,57 @@ test("Stop and tab reactivation use terminal lifecycle routes", async () => {
     "/api/terminal/agent-1/stop",
     "/api/terminal/session",
   ]);
+});
+
+test("terminal exit releases Stop UI before workflow cancellation finishes settling", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  let resolveStop;
+  const stopResponse = new Promise((resolve) => { resolveStop = resolve; });
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "goal-session",
+        process_id: "goal-process",
+        cwd: "/repo/worktree",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) return stopResponse;
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  await browser.runtime.openGoal("GOAL1");
+  const events = browser.events()[0];
+  const stopping = browser.runtime.stop("GOAL1");
+
+  assert.equal(browser.runtime.terminal("GOAL1").loading, false);
+  assert.equal(browser.runtime.terminal("GOAL1").stopping, true);
+  assert.match(browser.html(), /Stopping Goal GOAL1/);
+  assert.match(browser.html(), />Stopping…</);
+
+  await browser.runtime.activate("system");
+  assert.match(browser.html(), /data-testid="toolbar-system-panel"/);
+  await browser.runtime.activate("GOAL1");
+
+  events.emitError();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(
+    requests.some((request) => request[1].endsWith("/status")),
+    false,
+    "an intentional Stop must not start a competing reattach",
+  );
+
+  events.emit("terminal_exit", { seq: 1, data: "exit 0" });
+  assert.equal(browser.runtime.terminal("GOAL1").exited, true);
+  assert.equal(browser.runtime.terminal("GOAL1").stopping, false);
+  assert.match(browser.html(), />Session ended</);
+
+  resolveStop({ ok: true, termination: { confirmed_exit: true } });
+  await stopping;
+  assert.equal(browser.runtime.terminal("GOAL1").exited, true);
 });
 
 test("clicking a stopped terminal tab starts it once", async () => {

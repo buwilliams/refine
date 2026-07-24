@@ -35,6 +35,9 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
   workflow cancellation, claim-settlement, and audit semantics before the tab
   disappears;
+- stopping an agent keeps the rest of the Toolbar interactive, and an
+  authoritative terminal-exit event releases the terminal UI even while
+  workflow cancellation settlement is still finishing;
 - the Add menu is anchored to its Toolbar control, so it follows the collapsed,
   resized, and fullscreen Toolbar positions;
 - an interrupted browser event stream is not evidence that the managed process exited;

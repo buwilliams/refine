@@ -119,6 +119,7 @@ function terminalStateFor(tabId = chatState.activeTabId) {
       historyStart: 0,
       historyEnd: 0,
       error: "",
+      stopping: false,
       eventSource: null,
       outputResizeObserver: null,
       observedOutput: null,
@@ -469,7 +470,7 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   if (!tab) return;
   const wasActive = chatState.activeTabId === tabId;
   const terminal = toolbarTabUsesTerminal(tab) ? terminalStateFor(tabId) : null;
-  let shouldStart = !!terminal && !terminal.loading &&
+  let shouldStart = !!terminal && !terminal.loading && !terminal.stopping &&
     (!terminal.sessionId || (terminal.statusChecked && terminal.exited));
 
   if (toggleIfActive && wasActive && chatState.open && !shouldStart && terminal?.statusChecked !== false) {
@@ -1150,19 +1151,26 @@ function renderTerminalPanel(tab) {
   const role = tab.mode === "terminal" ? "shell" : `${tab.label} agent`;
   const status = terminal?.loading
     ? `Starting ${role}...`
+    : terminal?.stopping
+      ? `Stopping ${role}...`
+      : terminal?.reattaching
+        ? `Reattaching to ${role}...`
+        : terminal?.error
+          ? terminal.error
+          : terminal?.exited
+            ? `${role} exited.`
+            : terminal?.connected
+              ? terminal.attentionState === "needs_input"
+                ? terminal.attentionMessage || `${role} needs your input.`
+                : terminal.cwd || `${role} active.`
+              : `${role} stopped.`;
+  const pendingActionLabel = terminal?.stopping
+    ? "Stopping…"
     : terminal?.reattaching
-      ? `Reattaching to ${role}...`
-    : terminal?.error
-      ? terminal.error
-      : terminal?.exited
-        ? `${role} exited.`
-        : terminal?.connected
-          ? terminal.attentionState === "needs_input"
-            ? terminal.attentionMessage || `${role} needs your input.`
-            : terminal.cwd || `${role} active.`
-          : `${role} stopped.`;
-  const action = terminal?.loading || terminal?.reattaching
-    ? `<button type="button" class="secondary" data-terminal-action disabled>${terminal?.reattaching ? "Reattaching…" : "Starting…"}</button>`
+      ? "Reattaching…"
+      : "Starting…";
+  const action = terminal?.loading || terminal?.stopping || terminal?.reattaching
+    ? `<button type="button" class="secondary" data-terminal-action disabled>${pendingActionLabel}</button>`
     : terminal?.connected
       ? `<button type="button" class="danger" data-terminal-action="stop" data-testid="terminal-stop">Stop</button>`
       : terminal?.sessionId && !terminal?.statusChecked
@@ -1207,7 +1215,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
   if (!toolbarTabUsesTerminal(tab)) return;
   const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
   const terminal = terminalStateFor(tabId);
-  if (!terminal || terminal.loading || terminal.connected) return;
+  if (!terminal || terminal.loading || terminal.stopping || terminal.connected) return;
   terminal.loading = true;
   terminal.error = "";
   drawToolbar();
@@ -1267,27 +1275,23 @@ async function startTerminalSession(tab = currentToolbarTab()) {
 async function stopTerminalSession(tab = currentToolbarTab()) {
   const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
   const terminal = terminalStateFor(tabId);
-  if (!terminal?.sessionId || terminal.loading) return;
-  terminal.loading = true;
+  if (!terminal?.sessionId || terminal.loading || terminal.stopping) return;
+  const sessionId = terminal.sessionId;
+  terminal.stopping = true;
   terminal.error = "";
   drawToolbar();
   try {
-    await api("POST", `/api/terminal/${encodeURIComponent(terminal.sessionId)}/stop`);
-    terminal.connected = false;
-    terminal.exited = true;
-    terminal.statusChecked = true;
-    terminal.reattaching = false;
-    terminal.loading = false;
-    if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
-    terminal.resizeTimer = null;
-    terminal.eventSource?.close();
-    terminal.eventSource = null;
-    tab.exited = true;
-    saveChatStateToStorage();
+    const stopped = await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/stop`);
+    if (stopped?.termination?.confirmed_exit === false) {
+      throw new Error("Process termination was not confirmed.");
+    }
+    if (terminal.sessionId !== sessionId) return;
+    finishTerminalExit(tab, terminal);
     refreshProcessesTabForChatChange();
     drawToolbar();
   } catch (e) {
-    terminal.loading = false;
+    if (terminal.sessionId !== sessionId) return;
+    terminal.stopping = false;
     terminal.error = e.message || String(e);
     drawToolbar();
   }
@@ -1298,6 +1302,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
   const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
   const terminal = existingTerminal || terminalStateFor(tabId);
   if (!terminal?.sessionId) return false;
+  if (terminal.stopping) return false;
   if (terminal.statusChecked) return terminal.connected && !terminal.exited;
   if (terminal.attachmentPromise) return terminal.attachmentPromise;
 
@@ -1312,7 +1317,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
         undefined,
         { cache: false },
       );
-      if (terminal.sessionId !== sessionId) return false;
+      if (terminal.sessionId !== sessionId || terminal.stopping) return false;
       terminal.statusChecked = true;
       terminal.reattaching = false;
       terminal.connected = !!status.alive;
@@ -1340,7 +1345,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
       if (chatState.activeTabId === tabId) drawToolbar();
       return terminal.connected;
     } catch (error) {
-      if (terminal.sessionId !== sessionId) return false;
+      if (terminal.sessionId !== sessionId || terminal.stopping) return false;
       terminal.reattaching = false;
       terminal.connected = false;
       if (error?.status === 404) {
@@ -1394,21 +1399,15 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
   });
   source.addEventListener("terminal_exit", (event) => {
     handleTerminalEvent(event, terminal);
-    terminal.exited = true;
-    terminal.connected = false;
-    terminal.statusChecked = true;
-    terminal.reattaching = false;
-    if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
-    terminal.resizeTimer = null;
-    terminal.eventSource?.close();
-    terminal.eventSource = null;
-    tab.exited = true;
-    saveChatStateToStorage();
+    finishTerminalExit(tab, terminal);
     refreshProcessesTabForChatChange();
     if (chatState.activeTabId === tabId) drawToolbar();
   });
   source.onerror = () => {
     if (terminal.exited || terminal.eventSource !== source) return;
+    // An explicit Stop can close the PTY stream before its workflow-aware
+    // cancellation request finishes. Do not race that request by reattaching.
+    if (terminal.stopping) return;
     terminal.error = "Terminal stream interrupted. Reconnecting…";
     terminal.connected = false;
     terminal.statusChecked = false;
@@ -1416,6 +1415,21 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
     void reattachTerminalSession(tab, terminal);
     if (chatState.activeTabId === tabId) drawToolbar();
   };
+}
+
+function finishTerminalExit(tab, terminal) {
+  terminal.exited = true;
+  terminal.connected = false;
+  terminal.statusChecked = true;
+  terminal.reattaching = false;
+  terminal.loading = false;
+  terminal.stopping = false;
+  if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
+  terminal.resizeTimer = null;
+  terminal.eventSource?.close();
+  terminal.eventSource = null;
+  tab.exited = true;
+  saveChatStateToStorage();
 }
 
 function prepareGoalTerminalHistory(tab, terminal, transcriptBytes) {
