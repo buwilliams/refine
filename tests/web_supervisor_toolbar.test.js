@@ -33,6 +33,12 @@ class FakeElement {
   addEventListener(type, listener) { this.listeners.set(type, listener); }
   focus() {}
   remove() {}
+  getBoundingClientRect() {
+    return {
+      width: this.clientWidth,
+      height: this.clientHeight,
+    };
+  }
   querySelector() { return null; }
   querySelectorAll() { return []; }
 }
@@ -71,22 +77,52 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   FakeResizeObserver.instances = [];
   const toolbar = new FakeElement();
   const terminalOutput = new FakeElement();
+  let toolbarResize = null;
+  let toolbarBody = null;
+  Object.defineProperty(toolbar, "innerHTML", {
+    get() { return toolbar._innerHTML; },
+    set(value) {
+      toolbar._innerHTML = String(value);
+      toolbarResize = toolbar._innerHTML.includes('id="toolbar-dock-resize"')
+        ? new FakeElement()
+        : null;
+      toolbarBody = toolbar._innerHTML.includes('data-testid="toolbar-body"')
+        ? new FakeElement()
+        : null;
+      const height = toolbar._innerHTML.match(/data-testid="toolbar-body"[^>]*style="height:(\d+)px"/);
+      if (toolbarBody && height) toolbarBody.clientHeight = Number(height[1]);
+    },
+  });
+  const documentListeners = new Map();
   const document = {
     activeElement: null,
     body: { appendChild() {} },
     documentElement: { style: { setProperty() {} } },
-    addEventListener() {},
+    addEventListener(type, listener) {
+      if (!documentListeners.has(type)) documentListeners.set(type, new Set());
+      documentListeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      documentListeners.get(type)?.delete(listener);
+    },
+    dispatchTestEvent(type, event) {
+      for (const listener of documentListeners.get(type) || []) listener(event);
+    },
     createElement() { return new FakeElement(); },
     getElementById() { return null; },
     querySelector(selector) {
       if (selector === "#toolbar-dock") return toolbar;
       if (selector === ".terminal-output" && toolbar.innerHTML.includes("terminal-output")) return terminalOutput;
+      if (selector === "#toolbar-dock-resize") return toolbarResize;
+      if (selector === ".toolbar-dock-body") return toolbarBody;
       return null;
     },
     querySelectorAll() { return []; },
   };
   toolbar.querySelector = (selector) => {
     if (selector === ".terminal-output" && toolbar.innerHTML.includes("terminal-output")) return terminalOutput;
+    if (selector === "#toolbar-dock-resize") return toolbarResize;
+    if (selector === ".toolbar-dock-body") return toolbarBody;
     return null;
   };
   const context = vm.createContext({
@@ -256,6 +292,24 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         output.clientHeight = height;
         const terminal = terminalStateFor(chatState.activeTabId);
         terminal.outputResizeObserver?.trigger();
+      },
+      beginToolbarResize(clientY, pointerId = 1) {
+        const handle = document.querySelector("#toolbar-dock-resize");
+        handle?.listeners.get("pointerdown")?.({
+          clientY,
+          pointerId,
+          preventDefault() {},
+        });
+      },
+      moveToolbarResize(clientY, pointerId = 1) {
+        document.dispatchTestEvent("pointermove", { clientY, pointerId });
+      },
+      endToolbarResize(clientY, pointerId = 1) {
+        document.dispatchTestEvent("pointerup", { clientY, pointerId });
+      },
+      toolbarBodyHeight() {
+        const body = document.querySelector(".toolbar-dock-body");
+        return Number.parseInt(body?.style.height || "", 10) || body?.clientHeight || 0;
       },
     };
   `, context);
@@ -633,6 +687,74 @@ test("terminal exit releases Stop UI before workflow cancellation finishes settl
   resolveStop({ ok: true, termination: { confirmed_exit: true } });
   await stopping;
   assert.equal(browser.runtime.terminal("GOAL1").exited, true);
+});
+
+test("a stopping Agent tab closes locally without issuing a duplicate Stop", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  let resolveStop;
+  const stopResponse = new Promise((resolve) => { resolveStop = resolve; });
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    requests.push({ path: requestPath, body });
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "agent-session",
+        process_id: "agent-process",
+        cwd: "/repo",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) return stopResponse;
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  await browser.runtime.start("agent");
+  const stopping = browser.runtime.stop("agent");
+  const closing = browser.runtime.close("agent");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const closedBeforeSettlement = browser.runtime.tab("agent") === undefined;
+  const stopRequestsBeforeSettlement = requests.filter((request) => request.path.endsWith("/stop")).length;
+  resolveStop({ ok: true, termination: { confirmed_exit: true } });
+  await Promise.all([stopping, closing]);
+
+  assert.equal(closedBeforeSettlement, true);
+  assert.equal(stopRequestsBeforeSettlement, 1);
+});
+
+test("toolbar resizing survives a stopping Agent redraw", async () => {
+  const browser = browserRuntime();
+  let resolveStop;
+  const stopResponse = new Promise((resolve) => { resolveStop = resolve; });
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "goal-session",
+        process_id: "goal-process",
+        cwd: "/repo/worktree",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) return stopResponse;
+    if (requestPath.endsWith("/resize")) return { ok: true };
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  await browser.runtime.openGoal("GOAL1");
+  const events = browser.events()[0];
+  const stopping = browser.runtime.stop("GOAL1");
+  const initialHeight = browser.runtime.toolbarBodyHeight();
+
+  browser.runtime.beginToolbarResize(500);
+  events.emit("terminal_status", { attention_state: "", attention_message: "" });
+  browser.runtime.moveToolbarResize(400);
+  browser.runtime.endToolbarResize(400);
+
+  assert.equal(browser.runtime.toolbarBodyHeight(), initialHeight + 100);
+  resolveStop({ ok: true, termination: { confirmed_exit: true } });
+  await stopping;
 });
 
 test("clicking a stopped terminal tab starts it once", async () => {

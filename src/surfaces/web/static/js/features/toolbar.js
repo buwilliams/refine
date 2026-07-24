@@ -28,6 +28,7 @@ const TERMINAL_LINE_HEIGHT = 1.35;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
+let toolbarResizeGesture = null;
 const chatState = {
   tabs: {},                // tabId → { goalId, label, sessionId, output, closedReason }
   activeTabId: null,
@@ -1294,7 +1295,11 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
     if (terminal.sessionId !== sessionId) return;
     terminal.stopping = false;
     terminal.error = e.message || String(e);
-    drawToolbar();
+    if (chatState.tabs[tabId] === tab) {
+      drawToolbar();
+    } else {
+      await showActionError(e);
+    }
   }
 }
 
@@ -2757,29 +2762,45 @@ function wireToolbarResize(root) {
   handle.addEventListener("pointerdown", (e) => {
     if (!chatState.open) return;
     e.preventDefault();
-    const startY = e.clientY;
-    const startH = body.getBoundingClientRect().height;
-    handle.setPointerCapture(e.pointerId);
+    finishToolbarResize();
+    toolbarResizeGesture = {
+      root,
+      pointerId: e.pointerId,
+      startY: e.clientY,
+      startHeight: body.getBoundingClientRect().height,
+    };
     root.classList.add("resizing");
-    function onMove(ev) {
-      // Drag up grows the panel; drag down shrinks it.
-      const next = clampToolbarBodyHeight(startH + (startY - ev.clientY));
-      body.style.height = next + "px";
-      chatState.bodyHeight = next;
-      if (toolbarTabUsesTerminal(currentToolbarTab())) resizeTerminalRenderer();
-    }
-    function onUp(ev) {
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
-      handle.removeEventListener("pointercancel", onUp);
-      try { handle.releasePointerCapture(ev.pointerId); } catch {}
-      root.classList.remove("resizing");
-      saveChatStateToStorage();
-    }
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp);
-    handle.addEventListener("pointercancel", onUp);
+    // The Toolbar redraws for terminal lifecycle events. Keep the gesture on
+    // document so replacing the resize handle cannot strand pointer capture.
+    document.addEventListener("pointermove", moveToolbarResize);
+    document.addEventListener("pointerup", finishToolbarResize);
+    document.addEventListener("pointercancel", finishToolbarResize);
   });
+}
+
+function moveToolbarResize(event) {
+  const gesture = toolbarResizeGesture;
+  if (!gesture || event.pointerId !== gesture.pointerId) return;
+  const body = gesture.root.querySelector(".toolbar-dock-body");
+  if (!body) return;
+  // Drag up grows the panel; drag down shrinks it.
+  const next = clampToolbarBodyHeight(
+    gesture.startHeight + (gesture.startY - event.clientY),
+  );
+  body.style.height = next + "px";
+  chatState.bodyHeight = next;
+  if (toolbarTabUsesTerminal(currentToolbarTab())) resizeTerminalRenderer();
+}
+
+function finishToolbarResize(event = null) {
+  const gesture = toolbarResizeGesture;
+  if (!gesture || (event?.pointerId != null && event.pointerId !== gesture.pointerId)) return;
+  toolbarResizeGesture = null;
+  document.removeEventListener("pointermove", moveToolbarResize);
+  document.removeEventListener("pointerup", finishToolbarResize);
+  document.removeEventListener("pointercancel", finishToolbarResize);
+  gesture.root.classList.remove("resizing");
+  saveChatStateToStorage();
 }
 
 function wireChatDockResize(root) { wireToolbarResize(root); }
@@ -2800,6 +2821,10 @@ async function closeChatTab(tabId) {
   const t = chatState.tabs[tabId];
   if (!t) return;
   const terminal = toolbarTabUsesTerminal(t) ? terminalStates.get(tabId) : null;
+  if (terminal?.stopping) {
+    removeToolbarTab(tabId);
+    return;
+  }
   const alreadyStopped = !!t.exited || !!(terminal?.statusChecked && terminal.exited);
   if (toolbarTabUsesTerminal(t) && t.sessionId && !alreadyStopped) {
     try {
@@ -2819,6 +2844,10 @@ async function closeChatTab(tabId) {
     }
     refreshProcessesTabForChatChange();
   }
+  removeToolbarTab(tabId);
+}
+
+function removeToolbarTab(tabId) {
   const currentTerminal = terminalStates.get(tabId);
   currentTerminal?.eventSource?.close();
   currentTerminal?.term?.dispose();
