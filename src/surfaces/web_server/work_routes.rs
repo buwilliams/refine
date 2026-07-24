@@ -2386,29 +2386,63 @@ impl InProcessWebServer {
                 .find(|change| change.commit == commit)
                 .and_then(|change| change.goal_id.clone())
         });
-        match with_repository_git_lock(&target_root, || {
-            FileGitWorktreeService::with_runtime_root(&target_root, runtime_root)
-                .revert_commit(commit)
-        }) {
-            Ok(result) => {
-                let cancelled_goal = if result.ok {
-                    match linked_goal_id.as_deref() {
-                        Some(goal_id) => match self
-                            .work_item_service(refine_dir)
-                            .cancel_goal_summary(goal_id)
-                        {
-                            Ok(goal) => Some(goal.goal.id),
-                            Err(error) => return error_response(error),
-                        },
-                        None => None,
+        let registry = FileOperationRegistry::new(runtime_root);
+        let operation_owner = format!("changes:undo:{commit}");
+        let operation = match registry.register(&operation_owner) {
+            Ok(operation) => operation,
+            Err(error) => return error_response(error),
+        };
+        let _ = registry.update_progress(
+            &operation.id,
+            json!({"message": "Undoing Git change", "commit": commit}),
+        );
+        let operation = registry.status(&operation.id).unwrap_or(operation);
+        let operation_id = operation.id.clone();
+        let runtime_root = runtime_root.clone();
+        let commit = commit.to_string();
+        let server = self.clone();
+        thread::spawn(move || {
+            let registry = FileOperationRegistry::new(&runtime_root);
+            let result = with_repository_git_lock(&target_root, || {
+                FileGitWorktreeService::with_runtime_root(&target_root, &runtime_root)
+                    .revert_commit(&commit)
+            });
+            match result {
+                Ok(result) => {
+                    let cancelled_goal = if result.ok {
+                        match linked_goal_id.as_deref() {
+                            Some(goal_id) => match server
+                                .work_item_service(refine_dir)
+                                .cancel_goal_summary(goal_id)
+                            {
+                                Ok(goal) => Some(goal.goal.id),
+                                Err(error) => {
+                                    let _ = registry.fail_with_error(
+                                        &operation_id,
+                                        json!({
+                                            "code": "goal_cancellation_failed",
+                                            "message": error.to_string()
+                                        }),
+                                    );
+                                    return;
+                                }
+                            },
+                            None => None,
+                        }
+                    } else {
+                        None
+                    };
+                    if let Err(error) = server.rebuild_current_projection_cache() {
+                        let _ = registry.fail_with_error(
+                            &operation_id,
+                            json!({
+                                "code": "projection_refresh_failed",
+                                "message": error.to_string()
+                            }),
+                        );
+                        return;
                     }
-                } else {
-                    None
-                };
-                let _ = self.rebuild_current_projection_cache();
-                ApiResponse::json(
-                    200,
-                    json!({
+                    let response = json!({
                         "ok": result.ok,
                         "pushed": false,
                         "commit": commit,
@@ -2416,17 +2450,90 @@ impl InProcessWebServer {
                         "message": result.message.unwrap_or_default(),
                         "goal_id": linked_goal_id,
                         "cancelled_goal": cancelled_goal
-                    }),
-                )
+                    });
+                    let _ = registry.finish_with_result(
+                        &operation_id,
+                        OperationState::Succeeded,
+                        response,
+                    );
+                }
+                Err(error) => {
+                    let _ = registry.fail_with_error(
+                        &operation_id,
+                        json!({
+                            "code": "git_undo_failed",
+                            "message": error.to_string()
+                        }),
+                    );
+                }
             }
-            Err(error) => error_response(error),
-        }
+        });
+        ApiResponse::json(202, json!({"operation": operation_response(operation)}))
     }
 
-    pub(super) fn handle_cache_rebuild(&self) -> ApiResponse {
+    pub(super) fn handle_cache_rebuild(&self, request: ApiRequest) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("rebuild projection cache");
         };
+        if request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("background"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            let registry = FileOperationRegistry::new(runtime_root);
+            let operation = match registry.register("cache:rebuild") {
+                Ok(operation) => operation,
+                Err(error) => return error_response(error),
+            };
+            let _ = registry.update_progress(
+                &operation.id,
+                json!({"message": "Rebuilding projection cache"}),
+            );
+            let operation = registry.status(&operation.id).unwrap_or(operation);
+            let operation_id = operation.id.clone();
+            let runtime_root = runtime_root.clone();
+            let server = self.clone();
+            thread::spawn(move || {
+                let registry = FileOperationRegistry::new(&runtime_root);
+                match server.rebuild_current_projection_cache() {
+                    Ok(projection) => {
+                        let result = json!({
+                            "ok": true,
+                            "mode": "rebuilt",
+                            "goals": projection.goals.len(),
+                            "features": projection.features.len(),
+                            "projection_version": projection.version,
+                            "cache": runtime_root
+                                .join("cache")
+                                .join(PROJECTION_SNAPSHOT_FILE)
+                                .display()
+                                .to_string()
+                        });
+                        let _ = registry.update_progress(
+                            &operation_id,
+                            json!({"message": "Projection cache rebuilt"}),
+                        );
+                        let _ = registry.finish_with_result(
+                            &operation_id,
+                            OperationState::Succeeded,
+                            result,
+                        );
+                    }
+                    Err(error) => {
+                        let _ = registry.fail_with_error(
+                            &operation_id,
+                            json!({
+                                "code": "projection_rebuild_failed",
+                                "message": error.to_string()
+                            }),
+                        );
+                    }
+                }
+            });
+            return ApiResponse::json(202, json!({"operation": operation_response(operation)}));
+        }
         let projection = match self.rebuild_current_projection_cache() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
@@ -2859,19 +2966,49 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("hard-reset Git worktree");
         };
-        match with_repository_git_lock(&target_root, || {
-            FileGitWorktreeService::with_runtime_root(&target_root, runtime_root).hard_reset()
-        }) {
-            Ok(result) => ApiResponse::json(
-                200,
-                json!({
-                    "ok": result.ok,
-                    "conflicts": result.conflicts,
-                    "message": result.message.unwrap_or_default()
-                }),
-            ),
-            Err(error) => error_response(error),
-        }
+        let registry = FileOperationRegistry::new(runtime_root);
+        let operation = match registry.register_exclusive_with_request(
+            "changes:hard-reset",
+            json!({"target_root": target_root}),
+        ) {
+            Ok(operation) => operation,
+            Err(error) => return error_response(error),
+        };
+        let _ = registry.update_progress(
+            &operation.id,
+            json!({"message": "Hard-resetting target worktree"}),
+        );
+        let operation = registry.status(&operation.id).unwrap_or(operation);
+        let operation_id = operation.id.clone();
+        let runtime_root = runtime_root.clone();
+        thread::spawn(move || {
+            let registry = FileOperationRegistry::new(&runtime_root);
+            match with_repository_git_lock(&target_root, || {
+                FileGitWorktreeService::with_runtime_root(&target_root, &runtime_root).hard_reset()
+            }) {
+                Ok(result) => {
+                    let _ = registry.finish_with_result(
+                        &operation_id,
+                        OperationState::Succeeded,
+                        json!({
+                            "ok": result.ok,
+                            "conflicts": result.conflicts,
+                            "message": result.message.unwrap_or_default()
+                        }),
+                    );
+                }
+                Err(error) => {
+                    let _ = registry.fail_with_error(
+                        &operation_id,
+                        json!({
+                            "code": "git_hard_reset_failed",
+                            "message": error.to_string()
+                        }),
+                    );
+                }
+            }
+        });
+        ApiResponse::json(202, json!({"operation": operation_response(operation)}))
     }
 
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {

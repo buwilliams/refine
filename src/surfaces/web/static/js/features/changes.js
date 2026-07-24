@@ -275,7 +275,11 @@ function drawChanges(data, f) {
       if (!ok) return;
       await withButtonBusy(btn, "Undoing...", async () => {
         try {
-          const r = await api("POST", "/api/changes/undo", { commit });
+          const queued = await api("POST", "/api/changes/undo", { commit });
+          const r = await resolveBackgroundOperationResponse(
+            queued,
+            "Git undo queued",
+          );
           if (r.ok) {
             // Surface the push-failed-but-revert-succeeded case
             // prominently — the local state is ahead of remote and

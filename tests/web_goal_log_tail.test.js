@@ -10,6 +10,7 @@ class FakeEventSource {
   constructor(url) {
     this.url = url;
     this.listeners = new Map();
+    this.closed = false;
     FakeEventSource.latest = this;
   }
 
@@ -17,7 +18,7 @@ class FakeEventSource {
     this.listeners.set(name, listener);
   }
 
-  close() {}
+  close() { this.closed = true; }
 
   emit(name, payload) {
     this.listeners.get(name)?.({ data: JSON.stringify(payload) });
@@ -60,10 +61,21 @@ function browserRuntime() {
       loadGoalLogTail,
       renderGoalLogLine,
       renderGoalLogPanel,
+      waitForBackgroundOperation,
       saveGoalLogState: saveChatStateToStorage,
       storedGoalLogState() { return JSON.parse(localStorage.getItem(CHAT_TABS_STORAGE_KEY)); },
       visibleGoalLogEntries,
       setApi(nextApi) { api = nextApi; },
+      setLiveRoute(route, goalId = null) {
+        state.currentRoute = route;
+        state.currentGoal = goalId;
+      },
+      setLiveHooks(hooks) {
+        toast = hooks.toast || toast;
+        refreshDashboard = hooks.refreshDashboard || (() => {});
+        refreshGoalsTable = hooks.refreshGoalsTable || (() => {});
+        loadGoalDetail = hooks.loadGoalDetail || (() => {});
+      },
     };
   `, context);
   return context.goalLogTest;
@@ -132,6 +144,68 @@ test("the first Goal SSE log reaches the toolbar and replayed entries stay dedup
     Array.from(tab.logEntries, (entry) => entry.message),
     ["Goal log 001", "Goal log 002"],
   );
+});
+
+test("main SSE transport reconnects in place and reconciles durable visible state", () => {
+  const runtime = browserRuntime();
+  const notices = [];
+  let detailRefreshes = 0;
+  runtime.setLiveHooks({
+    toast(message) { notices.push(message); },
+    loadGoalDetail(goalId) {
+      assert.equal(goalId, "GOAL1");
+      detailRefreshes += 1;
+    },
+  });
+  runtime.setLiveRoute("goals_detail", "GOAL1");
+  runtime.initSSE();
+  const source = FakeEventSource.latest;
+
+  source.onerror?.(new Error("transient disconnect"));
+  assert.equal(source.closed, false);
+  assert.match(notices[0], /Reconnecting automatically/);
+
+  source.onopen?.();
+  assert.equal(detailRefreshes, 1);
+  assert.match(notices[1], /reconnected/i);
+});
+
+test("background operations use SSE after one durable registration read", async () => {
+  const runtime = browserRuntime();
+  let statusReads = 0;
+  runtime.setApi(async (_method, requestPath) => {
+    assert.equal(requestPath, "/api/operations/op-1");
+    statusReads += 1;
+    return {
+      operation: {
+        id: "op-1",
+        status: "running",
+        progress: { message: "Queued" },
+      },
+    };
+  });
+  runtime.initSSE();
+  FakeEventSource.latest.onopen?.();
+
+  const completed = runtime.waitForBackgroundOperation({
+    id: "op-1",
+    status: "running",
+    progress: { message: "Queued" },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(statusReads, 1);
+
+  FakeEventSource.latest.emit("operation_progress", {
+    operation: {
+      id: "op-1",
+      status: "complete",
+      progress: { message: "Done" },
+      result: { ok: true },
+    },
+  });
+  assert.equal((await completed).ok, true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(statusReads, 1);
 });
 
 test("Goal log search covers trail content and Head/Tail changes visible order", () => {

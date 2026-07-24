@@ -284,25 +284,21 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_processes(&self, raw_path: &str) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        if self.runtime_root.is_none() {
             return runtime_root_unavailable("read managed processes");
-        };
-        let refine_dir = match self.current_refine_dir() {
-            Ok(root) => root,
-            Err(error) => return error_response(error),
-        };
-        if let Err(error) = self.current_projection_with_runtime() {
-            return error_response(error);
         }
-        match live_process_summary(runtime_root, refine_dir.as_deref()) {
-            Ok(summary) => ApiResponse::json(
-                200,
-                if query_param(raw_path, "summary").as_deref() == Some("1") {
-                    process_status_value(&summary)
-                } else {
-                    summary
-                },
-            ),
+        match self.current_runtime_projection() {
+            Ok(runtime) => {
+                let summary = runtime_process_summary_value(&runtime);
+                ApiResponse::json(
+                    200,
+                    if query_param(raw_path, "summary").as_deref() == Some("1") {
+                        process_status_value(&summary)
+                    } else {
+                        summary
+                    },
+                )
+            }
             Err(error) => error_response(error),
         }
     }

@@ -6,7 +6,9 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::product::chat::ChatSessionRecord;
 
 use super::super::http::HttpRequest;
@@ -264,8 +266,35 @@ pub(in crate::surfaces::web_server) fn recent_operation_sse_events(
 ) -> RefineResult<Vec<Value>> {
     let registry = FileOperationRegistry::new(runtime_root);
     let operations = registry.recover()?;
+    let mut selected = operations
+        .iter()
+        .filter(|operation| {
+            matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running | OperationState::Cancelling
+            )
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut recent_terminal = operations
+        .into_iter()
+        .rev()
+        .filter(|operation| {
+            matches!(
+                operation.state,
+                OperationState::Succeeded
+                    | OperationState::Failed
+                    | OperationState::Cancelled
+                    | OperationState::Interrupted
+            )
+        })
+        .take(limit)
+        .collect::<Vec<_>>();
+    selected.append(&mut recent_terminal);
+    selected.sort_by(|a, b| a.id.cmp(&b.id));
+
     let mut events = Vec::new();
-    for operation in operations.into_iter().rev().take(limit) {
+    for operation in selected {
         let (logs, _, _) = registry.page_logs(&operation.id, 5, 0)?;
         let latest_log = logs.last().cloned();
         events.push(json!({
@@ -275,7 +304,6 @@ pub(in crate::surfaces::web_server) fn recent_operation_sse_events(
             "timestamp": now_timestamp_web()
         }));
     }
-    events.reverse();
     Ok(events)
 }
 

@@ -36,7 +36,7 @@ use crate::process::subprocess::{
 use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::surfaces::web_server::support::{
-    runtime_process_status_value, runtime_process_summary_value,
+    recent_operation_sse_events, runtime_process_status_value, runtime_process_summary_value,
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
@@ -417,6 +417,8 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
     assert!(releases.contains("const confirmed = window.confirm("));
     assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
+    assert!(releases.contains("handleSourcePromotionSseEvent"));
+    assert!(!releases.contains("setInterval"));
     assert!(init.contains("initSourceUpdateNav()"));
 }
 
@@ -2281,6 +2283,15 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     assert_eq!(body["goals"][0]["id"], "HOT1");
 
     let events = wait_for_http_request_metrics(&runtime_root);
+    assert!(events.iter().any(|event| {
+        event.operation == "http.request"
+            && event.details.get("method").and_then(|value| value.as_str()) == Some("POST")
+            && event
+                .details
+                .get("budget_ms")
+                .and_then(|value| value.as_f64())
+                == Some(50.0)
+    }));
     assert!(events.iter().any(|event| {
         event.operation == "http.request"
             && event.details.get("path").and_then(|value| value.as_str()) == Some("/work/goals")
@@ -4508,8 +4519,23 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         path: "/api/cache/rebuild".to_string(),
         body: Some(json!({"background": true})),
     });
-    assert_eq!(rebuilt.status, 200);
-    assert_eq!(rebuilt.body["goals"], 1);
+    assert_eq!(rebuilt.status, 202);
+    let operation_id = rebuilt.body["operation"]["id"].as_str().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let rebuilt_result = loop {
+        let operation = FileOperationRegistry::new(&runtime_root)
+            .status(operation_id)
+            .unwrap();
+        if operation.state == OperationState::Succeeded {
+            break operation.result;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "background cache rebuild did not finish: {operation:?}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(rebuilt_result["goals"], 1);
     assert!(
         runtime_root
             .join("cache")
@@ -4619,8 +4645,13 @@ fn web_server_lists_git_changes_and_reverts_commits() {
         path: "/api/changes/undo".to_string(),
         body: Some(json!({"commit": commit})),
     });
-    assert_eq!(undo.status, 200);
-    assert_eq!(undo.body["ok"], true);
+    assert_eq!(undo.status, 202);
+    let undo_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        undo.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Succeeded,
+    );
+    assert_eq!(undo_operation.result["ok"], true);
     assert_eq!(
         fs::read_to_string(temp_root.join("app.txt")).unwrap(),
         "unrelated\n"
@@ -4657,8 +4688,13 @@ fn web_server_hard_resets_git_worktree() {
         path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
         body: None,
     });
-    assert_eq!(reset.status, 200);
-    assert_eq!(reset.body["ok"], true);
+    assert_eq!(reset.status, 202);
+    let reset_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        reset.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Succeeded,
+    );
+    assert_eq!(reset_operation.result["ok"], true);
     assert_eq!(
         fs::read_to_string(temp_root.join("app.txt")).unwrap(),
         "committed\n"
@@ -4974,16 +5010,26 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
         path: "/api/changes/undo".to_string(),
         body: Some(json!({"commit": "abc123"})),
     });
-    assert_eq!(undo.status, 200);
-    assert_eq!(undo.body["ok"], false);
+    assert_eq!(undo.status, 202);
+    let undo_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        undo.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Succeeded,
+    );
+    assert_eq!(undo_operation.result["ok"], false);
 
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
         body: None,
     });
-    assert_eq!(reset.status, 200);
-    assert_eq!(reset.body["ok"], false);
+    assert_eq!(reset.status, 202);
+    let reset_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        reset.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Succeeded,
+    );
+    assert_eq!(reset_operation.result["ok"], false);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -5912,6 +5958,17 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
         .unwrap();
     chat.interrupt(&session.id, "SSE chat event").unwrap();
+    fs::write(
+        runtime_root.join("source-promotion.json"),
+        serde_json::to_vec_pretty(&json!({
+            "id": "source-sse",
+            "status": "running",
+            "stage": "build_candidate",
+            "message": "Building source candidate"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 
     let daemon = LocalHttpDaemon {
         server,
@@ -5929,15 +5986,46 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("event: ready"));
     assert!(sse_body.contains("event: project_updated"));
     assert!(sse_body.contains("event: status_change"));
-    assert!(sse_body.contains("event: system_operation"));
+    assert!(sse_body.contains("event: runtime_change"));
     assert!(sse_body.contains("event: process_output"));
     assert!(sse_body.contains("SSE process output"));
     assert!(sse_body.contains("event: operation_progress"));
     assert!(sse_body.contains("SSE operation progress"));
+    assert!(sse_body.contains("event: source_promotion"));
+    assert!(sse_body.contains("Building source candidate"));
     assert!(sse_body.contains("event: chat_event"));
     assert!(sse_body.contains("SSE chat event"));
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn operation_sse_keeps_all_active_operations_beyond_recent_terminal_limit() {
+    let runtime_root = unique_temp_dir("operation-sse-active-window");
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let active = registry.register("long-running-operation").unwrap();
+
+    for index in 0..11 {
+        let terminal = registry
+            .register(&format!("completed-operation-{index}"))
+            .unwrap();
+        registry
+            .succeed_with_result_and_progress(
+                &terminal.id,
+                json!({"stage": "complete"}),
+                json!({"ok": true}),
+            )
+            .unwrap();
+    }
+
+    let events = recent_operation_sse_events(&runtime_root, 10).unwrap();
+    assert_eq!(events.len(), 11);
+    assert!(events.iter().any(|event| {
+        event["operation"]["id"].as_str() == Some(active.id.as_str())
+            && event["operation"]["status"] == "running"
+    }));
+
+    fs::remove_dir_all(runtime_root).unwrap();
 }
 
 #[test]
@@ -6096,6 +6184,7 @@ fn web_server_retries_workflow_executions() {
     assert_eq!(retry.body["execution"]["status"], "running");
     assert_ne!(retry.body["execution"]["id"], execution_id);
 
+    server.current_projection_with_runtime().unwrap();
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
@@ -6431,21 +6520,14 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(summary.body["agent_count"], 3);
     assert_eq!(summary.body["process_count"], 8);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
-    let cached = FileProjectStateStore::new(&refine_dir)
-        .load_projection_snapshot(&runtime_root.join("cache"))
-        .unwrap()
-        .unwrap();
+    let cached = server.current_runtime_projection().unwrap();
     assert!(
         cached
-            .runtime
             .processes
             .iter()
             .any(|process| process["goal_id"] == "GOALCTX")
     );
-    assert_eq!(
-        cached.runtime.supervisor.unwrap()["runner_reachable"],
-        json!(false)
-    );
+    assert_eq!(cached.supervisor.unwrap()["runner_reachable"], json!(false));
 
     let stdout_path = runtime_root.join("stream.stdout.log");
     let stderr_path = runtime_root.join("stream.stderr.log");
@@ -6588,14 +6670,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(resumed.body["background_processes_stopped"], false);
     assert_eq!(resumed.body["agents_paused"], false);
     assert!(runtime_root.join("process-control.json").exists());
-    let cached = FileProjectStateStore::new(&refine_dir)
-        .load_projection_snapshot(&runtime_root.join("cache"))
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        cached.runtime.supervisor.unwrap()["workflow_paused"],
-        json!(false)
-    );
+    let cached = server.current_runtime_projection().unwrap();
+    assert_eq!(cached.supervisor.unwrap()["workflow_paused"], json!(false));
 
     // Terminate the long-lived agent so the test leaves no orphaned process.
     let _ = supervisor.signal(&launched_agent.id, "terminate");
@@ -8405,8 +8481,13 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         path: "/api/runner-workers/target-app-builder/build".to_string(),
         body: None,
     });
-    assert_eq!(rebuild.status, 200);
-    assert_eq!(rebuild.body["queued"], false);
+    assert_eq!(rebuild.status, 202);
+    let rebuild_operation = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        rebuild.body["operation"]["id"].as_str().unwrap(),
+        OperationState::Succeeded,
+    );
+    assert_eq!(rebuild_operation.result["queued"], false);
 
     let nodes = server.handle(ApiRequest {
         method: "GET".to_string(),

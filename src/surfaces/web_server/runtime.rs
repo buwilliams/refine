@@ -16,7 +16,6 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::project_layout::prepare_refine_dir;
 #[cfg(test)]
 use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
@@ -87,7 +86,7 @@ impl InProcessWebServer {
                 let key = projection_cache_key(&refine_dir, runtime_root);
                 let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
                 if let Some(snapshot) = hot_projection(&key)?
-                    && snapshot.source_fingerprints == store.collect_source_fingerprints()?
+                    && store.source_fingerprints_match(&snapshot.source_fingerprints)?
                 {
                     return Ok(snapshot);
                 }
@@ -268,28 +267,35 @@ impl InProcessWebServer {
             }
             Err(_) => None,
         };
-        let performance = performance_report_value(runtime_root, PerformanceQuery::default())
-            .ok()
-            .and_then(value_object);
         let preflight = provider_status_value().ok().and_then(value_object);
         Ok(RuntimeProjection {
             supervisor: value_object(process),
             processes,
             background_operations,
             target_app,
-            performance,
+            // Performance history is an independently queried diagnostic dataset. Loading it
+            // here made every dashboard/process refresh reparse the metrics log, while recording
+            // the request changed that same log and invalidated the runtime cache again.
+            performance: None,
             preflight,
         })
     }
 
     pub(super) fn refresh_projection_cache_after_mutation(&self) -> RefineResult<()> {
-        if self.runtime_root.is_none() {
+        let Some(runtime_root) = &self.runtime_root else {
             return Ok(());
-        }
-        if self.current_target_root()?.is_none() {
+        };
+        let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(());
-        }
-        self.rebuild_current_projection_cache().map(|_| ())
+        };
+        HOT_PROJECTIONS
+            .get_or_init(|| Mutex::new(BTreeMap::new()))
+            .lock()
+            .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))?
+            .remove(&projection_cache_key(&refine_dir, runtime_root));
+        // The SSE stream performs the next authoritative projection read on its own worker.
+        // Source fingerprints also protect direct reads that arrive before that refresh.
+        Ok(())
     }
 
     pub(super) fn warm_current_projection_cache(&self) -> RefineResult<Option<ProjectionSnapshot>> {
@@ -434,7 +440,6 @@ fn runtime_projection_fingerprint(
         runtime_root.join("process-control.json"),
         runtime_root.join("operations"),
         runtime_root.join("target-app-state.json"),
-        runtime_root.join("metrics/performance.jsonl"),
     ] {
         collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;
     }
@@ -543,10 +548,18 @@ mod tests {
             "{\"partial\":",
         )
         .unwrap();
+        let metrics_log = runtime_root.join("metrics/performance.jsonl");
+        fs::create_dir_all(metrics_log.parent().unwrap()).unwrap();
+        fs::write(&metrics_log, "{\"duration_ms\":1}\n").unwrap();
 
+        let fingerprint_before_metric_append =
+            runtime_projection_fingerprint(&runtime_root, None).unwrap();
+        fs::write(&metrics_log, "{\"duration_ms\":1}\n{\"duration_ms\":2}\n").unwrap();
         let fingerprint = runtime_projection_fingerprint(&runtime_root, None).unwrap();
 
+        assert_eq!(fingerprint, fingerprint_before_metric_append);
         assert!(fingerprint.entries.contains_key("processes"));
+        assert!(!fingerprint.entries.contains_key("metrics"));
         assert!(!fingerprint.entries.contains_key("processes/proc-live.json"));
         assert!(
             !fingerprint

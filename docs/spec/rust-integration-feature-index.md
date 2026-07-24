@@ -270,7 +270,7 @@ Modals
 	Request refine feature/bugfix Modal (Report Bug)
 		Title (Short summary), Description (What should change?)
 		Cancel, Open GitHub (pre-fills new-issue URL); validation; popup-blocked error
-	Shared: Escape closes, Enter submits (non-textarea), click-outside, focus management, toasts, danger confirmations, background-operation polling
+	Shared: Escape closes, Enter submits (non-textarea), click-outside, focus management, toasts, danger confirmations, SSE-driven background-operation updates
 
 Implementation Internals (for e2e testing)
 	Purpose: contract details a test needs to drive the UI, wait correctly, and assert outcomes. Frontend is a hash-routed SPA served from one index.html; all data via JSON over /api; live updates via SSE.
@@ -308,13 +308,15 @@ Implementation Internals (for e2e testing)
 	Live updates (SSE, EventSource "/api/sse")
 		Event "activity_added": invalidates screen-data cache; feeds System ops log (recordSystemOperation); refreshes dashboard / logs / changes / agent-status if on that route (silent refresh*, not render* — no "Loading…" blink)
 		Event "status_change": invalidates cache; refreshes agent status, target-app toggle, dashboard, goals table (table only, not filters — preserves in-flight search keystroke), logs, current settings surface
+		Event "operation_progress": resolves background-operation progress and terminal results without periodic status requests
+		Periodic UI polling is prohibited; one-shot authoritative reads are limited to initial load, operation registration-race closure, reconnect reconciliation, timeout recovery, or explicit user refresh
 		Tests should wait on resulting DOM change, not a fixed delay; SSE de-dupes repeat events (sseEventChanged)
 	Data fetching & caching
 		api(method, path, body, options) — fetch wrapper; GET responses cached per-path
 		Error envelope: { error: { message, code, details } }; non-OK throws with message; code "background_operation_active" surfaces "Active operation: …"
 		Screen-data GET cache TTL 5000ms (SCREEN_DATA_CACHE_TTL_MS); pass {cache:false} to bypass; invalidated on every SSE event
 		Background prefetch: delay 2000ms after navigation, 50ms between requests, 30000ms per-screen cooldown
-	Polling / timers
+	UI timers (not state polling)
 		Terminal output is event-driven per live session; no toolbar chat polling
 		Running-cell elapsed tickers: 1000ms (process/subprocess elapsed)
 		Dashboard refresh timeout: 6000ms

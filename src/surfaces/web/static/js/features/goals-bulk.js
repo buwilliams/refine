@@ -158,8 +158,8 @@ function _selectionCountText(noun = "selected") {
 }
 
 const GOALS_JIRA_EXPORT_OPERATION_KEY = "refine_goals_jira_export_operation";
-let goalsJiraExportPollOperationId = "";
-let goalsJiraExportPollPromise = null;
+let goalsJiraExportOperationId = "";
+let goalsJiraExportPromise = null;
 let goalsJiraExportSnapshot = null;
 let goalsJiraExportLogs = [];
 
@@ -368,11 +368,11 @@ function downloadGoalsJiraExport(payload) {
 }
 
 async function waitForGoalsJiraExportOperation(operationId, allowRecovery = true) {
-  if (goalsJiraExportPollOperationId === operationId && goalsJiraExportPollPromise) {
-    return await goalsJiraExportPollPromise;
+  if (goalsJiraExportOperationId === operationId && goalsJiraExportPromise) {
+    return await goalsJiraExportPromise;
   }
-  goalsJiraExportPollOperationId = operationId;
-  goalsJiraExportPollPromise = waitForBackgroundOperation(operationId, {
+  goalsJiraExportOperationId = operationId;
+  goalsJiraExportPromise = waitForBackgroundOperation(operationId, {
     onStatus: updateGoalsJiraExportOperation,
     onProgress: (progress) => {
       const message = String(progress?.message || "Exporting…").trim();
@@ -380,7 +380,7 @@ async function waitForGoalsJiraExportOperation(operationId, allowRecovery = true
     },
   });
   try {
-    return await goalsJiraExportPollPromise;
+    return await goalsJiraExportPromise;
   } catch (error) {
     if (allowRecovery && error?.code === "operation_interrupted") {
       const recovered = await api(
@@ -391,15 +391,15 @@ async function waitForGoalsJiraExportOperation(operationId, allowRecovery = true
       const recoveredId = recovered?.operation?.id;
       if (!recoveredId) throw error;
       writeGoalsJiraExportOperation(recoveredId);
-      goalsJiraExportPollOperationId = "";
-      goalsJiraExportPollPromise = null;
+      goalsJiraExportOperationId = "";
+      goalsJiraExportPromise = null;
       return await waitForGoalsJiraExportOperation(recoveredId, false);
     }
     throw error;
   } finally {
-    if (goalsJiraExportPollOperationId === operationId) {
-      goalsJiraExportPollOperationId = "";
-      goalsJiraExportPollPromise = null;
+    if (goalsJiraExportOperationId === operationId) {
+      goalsJiraExportOperationId = "";
+      goalsJiraExportPromise = null;
     }
   }
 }
@@ -429,7 +429,7 @@ function syncGoalsJiraExportOperation() {
     renderGoalsJiraExportOperation();
     return;
   }
-  if (goalsJiraExportPollOperationId) {
+  if (goalsJiraExportOperationId) {
     setGoalsJiraExportButtonLoading(true);
     return;
   }

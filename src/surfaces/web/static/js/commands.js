@@ -575,7 +575,11 @@ registerCommand({
   ),
   run: async ({ button } = {}) => {
     await withButtonBusy(button, "Resetting...", async () => {
-      const r = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
+      const queued = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
+      const r = await resolveBackgroundOperationResponse(
+        queued,
+        "Target worktree reset is running in the background",
+      );
       toast(r.message || "Target worktree reset", "info");
       if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
@@ -637,8 +641,8 @@ async function ensureTargetAppSettingsPane() {
 }
 
 const TARGET_APP_GENERATE_OPERATION_KEY = "refine_target_app_generate_operation";
-let targetAppGeneratePollOperationId = "";
-let targetAppGeneratePollPromise = null;
+let targetAppGenerateOperationId = "";
+let targetAppGeneratePromise = null;
 
 function readTargetAppGenerateOperation() {
   try {
@@ -694,11 +698,11 @@ async function handleTargetAppGenerateResult(result) {
 }
 
 async function waitForTargetAppGenerateOperation(operationId) {
-  if (targetAppGeneratePollOperationId === operationId && targetAppGeneratePollPromise) {
-    return await targetAppGeneratePollPromise;
+  if (targetAppGenerateOperationId === operationId && targetAppGeneratePromise) {
+    return await targetAppGeneratePromise;
   }
-  targetAppGeneratePollOperationId = operationId;
-  targetAppGeneratePollPromise = waitForBackgroundOperation(operationId, {
+  targetAppGenerateOperationId = operationId;
+  targetAppGeneratePromise = waitForBackgroundOperation(operationId, {
     onProgress: (progress) => {
       const message = String(progress?.message || "").trim();
       if (message) {
@@ -711,10 +715,10 @@ async function waitForTargetAppGenerateOperation(operationId) {
     },
   });
   try {
-    return await targetAppGeneratePollPromise;
+    return await targetAppGeneratePromise;
   } finally {
-    targetAppGeneratePollOperationId = "";
-    targetAppGeneratePollPromise = null;
+    targetAppGenerateOperationId = "";
+    targetAppGeneratePromise = null;
   }
 }
 

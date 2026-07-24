@@ -978,7 +978,11 @@ function bindSettingsProcessesTab(s) {
     b.addEventListener("click", async () => {
       await withButtonBusy(b, "Queueing…", async () => {
         try {
-          await api("POST", "/api/runner-workers/target-app-builder/build");
+          const queued = await api("POST", "/api/runner-workers/target-app-builder/build");
+          await resolveBackgroundOperationResponse(
+            queued,
+            "Target application build is running in the background",
+          );
           await refreshProcessesSettingsTab({ force: true });
         } catch (e) { await showActionError(e); }
       });

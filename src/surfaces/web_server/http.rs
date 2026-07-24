@@ -867,7 +867,7 @@ impl LocalHttpDaemon {
                         }
                     }
                 }
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
         });
         Sse::new(ReceiverStream::new(rx))
@@ -992,6 +992,26 @@ impl LocalHttpDaemon {
                     "attention": projection.dashboard.attention_indicators
                 }),
             },
+            SseEventFrame {
+                event: "runtime_change",
+                data: json!({
+                    "processes": projection.runtime.processes.iter().map(|process| json!({
+                        "id": process.get("id"),
+                        "kind": process.get("kind"),
+                        "status": process.get("status"),
+                        "attention_state": process.get("attention_state")
+                    })).collect::<Vec<_>>(),
+                    "operations": projection.runtime.background_operations.iter().map(|operation| json!({
+                        "id": operation.get("id"),
+                        "status": operation.get("status"),
+                        "progress": operation.get("progress")
+                    })).collect::<Vec<_>>(),
+                    "target_app": projection.runtime.target_app.as_ref().map(|target_app| json!({
+                        "state": target_app.get("state"),
+                        "last_operation": target_app.get("last_operation")
+                    }))
+                }),
+            },
         ];
         let mut recent_goal_logs = projection
             .activity
@@ -1030,17 +1050,14 @@ impl LocalHttpDaemon {
             }
         }
         if let Some(runtime_root) = &self.server.runtime_root {
-            let process = process_summary_response(runtime_root).body;
-            events.push(SseEventFrame {
-                event: "system_operation",
-                data: json!({
-                    "message": "Process snapshot refreshed",
-                    "status": "info",
-                    "category": "process",
-                    "timestamp": now_timestamp_web(),
-                    "details": process
-                }),
-            });
+            if let Ok(encoded) = fs::read_to_string(runtime_root.join("source-promotion.json"))
+                && let Ok(operation) = serde_json::from_str::<Value>(&encoded)
+            {
+                events.push(SseEventFrame {
+                    event: "source_promotion",
+                    data: json!({"operation": operation}),
+                });
+            }
             for payload in recent_process_sse_events(runtime_root, 10)? {
                 events.push(SseEventFrame {
                     event: "process_output",
@@ -1104,6 +1121,29 @@ mod terminal_event_route_tests {
         assert!(!terminal_events_snapshot_requested(
             "/api/terminal/session-1/events?after=42"
         ));
+    }
+
+    #[test]
+    fn operation_progress_sse_deduplicates_timestamp_only_replays() {
+        let first = SseEventFrame {
+            event: "operation_progress",
+            data: json!({
+                "operation": {"id": "op-1", "status": "running"},
+                "timestamp": "first"
+            }),
+        };
+        let replay = SseEventFrame {
+            event: "operation_progress",
+            data: json!({
+                "operation": {"id": "op-1", "status": "running"},
+                "timestamp": "second"
+            }),
+        };
+        let mut states = BTreeMap::new();
+        let mut streams = BTreeMap::new();
+
+        assert!(should_write_sse_frame(&first, &mut states, &mut streams));
+        assert!(!should_write_sse_frame(&replay, &mut states, &mut streams));
     }
 }
 
@@ -1347,8 +1387,8 @@ fn record_http_request_metric(
                 "status": status,
                 "bytes": bytes,
                 "cache_mode": cache_mode,
-                "budget_ms": 75.0,
-                "over_budget": elapsed_ms > 75.0
+                "budget_ms": 50.0,
+                "over_budget": elapsed_ms > 50.0
             }),
         );
     });
@@ -1356,15 +1396,15 @@ fn record_http_request_metric(
 }
 
 fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> bool {
-    if method != "GET" {
-        return false;
-    }
     if cache_mode == "static" {
-        return true;
+        return method == "GET";
     }
     let normalized = normalize_api_path(path);
     if matches!(normalized.as_str(), "/performance" | "/events") {
         return false;
+    }
+    if method != "GET" {
+        return true;
     }
     matches!(
         normalized.as_str(),
@@ -1421,13 +1461,17 @@ fn should_write_sse_frame(
 fn state_sse_event(event: &str) -> bool {
     matches!(
         event,
-        "project_updated" | "status_change" | "activity_added" | "system_operation"
+        "project_updated"
+            | "status_change"
+            | "runtime_change"
+            | "activity_added"
+            | "system_operation"
     )
 }
 
 fn sse_frame_signature(frame: &SseEventFrame) -> String {
     let mut data = frame.data.clone();
-    if frame.event == "system_operation"
+    if matches!(frame.event, "system_operation" | "operation_progress")
         && let Some(object) = data.as_object_mut()
     {
         object.remove("timestamp");

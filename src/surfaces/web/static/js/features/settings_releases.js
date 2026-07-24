@@ -1,14 +1,9 @@
 // ---- System / Releases ------------------------------------------------------
 
 let _releasePlan = null;
-let _releaseRefreshTimer = null;
-let _sourcePromotionPollTimer = null;
-let _sourceUpdateNavPollTimer = null;
-let _sourceUpdateNavCheckTimer = null;
 let _sourceUpdateNavRequest = null;
 let _sourceUpdateNavSnapshot = null;
 let _sourceUpdateNavTargetIsRefine = false;
-const SOURCE_UPDATE_NAV_CHECK_INTERVAL_MS = 300_000;
 
 function renderSettingsReleasesTab(releases = {}) {
   const operations = [...(releases.operations || [])].reverse();
@@ -120,8 +115,6 @@ function applySourcePromotionStatus(source) {
   const check = document.getElementById("source-promotion-check");
   if (promote) promote.disabled = !promotable;
   if (check) check.disabled = !!activeOperation;
-  if (activeOperation) startSourcePromotionPolling();
-  else stopSourcePromotionPolling();
 }
 
 async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false } = {}) {
@@ -142,7 +135,6 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
     root.innerHTML = `<p class="muted small">${quiet
       ? "Refine is restarting; reconnecting to source-promotion state…"
       : htmlEscape(error.message || "Source checkout status is unavailable")}</p>`;
-    if (!quiet) stopSourcePromotionPolling();
   }
 }
 
@@ -161,7 +153,6 @@ function applySourceUpdateNavStatus(result = {}) {
   if (button.hidden) {
     button.disabled = true;
     button.dataset.state = "hidden";
-    stopSourceUpdateNavPolling();
     return;
   }
 
@@ -170,12 +161,30 @@ function applySourceUpdateNavStatus(result = {}) {
   button.dataset.state = sourceUpdate.state || "unavailable";
   button.title = sourceUpdate.title || "Refine source update status is unavailable";
   updateSourceUpdateNavLabel(button, button.title);
-  if (sourceUpdate.state === "updating") {
-    startSourceUpdateNavPolling();
-  } else {
-    stopSourceUpdateNavPolling();
-  }
   button.setAttribute("aria-label", button.title);
+}
+
+function handleSourcePromotionSseEvent(payload = {}) {
+  const operation = payload.operation || null;
+  if (!operation?.id) return;
+  const source = { ...(_sourceUpdateNavSnapshot || {}), operation };
+  _sourceUpdateNavSnapshot = source;
+  if (document.getElementById("source-promotion-status")) {
+    applySourcePromotionStatus(source);
+  }
+  const active = ["queued", "running"].includes(operation.status);
+  applySourceUpdateNavStatus({
+    source,
+    source_update: {
+      visible: _sourceUpdateNavTargetIsRefine,
+      enabled: !active && operation.status === "failed" && sourcePromotionIsReady(source),
+      state: active ? "updating" : operation.status,
+      update_available: !!source.update_available,
+      title: operation.error
+        ? `${operation.message}: ${operation.error}`
+        : operation.message,
+    },
+  });
 }
 
 function markSourceUpdateNavUnavailable(error) {
@@ -223,24 +232,10 @@ async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {
   return _sourceUpdateNavRequest;
 }
 
-function startSourceUpdateNavPolling() {
-  if (_sourceUpdateNavPollTimer) return;
-  _sourceUpdateNavPollTimer = window.setInterval(() => {
-    refreshSourceUpdateNav({ quiet: true });
-  }, 1000);
-}
-
-function stopSourceUpdateNavPolling() {
-  if (!_sourceUpdateNavPollTimer) return;
-  window.clearInterval(_sourceUpdateNavPollTimer);
-  _sourceUpdateNavPollTimer = null;
-}
-
 function resetSourceUpdateNav() {
   const button = document.getElementById("btn-source-update");
   _sourceUpdateNavTargetIsRefine = false;
   _sourceUpdateNavSnapshot = null;
-  stopSourceUpdateNavPolling();
   if (!button) return;
   button.hidden = true;
   button.disabled = true;
@@ -268,7 +263,6 @@ async function promoteSourceFromNav() {
     button.title = result.operation?.message || "Source promotion queued";
     updateSourceUpdateNavLabel(button, button.title);
     button.setAttribute("aria-label", button.title);
-    startSourceUpdateNavPolling();
     toast("Source promotion queued; Refine will reconnect after restart", "info");
   } catch (error) {
     toast(error.message || "Source promotion could not start", "error");
@@ -285,28 +279,10 @@ function initSourceUpdateNav() {
     button.dataset.bound = "true";
     button.addEventListener("click", promoteSourceFromNav);
   }
-  if (_sourceUpdateNavCheckTimer) window.clearInterval(_sourceUpdateNavCheckTimer);
-  _sourceUpdateNavCheckTimer = window.setInterval(() => {
-    refreshSourceUpdateNav({ fetchRemote: true, quiet: true });
-  }, SOURCE_UPDATE_NAV_CHECK_INTERVAL_MS);
   refreshSourceUpdateNav({ fetchRemote: true });
 }
 
-function startSourcePromotionPolling() {
-  if (_sourcePromotionPollTimer) return;
-  _sourcePromotionPollTimer = window.setInterval(() => {
-    refreshSourcePromotionStatus({ quiet: true });
-  }, 1000);
-}
-
-function stopSourcePromotionPolling() {
-  if (!_sourcePromotionPollTimer) return;
-  window.clearInterval(_sourcePromotionPollTimer);
-  _sourcePromotionPollTimer = null;
-}
-
 function bindSourcePromotionControls() {
-  stopSourcePromotionPolling();
   const check = document.getElementById("source-promotion-check");
   const promote = document.getElementById("source-promotion-promote");
   check?.addEventListener("click", () => withButtonBusy(check, "Checking…", async () => {
@@ -369,7 +345,6 @@ function renderReleaseOperation(operation) {
 }
 
 function bindSettingsReleasesTab(releases = {}) {
-  clearTimeout(_releaseRefreshTimer);
   bindSourcePromotionControls();
   $("#release-preview")?.addEventListener("click", previewRelease);
   $("#release-prepare")?.addEventListener("click", prepareRelease);
@@ -381,10 +356,6 @@ function bindSettingsReleasesTab(releases = {}) {
     await api("POST", `/api/system/releases/${button.dataset.releaseRetry}/retry`, { confirmed: publish });
     await refreshActiveSettingsTab({ force: true });
   }));
-  const activeGoalStates = ["backlog", "todo", "in-progress", "ready-merge", "build", "qa", "review"];
-  if ((releases.operations || []).some((operation) => ["pending", "running"].includes(operation.status) || activeGoalStates.includes(operation.preparation?.status))) {
-    _releaseRefreshTimer = setTimeout(() => refreshActiveSettingsTab({ force: true }), 1500);
-  }
 }
 
 async function previewRelease() {

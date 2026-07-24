@@ -422,47 +422,106 @@ async function api(method, path, body, options = {}) {
   }
 }
 
-async function waitForBackgroundOperation(operationOrId, {
-  intervalMs = 750,
+const backgroundOperationWaiters = new Map();
+
+function backgroundOperationError(operation) {
+  if (operation.status === "failed") {
+    const err = new Error(operation.error?.message || "Background operation failed");
+    err.details = operation.error?.details;
+    err.code = operation.error?.code;
+    return err;
+  }
+  if (operation.status === "cancelled") {
+    const err = new Error("Background operation cancelled");
+    err.code = "operation_cancelled";
+    return err;
+  }
+  if (operation.status === "interrupted") {
+    const err = new Error("Background operation was interrupted and can be recovered");
+    err.code = "operation_interrupted";
+    return err;
+  }
+  return null;
+}
+
+function dispatchBackgroundOperationUpdate(operation) {
+  const operationId = operation?.id;
+  const waiters = operationId ? backgroundOperationWaiters.get(operationId) : null;
+  if (!waiters?.size) return;
+  const terminal = operation.status === "complete"
+    || operation.status === "failed"
+    || operation.status === "cancelled"
+    || operation.status === "interrupted";
+  for (const waiter of Array.from(waiters)) {
+    try { waiter.onStatus?.(operation); } catch {}
+    const progressKey = JSON.stringify(operation.progress || {});
+    if (waiter.onProgress && progressKey !== waiter.lastProgress) {
+      waiter.lastProgress = progressKey;
+      try { waiter.onProgress(operation.progress || {}, operation); } catch {}
+    }
+    if (!terminal) continue;
+    clearTimeout(waiter.timeout);
+    waiters.delete(waiter);
+    const error = backgroundOperationError(operation);
+    if (error) waiter.reject(error);
+    else waiter.resolve(operation.result || {});
+  }
+  if (!waiters.size) backgroundOperationWaiters.delete(operationId);
+}
+
+async function reconcileBackgroundOperation(operationId) {
+  try {
+    const snap = await api(
+      "GET",
+      `/api/operations/${operationId}`,
+      undefined,
+      { cache: false, prefetch: true },
+    );
+    dispatchBackgroundOperationUpdate(snap.operation || {});
+  } catch {}
+}
+
+function reconcilePendingBackgroundOperations() {
+  for (const operationId of backgroundOperationWaiters.keys()) {
+    reconcileBackgroundOperation(operationId);
+  }
+}
+
+function waitForBackgroundOperation(operationOrId, {
   timeoutMs = 10 * 60 * 1000,
   onProgress = null,
   onStatus = null,
 } = {}) {
   const operationId = typeof operationOrId === "string" ? operationOrId : operationOrId?.id;
   if (!operationId) throw new Error("Background operation id missing");
-  const started = Date.now();
-  let lastProgress = "";
-  while (true) {
-    const snap = await api("GET", `/api/operations/${operationId}`);
-    const operation = snap.operation || {};
-    if (onStatus) await onStatus(operation);
-    const progressKey = JSON.stringify(operation.progress || {});
-    if (onProgress && progressKey !== lastProgress) {
-      lastProgress = progressKey;
-      onProgress(operation.progress || {}, operation);
+  return new Promise((resolve, reject) => {
+    const waiters = backgroundOperationWaiters.get(operationId) || new Set();
+    const waiter = {
+      resolve,
+      reject,
+      onProgress,
+      onStatus,
+      lastProgress: "",
+      timeout: null,
+    };
+    waiter.timeout = setTimeout(async () => {
+      // One final durable reconciliation distinguishes a missed terminal frame
+      // from a genuinely timed-out operation; this is not a polling loop.
+      await reconcileBackgroundOperation(operationId);
+      if (!waiters.has(waiter)) return;
+      waiters.delete(waiter);
+      if (!waiters.size) backgroundOperationWaiters.delete(operationId);
+      reject(new Error("Background operation timed out"));
+    }, timeoutMs);
+    waiters.add(waiter);
+    backgroundOperationWaiters.set(operationId, waiters);
+    if (typeof operationOrId === "object") {
+      dispatchBackgroundOperationUpdate(operationOrId);
     }
-    if (operation.status === "complete") return operation.result || {};
-    if (operation.status === "failed") {
-      const err = new Error(operation.error?.message || "Background operation failed");
-      err.details = operation.error?.details;
-      err.code = operation.error?.code;
-      throw err;
-    }
-    if (operation.status === "cancelled") {
-      const err = new Error("Background operation cancelled");
-      err.code = "operation_cancelled";
-      throw err;
-    }
-    if (operation.status === "interrupted") {
-      const err = new Error("Background operation was interrupted and can be recovered");
-      err.code = "operation_interrupted";
-      throw err;
-    }
-    if (Date.now() - started > timeoutMs) {
-      throw new Error("Background operation timed out");
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
+    // Close the registration race with one durable read. Healthy progress and
+    // completion updates arrive through SSE; reconnects reconcile once again.
+    reconcileBackgroundOperation(operationId);
+  });
 }
 
 async function resolveBackgroundOperationResponse(response, message = "") {
@@ -1681,6 +1740,26 @@ function activitySystemOperationDetails(entry) {
 function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
+  sseSource.onopen = () => {
+    const reconnected = sseLastErrorNoticeAt > 0;
+    sseLastErrorNoticeAt = 0;
+    invalidateScreenDataCache();
+    reconcilePendingBackgroundOperations();
+    if (reconnected) toast("Live updates reconnected.", "success");
+    // SSE is a notification transport, not durable state. Reconcile the visible
+    // screen from the authoritative read endpoint on every initial connection
+    // and reconnect so a missed frame can never leave the workflow UI stale.
+    if (state.currentRoute === "dashboard") refreshDashboard();
+    if (state.currentRoute === "goals") refreshGoalsTable();
+    if (state.currentRoute === "logs") loadLogs();
+    if (state.currentRoute === "changes") loadChanges();
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+      refreshCurrentSettingsSurface({ force: true });
+    }
+    if (state.currentRoute === "goals_detail" && state.currentGoal) {
+      loadGoalDetail(state.currentGoal);
+    }
+  };
   sseSource.addEventListener("activity_added", (e) => {
     if (!sseEventChanged("Activity", e)) return;
     invalidateScreenDataCache();
@@ -1731,6 +1810,29 @@ function initSSE() {
     if (state.currentRoute === "goals_detail" && state.currentGoal) {
       loadGoalDetail(state.currentGoal);
     }
+  });
+  sseSource.addEventListener("runtime_change", () => {
+    invalidateScreenDataCache();
+    if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
+    if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
+    if (state.currentRoute === "dashboard") refreshDashboard();
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+      refreshCurrentSettingsSurface();
+    }
+  });
+  sseSource.addEventListener("operation_progress", (e) => {
+    try {
+      const payload = JSON.parse(e.data || "{}");
+      dispatchBackgroundOperationUpdate(payload.operation || {});
+    } catch {}
+  });
+  sseSource.addEventListener("source_promotion", (e) => {
+    try {
+      const payload = JSON.parse(e.data || "{}");
+      if (typeof handleSourcePromotionSseEvent === "function") {
+        handleSourcePromotionSseEvent(payload);
+      }
+    } catch {}
   });
   sseSource.addEventListener("target_app_state", () => {
     refreshTargetAppToggle();
@@ -1786,11 +1888,9 @@ function initSSE() {
     const now = Date.now();
     if (now - sseLastErrorNoticeAt > 30000) {
       sseLastErrorNoticeAt = now;
-      toast("Live updates disconnected. Refresh the page to reconnect.", "warn");
+      toast("Live updates disconnected. Reconnecting automatically…", "warn");
     }
-    if (sseSource) {
-      sseSource.close();
-      sseSource = null;
-    }
+    // Keep the EventSource alive: the browser automatically reconnects it and
+    // `onopen` above reconciles durable backend truth after transport recovery.
   };
 }

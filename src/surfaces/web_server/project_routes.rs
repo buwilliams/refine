@@ -781,21 +781,74 @@ impl InProcessWebServer {
             .strip_prefix("/target-app/")
             .unwrap_or("status")
             .to_string();
-        let result = match self.target_app_service() {
-            Ok(service) => match kind.as_str() {
-                "start" => service.start(),
-                "stop" => service.stop(),
-                "build" => service.build(),
-                _ => Err(RefineError::InvalidInput(format!(
-                    "unknown target-app action {kind}"
-                ))),
-            },
-            Err(error) => Err(error),
-        };
-        match result {
-            Ok(snapshot) => ApiResponse::json(200, self.target_app_response(snapshot)),
-            Err(error) => error_response(error),
+        if !matches!(kind.as_str(), "start" | "stop" | "build") {
+            return error_response(RefineError::InvalidInput(format!(
+                "unknown target-app action {kind}"
+            )));
         }
+        self.queue_target_app_action(kind)
+    }
+
+    fn queue_target_app_action(&self, kind: String) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("run target-app lifecycle action");
+        };
+        let registry = FileOperationRegistry::new(runtime_root);
+        let operation = match registry
+            .register_exclusive_with_request("target-app:lifecycle", json!({"kind": kind}))
+        {
+            Ok(operation) => operation,
+            Err(error) => return error_response(error),
+        };
+        let _ = registry.update_progress(
+            &operation.id,
+            json!({"message": format!("Target application {kind} is running")}),
+        );
+        let operation = registry.status(&operation.id).unwrap_or(operation);
+        let operation_id = operation.id.clone();
+        let runtime_root = runtime_root.clone();
+        let server = self.clone();
+        thread::spawn(move || {
+            let registry = FileOperationRegistry::new(&runtime_root);
+            let result = server
+                .target_app_service()
+                .and_then(|service| match kind.as_str() {
+                    "start" => service.start(),
+                    "stop" => service.stop(),
+                    "build" => service.build(),
+                    _ => unreachable!("target-app action was validated before launch"),
+                });
+            match result {
+                Ok(snapshot) => {
+                    let queued = kind == "build"
+                        && snapshot.ok
+                        && snapshot
+                            .last_operation
+                            .as_ref()
+                            .is_some_and(|operation| operation.kind == "build");
+                    let mut result = server.target_app_response(snapshot);
+                    if kind == "build" {
+                        result["queued"] = json!(queued);
+                    }
+                    let _ = registry.finish_with_result(
+                        &operation_id,
+                        OperationState::Succeeded,
+                        result,
+                    );
+                }
+                Err(error) => {
+                    let _ = registry.fail_with_error(
+                        &operation_id,
+                        json!({
+                            "code": "target_app_action_failed",
+                            "message": error.to_string(),
+                            "kind": kind
+                        }),
+                    );
+                }
+            }
+        });
+        ApiResponse::json(202, json!({"operation": operation_response(operation)}))
     }
 
     pub(super) fn handle_target_app_generate_instructions(
@@ -946,23 +999,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_target_app_build_queue(&self) -> ApiResponse {
-        match self
-            .target_app_service()
-            .and_then(|service| service.build())
-        {
-            Ok(snapshot) => {
-                let queued = snapshot.ok
-                    && snapshot
-                        .last_operation
-                        .as_ref()
-                        .map(|operation| operation.kind == "build")
-                        .unwrap_or(false);
-                let mut value = self.target_app_response(snapshot);
-                value["queued"] = json!(queued);
-                ApiResponse::json(200, value)
-            }
-            Err(error) => error_response(error),
-        }
+        self.queue_target_app_action("build".to_string())
     }
 
     pub(super) fn handle_project_status(&self) -> ApiResponse {

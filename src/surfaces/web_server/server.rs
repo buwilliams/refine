@@ -372,7 +372,7 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST" && request.path == "/cache/rebuild" {
-            return self.handle_cache_rebuild();
+            return self.handle_cache_rebuild(request);
         }
 
         if request.method == "GET" && request.path == "/performance" {
@@ -952,6 +952,7 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     !path.starts_with("/terminal/")
         && path != "/work/goals"
         && path != "/project/sync"
+        && path != "/cache/rebuild"
         && !path.starts_with("/system/source/")
         && path != mcp::MCP_ROUTE
 }

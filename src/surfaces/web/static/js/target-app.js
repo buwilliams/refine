@@ -197,7 +197,11 @@ async function runTargetAppAction(action) {
     state: isStop ? "stopping" : (isBuild ? "building" : "starting"),
   });
   try {
-    const r = await api("POST", `/api/target-app/${action}`);
+    const queued = await api("POST", `/api/target-app/${action}`);
+    const r = await resolveBackgroundOperationResponse(
+      queued,
+      `Target application ${action} is running in the background`,
+    );
     if (isBuild && r.queued !== undefined) {
       toast(r.queued ? "Target application build queued" : "Target application build was not queued", r.queued ? "info" : "warn");
       await refreshTargetAppToggle();

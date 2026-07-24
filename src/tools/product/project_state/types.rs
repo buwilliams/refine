@@ -45,6 +45,8 @@ pub struct SourceFingerprint {
     pub path: String,
     pub size: u64,
     pub modified_unix_ms: Option<i64>,
+    #[serde(default)]
+    pub change_unix_ns: Option<i64>,
     pub content_hash: Option<String>,
 }
 

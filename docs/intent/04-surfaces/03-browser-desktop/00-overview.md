@@ -5,6 +5,7 @@
 - **Primary Human Surface**: browser and desktop make Refine understandable and operable for people.
 - **Same Product, Packaged Differently**: desktop should wrap the browser experience rather than fork product behavior.
 - **Static App, Local Daemon**: the UI should stay lightweight and call the local daemon for capability.
+- **SSE-Driven State**: live browser state should arrive through server-sent events, never periodic UI polling.
 - **Operational Console**: the surface should combine work management, system visibility, chat, files, terminal, settings, and review.
 - **Agent-First Compatibility**: the UI should expose intent and state without becoming the only way to operate Refine.
 
@@ -24,6 +25,7 @@ Current implementation details that matter to intent:
 - the shell contains a topbar, banners, `#main`, toolbar dock, and Guide panel;
 - hash routing drives Dashboard, Features, Goals, Changes, Logs, Settings, Node, Project, modals, import, and Plan flows;
 - static assets call the local daemon API for product and runtime state;
+- initial loads and reconnects reconcile authoritative HTTP state once, while SSE exclusively drives subsequent live updates and background-operation progress;
 - desktop should be understood as a packaging and accessibility surface over the same local capability.
 
 The UI should not become a second product implementation. Product rules belong in shared services and workflow capabilities.

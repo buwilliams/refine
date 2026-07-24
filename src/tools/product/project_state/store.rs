@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(test)]
@@ -116,8 +118,66 @@ impl FileProjectStateStore {
             path: path.display().to_string(),
             size: metadata.len(),
             modified_unix_ms,
+            change_unix_ns: metadata_change_unix_ns(&metadata),
             content_hash: Some(fingerprint_content_hash(path)?),
         })
+    }
+
+    fn metadata_fingerprint(path: &Path) -> RefineResult<SourceFingerprint> {
+        let metadata = fs::metadata(path).map_err(|error| {
+            RefineError::Io(format!("failed to stat {}: {error}", path.display()))
+        })?;
+        let modified_unix_ms = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_millis() as i64);
+        Ok(SourceFingerprint {
+            path: path.display().to_string(),
+            size: metadata.len(),
+            modified_unix_ms,
+            change_unix_ns: metadata_change_unix_ns(&metadata),
+            content_hash: None,
+        })
+    }
+
+    pub fn source_fingerprints_match(
+        &self,
+        expected: &BTreeMap<String, SourceFingerprint>,
+    ) -> RefineResult<bool> {
+        let mut observed = BTreeMap::new();
+        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")? {
+            let rel_path = self.relative_path(&path)?;
+            observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
+        }
+        for path in Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")? {
+            let rel_path = self.relative_path(&path)?;
+            observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
+        }
+        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
+            let rel_path = self.relative_path(&path)?;
+            observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
+        }
+        let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
+        if activity_path.exists() {
+            let rel_path = self.relative_path(&activity_path)?;
+            observed.insert(rel_path, Self::metadata_fingerprint(&activity_path)?);
+        }
+        if let Some(fingerprint) = self.git_head_fingerprint() {
+            observed.insert(fingerprint.path.clone(), fingerprint);
+        }
+        if observed.len() != expected.len() {
+            return Ok(false);
+        }
+        Ok(observed.iter().all(|(path, current)| {
+            expected.get(path).is_some_and(|previous| {
+                previous.size == current.size
+                    && previous.modified_unix_ms == current.modified_unix_ms
+                    && previous.change_unix_ns.is_some()
+                    && previous.change_unix_ns == current.change_unix_ns
+                    && (path != "git:HEAD" || previous.content_hash == current.content_hash)
+            })
+        }))
     }
 
     pub fn collect_source_fingerprints(&self) -> RefineResult<BTreeMap<String, SourceFingerprint>> {
@@ -146,9 +206,8 @@ impl FileProjectStateStore {
     }
 
     pub fn load_or_refresh_projection(&self, cache_dir: &Path) -> RefineResult<ProjectionSnapshot> {
-        let current_fingerprints = self.collect_source_fingerprints()?;
         if let Some(snapshot) = self.load_projection_snapshot(cache_dir)?
-            && snapshot.source_fingerprints == current_fingerprints
+            && self.source_fingerprints_match(&snapshot.source_fingerprints)?
         {
             return Ok(snapshot);
         }
@@ -450,6 +509,7 @@ impl FileProjectStateStore {
             path: "git:HEAD".to_string(),
             size: latest.len() as u64,
             modified_unix_ms: None,
+            change_unix_ns: Some(0),
             content_hash: Some(format!("{branch}:{latest}")),
         })
     }
@@ -461,6 +521,23 @@ impl FileProjectStateStore {
             FileGitWorktreeService::new(target_root)
         }
     }
+}
+
+#[cfg(unix)]
+fn metadata_change_unix_ns(metadata: &fs::Metadata) -> Option<i64> {
+    metadata
+        .ctime()
+        .checked_mul(1_000_000_000)
+        .and_then(|seconds| seconds.checked_add(metadata.ctime_nsec()))
+}
+
+#[cfg(not(unix))]
+fn metadata_change_unix_ns(metadata: &fs::Metadata) -> Option<i64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| i64::try_from(duration.as_nanos()).ok())
 }
 
 fn round_log_activity_entry(goal_id: &str, index: usize, mut log: RoundLogEntry) -> ActivityEntry {

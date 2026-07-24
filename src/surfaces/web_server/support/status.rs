@@ -15,8 +15,7 @@ use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery}
 #[cfg(test)]
 pub(in crate::surfaces::web_server) use crate::tools::observability::processes::runtime_process_status_value;
 pub(in crate::surfaces::web_server) use crate::tools::observability::processes::{
-    process_status_value, process_summary_value, process_summary_value_with_chat_sessions,
-    runtime_process_summary_value,
+    process_status_value, process_summary_value_with_chat_sessions, runtime_process_summary_value,
 };
 use crate::tools::product::project_registry::registry_apps_array;
 
@@ -204,15 +203,6 @@ pub(in crate::surfaces::web_server) fn operation_response(
         "result": operation.result,
         "error": operation.error
     })
-}
-
-pub(in crate::surfaces::web_server) fn process_summary_response(
-    runtime_root: &Path,
-) -> ApiResponse {
-    match process_summary_value(runtime_root) {
-        Ok(value) => ApiResponse::json(200, value),
-        Err(error) => error_response(error),
-    }
 }
 
 pub(in crate::surfaces::web_server) fn provider_status_response() -> ApiResponse {
