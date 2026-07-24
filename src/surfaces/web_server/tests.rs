@@ -869,6 +869,7 @@ fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     assert!(toolbar_css.contains(".terminal-panel"));
     assert!(toolbar_css.contains("position: absolute"));
     assert!(toolbar_css.contains(".toolbar-dock:not(.open) .toolbar-add-options"));
+    assert!(toolbar_css.contains("min-height: 36px"));
     assert!(toolbar_css.contains("padding-inline: 0"));
     assert!(toolbar_css.contains("font-size: 15px"));
     assert!(toolbar.contains("observeTerminalOutputSize(output, tab)"));

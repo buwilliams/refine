@@ -324,6 +324,7 @@ test("Toolbar add button precedes the tab strip and exposes the exact lazy menu"
   assert.match(toolbarCss, /\.toolbar-add-options\s*\{[^}]*position:\s*absolute/s);
   assert.doesNotMatch(toolbarCss, /\.toolbar-add-options\s*\{[^}]*position:\s*fixed/s);
   assert.match(toolbarCss, /\.toolbar-dock:not\(\.open\) \.toolbar-add-options/);
+  assert.match(toolbarCss, /\.toolbar-dock-bar \.toolbar-tabs\s*\{[^}]*min-height:\s*36px/s);
   assert.deepEqual(
     [...initial.matchAll(/data-add-toolbar-tab="[^"]+">([^<]+)<\/button>/g)].map((match) => match[1]),
     ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planing Agent"],

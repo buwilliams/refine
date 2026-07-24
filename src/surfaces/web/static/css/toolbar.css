@@ -91,6 +91,7 @@
 .toolbar-dock-bar .toolbar-tabs {
   flex: 1;
   min-width: 0;
+  min-height: 36px;
   overflow-x: auto;
   flex-wrap: nowrap;
   margin-bottom: 0;
