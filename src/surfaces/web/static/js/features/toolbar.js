@@ -1519,22 +1519,141 @@ function handleTerminalEvent(event, terminal = terminalStateFor()) {
   }
 }
 
-function handleTerminalKeydown(e) {
-  const terminal = terminalStateFor();
+function handleTerminalKeydown(e, terminal = terminalStateFor()) {
   if (!terminal?.sessionId || terminal.exited) return;
+  if (handleTerminalClipboardKeydown(e, terminal)) return;
   const data = terminalKeyData(e);
   if (data == null) return;
   e.preventDefault();
   queueTerminalInput(data, terminal);
 }
 
-function handleTerminalPaste(e) {
-  const terminal = terminalStateFor();
-  if (!terminal?.sessionId || terminal.exited) return;
-  const text = e.clipboardData?.getData("text/plain") || "";
-  if (!text) return;
+function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
+  if (!terminal?.sessionId || terminal.exited || e.altKey) return false;
+  if (e.type && e.type !== "keydown") return false;
+  if (!e.ctrlKey && !e.metaKey) return false;
+  const key = String(e.key || "").toLowerCase();
+  if (key === "c") {
+    const selection = terminalSelection(terminal);
+    if (!selection) return false;
+    if (writeTerminalClipboard(selection, terminal)) e.preventDefault();
+    return true;
+  }
+  if (key !== "v") return false;
+  if (readTerminalClipboard(terminal)) e.preventDefault();
+  return true;
+}
+
+function terminalSelection(terminal) {
+  if (!terminal?.term?.hasSelection?.()) return "";
+  return terminal.term.getSelection?.() || "";
+}
+
+function handleTerminalCopy(e, terminal = terminalStateFor()) {
+  if (!terminal?.sessionId || terminal.exited) return false;
+  const selection = terminalSelection(terminal);
+  if (!selection) return false;
+  const setData = e.clipboardData?.setData;
+  if (typeof setData !== "function") {
+    showTerminalClipboardError(
+      "copy",
+      new Error("Browser copy data is unavailable."),
+      terminal,
+    );
+    return false;
+  }
+  try {
+    setData.call(e.clipboardData, "text/plain", selection);
+  } catch (error) {
+    showTerminalClipboardError("copy", error, terminal);
+    return false;
+  }
   e.preventDefault();
-  queueTerminalInput(text.replace(/\r?\n/g, "\r"), terminal);
+  return true;
+}
+
+function handleTerminalPaste(e, terminal = terminalStateFor()) {
+  if (!terminal?.sessionId || terminal.exited) return false;
+  let text;
+  try {
+    text = e.clipboardData?.getData("text/plain");
+  } catch (error) {
+    showTerminalClipboardError("paste", error, terminal);
+    return false;
+  }
+  if (typeof text !== "string") {
+    showTerminalClipboardError(
+      "paste",
+      new Error("Browser paste data is unavailable."),
+      terminal,
+    );
+    return false;
+  }
+  if (!text) return false;
+  e.preventDefault();
+  queueTerminalInput(text, terminal);
+  return true;
+}
+
+function writeTerminalClipboard(text, terminal) {
+  const writeText = typeof navigator !== "undefined"
+    ? navigator.clipboard?.writeText
+    : null;
+  if (typeof writeText !== "function") {
+    showTerminalClipboardError(
+      "copy",
+      new Error("Browser clipboard write access is unavailable."),
+      terminal,
+    );
+    return false;
+  }
+  try {
+    Promise.resolve(writeText.call(navigator.clipboard, text))
+      .catch((error) => showTerminalClipboardError("copy", error, terminal));
+  } catch (error) {
+    showTerminalClipboardError("copy", error, terminal);
+    return false;
+  }
+  return true;
+}
+
+function readTerminalClipboard(terminal) {
+  const readText = typeof navigator !== "undefined"
+    ? navigator.clipboard?.readText
+    : null;
+  if (typeof readText !== "function") {
+    showTerminalClipboardError(
+      "paste",
+      new Error("Browser clipboard read access is unavailable."),
+      terminal,
+    );
+    return false;
+  }
+  const sessionId = terminal.sessionId;
+  try {
+    Promise.resolve(readText.call(navigator.clipboard))
+      .then((text) => {
+        if (
+          typeof text === "string"
+          && text
+          && terminal.sessionId === sessionId
+          && !terminal.exited
+        ) {
+          queueTerminalInput(text, terminal);
+        }
+      })
+      .catch((error) => showTerminalClipboardError("paste", error, terminal));
+  } catch (error) {
+    showTerminalClipboardError("paste", error, terminal);
+    return false;
+  }
+  return true;
+}
+
+function showTerminalClipboardError(action, error, terminal) {
+  const detail = error?.message || String(error || "Clipboard access failed.");
+  terminal.error = `Unable to ${action} terminal text: ${detail}`;
+  if (chatState.activeTabId === terminal.tabId) drawToolbar();
 }
 
 function terminalKeyData(e) {
@@ -1670,6 +1789,19 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   term.open(output);
   if (terminal.display) term.write(terminal.display);
   term.onData((data) => queueTerminalInput(data, terminal));
+  term.attachCustomKeyEventHandler?.(
+    (event) => !handleTerminalClipboardKeydown(event, terminal),
+  );
+  term.element?.addEventListener?.(
+    "copy",
+    (event) => handleTerminalCopy(event, terminal),
+    true,
+  );
+  term.element?.addEventListener?.(
+    "paste",
+    (event) => handleTerminalPaste(event, terminal),
+    true,
+  );
   terminal.term = term;
   resizeTerminalRenderer(output, terminal);
 }

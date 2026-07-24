@@ -21,6 +21,11 @@ Current implementation details that matter to intent:
 
 - terminal is a toolbar tab;
 - backend routes create terminal sessions, send input, resize, stop, and stream events;
+- browser copy and paste shortcuts are scoped to the focused shared terminal
+  surface: copying an active selection does not interrupt the PTY, while
+  control-C without a selection retains normal terminal semantics;
+- clipboard text, including multiline text, is sent unchanged through the
+  managed terminal input route, and clipboard access failures remain visible;
 - output is retained up to a bounded size in the UI;
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.

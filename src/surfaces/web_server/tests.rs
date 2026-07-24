@@ -5513,6 +5513,97 @@ fn web_server_runs_interactive_terminal_session() {
 }
 
 #[test]
+fn web_terminal_input_stays_with_its_managed_session() {
+    let temp_root = unique_temp_dir("http-terminal-input-isolation");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(temp_root.join("run/8080"));
+
+    let mut session_ids = Vec::new();
+    for _ in 0..2 {
+        let response = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/terminal/session".to_string(),
+            body: Some(json!({"profile": "terminal", "cols": 80, "rows": 20})),
+        });
+        assert_eq!(response.status, 200, "{}", response.body);
+        session_ids.push(response.body["id"].as_str().unwrap().to_string());
+    }
+    let first_id = session_ids.remove(0);
+    let second_id = session_ids.remove(0);
+    assert_ne!(first_id, second_id);
+
+    for (session_id, marker) in [
+        (&first_id, "__clipboard_first__"),
+        (&second_id, "__clipboard_second__"),
+    ] {
+        let response = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: format!("/api/terminal/{session_id}/input"),
+            body: Some(json!({"data": format!("printf '{marker}\\n'\r")})),
+        });
+        assert_eq!(response.status, 200, "{}", response.body);
+    }
+
+    let mut outputs = [String::new(), String::new()];
+    for _ in 0..40 {
+        for (index, session_id) in [&first_id, &second_id].into_iter().enumerate() {
+            let response = server.handle(ApiRequest {
+                method: "GET".to_string(),
+                path: format!("/api/terminal/{session_id}/events"),
+                body: None,
+            });
+            assert_eq!(response.status, 200, "{}", response.body);
+            outputs[index] = response.body["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|event| event["data"].as_str())
+                .collect();
+        }
+        if outputs[0].contains("__clipboard_first__") && outputs[1].contains("__clipboard_second__")
+        {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+
+    assert!(
+        outputs[0].contains("__clipboard_first__"),
+        "{:?}",
+        outputs[0]
+    );
+    assert!(
+        !outputs[0].contains("__clipboard_second__"),
+        "{:?}",
+        outputs[0]
+    );
+    assert!(
+        outputs[1].contains("__clipboard_second__"),
+        "{:?}",
+        outputs[1]
+    );
+    assert!(
+        !outputs[1].contains("__clipboard_first__"),
+        "{:?}",
+        outputs[1]
+    );
+
+    for session_id in [&first_id, &second_id] {
+        let response = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: format!("/api/terminal/{session_id}/stop"),
+            body: None,
+        });
+        assert_eq!(response.status, 200, "{}", response.body);
+    }
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
     let _env_guard = smoke_ai_env_lock()
         .lock()
