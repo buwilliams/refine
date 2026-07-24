@@ -105,6 +105,7 @@ function terminalStateFor(tabId = chatState.activeTabId) {
       display: "",
       term: null,
       inputBuffer: "",
+      inputSessionId: "",
       inputFlushTimer: null,
       resizeTimer: null,
       inputSendPromise: Promise.resolve(),
@@ -1639,7 +1640,7 @@ function readTerminalClipboard(terminal) {
           && terminal.sessionId === sessionId
           && !terminal.exited
         ) {
-          queueTerminalInput(text, terminal);
+          queueTerminalInput(text, terminal, sessionId);
         }
       })
       .catch((error) => showTerminalClipboardError("paste", error, terminal));
@@ -1682,20 +1683,33 @@ function terminalKeyData(e) {
   return null;
 }
 
-function queueTerminalInput(data, terminal = terminalStateFor()) {
-  if (!terminal) return;
+function queueTerminalInput(
+  data,
+  terminal = terminalStateFor(),
+  sessionId = terminal?.sessionId,
+) {
+  if (!terminal || !data || !sessionId || terminal.sessionId !== sessionId) return;
+  if (terminal.inputBuffer && terminal.inputSessionId !== sessionId) {
+    if (terminal.inputFlushTimer) clearTimeout(terminal.inputFlushTimer);
+    terminal.inputBuffer = "";
+    terminal.inputFlushTimer = null;
+  }
+  terminal.inputSessionId = sessionId;
   terminal.inputBuffer += data;
   if (terminal.inputFlushTimer) return;
-  terminal.inputFlushTimer = setTimeout(() => flushTerminalInput(terminal), 12);
+  terminal.inputFlushTimer = setTimeout(() => flushTerminalInput(terminal, sessionId), 12);
 }
 
-function flushTerminalInput(terminal = terminalStateFor()) {
-  if (!terminal) return;
+function flushTerminalInput(
+  terminal = terminalStateFor(),
+  sessionId = terminal?.inputSessionId || terminal?.sessionId,
+) {
+  if (!terminal || terminal.inputSessionId !== sessionId) return;
   const data = terminal.inputBuffer;
   terminal.inputBuffer = "";
+  terminal.inputSessionId = "";
   terminal.inputFlushTimer = null;
-  if (!data || !terminal.sessionId) return;
-  const sessionId = terminal.sessionId;
+  if (!data || terminal.sessionId !== sessionId) return;
   terminal.inputSendPromise = terminal.inputSendPromise
     .catch(() => undefined)
     .then(async () => {

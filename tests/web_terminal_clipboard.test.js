@@ -405,6 +405,21 @@ test("an asynchronous paste cannot cross into a replacement managed session", as
   assert.deepEqual(inputRequests(browser), []);
 });
 
+test("clipboard text buffered before replacement cannot cross managed sessions", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("agent", "agent", "Agent");
+  let resolveClipboard;
+  browser.setRead(() => new Promise((resolve) => { resolveClipboard = resolve; }));
+
+  browser.runtime.key("agent", { key: "v", ctrlKey: true });
+  resolveClipboard("buffered for the original session");
+  await Promise.resolve();
+  browser.runtime.rotateSession("agent", "replacement-session");
+  await settleInput();
+
+  assert.deepEqual(inputRequests(browser), []);
+});
+
 test("clipboard shortcuts remain untouched when focus is outside a terminal", async () => {
   const browser = clipboardRuntime();
   const prevented = browser.runtime.nonTerminalKey({ key: "v", ctrlKey: true });
