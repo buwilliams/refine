@@ -9,14 +9,14 @@ function commandRuntime() {
   const window = {};
   const context = vm.createContext({
     SETTINGS_SURFACES: {},
-    SUPERVISOR_TAB_ID: "supervisor",
+
     SYSTEM_TAB_ID: "system",
     TERMINAL_TAB_ID: "terminal",
     chatState: { tabs: {} },
     console,
     location: { hash: "#/" },
     navigator: { platform: "Linux" },
-    openToolbarTab: (tabId) => openedToolbarTabs.push(tabId),
+    createToolbarTab: (mode) => openedToolbarTabs.push(mode),
     showActionError: async () => {},
     state: {
       currentRoute: "dashboard",
@@ -52,26 +52,26 @@ function commandRuntime() {
   };
 }
 
-test("palette discovers every permanent Toolbar surface", () => {
+test("palette discovers every lazy Toolbar surface", () => {
   const browser = commandRuntime();
 
-  assert.equal(browser.commands.ids("supervisor")[0], "supervisor.open");
+  assert.equal(browser.commands.ids("agent")[0], "agent.open");
   assert.equal(browser.commands.ids("system operations")[0], "system.open");
   assert.equal(browser.commands.ids("terminal")[0], "terminal.open");
-  assert.equal(browser.commands.ids("standalone")[0], "standalone.open");
+  assert.ok(browser.commands.ids("agent worktree").includes("agent-worktree.open"));
   assert.equal(browser.commands.ids("files")[0], "files.open");
 });
 
 test("Toolbar palette commands open the requested tab", async () => {
   const browser = commandRuntime();
 
-  await browser.commands.run("supervisor.open");
+  await browser.commands.run("agent.open");
   await browser.commands.run("system.open");
   await browser.commands.run("terminal.open");
-  await browser.commands.run("standalone.open");
+  await browser.commands.run("agent-worktree.open");
 
   assert.deepEqual(browser.openedToolbarTabs, [
-    "supervisor",
+    "agent",
     "system",
     "terminal",
     "standalone",

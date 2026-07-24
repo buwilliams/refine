@@ -24,6 +24,8 @@ The current implementation has explicit services and surfaces for settings, guid
 
 Guidance should not become a wall of policy text that agents ignore or a reason to expand every system prompt. It should be specific, current, structured enough to retrieve, and close enough to the work that it changes outcomes. Prompt changes should prefer less prescription when repository discovery, a prototype, or a focused user interview can close the gap more reliably.
 
+For Goal implementation, Refine snapshots every enabled guidance candidate into the current Round before launching the Goal Agent. The same agent decides which candidates apply while performing the implementation and reports their indexes with its completion signal. Refine validates and records the applied and skipped candidates without launching a separate guidance-classification turn.
+
 ## Future Direction
 
 As agents improve, guidance should become more active. It should help agents select strategies, evaluate tradeoffs, choose tools, explain risks, and coordinate with other agents.

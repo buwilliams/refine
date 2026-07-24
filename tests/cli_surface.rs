@@ -463,21 +463,24 @@ fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixt
         "qa"
     );
     let verified_quality = fixture.run_refine(&["goal", "verify", &quality_id]);
-    fixture.assert_success("goal verify qa", &verified_quality);
-    assert_eq!(
-        fixture.json_stdout(&verified_quality)["goal"]["status"],
-        "done"
+    assert!(
+        !verified_quality.status.success(),
+        "goal verify unexpectedly bypassed Ready Merge and Review"
     );
-    let undone_done = fixture.run_refine(&["goal", "undo", &quality_id]);
-    fixture.assert_success("goal undo done", &undone_done);
-    assert_eq!(
-        fixture.json_stdout(&undone_done)["goal"]["status"],
-        "review"
+    assert!(
+        String::from_utf8_lossy(&verified_quality.stderr)
+            .contains("Goal approval is only available from review"),
+        "unexpected goal verify failure: {}",
+        String::from_utf8_lossy(&verified_quality.stderr)
     );
-    let undone_review = fixture.run_refine(&["goal", "undo", &quality_id]);
-    fixture.assert_success("goal undo review", &undone_review);
+    fixture.assert_success(
+        "goal cancel quality retry",
+        &fixture.run_refine(&["goal", "cancel", &quality_id]),
+    );
+    let undone_quality_cancel = fixture.run_refine(&["goal", "undo", &quality_id]);
+    fixture.assert_success("goal undo quality cancel", &undone_quality_cancel);
     assert_eq!(
-        fixture.json_stdout(&undone_review)["goal"]["status"],
+        fixture.json_stdout(&undone_quality_cancel)["goal"]["status"],
         "todo"
     );
     fixture.assert_success(
@@ -1033,12 +1036,6 @@ fn log_commands_query_public_activity(fixture: &IntegrationFixture) {
 }
 
 fn agent_commands_use_smoke_ai(fixture: &IntegrationFixture) {
-    let supervisor = fixture.run_refine(&["agent", "supervisor"]);
-    fixture.assert_success("agent supervisor", &supervisor);
-    let supervisor_payload = fixture.json_stdout(&supervisor);
-    assert!(supervisor_payload["supervisor_agent"]["lifecycle"].is_string());
-    assert!(supervisor_payload["supervisor_agent"]["events"].is_array());
-
     let detect = fixture.run_refine(&["agent", "detect"]);
     fixture.assert_success("agent detect", &detect);
     let detect_payload = fixture.json_stdout(&detect);

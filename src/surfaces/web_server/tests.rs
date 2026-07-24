@@ -845,18 +845,20 @@ fn static_goal_log_tail_uses_toolbar_and_shared_sse_activity() {
 }
 
 #[test]
-fn static_toolbar_keeps_supervisor_visible_and_uses_shared_managed_terminal() {
+fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
     let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
 
-    assert!(toolbar.contains(r#"label: "Supervisor", mode: "supervisor""#));
-    assert!(toolbar.contains("STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID"));
+    assert!(toolbar.contains("CHAT_TABS_STORAGE_VERSION = 2"));
+    assert!(toolbar.contains(r#"["agent", "Agent"]"#));
+    assert!(toolbar.contains(r#"["standalone", "Agent in Worktree"]"#));
+    assert!(toolbar.contains(r#"["plan", "Planing Agent"]"#));
+    assert!(toolbar.contains("function createToolbarTab"));
+    assert!(!toolbar.contains("ensureSupervisorTab"));
     assert!(toolbar.contains(r#"api("POST", "/api/terminal/session"#));
     assert!(toolbar.contains("toolbarTabUsesTerminal(active)"));
     assert!(toolbar.contains("renderTerminalPanel(active)"));
-    assert!(toolbar.contains("recordSupervisorAgentEvents(snapshot?.events)"));
-    assert!(toolbar.contains(r#"category: "supervisor""#));
     assert!(!toolbar.contains("renderSupervisorPanel"));
     assert!(!toolbar.contains("renderChatPanel"));
     assert!(!toolbar.contains(r#"data-testid="supervisor-agent-conversation""#));
@@ -7213,115 +7215,48 @@ fn web_server_manages_quality_settings_and_checks() {
 }
 
 #[test]
-fn web_server_shares_supervisor_state_and_singleton_chat_session() {
-    let temp_root = unique_temp_dir("http-supervisor-agent");
-    let refine_dir = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run/8080");
+fn web_server_rejects_retired_supervisor_routes() {
+    let temp_root = unique_temp_dir("retired-supervisor-routes");
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
-    server.runtime_root = Some(runtime_root);
-    server
-        .settings_service(&refine_dir)
-        .update(&json!({"agent_cli": "smoke-ai"}))
-        .unwrap();
-
-    let goal_path = refine_dir.join("goals/GO/GOAL1/goal.json");
-    fs::create_dir_all(goal_path.parent().unwrap()).unwrap();
-    let write_goal_status = |status: &str| {
-        fs::write(
-            &goal_path,
-            serde_json::to_vec_pretty(&json!({
-                "id": "GOAL1",
-                "name": "Live Supervisor state",
-                "status": status,
-                "created": "2026-07-22T12:00:00Z",
-                "updated": Utc::now().to_rfc3339(),
-                "priority": "low",
-                "reporter": "test",
-                "rounds": []
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-    };
-    write_goal_status("review");
-
-    let state = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/supervisor-agent".to_string(),
-        body: None,
-    });
-    assert_eq!(state.status, 200);
-    assert_eq!(state.body["supervisor_agent"]["lifecycle"], "idle");
-    assert_eq!(state.body["supervisor_agent"]["health"], "healthy");
-    assert_eq!(
-        state.body["supervisor_agent"]["goal_states"]["GOAL1"],
-        "review"
-    );
-    let review_updated_at = state.body["supervisor_agent"]["updated_at"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let override_attempt = server.handle(ApiRequest {
+    server.runtime_root = Some(temp_root.join("run/8082"));
+    for (method, path) in [
+        ("GET", "/api/supervisor-agent"),
+        ("POST", "/api/supervisor-agent/session"),
+    ] {
+        let response = server.handle(ApiRequest {
+            method: method.to_string(),
+            path: path.to_string(),
+            body: Some(json!({})),
+        });
+        assert_eq!(response.status, 404);
+    }
+    let terminal = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/supervisor-agent/session".to_string(),
-        body: Some(json!({"provider": "smoke-ai"})),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "supervisor"})),
     });
-    assert_eq!(override_attempt.status, 400);
-    assert!(
-        override_attempt.body["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("configured agent_cli provider")
-    );
+    assert_eq!(terminal.status, 400);
+    assert_eq!(terminal.body["error"]["code"], "invalid_input");
+    let _ = fs::remove_dir_all(temp_root);
+}
 
-    let first = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/supervisor-agent/session".to_string(),
-        body: Some(json!({})),
-    });
-    let second = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/supervisor-agent/session".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!((first.status, second.status), (200, 200));
-    assert_eq!(first.body["session_id"], second.body["session_id"]);
-    assert_eq!(first.body["mode"], "supervisor");
-    assert_eq!(first.body["provider"], "smoke-ai");
+#[test]
+fn general_agent_prompt_has_checkout_local_cli_guidance_without_supervision() {
+    let prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+        &server_with_projection(),
+        "agent",
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
-    write_goal_status("done");
-
-    let restored = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/supervisor-agent".to_string(),
-        body: None,
-    });
-    assert_eq!(
-        restored.body["supervisor_agent"]["session_id"],
-        first.body["session_id"]
-    );
-    assert_eq!(
-        restored.body["supervisor_agent"]["goal_states"]["GOAL1"],
-        "done"
-    );
-    assert_ne!(
-        restored.body["supervisor_agent"]["updated_at"]
-            .as_str()
-            .unwrap(),
-        review_updated_at
-    );
-    assert!(
-        restored.body["supervisor_agent"]["events"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|event| event["message"] == "Goal GOAL1 changed from review to done.")
-    );
-    assert!(refine_dir.join("supervisor-agent.json").exists());
-
-    fs::remove_dir_all(temp_root).unwrap();
+    assert!(prompt.contains("general-purpose native Agent"));
+    assert!(prompt.contains("Active Refine executable:"));
+    assert!(prompt.contains("Resolved Refine source checkout:"));
+    assert!(prompt.contains("checkout-local `./r`"));
+    assert!(!prompt.contains("monitor the targeted app"));
 }
 
 #[test]

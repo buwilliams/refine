@@ -544,13 +544,9 @@ Build a support bundle of diagnostics and logs for troubleshooting, redacting se
 
 Manage coding agent providers (e.g. claude): detect, configure, authenticate, diagnose, and invoke directly
 
-### `refine agent supervisor`
-
-Show the shared supervisor agent lifecycle, health, and recovery evidence
-
 ### `refine agent open`
 
-Open a native agent TUI, attaching to the shared singleton or Goal instance
+Open a native agent TUI or attach to a Goal instance
 
 - `<GOAL_ID>` — Goal id whose running Goal Agent should be opened
 - `--profile` — Agent role to open

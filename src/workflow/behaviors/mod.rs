@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 
 use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
-use crate::process::supervisor::config::FileGovernanceService;
+use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -17,7 +17,8 @@ use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
     GovernanceEvaluation, agent_worktree_cwd, goal_agent_prompt, implementation_branch_name,
     json_object, now_timestamp, parse_governance_provider_output,
-    post_implementation_governance_prompt, setting_string,
+    post_implementation_governance_prompt, round_agent_context, selected_agent_context,
+    setting_string,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -129,7 +130,11 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(goal) => goal,
             Err(error) => return fail(ctx, "agent", error),
         };
-        let prompt = match goal_agent_prompt(&ctx.goal_id, &goal, ctx.round_idx) {
+        let agent_context = match ensure_goal_agent_context(ctx, &goal) {
+            Ok(context) => context,
+            Err(error) => return fail(ctx, "agent_context", error),
+        };
+        let prompt = match goal_agent_prompt(&ctx.goal_id, &agent_context) {
             Ok(prompt) => prompt,
             Err(error) => return fail(ctx, "agent", error),
         };
@@ -146,7 +151,7 @@ impl WorkflowBehavior for WorkflowImplementation {
             "worktree".to_string(),
             json!({"path": worktree_path, "branch": branch}),
         );
-        let provider_output = match run_goal_agent(
+        let agent_result = match run_goal_agent(
             GoalAgentLaunch {
                 runtime_root: ctx.runtime_root.to_path_buf(),
                 cwd: agent_cwd.clone(),
@@ -167,9 +172,21 @@ impl WorkflowBehavior for WorkflowImplementation {
                 );
             },
         ) {
-            Ok(result) => result.output,
+            Ok(result) => result,
             Err(error) => return fail(ctx, "agent", error),
         };
+        let guidance_decision =
+            match guidance_decision(&agent_context, agent_result.guidance_applied.as_deref()) {
+                Ok(decision) => decision,
+                Err(error) => return fail(ctx, "guidance", error),
+            };
+        if let Err(error) = ctx.work_items.update_latest_goal_round_evaluation_summary(
+            &ctx.goal_id,
+            &json!({"guidance_decision": guidance_decision}),
+        ) {
+            return fail(ctx, "guidance", error);
+        }
+        let provider_output = agent_result.output;
         if let Err(error) = ctx
             .work_items
             .update_latest_goal_round_implementation_report(&ctx.goal_id, &provider_output)
@@ -229,10 +246,11 @@ impl WorkflowBehavior for WorkflowImplementation {
             )?;
         }
 
-        let governance = match evaluate_workflow_governance(ctx, &worktree_path, &agent_cwd) {
-            Ok(evaluation) => evaluation,
-            Err(error) => return fail(ctx, "governance", error),
-        };
+        let governance =
+            match evaluate_workflow_governance(ctx, &worktree_path, &agent_cwd, &agent_context) {
+                Ok(evaluation) => evaluation,
+                Err(error) => return fail(ctx, "governance", error),
+            };
         record_governance(ctx, &governance)?;
         if governance.failed {
             let error = RefineError::Conflict(
@@ -494,12 +512,166 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
         .map(|operation| operation.result)
 }
 
+const GOAL_AGENT_WORKFLOW_SUMMARY: &str = "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge.";
+
+fn ensure_goal_agent_context(ctx: &WorkflowContext<'_>, goal: &Value) -> RefineResult<Value> {
+    let round = goal
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+        .ok_or_else(|| {
+            RefineError::NotFound(format!(
+                "Goal {} has no round {}",
+                ctx.goal_id,
+                ctx.round_idx + 1
+            ))
+        })?;
+    if let Some(context) = round.get("agent_context").filter(|context| {
+        context.get("version").and_then(Value::as_u64) == Some(1)
+            && context.get("goal").is_some()
+            && context.get("previous_rounds").is_some()
+            && context.get("current_round").is_some()
+    }) {
+        return Ok(context.clone());
+    }
+
+    let governance = FileGovernanceService::new(ctx.refine_dir()).load()?;
+    let guidance = FileGuidanceService::new(ctx.refine_dir()).list()?;
+    let context = goal_agent_context(&governance, &guidance, goal, ctx.round_idx)?;
+    ctx.work_items.update_latest_goal_round_evaluation_summary(
+        &ctx.goal_id,
+        &json!({"agent_context": context}),
+    )?;
+    Ok(context)
+}
+
+fn goal_agent_context(
+    governance: &Value,
+    guidance: &Value,
+    goal: &Value,
+    round_idx: usize,
+) -> RefineResult<Value> {
+    let rounds = goal
+        .get("rounds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| RefineError::Serialization("Goal rounds must be an array".to_string()))?;
+    let current_round = rounds
+        .get(round_idx)
+        .filter(|round| round.is_object())
+        .ok_or_else(|| RefineError::NotFound(format!("Goal has no round {}", round_idx + 1)))?;
+    let goal_context = selected_agent_context(
+        goal,
+        &[
+            "id",
+            "name",
+            "priority",
+            "reporter",
+            "assignee",
+            "feature_id",
+            "feature_order",
+            "node_id",
+            "notes",
+        ],
+    );
+    let previous_rounds = rounds[..round_idx]
+        .iter()
+        .enumerate()
+        .filter(|(_, round)| round.is_object())
+        .map(|(index, round)| round_agent_context(round, index))
+        .collect::<Vec<_>>();
+    let guidance_candidates = guidance
+        .get("guidance")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|item| item.get("enabled").and_then(Value::as_bool) != Some(false))
+        .cloned()
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "version": 1,
+        "assembled_at": now_timestamp(),
+        "governance": {
+            "product": governance.get("product").cloned().unwrap_or(Value::String(String::new())),
+            "constitution": governance.get("constitution").cloned().unwrap_or(Value::String(String::new())),
+            "rules": governance.get("rules").cloned().unwrap_or_else(|| json!([])),
+            "configured": governance.get("configured").cloned().unwrap_or(Value::Bool(false)),
+        },
+        "workflow_summary": GOAL_AGENT_WORKFLOW_SUMMARY,
+        "guidance_candidates": guidance_candidates,
+        "goal": goal_context,
+        "previous_rounds": previous_rounds,
+        "current_round": round_agent_context(current_round, round_idx),
+    }))
+}
+
+fn guidance_decision(agent_context: &Value, applied: Option<&[usize]>) -> RefineResult<Value> {
+    let candidates = agent_context
+        .get("guidance_candidates")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    if candidates.is_empty() {
+        if applied.is_some_and(|indexes| !indexes.is_empty()) {
+            return Err(RefineError::InvalidInput(
+                "Goal Agent selected guidance when no candidates were provided".to_string(),
+            ));
+        }
+        return Ok(json!({
+            "context_version": 1,
+            "applied": [],
+            "skipped": [],
+            "recorded_at": now_timestamp(),
+        }));
+    }
+    let applied = applied.ok_or_else(|| {
+        RefineError::InvalidInput(
+            "Goal Agent completion must include guidance_applied when guidance candidates exist"
+                .to_string(),
+        )
+    })?;
+    let unique = applied
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if unique.len() != applied.len() || unique.iter().any(|index| *index >= candidates.len()) {
+        return Err(RefineError::InvalidInput(
+            "Goal Agent guidance_applied must contain unique in-range candidate indexes"
+                .to_string(),
+        ));
+    }
+    let applied_candidates = candidates
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| unique.contains(index))
+        .map(|(_, candidate)| candidate.clone())
+        .collect::<Vec<_>>();
+    let skipped_candidates = candidates
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !unique.contains(index))
+        .map(|(_, candidate)| candidate.clone())
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "context_version": 1,
+        "applied": applied_candidates,
+        "skipped": skipped_candidates,
+        "recorded_at": now_timestamp(),
+    }))
+}
+
 fn evaluate_workflow_governance(
     ctx: &WorkflowContext<'_>,
     worktree_path: &str,
     provider_cwd: &std::path::Path,
+    agent_context: &Value,
 ) -> RefineResult<GovernanceEvaluation> {
-    let governance = FileGovernanceService::new(ctx.refine_dir()).load()?;
+    let governance = agent_context.get("governance").cloned().ok_or_else(|| {
+        RefineError::Serialization(format!(
+            "Goal {} round {} has no pinned governance context",
+            ctx.goal_id,
+            ctx.round_idx + 1
+        ))
+    })?;
     let rules = governance
         .get("rules")
         .and_then(|value| value.as_array())
@@ -602,4 +774,85 @@ fn record_governance(
 fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> RefineResult<T> {
     let _ = ctx.fail(category, &error);
     Err(error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn goal_agent_context_pins_governance_and_only_enabled_guidance() {
+        let context = goal_agent_context(
+            &json!({
+                "product": "Refine",
+                "constitution": "Preserve audit boundaries.",
+                "rules": [{"text": "Stop at Review."}],
+                "configured": true
+            }),
+            &json!({
+                "guidance": [
+                    {"name": "Architecture", "enabled": true},
+                    {"name": "Retired", "enabled": false},
+                    {"name": "Default enabled"}
+                ]
+            }),
+            &json!({
+                "id": "GOAL1",
+                "name": "Context contract",
+                "priority": "high",
+                "rounds": [
+                    {"reporter": "A", "prompt": "Earlier request"},
+                    {"reporter": "B", "prompt": "Current request"}
+                ]
+            }),
+            1,
+        )
+        .unwrap();
+
+        assert_eq!(context["version"], 1);
+        assert_eq!(context["governance"]["product"], "Refine");
+        assert_eq!(context["governance"]["configured"], true);
+        assert_eq!(context["guidance_candidates"].as_array().unwrap().len(), 2);
+        assert_eq!(context["goal"]["name"], "Context contract");
+        assert_eq!(context["previous_rounds"][0]["prompt"], "Earlier request");
+        assert_eq!(context["current_round"]["prompt"], "Current request");
+        assert!(
+            context["workflow_summary"]
+                .as_str()
+                .unwrap()
+                .contains("human Review")
+        );
+    }
+
+    #[test]
+    fn same_turn_guidance_decision_resolves_candidates_without_an_extra_provider() {
+        let context = json!({
+            "version": 1,
+            "guidance_candidates": [
+                {"name": "Architecture", "rule": "Architecture changes", "instructions": "Preserve boundaries."},
+                {"name": "Mobile", "rule": "Mobile changes", "instructions": "Test touch behavior."}
+            ]
+        });
+
+        let decision = guidance_decision(&context, Some(&[0])).unwrap();
+
+        assert_eq!(decision["context_version"], 1);
+        assert_eq!(decision["applied"][0]["name"], "Architecture");
+        assert_eq!(decision["skipped"][0]["name"], "Mobile");
+    }
+
+    #[test]
+    fn guidance_candidates_require_an_explicit_valid_completion_selection() {
+        let context = json!({
+            "version": 1,
+            "guidance_candidates": [
+                {"name": "Architecture", "rule": "Architecture changes", "instructions": "Preserve boundaries."}
+            ]
+        });
+
+        assert!(guidance_decision(&context, None).is_err());
+        assert!(guidance_decision(&context, Some(&[0, 0])).is_err());
+        assert!(guidance_decision(&context, Some(&[1])).is_err());
+        assert!(guidance_decision(&context, Some(&[])).is_ok());
+    }
 }

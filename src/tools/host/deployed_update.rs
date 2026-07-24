@@ -416,6 +416,22 @@ pub fn discover_refine_checkout() -> RefineResult<PathBuf> {
     ))
 }
 
+pub fn active_refine_paths() -> RefineResult<(PathBuf, PathBuf)> {
+    let executable = std::env::current_exe().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to resolve active Refine executable: {error}"
+        ))
+    })?;
+    let executable = executable.canonicalize().unwrap_or(executable);
+    let checkout = executable
+        .ancestors()
+        .find(|path| is_refine_checkout(path))
+        .map(Path::to_path_buf)
+        .map(Ok)
+        .unwrap_or_else(discover_refine_checkout)?;
+    Ok((executable, checkout))
+}
+
 pub fn is_refine_checkout(path: &Path) -> bool {
     path.join(".git").exists()
         && path.join("Cargo.toml").is_file()

@@ -574,14 +574,6 @@ impl InProcessWebServer {
             return self.handle_quality_checks(request);
         }
 
-        if request.method == "GET" && request.path == "/supervisor-agent" {
-            return self.handle_supervisor_agent_get();
-        }
-
-        if request.method == "POST" && request.path == "/supervisor-agent/session" {
-            return self.handle_supervisor_agent_session(request);
-        }
-
         if request.method == "GET" && request.path == "/quality/screenshots" {
             return self.handle_quality_screenshots(&raw_path);
         }

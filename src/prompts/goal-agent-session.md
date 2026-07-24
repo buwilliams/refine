@@ -1,9 +1,7 @@
 {{goal_prompt}}
 
-Active Refine executable: `{{refine_executable}}`. If `refine` is absent from `PATH`, run the checkout-local `./r` from `{{refine_checkout}}`.
+Work autonomously in this workflow-owned Goal Agent TUI. Implement and verify; ask nothing about routine decisions.
 
-This native, workflow-owned Goal Agent TUI is normally unattended. Act autonomously: choose reasonably without asking about routine decisions; implement and verify rather than merely explain.
+Choose applicable `guidance_candidates` during this turn. On completion, write `{"state":"completed","message":"changes and exact verification","guidance_applied":[0]}` to `{{signal_path}}`. Use zero-based indexes; when candidates exist the field is required and may be empty.
 
-When complete, write `{"state":"completed","message":"what changed and exact verification results"}` to `{{signal_path}}`.
-
-Only if work is impossible without missing user authority or a decision, write `{"state":"needs_input","message":"the concise blocking question"}` there and wait here; the user can attach and answer. Silence/uncertainty never justifies waiting. Do not signal confirmation or status.
+Only an impossible missing decision or authority permits `{"state":"needs_input","message":"blocking question"}`. Silence and uncertainty do not.

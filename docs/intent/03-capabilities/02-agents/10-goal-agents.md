@@ -8,6 +8,8 @@
 - **Instance Based**: every active Goal may have its own Goal Agent, so parallel Goals have distinct sessions, worktrees, process records, and evidence.
 - **Automation With Escalation**: routine judgment and uncertainty remain autonomous. Only work that is impossible without a missing decision or authority becomes an explicit needs-input state.
 - **One Agent Truth**: opening a Goal Agent never launches a second conversational agent for that Goal.
+- **Pinned Context Contract**: before launch, the current Round records the exact governance, workflow summary, enabled guidance candidates, Goal fields, previous Rounds, and current request used by the agent.
+- **Same-Turn Guidance**: the implementing agent selects applicable guidance while implementing and returns that selection with its completion signal; Refine does not spend a separate provider turn classifying guidance.
 
 ## Purpose
 
@@ -36,11 +38,13 @@ infer needs-input from elapsed time or lack of terminal output. A silent Goal
 Agent remains working and should make the best decision supported by its current
 context.
 
-Supervisor, Plan Mode, and Standalone agent profiles are singletons for their role. Goal Agents are keyed by Goal instance because several Goals may be implemented in parallel.
+General toolbar Agents are independent sessions. Plan Mode and Standalone remain role-specific sessions. Goal Agents are keyed by Goal instance because several Goals may be implemented in parallel.
 
-The CLI opens the same singleton profiles with `refine agent open --profile
-supervisor|plan|standalone`; Goal remains the default profile and takes a Goal
-id.
+The pinned Round context is immutable for that implementation attempt. Post-implementation governance consumes the same pinned governance snapshot, so a mid-turn settings edit cannot make implementation and evaluation reason from different rules. Refine records applied and skipped guidance candidates as structured Round evidence.
+
+The CLI opens a general Agent by default. `--profile plan|standalone` opens the
+role-specific sessions, while `--profile goal` takes a Goal id and attaches to
+the workflow-owned Goal Agent.
 
 ## Future Direction
 

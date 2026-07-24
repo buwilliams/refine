@@ -2043,42 +2043,16 @@ fn governance_violation_message(message: &str) -> String {
     }
 }
 
-fn goal_agent_prompt(goal_id: &str, goal: &Value, round_idx: usize) -> RefineResult<String> {
-    let goal_object = goal.as_object().ok_or_else(|| {
-        RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
+fn goal_agent_prompt(goal_id: &str, agent_context: &Value) -> RefineResult<String> {
+    let goal_context = agent_context.get("goal").ok_or_else(|| {
+        RefineError::Serialization(format!("Goal {goal_id} has no pinned Goal context"))
     })?;
-    let rounds = goal_object
-        .get("rounds")
-        .and_then(Value::as_array)
-        .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-    let current_round = rounds
-        .get(round_idx)
-        .filter(|round| round.is_object())
-        .ok_or_else(|| {
-            RefineError::NotFound(format!("Goal {goal_id} has no round {}", round_idx + 1))
-        })?;
-
-    let goal_context = selected_agent_context(
-        goal,
-        &[
-            "id",
-            "name",
-            "priority",
-            "reporter",
-            "assignee",
-            "feature_id",
-            "feature_order",
-            "node_id",
-            "notes",
-        ],
-    );
-    let previous_rounds = rounds[..round_idx]
-        .iter()
-        .enumerate()
-        .filter(|(_, round)| round.is_object())
-        .map(|(index, round)| round_agent_context(round, index))
-        .collect::<Vec<_>>();
-    let current_round = round_agent_context(current_round, round_idx);
+    let previous_rounds = agent_context.get("previous_rounds").ok_or_else(|| {
+        RefineError::Serialization(format!("Goal {goal_id} has no pinned previous Rounds"))
+    })?;
+    let current_round = agent_context.get("current_round").ok_or_else(|| {
+        RefineError::Serialization(format!("Goal {goal_id} has no pinned current Round"))
+    })?;
     let goal_context = serde_json::to_string_pretty(&goal_context).map_err(|error| {
         RefineError::Serialization(format!("failed to encode Goal {goal_id} context: {error}"))
     })?;
@@ -2092,11 +2066,17 @@ fn goal_agent_prompt(goal_id: &str, goal: &Value, round_idx: usize) -> RefineRes
             "failed to encode Goal {goal_id} current-round context: {error}"
         ))
     })?;
+    let agent_context = serde_json::to_string_pretty(agent_context).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode Goal {goal_id} agent context: {error}"
+        ))
+    })?;
 
     Ok(render(
         PromptTemplate::GoalAgent,
         &[
             ("goal_id", goal_id),
+            ("agent_context", &agent_context),
             ("goal_context", &goal_context),
             ("previous_rounds", &previous_rounds),
             ("latest_round", &current_round),
@@ -2242,9 +2222,26 @@ mod tests {
             ]
         });
 
-        let prompt = goal_agent_prompt("GOAL1", &goal, 1).unwrap();
+        let prompt = goal_agent_prompt(
+            "GOAL1",
+            &json!({
+                "version": 1,
+                "governance": {"product": "Refine", "constitution": "Be useful", "rules": []},
+                "workflow_summary": "Implement, verify, and stop at Review.",
+                "guidance_candidates": [],
+                "goal": selected_agent_context(
+                    &goal,
+                    &["id", "name", "priority", "reporter", "assignee", "notes"],
+                ),
+                "previous_rounds": [round_agent_context(&goal["rounds"][0], 0)],
+                "current_round": round_agent_context(&goal["rounds"][1], 1),
+            }),
+        )
+        .unwrap();
 
         assert!(prompt.contains("Keep the whole Goal visible"));
+        assert!(prompt.contains("Be useful"));
+        assert!(prompt.contains("Implement, verify, and stop at Review."));
         assert!(prompt.contains("Preserve compatibility."));
         assert!(prompt.contains("Build the first version."));
         assert!(prompt.contains("Added the initial implementation."));
@@ -3764,7 +3761,7 @@ mod tests {
              *\"Post-implementation Quality evaluation\"*)\n\
                printf '%s\\n' '{\"ok\":false,\"summary\":\"Candidate marker check failed.\",\"results\":[{\"test\":\"The candidate has no fail-qa marker.\",\"status\":\"failed\",\"evidence\":\"fail-qa exists\",\"command\":\"test ! -f fail-qa\"}]}'\n\
                ;;\n\
-             *\"governance\"*)\n\
+             *\"Post-implementation governance evaluation\"*)\n\
                printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
                ;;\n\
              *)\n\

@@ -1,1 +1,0 @@
-Help supervise Refine's active work using available evidence. Preserve confirmation and audit boundaries; do not expand destructive authority, force merges, discard worktrees, or hide provider or authentication failures.

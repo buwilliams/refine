@@ -804,13 +804,6 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Agent {
-            action: AgentAction::Supervisor,
-        } => {
-            let response = daemon_json("GET", "/supervisor-agent", None)?;
-            print_json(&response);
-            Ok(())
-        }
-        Commands::Agent {
             action:
                 AgentAction::Open {
                     goal_id,
@@ -818,6 +811,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     prompt,
                 },
         } => {
+            let profile = if goal_id.is_some() && profile == CliAgentProfile::Agent {
+                CliAgentProfile::Goal
+            } else {
+                profile
+            };
             let response = daemon_json(
                 "POST",
                 "/terminal/session",
@@ -2786,7 +2784,6 @@ fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
         action => action,
     };
     let response = match action {
-        AgentAction::Supervisor => daemon_json("GET", "/supervisor-agent", None)?,
         AgentAction::Open { .. } => unreachable!("handled before daemon dispatch"),
         AgentAction::Detect => daemon_json("GET", "/agents", None)?,
         AgentAction::Configure { provider } => daemon_json(

@@ -29,6 +29,49 @@
   text-transform: uppercase;
   letter-spacing: 0;
 }
+.toolbar-add-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.toolbar-add-button {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-weight: 750;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+}
+.toolbar-add-button::-webkit-details-marker { display: none; }
+.toolbar-add-button:hover,
+.toolbar-add-button:focus-visible {
+  background: var(--color-primary-hover);
+  color: white;
+}
+.toolbar-add-options {
+  position: fixed;
+  bottom: 42px;
+  left: 78px;
+  z-index: 120;
+  min-width: 190px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+}
+.toolbar-add-options button {
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: 0;
+}
+.toolbar-add-options button:hover,
+.toolbar-add-options button:focus-visible {
+  background: var(--color-primary-hover);
+  color: white;
+}
 .toolbar-dock-bar .toolbar-tabs {
   flex: 1;
   min-width: 0;

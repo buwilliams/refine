@@ -1794,7 +1794,6 @@ function initSSE() {
     if (!sseEventChanged("Status", e)) return;
     invalidateScreenDataCache();
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
-    if (typeof loadSupervisorAgentState === "function") loadSupervisorAgentState();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
     // Refresh only the table on background updates so an in-progress

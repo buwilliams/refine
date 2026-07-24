@@ -17,6 +17,7 @@ pub const GUIDANCE_FILE: &str = "guidance.json";
 pub const REPORTERS_FILE: &str = "reporters.json";
 const QUALITY_SETTINGS_FILE: &str = "quality/settings.json";
 const QUALITY_TIMING_KEY: &str = "quality_timing";
+const RETIRED_SUPERVISOR_STALL_KEY: &str = "supervisor_agent_stall_seconds";
 const DEFAULT_QUALITY_TIMING: &str = "pre_merge";
 
 pub trait ConfigService {
@@ -252,6 +253,8 @@ impl ConfigService for FileSettingsService {
                     new_key.to_string(),
                     Value::String(normalize_setting(new_key, &value)?),
                 );
+                migrated = true;
+            } else if key == RETIRED_SUPERVISOR_STALL_KEY {
                 migrated = true;
             }
         }
@@ -549,7 +552,6 @@ fn default_settings() -> JsonObject {
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
         ("backlog_promote_after_seconds", "3600"),
-        ("supervisor_agent_stall_seconds", "900"),
         ("state_sync_debounce_seconds", "5"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
@@ -606,7 +608,6 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "resource_isolation_mode",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
-        "supervisor_agent_stall_seconds",
         "state_sync_debounce_seconds",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
@@ -719,7 +720,6 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
                     | "agent_hard_cap_seconds"
                     | "agent_limit_pause_seconds"
                     | "backlog_promote_after_seconds"
-                    | "supervisor_agent_stall_seconds"
                     | "state_sync_debounce_seconds"
                     | "project_update_pulse_interval_seconds"
             ) =>
@@ -1285,7 +1285,8 @@ mod tests {
                         "settings": {
                             "agent_cli": "smoke-ai",
                             "parallel_run_cap": "1",
-                            "paused": "1"
+                            "paused": "1",
+                            "supervisor_agent_stall_seconds": "900"
                         }
                     }
                 ]
@@ -1300,11 +1301,10 @@ mod tests {
         assert_eq!(settings["agent_cli"], "smoke-ai");
         assert_eq!(settings["parallel_run_cap"], "1");
         assert!(settings.get("paused").is_none());
-        assert!(
-            !fs::read_to_string(refine_dir.join("nodes.json"))
-                .unwrap()
-                .contains("\"paused\"")
-        );
+        assert!(settings.get(RETIRED_SUPERVISOR_STALL_KEY).is_none());
+        let written = fs::read_to_string(refine_dir.join("nodes.json")).unwrap();
+        assert!(!written.contains("\"paused\""));
+        assert!(!written.contains(RETIRED_SUPERVISOR_STALL_KEY));
         fs::remove_dir_all(temp_root).unwrap();
     }
 

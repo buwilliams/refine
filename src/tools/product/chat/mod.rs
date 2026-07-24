@@ -27,8 +27,6 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::{FileProjectStateStore, GoalSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::WorkflowEngine;
-use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -164,6 +162,12 @@ impl FileChatService {
         provider: Option<&str>,
         mode: Option<&str>,
     ) -> RefineResult<ChatSessionRecord> {
+        if matches!(attachment, ChatAttachment::Supervisor) {
+            return Err(RefineError::Conflict(
+                "Supervisor Agent sessions are retired; open an independent general Agent"
+                    .to_string(),
+            ));
+        }
         if matches!(attachment, ChatAttachment::Standalone) {
             return self.start_standalone_with_options(provider, mode);
         }
@@ -209,6 +213,7 @@ impl FileChatService {
     pub fn read(&self, session_id: &str) -> RefineResult<ChatReadResult> {
         let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
+        reject_retired_supervisor(&record)?;
         let lines = unread_lines(&record);
         let progress_lines = unread_progress(&record);
         if !lines.is_empty() || !progress_lines.is_empty() {
@@ -315,61 +320,6 @@ impl FileChatService {
 
     pub fn stop(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
         self.interrupt(session_id, "stopped")
-    }
-
-    pub fn migrate_supervisor_provider(
-        &self,
-        session_id: &str,
-        configured_provider: &str,
-    ) -> RefineResult<Option<ChatSessionRecord>> {
-        let configured_provider = configured_provider.trim();
-        if configured_provider.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "configured agent_cli provider is required".to_string(),
-            ));
-        }
-        let existing = self.load_record(session_id)?;
-        if !matches!(existing.attachment, ChatAttachment::Supervisor) {
-            return Err(RefineError::InvalidInput(
-                "only Supervisor sessions can migrate configured providers".to_string(),
-            ));
-        }
-        if existing.provider == configured_provider {
-            return Ok(Some(existing));
-        }
-        if existing.in_flight
-            || existing.queue_dispatching
-            || self.session_has_active_operation(session_id)?
-            || self.session_has_managed_process(session_id)?
-        {
-            self.interrupt(
-                session_id,
-                &format!(
-                    "closed because configured agent_cli changed from {} to {configured_provider}",
-                    existing.provider
-                ),
-            )?;
-            return Ok(None);
-        }
-
-        let _guard = self.acquire_session_lock(session_id)?;
-        let mut record = self.load_record(session_id)?;
-        let previous = std::mem::replace(&mut record.provider, configured_provider.to_string());
-        record.provider_session_id = None;
-        record.interrupted = false;
-        record.interruption_detail = None;
-        record.updated_at = now_timestamp();
-        record.transcript_events.push(chat_event(
-            "system",
-            &format!(
-                "Supervisor provider migrated from {previous} to {configured_provider}; provider-session resume state was reset."
-            ),
-            false,
-            None,
-            Some(json!({"source": "configured_agent_cli"})),
-        ));
-        self.write_record(&record)?;
-        Ok(Some(record))
     }
 
     pub fn start_standalone_with_options(
@@ -574,6 +524,33 @@ impl FileChatService {
         Ok(sessions)
     }
 
+    /// Delete retired Supervisor conversations after their provider processes have been stopped.
+    pub fn purge_supervisor_sessions(&self) -> RefineResult<usize> {
+        let sessions = self
+            .list_sessions()?
+            .into_iter()
+            .filter(|session| matches!(session.attachment, ChatAttachment::Supervisor))
+            .collect::<Vec<_>>();
+        for session in &sessions {
+            for path in [
+                self.session_path(&session.id),
+                self.sessions_dir().join(format!(".{}.lock", session.id)),
+            ] {
+                match fs::remove_file(&path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == ErrorKind::NotFound => {}
+                    Err(error) => {
+                        return Err(RefineError::Io(format!(
+                            "failed to purge retired Supervisor session {}: {error}",
+                            path.display()
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(sessions.len())
+    }
+
     pub fn transcript_text(&self, session_id: &str) -> RefineResult<String> {
         let record = self.load_record(session_id)?;
         Ok(record
@@ -756,7 +733,6 @@ impl FileChatService {
         );
         let _guard = self.acquire_session_lock(session_id)?;
         let mut latest = self.load_record(session_id)?;
-        let mut provider_failure = None;
         if latest.closed {
             latest.in_flight = false;
             latest.queue_dispatching = false;
@@ -786,7 +762,6 @@ impl FileChatService {
                 Err(error) => {
                     let detail =
                         format!("Provider session resume failed; transcript preserved: {error}");
-                    provider_failure = Some(detail.clone());
                     self.apply_provider_failure(&mut latest, detail);
                     self.finish_provider_operation(
                         &operation.id,
@@ -799,7 +774,6 @@ impl FileChatService {
         latest.updated_at = now_timestamp();
         self.write_record(&latest)?;
         drop(_guard);
-        self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
         drop(capacity);
         Ok(latest)
     }
@@ -938,34 +912,6 @@ impl FileChatService {
         record.interruption_detail = Some(detail.clone());
     }
 
-    fn record_supervisor_provider_outcome(
-        &self,
-        record: &ChatSessionRecord,
-        failure: Option<&str>,
-    ) {
-        if !matches!(record.attachment, ChatAttachment::Supervisor) {
-            return;
-        }
-        let service = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
-            &self.refine_dir,
-            &self.runtime_root,
-        );
-        if let Some(detail) = failure {
-            let _ = service.record_failure(
-                "provider",
-                format!("Supervisor provider failure: {detail}"),
-                true,
-            );
-        } else {
-            let _ = service.record_recovery(
-                "provider",
-                "Supervisor provider turn",
-                "completed and preserved in the shared transcript",
-                true,
-            );
-        }
-    }
-
     fn append_provider_activity_progress(&self, session_id: &str, line: &str) -> RefineResult<()> {
         let text = line.trim();
         if text.is_empty() {
@@ -1012,38 +958,9 @@ impl FileChatService {
 
     fn try_turn_capacity(
         &self,
-        record: &ChatSessionRecord,
+        _record: &ChatSessionRecord,
     ) -> RefineResult<Option<ChatCapacityPermit>> {
-        if !matches!(record.attachment, ChatAttachment::Supervisor) {
-            return Ok(Some(ChatCapacityPermit::unlimited()));
-        }
-        let target_root = target_root_for_refine_dir(&self.refine_dir)?;
-        let policy = WorkflowEngine::with_target_root(&self.runtime_root, &target_root).policy()?;
-        if record.provider != policy.provider {
-            return Err(RefineError::Conflict(format!(
-                "Supervisor session provider {} does not match configured agent_cli {}; migrate the session before dispatch",
-                record.provider, policy.provider
-            )));
-        }
-        if self.other_supervisor_process_is_running(&record.id)? {
-            return Ok(None);
-        }
-        let service = AgentCapacityService::new(&self.runtime_root);
-        let owner_id = format!("supervisor:{}", record.id);
-        let acquired = service.try_acquire(
-            &policy,
-            AgentCapacityRequest {
-                owner_id: owner_id.clone(),
-                role: "supervisor".to_string(),
-                node_id: policy.active_node_id.clone(),
-                provider: policy.provider.clone(),
-                target_app_id: policy.target_app_id.clone(),
-            },
-        )?;
-        Ok(acquired.then(|| ChatCapacityPermit {
-            service: Some(service),
-            owner_id,
-        }))
+        Ok(Some(ChatCapacityPermit))
     }
 
     fn register_provider_operation(
@@ -1117,34 +1034,6 @@ impl FileChatService {
             }
         }
         Ok(matches)
-    }
-
-    fn session_has_managed_process(&self, session_id: &str) -> RefineResult<bool> {
-        Ok(!self.session_managed_processes(session_id)?.is_empty())
-    }
-
-    fn other_supervisor_process_is_running(&self, session_id: &str) -> RefineResult<bool> {
-        for root in self.managed_process_roots() {
-            for process in FileProcessSupervisor::new(root).list()? {
-                let details = process
-                    .details
-                    .as_deref()
-                    .and_then(|details| serde_json::from_str::<Value>(details).ok());
-                let is_supervisor = details.as_ref().is_some_and(|details| {
-                    details.get("agent_role").and_then(Value::as_str) == Some("supervisor")
-                        || details.get("mode").and_then(Value::as_str) == Some("supervisor")
-                });
-                let is_current = details
-                    .as_ref()
-                    .and_then(|details| details.get("session_id"))
-                    .and_then(Value::as_str)
-                    == Some(session_id);
-                if is_supervisor && !is_current {
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
     }
 
     fn request_session_process_termination(&self, session_id: &str) -> RefineResult<usize> {
@@ -1263,7 +1152,6 @@ impl FileChatService {
             );
             let _guard = self.acquire_session_lock(session_id)?;
             let mut latest = self.load_record(session_id)?;
-            let mut provider_failure = None;
             if latest.closed {
                 latest.in_flight = false;
                 latest.queue_dispatching = false;
@@ -1296,7 +1184,6 @@ impl FileChatService {
                     }
                     Err(error) => {
                         let detail = format!("Provider turn failed: {error}");
-                        provider_failure = Some(detail.clone());
                         self.apply_provider_failure(&mut latest, detail);
                         self.finish_provider_operation(
                             &operation.id,
@@ -1309,7 +1196,6 @@ impl FileChatService {
             latest.updated_at = now_timestamp();
             self.write_record(&latest)?;
             drop(_guard);
-            self.record_supervisor_provider_outcome(&latest, provider_failure.as_deref());
             drop(capacity);
         }
     }
@@ -1404,27 +1290,7 @@ struct ChatSessionLock {
     path: PathBuf,
 }
 
-struct ChatCapacityPermit {
-    service: Option<AgentCapacityService>,
-    owner_id: String,
-}
-
-impl ChatCapacityPermit {
-    fn unlimited() -> Self {
-        Self {
-            service: None,
-            owner_id: String::new(),
-        }
-    }
-}
-
-impl Drop for ChatCapacityPermit {
-    fn drop(&mut self) {
-        if let Some(service) = &self.service {
-            let _ = service.release(&self.owner_id);
-        }
-    }
-}
+struct ChatCapacityPermit;
 
 impl Drop for ChatSessionLock {
     fn drop(&mut self) {
@@ -1438,7 +1304,9 @@ impl ChatService for FileChatService {
     }
 
     fn resume(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
-        self.load_record(session_id)
+        let record = self.load_record(session_id)?;
+        reject_retired_supervisor(&record)?;
+        Ok(record)
     }
 
     fn append_user_message(
@@ -1448,6 +1316,7 @@ impl ChatService for FileChatService {
     ) -> RefineResult<ChatSessionRecord> {
         let _guard = self.acquire_session_lock(session_id)?;
         let mut record = self.load_record(session_id)?;
+        reject_retired_supervisor(&record)?;
         if record.closed {
             return Err(RefineError::Conflict(format!(
                 "Chat session {session_id} is closed"
@@ -1605,17 +1474,9 @@ impl FileChatService {
                 }))
             }
             ChatAttachment::Supervisor => {
-                let supervisor =
-                    crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
-                        &self.refine_dir,
-                        &self.runtime_root,
-                    )
-                    .snapshot()?;
-                serde_json::to_string_pretty(&json!({
-                    "type": "supervisor",
-                    "supervisor_agent": supervisor,
-                    "workflow": snapshot.runtime,
-                }))
+                return Err(RefineError::Conflict(
+                    "Supervisor Agent sessions are retired".to_string(),
+                ));
             }
             ChatAttachment::Standalone => {
                 let mut context = json!({
@@ -1641,7 +1502,7 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
     PromptEngine::load(match &record.attachment {
         ChatAttachment::Goal(_) => PromptTemplate::ChatGoal,
         ChatAttachment::Feature(_) => PromptTemplate::ChatFeature,
-        ChatAttachment::Supervisor => PromptTemplate::ChatSupervisor,
+        ChatAttachment::Supervisor => PromptTemplate::ChatAgent,
         ChatAttachment::Standalone => PromptTemplate::ChatStandalone,
     })
 }
@@ -1813,6 +1674,15 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+fn reject_retired_supervisor(record: &ChatSessionRecord) -> RefineResult<()> {
+    if matches!(record.attachment, ChatAttachment::Supervisor) {
+        return Err(RefineError::Conflict(
+            "Supervisor Agent sessions are retired; open an independent general Agent".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_session_id(session_id: &str) -> RefineResult<()> {
     if !session_id.is_empty()
         && session_id.len() <= 64
@@ -1907,9 +1777,33 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
-    use crate::process::subprocess::{ManagedProcess, ProcessOwner};
     use crate::tools::product::work_items::FileWorkItemService;
-    use crate::workflow::{WorkflowAutomation, WorkflowClaimState};
+
+    #[test]
+    fn retired_supervisor_sessions_cannot_start_and_are_purged() {
+        let temp_root = unique_temp_dir("retired-supervisor-chat");
+        let service = FileChatService::new(temp_root.join(".refine"));
+        let error = service
+            .start_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("retired"));
+
+        let legacy = service
+            .start_record_with_options(
+                ChatAttachment::Supervisor,
+                Some("smoke-ai"),
+                Some("supervisor"),
+            )
+            .unwrap();
+        assert!(service.session_path(&legacy.id).exists());
+        assert_eq!(service.purge_supervisor_sessions().unwrap(), 1);
+        assert!(!service.session_path(&legacy.id).exists());
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 
     #[test]
     fn file_chat_service_persists_session_transcript_and_stop() {
@@ -2186,215 +2080,6 @@ mod tests {
         );
 
         fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn supervisor_chat_provider_failure_is_shared_with_supervisor_state() {
-        let temp_root = unique_temp_dir("supervisor-chat-failure");
-        init_git_app(&temp_root);
-        let refine_dir =
-            crate::tools::host::project_layout::prepare_refine_dir(&temp_root).unwrap();
-        write_fake_provider(&refine_dir, "smoke-ai", 2, "provider auth failed");
-        let service = FileChatService::new(&refine_dir);
-        FileSettingsService::with_active_root(&refine_dir, &service.runtime_root)
-            .update(&json!({"agent_cli": "smoke-ai"}))
-            .unwrap();
-        let session = service
-            .start_with_options(
-                ChatAttachment::Supervisor,
-                Some("smoke-ai"),
-                Some("supervisor"),
-            )
-            .unwrap();
-
-        service
-            .append_user_message(&session.id, "investigate")
-            .unwrap();
-        wait_for_chat_record(&service, &session.id, |record| record.interrupted);
-        let state = crate::tools::product::supervisor_agent::FileSupervisorAgentService::new(
-            &refine_dir,
-            &service.runtime_root,
-        )
-        .snapshot()
-        .unwrap();
-        assert_eq!(state.health, "degraded");
-        assert!(state.events.iter().any(|event| {
-            event.kind == "failure"
-                && event.message.contains("provider auth failed")
-                && event.actionable
-        }));
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn supervisor_and_workflow_share_capacity_and_preserve_the_queue() {
-        let temp_root = unique_temp_dir("supervisor-workflow-capacity");
-        let refine_dir = temp_root.join(".refine");
-        let runtime_root = temp_root.join("run/8080");
-        write_fake_provider(&refine_dir, "smoke-ai", 0, "shared capacity response");
-        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
-            .update(&json!({
-                "agent_cli": "smoke-ai",
-                "parallel_run_cap": "1",
-                "parallel_per_node_cap": "1",
-                "parallel_per_provider_cap": "1",
-                "parallel_per_target_app_cap": "1"
-            }))
-            .unwrap();
-
-        let work_items = FileWorkItemService::new(&refine_dir);
-        work_items
-            .create_goal_summary("Capacity one", Some("GOAL1"))
-            .unwrap();
-        work_items
-            .append_goal_round_summary("GOAL1", "Capacity test", "Run workflow")
-            .unwrap();
-        work_items
-            .transition_goal_status("GOAL1", GoalStatus::Todo)
-            .unwrap();
-        let workflow = WorkflowEngine::with_target_root(&runtime_root, &temp_root);
-        let claim = workflow.claim("GOAL1").unwrap();
-        let execution = workflow.start_claim(&claim).unwrap();
-        register_capacity_test_workflow_process(&runtime_root, "GOAL1", &claim, &execution);
-
-        let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
-        let supervisor = chat
-            .start_with_options(
-                ChatAttachment::Supervisor,
-                Some("smoke-ai"),
-                Some("supervisor"),
-            )
-            .unwrap();
-        chat.append_user_message(&supervisor.id, "wait durably")
-            .unwrap();
-        let waiting = wait_for_chat_record(&chat, &supervisor.id, |record| {
-            !record.queued_messages.is_empty()
-                && record.transcript_events.iter().any(|event| {
-                    event
-                        .get("text")
-                        .and_then(Value::as_str)
-                        .is_some_and(|text| text.contains("waiting for shared agent capacity"))
-                })
-        });
-        assert_eq!(waiting.queued_messages.len(), 1);
-        assert!(
-            AgentCapacityService::new(&runtime_root)
-                .snapshot()
-                .unwrap()
-                .leases
-                .iter()
-                .all(|lease| lease.role == "workflow")
-        );
-
-        workflow.cancel(&execution).unwrap();
-        let completed = wait_for_chat_record(&chat, &supervisor.id, |record| {
-            record.queued_messages.is_empty()
-                && !record.queue_dispatching
-                && record.transcript_events.iter().any(|event| {
-                    event
-                        .get("text")
-                        .and_then(Value::as_str)
-                        .is_some_and(|text| text.contains("shared capacity response"))
-                })
-        });
-        assert!(completed.queued_messages.is_empty());
-
-        FileSettingsService::with_active_root(&refine_dir, &runtime_root)
-            .update(&json!({
-                "parallel_run_cap": "2",
-                "parallel_per_node_cap": "2",
-                "parallel_per_provider_cap": "2",
-                "parallel_per_target_app_cap": "2"
-            }))
-            .unwrap();
-        work_items
-            .create_goal_summary("Capacity two", Some("GOAL2"))
-            .unwrap();
-        work_items
-            .append_goal_round_summary("GOAL2", "Capacity test", "Run workflow")
-            .unwrap();
-        work_items
-            .transition_goal_status("GOAL2", GoalStatus::Todo)
-            .unwrap();
-        let claim = workflow.claim("GOAL2").unwrap();
-        let execution = workflow.start_claim(&claim).unwrap();
-        register_capacity_test_workflow_process(&runtime_root, "GOAL2", &claim, &execution);
-        chat.append_user_message(&supervisor.id, "run concurrently")
-            .unwrap();
-        let concurrent = wait_for_chat_record(&chat, &supervisor.id, |record| {
-            record.transcript_events.iter().any(|event| {
-                event
-                    .get("text")
-                    .and_then(Value::as_str)
-                    .is_some_and(|text| text.contains("shared capacity response"))
-            }) && record.queued_messages.is_empty()
-                && !record.queue_dispatching
-        });
-        assert!(concurrent.queued_messages.is_empty());
-        assert_eq!(
-            workflow
-                .load_state()
-                .unwrap()
-                .claims
-                .iter()
-                .find(|claim| claim.goal_id == "GOAL2")
-                .unwrap()
-                .state,
-            WorkflowClaimState::Running
-        );
-        workflow.cancel(&execution).unwrap();
-        assert!(
-            AgentCapacityService::new(&runtime_root)
-                .snapshot()
-                .unwrap()
-                .leases
-                .is_empty()
-        );
-
-        fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    fn register_capacity_test_workflow_process(
-        runtime_root: &Path,
-        goal_id: &str,
-        claim_id: &str,
-        execution_id: &str,
-    ) {
-        let child = if cfg!(windows) {
-            Command::new("cmd")
-                .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
-                .spawn()
-                .unwrap()
-        } else {
-            Command::new("sleep").arg("30").spawn().unwrap()
-        };
-        FileProcessSupervisor::new(runtime_root.join("agents"))
-            .register(ManagedProcess {
-                id: format!("capacity-test-{goal_id}"),
-                owner: ProcessOwner::Agent,
-                pid: Some(child.id()),
-                state: "running".to_string(),
-                label: Some("capacity test workflow".to_string()),
-                details: Some(
-                    json!({
-                        "kind": "workflow",
-                        "goal_id": goal_id,
-                        "claim_id": claim_id,
-                        "execution_id": execution_id,
-                        "round_idx": 0,
-                        "workflow_state": "in-progress"
-                    })
-                    .to_string(),
-                ),
-                stdout_path: None,
-                stderr_path: None,
-                stdin_path: None,
-                limits: None,
-                started_at: format!("capacity-test-{goal_id}"),
-                exit_code: None,
-            })
-            .unwrap();
     }
 
     #[test]

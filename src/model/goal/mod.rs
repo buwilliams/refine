@@ -85,7 +85,11 @@ pub struct GoalRound {
     pub prompt: String,
     pub created: Timestamp,
     pub updated: Timestamp,
-    pub guidance_decision: Option<String>,
+    /// Versioned context pinned before this round's implementation agent starts.
+    #[serde(default)]
+    pub agent_context: Option<serde_json::Value>,
+    /// Structured guidance selection for current rounds; legacy strings remain readable.
+    pub guidance_decision: Option<serde_json::Value>,
     #[serde(default)]
     pub implementation_report: Option<String>,
     #[serde(default)]

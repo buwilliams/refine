@@ -4,12 +4,8 @@
 // Agent-facing tabs are managed terminal launch profiles; each has an independent
 // PTY session while Files, System, and Goal Logs keep their specialized panels.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
-const FILES_TAB_ID = "files";
-const SYSTEM_TAB_ID = "system";
-const SUPERVISOR_TAB_ID = "supervisor";
-const TERMINAL_TAB_ID = "terminal";
-const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "supervisor", "plan", "goal", "standalone"]);
-const STANDARD_TOOLBAR_TAB_ORDER = [SUPERVISOR_TAB_ID, SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
+const CHAT_TABS_STORAGE_VERSION = 2;
+const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "agent", "plan", "goal", "standalone"]);
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
 const GOAL_LOG_DEFAULT_ORDER = "tail";
@@ -34,7 +30,7 @@ let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
 const chatState = {
   tabs: {},                // tabId → { goalId, label, sessionId, output, closedReason }
-  activeTabId: "standalone",
+  activeTabId: null,
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
@@ -42,12 +38,6 @@ const chatState = {
 const systemOperationState = {
   messages: [],
   filters: new Set(),
-};
-const supervisorAgentState = {
-  snapshot: null,
-  loading: false,
-  error: "",
-  timer: null,
 };
 const filesState = {
   path: "",
@@ -133,81 +123,19 @@ function terminalStateFor(tabId = chatState.activeTabId) {
 }
 
 function ensureStandaloneTab() {
-  if (!chatState.tabs.standalone) {
-    chatState.tabs.standalone = {
-      goalId: null, label: "Standalone", mode: "standalone",
-      sessionId: null,
-    };
-  }
-  normalizeInteractiveTerminalTab(chatState.tabs.standalone);
-  ensureSupervisorTab();
-  ensureFilesTab();
-  ensureSystemTab();
-  ensureTerminalTab();
-  reorderStandardToolbarTabs();
-}
-
-function ensureSupervisorTab() {
-  if (!chatState.tabs[SUPERVISOR_TAB_ID]) {
-    chatState.tabs[SUPERVISOR_TAB_ID] = {
-      goalId: null, label: "Supervisor", mode: "supervisor",
-      sessionId: null,
-    };
-  }
-  normalizeInteractiveTerminalTab(chatState.tabs[SUPERVISOR_TAB_ID]);
-}
-
-function ensureFilesTab() {
-  if (!chatState.tabs[FILES_TAB_ID]) {
-    chatState.tabs[FILES_TAB_ID] = {
-      goalId: null, label: "Files", mode: "files",
-      sessionId: null,
-    };
-  }
-}
-
-function ensureSystemTab() {
-  if (!chatState.tabs[SYSTEM_TAB_ID]) {
-    chatState.tabs[SYSTEM_TAB_ID] = {
-      goalId: null, label: "System", mode: "system",
-      sessionId: null,
-    };
-  }
-}
-
-function ensureTerminalTab() {
-  if (!chatState.tabs[TERMINAL_TAB_ID]) {
-    chatState.tabs[TERMINAL_TAB_ID] = {
-      goalId: null, label: "Terminal", mode: "terminal",
-      sessionId: null,
-    };
-  }
-  normalizeInteractiveTerminalTab(chatState.tabs[TERMINAL_TAB_ID]);
-}
-
-function reorderStandardToolbarTabs() {
-  const existing = chatState.tabs || {};
-  for (const tab of Object.values(existing)) {
+  for (const tab of Object.values(chatState.tabs || {})) {
     normalizeInteractiveTerminalTab(tab);
   }
-  const ordered = {};
-  for (const id of STANDARD_TOOLBAR_TAB_ORDER) {
-    if (existing[id]) ordered[id] = existing[id];
-  }
-  for (const [id, tab] of Object.entries(existing)) {
-    if (!STANDARD_TOOLBAR_TAB_ORDER.includes(id)) ordered[id] = tab;
-  }
-  chatState.tabs = ordered;
 }
 
 function currentToolbarTab() {
   ensureStandaloneTab();
-  let tab = chatState.tabs[chatState.activeTabId];
-  if (!tab) {
-    chatState.activeTabId = "standalone";
-    tab = chatState.tabs.standalone;
+  if (chatState.activeTabId && chatState.tabs[chatState.activeTabId]) {
+    return chatState.tabs[chatState.activeTabId];
   }
-  return tab;
+  const first = Object.keys(chatState.tabs)[0] || null;
+  chatState.activeTabId = first;
+  return first ? chatState.tabs[first] : null;
 }
 
 function loadChatStateFromStorage() {
@@ -216,7 +144,18 @@ function loadChatStateFromStorage() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && parsed.tabs) {
-      chatState.tabs = parsed.tabs;
+      chatState.tabs = Object.fromEntries(
+        Object.entries(parsed.tabs).filter(([, tab]) => {
+          if (tab?.mode === "supervisor") return false;
+          if (parsed.version === CHAT_TABS_STORAGE_VERSION) return true;
+          const legacyDefault = ["standalone", "system", "files", "terminal"].includes(tab?.mode);
+          return !legacyDefault || !!tab?.sessionId;
+        }),
+      );
+      for (const tab of Object.values(chatState.tabs)) {
+        if (tab.mode === "standalone") tab.label = "Agent in Worktree";
+        if (tab.mode === "plan") tab.label = "Planing Agent";
+      }
       if (parsed.activeTabId && chatState.tabs[parsed.activeTabId]) {
         chatState.activeTabId = parsed.activeTabId;
       }
@@ -264,6 +203,7 @@ function saveChatStateToStorage() {
   try {
     localStorage.setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
       tabs, activeTabId: chatState.activeTabId,
+      version: CHAT_TABS_STORAGE_VERSION,
       open: chatState.open, bodyHeight: chatState.bodyHeight,
       fullscreen: chatState.fullscreen,
       systemFilters: [...systemOperationState.filters],
@@ -287,7 +227,6 @@ function clampChatBodyHeight(px) { return clampToolbarBodyHeight(px); }
 
 function initToolbar() {
   loadChatStateFromStorage();
-  ensureStandaloneTab();
   if (typeof drainPendingSystemOperations === "function") drainPendingSystemOperations();
   drawToolbar();
   observeToolbarSize();
@@ -298,14 +237,11 @@ function initChatDock() { initToolbar(); }
 
 function resetChatForProjectSwitch() {
   chatState.tabs = {};
-  chatState.activeTabId = "standalone";
+  chatState.activeTabId = null;
   chatState.open = false;
   chatState.bodyHeight = null;
   chatState.fullscreen = false;
   systemOperationState.filters.clear();
-  supervisorAgentState.snapshot = null;
-  supervisorAgentState.error = "";
-  ensureStandaloneTab();
   resetFilesState();
   resetTerminalState();
   saveChatStateToStorage();
@@ -397,7 +333,8 @@ function observeChatDockSize() { observeToolbarSize(); }
 // Activating an agent tab starts its configured terminal session on demand.
 function openAgentDock({ goalId = null, goalStatus = null } = {}) {
   ensureStandaloneTab();
-  let tabId = "standalone";
+  if (!goalId) return createToolbarTab("agent");
+  let tabId = goalId;
   if (goalId) {
     if (!chatState.tabs[goalId]) {
       chatState.tabs[goalId] = {
@@ -411,9 +348,47 @@ function openAgentDock({ goalId = null, goalStatus = null } = {}) {
       chatState.tabs[goalId].goalStatus = goalStatus;
     }
     normalizeInteractiveTerminalTab(chatState.tabs[goalId]);
-    tabId = goalId;
   }
   return activateToolbarTab(tabId);
+}
+
+function nextToolbarTabId(mode) {
+  const suffix = typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${mode}:${suffix}`;
+}
+
+function nextToolbarLabel(mode) {
+  const base = {
+    agent: "Agent",
+    standalone: "Agent in Worktree",
+    system: "System",
+    files: "Files",
+    terminal: "Terminal",
+    plan: "Planing Agent",
+  }[mode] || "Tool";
+  const count = Object.values(chatState.tabs).filter((tab) => tab.mode === mode).length + 1;
+  return count === 1 ? base : `${base} ${count}`;
+}
+
+async function createToolbarTab(mode) {
+  if (!["agent", "standalone", "system", "files", "terminal", "plan"].includes(mode)) return;
+  const tabId = nextToolbarTabId(mode);
+  chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
+    goalId: null,
+    label: nextToolbarLabel(mode),
+    mode,
+    sessionId: null,
+  });
+  chatState.activeTabId = tabId;
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawToolbar();
+  if (toolbarTabUsesTerminal(chatState.tabs[tabId])) {
+    await startTerminalSession(chatState.tabs[tabId]);
+  }
+  return tabId;
 }
 
 function openToolbarTab(tabId) {
@@ -462,7 +437,7 @@ function ensurePlanTab() {
   if (!chatState.tabs.plan) {
     chatState.tabs.plan = {
       goalId: null,
-      label: "Plan",
+      label: "Planing Agent",
       mode: "plan",
       sessionId: null,
     };
@@ -547,10 +522,10 @@ function drawToolbar() {
   const active = currentToolbarTab();
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
-  const filesActive = active.mode === "files";
-  const systemActive = active.mode === "system";
+  const filesActive = active?.mode === "files";
+  const systemActive = active?.mode === "system";
   const terminalActive = toolbarTabUsesTerminal(active);
-  const goalLogsActive = active.mode === "goal_logs";
+  const goalLogsActive = active?.mode === "goal_logs";
 
   root.classList.toggle("open", !!chatState.open);
   root.classList.toggle("fullscreen", !!chatState.fullscreen);
@@ -567,6 +542,19 @@ function drawToolbar() {
          data-testid="toolbar-bar"
          title="${chatState.open ? "Click to collapse" : "Click a tab to expand Toolbar"}">
       <span class="toolbar-dock-label">TOOLBAR</span>
+      <details class="toolbar-add-menu" data-testid="toolbar-add-menu">
+        <summary class="toolbar-add-button" data-testid="toolbar-add" aria-label="Add Toolbar tab" title="Add tab">[+]</summary>
+        <div class="toolbar-add-options" role="menu">
+          ${[
+            ["agent", "Agent"],
+            ["standalone", "Agent in Worktree"],
+            ["system", "System"],
+            ["files", "Files"],
+            ["terminal", "Terminal"],
+            ["plan", "Planing Agent"],
+          ].map(([mode, label]) => `<button type="button" role="menuitem" data-add-toolbar-tab="${mode}">${label}</button>`).join("")}
+        </div>
+      </details>
       <div class="toolbar-tabs">
         ${Object.entries(tabs).map(([id, t]) => `
           <button class="toolbar-tab ${id === activeId ? "active" : ""} ${toolbarTabActivityClass(t)}"
@@ -574,7 +562,7 @@ function drawToolbar() {
                   data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
             ${htmlEscape(t.label)}${toolbarTabSessionDot(t)}
-            ${id === "standalone" || id === SUPERVISOR_TAB_ID || id === FILES_TAB_ID || id === SYSTEM_TAB_ID || id === TERMINAL_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
+            <span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">[x]</span>
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
@@ -599,7 +587,7 @@ function drawToolbar() {
             ? renderTerminalPanel(active)
             : goalLogsActive
               ? renderGoalLogPanel(active)
-              : `<div class="muted">This legacy toolbar tab is no longer available. Open its Terminal profile instead.</div>`}
+              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use [+] to open a tool or agent.</div>`}
     </div>
   `;
   if (filesActive) bindFilesPanel(root);
@@ -626,6 +614,12 @@ function drawToolbar() {
       closeChatTab(el.dataset.closeTab);
     });
   });
+  $$("[data-add-toolbar-tab]", root).forEach((el) => {
+    el.addEventListener("click", () => {
+      root.querySelector(".toolbar-add-menu")?.removeAttribute("open");
+      void createToolbarTab(el.dataset.addToolbarTab);
+    });
+  });
   $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
 
@@ -650,7 +644,7 @@ function drawToolbar() {
 function drawChatDock() { drawToolbar(); }
 
 function toolbarTabTitle(tab) {
-  if (tab.mode === "supervisor") return "Supervisor agent terminal";
+  if (tab.mode === "agent") return "General-purpose agent terminal";
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
   if (toolbarTabUsesTerminal(tab)) return `${tab.label} terminal`;
@@ -669,45 +663,6 @@ function toolbarTabActivityClass(tab) {
 function toolbarTabSessionDot(tab) {
   if (!toolbarTabHasSessionIndicator(tab)) return "";
   return ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="active session"></span>`;
-}
-
-async function loadSupervisorAgentState() {
-  if (supervisorAgentState.loading || !state.project?.attached) return;
-  supervisorAgentState.loading = true;
-  try {
-    const response = await api("GET", "/api/supervisor-agent");
-    const snapshot = response?.supervisor_agent || null;
-    supervisorAgentState.snapshot = snapshot;
-    recordSupervisorAgentEvents(snapshot?.events);
-    supervisorAgentState.error = "";
-  } catch (error) {
-    supervisorAgentState.error = error.message || String(error);
-  } finally {
-    supervisorAgentState.loading = false;
-  }
-  if (chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
-    drawToolbar();
-  }
-}
-
-function recordSupervisorAgentEvents(events) {
-  if (!Array.isArray(events)) return;
-  for (const event of events.slice(-80)) {
-    const details = {
-      event_kind: event?.kind || "observation",
-      event_id: event?.id || undefined,
-      goal_id: event?.goal_id || undefined,
-      actionable: event?.actionable || undefined,
-      retryable: event?.retryable || undefined,
-    };
-    recordSystemOperation({
-      message: event?.message,
-      status: event?.status,
-      category: "supervisor",
-      timestamp: event?.created_at,
-      details,
-    }, false);
-  }
 }
 
 function normalizeGoalLogEntries(entries) {
@@ -984,7 +939,7 @@ function recordSystemOperation(payload, redraw = true) {
   if (systemOperationState.messages.length > SYSTEM_OPERATION_LOG_LIMIT) {
     systemOperationState.messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
   }
-  if (redraw && chatState.tabs[SYSTEM_TAB_ID] && chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
+  if (redraw && chatState.open && currentToolbarTab()?.mode === "system") {
     drawToolbar();
   }
 }
@@ -2426,8 +2381,17 @@ async function clearFilesTreeView() {
 }
 
 async function openFilesToolbar(options = {}) {
-  ensureFilesTab();
-  chatState.activeTabId = FILES_TAB_ID;
+  let tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "files");
+  if (!tabId) {
+    tabId = nextToolbarTabId("files");
+    chatState.tabs[tabId] = {
+      goalId: null,
+      label: nextToolbarLabel("files"),
+      mode: "files",
+      sessionId: null,
+    };
+  }
+  chatState.activeTabId = tabId;
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
@@ -2659,13 +2623,21 @@ function refreshProcessesTabForChatChange() {
 function switchChatTab(tabId) { return activateToolbarTab(tabId); }
 
 async function closeChatTab(tabId) {
-  if (tabId === "standalone" || tabId === SUPERVISOR_TAB_ID || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID || tabId === TERMINAL_TAB_ID) return;
   const t = chatState.tabs[tabId];
   if (!t) return;
-  if (t.mode !== "goal" && t.sessionId) {
+  if (toolbarTabUsesTerminal(t) && t.sessionId) {
     try {
-      await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
-    } catch {}
+      const stopped = await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
+      if (stopped?.termination?.confirmed_exit === false) {
+        throw new Error("Process termination was not confirmed.");
+      }
+    } catch (error) {
+      const terminal = terminalStates.get(tabId) || terminalStateFor(tabId);
+      if (terminal) terminal.error = error.message || String(error);
+      await showActionError(error);
+      drawToolbar();
+      return;
+    }
     refreshProcessesTabForChatChange();
   }
   const terminal = terminalStates.get(tabId);
@@ -2673,7 +2645,9 @@ async function closeChatTab(tabId) {
   terminal?.term?.dispose();
   terminalStates.delete(tabId);
   delete chatState.tabs[tabId];
-  if (chatState.activeTabId === tabId) chatState.activeTabId = "standalone";
+  if (chatState.activeTabId === tabId) {
+    chatState.activeTabId = Object.keys(chatState.tabs)[0] || null;
+  }
   saveChatStateToStorage();
   drawChat();
 }

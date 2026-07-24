@@ -75,10 +75,7 @@ pub(in crate::surfaces::web_server) fn terminal_session_start_response(
     cols: u16,
     rows: u16,
 ) -> RefineResult<Value> {
-    let singleton_profile = matches!(
-        launch.profile.as_str(),
-        "supervisor" | "plan" | "standalone"
-    );
+    let singleton_profile = matches!(launch.profile.as_str(), "plan" | "standalone");
     let _singleton_launch_guard = if singleton_profile {
         Some(
             TERMINAL_SINGLETON_LAUNCH
@@ -406,6 +403,9 @@ impl TerminalSession {
             state: "running".to_string(),
             label: Some(match launch.profile.as_str() {
                 "terminal" => "Terminal".to_string(),
+                "agent" => "Agent".to_string(),
+                "standalone" => "Agent in Worktree".to_string(),
+                "plan" => "Planing Agent".to_string(),
                 role => format!("{} agent", title_case(role)),
             }),
             details: Some(details),
@@ -638,7 +638,7 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("refine-terminal-singleton-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
-        for profile in ["supervisor", "plan", "standalone"] {
+        for profile in ["plan", "standalone"] {
             let launch = || TerminalLaunchSpec {
                 runtime_root: root.join("run"),
                 cwd: root.clone(),

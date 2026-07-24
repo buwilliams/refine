@@ -58,7 +58,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
   const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
-  const supervisorStallSeconds = String(s.supervisor_agent_stall_seconds ?? "900");
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   return `
@@ -162,14 +161,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         control: `<select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${backlogOptions.map(([v, lbl]) => `<option value="${v}" ${backlogPromote === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
-      })}
-      ${renderSettingsEditableField({
-        id: "s-supervisor-stall",
-        label: "Supervisor stall threshold (seconds)",
-        guideItemId: "runtime-supervisor-stall-threshold",
-        description: "how long active work may remain unchanged before the supervisor reports an actionable stall.",
-        valueLabel: supervisorStallSeconds,
-        control: `<input type="number" min="1" id="s-supervisor-stall" data-testid="runtime-supervisor-stall-threshold" value="${htmlEscape(supervisorStallSeconds)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-state-sync-debounce",
@@ -320,7 +311,6 @@ async function autosaveSettingsRuntime(options = {}) {
     agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
-    supervisor_agent_stall_seconds: $("#s-supervisor-stall").value,
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
@@ -336,7 +326,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-supervisor-stall, #s-state-sync-debounce, #s-project-update-pulse, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-state-sync-debounce, #s-project-update-pulse, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

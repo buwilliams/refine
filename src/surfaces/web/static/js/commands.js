@@ -303,15 +303,15 @@ registerCommand({
   run: () => toggleToolbarFullscreen(),
 });
 
-for (const [id, title, tabId, aliases, keywords] of [
-  ["supervisor.open", "Supervisor agent", SUPERVISOR_TAB_ID,
-    ["supervisor", "supervisor-agent", "open-supervisor"], ["agent", "chat", "health"]],
-  ["system.open", "System operations", SYSTEM_TAB_ID,
+for (const [id, title, mode, aliases, keywords] of [
+  ["agent.open", "Agent", "agent",
+    ["agent", "open-agent"], ["chat", "assistant"]],
+  ["system.open", "System operations", "system",
     ["system", "system-operations", "open-system"], ["activity", "runtime", "logs"]],
-  ["terminal.open", "Terminal", TERMINAL_TAB_ID,
+  ["terminal.open", "Terminal", "terminal",
     ["terminal", "shell", "open-terminal"], ["command line", "console"]],
-  ["standalone.open", "Standalone agent", "standalone",
-    ["standalone", "standalone-agent", "open-standalone"], ["agent", "chat"]],
+  ["agent-worktree.open", "Agent in Worktree", "standalone",
+    ["agent-worktree", "open-agent-worktree"], ["agent", "chat", "worktree"]],
 ]) {
   registerCommand({
     id,
@@ -319,7 +319,7 @@ for (const [id, title, tabId, aliases, keywords] of [
     group: "Toolbar",
     aliases,
     keywords,
-    run: () => openToolbarTab(tabId),
+    run: () => createToolbarTab(mode),
   });
 }
 

@@ -32,6 +32,7 @@ class FakeElement {
   set innerHTML(value) { this._innerHTML = String(value); }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
   focus() {}
+  remove() {}
   querySelector() { return null; }
   querySelectorAll() { return []; }
 }
@@ -135,25 +136,47 @@ function browserRuntime(storage = new Map()) {
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(`
+    function ensureTestTab(tabId) {
+      if (chatState.tabs[tabId]) return;
+      const mode = ["agent", "standalone", "terminal"].includes(tabId) ? tabId : tabId;
+      const labels = {
+        agent: "Agent",
+        standalone: "Agent in Worktree",
+        terminal: "Terminal",
+      };
+      chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
+        goalId: null,
+        label: labels[tabId] || tabId,
+        mode,
+        sessionId: null,
+      });
+    }
     globalThis.toolbarTerminalTest = {
       activate(tabId) {
         ensureStandaloneTab();
         if (tabId === "plan") ensurePlanTab();
+        else ensureTestTab(tabId);
         return activateToolbarTab(tabId);
       },
-      click(tabId) { return activateToolbarTab(tabId, { toggleIfActive: true }); },
+      click(tabId) {
+        ensureTestTab(tabId);
+        return activateToolbarTab(tabId, { toggleIfActive: true });
+      },
       draw: drawToolbar,
       ensurePlan: ensurePlanTab,
       openGoal(goalId) { return openAgentDock({ goalId }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
+      create(mode) { return createToolbarTab(mode); },
       restore: loadChatStateFromStorage,
       reset: resetChatForProjectSwitch,
       save: saveChatStateToStorage,
       start(tabId) {
+        ensureTestTab(tabId);
         chatState.activeTabId = tabId;
         return startTerminalSession(chatState.tabs[tabId]);
       },
       stop(tabId) {
+        ensureTestTab(tabId);
         chatState.activeTabId = tabId;
         return stopTerminalSession(chatState.tabs[tabId]);
       },
@@ -174,9 +197,11 @@ function browserRuntime(storage = new Map()) {
       tabIds() { return Object.keys(chatState.tabs); },
       setApi(nextApi) { api = nextApi; },
       installTerminalResizer(tabId, resize) {
+        ensureTestTab(tabId);
         terminalStateFor(tabId).term = { resize };
       },
       installTerminalScrollModel(tabId) {
+        ensureTestTab(tabId);
         const terminal = terminalStateFor(tabId);
         const buffer = { baseY: 0, viewportY: 0 };
         let forcedScrolls = 0;
@@ -227,17 +252,164 @@ function browserRuntime(storage = new Map()) {
   };
 }
 
-test("Supervisor, Plan, Goal, and Standalone render the shared terminal surface", async () => {
+test("Toolbar starts empty and creates independent general Agent tabs lazily", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    requests.push({ path: requestPath, body });
+    const sequence = requests.length;
+    return {
+      id: `session-${sequence}`,
+      process_id: `process-${sequence}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: "codex",
+    };
+  });
+
+  assert.deepEqual([...browser.runtime.tabIds()], []);
+  browser.runtime.draw();
+  assert.match(browser.html(), /data-testid="toolbar-add"/);
+  assert.match(browser.html(), /Agent in Worktree/);
+  assert.match(browser.html(), /Planing Agent/);
+
+  const first = await browser.runtime.create("agent");
+  const second = await browser.runtime.create("agent");
+  assert.notEqual(first, second);
+  assert.equal(browser.runtime.tab(first).label, "Agent");
+  assert.equal(browser.runtime.tab(second).label, "Agent 2");
+  assert.deepEqual(
+    requests.map((request) => request.body.profile),
+    ["agent", "agent"],
+  );
+});
+
+test("Toolbar add button precedes the tab strip and exposes the exact lazy menu", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath !== "/api/terminal/session") {
+      return { entries: [], entries_by_path: {} };
+    }
+    return {
+      id: `session-${body.profile}`,
+      process_id: `process-${body.profile}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: body.profile === "terminal" ? null : "codex",
+    };
+  });
+  browser.runtime.draw();
+  const initial = browser.html();
+  assert.ok(initial.indexOf("toolbar-dock-label") < initial.indexOf("toolbar-add-menu"));
+  assert.ok(initial.indexOf("toolbar-add-menu") < initial.indexOf("toolbar-tabs"));
+  assert.deepEqual(
+    [...initial.matchAll(/data-add-toolbar-tab="[^"]+">([^<]+)<\/button>/g)].map((match) => match[1]),
+    ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planing Agent"],
+  );
+
+  for (const mode of ["agent", "standalone", "system", "files", "terminal", "plan"]) {
+    await browser.runtime.create(mode);
+  }
+  assert.deepEqual(
+    [...browser.runtime.tabIds()].map((id) => browser.runtime.tab(id).mode),
+    ["agent", "standalone", "system", "files", "terminal", "plan"],
+  );
+  assert.equal((browser.html().match(/data-testid="toolbar-tab-close"/g) || []).length, 6);
+});
+
+test("closing a worktree Agent confirms stop, preserves its worktree, and forgets the tab", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "worktree-session",
+        process_id: "worktree-process",
+        cwd: "/tmp/refine-worktree",
+        profile: "standalone",
+        provider: "codex",
+        worktree: {
+          branch: "refine/standalone/worktree-session",
+          path: "/tmp/refine-worktree",
+        },
+      };
+    }
+    return { ok: true, termination: { confirmed_exit: true } };
+  });
+
+  const tabId = await browser.runtime.create("standalone");
+  const worktree = { ...browser.runtime.tab(tabId).worktree };
+  await browser.runtime.close(tabId);
+
+  assert.deepEqual(worktree, {
+    branch: "refine/standalone/worktree-session",
+    path: "/tmp/refine-worktree",
+  });
+  assert.equal(browser.runtime.tab(tabId), undefined);
+  assert.deepEqual(
+    requests.filter((request) => request[1].endsWith("/stop")),
+    [["POST", "/api/terminal/worktree-session/stop", undefined]],
+  );
+  assert.equal(requests.some((request) => /delete|discard|remove.*worktree/i.test(request[1])), false);
+});
+
+test("a failed close keeps the process-backed tab and shows the actionable error", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "agent-session",
+        process_id: "agent-process",
+        cwd: "/repo",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) throw new Error("termination was not confirmed");
+    return { ok: true };
+  });
+
+  const tabId = await browser.runtime.create("agent");
+  await browser.runtime.close(tabId);
+
+  assert.ok(browser.runtime.tab(tabId));
+  assert.match(browser.html(), /termination was not confirmed/);
+});
+
+test("an unconfirmed backend stop result cannot remove the tab", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "agent-session",
+        process_id: "agent-process",
+        cwd: "/repo",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    return { ok: false, termination: { confirmed_exit: false } };
+  });
+
+  const tabId = await browser.runtime.create("agent");
+  await browser.runtime.close(tabId);
+
+  assert.ok(browser.runtime.tab(tabId));
+  assert.match(browser.html(), /Process termination was not confirmed/);
+});
+
+test("Agent, Plan, Goal, and Standalone render the shared terminal surface", async () => {
   const browser = browserRuntime();
   await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
 
-  for (const tabId of ["supervisor", "plan", "GOAL1", "standalone", "terminal"]) {
+  for (const tabId of ["agent", "plan", "GOAL1", "standalone", "terminal"]) {
     await browser.runtime.activate(tabId);
     assert.match(browser.html(), /data-testid="toolbar-terminal-panel"/);
     assert.match(browser.html(), /data-testid="terminal-start"/);
     assert.doesNotMatch(browser.html(), /id="chat-input"/);
-    assert.doesNotMatch(browser.html(), /data-testid="toolbar-supervisor-panel"/);
+    assert.doesNotMatch(browser.html(), /data-testid="toolbar-agent-panel"/);
   }
 });
 
@@ -246,7 +418,7 @@ test("agent terminals follow at the bottom and preserve user scrollback until re
   await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
 
-  for (const tabId of ["supervisor", "plan", "GOAL1", "standalone"]) {
+  for (const tabId of ["agent", "plan", "GOAL1", "standalone"]) {
     const scroll = browser.runtime.installTerminalScrollModel(tabId);
 
     browser.runtime.receive(tabId, "first line\n");
@@ -285,18 +457,18 @@ test("each terminal profile sends its launch context and keeps an independent ma
 
   await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
-  for (const tabId of ["terminal", "supervisor", "standalone"]) {
+  for (const tabId of ["terminal", "agent", "standalone"]) {
     await browser.runtime.activate(tabId);
   }
 
   const starts = requests.filter((request) => request.path === "/api/terminal/session");
   assert.deepEqual(starts.map((request) => request.body.profile), [
-    "plan", "goal", "terminal", "supervisor", "standalone",
+    "plan", "goal", "terminal", "agent", "standalone",
   ]);
   assert.equal(starts.find((request) => request.body.profile === "goal").body.goal_id, "GOAL1");
   assert.equal(starts.find((request) => request.body.profile === "plan").body.initial_prompt, "Design a retry queue");
   assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");
-  assert.equal(browser.runtime.terminal("supervisor").processId, "interactive-4");
+  assert.equal(browser.runtime.terminal("agent").processId, "interactive-4");
   assert.equal(browser.runtime.terminal("GOAL1").processId, "interactive-2");
 
   await browser.runtime.stop("standalone");
@@ -315,26 +487,26 @@ test("Stop and tab reactivation use terminal lifecycle routes", async () => {
     if (requestPath === "/api/terminal/session") {
       sequence += 1;
       return {
-        id: `supervisor-${sequence}`,
-        process_id: `interactive-supervisor-${sequence}`,
+        id: `agent-${sequence}`,
+        process_id: `interactive-agent-${sequence}`,
         cwd: "/repo",
-        profile: "supervisor",
+        profile: "agent",
         provider: "claude",
       };
     }
     return { ok: true };
   });
 
-  await browser.runtime.start("supervisor");
-  assert.equal(browser.runtime.terminal("supervisor").connected, true);
-  await browser.runtime.stop("supervisor");
-  assert.equal(browser.runtime.terminal("supervisor").exited, true);
+  await browser.runtime.start("agent");
+  assert.equal(browser.runtime.terminal("agent").connected, true);
+  await browser.runtime.stop("agent");
+  assert.equal(browser.runtime.terminal("agent").exited, true);
   assert.match(browser.html(), />Restart</);
-  await browser.runtime.activate("supervisor");
-  assert.equal(browser.runtime.terminal("supervisor").sessionId, "supervisor-2");
+  await browser.runtime.activate("agent");
+  assert.equal(browser.runtime.terminal("agent").sessionId, "agent-2");
   assert.deepEqual(requests.map((request) => request[1]), [
     "/api/terminal/session",
-    "/api/terminal/supervisor-1/stop",
+    "/api/terminal/agent-1/stop",
     "/api/terminal/session",
   ]);
 });
@@ -406,16 +578,16 @@ test("terminal output and exit events remain scoped to their tab", async () => {
     };
   });
   await browser.runtime.start("terminal");
-  await browser.runtime.start("supervisor");
-  const [terminalEvents, supervisorEvents] = browser.events();
+  await browser.runtime.start("agent");
+  const [terminalEvents, agentEvents] = browser.events();
   terminalEvents.emit("terminal_output", { seq: 1, data: "shell output" });
-  supervisorEvents.emit("terminal_output", { seq: 1, data: "agent output" });
-  supervisorEvents.emit("terminal_exit", { seq: 2, data: "exit 0" });
+  agentEvents.emit("terminal_output", { seq: 1, data: "agent output" });
+  agentEvents.emit("terminal_exit", { seq: 2, data: "exit 0" });
 
   assert.equal(browser.runtime.terminal("terminal").display, "shell output");
-  assert.equal(browser.runtime.terminal("supervisor").display, "agent outputexit 0");
+  assert.equal(browser.runtime.terminal("agent").display, "agent outputexit 0");
   assert.equal(browser.runtime.terminal("terminal").connected, true);
-  assert.equal(browser.runtime.terminal("supervisor").exited, true);
+  assert.equal(browser.runtime.terminal("agent").exited, true);
 });
 
 test("Goal Agent opens on the latest transcript tail while earlier context loads in the background", async () => {
@@ -474,7 +646,7 @@ test("stored custom-chat ids are discarded while managed terminal ids reattach",
   const storage = new Map();
   storage.set("refine_chat_tabs", JSON.stringify({
     tabs: {
-      supervisor: { label: "Supervisor", mode: "supervisor", sessionId: "legacy-chat" },
+      agent: { label: "Agent", mode: "agent", sessionId: "legacy-chat" },
       terminal: {
         label: "Terminal",
         mode: "terminal",
@@ -503,9 +675,58 @@ test("stored custom-chat ids are discarded while managed terminal ids reattach",
   browser.runtime.restore();
   browser.runtime.draw();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(browser.runtime.tab("supervisor").sessionId, null);
+  assert.equal(browser.runtime.tab("agent").sessionId, null);
   assert.equal(browser.runtime.tab("terminal").sessionId, "managed-terminal");
   assert.equal(browser.runtime.terminal("terminal").connected, true);
+});
+
+test("refresh preserves and independently reattaches every explicitly opened Agent", async () => {
+  const storage = new Map();
+  const firstBrowser = browserRuntime(storage);
+  let sequence = 0;
+  firstBrowser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    sequence += 1;
+    return {
+      id: `agent-session-${sequence}`,
+      process_id: `agent-process-${sequence}`,
+      cwd: "/repo",
+      profile: body.profile,
+      provider: "codex",
+    };
+  });
+  const firstId = await firstBrowser.runtime.create("agent");
+  const secondId = await firstBrowser.runtime.create("agent");
+
+  const restored = browserRuntime(storage);
+  const statusRequests = [];
+  restored.runtime.setApi(async (_method, requestPath) => {
+    statusRequests.push(requestPath);
+    const sessionId = requestPath.split("/").at(-2);
+    const sequence = sessionId.endsWith("-1") ? "1" : "2";
+    return {
+      id: sessionId,
+      process_id: `agent-process-${sequence}`,
+      profile: "agent",
+      provider: "codex",
+      cwd: "/repo",
+      worktree: null,
+      alive: true,
+      exited: false,
+    };
+  });
+  restored.runtime.restore();
+  restored.runtime.draw();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await restored.runtime.activate(firstId);
+  await restored.runtime.activate(secondId);
+
+  assert.deepEqual([...restored.runtime.tabIds()], [firstId, secondId]);
+  assert.notEqual(restored.runtime.tab(firstId).sessionId, restored.runtime.tab(secondId).sessionId);
+  assert.deepEqual(statusRequests.sort(), [
+    "/api/terminal/agent-session-1/status",
+    "/api/terminal/agent-session-2/status",
+  ]);
 });
 
 test("refresh reattaches a live terminal and stream errors do not persist process exit", async () => {
@@ -581,7 +802,7 @@ test("switching projects stops live terminal profiles before clearing the toolba
     };
   });
   await browser.runtime.start("terminal");
-  await browser.runtime.start("supervisor");
+  await browser.runtime.start("agent");
   browser.runtime.reset();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -591,7 +812,7 @@ test("switching projects stops live terminal profiles before clearing the toolba
   );
 });
 
-test("closing a Goal Agent tab detaches without stopping workflow-owned work", async () => {
+test("closing a Goal Agent tab stops it through the workflow-aware backend path", async () => {
   const browser = browserRuntime();
   const requests = [];
   browser.runtime.setApi(async (method, requestPath, body) => {
@@ -613,6 +834,6 @@ test("closing a Goal Agent tab detaches without stopping workflow-owned work", a
   assert.equal(browser.runtime.tab("GOAL1"), undefined);
   assert.deepEqual(
     requests.filter((request) => request[1].endsWith("/stop")),
-    [],
+    [["POST", "/api/terminal/goal-session/stop", undefined]],
   );
 });

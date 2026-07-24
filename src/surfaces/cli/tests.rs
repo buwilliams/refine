@@ -5,14 +5,14 @@ use super::dispatch::{
 use super::*;
 
 #[test]
-fn agent_open_parses_goal_instances_and_singleton_profiles() {
+fn agent_open_parses_goal_instances_and_profiles() {
     let goal = Cli::try_parse_from(["refine", "agent", "open", "GOAL1"]).unwrap();
     assert!(matches!(
         goal.command,
         Commands::Agent {
             action: AgentAction::Open {
                 goal_id: Some(ref goal_id),
-                profile: CliAgentProfile::Goal,
+                profile: CliAgentProfile::Agent,
                 prompt: None,
             }
         } if goal_id == "GOAL1"
@@ -2746,13 +2746,7 @@ fn cluster_commands_use_shared_cluster_service() {
 
 #[test]
 fn agent_configure_and_diagnose_use_provider_service() {
-    let supervisor = Cli::try_parse_from(["refine", "agent", "supervisor"]).unwrap();
-    assert!(matches!(
-        supervisor.command,
-        Commands::Agent {
-            action: AgentAction::Supervisor
-        }
-    ));
+    assert!(Cli::try_parse_from(["refine", "agent", "supervisor"]).is_err());
     dispatch(
         Cli::try_parse_from(["refine", "agent", "configure", "--provider", "smoke-ai"]).unwrap(),
     )

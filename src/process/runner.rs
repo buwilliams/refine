@@ -17,10 +17,10 @@ use crate::process::supervisor::operations::{
 };
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::product::chat::FileChatService;
 use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
-use crate::tools::product::supervisor_agent::FileSupervisorAgentService;
 use crate::tools::product::work_items::BulkGoalSelection;
 use crate::workflow::WorkflowEngine;
 
@@ -260,19 +260,16 @@ pub fn run_worker(
 
 fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
     let mut recovered_root = None;
+    let mut retired_supervisor_root = None;
     loop {
         if let Some(target_root) = current_target_root(runtime_root)? {
             let root = target_root
                 .canonicalize()
                 .unwrap_or_else(|_| target_root.clone());
             let workflow = WorkflowEngine::with_target_root(runtime_root, &target_root);
-            let supervisor_agent =
-                FileSupervisorAgentService::new(prepare_refine_dir(&target_root)?, runtime_root);
-            // Coordinate the ordinary supervisor CLI agent before workflow evaluation can block
-            // on a Goal provider process. This lets both agents run through the shared process
-            // supervisor during the same active-work window.
-            if let Err(error) = supervisor_agent.reconcile() {
-                eprintln!("refine supervisor agent: {error}");
+            if retired_supervisor_root.as_ref() != Some(&root) {
+                retire_legacy_supervisor(runtime_root, &target_root)?;
+                retired_supervisor_root = Some(root.clone());
             }
             if recovered_root.as_ref() != Some(&root) {
                 match workflow.fail_interrupted_goals(
@@ -280,29 +277,9 @@ fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
                 ) {
                     Ok(count) if count > 0 => {
                         let _ = refresh_projection(runtime_root, &target_root);
-                        let _ = supervisor_agent.record_recovery(
-                            "restart",
-                            "Daemon restart recovery",
-                            format!(
-                                "marked {count} interrupted Goal(s) failed so they can be restarted"
-                            ),
-                            true,
-                        );
                     }
-                    Ok(_) => {
-                        let _ = supervisor_agent.record_recovery(
-                            "restart",
-                            "Daemon restart recovery",
-                            "no interrupted Goals required repair",
-                            true,
-                        );
-                    }
+                    Ok(_) => {}
                     Err(error) => {
-                        let _ = supervisor_agent.record_failure(
-                            "restart",
-                            format!("Workflow restart recovery failed: {error}"),
-                            true,
-                        );
                         eprintln!("refine workflow recovery: {error}");
                     }
                 }
@@ -311,29 +288,80 @@ fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
             match workflow.evaluate_workflow() {
                 Ok(_) => {
                     let _ = refresh_projection(runtime_root, &target_root);
-                    let _ = supervisor_agent.record_recovery(
-                        "workflow",
-                        "Workflow evaluation",
-                        "completed without an engine error",
-                        true,
-                    );
-                    let _ = supervisor_agent.reconcile();
                 }
-                Err(RefineError::Conflict(message)) if message.contains("paused") => {
-                    let _ = supervisor_agent.reconcile();
-                }
+                Err(RefineError::Conflict(message)) if message.contains("paused") => {}
                 Err(error) => {
-                    let _ = supervisor_agent.record_failure(
-                        "workflow",
-                        format!("Workflow evaluation failed: {error}"),
-                        true,
-                    );
                     eprintln!("refine workflow runner: {error}");
                 }
             }
         }
         thread::sleep(WORKFLOW_INTERVAL);
     }
+}
+
+fn retire_legacy_supervisor(runtime_root: &Path, target_root: &Path) -> RefineResult<()> {
+    let mut process_ids = Vec::new();
+    for process_root in [runtime_root.to_path_buf(), runtime_root.join("agents")] {
+        let supervisor = FileProcessSupervisor::new(&process_root);
+        for process in supervisor.list()? {
+            let details = process
+                .details
+                .as_deref()
+                .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                .unwrap_or_else(|| json!({}));
+            let retired = details.get("agent_role").and_then(Value::as_str) == Some("supervisor")
+                || details.get("mode").and_then(Value::as_str) == Some("supervisor")
+                || details.get("profile").and_then(Value::as_str) == Some("supervisor");
+            if retired && FileProcessSupervisor::process_is_alive(&process)? {
+                supervisor.request_termination(&process.id, "terminate")?;
+                process_ids.push((process_root.clone(), process.id));
+            }
+        }
+    }
+    let deadline = Instant::now() + Duration::from_secs(10);
+    for (process_root, process_id) in process_ids {
+        let supervisor = FileProcessSupervisor::new(process_root);
+        loop {
+            match supervisor.inspect(&process_id) {
+                Ok(process) if FileProcessSupervisor::process_is_alive(&process)? => {
+                    if Instant::now() >= deadline {
+                        return Err(RefineError::Conflict(format!(
+                            "retired Supervisor process {process_id} did not confirm exit; workflow automation remains stopped"
+                        )));
+                    }
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Ok(_) | Err(RefineError::NotFound(_)) => break,
+                Err(error) => return Err(error),
+            }
+        }
+    }
+
+    let refine_dir = prepare_refine_dir(target_root)?;
+    FileChatService::with_runtime_root(&refine_dir, runtime_root).purge_supervisor_sessions()?;
+    for name in ["supervisor-agent.json", "supervisor-agent.lock"] {
+        let path = refine_dir.join(name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to purge retired Supervisor state {}: {error}",
+                    path.display()
+                )));
+            }
+        }
+    }
+    let capacity = crate::workflow::capacity::AgentCapacityService::new(runtime_root);
+    let leases = capacity.snapshot()?;
+    for lease in leases
+        .leases
+        .into_iter()
+        .filter(|lease| lease.owner_id.starts_with("supervisor:"))
+    {
+        capacity.release(&lease.owner_id)?;
+    }
+    Ok(())
 }
 
 fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
@@ -361,9 +389,6 @@ fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
                 active_schedule = None;
             }
             let service = FileGitSyncService::new(&target_root, runtime_root);
-            let supervisor_agent = prepare_refine_dir(&target_root)
-                .ok()
-                .map(|refine_dir| FileSupervisorAgentService::new(refine_dir, runtime_root));
             if let Ok(fingerprint) = service.durable_state_fingerprint() {
                 let schedule = git_sync_schedule(runtime_root, &target_root).unwrap_or_default();
                 if active_schedule != Some(schedule) {
@@ -399,26 +424,11 @@ fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
                                 .map(|interval| now + interval);
                             next_attempt = now;
                             let _ = refresh_projection(runtime_root, &target_root);
-                            if let Some(supervisor_agent) = &supervisor_agent {
-                                let _ = supervisor_agent.record_recovery(
-                                    "state_sync",
-                                    "Refine state synchronization",
-                                    "state synchronized and projection refreshed",
-                                    true,
-                                );
-                            }
                         }
                         Ok(_) => {
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
-                        Err(error) => {
-                            if let Some(supervisor_agent) = &supervisor_agent {
-                                let _ = supervisor_agent.record_failure(
-                                    "state_sync",
-                                    format!("Refine state synchronization failed: {error}"),
-                                    true,
-                                );
-                            }
+                        Err(_error) => {
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
                     }
@@ -859,6 +869,33 @@ fn optional_positive_duration(value: Option<&Value>, fallback: Duration) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retired_supervisor_state_is_purged_before_workflow_evaluation() {
+        let target_root = std::env::temp_dir().join(format!(
+            "refine-retired-supervisor-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&target_root).unwrap();
+        let initialized = std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&target_root)
+            .status()
+            .unwrap();
+        assert!(initialized.success());
+        let refine_dir = prepare_refine_dir(&target_root).unwrap();
+        std::fs::create_dir_all(&refine_dir).unwrap();
+        let runtime_root = target_root.join("run/8082");
+        for name in ["supervisor-agent.json", "supervisor-agent.lock"] {
+            std::fs::write(refine_dir.join(name), "{}\n").unwrap();
+        }
+
+        retire_legacy_supervisor(&runtime_root, &target_root).unwrap();
+
+        assert!(!refine_dir.join("supervisor-agent.json").exists());
+        assert!(!refine_dir.join("supervisor-agent.lock").exists());
+        std::fs::remove_dir_all(target_root).unwrap();
+    }
 
     #[test]
     fn runner_specs_create_real_runner_processes() {

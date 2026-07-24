@@ -19,7 +19,6 @@
     - [Merge, Review, And Git Worktrees](03-capabilities/02-agents/05-merge-review-git-worktrees.md)
     - [Activity And Evidence](03-capabilities/02-agents/06-activity-evidence.md)
     - [Planning](03-capabilities/02-agents/07-planning.md)
-    - [Supervisor Agent](03-capabilities/02-agents/08-supervisor-agent.md)
     - [Agent-First Orchestration](03-capabilities/02-agents/09-agent-first-orchestration.md)
     - [Goal Agents](03-capabilities/02-agents/10-goal-agents.md)
   - Workflow

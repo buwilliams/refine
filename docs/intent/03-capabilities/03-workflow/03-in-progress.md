@@ -26,6 +26,13 @@ When a Goal is in-progress:
 - The implementing Goal Agent runs in a background PTY owned by this workflow
   attempt. A user may attach through CLI or browser without creating a duplicate
   agent or changing workflow ownership.
+- Before the PTY starts, Refine pins the Round's context contract: governance
+  product, constitution, and rules; a short workflow summary; enabled guidance
+  candidates; Goal context; previous Rounds; and the current Round request.
+- Guidance selection happens inside the implementation turn and is returned in
+  the completion signal. It never requires a separate provider invocation.
+- Post-implementation governance evaluates against the pinned governance
+  snapshot rather than reloading settings that may have changed mid-turn.
 - A Goal Agent that truly needs a user decision keeps its process and claim alive,
   records an explicit needs-input state, and continues in the same session after
   the user responds.

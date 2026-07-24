@@ -20,6 +20,7 @@ use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::tools::host::deployed_update::active_refine_paths;
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
@@ -79,7 +80,7 @@ struct ImportDuplicateActions {
     updated_original: usize,
 }
 
-fn terminal_profile_prompt(
+pub(super) fn terminal_profile_prompt(
     server: &InProcessWebServer,
     profile: &str,
     goal_id: Option<&str>,
@@ -87,7 +88,7 @@ fn terminal_profile_prompt(
     supplemental_prompt: Option<&str>,
 ) -> Result<String, RefineError> {
     let template = match profile {
-        "supervisor" => PromptTemplate::ChatSupervisor,
+        "agent" => PromptTemplate::ChatAgent,
         "plan" => PromptTemplate::ChatPlan,
         "goal" => PromptTemplate::ChatGoal,
         "standalone" => PromptTemplate::ChatStandalone,
@@ -98,9 +99,21 @@ fn terminal_profile_prompt(
         }
     };
     let mut sections = vec![PromptEngine::load(template).trim().to_string()];
-    let projection = server.current_projection()?;
+    if profile == "agent" {
+        let (executable, checkout) = active_refine_paths()?;
+        sections.push(format!(
+            "Active Refine executable: `{}`. Resolved Refine source checkout: `{}`. If `refine` is absent from PATH, run the checkout-local `./r` from that checkout.",
+            executable.display(),
+            checkout.display(),
+        ));
+    }
+    let projection = (goal_id.is_some() || feature_id.is_some())
+        .then(|| server.current_projection())
+        .transpose()?;
     if let Some(goal_id) = goal_id {
         let goal = projection
+            .as_ref()
+            .expect("projection loaded for attached Goal")
             .goals
             .get(goal_id)
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} was not found")))?;
@@ -123,6 +136,8 @@ fn terminal_profile_prompt(
     }
     if let Some(feature_id) = feature_id {
         let feature = projection
+            .as_ref()
+            .expect("projection loaded for attached Feature")
             .features
             .get(feature_id)
             .ok_or_else(|| RefineError::NotFound(format!("Feature {feature_id} was not found")))?;
@@ -139,12 +154,7 @@ fn terminal_profile_prompt(
         })?;
         sections.push(format!("Attached Refine Feature context:\n{context}"));
     }
-    if profile == "supervisor" {
-        sections.push(
-            "Use Refine's CLI and repository evidence to monitor the targeted app. Investigate and fix actionable workflow issues within existing authority, and verify completed work."
-                .to_string(),
-        );
-    } else if profile == "plan" {
+    if profile == "plan" {
         sections.push(
             "Use Refine's CLI when the user asks you to persist the resulting Feature or Goals."
                 .to_string(),
@@ -2704,7 +2714,7 @@ impl InProcessWebServer {
             .to_lowercase();
         if !matches!(
             profile.as_str(),
-            "terminal" | "supervisor" | "plan" | "goal" | "standalone"
+            "terminal" | "agent" | "plan" | "goal" | "standalone"
         ) {
             return error_response(RefineError::InvalidInput(format!(
                 "unknown terminal profile {profile}"

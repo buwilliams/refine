@@ -2732,6 +2732,8 @@ impl FileWorkItemService {
             ))
         })?;
         for key in [
+            "agent_context",
+            "guidance_decision",
             "rule_state",
             "meta_rule_state",
             "product_state",
@@ -3430,6 +3432,8 @@ fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     round.insert("logs".to_string(), Value::Array(Vec::new()));
     round.insert("implementation_report".to_string(), Value::Null);
     round.insert("implementation_reported_at".to_string(), Value::Null);
+    round.insert("agent_context".to_string(), Value::Null);
+    round.insert("guidance_decision".to_string(), Value::Null);
     round.insert("workflow_quality_timing".to_string(), Value::Null);
     round.insert(
         "rule_state".to_string(),

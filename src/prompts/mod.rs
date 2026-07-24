@@ -7,14 +7,13 @@ pub enum PromptTemplate {
     ChatPlan,
     ChatGoal,
     ChatFeature,
-    ChatSupervisor,
+    ChatAgent,
     ChatStandalone,
     ImportFeature,
     ImportRound,
     ImportPlanGoal,
     ImportStandaloneGoal,
     ImportNotes,
-    Supervisor,
     ReleaseGoal,
     PostImplementationGovernance,
     PostImplementationQuality,
@@ -35,14 +34,13 @@ impl PromptTemplate {
             Self::ChatPlan => "chat-plan.md",
             Self::ChatGoal => "chat-goal.md",
             Self::ChatFeature => "chat-feature.md",
-            Self::ChatSupervisor => "chat-supervisor.md",
+            Self::ChatAgent => "chat-agent.md",
             Self::ChatStandalone => "chat-standalone.md",
             Self::ImportFeature => "import-feature.md",
             Self::ImportRound => "import-round.md",
             Self::ImportPlanGoal => "import-plan-goal.md",
             Self::ImportStandaloneGoal => "import-standalone-goal.md",
             Self::ImportNotes => "import-notes.md",
-            Self::Supervisor => "supervisor.md",
             Self::ReleaseGoal => "release-goal.md",
             Self::PostImplementationGovernance => "post-implementation-governance.md",
             Self::PostImplementationQuality => "post-implementation-quality.md",
@@ -63,14 +61,13 @@ impl PromptTemplate {
             Self::ChatPlan => include_str!("chat-plan.md"),
             Self::ChatGoal => include_str!("chat-goal.md"),
             Self::ChatFeature => include_str!("chat-feature.md"),
-            Self::ChatSupervisor => include_str!("chat-supervisor.md"),
+            Self::ChatAgent => include_str!("chat-agent.md"),
             Self::ChatStandalone => include_str!("chat-standalone.md"),
             Self::ImportFeature => include_str!("import-feature.md"),
             Self::ImportRound => include_str!("import-round.md"),
             Self::ImportPlanGoal => include_str!("import-plan-goal.md"),
             Self::ImportStandaloneGoal => include_str!("import-standalone-goal.md"),
             Self::ImportNotes => include_str!("import-notes.md"),
-            Self::Supervisor => include_str!("supervisor.md"),
             Self::ReleaseGoal => include_str!("release-goal.md"),
             Self::PostImplementationGovernance => {
                 include_str!("post-implementation-governance.md")
@@ -182,6 +179,7 @@ mod tests {
             PromptTemplate::GoalAgent,
             &[
                 ("goal_id", "goal-123"),
+                ("agent_context", "{}"),
                 ("goal_context", "{}"),
                 ("previous_rounds", "[]"),
                 ("latest_round", "{\"round\":1}"),
@@ -204,6 +202,7 @@ mod tests {
                 PromptTemplate::GoalAgent,
                 &[
                     ("goal_id", "goal-123"),
+                    ("agent_context", "{}"),
                     ("goal_context", "{}"),
                     ("previous_rounds", "[]"),
                     ("latest_round", "{\"round\":1}"),
@@ -237,14 +236,12 @@ mod tests {
             PromptTemplate::ChatPlan,
             PromptTemplate::ChatGoal,
             PromptTemplate::ChatFeature,
-            PromptTemplate::ChatSupervisor,
             PromptTemplate::ChatStandalone,
             PromptTemplate::ImportFeature,
             PromptTemplate::ImportRound,
             PromptTemplate::ImportPlanGoal,
             PromptTemplate::ImportStandaloneGoal,
             PromptTemplate::ImportNotes,
-            PromptTemplate::Supervisor,
             PromptTemplate::ReleaseGoal,
             PromptTemplate::PostImplementationGovernance,
             PromptTemplate::PostImplementationQuality,
@@ -285,10 +282,5 @@ mod tests {
             total_words <= 850,
             "prompt set is too prescriptive at {total_words} words"
         );
-
-        let supervisor = PromptEngine::load(PromptTemplate::Supervisor);
-        assert!(supervisor.contains("Do not hide provider failures"));
-        assert!(supervisor.contains("force merges"));
-        assert!(supervisor.contains("discard worktrees"));
     }
 }
