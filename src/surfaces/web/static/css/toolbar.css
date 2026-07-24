@@ -18,7 +18,7 @@
   padding: 4px 12px;
   min-height: 40px;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow: visible;
 }
 .toolbar-dock-label {
   font-weight: 750;
@@ -37,9 +37,21 @@
   cursor: pointer;
   list-style: none;
   color: var(--muted);
-  font-weight: 750;
-  padding: 4px 6px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: var(--radius);
+}
+.toolbar-action-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 .toolbar-add-button::-webkit-details-marker { display: none; }
 .toolbar-add-button:hover,
@@ -48,9 +60,9 @@
   color: white;
 }
 .toolbar-add-options {
-  position: fixed;
-  bottom: 42px;
-  left: 78px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
   z-index: 120;
   min-width: 190px;
   padding: 6px;
@@ -60,6 +72,10 @@
   border-radius: var(--radius-md);
   background: var(--card);
   box-shadow: var(--shadow-lg);
+}
+.toolbar-dock:not(.open) .toolbar-add-options {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 .toolbar-add-options button {
   text-align: left;
@@ -207,8 +223,6 @@ button.toolbar-tab:hover:not(:disabled),
   justify-content: center;
   width: 18px;
   height: 18px;
-  font-size: 16px;
-  line-height: 1;
   color: var(--muted);
   border-radius: 50%;
 }

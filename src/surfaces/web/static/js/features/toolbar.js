@@ -61,6 +61,12 @@ const filesState = {
 };
 const terminalStates = new Map();
 
+function toolbarStateStorage() {
+  // Toolbar layout is useful across a page refresh, but must not turn into a
+  // permanent set of default tabs when the app is opened in a new session.
+  return typeof sessionStorage === "undefined" ? localStorage : sessionStorage;
+}
+
 function toolbarTabUsesTerminal(tab) {
   return !!tab && INTERACTIVE_TERMINAL_MODES.has(tab.mode);
 }
@@ -140,7 +146,7 @@ function currentToolbarTab() {
 
 function loadChatStateFromStorage() {
   try {
-    const raw = localStorage.getItem(CHAT_TABS_STORAGE_KEY);
+    const raw = toolbarStateStorage().getItem(CHAT_TABS_STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && parsed.tabs) {
@@ -201,7 +207,7 @@ function saveChatStateToStorage() {
     };
   }
   try {
-    localStorage.setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
+    toolbarStateStorage().setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
       tabs, activeTabId: chatState.activeTabId,
       version: CHAT_TABS_STORAGE_VERSION,
       open: chatState.open, bodyHeight: chatState.bodyHeight,
@@ -543,7 +549,11 @@ function drawToolbar() {
          title="${chatState.open ? "Click to collapse" : "Click a tab to expand Toolbar"}">
       <span class="toolbar-dock-label">TOOLBAR</span>
       <details class="toolbar-add-menu" data-testid="toolbar-add-menu">
-        <summary class="toolbar-add-button" data-testid="toolbar-add" aria-label="Add Toolbar tab" title="Add tab">[+]</summary>
+        <summary class="toolbar-add-button" data-testid="toolbar-add" aria-label="Add Toolbar tab" title="Add tab">
+          <svg class="toolbar-action-icon" data-testid="toolbar-add-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+            <path d="M10 4v12M4 10h12"></path>
+          </svg>
+        </summary>
         <div class="toolbar-add-options" role="menu">
           ${[
             ["agent", "Agent"],
@@ -562,7 +572,11 @@ function drawToolbar() {
                   data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
             ${htmlEscape(t.label)}${toolbarTabSessionDot(t)}
-            <span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">[x]</span>
+            <span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">
+              <svg class="toolbar-action-icon" data-testid="toolbar-tab-close-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+                <path d="M5 5l10 10M15 5L5 15"></path>
+              </svg>
+            </span>
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
@@ -587,7 +601,7 @@ function drawToolbar() {
             ? renderTerminalPanel(active)
             : goalLogsActive
               ? renderGoalLogPanel(active)
-              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use [+] to open a tool or agent.</div>`}
+              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use the Add button to open a tool or agent.</div>`}
     </div>
   `;
   if (filesActive) bindFilesPanel(root);
@@ -2625,24 +2639,29 @@ function switchChatTab(tabId) { return activateToolbarTab(tabId); }
 async function closeChatTab(tabId) {
   const t = chatState.tabs[tabId];
   if (!t) return;
-  if (toolbarTabUsesTerminal(t) && t.sessionId) {
+  const terminal = toolbarTabUsesTerminal(t) ? terminalStates.get(tabId) : null;
+  const alreadyStopped = !!t.exited || !!(terminal?.statusChecked && terminal.exited);
+  if (toolbarTabUsesTerminal(t) && t.sessionId && !alreadyStopped) {
     try {
       const stopped = await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
       if (stopped?.termination?.confirmed_exit === false) {
         throw new Error("Process termination was not confirmed.");
       }
     } catch (error) {
-      const terminal = terminalStates.get(tabId) || terminalStateFor(tabId);
-      if (terminal) terminal.error = error.message || String(error);
-      await showActionError(error);
-      drawToolbar();
-      return;
+      const sessionMissing = error?.code === "not_found" || error?.status === 404;
+      if (!sessionMissing) {
+        const currentTerminal = terminalStates.get(tabId) || terminalStateFor(tabId);
+        if (currentTerminal) currentTerminal.error = error.message || String(error);
+        await showActionError(error);
+        drawToolbar();
+        return;
+      }
     }
     refreshProcessesTabForChatChange();
   }
-  const terminal = terminalStates.get(tabId);
-  terminal?.eventSource?.close();
-  terminal?.term?.dispose();
+  const currentTerminal = terminalStates.get(tabId);
+  currentTerminal?.eventSource?.close();
+  currentTerminal?.term?.dispose();
   terminalStates.delete(tabId);
   delete chatState.tabs[tabId];
   if (chatState.activeTabId === tabId) {

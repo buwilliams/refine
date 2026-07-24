@@ -851,6 +851,8 @@ fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
 
     assert!(toolbar.contains("CHAT_TABS_STORAGE_VERSION = 2"));
+    assert!(toolbar.contains("function toolbarStateStorage()"));
+    assert!(toolbar.contains(r#"typeof sessionStorage === "undefined""#));
     assert!(toolbar.contains(r#"["agent", "Agent"]"#));
     assert!(toolbar.contains(r#"["standalone", "Agent in Worktree"]"#));
     assert!(toolbar.contains(r#"["plan", "Planing Agent"]"#));
@@ -865,6 +867,8 @@ fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     assert!(!toolbar_css.contains(".supervisor-agent-summary"));
     assert!(!toolbar_css.contains(".chat-input-wrap"));
     assert!(toolbar_css.contains(".terminal-panel"));
+    assert!(toolbar_css.contains("position: absolute"));
+    assert!(toolbar_css.contains(".toolbar-dock:not(.open) .toolbar-add-options"));
     assert!(toolbar_css.contains("padding-inline: 0"));
     assert!(toolbar_css.contains("font-size: 15px"));
     assert!(toolbar.contains("observeTerminalOutputSize(output, tab)"));

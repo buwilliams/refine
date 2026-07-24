@@ -25,13 +25,18 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 
 ## Lifecycle
 
-- the initial toolbar has no permanent tabs and no active process;
+- a fresh app session starts with no permanent tabs and no active process;
+- a page refresh restores that browser session's explicitly opened tabs and
+  verifies their process state;
 - each tab has a close action;
 - closing an interactive terminal asks the backend to stop its managed process before removing the tab;
+- a tab whose process already exited or no longer exists closes locally without
+  requiring a successful stop request;
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
   workflow cancellation, claim-settlement, and audit semantics before the tab
   disappears;
-- reloading verifies persisted session identifiers against backend process state and reattaches only to live sessions;
+- the Add menu is anchored to its Toolbar control, so it follows the collapsed,
+  resized, and fullscreen Toolbar positions;
 - an interrupted browser event stream is not evidence that the managed process exited;
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;

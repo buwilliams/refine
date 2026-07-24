@@ -44,6 +44,10 @@ function browserRuntime() {
       getItem(key) { return storage.get(key) ?? null; },
       setItem(key, value) { storage.set(key, String(value)); },
     },
+    sessionStorage: {
+      getItem(key) { return storage.get(key) ?? null; },
+      setItem(key, value) { storage.set(key, String(value)); },
+    },
     setTimeout,
     window: {
       addEventListener() {},
@@ -63,7 +67,7 @@ function browserRuntime() {
       renderGoalLogPanel,
       waitForBackgroundOperation,
       saveGoalLogState: saveChatStateToStorage,
-      storedGoalLogState() { return JSON.parse(localStorage.getItem(CHAT_TABS_STORAGE_KEY)); },
+      storedGoalLogState() { return JSON.parse(sessionStorage.getItem(CHAT_TABS_STORAGE_KEY)); },
       visibleGoalLogEntries,
       setApi(nextApi) { api = nextApi; },
       setLiveRoute(route, goalId = null) {

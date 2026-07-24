@@ -66,7 +66,7 @@ class FakeResizeObserver {
   }
 }
 
-function browserRuntime(storage = new Map()) {
+function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   FakeEventSource.instances = [];
   FakeResizeObserver.instances = [];
   const toolbar = new FakeElement();
@@ -110,6 +110,10 @@ function browserRuntime(storage = new Map()) {
     }),
     location: { hash: "#/dashboard", pathname: "/" },
     localStorage: {
+      getItem(key) { return persistentStorage.get(key) ?? null; },
+      setItem(key, value) { persistentStorage.set(key, String(value)); },
+    },
+    sessionStorage: {
       getItem(key) { return storage.get(key) ?? null; },
       setItem(key, value) { storage.set(key, String(value)); },
     },
@@ -181,6 +185,14 @@ function browserRuntime(storage = new Map()) {
         return stopTerminalSession(chatState.tabs[tabId]);
       },
       close(tabId) { return closeChatTab(tabId); },
+      markExited(tabId) {
+        const tab = chatState.tabs[tabId];
+        const terminal = terminalStateFor(tabId);
+        tab.exited = true;
+        terminal.connected = false;
+        terminal.exited = true;
+        terminal.statusChecked = true;
+      },
       tab(tabId) { return chatState.tabs[tabId]; },
       terminal(tabId) {
         const value = terminalStateFor(tabId);
@@ -302,6 +314,16 @@ test("Toolbar add button precedes the tab strip and exposes the exact lazy menu"
   const initial = browser.html();
   assert.ok(initial.indexOf("toolbar-dock-label") < initial.indexOf("toolbar-add-menu"));
   assert.ok(initial.indexOf("toolbar-add-menu") < initial.indexOf("toolbar-tabs"));
+  assert.match(initial, /data-testid="toolbar-add-icon"/);
+  assert.doesNotMatch(initial, />\[\+\]</);
+  const toolbarCss = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/css/toolbar.css"),
+    "utf8",
+  );
+  assert.match(toolbarCss, /\.toolbar-add-menu\s*\{[^}]*position:\s*relative/s);
+  assert.match(toolbarCss, /\.toolbar-add-options\s*\{[^}]*position:\s*absolute/s);
+  assert.doesNotMatch(toolbarCss, /\.toolbar-add-options\s*\{[^}]*position:\s*fixed/s);
+  assert.match(toolbarCss, /\.toolbar-dock:not\(\.open\) \.toolbar-add-options/);
   assert.deepEqual(
     [...initial.matchAll(/data-add-toolbar-tab="[^"]+">([^<]+)<\/button>/g)].map((match) => match[1]),
     ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planing Agent"],
@@ -315,6 +337,8 @@ test("Toolbar add button precedes the tab strip and exposes the exact lazy menu"
     ["agent", "standalone", "system", "files", "terminal", "plan"],
   );
   assert.equal((browser.html().match(/data-testid="toolbar-tab-close"/g) || []).length, 6);
+  assert.equal((browser.html().match(/data-testid="toolbar-tab-close-icon"/g) || []).length, 6);
+  assert.doesNotMatch(browser.html(), />\[x\]</);
 });
 
 test("closing a worktree Agent confirms stop, preserves its worktree, and forgets the tab", async () => {
@@ -397,6 +421,52 @@ test("an unconfirmed backend stop result cannot remove the tab", async () => {
 
   assert.ok(browser.runtime.tab(tabId));
   assert.match(browser.html(), /Process termination was not confirmed/);
+});
+
+test("a tab closes locally when its background process already exited", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    return {
+      id: "agent-session",
+      process_id: "agent-process",
+      cwd: "/repo",
+      profile: body.profile,
+      provider: "codex",
+    };
+  });
+
+  const tabId = await browser.runtime.create("agent");
+  browser.runtime.markExited(tabId);
+  await browser.runtime.close(tabId);
+
+  assert.equal(browser.runtime.tab(tabId), undefined);
+  assert.equal(requests.some((request) => request[1].endsWith("/stop")), false);
+});
+
+test("a missing background session does not prevent closing its tab", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "missing-session",
+        process_id: "missing-process",
+        cwd: "/repo",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    const error = new Error("terminal session was not found");
+    error.status = 404;
+    error.code = "not_found";
+    throw error;
+  });
+
+  const tabId = await browser.runtime.create("agent");
+  await browser.runtime.close(tabId);
+
+  assert.equal(browser.runtime.tab(tabId), undefined);
 });
 
 test("Agent, Plan, Goal, and Standalone render the shared terminal surface", async () => {
@@ -727,6 +797,35 @@ test("refresh preserves and independently reattaches every explicitly opened Age
     "/api/terminal/agent-session-1/status",
     "/api/terminal/agent-session-2/status",
   ]);
+});
+
+test("a fresh app session ignores toolbar tabs from an earlier app session", () => {
+  const stalePersistentStorage = new Map();
+  stalePersistentStorage.set("refine_chat_tabs", JSON.stringify({
+    version: 2,
+    tabs: {
+      terminal: {
+        label: "Terminal",
+        mode: "terminal",
+        sessionId: "stale-terminal",
+        processId: "stale-process",
+      },
+      agent: {
+        label: "Agent",
+        mode: "agent",
+        sessionId: "stale-agent",
+        processId: "stale-agent-process",
+      },
+    },
+    activeTabId: "agent",
+    open: true,
+  }));
+
+  const browser = browserRuntime(new Map(), stalePersistentStorage);
+  browser.runtime.restore();
+  browser.runtime.draw();
+
+  assert.deepEqual([...browser.runtime.tabIds()], []);
 });
 
 test("refresh reattaches a live terminal and stream errors do not persist process exit", async () => {
