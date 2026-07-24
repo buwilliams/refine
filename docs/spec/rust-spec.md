@@ -678,6 +678,19 @@ durable operations. They expose progress and logs, support cancellation and
 interruption recovery, persist the completed CSV, and resolve all unique Goal
 commit ranges from one batched commit graph instead of invoking Git per Goal.
 
+The shared row renderer must keep each Jira Description at or below Jira's
+30,000-character limit, measured as Unicode characters. Evidence priority is:
+Goal identity and ownership; branch and commit anchors; delivered commits;
+round outcomes with normalized Quality and governance verdicts, actions, and
+violations; requested work; implementation narratives; guidance decisions; and
+notes. Compact summaries must not replay raw provider output or duplicate a
+verdict through messages, raw payloads, and structured JSON. When a section or
+pathological field cannot fit its budget, truncation occurs only at a character
+boundary and adds a deterministic marker naming the shortened evidence and the
+number of omitted characters. The final length check remains a safety
+invariant. Verbose optional history is shortened per row and must not abort an
+otherwise valid bulk export.
+
 ### Workflow Engine
 
 Module: `workflow`; path: `src/workflow/`.
