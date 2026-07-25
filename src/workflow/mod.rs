@@ -706,6 +706,112 @@ impl WorkflowEngine {
         Ok(signalled)
     }
 
+    /// True when a managed agent process for `execution_id` is still running.
+    fn workflow_execution_process_alive(&self, execution_id: &str) -> RefineResult<bool> {
+        for process_root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
+            let supervisor = FileProcessSupervisor::new(process_root);
+            for process in supervisor.list()? {
+                if process.state != "running" {
+                    continue;
+                }
+                let matches_execution = process
+                    .details
+                    .as_deref()
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
+                    .and_then(|details| {
+                        details
+                            .get("execution_id")
+                            .and_then(|value| value.as_str())
+                            .map(|value| value == execution_id)
+                    })
+                    .unwrap_or(false);
+                if matches_execution {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Settle `Running` claims whose executor no longer exists, releasing the
+    /// concurrency slot each one was holding.
+    ///
+    /// A claim reaches `Running` only after its capacity lease is acquired, and a
+    /// lease records the pid of the process that took it, so within one daemon
+    /// generation a `Running` claim always holds a live lease. When a daemon dies
+    /// between starting a claim and recording its terminal state, the worker that
+    /// would have settled the claim dies with it: the lease is pruned as dead on
+    /// the next capacity read, but the claim stays `Running` on disk forever.
+    ///
+    /// Nothing else reconciled that. Completion reports are matched by
+    /// `execution_id` and never arrive, and `interrupt_active_claims` only runs
+    /// against an explicit stop list. Admission counts every `Running` claim, so
+    /// each orphan permanently consumed a slot and effective parallelism drifted
+    /// below the configured cap with every mid-flight daemon death.
+    ///
+    /// Both conditions are required, and the order matters. Absence of a lease
+    /// alone would also match the brief window in which settlement has released
+    /// capacity but not yet persisted the terminal claim state, so a live process
+    /// for the execution vetoes the sweep.
+    fn reconcile_orphaned_running_claims(&self) -> RefineResult<usize> {
+        // Reading the capacity snapshot prunes leases whose holder is gone, which
+        // is what makes a missing lease meaningful here.
+        let held = self
+            .capacity_service()
+            .snapshot()?
+            .leases
+            .into_iter()
+            .map(|lease| lease.owner_id)
+            .collect::<BTreeSet<_>>();
+        let candidates = self
+            .load_state()?
+            .claims
+            .into_iter()
+            .filter(|claim| claim.state == WorkflowClaimState::Running)
+            .filter(|claim| !held.contains(&format!("workflow:{}", claim.claim_id)))
+            .collect::<Vec<_>>();
+        if candidates.is_empty() {
+            return Ok(0);
+        }
+
+        let mut orphaned = BTreeSet::new();
+        for claim in candidates {
+            let alive = match claim.execution_id.as_deref() {
+                Some(execution_id) => self.workflow_execution_process_alive(execution_id)?,
+                None => false,
+            };
+            if !alive {
+                orphaned.insert(claim.claim_id);
+            }
+        }
+        if orphaned.is_empty() {
+            return Ok(0);
+        }
+
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
+        let mut state = self.load_state()?;
+        let mut released_claim_ids = Vec::new();
+        let now = now_timestamp();
+        for claim in &mut state.claims {
+            // Re-check under the lock: a settlement may have landed since the scan.
+            if claim.state == WorkflowClaimState::Running && orphaned.contains(&claim.claim_id) {
+                claim.decision_version = claim.decision_version.saturating_add(1);
+                claim.state = WorkflowClaimState::Interrupted;
+                claim.updated_at = now.clone();
+                released_claim_ids.push(claim.claim_id.clone());
+            }
+        }
+        if released_claim_ids.is_empty() {
+            return Ok(0);
+        }
+        self.save_state(&mut state)?;
+        for claim_id in &released_claim_ids {
+            self.release_claim_capacity(claim_id)?;
+        }
+        Ok(released_claim_ids.len())
+    }
+
     fn workflow_paused(&self) -> RefineResult<bool> {
         let pause_state = FileProcessSupervisor::new(&self.runtime_root).pause_state()?;
         Ok(pause_state.workflow_paused)
@@ -937,6 +1043,9 @@ impl WorkflowEngine {
     pub fn execute_claimed_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
         let state = self.load_state()?;
         self.ensure_automation_running(&state)?;
+        // Reclaim slots held by claims whose executor died with an earlier daemon,
+        // before this tick decides how much capacity is available.
+        self.reconcile_orphaned_running_claims()?;
         let mut results = Vec::new();
         let mut errors = Vec::new();
         let mut scheduler_error = None;
@@ -2732,6 +2841,113 @@ mod tests {
         claim_automation.start_claim(&second_claim).unwrap();
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    // A daemon that dies between starting a claim and recording its terminal state
+    // leaves the claim `Running` on disk while its lease is pruned as dead. Nothing
+    // reconciled that, and admission counts `Running` claims, so the orphan held a
+    // concurrency slot for good: with a cap of 1 no further goal could ever start,
+    // and a restart did not help because startup recovery never touched claims.
+    #[test]
+    fn a_running_claim_orphaned_by_a_dead_daemon_releases_its_concurrency_slot() {
+        let temp_root = unique_temp_dir("automation-orphaned-running-claim");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&refine_dir);
+        for goal_id in ["GOAL1", "GOAL2"] {
+            work_items
+                .create_goal_summary(goal_id, Some(goal_id))
+                .unwrap();
+            work_items
+                .append_goal_round_summary(goal_id, "Reporter", "Prompt")
+                .unwrap();
+            work_items
+                .transition_goal_status(goal_id, GoalStatus::Todo)
+                .unwrap();
+        }
+        let settings = FileSettingsService::new(&refine_dir);
+        // Promotion is capped too, so both goals are claimed at a cap of 2 and the
+        // cap is then lowered to the single slot the orphan will occupy.
+        settings
+            .update(&json!({
+                "parallel_run_cap": 2,
+                "parallel_per_node_cap": 2,
+                "parallel_per_provider_cap": 2,
+                "parallel_per_target_app_cap": 2,
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        assert_eq!(automation.promote().unwrap(), 2);
+        settings
+            .update(&json!({
+                "parallel_run_cap": 1,
+                "parallel_per_node_cap": 1,
+                "parallel_per_provider_cap": 1,
+                "parallel_per_target_app_cap": 1
+            }))
+            .unwrap();
+        let claim_id = automation.load_state().unwrap().claims[0].claim_id.clone();
+        automation.start_claim(&claim_id).unwrap();
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Running
+        );
+
+        // The daemon that took the lease is gone. Rewriting the holder pid to one
+        // that cannot be alive reproduces what the next capacity read does on its
+        // own: the lease is pruned while the claim record survives.
+        let capacity_path = runtime_root.join(crate::workflow::capacity::AGENT_CAPACITY_STATE_FILE);
+        let mut capacity: Value =
+            serde_json::from_slice(&fs::read(&capacity_path).unwrap()).unwrap();
+        assert_eq!(capacity["leases"].as_array().unwrap().len(), 1);
+        capacity["leases"][0]["holder_pid"] = json!(u32::MAX);
+        fs::write(
+            &capacity_path,
+            serde_json::to_vec_pretty(&capacity).unwrap(),
+        )
+        .unwrap();
+
+        // The orphan is indistinguishable from live work to the admission gate: it
+        // is still `Running`, so the single slot stays occupied.
+        assert_eq!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .len(),
+            0
+        );
+        assert_eq!(
+            automation.load_state().unwrap().claims[0].state,
+            WorkflowClaimState::Running
+        );
+
+        assert_eq!(automation.reconcile_orphaned_running_claims().unwrap(), 1);
+        let state = automation.load_state().unwrap();
+        assert_eq!(state.claims[0].state, WorkflowClaimState::Interrupted);
+        assert!(
+            AgentCapacityService::new(&runtime_root)
+                .snapshot()
+                .unwrap()
+                .leases
+                .is_empty()
+        );
+        // Idempotent: a settled claim is not swept again.
+        assert_eq!(automation.reconcile_orphaned_running_claims().unwrap(), 0);
+
+        // The freed slot is now available to the goal that was starved.
+        let second_claim = state.claims[1].claim_id.clone();
+        automation.start_claim(&second_claim).unwrap();
+        assert_eq!(
+            automation.load_state().unwrap().claims[1].state,
+            WorkflowClaimState::Running
+        );
+
+        automation.release_claim_capacity(&second_claim).unwrap();
+        fs::remove_dir_all(temp_root).unwrap_or(());
     }
 
     #[test]
