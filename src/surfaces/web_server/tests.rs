@@ -618,7 +618,7 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     assert_eq!(hidden.body["source_update"]["enabled"], false);
     assert_eq!(hidden.body["source_update"]["state"], "hidden");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1105,7 +1105,7 @@ fn web_server_manages_agent_secrets() {
     assert_eq!(deleted.status, 200);
     assert!(runtime_root.join("secrets/secret-index.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap_or(());
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1314,7 +1314,7 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
     .unwrap();
     assert!(cached_projection.goals.contains_key("GOAL1"));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1358,7 +1358,7 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
     );
     assert_eq!(detail.body["goal"]["rounds"][0]["assignee"], "Bob");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1394,7 +1394,7 @@ fn web_server_instantly_promotes_new_goal_when_configured() {
         GoalStatus::Todo
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1483,7 +1483,7 @@ fn web_server_handles_new_goal_duplicate_decisions() {
     assert_eq!(list.status, 200);
     assert_eq!(list.body["page"]["total"], 2);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1604,7 +1604,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
         "successful create POST took {create_elapsed:?}, expected < {MAX_REQUEST_TIME:?}"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1639,7 +1639,7 @@ fn warmed_goal_create_detects_an_external_latest_round_change() {
     assert_eq!(duplicate.body["error"]["code"], "duplicate_goal");
     assert_eq!(duplicate.body["error"]["duplicate"]["match"]["id"], "EXT1");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1693,7 +1693,7 @@ fn concurrent_goal_create_requests_make_one_auditable_duplicate_decision() {
         Some("One coherent concurrent prompt")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1730,7 +1730,7 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     let body: serde_json::Value = serde_json::from_slice(&conflict.body).unwrap();
     assert_eq!(body["error"]["code"], "idempotency_conflict");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1766,7 +1766,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
     assert!(body.contains("event: api_mutation"));
     assert!(body.contains("\"path\":\"/work/goals\""));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1932,7 +1932,7 @@ fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
     let plan_response = blocked_request.join().unwrap();
     assert!(plan_response.starts_with("HTTP/1.1 201 Created"));
     server_thread.join().unwrap();
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -1999,7 +1999,7 @@ fn local_http_daemon_serves_static_assets() {
         body: None,
     });
     assert_eq!(traversal.status, 400);
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2257,7 +2257,7 @@ fn diagnostics_cache_keeps_process_health_live_after_startup_warming() {
             .exists()
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2378,7 +2378,7 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
         })
         .count();
     assert_eq!(cancelled_logs, 1, "replayed settlement must be idempotent");
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2461,7 +2461,7 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let events = wait_for_http_request_metric_count(&runtime_root, 10);
     assert!(events.len() >= 10);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2512,7 +2512,7 @@ fn web_server_transitions_goal_and_refine_dir() {
     assert_eq!(patch_response.status, 200);
     assert_eq!(patch_response.body["goal"]["status"], "backlog");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2539,7 +2539,7 @@ fn web_server_creates_and_shows_goal() {
     assert_eq!(show.status, 200);
     assert_eq!(show.body["goal"]["name"], "Created by API");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2625,7 +2625,7 @@ fn web_server_exports_selected_goals_for_jira() {
             .any(|entry| entry.message == "Jira CSV export completed")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -2844,7 +2844,7 @@ fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
             .any(|entry| entry.message == "Operation failed")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3008,7 +3008,7 @@ fn concurrent_jira_retry_posts_share_one_durable_replacement_and_worker_after_re
         source_logs_before
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3124,7 +3124,7 @@ fn web_server_goal_detail_exposes_failed_feature_blocking_notice() {
             .contains("Submit a recovery round")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3203,7 +3203,7 @@ fn web_server_edits_notes_and_deletes_goal() {
     assert_eq!(delete.status, 200);
     assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3257,7 +3257,7 @@ fn web_server_appends_and_edits_latest_round() {
     assert_eq!(reporters.body["reporters"][0]["name"], "Reviewer");
     assert!(refine_dir.join("reporters.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3358,7 +3358,7 @@ fn web_server_appends_and_reads_goal_round_logs() {
         "Quality check failed."
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3437,7 +3437,7 @@ fn web_server_creates_features_and_updates_membership() {
     assert_eq!(remove_goal.status, 200);
     assert_eq!(remove_goal.body["goal_ids"], json!([]));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3563,7 +3563,7 @@ fn web_server_feature_goal_authoring_is_one_policy_driven_api_operation() {
         2
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3634,7 +3634,7 @@ fn web_server_reorders_and_moves_feature_workflow() {
             .contains("\"status\": \"todo\"")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3774,7 +3774,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         GoalStatus::ReadyMerge
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3862,7 +3862,7 @@ fn web_server_cancels_and_deletes_features() {
     assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
     assert!(!refine_dir.join("goals/GO/AL2/goal.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3909,7 +3909,7 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     assert_eq!(cancel.status, 200);
     assert_eq!(cancel.body["goal"]["status"], "cancelled");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -3998,7 +3998,7 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     assert!(!refine_dir.join("goals/GO/AL1/goal.json").exists());
     assert!(refine_dir.join("goals/GO/AL2/goal.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4035,7 +4035,7 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     assert_eq!(filtered.body["page"]["limit"], 1);
     assert_eq!(filtered.body["activity"][0]["message"], "Boom");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4087,7 +4087,7 @@ fn web_server_parses_and_persists_imported_goals_with_feature_destination() {
     assert_eq!(goal.body["goal"]["feature_id"], feature_id);
     assert_eq!(goal.body["goal"]["feature_order"], json!(null));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4117,7 +4117,7 @@ fn web_server_parses_import_csv_in_background() {
     assert_eq!(result["drafts"][0]["name"], "Background CSV");
     assert_eq!(result["drafts"][0]["priority"], "high");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4170,7 +4170,7 @@ fn web_server_background_feature_import_promotes_all_instant_backlog_goals() {
     assert_eq!(goals.len(), 3);
     assert!(goals.iter().all(|goal| goal["status"] == "todo"));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4246,7 +4246,7 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
     );
     assert_eq!(extracted.body["source"], "input");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4278,7 +4278,7 @@ fn web_server_fails_background_plan_extraction_without_goal_drafts() {
         "Plan Draft extraction did not return any Goal drafts"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4366,7 +4366,7 @@ fn web_server_extracts_exactly_one_plan_goal_without_a_feature_destination() {
             None => std::env::remove_var("REFINE_SMOKE_AI_PATH"),
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4432,7 +4432,7 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4532,7 +4532,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4628,7 +4628,7 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_goals() {
         thread::sleep(Duration::from_millis(10));
     }
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4721,7 +4721,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         Some(&json!(1))
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4794,7 +4794,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
             .is_empty()
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4837,7 +4837,7 @@ fn web_server_hard_resets_git_worktree() {
             .is_empty()
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4902,7 +4902,7 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
     );
     assert!(git(&app_root, &["check-ignore", "-q", ".refine/probe.json"]).is_ok());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -4951,7 +4951,7 @@ fn web_server_project_sync_returns_while_repository_worker_is_busy() {
         wait_for_project_sync_operation(&runtime_root, &response, OperationState::Succeeded);
     assert_eq!(operation.result["git_sync"]["attempted"], true);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5017,7 +5017,7 @@ fn web_server_project_sync_ignores_refine_runtime_noise() {
     assert!(refine_dir.join("runtime/processes/local.json").exists());
     assert!(!app_root.join(".refine").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5048,7 +5048,7 @@ fn web_server_project_sync_ignores_dirty_user_worktree() {
         "local dirty\n"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5082,7 +5082,7 @@ fn web_server_project_sync_does_not_rebase_or_push_application_branches() {
     assert!(!app_root.join("remote.txt").exists());
     assert!(app_root.join("local.txt").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5162,7 +5162,7 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     );
     assert_eq!(reset_operation.result["ok"], false);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5275,7 +5275,7 @@ fn web_server_manages_nodes_and_transfers_goal_ownership() {
             .any(|node| node["display_name"] == "Remote QA Renamed")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5366,7 +5366,7 @@ fn web_server_transfers_feature_ownership_as_a_unit() {
         assert_eq!(goal.body["goal"]["node_id"], "remote-node");
     }
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5455,7 +5455,7 @@ fn web_server_manages_cluster_operations_over_nodes() {
         "ready"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5561,7 +5561,7 @@ fn web_server_serves_source_file_tree_read_and_search() {
     assert_eq!(traversal.status, 400);
     assert_eq!(traversal.body["error"]["code"], "invalid_input");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5685,7 +5685,7 @@ fn web_server_runs_interactive_terminal_session() {
             .any(|process| process.id == second_process_id)
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5776,7 +5776,7 @@ fn web_terminal_input_stays_with_its_managed_session() {
         });
         assert_eq!(response.status, 200, "{}", response.body);
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -5860,7 +5860,7 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6029,7 +6029,7 @@ fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6218,7 +6218,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("event: chat_event"));
     assert!(sse_body.contains("SSE chat event"));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6379,7 +6379,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
         "cancelled"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6413,7 +6413,7 @@ fn web_server_retries_workflow_executions() {
         .unwrap();
     assert!(cached.runtime.background_operations.is_empty());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6898,7 +6898,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     // Terminate the long-lived agent so the test leaves no orphaned process.
     let _ = supervisor.signal(&launched_agent.id, "terminate");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -6980,7 +6980,7 @@ fn web_server_resolves_nested_agent_process_stream_stop_and_not_found() {
         );
     }
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7147,7 +7147,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
         "cancelled"
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7431,7 +7431,7 @@ fn web_server_manages_quality_settings_and_checks() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7458,7 +7458,7 @@ fn web_server_rejects_retired_supervisor_routes() {
     });
     assert_eq!(terminal.status, 400);
     assert_eq!(terminal.body["error"]["code"], "invalid_input");
-    let _ = fs::remove_dir_all(temp_root);
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7579,7 +7579,7 @@ fn web_server_manages_refine_chat_sessions() {
     assert_eq!(stopped.status, 200);
     assert_eq!(stopped.body["alive"], false);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7638,7 +7638,7 @@ fn web_server_edits_and_removes_queued_chat_messages() {
     assert_eq!(removed.status, 200);
     assert_eq!(removed.body["queued_messages"].as_array().unwrap().len(), 0);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7680,7 +7680,7 @@ fn web_server_standalone_chat_start_and_stop_manage_worktree() {
         .is_err()
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7746,7 +7746,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_work
     assert_eq!(stopped.status, 200, "{stopped:#?}");
     assert!(worktree_path.exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7792,7 +7792,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
         OperationState::Interrupted
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -7987,7 +7987,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(removed.status, 200);
     assert_eq!(removed.body["apps"].as_array().unwrap().len(), 3);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8020,7 +8020,7 @@ fn web_server_project_attach_creates_missing_local_project() {
     assert!(runtime_root.join("processes").exists());
     assert!(!destination.join(".refine/runtime/processes").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8090,7 +8090,7 @@ fn web_server_applies_runtime_settings_updates_immediately() {
     assert_eq!(goal.status, 200);
     assert_eq!(goal.body["goal"]["status"], "todo");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8177,7 +8177,7 @@ fn web_server_requires_an_agent_for_legacy_project_state() {
             .contains("newer than this Refine supports")
     );
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8245,7 +8245,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     assert!(sse_body.contains("event: project_updated"));
     assert!(sse_body.contains("\"goal_count\":1"));
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8331,7 +8331,7 @@ fn web_server_manages_governance_guidance_and_reporters() {
     assert!(refine_dir.join("guidance.json").exists());
     assert!(refine_dir.join("reporters.json").exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8661,7 +8661,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(cluster.body["enabled"], true);
     assert_eq!(cluster.body["nodes"][0]["id"], "default");
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 #[test]
@@ -8704,7 +8704,7 @@ fn web_server_target_app_health_remains_available_while_workflow_is_paused() {
     assert_eq!(health.body["state"], "running");
     assert_eq!(health.body["last_health_ok"], true);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    remove_temp_dir(&temp_root);
 }
 
 fn server_with_projection() -> InProcessWebServer {
@@ -8982,6 +8982,33 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .canonicalize()
         .unwrap_or_else(|_| std::env::temp_dir());
     temp_root.join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+}
+
+/// Remove a test's temp tree, tolerating writers that outlive the request.
+///
+/// Request metrics are recorded on a detached thread so they stay off the
+/// response path (`record_http_request_metric`), so a metric line can land in
+/// `runtime_root` just after the assertions finish. Landing mid-walk makes
+/// `remove_dir_all` fail with `DirectoryNotEmpty`, and landing after it
+/// recreates the tree, so retry briefly instead of failing the test for it.
+fn remove_temp_dir(temp_root: impl AsRef<Path>) {
+    let temp_root = temp_root.as_ref();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let outcome = fs::remove_dir_all(temp_root);
+        match &outcome {
+            Ok(()) if !temp_root.exists() => return,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            _ => {}
+        }
+        if std::time::Instant::now() >= deadline {
+            if let Err(error) = outcome {
+                panic!("failed to remove {}: {error}", temp_root.display());
+            }
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 fn percent_encode_for_test(value: &str) -> String {

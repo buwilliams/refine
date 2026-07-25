@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 
 use crate::model::JsonObject;
 use crate::model::node::Node;
+use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -913,8 +914,7 @@ fn write_json(path: PathBuf, value: &Value) -> RefineResult<()> {
     }
     let encoded = serde_json::to_string_pretty(value)
         .map_err(|error| RefineError::Serialization(format!("failed to encode JSON: {error}")))?;
-    fs::write(&path, format!("{encoded}\n"))
-        .map_err(|error| RefineError::Io(format!("failed to write {}: {error}", path.display())))
+    write_json_atomically(&path, format!("{encoded}\n").as_bytes(), "JSON")
 }
 
 fn normalize_governance(value: &mut Value) {

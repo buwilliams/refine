@@ -9,6 +9,7 @@ use serde_json::{Map, Value, json};
 use crate::model::log::LogEntry;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+    write_json_atomically,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
@@ -200,12 +201,7 @@ impl FileQualityService {
             serde_json::to_string_pretty(&settings.clone().normalized()).map_err(|error| {
                 RefineError::Serialization(format!("failed to encode quality settings: {error}"))
             })?;
-        fs::write(&path, format!("{encoded}\n")).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to write quality settings {}: {error}",
-                path.display()
-            ))
-        })
+        write_json_atomically(&path, format!("{encoded}\n").as_bytes(), "quality settings")
     }
 
     fn settings_path(&self) -> PathBuf {

@@ -1786,7 +1786,11 @@ fn now_millis_string() -> String {
         .to_string()
 }
 
-fn write_json_atomically(path: &Path, encoded: &[u8], label: &str) -> RefineResult<()> {
+/// Write JSON through a temp file and a rename so concurrent readers observe
+/// either the previous content or the new content, never a truncated file.
+/// Settings and registry records are read by the daemon while workflow threads
+/// write them, so a plain `fs::write` lets a reader observe zero bytes.
+pub(crate) fn write_json_atomically(path: &Path, encoded: &[u8], label: &str) -> RefineResult<()> {
     let Some(parent) = path.parent() else {
         return Err(RefineError::Io(format!(
             "failed to write {label} {}: path has no parent",
