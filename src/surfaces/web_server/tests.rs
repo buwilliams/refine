@@ -818,7 +818,7 @@ fn static_goal_detail_opens_the_workflow_agent_instead_of_goal_chat() {
 
     assert!(goal_detail.contains(r#"data-testid="goal-open-agent""#));
     assert!(goal_detail.contains("Open Agent"));
-    assert!(goal_detail.contains("openAgentDock({ goalId: goal.id"));
+    assert!(goal_detail.contains("openAgentDock({ goalId: liveGoal().id"));
     assert!(toolbar.contains("function openAgentDock"));
     assert!(!goal_detail.contains("goal-open-chat"));
     assert!(!toolbar.contains("openChatDock"));
@@ -833,7 +833,7 @@ fn static_goal_log_tail_uses_toolbar_and_shared_sse_activity() {
     let toolbar_css = fs::read_to_string(static_root.join("css/toolbar.css")).unwrap();
 
     assert!(goal_detail.contains(r#"data-testid="goal-action-watch-logs""#));
-    assert!(goal_detail.contains("openGoalLogTail({ goalId: goal.id"));
+    assert!(goal_detail.contains("openGoalLogTail({ goalId: liveGoal().id"));
     assert!(toolbar.contains("function openGoalLogTail"));
     assert!(toolbar.contains("function loadGoalLogTail"));
     assert!(toolbar.contains("/api/activity?${params}"));

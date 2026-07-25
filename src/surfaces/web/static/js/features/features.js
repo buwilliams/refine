@@ -1,5 +1,8 @@
 // ---- Features ---------------------------------------------------------------
 
+// The Features page most recently drawn; see drawFeaturesTable.
+let _featuresPage = { rows: [], sort: "", dir: "" };
+
 const FEATURES_DEFAULT_LIMIT = 50;
 const FEATURES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const FEATURE_MODAL_GOAL_PAGE_SIZE = 25;
@@ -122,19 +125,19 @@ async function renderFeaturesList() {
     </details>
     <div id="features-table" data-testid="features-table"><p class="muted">Loading...</p></div>
   `;
-  $("#features-search")?.addEventListener("input", debounce((e) =>
+  bindOnce($("#features-search"), "input", debounce((e) =>
     updateFeaturesFilter({ q: e.target.value, page: 1 }), 250));
-  $("#features-status")?.addEventListener("change", (e) =>
+  bindOnce($("#features-status"), "change", (e) =>
     updateFeaturesFilter({ status: e.target.value, page: 1 }));
-  $("#features-reporter")?.addEventListener("change", (e) =>
+  bindOnce($("#features-reporter"), "change", (e) =>
     updateFeaturesFilter({ reporter: e.target.value, page: 1 }));
-  $("#features-assignee")?.addEventListener("change", (e) =>
+  bindOnce($("#features-assignee"), "change", (e) =>
     updateFeaturesFilter({ assignee: e.target.value, page: 1 }));
-  $("#features-node")?.addEventListener("change", (e) =>
+  bindOnce($("#features-node"), "change", (e) =>
     updateFeaturesFilter({ node: e.target.value, page: 1 }));
-  $("#features-limit")?.addEventListener("change", (e) =>
+  bindOnce($("#features-limit"), "change", (e) =>
     updateFeaturesFilter({ limit: parseInt(e.target.value, 10) || FEATURES_DEFAULT_LIMIT, page: 1 }));
-  $("#features-clear")?.addEventListener("click", () => {
+  bindOnce($("#features-clear"), "click", () => {
     history.replaceState(null, "", "#/features");
     renderFeaturesList();
   });
@@ -143,7 +146,7 @@ async function renderFeaturesList() {
   bindCommand("#features-bulk-assignee", "features.bulk.assignee");
   bindCommand("#features-bulk-transfer-node", "features.bulk.transfer_node");
   bindCommand("#features-bulk-delete", "features.bulk.delete");
-  $("#features-filter-shell").addEventListener("toggle", () => {
+  bindOnce($("#features-filter-shell"), "toggle", () => {
     if (_lastFeaturesRender) {
       drawFeaturesTable(_lastFeaturesRender.features, _lastFeaturesRender.state);
     }
@@ -187,6 +190,14 @@ async function refreshFeaturesTable() {
 
 function drawFeaturesTable(features, stateForRender) {
   const root = $("#features-table");
+  // Row, checkbox, and sort handlers are bound once and outlive the render that
+  // bound them, so they read the latest page from here rather than closing over
+  // the `features` and `stateForRender` they were first called with.
+  _featuresPage = {
+    rows: features,
+    sort: stateForRender.effectiveSort,
+    dir: stateForRender.effectiveDir,
+  };
   const shell = document.getElementById("features-filter-shell");
   const showSelection = !!(shell && shell.open);
   const page = stateForRender.pageMeta || {};
@@ -196,9 +207,9 @@ function drawFeaturesTable(features, stateForRender) {
     stateForRender.q || stateForRender.status || stateForRender.reporter || stateForRender.assignee || stateForRender.node
   );
   if (!features.length) {
-    root.innerHTML = `
+    renderInto(root, `
       <p class="muted">No Features match the current filters.</p>
-      ${renderPaginationControls("features", page, 0, "feature")}`;
+      ${renderPaginationControls("features", page, 0, "feature")}`);
     bindPaginationControls(root, "features", (pageNo) =>
       updateFeaturesFilter({ page: pageNo }));
     return;
@@ -236,7 +247,7 @@ function drawFeaturesTable(features, stateForRender) {
                 aria-label="Select all matching Features">
        </th>`
     : "";
-  root.innerHTML = `
+  renderInto(root, `
     <div class="table-scroll">
       <table class="table work-items-table features-table mobile-card-table">
         <colgroup>
@@ -265,54 +276,55 @@ function drawFeaturesTable(features, stateForRender) {
       </table>
     </div>
     ${renderPaginationControls("features", page, features.length, "feature")}
-  `;
-  $$("#features-table [data-sort]").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sort;
-      const nextDir = stateForRender.effectiveSort === key && stateForRender.effectiveDir === "asc" ? "desc" : "asc";
-      updateFeaturesFilter({ sort: key, dir: nextDir, page: 1 });
-    });
-  });
-  $$("#features-table tbody tr[data-feature-id]").forEach((row) => {
-    row.addEventListener("click", (e) => {
-      if (e.target.closest(".feature-select-col")) return;
-      if (e.target.closest("a, button, input, select, textarea")) return;
-      location.hash = `#/features/${encodeURIComponent(row.dataset.featureId)}`;
-    });
-  });
-  $$(".feature-select", root).forEach((cb) => {
-    cb.addEventListener("click", (e) => e.stopPropagation());
-    cb.addEventListener("change", (e) => {
-      const id = e.target.dataset.id;
-      if (featuresSelectAllMatching) {
-        if (e.target.checked) featuresExcludedIds.delete(id);
-        else featuresExcludedIds.add(id);
-      } else if (e.target.checked) {
-        featuresIncludedIds.add(id);
-      } else {
-        featuresIncludedIds.delete(id);
-      }
-      _updateFeatureSelectAllState(features.map((entry) => normalizeFeatureEntry(entry)));
-    });
-  });
-  const selectAll = root.querySelector("#feature-select-all");
-  if (selectAll) {
-    const normalized = features.map((entry) => normalizeFeatureEntry(entry));
-    _updateFeatureSelectAllState(normalized);
-    selectAll.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const shouldCheck = selectAll.checked;
-      featuresSelectAllMatching = shouldCheck;
-      featuresExcludedIds.clear();
-      featuresIncludedIds.clear();
-      $$(".feature-select", root).forEach((cb) => {
-        cb.checked = shouldCheck;
+  `, () => {
+    $$("#features-table [data-sort]").forEach((th) => {
+      bindOnce(th, "click", () => {
+        const key = th.dataset.sort;
+        const nextDir = _featuresPage.sort === key && _featuresPage.dir === "asc" ? "desc" : "asc";
+        updateFeaturesFilter({ sort: key, dir: nextDir, page: 1 });
       });
-      selectAll.indeterminate = false;
     });
-  }
-  bindPaginationControls($("#features-table"), "features", (pageNo) =>
-    updateFeaturesFilter({ page: pageNo }));
+    $$("#features-table tbody tr[data-feature-id]").forEach((row) => {
+      bindOnce(row, "click", (e) => {
+        if (e.target.closest(".feature-select-col")) return;
+        if (e.target.closest("a, button, input, select, textarea")) return;
+        location.hash = `#/features/${encodeURIComponent(row.dataset.featureId)}`;
+      });
+    });
+    $$(".feature-select", root).forEach((cb) => {
+      bindOnce(cb, "click", (e) => e.stopPropagation());
+      bindOnce(cb, "change", (e) => {
+        const id = e.target.dataset.id;
+        if (featuresSelectAllMatching) {
+          if (e.target.checked) featuresExcludedIds.delete(id);
+          else featuresExcludedIds.add(id);
+        } else if (e.target.checked) {
+          featuresIncludedIds.add(id);
+        } else {
+          featuresIncludedIds.delete(id);
+        }
+        _updateFeatureSelectAllState(_featuresPage.rows.map((entry) => normalizeFeatureEntry(entry)));
+      });
+    });
+    const selectAll = root.querySelector("#feature-select-all");
+    if (selectAll) {
+      const normalized = features.map((entry) => normalizeFeatureEntry(entry));
+      _updateFeatureSelectAllState(normalized);
+      bindOnce(selectAll, "click", (e) => {
+        e.stopPropagation();
+        const shouldCheck = selectAll.checked;
+        featuresSelectAllMatching = shouldCheck;
+        featuresExcludedIds.clear();
+        featuresIncludedIds.clear();
+        $$(".feature-select", root).forEach((cb) => {
+          cb.checked = shouldCheck;
+        });
+        selectAll.indeterminate = false;
+      });
+    }
+    bindPaginationControls($("#features-table"), "features", (pageNo) =>
+      updateFeaturesFilter({ page: pageNo }));
+  });
 }
 
 function normalizeFeatureEntry(entry) {
@@ -734,10 +746,10 @@ async function openFeatureDetailModal(featureId) {
     }
     document.addEventListener("keydown", onKey, true);
     root._cleanup = () => document.removeEventListener("keydown", onKey, true);
-    root.addEventListener("click", (evt) => {
+    bindOnce(root, "click", (evt) => {
       if (evt.target === root) dismiss();
     });
-    root.querySelector(".modal-close")?.addEventListener("click", dismiss);
+    bindOnce(root.querySelector(".modal-close"), "click", dismiss);
   }
 }
 
@@ -859,10 +871,10 @@ function openFeatureModal(feature = null, options = {}) {
   }
   document.addEventListener("keydown", onKey, true);
   root._cleanup = () => document.removeEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => {
+  bindOnce(root, "click", (e) => {
     if (e.target === root) close();
   });
-  root.querySelector(".modal-close")?.addEventListener("click", close);
+  bindOnce(root.querySelector(".modal-close"), "click", close);
   if (feature) {
     bindFeatureAutosave(root, feature);
   } else {
@@ -870,8 +882,8 @@ function openFeatureModal(feature = null, options = {}) {
     if (reporterSelect) reporterSelect.value = featureReporter;
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = featureAssignee;
-    root.querySelector("[data-cancel]")?.addEventListener("click", close);
-    root.querySelector("[data-ok]")?.addEventListener("click", async () => {
+    bindOnce(root.querySelector("[data-cancel]"), "click", close);
+    bindOnce(root.querySelector("[data-ok]"), "click", async () => {
       const body = {
         name: root.querySelector("#feature-name")?.value.trim() || "",
         description: root.querySelector("#feature-description")?.value.trim() || "",
@@ -907,12 +919,12 @@ function openFeatureModal(feature = null, options = {}) {
     bindPaginationControls(root, "feature-modal-goals", (pageNo) => {
       openFeatureModal(feature, { goalPage: pageNo, navigateAway });
     });
-    root.querySelector("[data-feature-cancel]")?.addEventListener("click", () =>
+    bindOnce(root.querySelector("[data-feature-cancel]"), "click", () =>
       cancelFeatureFromUi(feature.id));
-    root.querySelector("[data-feature-delete]")?.addEventListener("click", () =>
+    bindOnce(root.querySelector("[data-feature-delete]"), "click", () =>
       deleteFeatureFromUi(feature.id));
     root.querySelectorAll("[data-feature-workflow]").forEach((btn) => {
-      btn.addEventListener("click", () =>
+      bindOnce(btn, "click", () =>
         moveFeatureWorkflowFromUi(feature.id, btn.dataset.featureWorkflow, {
           button: btn,
           reload: reloadModal,
@@ -1005,16 +1017,16 @@ function bindFeatureAutosave(root, feature) {
     autosave();
   };
   controls.forEach((control) => {
-    control.addEventListener("input", scheduleAutosave);
-    control.addEventListener("change", save);
+    bindOnce(control, "input", scheduleAutosave);
+    bindOnce(control, "change", save);
   });
 }
 
 function bindFeatureGoalDragReorder(root, featureId, onChanged) {
   let draggedGoalId = "";
   root.querySelectorAll("[data-feature-drag-goal]").forEach((handle) => {
-    handle.addEventListener("click", (e) => e.preventDefault());
-    handle.addEventListener("dragstart", (e) => {
+    bindOnce(handle, "click", (e) => e.preventDefault());
+    bindOnce(handle, "dragstart", (e) => {
       draggedGoalId = handle.dataset.featureDragGoal || "";
       if (!draggedGoalId || handle.closest("[data-feature-goal-row]")?.dataset.featureGoalOrdered !== "1") {
         e.preventDefault();
@@ -1024,13 +1036,13 @@ function bindFeatureGoalDragReorder(root, featureId, onChanged) {
       e.dataTransfer.setData("text/plain", draggedGoalId);
       handle.closest("[data-feature-goal-row]")?.classList.add("dragging");
     });
-    handle.addEventListener("dragend", () => {
+    bindOnce(handle, "dragend", () => {
       draggedGoalId = "";
       clearFeatureGoalDragState(root);
     });
   });
   root.querySelectorAll("[data-feature-goal-row]").forEach((row) => {
-    row.addEventListener("dragover", (e) => {
+    bindOnce(row, "dragover", (e) => {
       if (!draggedGoalId) return;
       const targetGoalId = row.dataset.featureGoalRow || "";
       if (!targetGoalId || targetGoalId === draggedGoalId || row.dataset.featureGoalOrdered !== "1") return;
@@ -1044,11 +1056,11 @@ function bindFeatureGoalDragReorder(root, featureId, onChanged) {
       row.classList.add(position === "before" ? "drop-before" : "drop-after");
       row.dataset.featureDropPosition = position;
     });
-    row.addEventListener("dragleave", () => {
+    bindOnce(row, "dragleave", () => {
       row.classList.remove("drop-before", "drop-after");
       delete row.dataset.featureDropPosition;
     });
-    row.addEventListener("drop", async (e) => {
+    bindOnce(row, "drop", async (e) => {
       const sourceGoalId = e.dataTransfer.getData("text/plain") || draggedGoalId;
       const targetGoalId = row.dataset.featureGoalRow || "";
       const position = row.dataset.featureDropPosition || "after";
@@ -1077,7 +1089,7 @@ function clearFeatureGoalDragState(root) {
 
 function bindFeatureGoalActions(root, featureId, onChanged) {
   root.querySelectorAll("[data-feature-move]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    bindOnce(btn, "click", async () => {
       const goalId = btn.dataset.goalId;
       const siblingId = btn.dataset.neighborId;
       if (!goalId || !siblingId) return;
@@ -1094,7 +1106,7 @@ function bindFeatureGoalActions(root, featureId, onChanged) {
     });
   });
   root.querySelectorAll("[data-feature-order-toggle]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    bindOnce(btn, "click", async () => {
       const goalId = btn.dataset.goalId;
       const action = btn.dataset.featureOrderToggle;
       if (!goalId || !["order", "unorder"].includes(action)) return;
@@ -1108,7 +1120,7 @@ function bindFeatureGoalActions(root, featureId, onChanged) {
     });
   });
   root.querySelectorAll("[data-feature-delete-goal]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    bindOnce(btn, "click", async () => {
       const goalId = btn.dataset.featureDeleteGoal;
       if (!goalId) return;
       const ok = await modalConfirm(

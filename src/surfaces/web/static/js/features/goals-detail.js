@@ -12,6 +12,11 @@ async function renderGoalDetail(r) {
 
 let _goalModalRoot = null;
 let _goalRoundFormDraft = null;
+// The goal and workflow most recently drawn. The detail controls are bound once
+// and outlive the render that bound them, so they resolve the goal and its
+// available transitions through here instead of closing over one render's values
+// — the status, name, and workflow arrows all change as the goal moves.
+let _goalDetailView = { goal: null, workflow: null };
 const _loggedFeatureBlockingNoticeKeys = new Set();
 
 function goalDetailContainer() {
@@ -53,10 +58,10 @@ function openGoalDetailModal(goalId) {
   }
   document.addEventListener("keydown", onKey, true);
   root._cleanup = () => document.removeEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => {
+  bindOnce(root, "click", (e) => {
     if (e.target === root) dismiss();
   });
-  root.querySelector(".modal-close").addEventListener("click", dismiss);
+  bindOnce(root.querySelector(".modal-close"), "click", dismiss);
 
   loadGoalDetail(goalId);
 }
@@ -291,7 +296,9 @@ function drawGoalDetail(goal) {
 
   const container = goalDetailContainer();
   if (!container) return;
-  container.innerHTML = `
+  _goalDetailView = { goal, workflow };
+  recordFeatureBlockingNotice(goal, featureBlockingNotice);
+  renderInto(container, `
     <div class="goal-detail" data-testid="goal-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0" data-testid="goal-title">${htmlEscape(goal.name)}</h2>
@@ -396,23 +403,29 @@ function drawGoalDetail(goal) {
         </div>
       </details>
     </div>
-  `;
-  recordFeatureBlockingNotice(goal, featureBlockingNotice);
+  `, bindGoalDetailControls);
+}
 
-  $("#btn-open-agent")?.addEventListener("click", () => {
-    openAgentDock({ goalId: goal.id, goalStatus: goal.status });
+function bindGoalDetailControls() {
+  const liveGoal = () => _goalDetailView.goal || {};
+  const liveWorkflow = () => _goalDetailView.workflow || {};
+
+  bindOnce($("#btn-open-agent"), "click", () => {
+    openAgentDock({ goalId: liveGoal().id, goalStatus: liveGoal().status });
   });
-  $("#btn-watch-logs")?.addEventListener("click", () => {
+  bindOnce($("#btn-watch-logs"), "click", () => {
     closeGoalActionMenu();
-    openGoalLogTail({ goalId: goal.id, goalName: goal.name });
+    openGoalLogTail({ goalId: liveGoal().id, goalName: liveGoal().name });
   });
   // Workflow back / forward buttons. Forward from `review` calls the
   // dedicated /approve endpoint; every other arrow is a plain
   // status PATCH.
-  const wireWorkflow = (btnId, target) => {
-    if (!target) return;
-    $(btnId)?.addEventListener("click", async () => {
+  const wireWorkflow = (btnId, direction) => {
+    if (!liveWorkflow()[direction]) return;
+    bindOnce($(btnId), "click", async () => {
       const btn = $(btnId);
+      const target = liveWorkflow()[direction];
+      if (!target) return;
       const busyLabel = target.approve
         ? "Approving…"
         : target.retryMerge
@@ -421,50 +434,50 @@ function drawGoalDetail(goal) {
       await withButtonBusy(btn, busyLabel, async () => {
         try {
           if (target.approve) {
-            const r = await api("POST", `/api/goals/${goal.id}/approve`);
+            const r = await api("POST", `/api/goals/${liveGoal().id}/approve`);
             if (r.ok) toast(r.message || "Approved", "info");
             else toast(r.message || "Approval did not complete", "error");
           } else if (target.retryQuality) {
-            const r = await api("POST", `/api/goals/${goal.id}/retry-quality`);
+            const r = await api("POST", `/api/goals/${liveGoal().id}/retry-quality`);
             if (r.ok) toast(r.message || "Queued for QA", "info");
             else toast(r.message || "QA retry did not queue", "error");
           } else if (target.retryMerge) {
-            const r = await api("POST", `/api/goals/${goal.id}/retry-merge`);
+            const r = await api("POST", `/api/goals/${liveGoal().id}/retry-merge`);
             if (r.ok) toast(r.message || "Queued candidate", "info");
             else toast(r.message || "Candidate retry did not queue", "error");
           } else {
-            await api("PATCH", `/api/goals/${goal.id}`, { status: target.next });
+            await api("PATCH", `/api/goals/${liveGoal().id}`, { status: target.next });
             toast(`Moved to ${target.next}`, "info");
           }
-          await loadGoalDetail(goal.id);
+          await loadGoalDetail(liveGoal().id);
         } catch (e) { await showActionError(e); }
       });
     });
   };
-  wireWorkflow("#btn-state-back", workflow.back);
-  wireWorkflow("#btn-state-forward", workflow.forward);
-  $("#btn-reporter")?.addEventListener("click", async () => {
+  wireWorkflow("#btn-state-back", "back");
+  wireWorkflow("#btn-state-forward", "forward");
+  bindOnce($("#btn-reporter"), "click", async () => {
     closeGoalActionMenu();
-    await openGoalReporterModal(goal);
+    await openGoalReporterModal(liveGoal());
   });
-  $("#btn-assignee")?.addEventListener("click", async () => {
+  bindOnce($("#btn-assignee"), "click", async () => {
     closeGoalActionMenu();
-    await openGoalAssigneeModal(goal);
+    await openGoalAssigneeModal(liveGoal());
   });
-  $("#btn-rename")?.addEventListener("click", async () => {
+  bindOnce($("#btn-rename"), "click", async () => {
     closeGoalActionMenu();
-    const name = await modalPrompt("New name", goal.name,
+    const name = await modalPrompt("New name", liveGoal().name,
                                    { title: "Rename Goal" });
     if (!name || !name.trim()) return;
     try {
-      await api("PATCH", "/api/goals/" + goal.id, { name: name.trim() });
-      await loadGoalDetail(goal.id);
+      await api("PATCH", "/api/goals/" + liveGoal().id, { name: name.trim() });
+      await loadGoalDetail(liveGoal().id);
     } catch (e) { await showActionError(e); }
   });
-  $(".note-composer")?.addEventListener("toggle", (e) => {
+  bindOnce($(".note-composer"), "toggle", (e) => {
     if (e.target.open) $("#new-note-body")?.focus();
   });
-  $("#btn-add-note")?.addEventListener("click", async () => {
+  bindOnce($("#btn-add-note"), "click", async () => {
     const btn = $("#btn-add-note");
     const ta = $("#new-note-body");
     if (!ta) return;
@@ -473,16 +486,16 @@ function drawGoalDetail(goal) {
     const author = state.lastReporter || "";
     await withButtonBusy(btn, "Saving…", async () => {
       try {
-        await api("POST", `/api/goals/${goal.id}/notes`, { author, body });
+        await api("POST", `/api/goals/${liveGoal().id}/notes`, { author, body });
         toast("Note added", "info");
-        await loadGoalDetail(goal.id);
+        await loadGoalDetail(liveGoal().id);
       } catch (e) { await showActionError(e); }
     });
   });
-  $$("[data-note-edit]").forEach((el) => el.addEventListener("click", async (e) => {
+  $$("[data-note-edit]").forEach((el) => bindOnce(el, "click", async (e) => {
     e.preventDefault();
     const id = el.dataset.noteEdit;
-    const existing = (goal.notes || []).find((n) => n.id === id);
+    const existing = (liveGoal().notes || []).find((n) => n.id === id);
     if (!existing) return;
     const body = await modalPrompt(
       "Edit note", existing.body,
@@ -491,16 +504,16 @@ function drawGoalDetail(goal) {
     if (body === null) return;
     const trimmed = (body || "").trim();
     if (!trimmed) return toast("Note can't be empty", "error");
-    const nextNotes = (goal.notes || []).map(
+    const nextNotes = (liveGoal().notes || []).map(
       (n) => n.id === id ? { ...n, body: trimmed } : n,
     );
     try {
-      await api("PATCH", "/api/goals/" + goal.id, { notes: nextNotes });
+      await api("PATCH", "/api/goals/" + liveGoal().id, { notes: nextNotes });
       toast("Note updated", "info");
-      await loadGoalDetail(goal.id);
+      await loadGoalDetail(liveGoal().id);
     } catch (err) { await showActionError(err); }
   }));
-  $$("[data-note-delete]").forEach((el) => el.addEventListener("click", async (e) => {
+  $$("[data-note-delete]").forEach((el) => bindOnce(el, "click", async (e) => {
     e.preventDefault();
     const id = el.dataset.noteDelete;
     const ok = await modalConfirm(
@@ -508,21 +521,21 @@ function drawGoalDetail(goal) {
       { title: "Delete note", okLabel: "Delete", danger: true },
     );
     if (!ok) return;
-    const nextNotes = (goal.notes || []).filter((n) => n.id !== id);
+    const nextNotes = (liveGoal().notes || []).filter((n) => n.id !== id);
     try {
-      await api("PATCH", "/api/goals/" + goal.id, { notes: nextNotes });
+      await api("PATCH", "/api/goals/" + liveGoal().id, { notes: nextNotes });
       toast("Note deleted", "info");
-      await loadGoalDetail(goal.id);
+      await loadGoalDetail(liveGoal().id);
     } catch (err) { await showActionError(err); }
   }));
-  $("#btn-priority")?.addEventListener("click", async () => {
+  bindOnce($("#btn-priority"), "click", async () => {
     closeGoalActionMenu();
-    const current = goal.priority || "low";
+    const current = liveGoal().priority || "low";
     const body = () => `
       <div class="modal-title">Change priority</div>
       <div class="modal-body">
         <label for="modal-priority-select">Priority</label>
-        <select class="modal-input" id="modal-priority-select" data-testid="goal-priority-select" style="width:100%">
+        <select class="modal-input" id="modal-priority-select" data-testid="liveGoal()-priority-select" style="width:100%">
           ${["low", "medium", "high"].map((p) =>
             `<option value="${p}" ${p === current ? "selected" : ""}>${p}</option>`,
           ).join("")}
@@ -537,36 +550,36 @@ function drawGoalDetail(goal) {
     );
     if (next === null || next === current) return;
     try {
-      await api("PATCH", "/api/goals/" + goal.id, { priority: next });
+      await api("PATCH", "/api/goals/" + liveGoal().id, { priority: next });
       toast(`Priority set to ${next}`, "info");
-      await loadGoalDetail(goal.id);
+      await loadGoalDetail(liveGoal().id);
     } catch (err) {
       await showActionError(err);
     }
   });
-  $("#btn-goal-feature-assign")?.addEventListener("click", async () => {
+  bindOnce($("#btn-liveGoal()-feature-assign"), "click", async () => {
     closeGoalActionMenu();
-    await openGoalFeatureAssignModal(goal);
-    await loadGoalDetail(goal.id);
+    await openGoalFeatureAssignModal(liveGoal());
+    await loadGoalDetail(liveGoal().id);
   });
-  $("#btn-goal-feature-remove")?.addEventListener("click", async () => {
+  bindOnce($("#btn-liveGoal()-feature-remove"), "click", async () => {
     closeGoalActionMenu();
-    if (!goal.feature_id) return;
+    if (!liveGoal().feature_id) return;
     const ok = await modalConfirm(
       "Remove this Goal from its Feature? The Goal will not be deleted.",
       { title: "Remove from Feature", okLabel: "Remove", cancelLabel: "Keep it" },
     );
     if (!ok) return;
     try {
-      await api("DELETE", `/api/features/${encodeURIComponent(goal.feature_id)}/goals/${encodeURIComponent(goal.id)}`);
+      await api("DELETE", `/api/features/${encodeURIComponent(liveGoal().feature_id)}/goals/${encodeURIComponent(liveGoal().id)}`);
       toast("Goal removed from Feature", "info");
-      await loadGoalDetail(goal.id);
+      await loadGoalDetail(liveGoal().id);
       if (state.currentRoute === "goals") await refreshGoalsTable();
     } catch (e) {
       showActionError(e, "Remove from Feature failed");
     }
   });
-  $("#btn-cancel")?.addEventListener("click", async () => {
+  bindOnce($("#btn-cancel"), "click", async () => {
     closeGoalActionMenu();
     const btn = $("#btn-cancel");
     if (btn.disabled) return;
@@ -578,28 +591,28 @@ function drawGoalDetail(goal) {
     if (!ok) return;
     await withButtonBusy(btn, "Cancelling…", async () => {
       try {
-        await api("POST", `/api/goals/${goal.id}/cancel`);
+        await api("POST", `/api/goals/${liveGoal().id}/cancel`);
         toast("Cancelled", "info");
-        await loadGoalDetail(goal.id);
+        await loadGoalDetail(liveGoal().id);
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#btn-delete")?.addEventListener("click", async () => {
+  bindOnce($("#btn-delete"), "click", async () => {
     closeGoalActionMenu();
     const ok = await modalConfirm(
-      `Delete Goal "${goal.name}"? This cannot be undone.`,
+      `Delete Goal "${liveGoal().name}"? This cannot be undone.`,
       { title: "Delete Goal", okLabel: "Delete", danger: true },
     );
     if (!ok) return;
     try {
-      await api("DELETE", "/api/goals/" + goal.id);
+      await api("DELETE", "/api/goals/" + liveGoal().id);
       location.hash = "#/goals";
     } catch (e) { await showActionError(e); }
   });
 
-  bindFailureBannerActions(goal);
-  bindRoundFormSubmit(goal);
-  restoreRoundFormDraftFocus(goal.id);
+  bindFailureBannerActions(liveGoal());
+  bindRoundFormSubmit();
+  restoreRoundFormDraftFocus(liveGoal().id);
 }
 
 function closeGoalActionMenu() {
@@ -895,10 +908,13 @@ function renderPickReporterNotice() {
   `;
 }
 
-function bindRoundFormSubmit(goal) {
+// The submit handler is bound once and outlives the render that bound it, so it
+// reads the current goal rather than the one passed in when it was first bound.
+function bindRoundFormSubmit() {
+  const liveGoal = () => _goalDetailView.goal || {};
   const form = $("#round-form");
   if (!form) return;
-  form.addEventListener("submit", async (e) => {
+  bindOnce(form, "submit", async (e) => {
     e.preventDefault();
     const reporter = state.lastReporter || "";
     if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
@@ -907,16 +923,16 @@ function bindRoundFormSubmit(goal) {
     if (!prompt) return toast("Provide a prompt", "error");
     const kind = form.dataset.kind;
     try {
-      const assignee = goal.assignee || reporter;
+      const assignee = liveGoal().assignee || reporter;
       if (kind === "submit") {
-        await api("POST", `/api/goals/${goal.id}/rounds`, { reporter, assignee, prompt });
+        await api("POST", `/api/goals/${liveGoal().id}/rounds`, { reporter, assignee, prompt });
         toast("New round submitted", "info");
       } else {
-        await api("PATCH", `/api/goals/${goal.id}/rounds/latest`, { reporter, assignee, prompt });
+        await api("PATCH", `/api/goals/${liveGoal().id}/rounds/latest`, { reporter, assignee, prompt });
         toast("Round updated", "info");
       }
       _goalRoundFormDraft = null;
-      await loadGoalDetail(goal.id);
+      await loadGoalDetail(liveGoal().id);
     } catch (err) {
       await showActionError(err);
     }
