@@ -107,27 +107,27 @@ async function renderLogs() {
     <div id="logs-list" data-testid="logs-list"><p class="muted">Loading…</p></div>
   `;
 
-  $("#logs-q").addEventListener("input", debounce(() => {
+  bindOnce($("#logs-q"), "input", debounce(() => {
     updateLogsFilter({ q: $("#logs-q").value, page: 1 });
   }, 300));
-  $("#logs-severity").addEventListener("change", (e) =>
+  bindOnce($("#logs-severity"), "change", (e) =>
     updateLogsFilter({ severity: e.target.value, page: 1 }));
-  $("#logs-category").addEventListener("change", (e) =>
+  bindOnce($("#logs-category"), "change", (e) =>
     updateLogsFilter({ category: e.target.value, page: 1 }));
-  $("#logs-actor").addEventListener("change", (e) =>
+  bindOnce($("#logs-actor"), "change", (e) =>
     updateLogsFilter({ actor: e.target.value, page: 1 }));
-  $("#logs-goal-id").addEventListener("input", debounce(() => {
+  bindOnce($("#logs-goal-id"), "input", debounce(() => {
     updateLogsFilter({ goal_id: $("#logs-goal-id").value.trim(), page: 1 });
   }, 300));
-  $("#logs-limit").addEventListener("change", (e) =>
+  bindOnce($("#logs-limit"), "change", (e) =>
     updateLogsFilter({
       limit: parseInt(e.target.value, 10) || LOGS_DEFAULT_LIMIT,
       page: 1,
     }));
   $$("[data-logs-period]").forEach((btn) => {
-    btn.addEventListener("click", () => updateLogsFilter({ period: btn.dataset.logsPeriod, page: 1 }));
+    bindOnce(btn, "click", () => updateLogsFilter({ period: btn.dataset.logsPeriod, page: 1 }));
   });
-  $("#logs-clear").addEventListener("click", () => {
+  bindOnce($("#logs-clear"), "click", () => {
     history.replaceState(null, "", "#/logs");
     renderLogs();
   });
@@ -193,14 +193,14 @@ function drawLogsList(data, f) {
   const catSel = $("#logs-category");
   if (catSel) {
     const existing = facets.categories || [];
-    catSel.innerHTML = `<option value="">all categories</option>` +
-      existing.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join("");
+    renderInto(catSel, `<option value="">all categories</option>` +
+      existing.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join(""));
   }
   const actSel = $("#logs-actor");
   if (actSel) {
     const existing = facets.actors || [];
-    actSel.innerHTML = `<option value="">all actors</option>` +
-      existing.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join("");
+    renderInto(actSel, `<option value="">all actors</option>` +
+      existing.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join(""));
   }
   const countEl = $("#logs-count");
   if (countEl) {
@@ -211,10 +211,11 @@ function drawLogsList(data, f) {
   drawLogsVisualization(entries, f.period);
   const root = $("#logs-list");
   if (!entries.length) {
-    root.innerHTML = `
+    renderInto(root, `
       <p class="muted">No log entries match the current filters.</p>
-      ${renderPaginationControls("logs", pageMeta, 0, "entry", { boundaries: true })}`;
-    bindPaginationControls(root, "logs", navigateLogsPage);
+      ${renderPaginationControls("logs", pageMeta, 0, "entry", { boundaries: true })}`, () => {
+      bindPaginationControls(root, "logs", navigateLogsPage);
+    });
     return;
   }
   const columns = [
@@ -235,7 +236,7 @@ function drawLogsList(data, f) {
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
-  root.innerHTML = `
+  renderInto(root, `
     <table class="table logs-table mobile-card-table" data-testid="logs-table">
       <thead><tr>${sortHeads}</tr></thead>
       <tbody>
@@ -278,15 +279,19 @@ function drawLogsList(data, f) {
       </tbody>
     </table>
     ${renderPaginationControls("logs", pageMeta, entries.length, "entry", { boundaries: true })}
-  `;
-  bindPaginationControls(root, "logs", navigateLogsPage);
-  $$(".table th.sortable", root).forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sortKey;
-      const nextDir = key === f.effectiveSort
-        ? (f.effectiveDir === "asc" ? "desc" : "asc")
-        : (LOGS_DEFAULT_DIR[key] || "desc");
-      updateLogsFilter({ sort: key, dir: nextDir, page: 1 });
+  `, () => {
+    bindPaginationControls(root, "logs", navigateLogsPage);
+    $$(".table th.sortable", root).forEach((th) => {
+      bindOnce(th, "click", () => {
+        const key = th.dataset.sortKey;
+        // Read the sort live: this handler is bound once and outlives the render
+        // that bound it, so the captured `f` would flip the wrong way.
+        const live = logsFiltersFromHash();
+        const nextDir = key === live.effectiveSort
+          ? (live.effectiveDir === "asc" ? "desc" : "asc")
+          : (LOGS_DEFAULT_DIR[key] || "desc");
+        updateLogsFilter({ sort: key, dir: nextDir, page: 1 });
+      });
     });
   });
 }
@@ -345,11 +350,11 @@ function drawLogsVisualization(entries, period = "day") {
   }
   const rows = Array.from(buckets.values()).sort((a, b) => b.label.localeCompare(a.label));
   if (!rows.length) {
-    root.innerHTML = `<p class="muted">No log activity to visualize.</p>`;
+    renderInto(root, `<p class="muted">No log activity to visualize.</p>`);
     return;
   }
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
-  root.innerHTML = `
+  renderInto(root, `
     <section class="logs-visualization-grid" data-testid="logs-visualization-grid">
       ${rows.map((row) => `
         <div class="card logs-visualization-bucket" data-testid="logs-bucket">
@@ -369,7 +374,7 @@ function drawLogsVisualization(entries, period = "day") {
               </span>`).join("")}
           </div>
         </div>`).join("")}
-    </section>`;
+    </section>`);
 }
 
 // Mirror of applyGoalsFilterIndicator for the Logs screen.

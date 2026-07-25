@@ -101,24 +101,24 @@ async function renderChanges() {
       </div>
     </details>
     <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
-  $("#changes-q").addEventListener("input", debounce(() => {
+  bindOnce($("#changes-q"), "input", debounce(() => {
     updateChangesFilter({ q: $("#changes-q").value, page: 1 });
   }, 250));
-  $("#changes-status").addEventListener("change", (e) =>
+  bindOnce($("#changes-status"), "change", (e) =>
     updateChangesFilter({ status: e.target.value, page: 1 }));
-  $("#changes-priority").addEventListener("change", (e) =>
+  bindOnce($("#changes-priority"), "change", (e) =>
     updateChangesFilter({ priority: e.target.value, page: 1 }));
-  $("#changes-limit").addEventListener("change", (e) =>
+  bindOnce($("#changes-limit"), "change", (e) =>
     updateChangesFilter({
       limit: parseInt(e.target.value, 10) || CHANGES_DEFAULT_LIMIT,
       page: 1,
     }));
-  $("#changes-clear").addEventListener("click", () => {
+  bindOnce($("#changes-clear"), "click", () => {
     history.replaceState(null, "", "#/changes");
     renderChanges();
   });
   $$("[data-changes-period]").forEach((btn) => {
-    btn.addEventListener("click", () => updateChangesFilter({ period: btn.dataset.changesPeriod, page: 1 }));
+    bindOnce(btn, "click", () => updateChangesFilter({ period: btn.dataset.changesPeriod, page: 1 }));
   });
   await loadChanges();
 }
@@ -186,24 +186,24 @@ function drawChanges(data, f) {
   syncChangesPeriodControls(f.period);
   drawChangesVisualization(changes, f.period);
   if (!branch || branch === "(unknown)") {
-    root.innerHTML = `
+    renderInto(root, `
       <p class="muted" data-testid="changes-branch-unresolved">
         No integration branch resolved. Set <code>merge_target_branch</code>
         in <a href="#/node/target-app">Node → Target App Config</a>, or check that the host
         repo has a branch checked out.
-      </p>`;
+      </p>`);
     return;
   }
   if (!changes.length) {
-    root.innerHTML = `
+    renderInto(root, `
       <p class="muted" data-testid="changes-empty-state">
         ${f.q || f.status || f.priority
           ? `No changes match the current filters on <code>${htmlEscape(branch)}</code>.`
           : `No approved implementations on <code>${htmlEscape(branch)}</code> yet. When a reviewed Goal is approved, its integration commit shows up here.`}
       </p>
-      ${renderPaginationControls("changes", pageMeta, 0, "change")}`;
-    bindPaginationControls(root, "changes", (page) =>
-      updateChangesFilter({ page }));
+      ${renderPaginationControls("changes", pageMeta, 0, "change")}`, () => {
+      bindPaginationControls(root, "changes", (page) => updateChangesFilter({ page }));
+    });
     return;
   }
   const columns = [
@@ -225,7 +225,7 @@ function drawChanges(data, f) {
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
-  root.innerHTML = `
+  renderInto(root, `
     <p class="muted small" style="margin-bottom:10px" data-testid="changes-branch-info">
       Merges on <code>${htmlEscape(branch)}</code> (newest first).
       Each row maps to a Goal via the <code>Refine Goal:</code> trailer in
@@ -253,47 +253,48 @@ function drawChanges(data, f) {
       </tbody>
     </table>
     ${renderPaginationControls("changes", pageMeta, changes.length, "change")}
-  `;
-  bindPaginationControls(root, "changes", (page) =>
-    updateChangesFilter({ page }));
-  $$("[data-sort-key]", root).forEach((head) => {
-    head.addEventListener("click", () => updateChangesSort(head.dataset.sortKey));
-  });
-  $$("[data-undo-commit]", root).forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const commit = btn.dataset.undoCommit;
-      const row = btn.closest("tr");
-      const goalName = row?.querySelector("td:nth-child(2)")?.textContent?.trim() || "this Goal";
-      const ok = await modalConfirm(
-        `Undo implementation ${commit.slice(0, 10)}... for ${goalName}? ` +
-        "Refine will reverse the approved implementation, reconcile the project, " +
-        "and move the linked Goal to cancelled.",
-        { title: "Undo Goal", okLabel: "Undo", cancelLabel: "Keep merge",
-          danger: true },
-      );
-      if (!ok) return;
-      await withButtonBusy(btn, "Undoing...", async () => {
-        try {
-          const queued = await api("POST", "/api/changes/undo", { commit });
-          const r = await resolveBackgroundOperationResponse(
-            queued,
-            "Git undo queued",
-          );
-          if (r.ok) {
-            // Surface the push-failed-but-revert-succeeded case
-            // prominently — the local state is ahead of remote and
-            // the user needs to push manually.
-            if (r.push_warning) {
-              toast(r.push_warning, "error");
+  `, () => {
+    bindPaginationControls(root, "changes", (page) =>
+      updateChangesFilter({ page }));
+    $$("[data-sort-key]", root).forEach((head) => {
+      bindOnce(head, "click", () => updateChangesSort(head.dataset.sortKey));
+    });
+    $$("[data-undo-commit]", root).forEach((btn) => {
+      bindOnce(btn, "click", async (e) => {
+        e.stopPropagation();
+        const commit = btn.dataset.undoCommit;
+        const row = btn.closest("tr");
+        const goalName = row?.querySelector("td:nth-child(2)")?.textContent?.trim() || "this Goal";
+        const ok = await modalConfirm(
+          `Undo implementation ${commit.slice(0, 10)}... for ${goalName}? ` +
+          "Refine will reverse the approved implementation, reconcile the project, " +
+          "and move the linked Goal to cancelled.",
+          { title: "Undo Goal", okLabel: "Undo", cancelLabel: "Keep merge",
+            danger: true },
+        );
+        if (!ok) return;
+        await withButtonBusy(btn, "Undoing...", async () => {
+          try {
+            const queued = await api("POST", "/api/changes/undo", { commit });
+            const r = await resolveBackgroundOperationResponse(
+              queued,
+              "Git undo queued",
+            );
+            if (r.ok) {
+              // Surface the push-failed-but-revert-succeeded case
+              // prominently — the local state is ahead of remote and
+              // the user needs to push manually.
+              if (r.push_warning) {
+                toast(r.push_warning, "error");
+              } else {
+                toast(`Undone${r.pushed ? " and pushed" : ""}`, "info");
+              }
+              await loadChanges();
             } else {
-              toast(`Undone${r.pushed ? " and pushed" : ""}`, "info");
+              toast(r.message || "Undo failed", "error");
             }
-            await loadChanges();
-          } else {
-            toast(r.message || "Undo failed", "error");
-          }
-        } catch (e) { await showActionError(e); }
+          } catch (e) { await showActionError(e); }
+        });
       });
     });
   });
@@ -341,11 +342,11 @@ function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
   });
   const rows = Array.from(buckets.values()).sort((a, b) => b.label.localeCompare(a.label));
   if (!rows.length) {
-    root.innerHTML = `<p class="muted" data-testid="changes-visualization-empty">No Git changes to visualize.</p>`;
+    renderInto(root, `<p class="muted" data-testid="changes-visualization-empty">No Git changes to visualize.</p>`);
     return;
   }
   const maxTotal = Math.max(1, ...rows.map((row) => row.total));
-  root.innerHTML = `
+  renderInto(root, `
     <section class="logs-visualization-grid changes-visualization-grid" data-testid="changes-visualization-grid">
       ${rows.map((row) => {
         const width = Math.max(8, Math.round((row.total / maxTotal) * 100));
@@ -359,7 +360,7 @@ function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
             <span class="logs-visualization-counts changes-bucket-linked" data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Goal" : "Goals"}</span>
           </div>`;
       }).join("")}
-    </section>`;
+    </section>`);
 }
 
 function renderChangeGoalCell(change = {}) {
