@@ -39,7 +39,7 @@ function dashboardPanelOpen(panelId, fallback) {
 function wireDashboardPanelPersistence(panelId) {
   const panel = document.getElementById(panelId);
   if (!panel) return;
-  panel.addEventListener("toggle", () => {
+  bindOnce(panel, "toggle", () => {
     try {
       localStorage.setItem(dashboardPanelStorageKey(panelId), panel.open ? "open" : "closed");
     } catch (_) {}
@@ -180,7 +180,7 @@ function drawDashboard(d, opts = {}) {
   // Guard against late-arriving SSE refreshes after the user navigated
   // away — the container is gone, so just bail silently.
   if (!dash) return;
-  dash.innerHTML = `
+  renderInto(dash, `
     ${renderWorkflowVisualization({
       counts,
       statuses: orderedStatuses,
@@ -289,24 +289,29 @@ function drawDashboard(d, opts = {}) {
       </div>
     </details>
 
-  `;
-  // Click any assignee row -> deep-link into the Goals list filtered by
-  // that assignee. We use data-assignee + a delegated listener so the
-  // name can contain spaces/quotes without HTML-escaping hazards.
-  $$(".assignee-stats-row").forEach((row) => {
-    row.addEventListener("click", () => {
-      location.hash = goalsHash({ assignee: row.dataset.assignee, node: scope });
+  `, () => {
+    // Click any assignee row -> deep-link into the Goals list filtered by that
+    // assignee. We use data-assignee so the name can contain spaces/quotes
+    // without HTML-escaping hazards. The scope is read live rather than captured:
+    // this handler is bound once and outlives the render that bound it.
+    $$(".assignee-stats-row").forEach((row) => {
+      bindOnce(row, "click", () => {
+        location.hash = goalsHash({
+          assignee: row.dataset.assignee,
+          node: dashboardScopeFromHash(),
+        });
+      });
     });
-  });
 
-  wireDashboardPanelPersistence("reviews-for-reporter-card");
-  wireDashboardPanelPersistence("dashboard-assignee-stats-shell");
-  wireReviewsForReporter(reviewsForReporter);
+    wireDashboardPanelPersistence("reviews-for-reporter-card");
+    wireDashboardPanelPersistence("dashboard-assignee-stats-shell");
+    wireReviewsForReporter(reviewsForReporter);
+  });
 }
 
 function wireDashboardScopeSwitch() {
   $$(".dashboard-scope-switch [data-dashboard-scope]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       location.hash = dashboardHash(btn.dataset.dashboardScope || "current");
     });
   });
@@ -330,7 +335,10 @@ function wireReviewsForReporter(reviews) {
     if (!reviewIds.has(id)) dashboardReviewSelectedIds.delete(id);
   }
   const checks = () => $$(".rev-row-check", card);
-  const selected = () => reviews
+  // Read the current review set rather than the `reviews` this was called with:
+  // the handlers below are bound once and outlive the render that bound them.
+  const liveReviews = () => state.dashboardReviewSnapshot?.reviewsForReporter || [];
+  const selected = () => liveReviews()
     .map((g) => g.id)
     .filter((id) => dashboardReviewSelectedIds.has(id));
   const syncBulkButton = () => {
@@ -345,7 +353,7 @@ function wireReviewsForReporter(reviews) {
     }
   };
   const selectAll = $("#rev-select-all", card);
-  selectAll?.addEventListener("change", () => {
+  bindOnce(selectAll, "change", () => {
     checks().forEach((c) => {
       c.checked = selectAll.checked;
       if (selectAll.checked) dashboardReviewSelectedIds.add(c.dataset.revId);
@@ -355,7 +363,7 @@ function wireReviewsForReporter(reviews) {
   });
   checks().forEach((c) => {
     c.checked = dashboardReviewSelectedIds.has(c.dataset.revId);
-    c.addEventListener("change", () => {
+    bindOnce(c, "change", () => {
       if (c.checked) dashboardReviewSelectedIds.add(c.dataset.revId);
       else dashboardReviewSelectedIds.delete(c.dataset.revId);
       syncBulkButton();
@@ -363,7 +371,7 @@ function wireReviewsForReporter(reviews) {
   });
 
   $$("[data-rev-verify]", card).forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    bindOnce(btn, "click", async () => {
       const id = btn.dataset.revVerify;
       await withButtonBusy(btn, "Approving…", async () => {
         try {
@@ -378,7 +386,7 @@ function wireReviewsForReporter(reviews) {
   });
 
   $$("[data-rev-add-round]", card).forEach((btn) => {
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       openAddRoundModal({
         goalId: btn.dataset.revAddRound,
         goalName: btn.dataset.revName || "",
@@ -386,7 +394,7 @@ function wireReviewsForReporter(reviews) {
     });
   });
 
-  $("#rev-bulk-verify", card)?.addEventListener("click", async () => {
+  bindOnce($("#rev-bulk-verify", card), "click", async () => {
     const ids = selected();
     if (!ids.length) return;
     const ok = await modalConfirm(
@@ -464,8 +472,8 @@ function openAddRoundModal({ goalId, goalName }) {
   };
   const onKey = (e) => { if (e.key === "Escape") close(); };
   document.addEventListener("keydown", onKey, true);
-  root.addEventListener("click", (e) => { if (e.target === root) close(); });
-  root.querySelector("[data-cancel]").addEventListener("click", close);
+  bindOnce(root, "click", (e) => { if (e.target === root) close(); });
+  bindOnce(root.querySelector("[data-cancel]"), "click", close);
   const submit = async () => {
     const form = root.querySelector("#add-round-form");
     const fd = new FormData(form);
@@ -482,8 +490,8 @@ function openAddRoundModal({ goalId, goalName }) {
       } catch (err) { await showActionError(err); }
     });
   };
-  root.querySelector("[data-ok]").addEventListener("click", submit);
-  root.querySelector("#add-round-form").addEventListener("submit", (e) => {
+  bindOnce(root.querySelector("[data-ok]"), "click", submit);
+  bindOnce(root.querySelector("#add-round-form"), "submit", (e) => {
     e.preventDefault(); submit();
   });
   root.querySelector("textarea[name='prompt']")?.focus();

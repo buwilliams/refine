@@ -9,6 +9,11 @@ const GOALS_DEFAULT_DIR = {
 const GOALS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const GOALS_DEFAULT_LIMIT = 50;
 
+// The page most recently drawn. Row, checkbox, and sort handlers are bound once
+// and outlive the render that bound them, so they read this rather than closing
+// over the goals and sort state they first saw.
+let _goalsPage = { rows: [], sort: "", dir: "" };
+
 function goalsHash(parts) {
   const next = new URLSearchParams();
   if (parts.q)        next.set("q", parts.q);
@@ -147,35 +152,35 @@ async function renderGoalsList() {
   // `#main` from scratch — that destroys the focused search input mid-
   // keystroke. Sort-header clicks go through the same path
   // (`refreshGoalsTable`); see drawGoalsTable.
-  $("#search").addEventListener("input", debounce(() => {
+  bindOnce($("#search"), "input", debounce(() => {
     updateGoalsFilter({ q: $("#search").value, page: 1 });
   }, 250));
-  $("#filter-status").addEventListener("change", (e) =>
+  bindOnce($("#filter-status"), "change", (e) =>
     updateGoalsFilter({ status: e.target.value, page: 1 }));
-  $("#filter-reporter").addEventListener("change", (e) =>
+  bindOnce($("#filter-reporter"), "change", (e) =>
     updateGoalsFilter({ reporter: e.target.value, page: 1 }));
-  $("#filter-assignee").addEventListener("change", (e) =>
+  bindOnce($("#filter-assignee"), "change", (e) =>
     updateGoalsFilter({ assignee: e.target.value, page: 1 }));
-  $("#filter-feature").addEventListener("input", debounce((e) =>
+  bindOnce($("#filter-feature"), "input", debounce((e) =>
     updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
-  $("#filter-node").addEventListener("change", (e) =>
+  bindOnce($("#filter-node"), "change", (e) =>
     updateGoalsFilter({ node: e.target.value, page: 1 }));
-  $("#filter-rounds-gte").addEventListener("input", debounce((e) =>
+  bindOnce($("#filter-rounds-gte"), "input", debounce((e) =>
     updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
-  $("#filter-rounds-lte").addEventListener("input", debounce((e) =>
+  bindOnce($("#filter-rounds-lte"), "input", debounce((e) =>
     updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
-  $("#goals-severity").addEventListener("change", (e) =>
+  bindOnce($("#goals-severity"), "change", (e) =>
     updateGoalsFilter({ severity: e.target.value, page: 1 }));
-  $("#goals-category").addEventListener("change", (e) =>
+  bindOnce($("#goals-category"), "change", (e) =>
     updateGoalsFilter({ category: e.target.value, page: 1 }));
-  $("#goals-actor").addEventListener("change", (e) =>
+  bindOnce($("#goals-actor"), "change", (e) =>
     updateGoalsFilter({ actor: e.target.value, page: 1 }));
-  $("#goals-limit").addEventListener("change", (e) =>
+  bindOnce($("#goals-limit"), "change", (e) =>
     updateGoalsFilter({
       limit: parseInt(e.target.value, 10) || GOALS_DEFAULT_LIMIT,
       page: 1,
     }));
-  $("#goals-clear").addEventListener("click", () => {
+  bindOnce($("#goals-clear"), "click", () => {
     history.replaceState(null, "", "#/goals");
     renderGoalsList();
   });
@@ -193,7 +198,7 @@ async function renderGoalsList() {
 
   // Expanding / collapsing the filter shell shows / hides the per-row
   // checkbox column. Redraw from the cached results so we don't re-fetch.
-  $("#goals-filter-shell").addEventListener("toggle", () => {
+  bindOnce($("#goals-filter-shell"), "toggle", () => {
     if (_lastGoalsRender) {
       drawGoalsTable(_lastGoalsRender.goals, _lastGoalsRender.state);
     }
@@ -294,11 +299,11 @@ function goalsWorkflowStatusHash(status, filter = goalsFilterFromHash()) {
 function drawGoalsWorkflowVisualization(filter, counts) {
   const root = document.getElementById("goals-workflow");
   if (!root) return;
-  root.innerHTML = renderWorkflowVisualization({
+  renderInto(root, renderWorkflowVisualization({
     counts,
     hrefForStatus: (status) => goalsWorkflowStatusHash(status, filter),
     className: "goals-workflow-grid",
-  });
+  }));
 }
 
 async function refreshGoalsTable() {
@@ -333,14 +338,14 @@ async function refreshGoalsTable() {
     const catSel = $("#goals-category");
     if (catSel) {
       const cats = facets.categories || [];
-      catSel.innerHTML = `<option value="">all categories</option>` +
-        cats.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join("");
+      renderInto(catSel, `<option value="">all categories</option>` +
+        cats.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join(""));
     }
     const actSel = $("#goals-actor");
     if (actSel) {
       const acts = facets.actors || [];
-      actSel.innerHTML = `<option value="">all actors</option>` +
-        acts.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join("");
+      renderInto(actSel, `<option value="">all actors</option>` +
+        acts.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join(""));
     }
     const countEl = $("#goals-count");
     if (countEl) {
@@ -413,6 +418,10 @@ function renderGoalFeatureCell(goal) {
 
 function drawGoalsTable(goals, state) {
   const root = $("#goals-table");
+  // Row and header handlers are bound once and outlive the render that bound
+  // them, so they read the latest page from here instead of closing over the
+  // `goals` and `state` they were first called with.
+  _goalsPage = { rows: goals, sort: state.sort, dir: state.dir };
   // Selection UI follows the filter shell — only show checkboxes when the
   // shell is expanded (i.e. the user has indicated they want to interact
   // with bulk actions). Collapsed = focus on results.
@@ -420,11 +429,11 @@ function drawGoalsTable(goals, state) {
   const showSelection = !!(shell && shell.open);
 
   if (!goals.length) {
-    root.innerHTML = `
+    renderInto(root, `
       <p class="muted">No goals match the current filters.</p>
-      ${renderPaginationControls("goals", state.page, 0, "goal")}`;
-    bindPaginationControls(root, "goals", (page) =>
-      updateGoalsFilter({ page }));
+      ${renderPaginationControls("goals", state.page, 0, "goal")}`, () => {
+      bindPaginationControls(root, "goals", (page) => updateGoalsFilter({ page }));
+    });
     return;
   }
   const columns = [
@@ -458,7 +467,7 @@ function drawGoalsTable(goals, state) {
                 aria-label="Select all matching Goals">
        </th>`
     : "";
-  root.innerHTML = `
+  renderInto(root, `
     <div class="table-scroll">
       <table class="table work-items-table goals-table mobile-card-table">
         <colgroup>
@@ -501,61 +510,61 @@ function drawGoalsTable(goals, state) {
       </table>
     </div>
     ${renderPaginationControls("goals", state.page, goals.length, "goal")}
-		  `;
-  bindPaginationControls(root, "goals", (page) =>
-    updateGoalsFilter({ page }));
-  // Row click navigates to goal detail — but a click on the checkbox (or
-  // its surrounding td) should toggle selection, not navigate.
-  $$(".table tbody tr", root).forEach((row) => {
-    row.addEventListener("click", (e) => {
-      if (e.target.closest(".goal-select-col")) return;
-      if (e.target.closest("a, button, input, select, textarea")) return;
-      location.hash = "#/goals/" + row.dataset.id;
-    });
-  });
-  $$(".goal-select", root).forEach((cb) => {
-    cb.addEventListener("click", (e) => e.stopPropagation());
-    cb.addEventListener("change", (e) => {
-      const id = e.target.dataset.id;
-      if (goalsSelectAllMatching) {
-        if (e.target.checked) goalsExcludedIds.delete(id);
-        else goalsExcludedIds.add(id);
-      } else if (e.target.checked) {
-        goalsIncludedIds.add(id);
-      } else {
-        goalsIncludedIds.delete(id);
-      }
-      _updateSelectAllState(goals);
-    });
-  });
-  const selectAll = root.querySelector("#goal-select-all");
-  if (selectAll) {
-    _updateSelectAllState(goals);
-    selectAll.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const shouldCheck = selectAll.checked;
-      goalsSelectAllMatching = shouldCheck;
-      goalsExcludedIds.clear();
-      goalsIncludedIds.clear();
-      // Re-sync the current page checkboxes without a full redraw.
-      $$(".goal-select", root).forEach((cb) => {
-        cb.checked = shouldCheck;
+		  `, () => {
+    bindPaginationControls(root, "goals", (page) => updateGoalsFilter({ page }));
+    // Row click navigates to goal detail — but a click on the checkbox (or
+    // its surrounding td) should toggle selection, not navigate.
+    $$(".table tbody tr", root).forEach((row) => {
+      bindOnce(row, "click", (e) => {
+        if (e.target.closest(".goal-select-col")) return;
+        if (e.target.closest("a, button, input, select, textarea")) return;
+        location.hash = "#/goals/" + row.dataset.id;
       });
-      selectAll.indeterminate = false;
     });
-  }
-  $$(".table th.sortable", root).forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sortKey;
-      let nextDir;
-      if (key === state.sort) {
-        // Same column — flip the direction.
-        nextDir = state.dir === "asc" ? "desc" : "asc";
-      } else {
-        // New column — use its natural default direction.
-        nextDir = GOALS_DEFAULT_DIR[key] || "desc";
-      }
-      updateGoalsFilter({ sort: key, dir: nextDir, page: 1 });
+    $$(".goal-select", root).forEach((cb) => {
+      bindOnce(cb, "click", (e) => e.stopPropagation());
+      bindOnce(cb, "change", (e) => {
+        const id = e.target.dataset.id;
+        if (goalsSelectAllMatching) {
+          if (e.target.checked) goalsExcludedIds.delete(id);
+          else goalsExcludedIds.add(id);
+        } else if (e.target.checked) {
+          goalsIncludedIds.add(id);
+        } else {
+          goalsIncludedIds.delete(id);
+        }
+        _updateSelectAllState(_goalsPage.rows);
+      });
+    });
+    const selectAll = root.querySelector("#goal-select-all");
+    if (selectAll) {
+      _updateSelectAllState(_goalsPage.rows);
+      bindOnce(selectAll, "click", (e) => {
+        e.stopPropagation();
+        const shouldCheck = selectAll.checked;
+        goalsSelectAllMatching = shouldCheck;
+        goalsExcludedIds.clear();
+        goalsIncludedIds.clear();
+        // Re-sync the current page checkboxes without a full redraw.
+        $$(".goal-select", root).forEach((cb) => {
+          cb.checked = shouldCheck;
+        });
+        selectAll.indeterminate = false;
+      });
+    }
+    $$(".table th.sortable", root).forEach((th) => {
+      bindOnce(th, "click", () => {
+        const key = th.dataset.sortKey;
+        let nextDir;
+        if (key === _goalsPage.sort) {
+          // Same column — flip the direction.
+          nextDir = _goalsPage.dir === "asc" ? "desc" : "asc";
+        } else {
+          // New column — use its natural default direction.
+          nextDir = GOALS_DEFAULT_DIR[key] || "desc";
+        }
+        updateGoalsFilter({ sort: key, dir: nextDir, page: 1 });
+      });
     });
   });
 }
