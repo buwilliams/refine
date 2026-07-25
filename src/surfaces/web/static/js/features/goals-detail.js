@@ -539,7 +539,7 @@ function bindGoalDetailControls() {
       <div class="modal-title">Change priority</div>
       <div class="modal-body">
         <label for="modal-priority-select">Priority</label>
-        <select class="modal-input" id="modal-priority-select" data-testid="liveGoal()-priority-select" style="width:100%">
+        <select class="modal-input" id="modal-priority-select" data-testid="goal-priority-select" style="width:100%">
           ${["low", "medium", "high"].map((p) =>
             `<option value="${p}" ${p === current ? "selected" : ""}>${p}</option>`,
           ).join("")}
@@ -561,12 +561,12 @@ function bindGoalDetailControls() {
       await showActionError(err);
     }
   });
-  bindOnce($("#btn-liveGoal()-feature-assign"), "click", async () => {
+  bindOnce($("#btn-goal-feature-assign"), "click", async () => {
     closeGoalActionMenu();
     await openGoalFeatureAssignModal(liveGoal());
     await loadGoalDetail(liveGoal().id);
   });
-  bindOnce($("#btn-liveGoal()-feature-remove"), "click", async () => {
+  bindOnce($("#btn-goal-feature-remove"), "click", async () => {
     closeGoalActionMenu();
     if (!liveGoal().feature_id) return;
     const ok = await modalConfirm(
