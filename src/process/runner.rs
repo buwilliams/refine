@@ -64,7 +64,7 @@ impl FileRunnerWorkerService {
         if let Some(process) = supervisor
             .recover_owner(ProcessOwner::Runner)?
             .into_iter()
-            .find(|process| managed_worker_kind(process) == Some(worker_kind))
+            .find(|process| adoptable_worker(process, worker_kind))
         {
             return Ok(process);
         }
@@ -262,14 +262,35 @@ fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
     let mut recovered_root = None;
     let mut retired_supervisor_root = None;
     loop {
-        if let Some(target_root) = current_target_root(runtime_root)? {
+        // Every step here is retried on the next interval rather than propagated.
+        // A transient failure — the app detaching, a registry read losing a race,
+        // a lock held for a moment — must not end the tick loop: nothing restarts
+        // it in place, so returning here silences automation until the daemon is
+        // restarted, with a full queue and no surfaced error.
+        let target_root = match current_target_root(runtime_root) {
+            Ok(target_root) => target_root,
+            Err(error) => {
+                eprintln!("refine workflow runner: failed to read the active app: {error}");
+                thread::sleep(WORKFLOW_INTERVAL);
+                continue;
+            }
+        };
+        if let Some(target_root) = target_root {
             let root = target_root
                 .canonicalize()
                 .unwrap_or_else(|_| target_root.clone());
             let workflow = WorkflowEngine::with_target_root(runtime_root, &target_root);
             if retired_supervisor_root.as_ref() != Some(&root) {
-                retire_legacy_supervisor(runtime_root, &target_root)?;
-                retired_supervisor_root = Some(root.clone());
+                match retire_legacy_supervisor(runtime_root, &target_root) {
+                    // Only record the root as retired once it actually succeeded,
+                    // so a failed attempt is retried instead of skipped forever.
+                    Ok(()) => retired_supervisor_root = Some(root.clone()),
+                    Err(error) => {
+                        eprintln!("refine workflow runner: {error}");
+                        thread::sleep(WORKFLOW_INTERVAL);
+                        continue;
+                    }
+                }
             }
             if recovered_root.as_ref() != Some(&root) {
                 match workflow.fail_interrupted_goals(
@@ -669,6 +690,19 @@ fn project_sync_result(
     })
 }
 
+/// Whether an existing record is a worker supervision can rely on to keep
+/// ticking. Adopting anything else makes supervision believe a worker exists
+/// that will never tick again, and nothing relaunches it short of a daemon
+/// restart. Recovery already drops settled records and revives nothing, so the
+/// state check is a guard rather than the load-bearing part; the owner check is
+/// not, because `recover_owner` returns records belonging to every owner and
+/// only the caller's filter has been keeping foreign ones out.
+fn adoptable_worker(process: &ManagedProcess, worker_kind: &str) -> bool {
+    process.owner == ProcessOwner::Runner
+        && process.state == "running"
+        && managed_worker_kind(process) == Some(worker_kind)
+}
+
 fn managed_worker_kind(process: &ManagedProcess) -> Option<&str> {
     process
         .details
@@ -869,6 +903,93 @@ fn optional_positive_duration(value: Option<&Value>, fallback: Duration) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn worker_record(state: &str, worker_kind: &str) -> ManagedProcess {
+        ManagedProcess {
+            id: format!("process-{state}-{worker_kind}"),
+            owner: ProcessOwner::Runner,
+            pid: Some(4242),
+            state: state.to_string(),
+            label: Some("workflow runner".to_string()),
+            details: Some(json!({"worker_kind": worker_kind}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        }
+    }
+
+    #[test]
+    fn settled_worker_records_are_not_adopted_as_a_running_workflow_runner() {
+        assert!(adoptable_worker(
+            &worker_record("running", WORKFLOW_RUNNER),
+            WORKFLOW_RUNNER
+        ));
+        // Each of these means the worker is gone. Adopting one leaves nothing
+        // ticking the workflow while supervision believes a runner exists.
+        for state in ["exited", "failed", "stopped", "interrupted"] {
+            assert!(
+                !adoptable_worker(&worker_record(state, WORKFLOW_RUNNER), WORKFLOW_RUNNER),
+                "a {state} record must not be adopted as a live workflow runner"
+            );
+        }
+        assert!(!adoptable_worker(
+            &worker_record("running", GIT_SYNC_RUNNER),
+            WORKFLOW_RUNNER
+        ));
+        let mut foreign_owner = worker_record("running", WORKFLOW_RUNNER);
+        foreign_owner.owner = ProcessOwner::Agent;
+        assert!(!adoptable_worker(&foreign_owner, WORKFLOW_RUNNER));
+    }
+
+    #[test]
+    fn an_unremovable_settled_record_cannot_stop_supervision_from_seeing_the_registry() {
+        // A settled record whose artifacts refuse to be removed used to fail the
+        // entire process listing. Every consumer reads through that listing, so
+        // one leftover silently stopped supervision from noticing a dead workflow
+        // runner — and nothing relaunched it short of a daemon restart.
+        let runtime_root =
+            std::env::temp_dir().join(format!("refine-stuck-record-{}", uuid::Uuid::new_v4()));
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        std::fs::create_dir_all(supervisor.processes_dir()).unwrap();
+
+        let mut settled = worker_record("exited", WORKFLOW_RUNNER);
+        // A directory cannot be removed as a file, so cleanup of this record
+        // fails the way an undeletable leftover does in the field.
+        let undeletable = runtime_root.join("undeletable-stdout");
+        std::fs::create_dir_all(&undeletable).unwrap();
+        settled.stdout_path = Some(undeletable.display().to_string());
+        std::fs::write(
+            supervisor
+                .processes_dir()
+                .join(format!("{}.json", settled.id)),
+            serde_json::to_vec_pretty(&settled).unwrap(),
+        )
+        .unwrap();
+
+        let live = worker_record("running", GIT_SYNC_RUNNER);
+        std::fs::write(
+            supervisor.processes_dir().join(format!("{}.json", live.id)),
+            serde_json::to_vec_pretty(&live).unwrap(),
+        )
+        .unwrap();
+
+        let listed = supervisor
+            .list()
+            .expect("a settled record that will not clean up must not fail the listing");
+
+        assert!(
+            listed.iter().any(|process| process.id == live.id),
+            "the running record must still be visible"
+        );
+        assert!(
+            !listed.iter().any(|process| process.id == settled.id),
+            "the settled record must not be reported as running"
+        );
+        std::fs::remove_dir_all(&runtime_root).unwrap();
+    }
 
     #[test]
     fn retired_supervisor_state_is_purged_before_workflow_evaluation() {

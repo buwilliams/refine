@@ -663,7 +663,14 @@ impl FileProcessSupervisor {
             match serde_json::from_slice::<ManagedProcess>(&bytes) {
                 Ok(process) if process.state == "running" => processes.push(process),
                 Ok(process) => {
-                    self.remove_process_artifacts(&process)?;
+                    // Cleaning up a settled record is opportunistic: it is not
+                    // running whether or not its artifacts could be removed. One
+                    // undeletable leftover must not fail the whole listing —
+                    // every consumer reads through here, including the
+                    // supervision that relaunches the workflow runner and the
+                    // sweep that reclaims orphaned claims, so failing here stops
+                    // automation entirely until the daemon is restarted.
+                    let _ = self.remove_process_artifacts(&process);
                 }
                 Err(_) if bytes.is_empty() => continue,
                 Err(_) => continue,
