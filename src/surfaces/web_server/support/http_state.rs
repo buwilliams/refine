@@ -91,18 +91,54 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
     normalized
 }
 
-pub(in crate::surfaces::web_server) fn local_origin_allowed(request: &HttpRequest) -> bool {
-    let Some(origin) = request
+pub(in crate::surfaces::web_server) fn mutation_origin_allowed(request: &HttpRequest) -> bool {
+    let Some(origin_or_referer) = request
         .headers
         .get("origin")
         .or_else(|| request.headers.get("referer"))
     else {
         return true;
     };
-    origin.starts_with("http://127.0.0.1:")
-        || origin.starts_with("http://localhost:")
-        || origin.starts_with("tauri://")
-        || origin.starts_with("https://tauri.localhost/")
+
+    let Ok(uri) = origin_or_referer.parse::<axum::http::Uri>() else {
+        return false;
+    };
+    let Some(scheme) = uri.scheme_str() else {
+        return false;
+    };
+    let Some(origin_authority) = uri.authority() else {
+        return false;
+    };
+
+    if scheme.eq_ignore_ascii_case("tauri")
+        || (scheme.eq_ignore_ascii_case("https")
+            && origin_authority
+                .host()
+                .eq_ignore_ascii_case("tauri.localhost"))
+    {
+        return true;
+    }
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return false;
+    }
+
+    let Some(host) = request.headers.get("host") else {
+        return false;
+    };
+    let Ok(request_authority) = host.parse::<axum::http::uri::Authority>() else {
+        return false;
+    };
+
+    let origin_has_port = origin_authority.port().is_some();
+    let request_has_port = request_authority.port().is_some();
+    let origin_port = origin_authority.port_u16();
+    let request_port = request_authority.port_u16();
+
+    origin_authority
+        .host()
+        .eq_ignore_ascii_case(request_authority.host())
+        && origin_has_port == request_has_port
+        && (!origin_has_port || (origin_port.is_some() && origin_port == request_port))
 }
 
 pub(in crate::surfaces::web_server) fn valid_idempotency_key(key: &str) -> bool {

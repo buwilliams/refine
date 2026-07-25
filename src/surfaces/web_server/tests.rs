@@ -1118,10 +1118,134 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
     let forbidden = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
         path: "/work/goals".to_string(),
-        headers: BTreeMap::from([("origin".to_string(), "https://example.com".to_string())]),
+        headers: BTreeMap::from([
+            ("host".to_string(), "refine.internal:8082".to_string()),
+            ("origin".to_string(), "https://example.com".to_string()),
+        ]),
         body: Some(br#"{"name":"Bad"}"#.to_vec()),
     });
     assert_eq!(forbidden.status, 403);
+    let forbidden_body: serde_json::Value = serde_json::from_slice(&forbidden.body).unwrap();
+    assert_eq!(
+        forbidden_body["error"]["message"],
+        "mutation request origin must match the request host"
+    );
+
+    let same_origin = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            (
+                "host".to_string(),
+                "bo2lnxnevo03.ins.insurity.net:8082".to_string(),
+            ),
+            (
+                "origin".to_string(),
+                "http://bo2lnxnevo03.ins.insurity.net:8082".to_string(),
+            ),
+        ]),
+        body: None,
+    });
+    assert_eq!(same_origin.status, 404);
+
+    let same_origin_referer = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            ("host".to_string(), "10.20.30.40:8082".to_string()),
+            (
+                "referer".to_string(),
+                "http://10.20.30.40:8082/settings".to_string(),
+            ),
+        ]),
+        body: None,
+    });
+    assert_eq!(same_origin_referer.status, 404);
+
+    let same_origin_https = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            ("host".to_string(), "refine.example.com".to_string()),
+            (
+                "origin".to_string(),
+                "https://refine.example.com".to_string(),
+            ),
+        ]),
+        body: None,
+    });
+    assert_eq!(same_origin_https.status, 404);
+
+    let wrong_port = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            ("host".to_string(), "refine.example.com:8082".to_string()),
+            (
+                "origin".to_string(),
+                "http://refine.example.com:8083".to_string(),
+            ),
+        ]),
+        body: None,
+    });
+    assert_eq!(wrong_port.status, 403);
+
+    let tauri = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([("origin".to_string(), "tauri://localhost".to_string())]),
+        body: None,
+    });
+    assert_eq!(tauri.status, 404);
+
+    let tauri_https = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([("origin".to_string(), "https://tauri.localhost/".to_string())]),
+        body: None,
+    });
+    assert_eq!(tauri_https.status, 404);
+
+    let no_origin = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(no_origin.status, 404);
+
+    let opaque_origin = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            ("host".to_string(), "refine.example.com:8082".to_string()),
+            ("origin".to_string(), "null".to_string()),
+        ]),
+        body: None,
+    });
+    assert_eq!(opaque_origin.status, 403);
+
+    let missing_host = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([(
+            "origin".to_string(),
+            "http://refine.example.com:8082".to_string(),
+        )]),
+        body: None,
+    });
+    assert_eq!(missing_host.status, 403);
+
+    let loopback_origin_foreign_host = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/missing".to_string(),
+        headers: BTreeMap::from([
+            ("host".to_string(), "attacker.example.com".to_string()),
+            ("origin".to_string(), "http://localhost:8082".to_string()),
+        ]),
+        body: None,
+    });
+    assert_eq!(loopback_origin_foreign_host.status, 403);
 
     let version = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),

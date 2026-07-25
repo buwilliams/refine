@@ -490,13 +490,13 @@ impl LocalHttpDaemon {
         }
 
         if request.method != "GET" {
-            if !local_origin_allowed(&request) {
+            if !mutation_origin_allowed(&request) {
                 return WireResponse::json(ApiResponse::json(
                     403,
                     json!({
                         "error": {
                             "code": "forbidden_origin",
-                            "message": "mutation request origin must be local"
+                            "message": "mutation request origin must match the request host"
                         }
                     }),
                 ));

@@ -165,7 +165,7 @@ Desktop shell      Browser UI          CLI
                       |
               local web server
      HTTP, SSE, static assets,
-     local-origin checks, request parsing, response shaping
+     same-origin checks, request parsing, response shaping
                       |
                     workflow/tools
    supervisor, product workflow, host adapters,
@@ -600,8 +600,14 @@ runtime context.
 Requirements:
 
 - Desktop, browser, and CLI use the same local daemon routes.
-- The daemon must bind and expose supported HTTP APIs only as a local control
-  surface. Local mutation routes do not require authorization tokens.
+- The daemon exposes supported HTTP APIs as a control surface reachable at
+  whatever address it is bound to, including non-loopback hosts. Mutation routes
+  are guarded by a same-origin check rather than by requiring a loopback origin:
+  a browser `Origin`/`Referer` must match the request `Host`, the desktop shell's
+  `tauri` origin is accepted, and requests carrying neither header (CLI and other
+  non-browser clients) pass. Mutation routes do not require authorization tokens,
+  so binding to a non-loopback address grants every client that can reach the
+  port full control.
 - Web UI can stream activity, process output, operation progress, and chat events.
 - Desktop can subscribe to events for badges, tray state, and notifications.
 
@@ -1167,7 +1173,7 @@ product capability:
   under `src/surfaces/web/static/`.
 - `surfaces::web_server`; path: `src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
-  serving, local-origin checks, request parsing, response shaping, and
+  serving, same-origin mutation checks, request parsing, response shaping, and
   translation into supervisor and workflow/tools services.
 
 `xtask/` should contain repository automation that is not part of the
@@ -1185,8 +1191,8 @@ Responsibilities:
 - Expose HTTP routes for request/response operations.
 - Expose server-sent-event streams for operation events, logs, chat, and UI
   updates.
-- Handle local-origin checks, request parsing, response shaping, and API version
-  negotiation.
+- Handle same-origin mutation checks, request parsing, response shaping, and
+  API version negotiation.
 - Translate transport requests into supervisor-facing workflow/tools services.
 - Keep route handlers thin; workflow logic, state mutation, process lifecycle,
   provider execution, Git behavior, and storage orchestration belong in
