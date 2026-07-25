@@ -2131,7 +2131,7 @@ mod tests {
             GoalStatus::Cancelled
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[cfg(unix)]
@@ -2179,7 +2179,7 @@ mod tests {
         supervisor.request_termination(&process.id, "kill").unwrap();
         wait_for_exit(process.pid.unwrap());
         let _ = supervisor.recover();
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[cfg(target_os = "linux")]
@@ -2225,7 +2225,7 @@ mod tests {
             .status()
             .unwrap();
         wait_for_exit(process.pid.unwrap());
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2279,7 +2279,7 @@ mod tests {
 
         force_kill(process.pid.unwrap());
         wait_for_exit(process.pid.unwrap());
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2324,7 +2324,7 @@ mod tests {
                 .leases
                 .is_empty()
         );
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2409,7 +2409,7 @@ mod tests {
                 .is_empty()
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2539,7 +2539,7 @@ mod tests {
                     .is_empty()
             );
 
-            fs::remove_dir_all(temp_root).unwrap();
+            remove_temp_dir(&temp_root);
         }
     }
 
@@ -2667,7 +2667,7 @@ mod tests {
         assert_eq!(repeated["cancelled"], true);
         assert_eq!(repeated["replayed_settlement"], true);
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2752,7 +2752,7 @@ mod tests {
                     .ends_with(".tmp"))
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2805,7 +2805,7 @@ mod tests {
         assert_eq!(state.claims[0].provider, "provider-policy");
         assert_eq!(state.claims[0].target_app_id, "/srv/non-default-target");
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -2983,7 +2983,7 @@ mod tests {
             assert_eq!(process_receipt["goal_cancelled"], true);
             assert_eq!(process_receipt["claim_cancelled"], true);
 
-            fs::remove_dir_all(temp_root).unwrap();
+            remove_temp_dir(&temp_root);
         }
     }
 
@@ -3061,7 +3061,7 @@ mod tests {
             WorkflowClaimState::Running
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -3138,7 +3138,7 @@ mod tests {
             WorkflowClaimState::Running
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -3243,7 +3243,7 @@ mod tests {
                 .contains("current Goal owner")
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -3344,7 +3344,7 @@ mod tests {
                 .is_empty()
         );
 
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -3397,7 +3397,7 @@ mod tests {
 
         force_kill(process.pid.unwrap());
         wait_for_exit(process.pid.unwrap());
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     #[test]
@@ -3449,7 +3449,7 @@ mod tests {
 
         force_kill(process.pid.unwrap());
         wait_for_exit(process.pid.unwrap());
-        fs::remove_dir_all(temp_root).unwrap();
+        remove_temp_dir(&temp_root);
     }
 
     fn launch_agent(
@@ -3740,5 +3740,33 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    /// Remove a test's temp tree, tolerating the supervisor's reaper thread.
+    ///
+    /// `launch` spawns a thread that waits on the child and then cleans up that
+    /// process's artifacts, so it keeps deleting files under the temp root after
+    /// `stop` has already returned. Racing `remove_dir_all` against it fails the
+    /// walk on an entry that vanished underneath it, which surfaces as a rare
+    /// teardown panic in whichever test the scheduler happened to delay. Retry
+    /// briefly instead of failing a test for it; every assertion has already run.
+    fn remove_temp_dir(temp_root: impl AsRef<Path>) {
+        let temp_root = temp_root.as_ref();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let outcome = fs::remove_dir_all(temp_root);
+            match &outcome {
+                Ok(()) if !temp_root.exists() => return,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+                _ => {}
+            }
+            if std::time::Instant::now() >= deadline {
+                if let Err(error) = outcome {
+                    panic!("failed to remove {}: {error}", temp_root.display());
+                }
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 }
