@@ -1988,41 +1988,78 @@ fn post_implementation_governance_prompt(
     )
 }
 
+/// Keys that only a governance verdict object carries. A JSON object quoted in
+/// the review prose is very unlikely to hold one.
+const GOVERNANCE_VERDICT_KEYS: [&str; 5] = [
+    "status",
+    "verdict",
+    "violations",
+    "rule_violations",
+    "failed_actions",
+];
+
+/// Weaker verdict signals, consulted only when no object carries a strong key.
+const GOVERNANCE_VERDICT_FALLBACK_KEYS: [&str; 5] =
+    ["ok", "result", "failed", "violates", "violation"];
+
+const GOVERNANCE_VERDICT_UNPARSABLE: &str =
+    "Governance verdict could not be parsed: the review did not return the required JSON verdict object.";
+
 fn parse_governance_provider_output(output: &str, rules_checked: usize) -> GovernanceEvaluation {
     let trimmed = output.trim();
-    if let Some(value) = parse_json_value(trimmed) {
-        return governance_evaluation_from_json(value, trimmed, rules_checked);
+    match parse_governance_verdict(trimmed) {
+        Some(value) => governance_evaluation_from_json(value, trimmed, rules_checked),
+        // No verdict means the review could not be read, which is a parsing
+        // failure and not a rule violation. Guessing pass/fail from the prose
+        // scores explanatory text ("no rule violation here") as a violation, so
+        // fail closed and say plainly that the verdict was unreadable.
+        None => unparsable_governance_evaluation(trimmed, rules_checked),
     }
+}
 
-    let normalized = trimmed.to_ascii_lowercase();
-    let failed = !normalized.contains("no violation")
-        && !normalized.contains("no governance violation")
-        && (normalized.contains("rule violation")
-            || normalized.contains("violates governance")
-            || normalized.contains("governance failed")
-            || normalized.contains("status: failed"));
-    let message = failed.then(|| {
-        if trimmed.is_empty() {
-            "Governance rule violation detected.".to_string()
-        } else {
-            governance_violation_message(trimmed)
-        }
-    });
+fn unparsable_governance_evaluation(
+    raw_output: &str,
+    rules_checked: usize,
+) -> GovernanceEvaluation {
     GovernanceEvaluation {
-        failed,
-        message,
+        failed: true,
+        message: Some(GOVERNANCE_VERDICT_UNPARSABLE.to_string()),
         details: json_object(json!({
             "phase": "post_implementation",
             "configured": true,
             "rules_checked": rules_checked,
-            "failed_actions": if failed {
-                json!([{"action": "fail", "message": trimmed}])
-            } else {
-                json!([])
-            },
-            "raw_output": trimmed
+            "verdict_parse_error": true,
+            "failed_actions": [{
+                "action": "verdict_parse_error",
+                "message": GOVERNANCE_VERDICT_UNPARSABLE
+            }],
+            "raw_output": raw_output
         })),
     }
+}
+
+/// Find the review's verdict, not merely the first brace in its prose. Reviews
+/// routinely quote code and JSON while reasoning about rules, so scan every
+/// balanced object and take the last one that actually looks like a verdict.
+fn parse_governance_verdict(raw: &str) -> Option<Value> {
+    let candidates = json_object_candidates(raw);
+    candidates
+        .iter()
+        .rev()
+        .find(|value| has_any_key(value, &GOVERNANCE_VERDICT_KEYS))
+        .or_else(|| {
+            candidates
+                .iter()
+                .rev()
+                .find(|value| has_any_key(value, &GOVERNANCE_VERDICT_FALLBACK_KEYS))
+        })
+        .cloned()
+}
+
+fn has_any_key(value: &Value, keys: &[&str]) -> bool {
+    value
+        .as_object()
+        .is_some_and(|object| keys.iter().any(|key| object.contains_key(*key)))
 }
 
 fn governance_evaluation_from_json(
@@ -2087,14 +2124,29 @@ fn governance_evaluation_from_json(
     }
 }
 
-fn parse_json_value(raw: &str) -> Option<Value> {
-    serde_json::from_str::<Value>(raw)
-        .ok()
-        .or_else(|| extract_json_object(raw).and_then(|json| serde_json::from_str(&json).ok()))
+/// Every top-level balanced object in `raw` that parses as JSON, in the order
+/// they appear. An opening brace that never balances (unclosed code in prose)
+/// only costs the scan that brace: it resumes right after it instead of
+/// swallowing the rest of the text.
+fn json_object_candidates(raw: &str) -> Vec<Value> {
+    let mut candidates = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(relative_start) = raw[search_from..].find('{') {
+        let start = search_from + relative_start;
+        if let Some(end) = balanced_object_end(raw, start)
+            && let Ok(value) = serde_json::from_str::<Value>(&raw[start..=end])
+        {
+            candidates.push(value);
+            search_from = end + 1;
+            continue;
+        }
+        search_from = start + 1;
+    }
+    candidates
 }
 
-fn extract_json_object(raw: &str) -> Option<String> {
-    let start = raw.find('{')?;
+/// Byte index of the `}` closing the object that opens at `start`.
+fn balanced_object_end(raw: &str, start: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut in_string = false;
     let mut escaped = false;
@@ -2115,7 +2167,7 @@ fn extract_json_object(raw: &str) -> Option<String> {
             '}' => {
                 depth = depth.saturating_sub(1);
                 if depth == 0 {
-                    return Some(raw[start..=start + offset].to_string());
+                    return Some(start + offset);
                 }
             }
             _ => {}
@@ -3393,6 +3445,78 @@ mod tests {
         }
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace() {
+        // Shape of the review that was misread: a code reference containing
+        // braces, the phrase "rule violation" used while *clearing* a rule, and
+        // the real verdict last.
+        let output = "## Rule 3\n\
+             The `error: () => { setDiaryError(true) }` handler in \
+             `onClaimNumberChange` is unchanged, so this is not a rule violation. \
+             Compliant.\n\n\
+             {\"status\":\"passed\",\"message\":\"Round 1 is a clean, well-scoped diary-editor bug fix.\"}";
+
+        let evaluation = parse_governance_provider_output(output, 3);
+
+        assert!(!evaluation.failed);
+        assert_eq!(
+            evaluation.message.as_deref(),
+            Some("Round 1 is a clean, well-scoped diary-editor bug fix.")
+        );
+        assert_eq!(evaluation.details["failed_actions"], json!([]));
+        assert_eq!(evaluation.details["verdict"]["status"], "passed");
+    }
+
+    #[test]
+    fn governance_verdict_survives_an_unclosed_brace_in_the_review_prose() {
+        let output = "Reviewed `if (claim.diary) {` in the editor.\n\
+             {\"status\":\"passed\",\"message\":\"All rules compliant.\"}";
+
+        let evaluation = parse_governance_provider_output(output, 2);
+
+        assert!(!evaluation.failed);
+        assert_eq!(evaluation.details["verdict"]["status"], "passed");
+    }
+
+    #[test]
+    fn governance_review_without_a_verdict_fails_closed_as_a_parse_error() {
+        let output = "The change looks fine to me. No rules were broken.";
+
+        let evaluation = parse_governance_provider_output(output, 2);
+
+        // Unreadable verdicts must be obviously a parsing problem, never a
+        // silent pass and never a fabricated rule violation.
+        assert!(evaluation.failed);
+        assert_eq!(
+            evaluation.message.as_deref(),
+            Some(GOVERNANCE_VERDICT_UNPARSABLE)
+        );
+        assert_eq!(evaluation.details["verdict_parse_error"], true);
+        assert_eq!(
+            evaluation.details["failed_actions"][0]["action"],
+            "verdict_parse_error"
+        );
+        // The review body is kept for triage, but is not itself the failure.
+        assert_eq!(evaluation.details["raw_output"], output);
+        assert_ne!(evaluation.details["failed_actions"][0]["message"], output);
+    }
+
+    #[test]
+    fn governance_failing_verdict_records_the_parsed_violations() {
+        let output = "Rule 1 is violated.\n\
+             {\"status\":\"failed\",\"message\":\"app.py contains a smoke marker\",\
+             \"violations\":[{\"rule_id\":\"rule-1\",\"message\":\"smoke marker appended\"}]}";
+
+        let evaluation = parse_governance_provider_output(output, 1);
+
+        assert!(evaluation.failed);
+        assert_eq!(
+            evaluation.message.as_deref(),
+            Some("app.py contains a smoke marker")
+        );
+        assert_eq!(evaluation.details["failed_actions"][0]["rule_id"], "rule-1");
     }
 
     #[test]

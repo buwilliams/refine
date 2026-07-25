@@ -3,7 +3,7 @@ Post-implementation governance review for committed Goal {{goal_id}}, round {{ro
 Worktree root: {{worktree_path}}
 Provider cwd: {{provider_cwd}}
 
-Return only:
+Return only this verdict. If you write anything else, the verdict must come last:
 {"status":"passed|failed","message":"short human-readable result","violations":[{"rule_id":"...","rule":"...","message":"..."}]}
 
 Product:
