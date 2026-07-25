@@ -1170,7 +1170,10 @@ product capability:
   narrow bridge command definitions used by the Tauri wrapper.
 - `surfaces::web`; path: `src/surfaces/web/`. Owns the native web UI assets,
   generated client bindings, and asset packaging metadata. Static assets live
-  under `src/surfaces/web/static/`.
+  under `src/surfaces/web/static/`. Background refreshes must redraw in place:
+  a screen update morphs the existing DOM rather than replacing it, must not
+  overwrite a control the user is focused in or has edited but not saved, and
+  must not re-bind handlers onto nodes that survived the redraw.
 - `surfaces::web_server`; path: `src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
   serving, same-origin mutation checks, request parsing, response shaping, and

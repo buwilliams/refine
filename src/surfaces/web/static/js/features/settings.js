@@ -268,9 +268,16 @@ function updateSettingsTabContent(slug, body, bind) {
   const next = document.createElement("div");
   next.innerHTML = body;
   if (card.innerHTML === next.innerHTML) return;
-  reconcileSettingsChildren(card, next);
+  const focus = captureMorphFocus(card);
+  const { structural } = morphChildren(card, body);
+  // Nodes the morph kept still carry the listeners they were bound with, so
+  // re-binding here would attach a second copy of every handler. Only a
+  // structural change introduces nodes that need binding, and only that path
+  // has to disturb the controls the user is working in.
+  if (!structural) return;
   rearmSettingsControls(card);
   if (typeof bind === "function") bind();
+  restoreMorphFocus(card, focus);
 }
 
 async function copySettingsFromNode(section, {
@@ -317,64 +324,9 @@ async function copySettingsFromNode(section, {
   });
 }
 
-function reconcileSettingsChildren(currentParent, nextParent) {
-  const currentChildren = Array.from(currentParent.childNodes);
-  const nextChildren = Array.from(nextParent.childNodes);
-  const max = Math.max(currentChildren.length, nextChildren.length);
-  for (let i = 0; i < max; i += 1) {
-    const current = currentChildren[i];
-    const next = nextChildren[i];
-    if (!current && next) {
-      currentParent.appendChild(next.cloneNode(true));
-    } else if (current && !next) {
-      current.remove();
-    } else {
-      reconcileSettingsNode(current, next);
-    }
-  }
-}
-
-function reconcileSettingsNode(current, next) {
-  if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
-    current.replaceWith(next.cloneNode(true));
-    return;
-  }
-  if (current.nodeType === Node.TEXT_NODE) {
-    if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
-    return;
-  }
-  if (current.nodeType !== Node.ELEMENT_NODE) return;
-  reconcileSettingsAttributes(current, next);
-  reconcileSettingsChildren(current, next);
-  reconcileSettingsFormState(current, next);
-}
-
-function reconcileSettingsAttributes(current, next) {
-  Array.from(current.attributes).forEach((attr) => {
-    if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
-  });
-  Array.from(next.attributes).forEach((attr) => {
-    if (current.getAttribute(attr.name) !== attr.value) {
-      current.setAttribute(attr.name, attr.value);
-    }
-  });
-}
-
-function reconcileSettingsFormState(current, next) {
-  if (current instanceof HTMLInputElement && next instanceof HTMLInputElement) {
-    if (current.type === "checkbox" || current.type === "radio") {
-      current.checked = next.checked;
-    } else if (current.value !== next.value) {
-      current.value = next.value;
-    }
-  } else if (
-    (current instanceof HTMLTextAreaElement && next instanceof HTMLTextAreaElement) ||
-    (current instanceof HTMLSelectElement && next instanceof HTMLSelectElement)
-  ) {
-    if (current.value !== next.value) current.value = next.value;
-  }
-}
-
+// Strip listeners from a tab's controls so the tab's bind functions can re-attach
+// without doubling up. Replacing a node drops the user's focus with it, so this
+// runs only on the structural path, paired with `restoreMorphFocus`.
 function rearmSettingsControls(root) {
   $$("button, input, select, textarea, a, [tabindex], [data-full-details]", root).forEach((el) => {
     const clone = el.cloneNode(true);
