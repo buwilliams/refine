@@ -447,9 +447,9 @@ impl FileInstallationService {
             systemd_escape_arg(&exe),
             port_args,
             systemd_escape_arg(&self.runtime_root.display().to_string()),
-            systemd_escape_arg(backend.app_support_dir.as_deref().unwrap_or(".")),
-            logs_dir,
-            logs_dir
+            systemd_escape_path(backend.app_support_dir.as_deref().unwrap_or(".")),
+            systemd_escape_path(logs_dir),
+            systemd_escape_path(logs_dir)
         ))
     }
 
@@ -911,15 +911,39 @@ fn launchctl_gui_domain() -> String {
     "gui/current".to_string()
 }
 
+/// Render one word of a systemd `ExecStart=` command line.
+///
+/// That line is split into words, so a value containing whitespace or shell-like
+/// characters has to be quoted. Specifiers are expanded here, so a literal `%`
+/// must be doubled, and inside quotes a backslash escapes the next character.
 fn systemd_escape_arg(value: &str) -> String {
+    let value = systemd_escape_specifiers(value);
     if value
         .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | '@'))
     {
-        value.to_string()
+        value
     } else {
-        format!("\"{}\"", value.replace('"', "\\\""))
+        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
     }
+}
+
+/// Render a value for a systemd setting that takes a bare path, such as
+/// `WorkingDirectory=` or a `StandardOutput=append:` target.
+///
+/// These settings consume the rest of the line as the path, so quoting is wrong
+/// rather than merely unnecessary: systemd does not strip the quotes and rejects
+/// the value as "path is not absolute". That broke every corporate home
+/// directory, whose `@` tripped the `ExecStart=` quoting rules. Whitespace needs
+/// no escaping either; only `%` does, because specifiers are still expanded.
+fn systemd_escape_path(value: &str) -> String {
+    systemd_escape_specifiers(value)
+}
+
+/// Protect a literal `%` from systemd specifier expansion. An unescaped `%` is
+/// either rejected (`Invalid slot`) or silently expanded into something else.
+fn systemd_escape_specifiers(value: &str) -> String {
+    value.replace('%', "%%")
 }
 
 fn shell_word(value: &str) -> String {
@@ -1159,6 +1183,91 @@ mod tests {
         assert!(conflicting.conflicting);
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    // Every corporate home directory contains an `@` (`<user>@INS.Insurity.net`).
+    // `@` is not in the set `systemd_escape_arg` leaves bare, so routing
+    // WorkingDirectory through it quoted the path, and systemd rejects a quoted
+    // path as "not absolute" — the unit was enabled but could never start.
+    #[test]
+    fn systemd_unit_leaves_path_settings_bare_for_a_home_directory_containing_an_at_sign() {
+        let temp_root = unique_temp_dir("installation-at-sign").join("buddy@INS.Insurity.net");
+        let runtime_root = temp_root.join("state/refine");
+        let service = test_installation_service_for_port(&runtime_root, "1.0.0", 8082, &temp_root);
+
+        let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
+        let backend = installed.backend.as_ref().unwrap();
+        let unit_path = backend.service_metadata_path.as_ref().unwrap();
+        let unit = fs::read_to_string(unit_path).unwrap();
+
+        let setting = |name: &str| {
+            unit.lines()
+                .find_map(|line| line.strip_prefix(name))
+                .unwrap_or_else(|| panic!("{name} missing from unit:\n{unit}"))
+                .to_string()
+        };
+
+        // The reported failure: a quoted value here is fatal, not merely untidy.
+        let working_directory = setting("WorkingDirectory=");
+        assert!(
+            !working_directory.starts_with('"'),
+            "WorkingDirectory must be a bare path, got {working_directory}"
+        );
+        assert!(
+            working_directory.starts_with('/'),
+            "WorkingDirectory must be absolute, got {working_directory}"
+        );
+        assert!(working_directory.contains('@'), "got {working_directory}");
+
+        // The `append:` targets are the same class of setting and equally fatal
+        // when quoted.
+        for name in ["StandardOutput=append:", "StandardError=append:"] {
+            let value = setting(name);
+            assert!(!value.starts_with('"'), "{name} must be bare, got {value}");
+            assert!(
+                value.starts_with('/'),
+                "{name} must be absolute, got {value}"
+            );
+        }
+
+        fs::remove_dir_all(temp_root).unwrap_or(());
+    }
+
+    // Both helpers feed settings that systemd expands specifiers in, so a literal
+    // `%` has to be doubled or it is rejected as an invalid slot — or worse,
+    // silently expands to something else.
+    #[test]
+    fn systemd_escaping_distinguishes_command_words_from_bare_paths() {
+        // Bare-path settings consume the rest of the line: no quoting, and
+        // whitespace needs no escaping either.
+        assert_eq!(
+            systemd_escape_path("/home/buddy@INS.Insurity.net/.local/state/refine"),
+            "/home/buddy@INS.Insurity.net/.local/state/refine"
+        );
+        assert_eq!(
+            systemd_escape_path("/home/My Files/refine"),
+            "/home/My Files/refine"
+        );
+        assert_eq!(systemd_escape_path("/home/50%/refine"), "/home/50%%/refine");
+
+        // `ExecStart=` is split into words, so these do need quoting.
+        assert_eq!(systemd_escape_arg("/usr/bin/refine"), "/usr/bin/refine");
+        assert_eq!(
+            systemd_escape_arg("/home/buddy@INS.Insurity.net/bin/refine"),
+            "/home/buddy@INS.Insurity.net/bin/refine"
+        );
+        assert_eq!(
+            systemd_escape_arg("/opt/My Apps/refine"),
+            "\"/opt/My Apps/refine\""
+        );
+        assert_eq!(
+            systemd_escape_arg("/opt/50%/refine"),
+            "\"/opt/50%%/refine\""
+        );
+        assert_eq!(
+            systemd_escape_arg("/opt/a\"b/refine"),
+            "\"/opt/a\\\"b/refine\""
+        );
     }
 
     fn test_installation_service_for_port(
