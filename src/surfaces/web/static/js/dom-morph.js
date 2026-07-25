@@ -57,8 +57,30 @@ function isMorphEditableControl(el) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(el?.tagName);
 }
 
+// Local UI state the server knows nothing about: a field switched from preview to
+// edit, an inline editor opened. The rendered HTML always describes the closed
+// state, so a redraw would collapse it. Claim the subtree while it is open.
+//
+// Marked with a `data-` attribute rather than a WeakMap because the guard skips
+// the marked element before the morph reaches it, so the attribute is never
+// synced away — and because the mark applies to the whole subtree, not one node.
+function preserveDuringMorph(el) {
+  if (el) el.dataset.morphPreserve = "1";
+}
+
+function releaseAfterMorph(el) {
+  if (el) delete el.dataset.morphPreserve;
+}
+
+function isPreservedDuringMorph(el) {
+  return el?.dataset?.morphPreserve === "1";
+}
+
 function shouldPreserveDuringMorph(el, activeEl) {
   if (!el || el.nodeType !== 1) return false;
+  // Checked before the control tests below: this claims a whole subtree, and the
+  // element carrying it is usually a wrapper rather than the control itself.
+  if (isPreservedDuringMorph(el)) return true;
   if (!isMorphEditableControl(el)) return false;
   // Never yank the caret out of the control the user is typing in, even if they
   // have not changed it yet — a value swap under the cursor is just as jarring.

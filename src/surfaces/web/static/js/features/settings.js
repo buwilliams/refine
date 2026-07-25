@@ -589,6 +589,9 @@ function editSettingsEditableField(field) {
   preview?.setAttribute("hidden", "");
   editor.hidden = false;
   setSettingsEditableButtonState(btn, true);
+  // A background refresh renders this field closed, which would collapse the
+  // editor and reset the committed baseline underneath the user.
+  preserveDuringMorph(field);
   const focusControl = field.querySelector("[data-settings-editable-focus]") || control;
   focusControl.focus();
   if (focusControl instanceof HTMLInputElement && focusControl.type !== "number") {
@@ -607,6 +610,7 @@ function commitSettingsEditableField(field) {
   editor.hidden = true;
   preview.hidden = false;
   setSettingsEditableButtonState(btn, false);
+  releaseAfterMorph(field);
   if (control.dataset.settingsCommittedValue !== settingsControlValue(control)) {
     control.dataset.settingsCommittedValue = settingsControlValue(control);
     control.dispatchEvent(new Event("settings-editable-commit", { bubbles: true }));
@@ -619,9 +623,11 @@ function bindSettingsEditableFields(root) {
     const control = settingsEditableControl(field);
     const btn = field.querySelector("[data-settings-editable-toggle]");
     if (!control || !btn) return;
-    control.dataset.settingsCommittedValue = settingsControlValue(control);
-    updateSettingsEditablePreview(field);
-    syncSettingsEditableDisabled(control);
+    if (!isPreservedDuringMorph(field)) {
+      control.dataset.settingsCommittedValue = settingsControlValue(control);
+      updateSettingsEditablePreview(field);
+      syncSettingsEditableDisabled(control);
+    }
     bindOnce(btn, "mousedown", (e) => {
       if (btn.dataset.settingsEditableEditing === "1") e.preventDefault();
     });
@@ -672,6 +678,7 @@ function commitSettingsMarkdownField(field) {
   editor.hidden = true;
   preview.hidden = false;
   setSettingsMarkdownButtonState(btn, false);
+  releaseAfterMorph(field);
   editor.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
@@ -684,6 +691,7 @@ function editSettingsMarkdownField(field) {
   preview?.setAttribute("hidden", "");
   editor.hidden = false;
   setSettingsMarkdownButtonState(btn, true);
+  preserveDuringMorph(field);
   editor.focus();
 }
 

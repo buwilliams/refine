@@ -20,6 +20,9 @@ function morphRuntime() {
       shouldPreserve: shouldPreserveDuringMorph,
       isEditable: isMorphEditableControl,
       bindOnce,
+      preserve: preserveDuringMorph,
+      release: releaseAfterMorph,
+      isPreserved: isPreservedDuringMorph,
     };
   `, context);
   return context.morphTest;
@@ -195,4 +198,33 @@ test("binding a missing element is a no-op", () => {
 
   assert.doesNotThrow(() => bindOnce(null, "click", () => {}));
   assert.doesNotThrow(() => bindOnce(undefined, "click", () => {}));
+});
+
+// An inline editor's open state lives only in the DOM: the rendered HTML always
+// describes the closed field, so a refresh would collapse it mid-edit. The mark
+// claims the whole subtree, which is why it is checked before the control tests.
+test("a subtree claimed by an open editor is withheld from a redraw", () => {
+  const { shouldPreserve, preserve, release, isPreserved } = morphRuntime();
+  const field = { nodeType: 1, tagName: "DIV", dataset: {} };
+
+  assert.equal(isPreserved(field), false);
+  assert.equal(shouldPreserve(field, null), false);
+
+  preserve(field);
+  assert.equal(isPreserved(field), true);
+  // A plain wrapper, not a form control, and not focused — the mark alone holds it.
+  assert.equal(shouldPreserve(field, null), true);
+
+  release(field);
+  assert.equal(isPreserved(field), false);
+  assert.equal(shouldPreserve(field, null), false);
+});
+
+test("the preserve helpers tolerate a missing element", () => {
+  const { preserve, release, isPreserved } = morphRuntime();
+
+  assert.doesNotThrow(() => preserve(null));
+  assert.doesNotThrow(() => release(null));
+  assert.equal(isPreserved(null), false);
+  assert.equal(isPreserved({ nodeType: 1, tagName: "DIV" }), false);
 });

@@ -296,6 +296,10 @@ function drawGoalDetail(goal) {
 
   const container = goalDetailContainer();
   if (!container) return;
+  // `<details>` open state is local UI state the server knows nothing about, so
+  // it has to be rendered back or the next refresh closes it under the user.
+  const actionMenuOpen = !!container.querySelector("#goal-action-menu")?.open;
+  const noteComposerOpen = !!container.querySelector(".note-composer")?.open;
   _goalDetailView = { goal, workflow };
   recordFeatureBlockingNotice(goal, featureBlockingNotice);
   renderInto(container, `
@@ -312,7 +316,7 @@ function drawGoalDetail(goal) {
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
                   title="${canOpenAgent ? "Attach to the running Goal Agent" : "The Goal Agent is available while implementation is active"}">Open Agent</button>
-          <details class="nav-menu goal-action-menu" id="goal-action-menu">
+          <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
               <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
@@ -390,7 +394,7 @@ function drawGoalDetail(goal) {
               ? `<p class="muted small">No notes yet.</p>`
               : (goal.notes || []).map(renderNote).join("")}
           </div>
-          <details class="note-composer" data-testid="goal-note-composer" style="margin-top:10px">
+          <details class="note-composer" data-testid="goal-note-composer" style="margin-top:10px"${noteComposerOpen ? " open" : ""}>
             <summary data-testid="goal-note-composer-toggle">+ Add a note</summary>
             <div class="form-row" style="margin-top:8px">
               <textarea id="new-note-body" data-testid="goal-note-body" rows="3"
