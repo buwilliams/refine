@@ -19,10 +19,21 @@ function morphRuntime() {
       isUserEdited: isUserEditedControl,
       shouldPreserve: shouldPreserveDuringMorph,
       isEditable: isMorphEditableControl,
+      bindOnce,
     };
   `, context);
   return context.morphTest;
 }
+
+// Stands in for a DOM element: records the listeners actually attached.
+const listenerSpy = () => ({
+  nodeType: 1,
+  tagName: "BUTTON",
+  attached: [],
+  addEventListener(event, handler) {
+    this.attached.push({ event, handler });
+  },
+});
 
 const input = (props = {}) => ({
   nodeType: 1, tagName: "INPUT", type: "text", value: "", defaultValue: "", ...props,
@@ -122,4 +133,66 @@ test("only form controls are withheld from a redraw", () => {
   assert.equal(shouldPreserve(button, button), false);
   assert.equal(shouldPreserve(textNode, null), false);
   assert.equal(shouldPreserve(null, null), false);
+});
+
+// Screens re-run their bind step after every redraw. Nodes the morph kept must
+// not collect a second copy of a handler, or one click would fire the command
+// once per refresh that had happened since the screen was opened.
+test("a surviving element is bound once no matter how many redraws bind it", () => {
+  const { bindOnce } = morphRuntime();
+  const button = listenerSpy();
+
+  bindOnce(button, "click", () => {});
+  bindOnce(button, "click", () => {});
+  bindOnce(button, "click", () => {});
+
+  assert.equal(button.attached.length, 1);
+});
+
+test("each event on an element binds separately", () => {
+  const { bindOnce } = morphRuntime();
+  const control = listenerSpy();
+
+  bindOnce(control, "mousedown", () => {});
+  bindOnce(control, "click", () => {});
+  bindOnce(control, "keydown", () => {});
+  bindOnce(control, "click", () => {});
+
+  assert.deepEqual(control.attached.map((entry) => entry.event), [
+    "mousedown",
+    "click",
+    "keydown",
+  ]);
+});
+
+// Two distinct handlers for the same event on one element need distinct keys.
+test("an explicit key allows a second handler for the same event", () => {
+  const { bindOnce } = morphRuntime();
+  const control = listenerSpy();
+
+  bindOnce(control, "change", () => {}, "autosave");
+  bindOnce(control, "change", () => {}, "preview");
+  bindOnce(control, "change", () => {}, "autosave");
+
+  assert.equal(control.attached.length, 2);
+});
+
+// Nodes the morph introduced have no binding history, so they must get bound.
+test("a newly rendered element is bound even after its predecessor was", () => {
+  const { bindOnce } = morphRuntime();
+  const before = listenerSpy();
+  const after = listenerSpy();
+
+  bindOnce(before, "click", () => {});
+  bindOnce(after, "click", () => {});
+
+  assert.equal(before.attached.length, 1);
+  assert.equal(after.attached.length, 1);
+});
+
+test("binding a missing element is a no-op", () => {
+  const { bindOnce } = morphRuntime();
+
+  assert.doesNotThrow(() => bindOnce(null, "click", () => {}));
+  assert.doesNotThrow(() => bindOnce(undefined, "click", () => {}));
 });

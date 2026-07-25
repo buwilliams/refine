@@ -158,13 +158,13 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
       toggle.textContent = guidanceEnabled ? "Disable guidance" : "Enable guidance";
     }
   }
-  root.addEventListener("click", (e) => {
+  bindOnce(root, "click", (e) => {
     if (e.target === root) close();
   });
-  root.querySelector("[data-cancel]").addEventListener("click", close);
-  root.querySelector("[data-ok]").addEventListener("click", submit);
-  root.querySelector("[data-delete]")?.addEventListener("click", remove);
-  root.querySelector("[data-toggle-enabled]")?.addEventListener("click", () => {
+  bindOnce(root.querySelector("[data-cancel]"), "click", close);
+  bindOnce(root.querySelector("[data-ok]"), "click", submit);
+  bindOnce(root.querySelector("[data-delete]"), "click", remove);
+  bindOnce(root.querySelector("[data-toggle-enabled]"), "click", () => {
     guidanceEnabled = !guidanceEnabled;
     updateGuidanceEnabled();
   });

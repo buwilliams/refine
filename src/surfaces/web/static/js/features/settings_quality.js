@@ -113,7 +113,7 @@ function bindSettingsQualityNodeSections(tabSlug = "nodes") {
       errorPrefix: "Save failed",
     },
   );
-  $("#s-quality-timing")?.addEventListener("change", async () => {
+  bindOnce($("#s-quality-timing"), "change", async () => {
     await autosaveQuality();
   });
 }

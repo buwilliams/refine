@@ -32,7 +32,7 @@ function renderSettingsReportersTab(reps, activeNodeLabel) {
 }
 
 function bindSettingsReportersTab() {
-  $$("[data-rmerge]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-rmerge]").forEach((b) => bindOnce(b, "click", async () => {
     const oldName = b.dataset.name;
     const targetId = await openReporterMergeModal({
       id: b.dataset.rmerge,
@@ -53,7 +53,7 @@ function bindSettingsReportersTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-rdel]").forEach((b) => bindOnce(b, "click", async () => {
     const ok = await modalConfirm(
       "Remove this reporter from the dropdown? Historical rounds keep their original reporter string.",
       { title: "Remove reporter", okLabel: "Remove", danger: true },
@@ -64,7 +64,7 @@ function bindSettingsReportersTab() {
       catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-rename]").forEach((b) => bindOnce(b, "click", async () => {
     const oldName = b.dataset.name;
     const name = await modalPrompt("New name", oldName,
                                    { title: "Rename reporter" });
@@ -79,7 +79,7 @@ function bindSettingsReportersTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $("#r-add").addEventListener("click", async (e) => {
+  bindOnce($("#r-add"), "click", async (e) => {
     const btn = e.currentTarget;
     const name = await modalPrompt("Reporter name", "",
                                    { title: "Add reporter" });

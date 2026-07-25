@@ -81,13 +81,13 @@ function bindSettingsNodesTab() {
     if (menu) menu.open = false;
   };
   $$("[data-testid='node-action-menu-toggle']").forEach((summary) => {
-    summary.addEventListener("click", () => {
+    bindOnce(summary, "click", () => {
       $$(".node-action-menu[open]").forEach((menu) => {
         if (!menu.contains(summary)) menu.open = false;
       });
     });
   });
-  $("#node-add")?.addEventListener("click", async (e) => {
+  bindOnce($("#node-add"), "click", async (e) => {
     const btn = e.currentTarget;
     const name = await modalPrompt("Node name", "",
                                    { title: "Create node" });
@@ -99,7 +99,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   });
-  $$("[data-node-activate]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-activate]").forEach((b) => bindOnce(b, "click", async () => {
     await withButtonBusy(b, "Activating...", async () => {
       try {
         const result = await api("POST", "/api/nodes/activate", { node_id: b.dataset.nodeActivate });
@@ -116,7 +116,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-node-rename]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-rename]").forEach((b) => bindOnce(b, "click", async () => {
     closeNodeActionMenu(b);
     const name = await modalPrompt("Node name", b.dataset.name || "",
                                    { title: "Rename node" });
@@ -130,7 +130,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-node-archive]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-archive]").forEach((b) => bindOnce(b, "click", async () => {
     closeNodeActionMenu(b);
     const ok = await modalConfirm(
       "Archive this node? Goal ownership IDs stay unchanged and can still be transferred.",
@@ -146,7 +146,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-node-remote-configure]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-remote-configure]").forEach((b) => bindOnce(b, "click", async () => {
     closeNodeActionMenu(b);
     const payload = await openNodeConnectionModal(b);
     if (!payload) return;
@@ -160,7 +160,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-node-remote-toggle]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-remote-toggle]").forEach((b) => bindOnce(b, "click", async () => {
     closeNodeActionMenu(b);
     const enabled = b.dataset.enabled !== "1";
     await withButtonBusy(b, enabled ? "Enabling..." : "Disabling...", async () => {
@@ -172,7 +172,7 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $$("[data-node-remote-bootstrap]").forEach((b) => b.addEventListener("click", async () => {
+  $$("[data-node-remote-bootstrap]").forEach((b) => bindOnce(b, "click", async () => {
     closeNodeActionMenu(b);
     const ok = await modalConfirm(
       "Bootstrap this node over SSH using the current host user?",
@@ -279,11 +279,11 @@ function openNodeConnectionModal(button) {
     }
 
     document.addEventListener("keydown", onKey, true);
-    root.addEventListener("click", (event) => {
+    bindOnce(root, "click", (event) => {
       if (event.target === root) close(null);
     });
-    root.querySelector("[data-cancel]")?.addEventListener("click", () => close(null));
-    form.addEventListener("submit", (event) => {
+    bindOnce(root.querySelector("[data-cancel]"), "click", () => close(null));
+    bindOnce(form, "submit", (event) => {
       event.preventDefault();
       submit();
     });

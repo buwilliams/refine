@@ -397,13 +397,16 @@ function applyGeneratedTargetAppConfig(cfg) {
 }
 
 function bindProjectApplicationsControls(currentProject, refreshTab = "runtime") {
-  $("#s-project-add")?.addEventListener("click", async () => {
+  bindOnce($("#s-project-add"), "click", async () => {
     await openAddAppModal();
   });
-  $("#s-project-switch")?.addEventListener("click", async (e) => {
+  bindOnce($("#s-project-switch"), "click", async (e) => {
     const btn = e.currentTarget;
     const path = ($("#s-project-select")?.value || "").trim();
-    if (!path || path === currentProject) return;
+    // Read the active app live: this handler is bound once and outlives the
+    // render that bound it, so the `currentProject` argument goes stale as soon
+    // as the app is switched.
+    if (!path || path === (state.project?.target_root || "")) return;
     const ok = await modalConfirm(
       "Switch refine to the selected app? Running agents will be stopped and the current app must be clean.",
       { title: "Switch app", okLabel: "Switch" },
@@ -442,7 +445,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
       }
     });
   });
-  $("#s-project-remove")?.addEventListener("click", async (e) => {
+  bindOnce($("#s-project-remove"), "click", async (e) => {
     const btn = e.currentTarget;
     const path = ($("#s-project-select")?.value || "").trim();
     if (!path) return;
@@ -508,7 +511,7 @@ function bindNodeApplicationConfigControls() {
   const autoBuild = $("#s-target-auto-build");
   const autoBuildHour = $("#s-target-auto-build-hour-utc");
   if (autoBuild && autoBuildHour) {
-    autoBuild.addEventListener("change", () => {
+    bindOnce(autoBuild, "change", () => {
       autoBuildHour.disabled = autoBuild.value !== "daily";
       syncSettingsEditableDisabled(autoBuildHour);
     });

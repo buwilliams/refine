@@ -1170,10 +1170,19 @@ product capability:
   narrow bridge command definitions used by the Tauri wrapper.
 - `surfaces::web`; path: `src/surfaces/web/`. Owns the native web UI assets,
   generated client bindings, and asset packaging metadata. Static assets live
-  under `src/surfaces/web/static/`. Background refreshes must redraw in place:
-  a screen update morphs the existing DOM rather than replacing it, must not
-  overwrite a control the user is focused in or has edited but not saved, and
-  must not re-bind handlers onto nodes that survived the redraw.
+  under `src/surfaces/web/static/`. Background refreshes must redraw in place
+  through the shared `renderInto` and `bindOnce` helpers in
+  `static/js/dom-morph.js`:
+  - `renderInto(root, html, bind)` morphs `html` onto the existing tree instead
+    of replacing it, so focus, caret, scroll offset, and attached listeners
+    survive a refresh. It must not overwrite a control the user is focused in or
+    has edited but not saved.
+  - `bindOnce(el, event, handler)` attaches a listener once per element, which is
+    what makes the bind step safe to re-run after every redraw. Handlers must
+    read live state rather than closing over data from the render that bound
+    them, because a surviving node keeps its original handler.
+  - Only route-entry paints may assign `innerHTML` directly; replacing a whole
+    screen on navigation is correct, and refreshes are what must morph.
 - `surfaces::web_server`; path: `src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
   serving, same-origin mutation checks, request parsing, response shaping, and

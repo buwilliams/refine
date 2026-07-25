@@ -1390,7 +1390,14 @@ function renderPaginationControls(idPrefix, pageMeta = {}, itemCount = 0,
 
 function bindPaginationControls(root, idPrefix, onPage) {
   $$(`#${idPrefix}-pagination [data-page]`, root).forEach((btn) => {
-    btn.addEventListener("click", () => onPage(parseInt(btn.dataset.page, 10)));
+    // The listener is bound once, but each redraw supplies a fresh `onPage`
+    // closure, so the latest one is parked on the element for the handler to
+    // read. A property rather than a `data-` attribute: the morph would strip
+    // the attribute, and it holds a function besides.
+    btn._refinePageHandler = onPage;
+    bindOnce(btn, "click", () => {
+      btn._refinePageHandler?.(parseInt(btn.dataset.page, 10));
+    });
   });
 }
 

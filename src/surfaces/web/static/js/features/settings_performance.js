@@ -185,15 +185,21 @@ function performanceMetricStoreLabel(backend = {}) {
   return "Local runtime history";
 }
 
+// Latest metrics backend, refreshed on every bind. The filter-clear handler is
+// bound once and outlives the render that bound it, so it reads this rather than
+// closing over the arguments it was first called with.
+let _performanceBackend = null;
+
 function bindSettingsPerformanceTab(
   s, diag, reps, feats, gov, dash, nodeData, guidanceData, performanceBackend = null,
 ) {
-  $("#performance-refresh")?.addEventListener("click", async (e) => {
+  _performanceBackend = performanceBackend || diag?.backend || null;
+  bindOnce($("#performance-refresh"), "click", async (e) => {
     await withButtonBusy(e.currentTarget, "Refreshing…", async () => {
       await refreshSettingsTab("performance", { force: true });
     });
   });
-  $("#performance-prune")?.addEventListener("click", async (e) => {
+  bindOnce($("#performance-prune"), "click", async (e) => {
     await withButtonBusy(e.currentTarget, "Pruning…", async () => {
       try {
         const r = await api("POST", "/api/performance/cleanup", {});
@@ -202,7 +208,7 @@ function bindSettingsPerformanceTab(
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#performance-clear")?.addEventListener("click", async (e) => {
+  bindOnce($("#performance-clear"), "click", async (e) => {
     const btn = e.currentTarget;
     const ok = await modalConfirm(
       "Delete all local performance metrics? This cannot be undone.",
@@ -217,18 +223,18 @@ function bindSettingsPerformanceTab(
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#performance-operation-filter")?.addEventListener("change", (e) =>
+  bindOnce($("#performance-operation-filter"), "change", (e) =>
     updatePerformanceFilter({ operation: e.target.value, page: 1 }));
-  $("#performance-success-filter")?.addEventListener("change", (e) =>
+  bindOnce($("#performance-success-filter"), "change", (e) =>
     updatePerformanceFilter({ success: e.target.value, page: 1 }));
-  $("#performance-limit")?.addEventListener("change", (e) =>
+  bindOnce($("#performance-limit"), "change", (e) =>
     updatePerformanceFilter({
       limit: parseInt(e.target.value, 10) || PERFORMANCE_DEFAULT_LIMIT,
       page: 1,
     }));
-  $("#performance-filter-clear")?.addEventListener("click", () => {
+  bindOnce($("#performance-filter-clear"), "click", () => {
     history.replaceState(null, "", "#/node/performance");
-    loadPerformanceEvents(performanceBackend || diag?.backend || {});
+    loadPerformanceEvents(_performanceBackend || {});
   });
   const root = document.querySelector('[data-tab-pane="performance"]');
   if (root) {

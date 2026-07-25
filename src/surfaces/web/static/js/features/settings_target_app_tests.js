@@ -149,11 +149,11 @@ function bindTargetAppTestCommandList(root = document) {
 
     const bindRows = () => {
       $$("[data-target-test-enabled], [data-target-test-command]", list).forEach((control) => {
-        control.addEventListener("input", syncValue);
-        control.addEventListener("change", syncValue);
+        bindOnce(control, "input", syncValue);
+        bindOnce(control, "change", syncValue);
       });
       $$("[data-target-test-remove]", list).forEach((button) => {
-        button.addEventListener("click", () => {
+        bindOnce(button, "click", () => {
           button.closest("[data-target-test-command-row]")?.remove();
           if (!list.querySelector("[data-target-test-command-row]")) {
             list.innerHTML = renderTargetAppTestCommandRows([]);
@@ -163,7 +163,7 @@ function bindTargetAppTestCommandList(root = document) {
       });
     };
 
-    add.addEventListener("click", () => {
+    bindOnce(add, "click", () => {
       const commands = commandsFromRows();
       commands.push({ command: "", enabled: true });
       list.innerHTML = renderTargetAppTestCommandRows(commands);

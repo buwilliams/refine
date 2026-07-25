@@ -614,7 +614,7 @@ function setSupervisorProcessExpanded(expanded) {
 }
 
 function bindSupervisorProcessToggle() {
-  document.querySelector("[data-supervisor-toggle]")?.addEventListener("click", () => {
+  bindOnce(document.querySelector("[data-supervisor-toggle]"), "click", () => {
     setSupervisorProcessExpanded(!supervisorProcessExpanded);
   });
 }
@@ -689,8 +689,8 @@ function runnerWorkKindLabel(kind) {
 function bindProcessDetailCells() {
   updateProcessDetailAffordances();
   $$(".process-details-cell").forEach((cell) => {
-    cell.addEventListener("click", () => openProcessDetailsIfOverflowing(cell));
-    cell.addEventListener("keydown", (ev) => {
+    bindOnce(cell, "click", () => openProcessDetailsIfOverflowing(cell));
+    bindOnce(cell, "keydown", (ev) => {
       if (ev.key !== "Enter" && ev.key !== " ") return;
       if (!cell.classList.contains("is-overflowing")) return;
       ev.preventDefault();
@@ -898,7 +898,7 @@ function bindSettingsProcessesTab(s) {
   bindProcessDetailCells();
   bindSupervisorProcessToggle();
   $$("[data-toggle-workflow]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       const shouldPause = b.dataset.toggleWorkflow === "pause";
       const ok = shouldPause
         ? await modalConfirm(
@@ -919,7 +919,7 @@ function bindSettingsProcessesTab(s) {
   });
   bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
   $$("[data-stop-agent]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       const processId = b.dataset.stopAgent;
       const goalId = b.dataset.stopAgentGoal;
       const ok = await modalConfirm(
@@ -941,7 +941,7 @@ function bindSettingsProcessesTab(s) {
     });
   });
   $$("[data-cancel-agent]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       const id = b.dataset.cancelAgent;
       const ok = await modalConfirm(
         "Cancel this Goal's running subprocess?",
@@ -958,7 +958,7 @@ function bindSettingsProcessesTab(s) {
     });
   });
   $$("[data-stop-chat]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       const id = b.dataset.stopChat;
       const ok = await modalConfirm(
         "Stop this chat session?",
@@ -975,7 +975,7 @@ function bindSettingsProcessesTab(s) {
     });
   });
   $$("[data-runner-target-app-build]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       await withButtonBusy(b, "Queueing…", async () => {
         try {
           const queued = await api("POST", "/api/runner-workers/target-app-builder/build");
@@ -989,19 +989,19 @@ function bindSettingsProcessesTab(s) {
     });
   });
   $$("[data-runner-target-app-generate]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       await runCommand("target_app.generate", {
         context: { button: b },
       });
     });
   });
   $$("[data-runner-cache-rebuild]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       await runCommand("system.cache.rebuild", { context: { button: b } });
     });
   });
   $$("[data-runner-log-cleanup]").forEach((b) => {
-    b.addEventListener("click", async () => {
+    bindOnce(b, "click", async () => {
       const select = b.parentElement?.querySelector("[data-runner-log-cleanup-days]");
       const days = parseInt(select?.value || "7", 10);
       await runCommand("system.logs.cleanup", {

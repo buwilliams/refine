@@ -338,7 +338,7 @@ function bindNodeRuntimeConfigControls() {
   );
   bindCommand("#s-recheck", "runtime.recheck_auth");
   const syncNow = document.querySelector("#s-state-sync-now");
-  syncNow?.addEventListener("click", async () => {
+  bindOnce(syncNow, "click", async () => {
     await withButtonBusy(syncNow, "Syncing...", async () => {
       try {
         const queued = await api("POST", "/api/project/sync", {});
@@ -366,7 +366,7 @@ function bindNodeRuntimeConfigControls() {
 
 function bindRuntimeUpgradeBanner(rootSelector = ".settings-tabs-row") {
   const root = document.querySelector(rootSelector);
-  root?.addEventListener("click", (e) => {
+  bindOnce(root, "click", (e) => {
     const button = e.target.closest("[data-runtime-copy-upgrade]");
     if (!button) return;
     copyRuntimeUpgradeCommand(button.getAttribute("data-runtime-copy-upgrade") || "");

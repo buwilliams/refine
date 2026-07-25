@@ -265,19 +265,7 @@ function detachedSettingsSurfaceData(project = {}) {
 function updateSettingsTabContent(slug, body, bind) {
   const card = document.querySelector(`[data-tab-pane="${slug}"] .settings-tab-card`);
   if (!card) return;
-  const next = document.createElement("div");
-  next.innerHTML = body;
-  if (card.innerHTML === next.innerHTML) return;
-  const focus = captureMorphFocus(card);
-  const { structural } = morphChildren(card, body);
-  // Nodes the morph kept still carry the listeners they were bound with, so
-  // re-binding here would attach a second copy of every handler. Only a
-  // structural change introduces nodes that need binding, and only that path
-  // has to disturb the controls the user is working in.
-  if (!structural) return;
-  rearmSettingsControls(card);
-  if (typeof bind === "function") bind();
-  restoreMorphFocus(card, focus);
+  renderInto(card, body, bind);
 }
 
 async function copySettingsFromNode(section, {
@@ -321,16 +309,6 @@ async function copySettingsFromNode(section, {
       toast(`Copied ${r.copied_count || 0} setting${r.copied_count === 1 ? "" : "s"}.`, "info");
       await refreshSettingsTab(refreshTab, { force: true });
     } catch (e) { await showActionError(e, "Copy failed"); }
-  });
-}
-
-// Strip listeners from a tab's controls so the tab's bind functions can re-attach
-// without doubling up. Replacing a node drops the user's focus with it, so this
-// runs only on the structural path, paired with `restoreMorphFocus`.
-function rearmSettingsControls(root) {
-  $$("button, input, select, textarea, a, [tabindex], [data-full-details]", root).forEach((el) => {
-    const clone = el.cloneNode(true);
-    el.replaceWith(clone);
   });
 }
 
@@ -420,7 +398,7 @@ function bindSettingsAutosave(root, selector, save, options = {}) {
   const autosave = createSettingsAutosave(save, { ...options, controls });
   if (!root) return autosave;
   controls.forEach((el) => {
-    el.addEventListener(options.event || "change", autosave);
+    bindOnce(el, options.event || "change", autosave, "settings-autosave");
   });
   return autosave;
 }
@@ -644,17 +622,17 @@ function bindSettingsEditableFields(root) {
     control.dataset.settingsCommittedValue = settingsControlValue(control);
     updateSettingsEditablePreview(field);
     syncSettingsEditableDisabled(control);
-    btn.addEventListener("mousedown", (e) => {
+    bindOnce(btn, "mousedown", (e) => {
       if (btn.dataset.settingsEditableEditing === "1") e.preventDefault();
     });
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       if (btn.dataset.settingsEditableEditing === "1") {
         commitSettingsEditableField(field);
       } else {
         editSettingsEditableField(field);
       }
     });
-    control.addEventListener("keydown", (e) => {
+    bindOnce(control, "keydown", (e) => {
       if (e.key === "Enter" && control.tagName !== "TEXTAREA") {
         e.preventDefault();
         commitSettingsEditableField(field);
@@ -665,7 +643,7 @@ function bindSettingsEditableFields(root) {
         commitSettingsEditableField(field);
       }
     });
-    control.addEventListener("change", () => {
+    bindOnce(control, "change", () => {
       updateSettingsEditablePreview(field);
     });
   });
@@ -712,12 +690,12 @@ function editSettingsMarkdownField(field) {
 function bindSettingsMarkdownFields(root) {
   if (!root) return;
   $$("[data-settings-markdown-edit]", root).forEach((btn) => {
-    btn.addEventListener("mousedown", (e) => {
+    bindOnce(btn, "mousedown", (e) => {
       const editor = btn.closest("[data-settings-markdown-field]")
         ?.querySelector("[data-settings-markdown-editor]");
       if (editor && !editor.hidden) e.preventDefault();
     });
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       const field = btn.closest("[data-settings-markdown-field]");
       if (!field) return;
       const editor = field.querySelector("[data-settings-markdown-editor]");
@@ -729,7 +707,7 @@ function bindSettingsMarkdownFields(root) {
     });
   });
   $$("[data-settings-markdown-editor]", root).forEach((editor) => {
-    editor.addEventListener("blur", () => {
+    bindOnce(editor, "blur", () => {
       if (editor.hidden) return;
       commitSettingsMarkdownField(editor.closest("[data-settings-markdown-field]"));
     });
@@ -870,7 +848,7 @@ function renderSettingsPane(slug, body, activeSlug) {
 
 function bindSettingsTabHandlers() {
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       setSettingsTab(btn.dataset.tabTarget);
     });
   });
@@ -1041,7 +1019,7 @@ function disableSettingsControls(markup) {
 
 function bindSettingsNoProjectTab() {
   $$("[data-settings-open-guide]").forEach((button) => {
-    button.addEventListener("click", () => {
+    bindOnce(button, "click", () => {
       if (typeof openGuide === "function") {
         openGuide({
           context: "no-app",

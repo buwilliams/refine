@@ -277,7 +277,7 @@ function initSourceUpdateNav() {
   if (!button) return;
   if (button.dataset.bound !== "true") {
     button.dataset.bound = "true";
-    button.addEventListener("click", promoteSourceFromNav);
+    bindOnce(button, "click", promoteSourceFromNav);
   }
   refreshSourceUpdateNav({ fetchRemote: true });
 }
@@ -285,10 +285,10 @@ function initSourceUpdateNav() {
 function bindSourcePromotionControls() {
   const check = document.getElementById("source-promotion-check");
   const promote = document.getElementById("source-promotion-promote");
-  check?.addEventListener("click", () => withButtonBusy(check, "Checking…", async () => {
+  bindOnce(check, "click", () => withButtonBusy(check, "Checking…", async () => {
     await refreshSourcePromotionStatus({ fetchRemote: true });
   }));
-  promote?.addEventListener("click", () => withButtonBusy(promote, "Queuing…", async () => {
+  bindOnce(promote, "click", () => withButtonBusy(promote, "Queuing…", async () => {
     try {
       const result = await queueSourcePromotionFromUi();
       if (!result) return;
@@ -344,13 +344,18 @@ function renderReleaseOperation(operation) {
   </article>`;
 }
 
+// Latest prepared release, refreshed on every bind. The publish handler is bound
+// once and outlives the render that bound it, so it has to read this rather than
+// close over the `releases` it was first called with.
+let _releasePreparation = null;
+
 function bindSettingsReleasesTab(releases = {}) {
   bindSourcePromotionControls();
-  $("#release-preview")?.addEventListener("click", previewRelease);
-  $("#release-prepare")?.addEventListener("click", prepareRelease);
-  const prepared = [...(releases.operations || [])].reverse().find((operation) => operation.owner === "release:prepare" && operation.preparation)?.preparation;
-  $("#release-publish")?.addEventListener("click", () => publishRelease(prepared));
-  $$('[data-release-retry]').forEach((button) => button.addEventListener("click", async () => {
+  bindOnce($("#release-preview"), "click", previewRelease);
+  bindOnce($("#release-prepare"), "click", prepareRelease);
+  _releasePreparation = [...(releases.operations || [])].reverse().find((operation) => operation.owner === "release:prepare" && operation.preparation)?.preparation;
+  bindOnce($("#release-publish"), "click", () => publishRelease(_releasePreparation));
+  $$('[data-release-retry]').forEach((button) => bindOnce(button, "click", async () => {
     const publish = button.dataset.releasePublishRetry === "true";
     if (publish && !confirm("Retry publishing this release? This may create and push a tag and publish externally.")) return;
     await api("POST", `/api/system/releases/${button.dataset.releaseRetry}/retry`, { confirmed: publish });

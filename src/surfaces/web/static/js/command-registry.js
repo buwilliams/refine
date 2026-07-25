@@ -166,7 +166,9 @@ async function runCommand(id, options = {}) {
 function bindCommand(target, id, options = {}) {
   const el = typeof target === "string" ? document.querySelector(target) : target;
   if (!el) return;
-  el.addEventListener("click", async (e) => {
+  // Bound once per element: screens re-run their bind step after every redraw,
+  // and a surviving node must not collect a second copy of the command.
+  bindOnce(el, "click", async (e) => {
     if (options.preventDefault !== false) e.preventDefault();
     if (typeof options.beforeRun === "function") await options.beforeRun(e);
     await runCommand(id, {

@@ -37,7 +37,7 @@ function scheduleAutosaveSettingsGovernance() {
 
 function bindGovernanceRuleButtons() {
   $$("[data-governance-remove-rule]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    bindOnce(btn, "click", () => {
       btn.closest(".governance-rule-row")?.remove();
       if (!$(".governance-rule-input")) {
         $("#governance-rules-list").innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
@@ -61,14 +61,14 @@ function addGovernanceRuleRow(text = "") {
     <button class="danger" data-governance-remove-rule data-testid="governance-remove-rule">Remove</button>
   `;
   list.appendChild(row);
-  row.querySelector("[data-governance-remove-rule]").addEventListener("click", () => {
+  bindOnce(row.querySelector("[data-governance-remove-rule]"), "click", () => {
     row.remove();
     if (!$(".governance-rule-input")) {
       list.innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
     }
     scheduleAutosaveSettingsGovernance();
   });
-  row.querySelector("input")?.addEventListener("change", scheduleAutosaveSettingsGovernance);
+  bindOnce(row.querySelector("input"), "change", scheduleAutosaveSettingsGovernance);
   row.querySelector("input")?.focus();
 }
 
@@ -138,8 +138,8 @@ function bindSettingsGovernanceTab(tabSlug = "governance") {
     "#s-governance-product, #s-governance-constitution, .governance-rule-input",
     autosaveSettingsGovernance,
   );
-  $("#s-governance-add-rule")?.addEventListener("click", () => addGovernanceRuleRow());
-  $("#s-governance-generate")?.addEventListener("click", async (e) => {
+  bindOnce($("#s-governance-add-rule"), "click", () => addGovernanceRuleRow());
+  bindOnce($("#s-governance-generate"), "click", async (e) => {
     const btn = e.currentTarget;
     const product = ($("#s-governance-product")?.value || "").trim();
     const constitution = ($("#s-governance-constitution")?.value || "").trim();

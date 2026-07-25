@@ -1,17 +1,32 @@
-// ---- DOM morphing -----------------------------------------------------------
+// ---- Redraw-in-place rendering ----------------------------------------------
 //
-// Screens render HTML strings and swap them in with `innerHTML`. That destroys
-// and rebuilds every node, which drops focus, caret position, scroll offset, and
-// every attached listener — so any background refresh (SSE, polling) interrupts
-// whatever the user was editing mid-keystroke.
+// THE PATTERN. Every screen that redraws after its first paint uses exactly two
+// calls, and nothing else should assign `innerHTML` on a refresh path:
 //
-// Morphing updates the existing tree in place instead: nodes that did not change
-// keep their identity, so their listeners and the user's focus survive. Only the
-// parts that actually differ are touched.
+//   async function refreshThing() {
+//     const data = await api("GET", "/api/thing");
+//     renderInto($("#thing"), thingHtml(data), () => {
+//       $$(".thing-row").forEach((row) => bindOnce(row, "click", onRowClick));
+//     });
+//   }
 //
-// Idiomorph still syncs form values onto the nodes it keeps, which would replace
-// an in-progress edit with the server's value. `shouldPreserveDuringMorph`
-// decides which controls a redraw is not allowed to touch.
+// `renderInto` morphs the new HTML onto the existing tree instead of replacing
+// it. Nodes that did not change keep their identity, so the user's focus, caret,
+// scroll offset, and every attached listener survive a background refresh.
+//
+// `bindOnce` makes the bind step safe to run after every render: nodes that
+// survived the morph are skipped, and only new nodes get listeners. That is what
+// removes the need to strip listeners by replacing nodes first — the old
+// approach, which is precisely what interrupted the user mid-edit.
+//
+// Two rules the callbacks must follow:
+//
+//   1. Read live state inside the handler; do not close over data from the
+//      render that bound it. A surviving node keeps its original handler, so a
+//      captured `data` goes stale on the next refresh. Read `state.*` or the
+//      element's own `dataset` instead.
+//   2. Route-entry paints may still assign `innerHTML` — replacing the whole
+//      screen on navigation is correct. It is only refreshes that must morph.
 
 // Which controls a redraw must leave alone: the one the user is currently in,
 // and any whose value they have changed but not yet saved.
@@ -51,28 +66,52 @@ function shouldPreserveDuringMorph(el, activeEl) {
   return isUserEditedControl(el);
 }
 
-// Morph `root`'s children to `html`.
+// Listeners already attached, tracked off-DOM. A `data-` marker would not work:
+// the morph syncs attributes against the incoming HTML, which does not carry the
+// marker, so it would be stripped and the element would be bound twice.
+const BOUND_LISTENERS = new WeakMap();
+
+// Attach `handler` to `el` once, no matter how many redraws call this.
 //
-// Returns `{ structural }` — whether the morph added, removed, or replaced any
-// node. When nothing structural changed, every surviving node still carries the
-// listeners it was bound with, so callers must not re-bind (that would attach a
-// second copy of every handler). When it did, new nodes need binding.
+// `key` distinguishes multiple listeners for the same event on one element;
+// it defaults to the event name, which is what nearly every caller wants.
+function bindOnce(el, event, handler, key = event) {
+  if (!el) return;
+  let bound = BOUND_LISTENERS.get(el);
+  if (!bound) {
+    bound = new Set();
+    BOUND_LISTENERS.set(el, bound);
+  }
+  if (bound.has(key)) return;
+  bound.add(key);
+  el.addEventListener(event, handler);
+}
+
 function morphChildren(root, html) {
-  let structural = false;
   const activeEl = document.activeElement;
   Idiomorph.morph(root, html, {
     morphStyle: "innerHTML",
     callbacks: {
       beforeNodeMorphed: (fromEl) => !shouldPreserveDuringMorph(fromEl, activeEl),
-      afterNodeAdded: () => { structural = true; },
-      beforeNodeRemoved: () => { structural = true; return true; },
     },
   });
-  return { structural };
 }
 
-// Focus, caret, and scroll offset of whatever the user is in, so a redraw that
-// does have to replace nodes can put them back where they were.
+// Redraw `root`'s contents from `html`, then re-run `bind`.
+//
+// `bind` must use `bindOnce` (or otherwise be idempotent) because it runs on
+// every redraw. It runs unconditionally so that nodes the morph introduced are
+// always bound.
+function renderInto(root, html, bind) {
+  if (!root) return;
+  // Idiomorph keeps nodes in place, but a changed tag or id still forces a
+  // replacement, which would drop focus. Cheap safety net for that case.
+  const focus = captureMorphFocus(root);
+  morphChildren(root, html);
+  if (typeof bind === "function") bind();
+  restoreMorphFocus(root, focus);
+}
+
 function captureMorphFocus(root) {
   const el = document.activeElement;
   if (!el || !root?.contains(el) || !isMorphEditableControl(el)) return null;
@@ -99,7 +138,8 @@ function restoreMorphFocus(root, snapshot) {
       && root.querySelector(`[data-testid="${CSS.escape(snapshot.testId)}"]`))
     || (snapshot.name && root.querySelector(`[name="${CSS.escape(snapshot.name)}"]`))
     || byIndex();
-  if (!el || el.disabled || el.readOnly || !isMorphEditableControl(el)) return;
+  if (!el || el === document.activeElement) return;
+  if (el.disabled || el.readOnly || !isMorphEditableControl(el)) return;
   el.focus({ preventScroll: true });
   if (typeof el.setSelectionRange === "function"
     && snapshot.selectionStart !== null && snapshot.selectionEnd !== null) {
