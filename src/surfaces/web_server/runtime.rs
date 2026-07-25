@@ -143,7 +143,11 @@ impl InProcessWebServer {
     pub(super) fn work_item_service(&self, refine_dir: impl Into<PathBuf>) -> FileWorkItemService {
         let refine_dir = refine_dir.into();
         if let Some(runtime_root) = &self.runtime_root {
-            FileWorkItemService::with_projection_cache(refine_dir, runtime_root.join("cache"))
+            FileWorkItemService::with_projection_cache(
+                refine_dir,
+                runtime_root,
+                runtime_root.join("cache"),
+            )
         } else {
             FileWorkItemService::new(refine_dir)
         }

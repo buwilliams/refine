@@ -437,6 +437,7 @@ impl FileChatService {
         let target_root = target_root_for_refine_dir(&self.refine_dir)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
+            &self.runtime_root,
             self.runtime_root.join("cache"),
         );
         let goal = work_items.create_goal_summary(&name, None)?;

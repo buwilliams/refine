@@ -117,6 +117,7 @@ impl BacklogPromotionService {
         });
         let service = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
+            &self.runtime_root,
             self.runtime_root.join("cache"),
         );
         for goal in &candidates {

@@ -199,6 +199,7 @@ impl FileMergerService {
     pub fn approve_reviewed_goal(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let work_items = FileWorkItemService::with_projection_cache(
             &self.refine_dir,
+            &self.runtime_root,
             self.runtime_root.join("cache"),
         );
         let goal = work_items.show_goal_summary(goal_id)?;

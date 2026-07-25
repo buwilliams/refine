@@ -437,6 +437,7 @@ impl FileReleaseService {
         let refine_dir = prepare_refine_dir(&self.repo_root)?;
         Ok(FileWorkItemService::with_projection_cache(
             refine_dir,
+            &self.runtime_root,
             self.runtime_root.join("cache"),
         ))
     }

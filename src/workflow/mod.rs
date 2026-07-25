@@ -1100,6 +1100,7 @@ impl WorkflowEngine {
         let refine_dir = prepare_refine_dir(target_root)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
+            &self.runtime_root,
             self.runtime_root
                 .join("cache/workflow")
                 .join(&claim.claim_id),

@@ -164,6 +164,7 @@ impl FileGoalExportService {
         match &self.runtime_root {
             Some(runtime_root) => FileWorkItemService::with_projection_cache(
                 &self.refine_dir,
+                runtime_root,
                 runtime_root.join("cache"),
             ),
             None => FileWorkItemService::new(&self.refine_dir),

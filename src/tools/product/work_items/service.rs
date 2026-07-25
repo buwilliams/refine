@@ -202,16 +202,25 @@ impl FileWorkItemService {
         }
     }
 
+    /// Reads projections through `cache_dir` while resolving Node ownership and
+    /// project state against `runtime_root`.
+    ///
+    /// The runtime root is passed explicitly rather than inferred from the cache
+    /// directory. It used to be taken as `cache_dir.parent()`, which held only for
+    /// callers whose cache directory sat immediately under the runtime root: a
+    /// caller scoping its cache per unit of work (`cache/workflow/<claim id>`)
+    /// resolved the runtime root to `cache/workflow`, where no `active-node.json`
+    /// exists, so every ownership check compared against the `default` fallback
+    /// and rejected goals owned by the real active Node.
     pub fn with_projection_cache(
         refine_dir: impl Into<PathBuf>,
+        runtime_root: impl Into<PathBuf>,
         cache_dir: impl Into<PathBuf>,
     ) -> Self {
-        let cache_dir = cache_dir.into();
-        let active_node_root = cache_dir.parent().map(PathBuf::from);
         Self {
             refine_dir: refine_dir.into(),
-            projection_cache_dir: Some(cache_dir),
-            active_node_root,
+            projection_cache_dir: Some(cache_dir.into()),
+            active_node_root: Some(runtime_root.into()),
             active_node_id_override: None,
         }
     }
@@ -220,8 +229,11 @@ impl FileWorkItemService {
         &self,
     ) -> RefineResult<crate::tools::product::project_state::ProjectionSnapshot> {
         if let Some(cache_dir) = &self.projection_cache_dir {
-            let store = cache_dir
-                .parent()
+            // Same explicit runtime root as ownership resolution: inferring it from
+            // the cache directory pointed the store at a nested cache path.
+            let store = self
+                .active_node_root
+                .as_ref()
                 .map(|runtime_root| {
                     FileProjectStateStore::with_runtime_root(&self.refine_dir, runtime_root)
                 })

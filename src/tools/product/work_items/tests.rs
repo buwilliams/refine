@@ -65,6 +65,58 @@ fn projected_status_transition_rejects_an_external_revision_change() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+// Claim execution scopes its projection cache per claim
+// (`cache/workflow/<claim id>`), so inferring the runtime root from the cache
+// directory landed on `cache/workflow`. No `active-node.json` exists there, the
+// active Node fell back to `default`, and every goal owned by the real active
+// Node failed its ownership check — automation claimed goals, failed instantly,
+// and left them in `todo` forever.
+#[test]
+fn a_nested_projection_cache_still_resolves_the_real_active_node() {
+    let temp_root = unique_temp_dir("work-item-nested-cache-active-node");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    fs::create_dir_all(&runtime_root).unwrap();
+    fs::write(
+        runtime_root.join("active-node.json"),
+        json!({
+            "active_node_id": "bo2lnxnevo03-buddy",
+            "refine_dir": refine_dir.display().to_string(),
+            "updated_at": "2026-07-25T00:00:00Z"
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    // A goal owned by that Node, as automation would have created it.
+    let owned = FileWorkItemService::for_node(&refine_dir, "bo2lnxnevo03-buddy")
+        .create_goal_summary("Owned by the active node", Some("GOAL1"))
+        .unwrap();
+    assert_eq!(owned.goal.node_id.as_deref(), Some("bo2lnxnevo03-buddy"));
+
+    // The cache directory claim execution uses: two levels below the runtime root.
+    let nested_cache = runtime_root.join("cache/workflow").join("CLAIM123");
+    let service =
+        FileWorkItemService::with_projection_cache(&refine_dir, &runtime_root, &nested_cache);
+
+    // Ownership must resolve against runtime_root/active-node.json, not against a
+    // file that would have to sit next to the nested cache directory.
+    assert!(!nested_cache.join("active-node.json").exists());
+    service
+        .transition_goal_status(&owned.goal.id, GoalStatus::Todo)
+        .unwrap();
+    assert_eq!(
+        service
+            .show_goal_summary(&owned.goal.id)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Todo
+    );
+
+    fs::remove_dir_all(temp_root).unwrap_or(());
+}
+
 #[test]
 fn file_work_item_service_creates_and_lists_goal_json() {
     let temp_root = unique_temp_dir("work-item-create");
