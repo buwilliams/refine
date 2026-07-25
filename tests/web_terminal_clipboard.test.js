@@ -94,6 +94,18 @@ function clipboardRuntime() {
     },
   };
   const context = vm.createContext({
+    // The real helpers live in dom-morph.js and need a browser DOM plus
+    // Idiomorph. These stand in with the pre-morph semantics this fake DOM
+    // models: replace the content, then run the bind step.
+    renderInto(root, html, bind) {
+      if (!root) return;
+      root.innerHTML = html;
+      if (typeof bind === "function") bind();
+    },
+    bindOnce(el, event, handler) {
+      if (!el) return;
+      el.addEventListener(event, handler);
+    },
     AbortController,
     EventSource: class {
       addEventListener() {}

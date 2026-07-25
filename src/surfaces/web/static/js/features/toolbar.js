@@ -541,7 +541,7 @@ function drawToolbar() {
   if (chatState.open && !chatState.bodyHeight) {
     chatState.bodyHeight = defaultToolbarBodyHeight();
   }
-  root.innerHTML = `
+  renderInto(root, `
     <div class="toolbar-dock-resize" id="toolbar-dock-resize"
          role="separator" aria-orientation="horizontal"
          aria-label="Resize Toolbar"
@@ -606,56 +606,57 @@ function drawToolbar() {
               ? renderGoalLogPanel(active)
               : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use the Add button to open a tool or agent.</div>`}
     </div>
-  `;
-  if (filesActive) bindFilesPanel(root);
-  if (systemActive) bindSystemPanel(root);
-  if (terminalActive) bindTerminalPanel(root, active);
-  if (goalLogsActive) bindGoalLogPanel(root, active);
+  `, () => {
+    if (filesActive) bindFilesPanel(root);
+    if (systemActive) bindSystemPanel(root);
+    if (terminalActive) bindTerminalPanel(root, active);
+    if (goalLogsActive) bindGoalLogPanel(root, active);
 
-  if (chatState.open && goalLogsActive) {
-    const out = root.querySelector("#goal-log-tail");
-    if (out) scrollGoalLogEdge(active, out);
-  }
-
-  $$(".toolbar-tab", root).forEach((el) => {
-    el.addEventListener("click", (e) => {
-      if (e.target.matches("[data-close-tab]")) return;
-      const id = el.dataset.tabId;
-      if (!id) return;
-      void activateToolbarTab(id, { toggleIfActive: true });
-    });
-  });
-  $$("[data-close-tab]", root).forEach((el) => {
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      closeChatTab(el.dataset.closeTab);
-    });
-  });
-  $$("[data-add-toolbar-tab]", root).forEach((el) => {
-    el.addEventListener("click", () => {
-      root.querySelector(".toolbar-add-menu")?.removeAttribute("open");
-      void createToolbarTab(el.dataset.addToolbarTab);
-    });
-  });
-  $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
-  $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
-
-  wireToolbarResize(root);
-  if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
-    loadFilesDirectory("", { expand: true, redraw: true });
-  }
-  if (terminalActive) {
-    const terminal = terminalStateFor(chatState.activeTabId);
-    if (terminal?.sessionId && !terminal.statusChecked) {
-      void reattachTerminalSession(active, terminal);
-    } else {
-      connectTerminalEvents(active);
+    if (chatState.open && goalLogsActive) {
+      const out = root.querySelector("#goal-log-tail");
+      if (out) scrollGoalLogEdge(active, out);
     }
-    focusTerminalSoon(active);
-  }
-  if (goalLogsActive && !active.logsLoaded && !active.logsLoading) {
-    loadGoalLogTail(active);
-  }
+
+    $$(".toolbar-tab", root).forEach((el) => {
+      bindOnce(el, "click", (e) => {
+        if (e.target.matches("[data-close-tab]")) return;
+        const id = el.dataset.tabId;
+        if (!id) return;
+        void activateToolbarTab(id, { toggleIfActive: true });
+      });
+    });
+    $$("[data-close-tab]", root).forEach((el) => {
+      bindOnce(el, "click", (e) => {
+        e.stopPropagation();
+        closeChatTab(el.dataset.closeTab);
+      });
+    });
+    $$("[data-add-toolbar-tab]", root).forEach((el) => {
+      bindOnce(el, "click", () => {
+        root.querySelector(".toolbar-add-menu")?.removeAttribute("open");
+        void createToolbarTab(el.dataset.addToolbarTab);
+      });
+    });
+    bindOnce($("#btn-dock-toggle"), "click", toggleToolbar);
+    bindOnce($("#btn-dock-fullscreen"), "click", toggleToolbarFullscreen);
+
+    wireToolbarResize(root);
+    if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
+      loadFilesDirectory("", { expand: true, redraw: true });
+    }
+    if (terminalActive) {
+      const terminal = terminalStateFor(chatState.activeTabId);
+      if (terminal?.sessionId && !terminal.statusChecked) {
+        void reattachTerminalSession(active, terminal);
+      } else {
+        connectTerminalEvents(active);
+      }
+      focusTerminalSoon(active);
+    }
+    if (goalLogsActive && !active.logsLoaded && !active.logsLoading) {
+      loadGoalLogTail(active);
+    }
+  });
 }
 
 function drawChatDock() { drawToolbar(); }
@@ -899,44 +900,45 @@ function updateGoalLogPanel(root, tab) {
   const lines = root.querySelector("#goal-log-lines");
   const status = root.querySelector('[data-testid="goal-log-status"]');
   if (!lines || !status) return false;
-  lines.innerHTML = renderGoalLogLines(tab);
+  renderInto(lines, renderGoalLogLines(tab));
   status.textContent = goalLogStatus(tab);
   scrollGoalLogEdge(tab, root.querySelector("#goal-log-tail"));
   return true;
 }
 
-function bindGoalLogPanel(root, tab) {
-  root.querySelector("#btn-goal-log-refresh")?.addEventListener("click", () => {
-    tab.logsLoaded = false;
-    loadGoalLogTail(tab);
+function bindGoalLogPanel(root, boundTab) {
+  const liveTab = () => currentToolbarTab() || boundTab;
+  bindOnce(root.querySelector("#btn-goal-log-refresh"), "click", () => {
+    liveTab().logsLoaded = false;
+    loadGoalLogTail(liveTab());
   });
   const search = root.querySelector("#goal-log-search");
   const clear = root.querySelector("#btn-goal-log-clear");
-  search?.addEventListener("input", (event) => {
-    tab.logQuery = event.currentTarget.value;
-    if (clear) clear.disabled = !tab.logQuery;
-    updateGoalLogPanel(root, tab);
+  bindOnce(search, "input", (event) => {
+    liveTab().logQuery = event.currentTarget.value;
+    if (clear) clear.disabled = !liveTab().logQuery;
+    updateGoalLogPanel(root, liveTab());
     saveChatStateToStorage();
   });
-  clear?.addEventListener("click", () => {
-    tab.logQuery = "";
+  bindOnce(clear, "click", () => {
+    liveTab().logQuery = "";
     if (search) {
       search.value = "";
       search.focus();
     }
     clear.disabled = true;
-    updateGoalLogPanel(root, tab);
+    updateGoalLogPanel(root, liveTab());
     saveChatStateToStorage();
   });
   root.querySelectorAll("[data-goal-log-order]").forEach((button) => {
-    button.addEventListener("click", () => {
-      tab.logOrder = normalizeGoalLogOrder(button.dataset.goalLogOrder);
+    bindOnce(button, "click", () => {
+      liveTab().logOrder = normalizeGoalLogOrder(button.dataset.goalLogOrder);
       root.querySelectorAll("[data-goal-log-order]").forEach((candidate) => {
-        const active = candidate.dataset.goalLogOrder === tab.logOrder;
+        const active = candidate.dataset.goalLogOrder === liveTab().logOrder;
         candidate.classList.toggle("active", active);
         candidate.setAttribute("aria-pressed", String(active));
       });
-      updateGoalLogPanel(root, tab);
+      updateGoalLogPanel(root, liveTab());
       saveChatStateToStorage();
     });
   });
@@ -1044,7 +1046,7 @@ function activeSystemLogFilters(messages) {
 
 function bindSystemPanel(root) {
   $$("[data-system-log-filter]", root).forEach((el) => {
-    el.addEventListener("change", () => {
+    bindOnce(el, "change", () => {
       const filter = el.dataset.systemLogFilter || "all";
       if (filter === "all") {
         systemOperationState.filters.clear();
@@ -1198,19 +1200,21 @@ function renderTerminalPanel(tab) {
            tabindex="0"
            role="textbox"
            aria-label="Terminal"
-           spellcheck="false"></div>
+           spellcheck="false"
+           data-morph-preserve="1"></div>
     </div>`;
 }
 
-function bindTerminalPanel(root, tab) {
+function bindTerminalPanel(root, boundTab) {
+  const liveTab = () => currentToolbarTab() || boundTab;
   const output = root.querySelector(".terminal-output");
-  output?.addEventListener("focus", () => output.classList.add("focused"));
-  output?.addEventListener("blur", () => output.classList.remove("focused"));
-  ensureTerminalRenderer(output, tab);
-  observeTerminalOutputSize(output, tab);
-  root.querySelector('[data-terminal-action="start"]')?.addEventListener("click", () => startTerminalSession(tab));
-  root.querySelector('[data-terminal-action="reattach"]')?.addEventListener("click", () => reattachTerminalSession(tab));
-  root.querySelector('[data-terminal-action="stop"]')?.addEventListener("click", () => stopTerminalSession(tab));
+  bindOnce(output, "focus", () => output.classList.add("focused"));
+  bindOnce(output, "blur", () => output.classList.remove("focused"));
+  ensureTerminalRenderer(output, liveTab());
+  observeTerminalOutputSize(output, liveTab());
+  bindOnce(root.querySelector('[data-terminal-action="start"]'), "click", () => startTerminalSession(liveTab()));
+  bindOnce(root.querySelector('[data-terminal-action="reattach"]'), "click", () => reattachTerminalSession(liveTab()));
+  bindOnce(root.querySelector('[data-terminal-action="stop"]'), "click", () => stopTerminalSession(liveTab()));
 }
 
 async function startTerminalSession(tab = currentToolbarTab()) {
@@ -1386,8 +1390,8 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
   );
   terminal.eventSource = source;
   loadGoalTerminalHistory(tab, terminal);
-  source.addEventListener("terminal_output", (event) => handleTerminalEvent(event, terminal));
-  source.addEventListener("terminal_status", (event) => {
+  bindOnce(source, "terminal_output", (event) => handleTerminalEvent(event, terminal));
+  bindOnce(source, "terminal_status", (event) => {
     try {
       const status = JSON.parse(event.data || "{}");
       terminal.attentionState = status.attention_state || "";
@@ -1398,12 +1402,12 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
       if (chatState.activeTabId === tabId) drawToolbar();
     } catch {}
   });
-  source.addEventListener("terminal_error", (event) => {
+  bindOnce(source, "terminal_error", (event) => {
     handleTerminalEvent(event, terminal);
     terminal.error = "Terminal stream error.";
     if (chatState.activeTabId === tabId) drawToolbar();
   });
-  source.addEventListener("terminal_exit", (event) => {
+  bindOnce(source, "terminal_exit", (event) => {
     handleTerminalEvent(event, terminal);
     finishTerminalExit(tab, terminal);
     refreshProcessesTabForChatChange();
@@ -2192,21 +2196,21 @@ function highlightFileLine(line, lang) {
 }
 
 function bindFilesPanel(root) {
-  root.querySelector("#files-path-input")?.addEventListener("input", (e) => {
+  bindOnce(root.querySelector("#files-path-input"), "input", (e) => {
     filesState.pathInputValue = e.target.value || "";
   });
-  root.querySelector("#files-path-input")?.addEventListener("keydown", (e) => {
+  bindOnce(root.querySelector("#files-path-input"), "keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     navigateFilesPath(e.target.value);
   });
-  root.querySelector("#files-search-input")?.addEventListener("input", (e) => {
+  bindOnce(root.querySelector("#files-search-input"), "input", (e) => {
     filesState.searchSelectedIndex = -1;
     filesState.searchSelectedPath = "";
     filesState.searchUserSelectedPath = "";
     scheduleFilesSearch(e.target.value);
   });
-  root.querySelector("#files-search-input")?.addEventListener("keydown", (e) => {
+  bindOnce(root.querySelector("#files-search-input"), "keydown", (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       moveFilesSearchSelection(1);
@@ -2225,15 +2229,15 @@ function bindFilesPanel(root) {
     if (filesState.searchLoading) return;
     runFilesSearch(e.target.value, { refocus: true, openSelectedFile: true });
   });
-  root.querySelector("[data-files-go]")?.addEventListener("click", () => {
+  bindOnce(root.querySelector("[data-files-go]"), "click", () => {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
   });
-  root.querySelector("[data-files-clear]")?.addEventListener("click", () => clearFilesPathInput());
-  root.querySelector("[data-files-refresh]")?.addEventListener("click", () => refreshFilesPanel());
-  root.querySelector("[data-files-expand-all]")?.addEventListener("click", () => expandAllFilesTree());
-  root.querySelector("[data-files-clear-tree]")?.addEventListener("click", () => clearFilesTreeView());
-  root.querySelector("[data-files-collapse-all]")?.addEventListener("click", () => collapseAllFilesTree());
-  root.querySelector("[data-files-copy]")?.addEventListener("click", async () => {
+  bindOnce(root.querySelector("[data-files-clear]"), "click", () => clearFilesPathInput());
+  bindOnce(root.querySelector("[data-files-refresh]"), "click", () => refreshFilesPanel());
+  bindOnce(root.querySelector("[data-files-expand-all]"), "click", () => expandAllFilesTree());
+  bindOnce(root.querySelector("[data-files-clear-tree]"), "click", () => clearFilesTreeView());
+  bindOnce(root.querySelector("[data-files-collapse-all]"), "click", () => collapseAllFilesTree());
+  bindOnce(root.querySelector("[data-files-copy]"), "click", async () => {
     try {
       await navigator.clipboard.writeText(root.querySelector("#files-path-input")?.value || "");
       toast("Path copied", "info");
@@ -2241,7 +2245,7 @@ function bindFilesPanel(root) {
       toast("Clipboard copy is unavailable.", "error");
     }
   });
-  root.querySelector("[data-files-copy-content]")?.addEventListener("click", async () => {
+  bindOnce(root.querySelector("[data-files-copy-content]"), "click", async () => {
     try {
       await navigator.clipboard.writeText(filesState.file?.content || "");
       toast("File contents copied", "info");
@@ -2250,13 +2254,13 @@ function bindFilesPanel(root) {
     }
   });
   const source = root.querySelector(".files-source");
-  source?.addEventListener("scroll", () => {
+  bindOnce(source, "scroll", () => {
     if (!filesState.file?.has_more || filesState.fileChunkLoading) return;
     const remaining = source.scrollHeight - source.scrollTop - source.clientHeight;
     if (remaining < 240) loadNextFileChunk();
   });
   $$(".files-tree-item", root).forEach((row) => {
-    row.addEventListener("click", () => {
+    bindOnce(row, "click", () => {
       const path = row.dataset.filesPath || "";
       const type = row.dataset.filesType || "";
       const depth = Number.parseInt(row.dataset.filesDepth || "0", 10);
@@ -2759,7 +2763,7 @@ function wireToolbarResize(root) {
   const handle = root.querySelector("#toolbar-dock-resize");
   const body = root.querySelector(".toolbar-dock-body");
   if (!handle || !body) return;
-  handle.addEventListener("pointerdown", (e) => {
+  bindOnce(handle, "pointerdown", (e) => {
     if (!chatState.open) return;
     e.preventDefault();
     finishToolbarResize();
