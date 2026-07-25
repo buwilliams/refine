@@ -749,8 +749,9 @@ Requirements:
 
 ### Process Supervision
 
-Modules: `process::subprocess`, `process::agent_sessions`; paths:
-`src/process/subprocess/`, `src/process/agent_sessions.rs`.
+Modules: `process::subprocess`, `process::agent_sessions`, `process::agent_env`;
+paths: `src/process/subprocess/`, `src/process/agent_sessions.rs`,
+`src/process/agent_env.rs`.
 
 Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
@@ -782,6 +783,17 @@ Requirements:
   unless they are inside the process-supervision backend itself.
 - Short-lived commands still produce managed process records with captured
   stdout, stderr, exit status, ownership, and command context.
+- Spawned agents receive the environment the user already configured. A service
+  manager does not read shell startup files, so refine reads them itself — both
+  the profile and the rc file, which are separate conventions and neither a
+  superset of the other — and applies an explicit `<config>/refine/agent.env`
+  over the result. Refine's own per-process variables win over both, and a
+  failure to read either source must leave a spawn unaffected rather than fail
+  it. The shell environment is captured once per daemon lifetime, so rc-file
+  edits apply on restart.
+- An agent that exits because it could not authenticate must say so. A bare
+  non-zero exit reads as a capacity or liveness problem and hides a
+  configuration one.
 - Sensitive commands, such as native secret-store operations, must redact
   command details and avoid persisting secret stdin or token-bearing arguments
   in process records.

@@ -1,3 +1,4 @@
+pub mod agent_env;
 pub mod agent_sessions;
 pub mod runner;
 pub mod subprocess;

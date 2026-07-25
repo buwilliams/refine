@@ -261,6 +261,11 @@ where
     let mut pty_command = CommandBuilder::new(&command.binary);
     pty_command.args(&command.args);
     pty_command.cwd(&cwd);
+    // Same precedence as the managed-process path: the user's configured
+    // environment first, then refine's own per-process variables.
+    for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
+        pty_command.env(key, value);
+    }
     for (key, value) in &managed_spec.env {
         pty_command.env(key, value);
     }
@@ -542,8 +547,14 @@ where
     let _ = supervisor.recover_owner(ProcessOwner::Agent);
 
     if !status.success() && !completed_by_signal {
+        // Name the cause when the CLI could not authenticate. Otherwise a total
+        // auth failure reads as an opaque non-zero exit, which is what made this
+        // look like a capacity or liveness problem instead of a config one.
+        let detail = crate::process::agent_env::auth_failure_hint(&output)
+            .map(|hint| format!("; {hint}"))
+            .unwrap_or_default();
         return Err(RefineError::Degraded(format!(
-            "Goal Agent exited unsuccessfully: {}",
+            "Goal Agent exited unsuccessfully: {}{detail}",
             status.exit_code()
         )));
     }

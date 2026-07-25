@@ -1669,6 +1669,12 @@ fn process_command(spec: &ManagedProcessSpec) -> Command {
     if let Some(cwd) = spec.cwd.as_deref().filter(|cwd| !cwd.trim().is_empty()) {
         command.current_dir(cwd);
     }
+    if spec.owner == ProcessOwner::Agent {
+        // The user's configured environment first, so an agent authenticates the
+        // same way it would from a terminal. Applied before `spec.env` so refine's
+        // own per-process variables still win.
+        command.envs(crate::process::agent_env::agent_env_overlay(None));
+    }
     command.envs(spec.env.iter().map(|(key, value)| (key, value)));
     if spec.owner == ProcessOwner::Agent {
         for key in AGENT_DIRECT_API_KEY_ENV {
