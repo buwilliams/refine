@@ -108,7 +108,7 @@ function applySourcePromotionStatus(source) {
   const root = document.getElementById("source-promotion-status");
   if (!root) return;
   root.setAttribute("aria-busy", "false");
-  root.innerHTML = renderSourcePromotionStatus(source);
+  renderInto(root, renderSourcePromotionStatus(source));
   const activeOperation = sourcePromotionActiveOperation(source);
   const promotable = sourcePromotionIsReady(source);
   const promote = document.getElementById("source-promotion-promote");
@@ -132,9 +132,9 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
   } catch (error) {
     if (!document.getElementById("source-promotion-status")) return;
     root.setAttribute("aria-busy", "true");
-    root.innerHTML = `<p class="muted small">${quiet
+    renderInto(root, `<p class="muted small">${quiet
       ? "Refine is restarting; reconnecting to source-promotion state…"
-      : htmlEscape(error.message || "Source checkout status is unavailable")}</p>`;
+      : htmlEscape(error.message || "Source checkout status is unavailable")}</p>`);
   }
 }
 
@@ -367,7 +367,7 @@ async function previewRelease() {
   try {
     const response = await api("POST", "/api/system/releases/plan", { bump: $("#release-bump")?.value || "patch" });
     _releasePlan = response.plan;
-    if ($("#release-plan")) $("#release-plan").innerHTML = renderReleasePlan(_releasePlan);
+    renderInto($("#release-plan"), renderReleasePlan(_releasePlan));
     if ($("#release-prepare")) $("#release-prepare").disabled = false;
   } catch (error) { await showActionError(error); }
 }

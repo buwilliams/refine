@@ -755,7 +755,7 @@ async function refreshTargetAppStatus() {
     drawTargetAppStatusBlock(r);
   } catch (e) {
     if (block) {
-      block.innerHTML = `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`;
+      renderInto(block, `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`);
     }
   }
 }
@@ -797,7 +797,7 @@ function drawTargetAppStatusBlock(snap) {
   }</p>`;
   const block = document.getElementById("target-app-status-block");
   if (block) {
-    block.innerHTML = `
+    renderInto(block, `
       <div style="display:flex;align-items:center;gap:10px">
         <span class="target-app-dot" data-status-dot></span>
         <strong>${htmlEscape(stateLabel)}</strong>
@@ -809,7 +809,7 @@ function drawTargetAppStatusBlock(snap) {
       ${autoBuild}
       ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
       ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
-    `;
+    `);
     // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
     // colour rules key off `data-state` on an ancestor, so set it here too.
     const dot = block.querySelector("[data-status-dot]");
