@@ -102,6 +102,17 @@ pub struct ManagedProcessOutput {
     pub stderr: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProcessOutputObservation {
+    Observed {
+        process: ManagedProcess,
+        output: String,
+    },
+    Terminal {
+        process_id: String,
+    },
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ManagedProcessOutputStream {
     Stdout,
@@ -261,6 +272,8 @@ pub trait ProcessSupervisor {
     fn signal(&self, process_id: &str, signal: &str) -> RefineResult<ManagedProcess>;
     fn wait(&self, process_id: &str) -> RefineResult<ManagedProcess>;
     fn stream(&self, process_id: &str) -> RefineResult<String>;
+    fn observe_output(&self, enumerated: &ManagedProcess)
+    -> RefineResult<ProcessOutputObservation>;
     fn inspect(&self, process_id: &str) -> RefineResult<ManagedProcess>;
     fn cleanup(&self, process_id: &str) -> RefineResult<()>;
     fn recover(&self) -> RefineResult<Vec<ManagedProcess>>;
@@ -654,12 +667,16 @@ impl FileProcessSupervisor {
                 }
                 continue;
             }
-            let bytes = fs::read(&path).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to read process {}: {error}",
-                    path.display()
-                ))
-            })?;
+            let bytes = match fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to read process {}: {error}",
+                        path.display()
+                    )));
+                }
+            };
             match serde_json::from_slice::<ManagedProcess>(&bytes) {
                 Ok(process) if process.state == "running" => processes.push(process),
                 Ok(process) => {
@@ -678,6 +695,25 @@ impl FileProcessSupervisor {
         }
         processes.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(processes)
+    }
+
+    pub fn recent_output_observations(
+        &self,
+        limit: usize,
+    ) -> RefineResult<Vec<ProcessOutputObservation>> {
+        let mut selected = self
+            .list()?
+            .into_iter()
+            .rev()
+            .take(limit)
+            .collect::<Vec<_>>();
+        selected.reverse();
+        #[cfg(test)]
+        run_after_process_enumeration_hook(&self.runtime_root);
+        selected
+            .iter()
+            .map(|process| self.observe_output(process))
+            .collect()
     }
 
     pub fn recover_owner(&self, owner: ProcessOwner) -> RefineResult<Vec<ManagedProcess>> {
@@ -1432,6 +1468,57 @@ impl ProcessSupervisor for FileProcessSupervisor {
         }
     }
 
+    fn observe_output(
+        &self,
+        enumerated: &ManagedProcess,
+    ) -> RefineResult<ProcessOutputObservation> {
+        let current = match self.inspect(&enumerated.id) {
+            Ok(current) => current,
+            Err(RefineError::NotFound(_)) => {
+                return Ok(ProcessOutputObservation::Terminal {
+                    process_id: enumerated.id.clone(),
+                });
+            }
+            Err(error) => return Err(error),
+        };
+        if current.id != enumerated.id
+            || current.owner != enumerated.owner
+            || current.pid != enumerated.pid
+            || current.started_at != enumerated.started_at
+            || current.stdout_path != enumerated.stdout_path
+            || current.stderr_path != enumerated.stderr_path
+        {
+            return Err(RefineError::Conflict(format!(
+                "managed process {} identity changed after enumeration; output observation was skipped and both observations were retained",
+                enumerated.id
+            )));
+        }
+
+        let mut output = String::new();
+        for (label, path) in [
+            ("stdout", current.stdout_path.as_deref()),
+            ("stderr", current.stderr_path.as_deref()),
+        ] {
+            let Some(path) = path else {
+                continue;
+            };
+            if !append_observed_stream_file(&mut output, label, path)? {
+                return Ok(ProcessOutputObservation::Terminal {
+                    process_id: current.id,
+                });
+            }
+        }
+        if output.trim().is_empty()
+            && (current.stdout_path.is_some() || current.stderr_path.is_some())
+        {
+            output = format!("No captured output for process {}.", current.id);
+        }
+        Ok(ProcessOutputObservation::Observed {
+            process: current,
+            output,
+        })
+    }
+
     fn inspect(&self, process_id: &str) -> RefineResult<ManagedProcess> {
         let path = self.processes_dir().join(format!("{process_id}.json"));
         let bytes = fs::read(&path).map_err(|error| {
@@ -2115,6 +2202,61 @@ fn append_stream_file(output: &mut String, label: &str, path: &str) -> RefineRes
     Ok(())
 }
 
+fn append_observed_stream_file(output: &mut String, label: &str, path: &str) -> RefineResult<bool> {
+    let path = PathBuf::from(path);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(RefineError::Io(format!(
+                "failed to read process {label} stream {}: {error}",
+                path.display()
+            )));
+        }
+    };
+    if text.trim().is_empty() {
+        return Ok(true);
+    }
+    output.push_str(&format!("== {label} ==\n"));
+    output.push_str(&tail_text(&text, 16_000));
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+    Ok(true)
+}
+
+#[cfg(test)]
+type AfterProcessEnumerationHook = Box<dyn FnOnce() + Send + 'static>;
+
+#[cfg(test)]
+static AFTER_PROCESS_ENUMERATION_HOOKS: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::BTreeMap<PathBuf, AfterProcessEnumerationHook>>,
+> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+pub(crate) fn install_after_process_enumeration_hook(
+    runtime_root: &Path,
+    hook: impl FnOnce() + Send + 'static,
+) {
+    AFTER_PROCESS_ENUMERATION_HOOKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(runtime_root.to_path_buf(), Box::new(hook));
+}
+
+#[cfg(test)]
+fn run_after_process_enumeration_hook(runtime_root: &Path) {
+    let hook = AFTER_PROCESS_ENUMERATION_HOOKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(runtime_root);
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
 fn tail_text(value: &str, max_chars: usize) -> String {
     let count = value.chars().count();
     if count <= max_chars {
@@ -2214,6 +2356,140 @@ mod tests {
         }
 
         assert!(supervisor.list().unwrap().is_empty());
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_output_observation_skips_a_process_reaped_after_listing() {
+        let temp_root = unique_temp_dir("process-output-reaping-race");
+        let runtime_root = temp_root.join("run/8080");
+        let release_path = temp_root.join("release");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let process = supervisor
+            .launch(ManagedProcessSpec {
+                owner: ProcessOwner::Runner,
+                command: shell_binary().to_string(),
+                args: shell_args(&format!(
+                    "while [ ! -f '{}' ]; do sleep 0.01; done",
+                    release_path.display()
+                )),
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+                metadata: Default::default(),
+            })
+            .unwrap();
+        let listed = supervisor
+            .list()
+            .unwrap()
+            .into_iter()
+            .find(|candidate| candidate.id == process.id)
+            .unwrap();
+
+        fs::write(&release_path, "").unwrap();
+        let process_path = supervisor
+            .processes_dir()
+            .join(format!("{}.json", process.id));
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while process_path.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!process_path.exists(), "managed process was not reaped");
+
+        assert_eq!(
+            supervisor.observe_output(&listed).unwrap(),
+            ProcessOutputObservation::Terminal {
+                process_id: listed.id
+            }
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_output_observation_skips_a_reaped_output_artifact() {
+        let temp_root = unique_temp_dir("process-output-artifact-race");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let stdout_path = runtime_root.join("observed.stdout.log");
+        fs::create_dir_all(&runtime_root).unwrap();
+        fs::write(&stdout_path, "before reaping\n").unwrap();
+        supervisor
+            .register(ManagedProcess {
+                id: "artifact-race".to_string(),
+                owner: ProcessOwner::Runner,
+                pid: None,
+                state: "running".to_string(),
+                label: Some("artifact race".to_string()),
+                details: None,
+                stdout_path: Some(stdout_path.display().to_string()),
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: "observed-start".to_string(),
+                exit_code: None,
+            })
+            .unwrap();
+        let listed = supervisor.list().unwrap().pop().unwrap();
+
+        fs::remove_file(&stdout_path).unwrap();
+
+        assert_eq!(
+            supervisor.observe_output(&listed).unwrap(),
+            ProcessOutputObservation::Terminal {
+                process_id: listed.id
+            }
+        );
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_output_observation_preserves_actionable_errors() {
+        let temp_root = unique_temp_dir("process-output-errors");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let output_dir = runtime_root.join("not-a-log");
+        fs::create_dir_all(&output_dir).unwrap();
+        let process = supervisor
+            .register(ManagedProcess {
+                id: "output-errors".to_string(),
+                owner: ProcessOwner::Runner,
+                pid: None,
+                state: "running".to_string(),
+                label: Some("output errors".to_string()),
+                details: None,
+                stdout_path: Some(output_dir.display().to_string()),
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: "original-start".to_string(),
+                exit_code: None,
+            })
+            .unwrap();
+        let listed = supervisor.list().unwrap().pop().unwrap();
+        let io_error = supervisor.observe_output(&listed).unwrap_err();
+        assert!(matches!(io_error, RefineError::Io(_)), "{io_error}");
+
+        let mut changed = process.clone();
+        changed.started_at = "replacement-start".to_string();
+        supervisor.write_process(&changed).unwrap();
+        let conflict = supervisor.observe_output(&listed).unwrap_err();
+        assert!(matches!(conflict, RefineError::Conflict(_)), "{conflict}");
+
+        fs::write(
+            supervisor
+                .processes_dir()
+                .join(format!("{}.json", process.id)),
+            "{not-json",
+        )
+        .unwrap();
+        let serialization = supervisor.observe_output(&listed).unwrap_err();
+        assert!(
+            matches!(serialization, RefineError::Serialization(_)),
+            "{serialization}"
+        );
         fs::remove_dir_all(temp_root).unwrap();
     }
 

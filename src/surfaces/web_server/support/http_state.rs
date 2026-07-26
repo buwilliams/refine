@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessOutputObservation};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
@@ -347,12 +347,14 @@ pub(in crate::surfaces::web_server) fn recent_process_sse_events(
 ) -> RefineResult<Vec<Value>> {
     let supervisor = FileProcessSupervisor::new(runtime_root);
     let mut events = Vec::new();
-    for process in supervisor.list()?.into_iter().rev().take(limit) {
+    for observation in supervisor.recent_output_observations(limit)? {
+        let ProcessOutputObservation::Observed { process, output } = observation else {
+            continue;
+        };
         let (output, truncated) = if process.stdout_path.is_some() || process.stderr_path.is_some()
         {
-            let full_output = supervisor.stream(&process.id)?;
-            let truncated = full_output.chars().count() > 4000;
-            (tail_text(full_output, 4000), truncated)
+            let truncated = output.chars().count() > 4000;
+            (tail_text(output, 4000), truncated)
         } else {
             (String::new(), false)
         };
@@ -364,7 +366,6 @@ pub(in crate::surfaces::web_server) fn recent_process_sse_events(
             "timestamp": now_timestamp_web()
         }));
     }
-    events.reverse();
     Ok(events)
 }
 
