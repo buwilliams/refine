@@ -57,6 +57,11 @@ Current implementation details that matter to intent:
   retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,
   cause, and supported recovery evidence.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
+- live observers enumerate and capture output through the shared Process
+  capability. A listed process record or output artifact removed by ordinary
+  reaping before capture is a terminal, skipped observation; permission,
+  persistent I/O, serialization, and process-identity failures remain
+  actionable.
 - the browser Goal terminal resolves its session to the managed Goal Agent and
   delegates Stop to this same capability; only non-Goal local terminals retain
   process-only terminal shutdown behavior.
