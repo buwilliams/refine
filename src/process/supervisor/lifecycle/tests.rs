@@ -22,6 +22,44 @@ fn file_lifecycle_persists_port_scoped_status() {
 }
 
 #[test]
+fn startup_status_is_not_healthy_until_explicitly_ready() {
+    let temp_root = unique_temp_dir("lifecycle-startup-status");
+    let runtime_root = RuntimeRoot {
+        root: temp_root.join("run"),
+    };
+    let service = FileDaemonLifecycleService::new(runtime_root);
+
+    let starting = service.prepare_start(4555).unwrap();
+    assert!(!starting.daemon_healthy);
+    assert!(!starting.web_available);
+    assert_eq!(starting.worker_state, "starting");
+    assert!(!service.status(4555).unwrap().daemon_healthy);
+
+    let ready = service.mark_ready(starting).unwrap();
+    assert!(ready.daemon_healthy);
+    assert!(ready.web_available);
+    assert_eq!(ready.worker_state, "idle");
+
+    let failed = service
+        .mark_start_failed(
+            4555,
+            &RefineError::Io("startup recovery failed".to_string()),
+        )
+        .unwrap();
+    assert!(!failed.daemon_healthy);
+    assert!(!failed.web_available);
+    assert_eq!(failed.worker_state, "failed");
+    assert!(
+        failed
+            .degraded_integrations
+            .iter()
+            .any(|entry| entry.contains("startup recovery failed"))
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn background_daemon_launch_records_are_port_scoped() {
     let temp_root = unique_temp_dir("lifecycle-background");
     let runtime_root = RuntimeRoot {

@@ -735,7 +735,14 @@ fn workflow_evaluation_does_not_hold_the_repository_lock_between_git_steps() {
     let evaluation_thread = std::thread::spawn(move || {
         finished_tx.send(automation.evaluate_workflow()).unwrap();
     });
-    let evaluation = finished_rx.recv_timeout(Duration::from_millis(250));
+    #[cfg(not(target_os = "macos"))]
+    let lock_independence_timeout = Duration::from_millis(250);
+    // APFS-backed debug test runs can exceed the Linux budget without waiting
+    // on the held repository lock. A real lock dependency still times out
+    // because the lock is not released until after this receive completes.
+    #[cfg(target_os = "macos")]
+    let lock_independence_timeout = Duration::from_secs(2);
+    let evaluation = finished_rx.recv_timeout(lock_independence_timeout);
 
     release_tx.send(()).unwrap();
     lock_thread.join().unwrap();

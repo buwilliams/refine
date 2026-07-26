@@ -182,38 +182,100 @@ pub(super) fn run_system_start(
         root: runtime_root.clone(),
     }
     .port_root(actual_port);
-    eprintln!("refine: preparing daemon at http://{addr}");
-    eprintln!("refine: loading active project registry");
-    let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
-    let snapshot = if let Some(target_root) = project_status.target_root {
-        eprintln!("refine: warming project cache for {target_root}");
-        let target_root = PathBuf::from(target_root);
-        let refine_dir = refine_dir_for_target_root(&target_root)?;
-        let cache_root = cache_dir
-            .clone()
-            .unwrap_or_else(|| port_runtime_root.join("cache"));
-        let store = FileProjectStateStore::with_runtime_root(&refine_dir, &port_runtime_root);
-        store.load_or_refresh_projection(&cache_root)?
-    } else {
-        eprintln!("refine: no active project; using empty project cache");
-        ProjectionSnapshot::default()
-    };
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: runtime_root.clone(),
     });
-    let status = lifecycle.start(actual_port)?;
-    let daemon = LocalHttpDaemon {
+    lifecycle.begin_start(actual_port)?;
+    eprintln!("refine: preparing daemon at http://{addr}");
+    let project_preparation = (|| -> RefineResult<_> {
+        eprintln!("refine: loading active project registry");
+        let project_registry = FileProjectRegistryService::new(&runtime_root, None);
+        let legacy_project_registry = FileProjectRegistryService::new(&port_runtime_root, None);
+        if !project_registry.path().exists() && legacy_project_registry.path().exists() {
+            eprintln!(
+                "refine: migrating port-scoped project registry to {}",
+                project_registry.path().display()
+            );
+            project_registry.save(&legacy_project_registry.load()?)?;
+        }
+        let registry = project_registry.load()?;
+        let mut project_degradation = None;
+        let target_root = match registry.active_app {
+            None => None,
+            Some(target_root) if !Path::new(&target_root).is_dir() => {
+                let message = format!(
+                    "active project {target_root} is unavailable; detaching it for daemon startup"
+                );
+                eprintln!("refine: {message}");
+                project_registry.detach()?;
+                project_degradation = Some("active-project-unavailable".to_string());
+                None
+            }
+            Some(_) => match project_registry.status() {
+                Ok(status) => status.target_root,
+                Err(RefineError::InvalidInput(error))
+                    if error.contains("must be a Git worktree") =>
+                {
+                    eprintln!(
+                        "refine: active project is not a usable Git worktree ({error}); detaching it for daemon startup"
+                    );
+                    project_registry.detach()?;
+                    project_degradation = Some("active-project-unavailable".to_string());
+                    None
+                }
+                Err(error) => return Err(error),
+            },
+        };
+        let snapshot = if let Some(target_root) = target_root {
+            eprintln!("refine: warming project cache for {target_root}");
+            let target_root = PathBuf::from(target_root);
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let cache_root = cache_dir
+                .clone()
+                .unwrap_or_else(|| port_runtime_root.join("cache"));
+            let store = FileProjectStateStore::with_runtime_root(&refine_dir, &port_runtime_root);
+            store.load_or_refresh_projection(&cache_root)?
+        } else {
+            eprintln!("refine: no active project; using empty project cache");
+            ProjectionSnapshot::default()
+        };
+        Ok((snapshot, project_degradation))
+    })();
+    let (snapshot, project_degradation) = match project_preparation {
+        Ok(preparation) => preparation,
+        Err(error) => {
+            let _ = lifecycle.mark_start_failed(actual_port, &error);
+            return Err(error);
+        }
+    };
+    let mut status = match lifecycle.prepare_start(actual_port) {
+        Ok(status) => status,
+        Err(error) => {
+            let _ = lifecycle.mark_start_failed(actual_port, &error);
+            return Err(error);
+        }
+    };
+    if let Some(degradation) = project_degradation {
+        status.degraded_integrations.push(degradation);
+    }
+    let mut daemon = LocalHttpDaemon {
         server: InProcessWebServer {
-            status,
+            status: status.clone(),
             projection: snapshot,
             target_root: None,
+            app_registry_root: Some(runtime_root.clone()),
             runtime_root: Some(port_runtime_root),
         },
         static_root: static_root.or_else(default_static_root),
     };
-    daemon.recover_runtime_state_with_progress(|message| {
+    if let Err(error) = daemon.recover_runtime_state_with_progress(|message| {
         eprintln!("refine: {message}");
-    })?;
+    }) {
+        let _ = lifecycle.mark_start_failed(actual_port, &error);
+        return Err(error);
+    }
+    let status = lifecycle.mark_ready(status)?;
+    daemon.server.status = status;
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
         daemon.serve_once(listener)?;

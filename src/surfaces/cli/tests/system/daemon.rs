@@ -93,6 +93,78 @@ fn system_lifecycle_commands_default_to_8082() {
 }
 
 #[test]
+fn system_start_migrates_and_detaches_an_unavailable_port_scoped_project() {
+    let temp_root = unique_temp_dir("cli-system-start-stale-project");
+    let runtime_root = temp_root.join("run");
+    let port_probe = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let port = port_probe.local_addr().unwrap().port();
+    drop(port_probe);
+    let port_runtime_root = RuntimeRoot {
+        root: runtime_root.clone(),
+    }
+    .port_root(port);
+    fs::create_dir_all(&port_runtime_root).unwrap();
+    let missing_project = temp_root.join("missing-project");
+    fs::write(
+        port_runtime_root.join("apps.json"),
+        serde_json::to_vec_pretty(&json!({
+            "version": 1,
+            "active_app": missing_project.display().to_string(),
+            "apps": {
+                (missing_project.display().to_string()): {
+                    "name": "missing-project",
+                    "path": missing_project.display().to_string(),
+                    "added_at": "2026-07-26T00:00:00Z",
+                    "last_used_at": "2026-07-26T00:00:00Z"
+                }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let start_runtime_root = runtime_root.clone();
+    let server = thread::spawn(move || {
+        run_system_start(
+            port,
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            None,
+            None,
+            start_runtime_root,
+            true,
+            true,
+        )
+    });
+    let mut stream = connect_to_cli_test_daemon(port);
+    stream
+        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+    server.join().unwrap().unwrap();
+
+    let canonical: serde_json::Value =
+        serde_json::from_slice(&fs::read(runtime_root.join("apps.json")).unwrap()).unwrap();
+    assert!(canonical["active_app"].is_null());
+    assert_eq!(
+        canonical["apps"][missing_project.display().to_string()]["path"],
+        missing_project.display().to_string()
+    );
+    let status: crate::process::supervisor::lifecycle::DaemonStatus =
+        serde_json::from_slice(&fs::read(port_runtime_root.join("daemon-status.json")).unwrap())
+            .unwrap();
+    assert!(status.daemon_healthy);
+    assert!(
+        status
+            .degraded_integrations
+            .contains(&"active-project-unavailable".to_string())
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn system_status_reports_current_version_and_running_ports() {
     let temp_root = unique_temp_dir("cli-system-status");
     let runtime_root = temp_root.join("run");

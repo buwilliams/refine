@@ -194,8 +194,12 @@ impl FileDaemonLifecycleService {
             if managed.state != "running" {
                 relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
                 return Err(RefineError::Conflict(format!(
-                    "daemon process exited before becoming reachable: {}",
-                    managed.state
+                    "daemon process exited before becoming reachable: {}{}",
+                    managed.state,
+                    managed
+                        .exit_code
+                        .map(|code| format!(" (exit code {code})"))
+                        .unwrap_or_default()
                 )));
             }
             if http_probe(port).is_ok() {
@@ -248,6 +252,103 @@ impl FileDaemonLifecycleService {
                 path.display()
             ))
         })
+    }
+
+    fn recovered_status(&self, port: u16) -> RefineResult<DaemonStatus> {
+        let port_root = self.runtime_root.port_root(port);
+        let supervisor = FileProcessSupervisor::new(&port_root);
+        let before_recovery = supervisor.list()?;
+        supervisor.recover()?;
+        let recovered_operations =
+            FileOperationRegistry::new(&port_root).recover_active_supervised()?;
+        let recovered = supervisor.recover()?;
+        let mut status = running_status(port);
+        status.active_operations = recovered
+            .iter()
+            .filter(|process| process.state == "running")
+            .map(|process| process.id.clone())
+            .collect();
+        status.active_operations.extend(
+            FileOperationRegistry::new(&port_root)
+                .recover()?
+                .into_iter()
+                .filter(|operation| {
+                    matches!(operation.state.as_api_status(), "pending" | "running")
+                })
+                .map(|operation| operation.id),
+        );
+        if before_recovery
+            .iter()
+            .any(|before| !recovered.iter().any(|after| after.id == before.id))
+        {
+            status
+                .degraded_integrations
+                .push("process-recovery-reconciled".to_string());
+        }
+        if recovered_operations
+            .iter()
+            .any(|operation| operation.state.as_api_status() == "interrupted")
+        {
+            status
+                .degraded_integrations
+                .push("operation-recovery-interrupted".to_string());
+        }
+        if recovered_operations.iter().any(|operation| {
+            operation.error.as_ref().is_some_and(|error| {
+                error.get("code").and_then(serde_json::Value::as_str)
+                    == Some("operation_recovery_process_termination_failed")
+            })
+        }) {
+            status
+                .degraded_integrations
+                .push("operation-recovery-attention-required".to_string());
+        }
+        Ok(status)
+    }
+
+    /// Reconcile runtime state while publishing an explicitly non-ready daemon status.
+    /// Foreground startup promotes this same status only after every recovery and cache
+    /// warmup step succeeds.
+    pub fn begin_start(&self, port: u16) -> RefineResult<DaemonStatus> {
+        let mut status = running_status(port);
+        status.daemon_healthy = false;
+        status.web_available = false;
+        status.worker_state = "starting".to_string();
+        status.active_operations.clear();
+        self.write_status(&status)?;
+        Ok(status)
+    }
+
+    pub fn prepare_start(&self, port: u16) -> RefineResult<DaemonStatus> {
+        let mut status = self.recovered_status(port)?;
+        status.daemon_healthy = false;
+        status.web_available = false;
+        status.worker_state = "starting".to_string();
+        self.write_status(&status)?;
+        Ok(status)
+    }
+
+    pub fn mark_ready(&self, mut status: DaemonStatus) -> RefineResult<DaemonStatus> {
+        status.daemon_healthy = true;
+        status.web_available = true;
+        status.worker_state = "idle".to_string();
+        self.write_status(&status)?;
+        Ok(status)
+    }
+
+    pub fn mark_start_failed(&self, port: u16, error: &RefineError) -> RefineResult<DaemonStatus> {
+        let mut status = self
+            .read_status(port)
+            .unwrap_or_else(|_| stopped_status(port, Vec::new()));
+        status.daemon_healthy = false;
+        status.web_available = false;
+        status.worker_state = "failed".to_string();
+        status.active_operations.clear();
+        status
+            .degraded_integrations
+            .push(format!("startup-failed:{error}"));
+        self.write_status(&status)?;
+        Ok(status)
     }
 }
 
@@ -369,54 +470,7 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
     }
 
     fn recover(&self, port: u16) -> RefineResult<DaemonStatus> {
-        let port_root = self.runtime_root.port_root(port);
-        let supervisor = FileProcessSupervisor::new(&port_root);
-        let before_recovery = supervisor.list()?;
-        supervisor.recover()?;
-        let recovered_operations =
-            FileOperationRegistry::new(&port_root).recover_active_supervised()?;
-        let recovered = supervisor.recover()?;
-        let mut status = running_status(port);
-        status.active_operations = recovered
-            .iter()
-            .filter(|process| process.state == "running")
-            .map(|process| process.id.clone())
-            .collect();
-        status.active_operations.extend(
-            FileOperationRegistry::new(&port_root)
-                .recover()?
-                .into_iter()
-                .filter(|operation| {
-                    matches!(operation.state.as_api_status(), "pending" | "running")
-                })
-                .map(|operation| operation.id),
-        );
-        if before_recovery
-            .iter()
-            .any(|before| !recovered.iter().any(|after| after.id == before.id))
-        {
-            status
-                .degraded_integrations
-                .push("process-recovery-reconciled".to_string());
-        }
-        if recovered_operations
-            .iter()
-            .any(|operation| operation.state.as_api_status() == "interrupted")
-        {
-            status
-                .degraded_integrations
-                .push("operation-recovery-interrupted".to_string());
-        }
-        if recovered_operations.iter().any(|operation| {
-            operation.error.as_ref().is_some_and(|error| {
-                error.get("code").and_then(serde_json::Value::as_str)
-                    == Some("operation_recovery_process_termination_failed")
-            })
-        }) {
-            status
-                .degraded_integrations
-                .push("operation-recovery-attention-required".to_string());
-        }
+        let status = self.recovered_status(port)?;
         self.write_status(&status)?;
         Ok(status)
     }

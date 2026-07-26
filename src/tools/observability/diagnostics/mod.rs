@@ -35,6 +35,7 @@ pub struct FileDiagnosticsService {
     pub target_root: Option<PathBuf>,
     pub runtime_root: PathBuf,
     pub repo_root: PathBuf,
+    pub project_registry_root: Option<PathBuf>,
 }
 
 impl FileDiagnosticsService {
@@ -47,14 +48,24 @@ impl FileDiagnosticsService {
             target_root,
             runtime_root: runtime_root.into(),
             repo_root: repo_root.into(),
+            project_registry_root: None,
         }
+    }
+
+    pub fn with_project_registry_root(mut self, project_registry_root: impl Into<PathBuf>) -> Self {
+        self.project_registry_root = Some(project_registry_root.into());
+        self
     }
 }
 
 impl DiagnosticsService for FileDiagnosticsService {
     fn doctor(&self) -> RefineResult<DoctorReport> {
+        let project_registry_root = self
+            .project_registry_root
+            .as_ref()
+            .unwrap_or(&self.runtime_root);
         let project_status =
-            FileProjectRegistryService::new(&self.runtime_root, self.target_root.clone())
+            FileProjectRegistryService::new(project_registry_root, self.target_root.clone())
                 .status()?;
         let process_summary = FileProcessSupervisor::new(&self.runtime_root).list()?;
         let providers = HostAgentProviderService::new().detect().unwrap_or_default();

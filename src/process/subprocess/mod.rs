@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fs2::FileExt;
@@ -16,6 +16,7 @@ use crate::process::supervisor::operations::{FileOperationRegistry, OperationLau
 use crate::process::supervisor::security::FileSecurityService;
 
 const PROCESS_IDENTITIES_DIR: &str = "process-identities";
+const PROCESS_HISTORY_DIR: &str = "process-history";
 const WORKFLOW_PROCESS_REGISTRATION_LOCK_FILE: &str = ".workflow-process-registration.lock";
 const WORKFLOW_AUTOMATION_STATE_FILE: &str = "workflow-automation-state.json";
 
@@ -283,6 +284,7 @@ pub trait ProcessSupervisor {
 pub struct FileProcessSupervisor {
     pub runtime_root: PathBuf,
     pub allowed_commands: BTreeSet<String>,
+    reaper_owned: Arc<Mutex<BTreeSet<String>>>,
 }
 
 #[derive(Debug)]

@@ -97,6 +97,10 @@ impl ProcessSupervisor for FileProcessSupervisor {
         }
         drop(workflow_registration_guard);
         drop(launch_guard);
+        self.reaper_owned
+            .lock()
+            .map_err(|_| RefineError::Io("managed process reaper lock was poisoned".to_string()))?
+            .insert(process.id.clone());
         let reaper = self.clone();
         let reaped_process = process.clone();
         std::thread::spawn(move || {
@@ -109,7 +113,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
                         "failed".to_string()
                     };
                     reaped_process.exit_code = status.code();
-                    let _ = reaper.remove_process_artifacts(&reaped_process);
+                    let _ = reaper.archive_terminal_process(&reaped_process);
                 }
                 Err(error) => {
                     reaped_process.state = "failed".to_string();
@@ -117,8 +121,11 @@ impl ProcessSupervisor for FileProcessSupervisor {
                         reaped_process.details.take(),
                         &format!("failed to reap managed process: {error}"),
                     ));
-                    let _ = reaper.remove_process_artifacts(&reaped_process);
+                    let _ = reaper.archive_terminal_process(&reaped_process);
                 }
+            }
+            if let Ok(mut reaper_owned) = reaper.reaper_owned.lock() {
+                reaper_owned.remove(&reaped_process.id);
             }
         });
         Ok(process)
@@ -148,20 +155,47 @@ impl ProcessSupervisor for FileProcessSupervisor {
     }
 
     fn wait(&self, process_id: &str) -> RefineResult<ManagedProcess> {
-        let mut process = self.inspect(process_id)?;
+        let mut process = match self.inspect(process_id) {
+            Ok(process) => process,
+            Err(RefineError::NotFound(_)) => return self.inspect_terminal(process_id),
+            Err(error) => return Err(error),
+        };
         if process.state == "running"
             && let Some(pid) = process.pid
             && !pid_alive(pid)?
         {
+            let reaper_owned = self
+                .reaper_owned
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("managed process reaper lock was poisoned".to_string())
+                })?
+                .contains(process_id);
+            if reaper_owned {
+                let deadline = Instant::now() + Duration::from_secs(1);
+                while Instant::now() < deadline {
+                    match self.inspect_terminal(process_id) {
+                        Ok(terminal) => return Ok(terminal),
+                        Err(RefineError::NotFound(_)) => {
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+            }
             process.state = "exited".to_string();
             self.write_process(&process)?;
-            self.remove_process_artifacts(&process)?;
+            process = self.archive_terminal_process(&process)?;
         }
         Ok(process)
     }
 
     fn stream(&self, process_id: &str) -> RefineResult<String> {
-        let process = self.inspect(process_id)?;
+        let process = match self.inspect(process_id) {
+            Ok(process) => process,
+            Err(RefineError::NotFound(_)) => self.inspect_terminal(process_id)?,
+            Err(error) => return Err(error),
+        };
         let mut output = String::new();
         if let Some(path) = process.stdout_path.as_deref() {
             append_stream_file(&mut output, "stdout", path)?;
@@ -182,11 +216,15 @@ impl ProcessSupervisor for FileProcessSupervisor {
     ) -> RefineResult<ProcessOutputObservation> {
         let current = match self.inspect(&enumerated.id) {
             Ok(current) => current,
-            Err(RefineError::NotFound(_)) => {
-                return Ok(ProcessOutputObservation::Terminal {
-                    process_id: enumerated.id.clone(),
-                });
-            }
+            Err(RefineError::NotFound(_)) => match self.inspect_terminal(&enumerated.id) {
+                Ok(terminal) => terminal,
+                Err(RefineError::NotFound(_)) => {
+                    return Ok(ProcessOutputObservation::Terminal {
+                        process_id: enumerated.id.clone(),
+                    });
+                }
+                Err(error) => return Err(error),
+            },
             Err(error) => return Err(error),
         };
         if current.id != enumerated.id
@@ -245,7 +283,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             ))
         })?;
         if process.state != "running" {
-            self.remove_process_artifacts(&process)?;
+            self.archive_terminal_process(&process)?;
             return Err(RefineError::NotFound(format!(
                 "Process {process_id} was not found"
             )));
@@ -256,6 +294,8 @@ impl ProcessSupervisor for FileProcessSupervisor {
     fn cleanup(&self, process_id: &str) -> RefineResult<()> {
         if let Ok(process) = self.inspect(process_id) {
             let _ = self.signal(process_id, "terminate");
+            self.remove_process_artifacts(&process)?;
+        } else if let Ok(process) = self.inspect_terminal(process_id) {
             self.remove_process_artifacts(&process)?;
         }
         Ok(())

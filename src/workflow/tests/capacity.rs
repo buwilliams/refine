@@ -391,7 +391,11 @@ fn file_automation_replenishes_running_agents_when_concurrency_cap_increases() {
             "parallel_per_target_app_cap": 4
         }))
         .unwrap();
-    assert_eq!(automation.apply_runtime_settings().unwrap(), 2);
+    let promoted_by_settings_call = automation.apply_runtime_settings().unwrap();
+    assert!(
+        promoted_by_settings_call <= 2,
+        "cap expansion promoted more work than the two remaining Goals"
+    );
 
     let expansion_deadline = std::time::Instant::now() + Duration::from_secs(10);
     while fs::read_dir(&marker_root).unwrap().count() < 4

@@ -56,14 +56,14 @@ fn file_process_supervisor_tracks_running_processes_and_pause_state() {
 }
 
 #[test]
-fn file_process_supervisor_reaps_launched_processes_after_exit() {
+fn file_process_supervisor_archives_launched_process_exit_and_output() {
     let temp_root = unique_temp_dir("process-reaper");
     let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));
     let process = supervisor
         .launch(ManagedProcessSpec {
             owner: ProcessOwner::Runner,
             command: shell_binary().to_string(),
-            args: shell_args("exit 0"),
+            args: shell_args("printf 'retained failure\\n' >&2; exit 7"),
             cwd: None,
             env: Vec::new(),
             stdin: None,
@@ -85,6 +85,20 @@ fn file_process_supervisor_reaps_launched_processes_after_exit() {
     }
 
     assert!(supervisor.list().unwrap().is_empty());
+    let terminal = supervisor.wait(&process.id).unwrap();
+    assert_eq!(terminal.state, "failed");
+    assert_eq!(terminal.exit_code, Some(7));
+    assert!(
+        supervisor
+            .stream(&process.id)
+            .unwrap()
+            .contains("retained failure")
+    );
+    assert!(supervisor.process_history_path(&process.id).exists());
+
+    supervisor.cleanup(&process.id).unwrap();
+    assert!(!supervisor.process_history_path(&process.id).exists());
+    assert!(supervisor.stream(&process.id).is_err());
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -162,6 +176,15 @@ fn file_process_supervisor_keeps_process_launch_separate_from_workflow_pause_and
     let recovered = supervisor.recover().unwrap();
     assert!(recovered.is_empty());
     assert!(supervisor.inspect("stale").is_err());
+    let stale = supervisor.wait("stale").unwrap();
+    assert_eq!(stale.state, "interrupted");
+    assert!(
+        stale
+            .details
+            .as_deref()
+            .unwrap()
+            .contains("running process had no pid during recovery")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -197,15 +220,13 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
 
     assert!(supervisor.recover().unwrap().is_empty());
     assert!(stdout_path.is_file());
-    let process_path = supervisor
-        .processes_dir()
-        .join(format!("{process_id}.json"));
+    let process_path = supervisor.process_history_path(process_id);
     let reconciled: ManagedProcess =
         serde_json::from_slice(&fs::read(&process_path).unwrap()).unwrap();
     assert_eq!(reconciled.state, "interrupted");
 
     supervisor.finish_artifact_handoff(handoff).unwrap();
-    assert!(supervisor.recover().unwrap().is_empty());
+    supervisor.cleanup(process_id).unwrap();
     assert!(!stdout_path.exists());
     assert!(!process_path.exists());
     assert!(!supervisor.artifact_handoff_path(process_id).exists());

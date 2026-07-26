@@ -224,6 +224,7 @@ fn server_with_projection() -> InProcessWebServer {
             runtime: RuntimeProjection::default(),
         },
         target_root: None,
+        app_registry_root: None,
         runtime_root: None,
     }
 }

@@ -71,7 +71,9 @@ impl InProcessWebServer {
     }
 
     pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {
-        self.runtime_root.clone()
+        self.app_registry_root
+            .clone()
+            .or_else(|| self.runtime_root.clone())
     }
 
     pub(super) fn project_registry_service(&self) -> Option<FileProjectRegistryService> {

@@ -37,6 +37,7 @@ pub(super) fn run_website(
             },
             projection: ProjectionSnapshot::default(),
             target_root: None,
+            app_registry_root: None,
             runtime_root: None,
         },
         static_root: Some(static_root),

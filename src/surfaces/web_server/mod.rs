@@ -194,6 +194,10 @@ pub struct InProcessWebServer {
     /// Test/bootstrap target app root. The served daemon resolves real app state
     /// from the runtime app registry at request time.
     pub target_root: Option<PathBuf>,
+    /// Canonical, daemon-independent project registry root. Process and operation
+    /// state remains port-scoped under `runtime_root`, while attached projects are
+    /// shared by every daemon port under this root.
+    pub app_registry_root: Option<PathBuf>,
     pub runtime_root: Option<PathBuf>,
 }
 

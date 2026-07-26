@@ -284,7 +284,13 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
         static_root: None,
     };
     let automation_loop = daemon.start_agent_automation_loop(Duration::from_millis(25));
-    let deadline = Instant::now() + Duration::from_secs(15);
+    #[cfg(not(target_os = "macos"))]
+    let automation_timeout = Duration::from_secs(15);
+    // Parallel debug tests perform many durable APFS writes; keep the Linux
+    // budget while allowing the same workflow to finish under macOS load.
+    #[cfg(target_os = "macos")]
+    let automation_timeout = Duration::from_secs(30);
+    let deadline = Instant::now() + automation_timeout;
     loop {
         let show = server.handle(ApiRequest {
             method: "GET".to_string(),

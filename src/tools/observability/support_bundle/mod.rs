@@ -26,6 +26,7 @@ pub struct FileSupportBundleService {
     pub refine_dir: PathBuf,
     pub runtime_root: PathBuf,
     pub repo_root: PathBuf,
+    pub project_registry_root: Option<PathBuf>,
 }
 
 impl FileSupportBundleService {
@@ -38,7 +39,13 @@ impl FileSupportBundleService {
             refine_dir: refine_dir.into(),
             runtime_root: runtime_root.into(),
             repo_root: repo_root.into(),
+            project_registry_root: None,
         }
+    }
+
+    pub fn with_project_registry_root(mut self, project_registry_root: impl Into<PathBuf>) -> Self {
+        self.project_registry_root = Some(project_registry_root.into());
+        self
     }
 
     fn output_dir(&self) -> PathBuf {
@@ -49,9 +56,12 @@ impl FileSupportBundleService {
 impl SupportBundleService for FileSupportBundleService {
     fn export(&self, redact_secrets: bool) -> RefineResult<SupportBundle> {
         let target_root = target_root_for_refine_dir(&self.refine_dir)?;
-        let diagnostics =
-            FileDiagnosticsService::new(Some(target_root), &self.runtime_root, &self.repo_root)
-                .doctor()?;
+        let mut diagnostics =
+            FileDiagnosticsService::new(Some(target_root), &self.runtime_root, &self.repo_root);
+        if let Some(project_registry_root) = &self.project_registry_root {
+            diagnostics = diagnostics.with_project_registry_root(project_registry_root.clone());
+        }
+        let diagnostics = diagnostics.doctor()?;
         let activity = FileActivityService::new(&self.refine_dir)
             .recent(200)
             .unwrap_or_default();

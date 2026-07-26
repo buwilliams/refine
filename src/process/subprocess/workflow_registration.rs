@@ -60,7 +60,7 @@ impl FileProcessSupervisor {
                     "process was not alive during recovery",
                 ));
                 self.write_process(process)?;
-                self.remove_process_artifacts(process)?;
+                self.archive_terminal_process(process)?;
                 return Ok(false);
             }
             None => {
@@ -70,7 +70,7 @@ impl FileProcessSupervisor {
                     "running process had no pid during recovery",
                 ));
                 self.write_process(process)?;
-                self.remove_process_artifacts(process)?;
+                self.archive_terminal_process(process)?;
                 return Ok(false);
             }
         }

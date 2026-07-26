@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+    ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};

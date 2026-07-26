@@ -249,7 +249,7 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
             assert!(stdout_path.is_file());
 
             let process_path = supervisor
-                .processes_dir()
+                .process_history_dir()
                 .join(format!("{}.json", process.id));
             let reconciled: ManagedProcess =
                 serde_json::from_slice(&fs::read(&process_path).unwrap()).unwrap();

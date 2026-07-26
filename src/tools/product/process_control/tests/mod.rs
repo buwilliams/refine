@@ -19,7 +19,6 @@ use crate::workflow::{WorkflowAutomation, WorkflowClaim, WorkflowPolicy};
 const TEST_AGENT_LIFETIME_SECONDS: &str = "300";
 
 #[cfg(unix)]
-#[cfg(target_os = "linux")]
 fn launch_agent(
     supervisor: &FileProcessSupervisor,
     goal_id: &str,

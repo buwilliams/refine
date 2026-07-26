@@ -27,9 +27,12 @@ impl InProcessWebServer {
         let repo_root = self
             .target_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        match FileSupportBundleService::new(refine_dir, runtime_root.clone(), repo_root)
-            .export(redact_secrets)
-        {
+        let mut support =
+            FileSupportBundleService::new(refine_dir, runtime_root.clone(), repo_root);
+        if let Some(project_registry_root) = self.app_registry_runtime_root() {
+            support = support.with_project_registry_root(project_registry_root);
+        }
+        match support.export(redact_secrets) {
             Ok(bundle) => ApiResponse::json(200, json!(bundle)),
             Err(error) => error_response(error),
         }
@@ -71,8 +74,12 @@ impl InProcessWebServer {
             }
         }
         let projection = self.current_projection_with_runtime()?;
-        let doctor =
-            FileDiagnosticsService::new(target_root, runtime_root.clone(), repo_root).doctor()?;
+        let mut diagnostics =
+            FileDiagnosticsService::new(target_root, runtime_root.clone(), repo_root);
+        if let Some(project_registry_root) = self.app_registry_runtime_root() {
+            diagnostics = diagnostics.with_project_registry_root(project_registry_root);
+        }
+        let doctor = diagnostics.doctor()?;
         let provider = projection
             .runtime
             .preflight

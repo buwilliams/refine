@@ -413,7 +413,9 @@ where
             let _ = reader_thread.join();
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+            let process_id = process.id.clone();
             let _ = supervisor.register(process);
+            let _ = supervisor.cleanup(&process_id);
             cleanup_session_artifacts(&command_path, &signal_path);
             return Err(error);
         }
@@ -422,7 +424,9 @@ where
         let _ = reader_thread.join();
         process.state = "failed".to_string();
         let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+        let process_id = process.id.clone();
         let _ = supervisor.register(process);
+        let _ = supervisor.cleanup(&process_id);
         cleanup_session_artifacts(&command_path, &signal_path);
         return Err(error);
     }
@@ -434,7 +438,9 @@ where
     if let Err(error) = reader_result {
         process.state = "failed".to_string();
         let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+        let process_id = process.id.clone();
         let _ = supervisor.register(process);
+        let _ = supervisor.cleanup(&process_id);
         cleanup_session_artifacts(&command_path, &signal_path);
         return Err(error);
     }
@@ -443,7 +449,9 @@ where
         Err(error) => {
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+            let process_id = process.id.clone();
             let _ = supervisor.register(process);
+            let _ = supervisor.cleanup(&process_id);
             cleanup_session_artifacts(&command_path, &signal_path);
             return Err(RefineError::Io(format!(
                 "failed to read Goal Agent transcript {}: {error}",
@@ -460,10 +468,11 @@ where
         "failed".to_string()
     };
     process.exit_code = i32::try_from(status.exit_code()).ok();
+    let process_id = process.id.clone();
     let _ = supervisor.register(process);
     cleanup_session_artifacts(&command_path, &signal_path);
     let _ = supervisor.finish_artifact_handoff(artifact_handoff);
-    let _ = supervisor.recover_owner(ProcessOwner::Agent);
+    let _ = supervisor.cleanup(&process_id);
 
     if !status.success() && !completed_by_signal {
         // Name the cause when the CLI could not authenticate. Otherwise a total

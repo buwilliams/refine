@@ -40,12 +40,14 @@ fn file_process_supervisor_output_observation_skips_a_process_reaped_after_listi
     }
     assert!(!process_path.exists(), "managed process was not reaped");
 
-    assert_eq!(
-        supervisor.observe_output(&listed).unwrap(),
-        ProcessOutputObservation::Terminal {
-            process_id: listed.id
-        }
-    );
+    let ProcessOutputObservation::Observed { process, output } =
+        supervisor.observe_output(&listed).unwrap()
+    else {
+        panic!("terminal process output should remain observable");
+    };
+    assert_eq!(process.id, listed.id);
+    assert_eq!(process.state, "exited");
+    assert!(output.contains("No captured output"));
     fs::remove_dir_all(temp_root).unwrap();
 }
 

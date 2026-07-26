@@ -79,6 +79,16 @@ fn system_start_recovers_jira_export_and_public_retry_launches_supervised_worker
         interrupted_after_start.error.unwrap()["code"],
         "operation_interrupted"
     );
+    let registry_deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while supervisor
+        .list()
+        .unwrap()
+        .iter()
+        .any(|process| process.id == worker.id)
+        && std::time::Instant::now() < registry_deadline
+    {
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
     assert!(
         supervisor
             .list()

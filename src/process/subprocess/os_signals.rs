@@ -101,7 +101,7 @@ pub(super) fn pid_alive(pid: u32) -> RefineResult<bool> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub(super) fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
     let status_path = PathBuf::from(format!("/proc/{pid}/status"));
     let status = match fs::read_to_string(&status_path) {
@@ -118,6 +118,24 @@ pub(super) fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
         .lines()
         .find_map(|line| line.strip_prefix("State:"))
         .is_some_and(|state| state.trim_start().starts_with('Z')))
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+pub(super) fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
+    let output = Command::new("ps")
+        .args(["-o", "stat=", "-p", &pid.to_string()])
+        .output()
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to inspect process state {pid} with ps: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Ok(false);
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .trim_start()
+        .starts_with('Z'))
 }
 
 pub(super) fn append_stream_file(output: &mut String, label: &str, path: &str) -> RefineResult<()> {

@@ -155,8 +155,15 @@ fn local_http_daemon_keeps_sse_open_when_process_is_reaped_between_enumeration_a
         "managed process record was not reaped"
     );
     assert!(
-        !stdout_path.exists(),
-        "managed process output was not reaped"
+        stdout_path.exists(),
+        "terminal process output should remain available for recovery"
+    );
+    assert!(
+        supervisor
+            .process_history_dir()
+            .join(format!("{}.json", process.id))
+            .exists(),
+        "terminal process state should be archived"
     );
     continue_tx.send(()).unwrap();
 

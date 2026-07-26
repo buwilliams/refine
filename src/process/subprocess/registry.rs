@@ -5,6 +5,7 @@ impl FileProcessSupervisor {
         Self {
             runtime_root: runtime_root.into(),
             allowed_commands: BTreeSet::new(),
+            reaper_owned: Arc::new(Mutex::new(BTreeSet::new())),
         }
     }
 
@@ -18,11 +19,21 @@ impl FileProcessSupervisor {
                 .into_iter()
                 .map(|command| command.into())
                 .collect(),
+            reaper_owned: Arc::new(Mutex::new(BTreeSet::new())),
         }
     }
 
     pub fn processes_dir(&self) -> PathBuf {
         self.runtime_root.join("processes")
+    }
+
+    pub fn process_history_dir(&self) -> PathBuf {
+        self.runtime_root.join(PROCESS_HISTORY_DIR)
+    }
+
+    pub(super) fn process_history_path(&self, process_id: &str) -> PathBuf {
+        self.process_history_dir()
+            .join(format!("{process_id}.json"))
     }
 
     /// Hold transient process artifacts while a workflow-owned consumer finishes reading them.
@@ -130,14 +141,10 @@ impl FileProcessSupervisor {
             match serde_json::from_slice::<ManagedProcess>(&bytes) {
                 Ok(process) if process.state == "running" => processes.push(process),
                 Ok(process) => {
-                    // Cleaning up a settled record is opportunistic: it is not
-                    // running whether or not its artifacts could be removed. One
-                    // undeletable leftover must not fail the whole listing —
-                    // every consumer reads through here, including the
-                    // supervision that relaunches the workflow runner and the
-                    // sweep that reclaims orphaned claims, so failing here stops
-                    // automation entirely until the daemon is restarted.
-                    let _ = self.remove_process_artifacts(&process);
+                    // Terminal records do not belong in active enumeration, but
+                    // their exit status and output remain available for explicit
+                    // inspection and cleanup.
+                    let _ = self.archive_terminal_process(&process);
                 }
                 Err(_) if bytes.is_empty() => continue,
                 Err(_) => continue,
@@ -426,6 +433,17 @@ impl FileProcessSupervisor {
                 )));
             }
         }
+        let history_path = self.process_history_path(&process.id);
+        match fs::remove_file(&history_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to remove process history {}: {error}",
+                    history_path.display()
+                )));
+            }
+        }
         let identity_path = self.process_identity_path(&process.id);
         match fs::remove_file(&identity_path) {
             Ok(()) => {}
@@ -440,11 +458,68 @@ impl FileProcessSupervisor {
         Ok(())
     }
 
+    pub(super) fn inspect_terminal(&self, process_id: &str) -> RefineResult<ManagedProcess> {
+        let path = self.process_history_path(process_id);
+        let bytes = fs::read(&path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                return RefineError::NotFound(format!("Process {process_id} was not found"));
+            }
+            RefineError::Io(format!(
+                "failed to read process history {}: {error}",
+                path.display()
+            ))
+        })?;
+        serde_json::from_slice::<ManagedProcess>(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse process history {}: {error}",
+                path.display()
+            ))
+        })
+    }
+
+    pub(super) fn archive_terminal_process(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcess> {
+        if process.state == "running" {
+            return Err(RefineError::Conflict(format!(
+                "running process {} cannot be archived as terminal",
+                process.id
+            )));
+        }
+        fs::create_dir_all(self.process_history_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process history {}: {error}",
+                self.process_history_dir().display()
+            ))
+        })?;
+        let mut archived = process.clone();
+        if let Some(stdin_path) = archived.stdin_path.take() {
+            remove_file_if_present(Path::new(&stdin_path), "process stdin")?;
+        }
+        let encoded = serde_json::to_vec_pretty(&archived).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode process history: {error}"))
+        })?;
+        write_json_atomically(
+            &self.process_history_path(&archived.id),
+            &encoded,
+            "process history",
+        )?;
+        remove_file_if_present(
+            &self.processes_dir().join(format!("{}.json", archived.id)),
+            "active process registry",
+        )?;
+        remove_file_if_present(
+            &self.process_identity_path(&archived.id),
+            "process identity",
+        )?;
+        Ok(archived)
+    }
+
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
         if process.state != "running" {
             self.write_process(&process)?;
-            self.remove_process_artifacts(&process)?;
-            return Ok(process);
+            return self.archive_terminal_process(&process);
         }
         let existing = match self.inspect(&process.id) {
             Ok(existing) => Some(existing),
