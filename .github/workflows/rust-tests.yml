@@ -27,6 +27,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Configure Git test defaults
+        run: |
+          git config --global init.defaultBranch main
+          git config --global user.name "Refine Tests"
+          git config --global user.email "refine-tests@example.invalid"
+
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
