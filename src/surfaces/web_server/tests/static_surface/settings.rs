@@ -18,8 +18,10 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(
         r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
     ));
-    assert!(!runtime.contains(r#"data-testid="source-promotion-section""#));
-    assert!(releases.contains(r#"data-testid="source-promotion-section""#));
+    assert!(!runtime.contains(r#"data-testid="source-upgrade-section""#));
+    assert!(releases.contains(r#"data-testid="source-upgrade-section""#));
+    assert!(releases.contains("<h3>Upgrade</h3>"));
+    assert!(!releases.contains("Dogfood source"));
     assert!(releases.contains(r#"data-testid="source-promotion-check""#));
     assert!(releases.contains(r#"data-testid="source-promotion-promote""#));
     assert!(releases.contains("/api/system/source/check"));

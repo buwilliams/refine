@@ -34,8 +34,8 @@ function renderSettingsReleasesTab(releases = {}) {
 
 function renderSourcePromotionSection() {
   return `
-    <section class="settings-section" data-testid="source-promotion-section">
-      <h3>Dogfood source</h3>
+    <section class="settings-section" data-testid="source-upgrade-section">
+      <h3>Upgrade</h3>
       <p class="muted small" style="margin-top:0">
         Check and promote the configured upstream source separately from published release updates.
         Promotion requires a clean checkout, fast-forward ancestry, paused automation with no active work, and a successful candidate build.
