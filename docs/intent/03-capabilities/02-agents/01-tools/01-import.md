@@ -45,7 +45,15 @@ Current implementation details that matter to intent:
   accounting, and rollback evidence;
 - direct CLI imports and daemon-backed CLI/browser/API imports delegate to that
   same persistence capability, while surfaces retain only input parsing,
-  operation lifecycle, projection refresh, and response formatting.
+  operation lifecycle, projection refresh, and response formatting;
+- capability failure locations remain zero-based internal draft offsets, while
+  the public HTTP `failures[].index` contract is explicitly one-based so the
+  browser retry selection identifies the same draft;
+- cancellation is successful only after every import-created record is rolled
+  back. Incomplete cleanup is a durable partial failure with created,
+  rolled-back, and unrecovered Goal/Feature IDs, the exact rollback failures,
+  and recovery guidance; background operations must settle `Failed`, never
+  `Cancelled` or `Completed`, while imported records remain.
 
 ## Future Direction
 

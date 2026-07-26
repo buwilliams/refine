@@ -175,6 +175,8 @@ fn static_import_modal_exposes_feature_import_surface() {
         fs::read_to_string(static_root.join("js/features/goals-import-modal.js")).unwrap();
     let import_prepare =
         fs::read_to_string(static_root.join("js/features/goals-import-prepare.js")).unwrap();
+    let import_save =
+        fs::read_to_string(static_root.join("js/features/goals-import-save.js")).unwrap();
 
     assert!(index.contains(r#"data-testid="nav-import-goals">Import</a>"#));
     assert!(commands.contains(r#"title: "Import""#));
@@ -198,6 +200,8 @@ fn static_import_modal_exposes_feature_import_surface() {
     assert!(import_prepare.contains("async function startImportCsvParseOperation"));
     assert!(import_prepare.contains("async function saveImportDraftReviewState"));
     assert!(import_prepare.contains("async function reviewPlanFeatureDraftPayload"));
+    assert!(import_save.contains("const oneBasedIndex ="));
+    assert!(import_save.contains("const original = payload[oneBasedIndex - 1]"));
 }
 
 #[test]

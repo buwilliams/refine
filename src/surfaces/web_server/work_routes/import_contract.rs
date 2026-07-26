@@ -9,7 +9,7 @@ use crate::process::supervisor::operations::{
 };
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::imports::{
-    ImportExtractionResult, ImportPersistObserver, ImportPersistProgress,
+    ImportExtractionResult, ImportPersistObserver, ImportPersistProgress, ImportRollbackEvidence,
 };
 
 use super::{ApiResponse, body_text, provider_status_value};
@@ -113,7 +113,12 @@ impl ImportPersistObserver for WebImportPersistObserver<'_> {
     fn is_cancelled(&self) -> bool {
         self.registry
             .status(self.operation_id)
-            .map(|operation| matches!(operation.state, OperationState::Cancelled))
+            .map(|operation| {
+                matches!(
+                    operation.state,
+                    OperationState::Cancelling | OperationState::Cancelled
+                )
+            })
             .unwrap_or(false)
     }
 
@@ -129,5 +134,16 @@ impl ImportPersistObserver for WebImportPersistObserver<'_> {
         // Keep background batches cooperative so cancellation can be observed
         // between durable draft transactions.
         std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    fn on_rollback_start(&mut self, rollback: &ImportRollbackEvidence) {
+        let _ = self.registry.update_progress(
+            self.operation_id,
+            json!({
+                "message": "Rolling back import",
+                "completed": 0,
+                "total": rollback.created_goal_ids.len()
+            }),
+        );
     }
 }

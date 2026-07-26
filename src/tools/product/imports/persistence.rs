@@ -54,6 +54,8 @@ pub trait ImportPersistObserver {
     }
 
     fn on_progress(&mut self, _progress: ImportPersistProgress) {}
+
+    fn on_rollback_start(&mut self, _rollback: &ImportRollbackEvidence) {}
 }
 
 impl ImportPersistObserver for () {}
@@ -77,7 +79,9 @@ pub enum ImportPersistFailureKind {
 pub struct ImportPersistFailure {
     pub kind: ImportPersistFailureKind,
     pub error: Option<RefineError>,
-    pub failed_index: Option<usize>,
+    /// Zero-based index into the capability input drafts. Surface adapters must
+    /// convert this exactly once when their public contract uses another base.
+    pub failed_draft_index_zero_based: Option<usize>,
     pub failed_name: Option<String>,
     pub duplicate_actions: ImportDuplicateActions,
     pub duplicate_outcomes: Vec<ImportDuplicateOutcome>,
@@ -136,13 +140,16 @@ fn persist_with_service(
         if observer.is_cancelled() {
             return Err(rollback_failure(
                 service,
-                ImportPersistFailureKind::Cancelled,
-                None,
-                None,
-                None,
-                duplicate_actions,
-                duplicate_outcomes,
                 transaction,
+                observer,
+                ImportFailureContext {
+                    kind: ImportPersistFailureKind::Cancelled,
+                    error: None,
+                    failed_draft_index_zero_based: None,
+                    failed_name: None,
+                    duplicate_actions,
+                    duplicate_outcomes,
+                },
             ));
         }
         if let Err(error) = persist_draft(
@@ -156,13 +163,16 @@ fn persist_with_service(
         ) {
             return Err(rollback_failure(
                 service,
-                ImportPersistFailureKind::Failed,
-                Some(error),
-                Some(index),
-                Some(draft.name),
-                duplicate_actions,
-                duplicate_outcomes,
                 transaction,
+                observer,
+                ImportFailureContext {
+                    kind: ImportPersistFailureKind::Failed,
+                    error: Some(error),
+                    failed_draft_index_zero_based: Some(index),
+                    failed_name: Some(draft.name),
+                    duplicate_actions,
+                    duplicate_outcomes,
+                },
             ));
         }
         observer.on_progress(ImportPersistProgress {
@@ -174,13 +184,16 @@ fn persist_with_service(
     if observer.is_cancelled() {
         return Err(rollback_failure(
             service,
-            ImportPersistFailureKind::Cancelled,
-            None,
-            None,
-            None,
-            duplicate_actions,
-            duplicate_outcomes,
             transaction,
+            observer,
+            ImportFailureContext {
+                kind: ImportPersistFailureKind::Cancelled,
+                error: None,
+                failed_draft_index_zero_based: None,
+                failed_name: None,
+                duplicate_actions,
+                duplicate_outcomes,
+            },
         ));
     }
     if let Some(feature_id) = feature_id
@@ -188,13 +201,16 @@ fn persist_with_service(
     {
         return Err(rollback_failure(
             service,
-            ImportPersistFailureKind::Failed,
-            Some(error),
-            None,
-            Some("dependency ordering".to_string()),
-            duplicate_actions,
-            duplicate_outcomes,
             transaction,
+            observer,
+            ImportFailureContext {
+                kind: ImportPersistFailureKind::Failed,
+                error: Some(error),
+                failed_draft_index_zero_based: None,
+                failed_name: Some("dependency ordering".to_string()),
+                duplicate_actions,
+                duplicate_outcomes,
+            },
         ));
     }
 
@@ -384,21 +400,27 @@ fn persist_draft(
     Ok(())
 }
 
-fn rollback_failure(
-    service: &FileWorkItemService,
+struct ImportFailureContext {
     kind: ImportPersistFailureKind,
     error: Option<RefineError>,
-    failed_index: Option<usize>,
+    failed_draft_index_zero_based: Option<usize>,
     failed_name: Option<String>,
     duplicate_actions: ImportDuplicateActions,
     duplicate_outcomes: Vec<ImportDuplicateOutcome>,
+}
+
+fn rollback_failure(
+    service: &FileWorkItemService,
     transaction: ImportTransaction,
+    observer: &mut impl ImportPersistObserver,
+    context: ImportFailureContext,
 ) -> ImportPersistFailure {
     let mut rollback = ImportRollbackEvidence {
         created_goal_ids: transaction.created_goal_ids.clone(),
         created_feature_id: transaction.created_feature_id.clone(),
         ..ImportRollbackEvidence::default()
     };
+    observer.on_rollback_start(&rollback);
     for goal_id in transaction.created_goal_ids.iter().rev() {
         match service.delete_goal_record(goal_id) {
             Ok(()) => rollback.rolled_back_goal_ids.push(goal_id.clone()),
@@ -416,25 +438,25 @@ fn rollback_failure(
         }
     }
     ImportPersistFailure {
-        kind,
-        error,
-        failed_index,
-        failed_name,
-        duplicate_actions,
-        duplicate_outcomes,
+        kind: context.kind,
+        error: context.error,
+        failed_draft_index_zero_based: context.failed_draft_index_zero_based,
+        failed_name: context.failed_name,
+        duplicate_actions: context.duplicate_actions,
+        duplicate_outcomes: context.duplicate_outcomes,
         rollback,
     }
 }
 
 fn failure_without_mutation(
     error: RefineError,
-    failed_index: Option<usize>,
+    failed_draft_index_zero_based: Option<usize>,
     failed_name: Option<String>,
 ) -> ImportPersistFailure {
     ImportPersistFailure {
         kind: ImportPersistFailureKind::Failed,
         error: Some(error),
-        failed_index,
+        failed_draft_index_zero_based,
         failed_name,
         duplicate_actions: ImportDuplicateActions::default(),
         duplicate_outcomes: Vec::new(),
@@ -446,7 +468,7 @@ fn cancelled_without_mutation() -> ImportPersistFailure {
     ImportPersistFailure {
         kind: ImportPersistFailureKind::Cancelled,
         error: None,
-        failed_index: None,
+        failed_draft_index_zero_based: None,
         failed_name: None,
         duplicate_actions: ImportDuplicateActions::default(),
         duplicate_outcomes: Vec::new(),

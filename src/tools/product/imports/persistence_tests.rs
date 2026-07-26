@@ -8,6 +8,9 @@ use super::{
 use crate::model::workflow::GoalStatus;
 use crate::tools::product::work_items::FileWorkItemService;
 
+#[cfg(unix)]
+mod rollback_failures;
+
 #[test]
 fn shared_persistence_creates_goal_with_round_and_metadata() {
     let temp_root = unique_temp_dir("import-persist-metadata");
@@ -262,7 +265,7 @@ fn shared_persistence_accounts_for_failure_and_rolls_back_created_work() {
         )
         .unwrap_err();
     assert_eq!(failure.kind, ImportPersistFailureKind::Failed);
-    assert_eq!(failure.failed_index, Some(1));
+    assert_eq!(failure.failed_draft_index_zero_based, Some(1));
     assert_eq!(failure.failed_name.as_deref(), Some("Second"));
     assert_eq!(failure.rollback.created_goal_ids.len(), 2);
     assert_eq!(failure.rollback.rolled_back_goal_ids.len(), 2);

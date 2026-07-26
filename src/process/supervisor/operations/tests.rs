@@ -163,6 +163,47 @@ fn file_operation_registry_registers_recovers_and_cancels_operations() {
 }
 
 #[test]
+fn deferred_cancellation_can_settle_as_a_durable_partial_failure() {
+    let temp_root = unique_temp_dir("operations-deferred-cancel-partial-failure");
+    let registry = FileOperationRegistry::new(temp_root.join("run/8080"));
+    let operation = registry
+        .register_with_request(
+            "import:persist",
+            json!({"defer_cancellation_terminal": true}),
+        )
+        .unwrap();
+    let cancelling = registry.cancel(&operation.id).unwrap();
+    assert_eq!(cancelling.state, OperationState::Cancelling);
+
+    let error = json!({
+        "code": "import_rollback_incomplete",
+        "kind": "partial_failure",
+        "message": "manual recovery required"
+    });
+    let result = json!({
+        "unrecovered_goal_ids": ["GOAL1"],
+        "rollback_failures": ["Goal GOAL1: injected deletion failure"]
+    });
+    let failed = registry
+        .fail_with_partial_result(&operation.id, error.clone(), result.clone())
+        .unwrap();
+    assert_eq!(failed.state, OperationState::Failed);
+    assert_eq!(failed.error, Some(error));
+    assert_eq!(failed.result, result);
+
+    let restarted_registry = FileOperationRegistry::new(temp_root.join("run/8080"));
+    let durable = restarted_registry.status(&operation.id).unwrap();
+    assert_eq!(durable, failed);
+    assert_eq!(
+        restarted_registry.recover().unwrap(),
+        vec![failed],
+        "partial-failure evidence must survive registry reconstruction"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_operation_registry_state_replacement_never_exposes_partial_json() {
     let temp_root = unique_temp_dir("operations-atomic-state");
     let registry = FileOperationRegistry::new(temp_root.join("run/8080"));

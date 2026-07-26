@@ -1,5 +1,7 @@
 use super::*;
 
+mod failure_contract;
+
 #[test]
 fn web_server_parses_and_persists_imported_goals_with_feature_destination() {
     let temp_root = unique_temp_dir("http-import-persist");
@@ -345,7 +347,7 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_goals() {
         body: None,
     });
     assert_eq!(cancel.status, 200);
-    assert_eq!(cancel.body["operation"]["status"], "cancelled");
+    assert_eq!(cancel.body["operation"]["status"], "cancelling");
 
     let registry = FileOperationRegistry::new(&runtime_root);
     let worker_deadline = Instant::now() + Duration::from_secs(5);

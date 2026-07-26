@@ -199,4 +199,53 @@ impl FileOperationRegistry {
         )?;
         Ok(handle)
     }
+
+    /// Records an actionable partial failure together with its public result.
+    ///
+    /// A capability with deferred cancellation may discover that its promised
+    /// cleanup was incomplete after cancellation won the admission race. That
+    /// is a failure, not a successful cancellation, so `Cancelling` is an
+    /// accepted source state here. Already-terminal cancellation remains
+    /// authoritative and cannot be rewritten by a late worker.
+    pub fn fail_with_partial_result(
+        &self,
+        operation_id: &str,
+        error: Value,
+        result: Value,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if matches!(handle.state, OperationState::Failed) {
+            FileExt::unlock(&lock).ok();
+            return Ok(handle);
+        }
+        if !matches!(
+            handle.state,
+            OperationState::Pending | OperationState::Running | OperationState::Cancelling
+        ) {
+            let state = handle.state.as_api_status();
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} is {state}; partial failure settlement no longer owns it"
+            )));
+        }
+        handle.state = OperationState::Failed;
+        handle.result = result;
+        handle.error = Some(error.clone());
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        self.append_log(
+            &handle.id,
+            operation_log_entry(
+                &handle,
+                "error",
+                "Operation failed with incomplete recovery",
+                Some(crate::model::JsonObject::from_iter([(
+                    "error".to_string(),
+                    error,
+                )])),
+            ),
+        )?;
+        Ok(handle)
+    }
 }
