@@ -544,6 +544,90 @@ test("Refine dev source refreshes morph identical and changed status without rep
   }
 });
 
+test("settings refresh never clears the Upgrade banner while its read is pending", { skip: SKIP }, async () => {
+  const fixture = (pathname, request) => {
+    if (pathname.startsWith("/api/upgrade")) {
+      return {
+        upgrade: {
+          current_version: "4.0.0",
+          latest_version: "4.1.0",
+          upgrade_available: true,
+          local_development: false,
+        },
+      };
+    }
+    return apiFixture(pathname, request);
+  };
+  const app = await openApp({ fixture });
+  try {
+    await assertScreenRenders(app, {
+      route: "#/node/releases",
+      marker: '[data-testid="runtime-upgrade-status"]',
+    });
+    const result = await app.page.evaluate(async () => {
+      const root = document.getElementById("runtime-upgrade-banner");
+      const status = root.querySelector('[data-testid="runtime-upgrade-status"]');
+      const originalApi = api;
+      let releaseUpgrade;
+      let pendingUpgradeRead;
+      let mutations = 0;
+      const observer = new MutationObserver((records) => {
+        mutations += records.length;
+      });
+      observer.observe(root, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+      api = async (method, path, body, options) => {
+        if (path === "/api/upgrade") {
+          pendingUpgradeRead = new Promise((resolve) => {
+            releaseUpgrade = resolve;
+          });
+          return pendingUpgradeRead;
+        }
+        return originalApi(method, path, body, options);
+      };
+
+      try {
+        await refreshSettings({ force: true });
+        await Promise.resolve();
+        const whilePending = {
+          statusIdentity:
+            root.querySelector('[data-testid="runtime-upgrade-status"]') === status,
+          text: root.textContent,
+          mutations,
+        };
+        releaseUpgrade({
+          upgrade: {
+            current_version: "4.0.0",
+            latest_version: "4.2.0",
+            upgrade_available: true,
+            local_development: false,
+          },
+        });
+        await pendingUpgradeRead;
+        await Promise.resolve();
+        return {
+          whilePending,
+          afterRead: root.textContent,
+        };
+      } finally {
+        api = originalApi;
+        observer.disconnect();
+      }
+    });
+
+    assert.equal(result.whilePending.statusIdentity, true);
+    assert.match(result.whilePending.text, /Upgrade available 4\.1\.0/);
+    assert.equal(result.whilePending.mutations, 0);
+    assert.match(result.afterRead, /Upgrade available 4\.2\.0/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("changed settings refresh preserves focus, dirty controls, scroll, and one live handler", { skip: SKIP }, async () => {
   let settingsVersion = 1;
   const settingsWrites = [];

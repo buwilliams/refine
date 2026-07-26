@@ -830,7 +830,10 @@ function setSettingsTab(slug) {
 
 function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute()) {
   const releaseStatus = (surface === SETTINGS_SURFACES.settings || surface === SETTINGS_SURFACES.node)
-    ? '<div id="runtime-upgrade-banner" class="settings-release-status" aria-live="polite"></div>'
+    // The banner has its own authoritative read. Main settings redraws must not
+    // morph this empty placeholder over its current status while that read is
+    // pending, or every SSE event makes the Upgrade message flash off and on.
+    ? '<div id="runtime-upgrade-banner" class="settings-release-status" aria-live="polite" data-morph-preserve="1"></div>'
     : "";
   return `
     <div class="settings-tabs-row">
