@@ -231,6 +231,19 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         return stopTerminalSession(chatState.tabs[tabId]);
       },
       close(tabId) { return closeChatTab(tabId); },
+      clickCloseDescendant(tabId) {
+        return handleToolbarTabClick({
+          target: {
+            closest(selector) {
+              return selector === "[data-close-tab]"
+                ? { dataset: { closeTab: tabId } }
+                : null;
+            },
+          },
+          preventDefault() {},
+          stopPropagation() {},
+        }, { dataset: { tabId } });
+      },
       markExited(tabId) {
         const tab = chatState.tabs[tabId];
         const terminal = terminalStateFor(tabId);
@@ -255,6 +268,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         };
       },
       tabIds() { return Object.keys(chatState.tabs); },
+      systemOperations() {
+        return systemOperationState.messages.map((item) => ({ ...item }));
+      },
       setApi(nextApi) { api = nextApi; },
       setReporter(name) { setLastReporter(name); },
       todoState() {
@@ -599,7 +615,7 @@ test("closing a worktree Agent confirms stop, preserves its worktree, and forget
   assert.equal(requests.some((request) => /delete|discard|remove.*worktree/i.test(request[1])), false);
 });
 
-test("a failed close keeps the process-backed tab and shows the actionable error", async () => {
+test("a failed backend stop does not restore an optimistically closed tab", async () => {
   const browser = browserRuntime();
   browser.runtime.setApi(async (_method, requestPath, body) => {
     if (requestPath === "/api/terminal/session") {
@@ -618,11 +634,14 @@ test("a failed close keeps the process-backed tab and shows the actionable error
   const tabId = await browser.runtime.create("agent");
   await browser.runtime.close(tabId);
 
-  assert.ok(browser.runtime.tab(tabId));
-  assert.match(browser.html(), /termination was not confirmed/);
+  assert.equal(browser.runtime.tab(tabId), undefined);
+  assert.equal(
+    browser.runtime.systemOperations().at(-1)?.message,
+    "termination was not confirmed",
+  );
 });
 
-test("an unconfirmed backend stop result cannot remove the tab", async () => {
+test("an unconfirmed backend stop result does not restore an optimistically closed tab", async () => {
   const browser = browserRuntime();
   browser.runtime.setApi(async (_method, requestPath, body) => {
     if (requestPath === "/api/terminal/session") {
@@ -640,8 +659,37 @@ test("an unconfirmed backend stop result cannot remove the tab", async () => {
   const tabId = await browser.runtime.create("agent");
   await browser.runtime.close(tabId);
 
-  assert.ok(browser.runtime.tab(tabId));
-  assert.match(browser.html(), /Process termination was not confirmed/);
+  assert.equal(browser.runtime.tab(tabId), undefined);
+  assert.equal(
+    browser.runtime.systemOperations().at(-1)?.message,
+    "Process termination was not confirmed.",
+  );
+});
+
+test("clicking a close icon descendant removes the tab before backend Stop settles", async () => {
+  const browser = browserRuntime();
+  let resolveStop;
+  const stopResponse = new Promise((resolve) => { resolveStop = resolve; });
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "agent-session",
+        process_id: "agent-process",
+        cwd: "/repo",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) return stopResponse;
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  const tabId = await browser.runtime.create("agent");
+  const closing = browser.runtime.clickCloseDescendant(tabId);
+
+  assert.equal(browser.runtime.tab(tabId), undefined);
+  resolveStop({ ok: true, termination: { confirmed_exit: true } });
+  await closing;
 });
 
 test("a tab closes locally when its background process already exited", async () => {

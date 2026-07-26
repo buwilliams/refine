@@ -32,11 +32,14 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - a page refresh restores that browser session's explicitly opened tabs and
   verifies their process state;
 - each tab has a close action;
-- closing an interactive terminal asks the backend to stop its managed process before removing the tab;
+- closing an interactive terminal removes its browser tab immediately and asks
+  the backend to stop its managed process without waiting for termination or
+  workflow settlement;
 - a tab whose process already exited or no longer exists closes locally without
   requiring a successful stop request;
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
-  workflow cancellation, claim-settlement, and audit semantics;
+  workflow cancellation, claim-settlement, and audit semantics after the
+  browser surface detaches;
 - when an explicit Stop is already in progress, closing its tab only detaches
   the browser surface and never sends a duplicate Stop; the original
   workflow-aware cancellation continues and any late failure remains visible;

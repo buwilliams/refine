@@ -629,18 +629,7 @@ function drawToolbar() {
     }
 
     $$(".toolbar-tab", root).forEach((el) => {
-      bindOnce(el, "click", (e) => {
-        if (e.target.matches("[data-close-tab]")) return;
-        const id = el.dataset.tabId;
-        if (!id) return;
-        void activateToolbarTab(id, { toggleIfActive: true });
-      });
-    });
-    $$("[data-close-tab]", root).forEach((el) => {
-      bindOnce(el, "click", (e) => {
-        e.stopPropagation();
-        closeChatTab(el.dataset.closeTab);
-      });
+      bindOnce(el, "click", (e) => void handleToolbarTabClick(e, el));
     });
     $$("[data-add-toolbar-tab]", root).forEach((el) => {
       bindOnce(el, "click", () => {
@@ -3153,34 +3142,45 @@ function refreshProcessesTabForChatChange() {
 
 function switchChatTab(tabId) { return activateToolbarTab(tabId); }
 
+function handleToolbarTabClick(event, tabElement) {
+  const close = event.target?.closest?.("[data-close-tab]");
+  if (close) {
+    event.preventDefault();
+    event.stopPropagation();
+    return closeChatTab(close.dataset.closeTab);
+  }
+  const tabId = tabElement?.dataset?.tabId;
+  if (!tabId) return;
+  return activateToolbarTab(tabId, { toggleIfActive: true });
+}
+
 async function closeChatTab(tabId) {
   const t = chatState.tabs[tabId];
   if (!t) return;
   const terminal = toolbarTabUsesTerminal(t) ? terminalStates.get(tabId) : null;
-  if (terminal?.stopping) {
-    removeToolbarTab(tabId);
-    return;
-  }
   const alreadyStopped = !!t.exited || !!(terminal?.statusChecked && terminal.exited);
-  if (toolbarTabUsesTerminal(t) && t.sessionId && !alreadyStopped) {
-    try {
-      const stopped = await api("POST", `/api/terminal/${encodeURIComponent(t.sessionId)}/stop`);
-      if (stopped?.termination?.confirmed_exit === false) {
-        throw new Error("Process termination was not confirmed.");
-      }
-    } catch (error) {
-      const sessionMissing = error?.code === "not_found" || error?.status === 404;
-      if (!sessionMissing) {
-        const currentTerminal = terminalStates.get(tabId) || terminalStateFor(tabId);
-        if (currentTerminal) currentTerminal.error = error.message || String(error);
-        await showActionError(error);
-        drawToolbar();
-        return;
-      }
+  const sessionId = toolbarTabUsesTerminal(t) && t.sessionId && !alreadyStopped && !terminal?.stopping
+    ? t.sessionId
+    : "";
+
+  // Closing a tab is a local UI action. Detach it before waiting for process
+  // termination and workflow settlement, which remain owned by the backend.
+  removeToolbarTab(tabId);
+  if (!sessionId) return;
+
+  try {
+    const stopped = await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/stop`);
+    if (stopped?.termination?.confirmed_exit === false) {
+      throw new Error("Process termination was not confirmed.");
     }
+  } catch (error) {
+    const sessionMissing = error?.code === "not_found" || error?.status === 404;
+    if (!sessionMissing) {
+      await showActionError(error);
+    }
+  } finally {
     refreshProcessesTabForChatChange();
   }
-  removeToolbarTab(tabId);
 }
 
 function removeToolbarTab(tabId) {
