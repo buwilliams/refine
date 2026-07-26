@@ -302,6 +302,91 @@ test("feature detail renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    await app.page.setViewportSize({ width: 1100, height: 800 });
+    await app.page.evaluate(() => {
+      state.lastReporter = "Reporter";
+      chatState.tabs = {
+        todo: {
+          goalId: null,
+          label: "Todo List",
+          mode: "todo",
+          sessionId: null,
+        },
+      };
+      chatState.activeTabId = "todo";
+      chatState.open = true;
+      chatState.bodyHeight = 430;
+      todoState.reporter = "Reporter";
+      todoState.selectedListId = "release";
+      todoState.lists = [
+        {
+          id: "release",
+          name: "Release",
+          items: [
+            { id: "ship", text: "Ship the candidate", done: false },
+            { id: "notes", text: "Write release notes", done: true },
+          ],
+        },
+        {
+          id: "later",
+          name: "Later",
+          items: [],
+        },
+      ];
+      drawToolbar();
+    });
+
+    const desktop = await app.page.evaluate(() => {
+      const rail = document.querySelector(".todo-list-rail").getBoundingClientRect();
+      const workspace = document.querySelector(".todo-workspace").getBoundingClientRect();
+      const composer = document.querySelector(".todo-add-form").getBoundingClientRect();
+      const items = document.querySelector(".todo-item-scroll").getBoundingClientRect();
+      return {
+        railBeforeWorkspace: rail.right <= workspace.left,
+        composerBeforeItems: composer.bottom <= items.bottom && composer.top < items.top,
+        title: document.querySelector('[data-testid="todo-list-title"]').textContent,
+        openCount: document.querySelector(".todo-list-nav-item.active .todo-list-nav-count").textContent,
+        completedCount: document.querySelector(".todo-completed-section h4 span").textContent,
+      };
+    });
+    assert.deepEqual(desktop, {
+      railBeforeWorkspace: true,
+      composerBeforeItems: true,
+      title: "Release",
+      openCount: "1",
+      completedCount: "1",
+    });
+
+    await app.page.locator('[data-todo-item-id="ship"] [data-todo-edit]').click();
+    await app.page.waitForSelector('[data-todo-item-id="ship"] [data-todo-edit-form]');
+    assert.equal(
+      await app.page.locator('[data-todo-item-id="ship"] [data-todo-edit-text]').inputValue(),
+      "Ship the candidate",
+    );
+
+    await app.page.setViewportSize({ width: 700, height: 800 });
+    const mobile = await app.page.evaluate(() => {
+      const rail = document.querySelector(".todo-list-rail").getBoundingClientRect();
+      const workspace = document.querySelector(".todo-workspace").getBoundingClientRect();
+      return {
+        railAboveWorkspace: rail.bottom <= workspace.top,
+        listFlow: getComputedStyle(document.querySelector(".todo-list-nav")).display,
+      };
+    });
+    assert.deepEqual(mobile, {
+      railAboveWorkspace: true,
+      listFlow: "flex",
+    });
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("terminal tabs swap one mounted xterm and retain inactive scrollback", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

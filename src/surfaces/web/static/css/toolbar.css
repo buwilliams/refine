@@ -250,112 +250,6 @@ button.toolbar-tab:hover:not(:disabled),
 }
 .chat-goal-link:hover { text-decoration: underline; }
 
-/* --- Todo List tab ------------------------------------------------------ */
-.todo-panel {
-  width: min(960px, 100%);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-}
-.todo-panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.todo-panel-header h3 {
-  margin: 0 0 3px;
-}
-.todo-panel-header p {
-  margin: 0;
-}
-.todo-reporter {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 650;
-  vertical-align: middle;
-}
-.todo-list-tools,
-.todo-list-name-form,
-.todo-add-form {
-  display: flex;
-  align-items: end;
-  gap: 8px;
-}
-.todo-list-tools label,
-.todo-list-name-form label {
-  flex: 1;
-  min-width: 160px;
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-}
-.todo-list-tools select,
-.todo-list-name-form input,
-.todo-add-form input {
-  width: 100%;
-  min-width: 0;
-  color: var(--fg);
-}
-.todo-add-form input {
-  flex: 1;
-}
-.todo-items {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 6px;
-  overflow: auto;
-}
-.todo-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-}
-.todo-item.done .todo-item-text {
-  color: var(--muted);
-  text-decoration: line-through;
-}
-.todo-done-toggle {
-  min-width: 58px;
-}
-.todo-item-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.todo-item-actions {
-  display: inline-flex;
-  gap: 6px;
-}
-.todo-empty,
-.todo-message {
-  padding: 18px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  text-align: center;
-}
-.todo-message.error {
-  border-style: solid;
-  border-color: var(--danger);
-  color: var(--danger);
-  text-align: left;
-}
-
 /* --- System tab -------------------------------------------------------- */
 .system-panel {
   display: flex;
@@ -1032,21 +926,6 @@ button.toolbar-tab:hover:not(:disabled),
 }
 
 @media (max-width: 760px) {
-  .todo-list-tools,
-  .todo-list-name-form {
-    align-items: stretch;
-    flex-wrap: wrap;
-  }
-  .todo-list-tools label,
-  .todo-list-name-form label {
-    flex-basis: 100%;
-  }
-  .todo-item {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .todo-item-actions {
-    grid-column: 2;
-  }
   .files-browser {
     grid-template-columns: 1fr;
   }

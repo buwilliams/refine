@@ -187,6 +187,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   const staticRoot = path.join(__dirname, "../src/surfaces/web/static/js");
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar-todo.js"), "utf8"), context);
   vm.runInContext(`
     function ensureTestTab(tabId) {
       if (chatState.tabs[tabId]) return;
@@ -536,21 +537,27 @@ test("Todo List tab uses the selected Reporter and shared todo API for every act
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(browser.runtime.tab(tabId).label, "Todo List");
   assert.match(browser.html(), /data-testid="toolbar-todo-panel"/);
-  assert.match(browser.html(), /Saved for this Reporter in the target app and available from other nodes/);
   assert.equal(requests[0].path, "/api/todos?reporter=Buddy");
 
   await browser.runtime.createTodoList("Release");
-  assert.match(browser.html(), /data-testid="todo-list-selector"/);
+  assert.match(browser.html(), /data-testid="todo-list-nav"/);
+  assert.match(browser.html(), /data-testid="todo-list-option"/);
+  assert.match(browser.html(), /data-testid="todo-list-title">Release/);
+  assert.match(browser.html(), /data-testid="todo-list-menu-toggle"/);
   assert.match(browser.html(), /data-testid="todo-list-name"/);
   assert.match(browser.html(), /data-testid="todo-add-item"/);
+  assert.doesNotMatch(browser.html(), /data-testid="todo-list-selector"/);
+  assert.doesNotMatch(browser.html(), /Saved for this Reporter/);
   await browser.runtime.renameTodoList("list-1", "Ready for review");
   await browser.runtime.addTodoItem("list-1", "Verify candidate");
   assert.match(browser.html(), /Verify candidate/);
-  assert.match(browser.html(), />\s*Done\s*</);
+  assert.match(browser.html(), /aria-label="Mark complete: Verify candidate"/);
   assert.match(browser.html(), />Edit</);
   assert.match(browser.html(), />Delete</);
   await browser.runtime.updateTodoItem("list-1", "item-1", { done: true });
-  assert.match(browser.html(), />\s*Undo\s*</);
+  assert.match(browser.html(), /data-testid="todo-all-done"/);
+  assert.match(browser.html(), /Completed <span>1<\/span>/);
+  assert.match(browser.html(), /aria-label="Mark incomplete: Verify candidate"/);
   await browser.runtime.updateTodoItem("list-1", "item-1", { text: "Verify exact results" });
   assert.match(browser.html(), /Verify exact results/);
   await browser.runtime.deleteTodoItem("list-1", "item-1");
