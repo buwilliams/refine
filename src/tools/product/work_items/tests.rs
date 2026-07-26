@@ -415,6 +415,59 @@ fn file_work_item_service_exposes_failed_feature_blocking_notice_on_goal_detail(
 }
 
 #[test]
+fn retrying_a_failed_goal_clears_the_recorded_failure_reason() {
+    let temp_root = unique_temp_dir("work-item-retry-clears-failure");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Stale candidate", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+        .unwrap();
+    service
+        .update_latest_goal_round_evaluation_summary(
+            "GOAL1",
+            &json!({
+                "failure_category": "merge",
+                "failure_message": "Candidate abc123 is stale: recorded base def456 is not its ancestor",
+                "failure_at": "2026-07-25T12:02:30Z"
+            }),
+        )
+        .unwrap();
+
+    let failed = service.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(failed["rounds"][0]["failure_category"], "merge");
+    assert!(
+        failed["rounds"][0]["failure_message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("is stale")
+    );
+
+    // A retry reuses this same round, so the reason it carries is now spent.
+    // Leaving it would show a live failure on work that has moved on.
+    service.retry_goal_merge_summary("GOAL1").unwrap();
+
+    let retried = service.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(retried["status"], "ready-merge");
+    assert_eq!(retried["rounds"][0]["failure_category"], "");
+    assert_eq!(retried["rounds"][0]["failure_message"], "");
+    assert_eq!(retried["rounds"][0]["failure_at"], "");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_work_item_service_cancels_and_deletes_features_through_goal_paths() {
     let temp_root = unique_temp_dir("work-item-feature-cancel-delete");
     let refine_dir = temp_root.join(".refine");

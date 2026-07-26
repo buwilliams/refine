@@ -154,6 +154,18 @@ impl<'a> WorkflowContext<'a> {
 
     pub fn fail(&self, category: &str, error: &RefineError) -> RefineResult<()> {
         let _ = self.work_items.fail_automated_goal_if_active(&self.goal_id);
+        // Record the reason on the Goal itself, not only in the log sidecar. A
+        // Goal can fail here with every gate it reached recorded as passed — an
+        // integration that found the branch tip moved, for one — and reading
+        // `failed` with nothing but passes above it explains nothing about why.
+        let _ = self.work_items.update_latest_goal_round_evaluation_summary(
+            &self.goal_id,
+            &json!({
+                "failure_category": category,
+                "failure_message": error.to_string(),
+                "failure_at": now_timestamp()
+            }),
+        );
         self.log(
             category,
             &format!("Workflow failed: {error}"),

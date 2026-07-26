@@ -354,6 +354,7 @@ function drawGoalDetail(goal) {
           <span class="banner-msg" data-testid="goal-feature-blocking-banner-message">${htmlEscape(featureBlockingNotice.message)}</span>
         </div>` : ""}
 
+      ${latest ? renderFailureSummary(latest) : ""}
       ${latest ? renderGovernanceSummary(latest) : ""}
       ${latest ? renderQualitySummary(latest) : ""}
 
@@ -804,6 +805,24 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
       </div>
     </details>
   `;
+}
+
+// A Goal can fail after every gate it reached passed — an integration that
+// found the branch tip moved, for one — so the reason gets its own card above
+// the gate summaries rather than being inferred from them.
+function renderFailureSummary(round) {
+  if (!round || !round.failure_message) {
+    return "";
+  }
+  return `
+    <div class="card" style="margin:0 0 14px" data-testid="goal-failure-summary">
+      <h3>Failure</h3>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        ${round.failure_category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(round.failure_category)}</span>` : ""}
+        ${round.failure_at ? `<span class="muted small" data-testid="goal-failure-at">${fmtTime(round.failure_at)}</span>` : ""}
+      </div>
+      <p style="margin-bottom:6px" data-testid="goal-failure-message">${htmlEscape(round.failure_message)}</p>
+    </div>`;
 }
 
 function renderGovernanceSummary(round) {

@@ -4178,6 +4178,24 @@ mod tests {
             detail["rounds"][0]["quality_details"]["results"][0]["test"],
             "The candidate has no fail-qa marker."
         );
+        // A failed Goal has to carry its own reason. Reading `failed` with the
+        // gates it reached recorded as passed otherwise explains nothing, and
+        // the operator has no reason to go opening operations files.
+        assert_eq!(detail["rounds"][0]["failure_category"], "quality");
+        assert!(
+            detail["rounds"][0]["failure_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("quality checks failed"),
+            "the Goal must record why it failed, got {:?}",
+            detail["rounds"][0]["failure_message"]
+        );
+        assert!(
+            !detail["rounds"][0]["failure_at"]
+                .as_str()
+                .unwrap_or_default()
+                .is_empty()
+        );
         assert_eq!(
             git_stdout(&target_root, &["rev-parse", "HEAD"])
                 .unwrap()

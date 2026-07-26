@@ -2761,6 +2761,9 @@ impl FileWorkItemService {
             "workflow_quality_timing",
             "workflow_git_remote",
             "workflow_integration",
+            "failure_category",
+            "failure_message",
+            "failure_at",
         ] {
             if let Some(value) = fields.get(key) {
                 round.insert(key.to_string(), value.clone());
@@ -2928,6 +2931,9 @@ impl FileWorkItemService {
             "status".to_string(),
             Value::String(status.as_str().to_string()),
         );
+        if !matches!(status, GoalStatus::Failed) {
+            clear_latest_round_failure(object);
+        }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(goal_path, value)
     }
@@ -3433,6 +3439,25 @@ fn attach_latest_log_fields(
     Ok(())
 }
 
+/// A recorded failure describes the round that failed. Retrying a Goal reuses
+/// that same round, so leaving the reason behind would show a live failure on
+/// work that has since moved on.
+fn clear_latest_round_failure(object: &mut Map<String, Value>) {
+    let Some(round) = object
+        .get_mut("rounds")
+        .and_then(Value::as_array_mut)
+        .and_then(|rounds| rounds.last_mut())
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    for key in ["failure_category", "failure_message", "failure_at"] {
+        if round.contains_key(key) {
+            round.insert(key.to_string(), Value::String(String::new()));
+        }
+    }
+}
+
 fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     let now = now_timestamp();
     let mut round = Map::new();
@@ -3489,6 +3514,9 @@ fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
         "quality_checked_at".to_string(),
         Value::String(String::new()),
     );
+    round.insert("failure_category".to_string(), Value::String(String::new()));
+    round.insert("failure_message".to_string(), Value::String(String::new()));
+    round.insert("failure_at".to_string(), Value::String(String::new()));
     Value::Object(round)
 }
 
