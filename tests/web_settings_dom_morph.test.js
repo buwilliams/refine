@@ -89,3 +89,18 @@ test("every recurring settings redraw names the shared morph contract", () => {
     );
   }
 });
+
+test("the independently refreshed Upgrade banner survives parent settings redraws", () => {
+  const source = settingsSources()
+    .find(({ name }) => name === "settings.js")
+    .source;
+  const start = source.indexOf("function renderSettingsTabStrip(");
+  const next = source.indexOf("\nfunction ", start + 1);
+  const body = source.slice(start, next);
+
+  assert.match(
+    body,
+    /id="runtime-upgrade-banner"[^>]*data-morph-preserve="1"/,
+    "the parent settings morph must not clear the banner before /api/upgrade returns",
+  );
+});
