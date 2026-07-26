@@ -37,7 +37,7 @@ Draft Goal should offer the narrower conversion boundary for a user who wants he
 
 Current implementation details that matter to intent:
 
-- browser Plan Mode is a managed terminal that launches the configured native agent harness with planning context and an optional starting prompt;
+- browser Plan Mode opens a new managed terminal instance of the configured native agent harness for each request, with planning context and an optional starting prompt;
 - the planning agent uses the ordinary Refine CLI or API to create a Feature and naturally ordered Goals when the user chooses to persist the plan;
 - Refine does not parse the native harness transcript or maintain browser-only Draft Goal and Draft Feature controls;
 - CLI, HTTP API, MCP, and import surfaces may still expose structured drafting and review-before-persist where that interaction model is useful;

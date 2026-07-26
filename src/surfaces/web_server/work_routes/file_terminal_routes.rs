@@ -223,15 +223,7 @@ impl InProcessWebServer {
         };
 
         match terminal_session_start_response(launch, cols, rows) {
-            Ok(value) => {
-                if worktree_created
-                    && value.get("reattached").and_then(Value::as_bool) == Some(true)
-                    && let Some(worktree) = worktree.as_ref()
-                {
-                    cleanup_failed_terminal_worktree(&target_root, worktree);
-                }
-                ApiResponse::json(200, value)
-            }
+            Ok(value) => ApiResponse::json(200, value),
             Err(error) => {
                 if worktree_created && let Some(worktree) = worktree.as_ref() {
                     cleanup_failed_terminal_worktree(&target_root, worktree);

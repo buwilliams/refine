@@ -57,7 +57,6 @@ struct TerminalSession {
 }
 
 static TERMINAL_SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<TerminalSession>>>> = OnceLock::new();
-static TERMINAL_SINGLETON_LAUNCH: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub(in crate::surfaces::web_server) struct TerminalLaunchSpec {
@@ -75,35 +74,6 @@ pub(in crate::surfaces::web_server) fn terminal_session_start_response(
     cols: u16,
     rows: u16,
 ) -> RefineResult<Value> {
-    let singleton_profile = matches!(launch.profile.as_str(), "plan" | "standalone");
-    let _singleton_launch_guard = if singleton_profile {
-        Some(
-            TERMINAL_SINGLETON_LAUNCH
-                .get_or_init(|| Mutex::new(()))
-                .lock()
-                .map_err(|_| {
-                    RefineError::Io("terminal singleton launch lock was poisoned".to_string())
-                })?,
-        )
-    } else {
-        None
-    };
-    if singleton_profile
-        && let Some(existing) = sessions()
-            .lock()
-            .map_err(|_| RefineError::Io("terminal session lock was poisoned".to_string()))?
-            .values()
-            .find(|session| {
-                session.profile == launch.profile
-                    && session.supervisor.runtime_root == launch.runtime_root
-                    && !session.exited.load(Ordering::Acquire)
-            })
-            .cloned()
-    {
-        let mut response = existing.launch_json();
-        response["reattached"] = json!(true);
-        return Ok(response);
-    }
     let cwd = launch.cwd.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
             "terminal cwd {} is not available: {error}",
@@ -634,11 +604,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn singleton_agent_profiles_return_the_existing_live_session() {
+    fn interactive_agent_profiles_start_independent_live_sessions() {
         let root =
-            std::env::temp_dir().join(format!("refine-terminal-singleton-{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("refine-terminal-instances-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
-        for profile in ["plan", "standalone"] {
+        for profile in ["agent", "plan", "standalone"] {
             let launch = || TerminalLaunchSpec {
                 runtime_root: root.join("run"),
                 cwd: root.clone(),
@@ -650,9 +620,12 @@ mod tests {
             };
             let first = terminal_session_start_response(launch(), 80, 24).unwrap();
             let second = terminal_session_start_response(launch(), 120, 36).unwrap();
-            assert_eq!(first["id"], second["id"], "{profile}");
-            assert_eq!(second["reattached"], true, "{profile}");
+            assert_ne!(first["id"], second["id"], "{profile}");
+            assert_eq!(first["reattached"], false, "{profile}");
+            assert_eq!(second["reattached"], false, "{profile}");
             terminal_stop_response(&root.join("run"), None, first["id"].as_str().unwrap()).unwrap();
+            terminal_stop_response(&root.join("run"), None, second["id"].as_str().unwrap())
+                .unwrap();
         }
         fs::remove_dir_all(root).unwrap();
     }

@@ -400,7 +400,7 @@ function nextToolbarLabel(mode) {
   return count === 1 ? base : `${base} ${count}`;
 }
 
-async function createToolbarTab(mode) {
+async function createToolbarTab(mode, options = {}) {
   if (!["agent", "standalone", "system", "files", "todo", "terminal", "plan"].includes(mode)) return;
   if (mode === "todo") {
     const existing = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "todo");
@@ -412,6 +412,7 @@ async function createToolbarTab(mode) {
     label: nextToolbarLabel(mode),
     mode,
     sessionId: null,
+    initialPrompt: String(options.initialPrompt || "").trim(),
   });
   chatState.activeTabId = tabId;
   chatState.open = true;
@@ -464,29 +465,11 @@ async function renderGoalPlan() {
   openPlanChatDock();
 }
 
-function ensurePlanTab() {
-  ensureStandaloneTab();
-  if (!chatState.tabs.plan) {
-    chatState.tabs.plan = {
-      goalId: null,
-      label: "Planing Agent",
-      mode: "plan",
-      sessionId: null,
-    };
-  }
-  normalizeInteractiveTerminalTab(chatState.tabs.plan);
-}
-
 async function openPlanChatDock(options = {}) {
   const initialPrompt = typeof options === "string"
     ? options
     : String(options.initialPrompt || "");
-  ensurePlanTab();
-  const t = chatState.tabs.plan;
-  if (initialPrompt.trim()) {
-    t.initialPrompt = initialPrompt.trim();
-  }
-  await activateToolbarTab("plan");
+  return createToolbarTab("plan", { initialPrompt });
 }
 
 async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
