@@ -103,12 +103,14 @@ pub(super) fn pid_alive(pid: u32) -> RefineResult<bool> {
 
 #[cfg(target_os = "linux")]
 pub(super) fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
+    const LINUX_ESRCH: i32 = 3;
+
     let status_path = PathBuf::from(format!("/proc/{pid}/status"));
     let status = match fs::read_to_string(&status_path) {
         Ok(status) => status,
         Err(error)
             if error.kind() == std::io::ErrorKind::NotFound
-                || error.raw_os_error() == Some(libc::ESRCH) =>
+                || error.raw_os_error() == Some(LINUX_ESRCH) =>
         {
             // A process can exit after kill(0) succeeds but before procfs
             // serves its status. Linux reports that race as either ENOENT or
