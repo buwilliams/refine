@@ -2077,7 +2077,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   );
   if (!terminal) return;
   if (terminal.term?.element) {
-    if (!output.contains(terminal.term.element)) {
+    if (output.children.length !== 1 || output.firstElementChild !== terminal.term.element) {
       output.replaceChildren(terminal.term.element);
     }
     resizeTerminalRenderer(output, terminal);
@@ -2120,6 +2120,10 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
       brightWhite: "#ffffff",
     },
   });
+  // The output host survives toolbar morphs, but each tab owns its own xterm.
+  // Detach the inactive renderer before opening a new one so the preserved host
+  // always contains exactly the active tab's terminal.
+  output.replaceChildren();
   term.open(output);
   if (terminal.display) term.write(terminal.display);
   term.onData((data) => queueTerminalInput(data, terminal));

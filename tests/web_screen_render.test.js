@@ -302,6 +302,117 @@ test("feature detail renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("terminal tabs swap one mounted xterm and retain inactive scrollback", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    const result = await app.page.evaluate(async () => {
+      const firstId = "renderer-agent";
+      const secondId = "renderer-plan";
+      const makeTab = (label, mode) => normalizeInteractiveTerminalTab({
+        goalId: null,
+        label,
+        mode,
+        sessionId: null,
+      });
+      const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      const flushWrites = (term) => new Promise((resolve) => term.write("", resolve));
+      const bufferText = (term) => {
+        const buffer = term.buffer.active;
+        const lines = [];
+        for (let index = 0; index < buffer.length; index += 1) {
+          lines.push(buffer.getLine(index)?.translateToString(true) || "");
+        }
+        return lines.join("\n");
+      };
+
+      chatState.tabs = {
+        [firstId]: makeTab("Agent", "agent"),
+        [secondId]: makeTab("Planing Agent", "plan"),
+      };
+      chatState.activeTabId = firstId;
+      chatState.open = true;
+      chatState.bodyHeight = 420;
+      drawToolbar();
+      await nextFrame();
+
+      const first = terminalStateFor(firstId);
+      const firstTerm = first.term;
+      const firstOutput = Array.from(
+        { length: 80 },
+        (_, index) => `FIRST-SCROLLBACK-${String(index).padStart(2, "0")}`,
+      ).join("\r\n");
+      terminalReceiveOutput(`${firstOutput}\r\nFIRST-SCROLLBACK-END`, first);
+      await flushWrites(firstTerm);
+      firstTerm.scrollToTop();
+      const firstViewport = firstTerm.buffer.active.viewportY;
+      const firstBase = firstTerm.buffer.active.baseY;
+
+      chatState.activeTabId = secondId;
+      drawToolbar();
+      await nextFrame();
+      const second = terminalStateFor(secondId);
+      const secondTerm = second.term;
+      terminalReceiveOutput("SECOND-ACTIVE-ONLY", second);
+      await flushWrites(secondTerm);
+      await nextFrame();
+      const secondHost = document.querySelector(".terminal-output");
+      const secondMount = {
+        count: secondHost.querySelectorAll(":scope > .xterm").length,
+        showsSecond: secondHost.querySelector(".xterm-rows")?.textContent
+          .includes("SECOND-ACTIVE-ONLY") || false,
+        firstDetached: !firstTerm.element.isConnected,
+        secondMounted: secondTerm.element.parentElement === secondHost,
+      };
+
+      chatState.activeTabId = firstId;
+      drawToolbar();
+      await nextFrame();
+      const firstHost = document.querySelector(".terminal-output");
+      const firstBuffer = bufferText(firstTerm);
+      return {
+        secondMount,
+        firstMountCount: firstHost.querySelectorAll(":scope > .xterm").length,
+        firstMounted: firstTerm.element.parentElement === firstHost,
+        secondDetached: !secondTerm.element.isConnected,
+        firstInstanceRetained: terminalStateFor(firstId).term === firstTerm,
+        secondInstanceRetained: terminalStateFor(secondId).term === secondTerm,
+        firstScrollbackRetained:
+          firstBase > 0
+          && firstTerm.buffer.active.baseY === firstBase
+          && firstTerm.buffer.active.viewportY === firstViewport
+          && firstBuffer.includes("FIRST-SCROLLBACK-00")
+          && firstBuffer.includes("FIRST-SCROLLBACK-END"),
+        firstVisible:
+          firstHost.querySelector(".xterm-rows")?.textContent.includes("FIRST-SCROLLBACK-00")
+          || false,
+        firstExcludesSecond:
+          !firstHost.querySelector(".xterm-rows")?.textContent.includes("SECOND-ACTIVE-ONLY"),
+      };
+    });
+
+    assert.deepEqual(result, {
+      secondMount: {
+        count: 1,
+        showsSecond: true,
+        firstDetached: true,
+        secondMounted: true,
+      },
+      firstMountCount: 1,
+      firstMounted: true,
+      secondDetached: true,
+      firstInstanceRetained: true,
+      secondInstanceRetained: true,
+      firstScrollbackRetained: true,
+      firstVisible: true,
+      firstExcludesSecond: true,
+    });
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 // The remaining screens moved onto the redraw pattern. One browser for all of
 // them: each assertion is a scaffold element that paints regardless of whether the
 // screen has data, so an empty fixture still proves the route booted, rendered,
