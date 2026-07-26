@@ -145,6 +145,58 @@ fn failed_first_reconciliation_does_not_turn_remote_records_into_local_deletions
 }
 
 #[test]
+fn first_sync_hydrates_remote_state_over_local_bootstrap_metadata() {
+    let fixture = SyncFixture::new("remote-first-bootstrap");
+    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    fs::create_dir_all(refine_a.join("quality")).unwrap();
+    fs::create_dir_all(refine_b.join("quality")).unwrap();
+    write_goal(&fixture.a, "GOALA");
+    fs::write(
+        refine_a.join("refine.json"),
+        "{\"schema_version\":2,\"source\":\"remote\"}\n",
+    )
+    .unwrap();
+    fs::write(
+        refine_a.join("quality/settings.json"),
+        "{\"instructions\":\"remote\"}\n",
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+
+    fs::write(
+        refine_b.join("refine.json"),
+        "{\"schema_version\":2,\"source\":\"bootstrap\"}\n",
+    )
+    .unwrap();
+    fs::write(
+        refine_b.join("quality/settings.json"),
+        "{\"instructions\":\"bootstrap\"}\n",
+    )
+    .unwrap();
+
+    let hydrated = fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(!hydrated.committed, "{hydrated:?}");
+    assert!(refine_b.join("goals/GOALA/goal.json").exists());
+    assert_eq!(
+        fs::read_to_string(refine_b.join("refine.json")).unwrap(),
+        "{\"schema_version\":2,\"source\":\"remote\"}\n"
+    );
+    assert_eq!(
+        fs::read_to_string(refine_b.join("quality/settings.json")).unwrap(),
+        "{\"instructions\":\"remote\"}\n"
+    );
+    assert!(
+        hydrated
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("bootstrap metadata")),
+        "{hydrated:?}"
+    );
+}
+
+#[test]
 fn sync_uses_the_configured_git_remote() {
     let fixture = SyncFixture::new("configured-remote");
     git(&fixture.a, &["remote", "rename", "origin", "upstream"]);

@@ -3,13 +3,14 @@ use super::*;
 pub fn run_worker(
     worker_kind: &str,
     runtime_root: PathBuf,
+    project_registry_root: Option<PathBuf>,
     target_root: Option<PathBuf>,
     operation_id: Option<String>,
 ) -> RefineResult<()> {
     validate_worker_kind(worker_kind, true)?;
     match worker_kind {
-        WORKFLOW_RUNNER => run_workflow_worker(&runtime_root),
-        GIT_SYNC_RUNNER => run_git_sync_worker(&runtime_root),
+        WORKFLOW_RUNNER => run_workflow_worker(&runtime_root, project_registry_root.as_deref()),
+        GIT_SYNC_RUNNER => run_git_sync_worker(&runtime_root, project_registry_root.as_deref()),
         PROJECT_SYNC_RUNNER => {
             let target_root = target_root.ok_or_else(|| {
                 RefineError::InvalidInput("project-sync worker requires --target-root".to_string())

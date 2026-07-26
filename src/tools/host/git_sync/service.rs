@@ -114,7 +114,7 @@ impl FileGitSyncService {
         // into the live store. Persist the last successfully copied state so an
         // absent local record is only interpreted as a deletion after this node
         // has actually observed it.
-        let base = self.load_state_baseline()?.unwrap_or_default();
+        let stored_base = self.load_state_baseline()?;
         let local = durable_state_map(&live_refine)?;
         let before = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
 
@@ -156,6 +156,17 @@ impl FileGitSyncService {
             .filter(|path| tracked_transient.contains(path))
             .collect::<Vec<_>>();
         let remote_state = durable_state_map(&state_refine)?;
+        let bootstrap_remote_state =
+            stored_base.is_none() && remote_exists && bootstrap_only_state(&local);
+        let base = if bootstrap_remote_state {
+            details.push(
+                "Adopted remote Refine state over locally generated bootstrap metadata."
+                    .to_string(),
+            );
+            remote_first_bootstrap_baseline(&local, &remote_state)
+        } else {
+            stored_base.unwrap_or_default()
+        };
         let resolved_paths = BTreeSet::new();
         let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         if !conflicts.is_empty() {

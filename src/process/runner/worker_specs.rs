@@ -1,10 +1,15 @@
 use super::*;
 
-pub(super) fn current_target_root(runtime_root: &Path) -> RefineResult<Option<PathBuf>> {
-    Ok(FileProjectRegistryService::new(runtime_root, None)
-        .load()?
-        .active_app
-        .map(PathBuf::from))
+pub(super) fn current_target_root(
+    runtime_root: &Path,
+    project_registry_root: Option<&Path>,
+) -> RefineResult<Option<PathBuf>> {
+    Ok(
+        FileProjectRegistryService::new(project_registry_root.unwrap_or(runtime_root), None)
+            .load()?
+            .active_app
+            .map(PathBuf::from),
+    )
 }
 
 pub(super) fn project_sync_result(
@@ -29,10 +34,17 @@ pub(super) fn project_sync_result(
 /// state check is a guard rather than the load-bearing part; the owner check is
 /// not, because `recover_owner` returns records belonging to every owner and
 /// only the caller's filter has been keeping foreign ones out.
-pub(super) fn adoptable_worker(process: &ManagedProcess, worker_kind: &str) -> bool {
+pub(super) fn adoptable_worker(
+    process: &ManagedProcess,
+    worker_kind: &str,
+    project_registry_root: Option<&Path>,
+) -> bool {
     process.owner == ProcessOwner::Runner
         && process.state == "running"
         && managed_worker_kind(process) == Some(worker_kind)
+        && project_registry_root.is_none_or(|root| {
+            managed_worker_project_registry_root(process).as_deref() == Some(root)
+        })
 }
 
 pub(super) fn managed_worker_kind(process: &ManagedProcess) -> Option<&str> {
@@ -54,12 +66,33 @@ pub(super) fn managed_worker_kind(process: &ManagedProcess) -> Option<&str> {
         })
 }
 
+pub(super) fn managed_worker_project_registry_root(process: &ManagedProcess) -> Option<PathBuf> {
+    process
+        .details
+        .as_deref()
+        .and_then(|details| serde_json::from_str::<Value>(details).ok())
+        .and_then(|details| {
+            details
+                .get("project_registry_root")
+                .and_then(Value::as_str)
+                .map(PathBuf::from)
+        })
+}
+
 pub(super) fn background_worker_spec(
     executable: &Path,
     runtime_root: &Path,
+    project_registry_root: Option<&Path>,
     worker_kind: &str,
 ) -> ManagedProcessSpec {
-    runner_worker_spec(executable, runtime_root, worker_kind, None, None)
+    runner_worker_spec(
+        executable,
+        runtime_root,
+        project_registry_root,
+        worker_kind,
+        None,
+        None,
+    )
 }
 
 pub(super) fn project_sync_worker_spec(
@@ -71,6 +104,7 @@ pub(super) fn project_sync_worker_spec(
     runner_worker_spec(
         executable,
         runtime_root,
+        None,
         PROJECT_SYNC_RUNNER,
         Some(target_root),
         Some(operation_id),
@@ -85,6 +119,7 @@ pub(super) fn jira_export_worker_spec(
     let mut spec = runner_worker_spec(
         executable,
         runtime_root,
+        None,
         JIRA_EXPORT_RUNNER,
         None,
         Some(operation_id),
@@ -132,6 +167,7 @@ pub(super) fn jira_export_test_worker_spec(
 pub(super) fn runner_worker_spec(
     executable: &Path,
     runtime_root: &Path,
+    project_registry_root: Option<&Path>,
     worker_kind: &str,
     target_root: Option<&Path>,
     operation_id: Option<&str>,
@@ -144,6 +180,12 @@ pub(super) fn runner_worker_spec(
         "--port-runtime-root".to_string(),
         runtime_root.display().to_string(),
     ];
+    if let Some(project_registry_root) = project_registry_root {
+        args.extend([
+            "--project-registry-root".to_string(),
+            project_registry_root.display().to_string(),
+        ]);
+    }
     if let Some(target_root) = target_root {
         args.extend([
             "--target-root".to_string(),
@@ -169,7 +211,9 @@ pub(super) fn runner_worker_spec(
         metadata: serde_json::from_value(json!({
             "kind": "runner",
             "worker_kind": worker_kind,
-            "operation_id": operation_id
+            "operation_id": operation_id,
+            "project_registry_root": project_registry_root
+                .map(|root| root.display().to_string())
         }))
         .unwrap_or_default(),
     }

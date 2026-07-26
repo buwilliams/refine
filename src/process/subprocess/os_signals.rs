@@ -106,7 +106,15 @@ pub(super) fn unix_pid_is_zombie(pid: u32) -> RefineResult<bool> {
     let status_path = PathBuf::from(format!("/proc/{pid}/status"));
     let status = match fs::read_to_string(&status_path) {
         Ok(status) => status,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                || error.raw_os_error() == Some(libc::ESRCH) =>
+        {
+            // A process can exit after kill(0) succeeds but before procfs
+            // serves its status. Linux reports that race as either ENOENT or
+            // ESRCH; both mean there is no zombie left to inspect.
+            return Ok(false);
+        }
         Err(error) => {
             return Err(RefineError::Io(format!(
                 "failed to inspect process status {}: {error}",

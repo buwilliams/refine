@@ -21,23 +21,49 @@ fn worker_record(state: &str, worker_kind: &str) -> ManagedProcess {
 fn settled_worker_records_are_not_adopted_as_a_running_workflow_runner() {
     assert!(adoptable_worker(
         &worker_record("running", WORKFLOW_RUNNER),
-        WORKFLOW_RUNNER
+        WORKFLOW_RUNNER,
+        None
     ));
     // Each of these means the worker is gone. Adopting one leaves nothing
     // ticking the workflow while supervision believes a runner exists.
     for state in ["exited", "failed", "stopped", "interrupted"] {
         assert!(
-            !adoptable_worker(&worker_record(state, WORKFLOW_RUNNER), WORKFLOW_RUNNER),
+            !adoptable_worker(
+                &worker_record(state, WORKFLOW_RUNNER),
+                WORKFLOW_RUNNER,
+                None
+            ),
             "a {state} record must not be adopted as a live workflow runner"
         );
     }
     assert!(!adoptable_worker(
         &worker_record("running", GIT_SYNC_RUNNER),
-        WORKFLOW_RUNNER
+        WORKFLOW_RUNNER,
+        None
     ));
     let mut foreign_owner = worker_record("running", WORKFLOW_RUNNER);
     foreign_owner.owner = ProcessOwner::Agent;
-    assert!(!adoptable_worker(&foreign_owner, WORKFLOW_RUNNER));
+    assert!(!adoptable_worker(&foreign_owner, WORKFLOW_RUNNER, None));
+
+    let canonical_registry = Path::new("/tmp/run");
+    let legacy_worker = worker_record("running", WORKFLOW_RUNNER);
+    assert!(
+        !adoptable_worker(&legacy_worker, WORKFLOW_RUNNER, Some(canonical_registry)),
+        "a pre-canonical-registry worker must be replaced"
+    );
+    let mut current_worker = legacy_worker;
+    current_worker.details = Some(
+        json!({
+            "worker_kind": WORKFLOW_RUNNER,
+            "project_registry_root": canonical_registry
+        })
+        .to_string(),
+    );
+    assert!(adoptable_worker(
+        &current_worker,
+        WORKFLOW_RUNNER,
+        Some(canonical_registry)
+    ));
 }
 
 #[test]
@@ -116,6 +142,19 @@ fn retired_supervisor_state_is_purged_before_workflow_evaluation() {
 
 #[test]
 fn runner_specs_create_real_runner_processes() {
+    let background_spec = background_worker_spec(
+        Path::new("/opt/refine"),
+        Path::new("/tmp/run/8082"),
+        Some(Path::new("/tmp/run")),
+        GIT_SYNC_RUNNER,
+    );
+    assert!(
+        background_spec
+            .args
+            .windows(2)
+            .any(|args| args == ["--project-registry-root", "/tmp/run"])
+    );
+
     let spec = project_sync_worker_spec(
         Path::new("/opt/refine"),
         Path::new("/tmp/run/8082"),
@@ -146,4 +185,42 @@ fn runner_specs_create_real_runner_processes() {
             .map(|limits| limits.kill_on_parent_exit),
         Some(false)
     );
+}
+
+#[test]
+fn runner_target_resolution_uses_canonical_registry_over_stale_port_registry() {
+    let root = std::env::temp_dir().join(format!(
+        "refine-runner-project-registry-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let canonical_root = root.join("run");
+    let port_runtime_root = canonical_root.join("8082");
+    std::fs::create_dir_all(&port_runtime_root).unwrap();
+    std::fs::write(
+        canonical_root.join("apps.json"),
+        serde_json::to_vec_pretty(&json!({
+            "version": 1,
+            "active_app": "/tmp/current-app",
+            "apps": {}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        port_runtime_root.join("apps.json"),
+        serde_json::to_vec_pretty(&json!({
+            "version": 1,
+            "active_app": "/tmp/stale-app",
+            "apps": {}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        current_target_root(&port_runtime_root, Some(&canonical_root)).unwrap(),
+        Some(PathBuf::from("/tmp/current-app"))
+    );
+
+    std::fs::remove_dir_all(root).unwrap();
 }

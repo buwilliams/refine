@@ -10,6 +10,30 @@ pub(super) struct StateWorktreeSetup {
 
 pub(super) type DurableStateMap = BTreeMap<PathBuf, u64>;
 
+pub(super) fn bootstrap_only_state(state: &DurableStateMap) -> bool {
+    state.keys().all(|path| {
+        matches!(
+            path.to_string_lossy().replace('\\', "/").as_str(),
+            "refine.json"
+                | "nodes.json"
+                | "logs/activity.jsonl"
+                | "quality/settings.json"
+                | "quality/legacy-command-transition.json"
+        )
+    })
+}
+
+pub(super) fn remote_first_bootstrap_baseline(
+    local: &DurableStateMap,
+    remote: &DurableStateMap,
+) -> DurableStateMap {
+    local
+        .iter()
+        .filter(|(path, _)| remote.contains_key(*path))
+        .map(|(path, fingerprint)| (path.clone(), *fingerprint))
+        .collect()
+}
+
 pub(super) fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableStateMap> {
     if !root.exists() {
         return Ok(BTreeMap::new());

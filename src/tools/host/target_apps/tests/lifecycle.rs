@@ -109,6 +109,11 @@ fn target_app_service_spawns_start_command_and_registers_process() {
             .contains("target-started")
     );
     service.stop().unwrap();
+    match supervisor.wait(process_id) {
+        Ok(_) | Err(RefineError::NotFound(_)) => {}
+        Err(error) => panic!("target app process did not settle after stop: {error}"),
+    }
+    supervisor.cleanup(process_id).unwrap();
 
     fs::remove_dir_all(temp_root).unwrap();
 }

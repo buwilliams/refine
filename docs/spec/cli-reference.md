@@ -747,6 +747,7 @@ Run a supervised background worker outside the daemon process
 
 - `--kind` (required) — Worker implementation to run
 - `--port-runtime-root` (required) — Port-scoped runtime directory shared with the daemon
+- `--project-registry-root` — Canonical runtime directory containing the shared project registry
 - `--target-root` — Target repository for one-shot project operations
 - `--operation-id` — Durable operation identifier for one-shot work
 

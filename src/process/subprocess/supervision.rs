@@ -1,5 +1,34 @@
 use super::*;
 
+impl FileProcessSupervisor {
+    fn wait_for_reaper_terminal(&self, process_id: &str) -> RefineResult<Option<ManagedProcess>> {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        loop {
+            match self.inspect_terminal(process_id) {
+                Ok(terminal) => return Ok(Some(terminal)),
+                Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+            let reaper_owned = self
+                .reaper_owned
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("managed process reaper lock was poisoned".to_string())
+                })?
+                .contains(process_id);
+            if !reaper_owned {
+                return Ok(None);
+            }
+            if Instant::now() >= deadline {
+                return Err(RefineError::Conflict(format!(
+                    "managed process reaper did not settle {process_id}"
+                )));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+}
+
 impl ProcessSupervisor for FileProcessSupervisor {
     fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
         self.validate_launch(&spec)?;
@@ -157,31 +186,19 @@ impl ProcessSupervisor for FileProcessSupervisor {
     fn wait(&self, process_id: &str) -> RefineResult<ManagedProcess> {
         let mut process = match self.inspect(process_id) {
             Ok(process) => process,
-            Err(RefineError::NotFound(_)) => return self.inspect_terminal(process_id),
+            Err(RefineError::NotFound(error)) => {
+                return self
+                    .wait_for_reaper_terminal(process_id)?
+                    .ok_or_else(|| RefineError::NotFound(error));
+            }
             Err(error) => return Err(error),
         };
         if process.state == "running"
             && let Some(pid) = process.pid
             && !pid_alive(pid)?
         {
-            let reaper_owned = self
-                .reaper_owned
-                .lock()
-                .map_err(|_| {
-                    RefineError::Io("managed process reaper lock was poisoned".to_string())
-                })?
-                .contains(process_id);
-            if reaper_owned {
-                let deadline = Instant::now() + Duration::from_secs(1);
-                while Instant::now() < deadline {
-                    match self.inspect_terminal(process_id) {
-                        Ok(terminal) => return Ok(terminal),
-                        Err(RefineError::NotFound(_)) => {
-                            std::thread::sleep(Duration::from_millis(5));
-                        }
-                        Err(error) => return Err(error),
-                    }
-                }
+            if let Some(terminal) = self.wait_for_reaper_terminal(process_id)? {
+                return Ok(terminal);
             }
             process.state = "exited".to_string();
             self.write_process(&process)?;

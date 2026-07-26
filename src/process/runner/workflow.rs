@@ -1,6 +1,9 @@
 use super::*;
 
-pub(super) fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
+pub(super) fn run_workflow_worker(
+    runtime_root: &Path,
+    project_registry_root: Option<&Path>,
+) -> RefineResult<()> {
     let mut recovered_root = None;
     let mut retired_supervisor_root = None;
     loop {
@@ -9,7 +12,7 @@ pub(super) fn run_workflow_worker(runtime_root: &Path) -> RefineResult<()> {
         // a lock held for a moment — must not end the tick loop: nothing restarts
         // it in place, so returning here silences automation until the daemon is
         // restarted, with a full queue and no surfaced error.
-        let target_root = match current_target_root(runtime_root) {
+        let target_root = match current_target_root(runtime_root, project_registry_root) {
             Ok(target_root) => target_root,
             Err(error) => {
                 eprintln!("refine workflow runner: failed to read the active app: {error}");

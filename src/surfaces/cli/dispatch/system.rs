@@ -168,12 +168,14 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 SystemAction::RunnerWorker {
                     kind,
                     port_runtime_root,
+                    project_registry_root,
                     target_root,
                     operation_id,
                 },
         } => run_worker(
             &kind,
             absolute_cli_path(port_runtime_root)?,
+            project_registry_root.map(absolute_cli_path).transpose()?,
             target_root.map(absolute_cli_path).transpose()?,
             operation_id,
         ),

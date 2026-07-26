@@ -129,6 +129,9 @@ pub enum SystemAction {
         /// Port-scoped runtime directory shared with the daemon.
         #[arg(long)]
         port_runtime_root: PathBuf,
+        /// Canonical runtime directory containing the shared project registry.
+        #[arg(long)]
+        project_registry_root: Option<PathBuf>,
         /// Target repository for one-shot project operations.
         #[arg(long)]
         target_root: Option<PathBuf>,

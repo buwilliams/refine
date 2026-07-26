@@ -1,6 +1,9 @@
 use super::*;
 
-pub(super) fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
+pub(super) fn run_git_sync_worker(
+    runtime_root: &Path,
+    project_registry_root: Option<&Path>,
+) -> RefineResult<()> {
     let mut active_root = None;
     let mut last_observed_fingerprint = None;
     let mut pending_sync = None;
@@ -10,7 +13,8 @@ pub(super) fn run_git_sync_worker(runtime_root: &Path) -> RefineResult<()> {
     loop {
         let now = Instant::now();
         if now >= next_attempt {
-            let Some(target_root) = current_target_root(runtime_root)? else {
+            let Some(target_root) = current_target_root(runtime_root, project_registry_root)?
+            else {
                 thread::sleep(GIT_RECONCILE_POLL_INTERVAL);
                 continue;
             };

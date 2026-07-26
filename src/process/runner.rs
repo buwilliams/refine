@@ -38,6 +38,7 @@ const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 #[derive(Clone, Debug)]
 pub struct FileRunnerWorkerService {
     pub runtime_root: PathBuf,
+    pub project_registry_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -72,18 +73,30 @@ impl FileRunnerWorkerService {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
+            project_registry_root: None,
         }
+    }
+
+    pub fn with_project_registry_root(mut self, project_registry_root: impl Into<PathBuf>) -> Self {
+        self.project_registry_root = Some(project_registry_root.into());
+        self
     }
 
     pub fn ensure_background_worker(&self, worker_kind: &str) -> RefineResult<ManagedProcess> {
         validate_worker_kind(worker_kind, false)?;
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        if let Some(process) = supervisor
-            .recover_owner(ProcessOwner::Runner)?
-            .into_iter()
-            .find(|process| adoptable_worker(process, worker_kind))
-        {
-            return Ok(process);
+        let recovered = supervisor.recover_owner(ProcessOwner::Runner)?;
+        if let Some(process) = recovered.iter().into_iter().find(|process| {
+            adoptable_worker(process, worker_kind, self.project_registry_root.as_deref())
+        }) {
+            return Ok(process.clone());
+        }
+        for process in recovered.into_iter().filter(|process| {
+            process.owner == ProcessOwner::Runner
+                && process.state == "running"
+                && managed_worker_kind(process) == Some(worker_kind)
+        }) {
+            let _ = supervisor.signal(&process.id, "terminate");
         }
         let executable = std::env::current_exe().map_err(|error| {
             RefineError::Io(format!("failed to locate runner executable: {error}"))
@@ -91,6 +104,7 @@ impl FileRunnerWorkerService {
         supervisor.launch(background_worker_spec(
             &executable,
             &self.runtime_root,
+            self.project_registry_root.as_deref(),
             worker_kind,
         ))
     }
