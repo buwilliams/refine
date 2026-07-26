@@ -454,9 +454,19 @@ impl FileMergerService {
             )));
         }
         if !git.commit_is_ancestor(&base_commit, &candidate_commit)? {
-            return Err(RefineError::Conflict(format!(
-                "Candidate {candidate_commit} is stale: recorded base {base_commit} is not its ancestor"
-            )));
+            // A candidate already contained in the target branch is integrated,
+            // not stale: the work is in the branch whatever the recorded base
+            // says, and there is nothing left to merge. Integration below
+            // recognizes that and still publishes it, but only if the candidate
+            // gets that far — rejecting here first turned finished work into a
+            // failed Goal whenever the branch tip moved under an in-flight round.
+            // Reject only when the work is genuinely absent from the target.
+            let local_target = git.resolve_commit(&target_branch)?;
+            if !git.commit_is_ancestor(&candidate_commit, &local_target)? {
+                return Err(RefineError::Conflict(format!(
+                    "Candidate {candidate_commit} is stale: recorded base {base_commit} is not its ancestor"
+                )));
+            }
         }
 
         self.verify_integration_fence(
