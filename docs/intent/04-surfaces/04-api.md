@@ -16,7 +16,7 @@ The API should be treated as local capability plumbing. It is important, but it 
 
 ## Expected Role
 
-The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, nodes, cluster, changes, cache, performance, files, terminal, diagnostics, and upgrade.
+The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, cluster, changes, cache, performance, files, terminal, diagnostics, and upgrade.
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 

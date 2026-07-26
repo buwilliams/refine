@@ -35,6 +35,8 @@ The current implementation details that matter to intent are:
 - durable product state is associated with the target app but never appears at `<app>/.refine` or in the primary worktree: the local mutation projection is `<app>/.git/refine-live-state/` and the branch checkout is `<app>/.git/refine-state-worktree/.refine/`;
 - runtime state is separated from durable product state so processes and daemons can recover cleanly;
 - flat JSON-like records keep Goals, Features, settings, guidance, governance, and logs inspectable;
+- Reporter-scoped todo lists are durable target-app records, so the same Reporter
+  can open them from any Node synchronized with that app;
 - projections and caches exist for speed but should be rebuildable from durable state;
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.

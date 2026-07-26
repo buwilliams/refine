@@ -60,6 +60,7 @@ test("palette discovers every lazy Toolbar surface", () => {
   assert.equal(browser.commands.ids("terminal")[0], "terminal.open");
   assert.ok(browser.commands.ids("agent worktree").includes("agent-worktree.open"));
   assert.equal(browser.commands.ids("files")[0], "files.open");
+  assert.equal(browser.commands.ids("todo list")[0], "todo.open");
 });
 
 test("Toolbar palette commands open the requested tab", async () => {
@@ -67,12 +68,14 @@ test("Toolbar palette commands open the requested tab", async () => {
 
   await browser.commands.run("agent.open");
   await browser.commands.run("system.open");
+  await browser.commands.run("todo.open");
   await browser.commands.run("terminal.open");
   await browser.commands.run("agent-worktree.open");
 
   assert.deepEqual(browser.openedToolbarTabs, [
     "agent",
     "system",
+    "todo",
     "terminal",
     "standalone",
   ]);

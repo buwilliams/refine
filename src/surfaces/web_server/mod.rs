@@ -98,6 +98,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "reporter registry, rename, merge, delete",
     },
     ApiRouteGroup {
+        prefix: "/todos",
+        capability: "Reporter-scoped todo lists and items",
+    },
+    ApiRouteGroup {
         prefix: "/nodes",
         capability: "node registry, activation, ownership transfer",
     },

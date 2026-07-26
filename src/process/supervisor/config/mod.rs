@@ -11,6 +11,7 @@ use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::todos::FileTodoService;
 
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const GOVERNANCE_FILE: &str = "governance.json";
@@ -1124,7 +1125,8 @@ fn rewrite_reporter_references(refine_dir: &Path, old: &str, new: &str) -> Refin
         return Ok(());
     }
     rewrite_reporter_references_in_tree(&refine_dir.join("goals"), "goal.json", old, new)?;
-    rewrite_reporter_references_in_tree(&refine_dir.join("features"), "feature.json", old, new)
+    rewrite_reporter_references_in_tree(&refine_dir.join("features"), "feature.json", old, new)?;
+    FileTodoService::new(refine_dir).reassign_reporter(old, new)
 }
 
 fn rewrite_reporter_references_in_tree(

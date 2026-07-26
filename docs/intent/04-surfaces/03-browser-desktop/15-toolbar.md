@@ -6,6 +6,8 @@
 - **Native Agent Harnesses**: agent interaction uses the configured frontier-lab CLI in a real terminal rather than a Refine-owned chat imitation.
 - **Independent Agents**: every Agent command starts a distinct general-purpose agent session; agents are not coupled to Goal Agent turns or an automatic Supervisor role.
 - **Shared Terminal Surface**: Terminal, Agent, Agent in Worktree, Planing Agent, Goal, and Standalone use one terminal renderer and backend lifecycle.
+- **Reporter Utilities**: Todo List uses the selected Reporter and shared
+  target-app state rather than browser storage.
 - **Recoverable State**: live sessions reattach after navigation or reload without making browser storage the source of process truth.
 
 ## Purpose
@@ -18,6 +20,7 @@ The add menu appears immediately after the Toolbar label and offers:
 - Agent in Worktree;
 - System;
 - Files;
+- Todo List;
 - Terminal;
 - Planing Agent.
 
@@ -47,11 +50,18 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
 - changing target apps stops live target-scoped interactive terminals before clearing project-specific browser state.
+- Todo List offers named-list selection and creation plus todo add, edit,
+  delete, done, and undo. Changing the selected Reporter reloads that
+  Reporter's lists, and explicit Refresh reconciles state synchronized from
+  another Node without polling.
 
 The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, lock, capacity leases, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
 
 ## Boundary
 
-The toolbar exposes shared backend capability. It does not implement workflow transitions, duplicate Goal ownership, agent turn scheduling, or an alternate conversation protocol.
+The toolbar exposes shared backend capability. Todo data is authoritative in
+the target app's inspectable Refine state; the tab only renders and invokes the
+shared todo API. The toolbar does not implement workflow transitions, duplicate
+Goal ownership, agent turn scheduling, or an alternate conversation protocol.
 
 Future versions may add fleet-level views for active claims, pending approvals, process health, Goal evidence, and multiple native agents while retaining lazy creation and explicit lifecycle ownership.

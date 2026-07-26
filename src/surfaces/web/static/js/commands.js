@@ -308,6 +308,8 @@ for (const [id, title, mode, aliases, keywords] of [
     ["agent", "open-agent"], ["chat", "assistant"]],
   ["system.open", "System operations", "system",
     ["system", "system-operations", "open-system"], ["activity", "runtime", "logs"]],
+  ["todo.open", "Todo List", "todo",
+    ["todo", "todos", "todo-list"], ["reporter", "tasks", "checklist"]],
   ["terminal.open", "Terminal", "terminal",
     ["terminal", "shell", "open-terminal"], ["command line", "console"]],
   ["agent-worktree.open", "Agent in Worktree", "standalone",
