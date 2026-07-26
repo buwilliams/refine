@@ -76,7 +76,10 @@ fn dashboard_attention_items(indicators: &[String], runner_reachable: bool) -> V
             json!({
                 "kind": "filter",
                 "severity": "warn",
-                "message": message
+                "message": message,
+                "filter": {
+                    "status": "failed"
+                }
             })
         })
         .collect::<Vec<_>>();

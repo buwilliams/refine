@@ -211,6 +211,7 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
         item["kind"] == "filter"
             && item["message"] == "1 failed Goal(s) need recovery"
             && item["severity"] == "warn"
+            && item["filter"] == json!({"status": "failed"})
     }));
     assert!(attention.iter().any(|item| {
         item["kind"] == "banner"

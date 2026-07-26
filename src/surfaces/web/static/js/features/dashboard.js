@@ -21,6 +21,14 @@ function dashboardScopeParam(d = null) {
   return d?.node_filter || dashboardScopeFromHash();
 }
 
+function dashboardAttentionGoalsHash(item, reporter, scope) {
+  return goalsHash({
+    status: item.filter?.status || "",
+    reporter: item.filter?.reporter || reporter,
+    node: item.filter?.node || scope,
+  });
+}
+
 function dashboardPanelStorageKey(panelId) {
   return `${DASHBOARD_PANEL_STORAGE_PREFIX}${panelId}`;
 }
@@ -200,10 +208,7 @@ function drawDashboard(d, opts = {}) {
         ${needsAttention.length ? `
           <div class="actions dashboard-panel-actions">
             ${needsAttention.map((x) => `
-              <a href="${goalsHash({
-                status: x.filter?.status || "",
-                node: x.filter?.node || scope,
-              })}" class="btn">
+              <a href="${dashboardAttentionGoalsHash(x, reviewReporter, scope)}" class="btn">
                 ${htmlEscape(x.message)}
               </a>`).join("")}
           </div>` : ""}
