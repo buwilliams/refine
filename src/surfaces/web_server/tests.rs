@@ -4075,6 +4075,28 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     assert_eq!(bulk_status.status, 200);
     assert_eq!(bulk_status.body["updated"], 2);
 
+    let bulk_review = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GOAL1", "GOAL2"],
+            "update": {"status": "review"}
+        })),
+    });
+    assert_eq!(bulk_review.status, 200);
+    assert_eq!(bulk_review.body["updated"], 2);
+
+    let bulk_done = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GOAL1", "GOAL2"],
+            "update": {"status": "done"}
+        })),
+    });
+    assert_eq!(bulk_done.status, 200);
+    assert_eq!(bulk_done.body["updated"], 2);
+
     let bulk_assign = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features/FEA1/goals/bulk".to_string(),

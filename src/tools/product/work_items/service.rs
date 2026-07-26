@@ -29,6 +29,7 @@ use crate::tools::product::project_state::{
     FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection, ProjectStateStore,
     ProjectionSnapshot,
 };
+use crate::workflow::WorkflowEngine;
 
 use super::types::*;
 
@@ -44,6 +45,18 @@ pub(crate) struct GoalCancellationExpectation {
 struct GoalMutationLock {
     _coordination: WorkflowCoordinationLease,
     file: File,
+}
+
+#[derive(Clone, Copy)]
+enum BulkGoalStatusProtection {
+    None,
+    Automated,
+    WorkflowOwned,
+}
+
+enum BulkGoalStatusMutation {
+    Updated,
+    Skipped(String),
 }
 
 impl Drop for GoalMutationLock {
@@ -172,12 +185,26 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FileWorkItemService {
     pub refine_dir: PathBuf,
     pub projection_cache_dir: Option<PathBuf>,
     pub active_node_root: Option<PathBuf>,
     pub active_node_id_override: Option<String>,
+    #[cfg(test)]
+    after_bulk_goal_selection_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+}
+
+impl std::fmt::Debug for FileWorkItemService {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FileWorkItemService")
+            .field("refine_dir", &self.refine_dir)
+            .field("projection_cache_dir", &self.projection_cache_dir)
+            .field("active_node_root", &self.active_node_root)
+            .field("active_node_id_override", &self.active_node_id_override)
+            .finish_non_exhaustive()
+    }
 }
 
 impl FileWorkItemService {
@@ -187,6 +214,8 @@ impl FileWorkItemService {
             projection_cache_dir: None,
             active_node_root: None,
             active_node_id_override: None,
+            #[cfg(test)]
+            after_bulk_goal_selection_hook: None,
         }
     }
 
@@ -199,6 +228,8 @@ impl FileWorkItemService {
             projection_cache_dir: None,
             active_node_root: None,
             active_node_id_override: Some(node_id.into()),
+            #[cfg(test)]
+            after_bulk_goal_selection_hook: None,
         }
     }
 
@@ -222,7 +253,18 @@ impl FileWorkItemService {
             projection_cache_dir: Some(cache_dir.into()),
             active_node_root: Some(runtime_root.into()),
             active_node_id_override: None,
+            #[cfg(test)]
+            after_bulk_goal_selection_hook: None,
         }
+    }
+
+    #[cfg(test)]
+    pub(super) fn with_after_bulk_goal_selection_hook(
+        mut self,
+        hook: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        self.after_bulk_goal_selection_hook = Some(std::sync::Arc::new(hook));
+        self
     }
 
     fn projection_snapshot(
@@ -1464,8 +1506,7 @@ impl FileWorkItemService {
             };
             if !is_bulk_target_allowed(&status) {
                 return Err(RefineError::Conflict(
-                    "Bulk status updates cannot enter workflow-owned, review, or done states"
-                        .to_string(),
+                    "Bulk status updates cannot enter automated workflow states".to_string(),
                 ));
             }
         }
@@ -1480,25 +1521,38 @@ impl FileWorkItemService {
             ));
         }
 
-        let skip_workflow_owned = field == "status";
-        let (goals, skipped_details) =
-            self.select_bulk_goal_summaries(&selection, skip_workflow_owned)?;
+        let status_protection = match (field.as_str(), raw_value.as_str()) {
+            ("status", "review" | "done") => BulkGoalStatusProtection::Automated,
+            ("status", _) => BulkGoalStatusProtection::WorkflowOwned,
+            _ => BulkGoalStatusProtection::None,
+        };
+        let (goals, mut skipped_details) =
+            self.select_bulk_goal_summaries(&selection, status_protection)?;
+        #[cfg(test)]
+        if let Some(hook) = &self.after_bulk_goal_selection_hook {
+            hook();
+        }
         let mut ids = Vec::new();
         for goal in goals {
+            if field == "status" {
+                match self.mutate_bulk_goal_status_if_eligible(
+                    &goal.goal.id,
+                    &raw_value,
+                    status_protection,
+                )? {
+                    BulkGoalStatusMutation::Updated => ids.push(goal.goal.id),
+                    BulkGoalStatusMutation::Skipped(reason) => {
+                        skipped_details.push(BulkSkippedDetail {
+                            id: goal.goal.id,
+                            reason,
+                        });
+                    }
+                }
+                continue;
+            }
             self.ensure_goal_owned(&goal)?;
             match field.as_str() {
                 "priority" => self.set_goal_priority_unchecked(&goal.goal.id, &raw_value)?,
-                "status" if raw_value == "__last_workflow_state" => {
-                    let restored = restore_last_workflow_status(&goal.goal.status);
-                    if restored != goal.goal.status {
-                        self.set_goal_status_unchecked(&goal.goal.id, &restored)?;
-                    }
-                }
-                "status" => {
-                    let status = GoalStatus::parse_wire(&raw_value)
-                        .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?;
-                    self.set_goal_status_unchecked(&goal.goal.id, &status)?;
-                }
                 "reporter" => self.set_goal_reporter_unchecked(&goal.goal.id, &raw_value)?,
                 "assignee" => self.set_latest_round_assignee(&goal.goal.id, &raw_value)?,
                 _ => unreachable!(),
@@ -1518,7 +1572,8 @@ impl FileWorkItemService {
     }
 
     pub fn select_bulk_goal_ids(&self, selection: &BulkGoalSelection) -> RefineResult<Vec<String>> {
-        let (goals, _) = self.select_bulk_goal_summaries(selection, false)?;
+        let (goals, _) =
+            self.select_bulk_goal_summaries(selection, BulkGoalStatusProtection::None)?;
         Ok(goals.into_iter().map(|goal| goal.goal.id).collect())
     }
 
@@ -1526,7 +1581,8 @@ impl FileWorkItemService {
         &self,
         selection: BulkGoalSelection,
     ) -> RefineResult<BulkDeleteResult> {
-        let (goals, _) = self.select_bulk_goal_summaries(&selection, false)?;
+        let (goals, _) =
+            self.select_bulk_goal_summaries(&selection, BulkGoalStatusProtection::None)?;
         let mut ids = Vec::new();
         let mut feature_ids = BTreeSet::new();
         for goal in goals {
@@ -1635,7 +1691,8 @@ impl FileWorkItemService {
     ) -> RefineResult<BulkAssignFeatureResult> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
-        let (goals, mut skipped_details) = self.select_bulk_goal_summaries(&selection, false)?;
+        let (goals, mut skipped_details) =
+            self.select_bulk_goal_summaries(&selection, BulkGoalStatusProtection::None)?;
         let mut old_feature_ids = BTreeSet::new();
         let mut ids = Vec::new();
         for goal in goals {
@@ -1672,7 +1729,8 @@ impl FileWorkItemService {
         selection: BulkGoalSelection,
     ) -> RefineResult<BulkTransferNodeResult> {
         let target_node_id = self.validate_transfer_target_node(target_node_id)?;
-        let (goals, mut skipped_details) = self.select_bulk_goal_summaries(&selection, false)?;
+        let (goals, mut skipped_details) =
+            self.select_bulk_goal_summaries(&selection, BulkGoalStatusProtection::None)?;
         let mut ids = Vec::new();
         for goal in goals {
             if let Some(reason) = goal_transfer_skip_reason(&goal) {
@@ -2907,6 +2965,80 @@ impl FileWorkItemService {
         self.write_goal_status_value(&goal_path, &mut value, status)
     }
 
+    fn mutate_bulk_goal_status_if_eligible(
+        &self,
+        goal_id: &str,
+        raw_target: &str,
+        status_protection: BulkGoalStatusProtection,
+    ) -> RefineResult<BulkGoalStatusMutation> {
+        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let goal_path = goal_json_path(&self.refine_dir, goal_id);
+        let bytes = fs::read(&goal_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read Goal {}: {error}",
+                goal_path.display()
+            ))
+        })?;
+        let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse Goal {}: {error}",
+                goal_path.display()
+            ))
+        })?;
+        let object = value.as_object().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        let current_status = object
+            .get("status")
+            .and_then(Value::as_str)
+            .and_then(GoalStatus::parse_wire)
+            .unwrap_or(GoalStatus::Backlog);
+        let owner = object
+            .get("node_id")
+            .and_then(Value::as_str)
+            .filter(|node_id| !node_id.is_empty())
+            .or_else(|| {
+                object
+                    .get("instance_id")
+                    .and_then(Value::as_str)
+                    .filter(|node_id| !node_id.is_empty())
+            })
+            .unwrap_or("default");
+        let active_node = self.active_node_id()?;
+        if owner != active_node {
+            return Ok(BulkGoalStatusMutation::Skipped(format!("node:{owner}")));
+        }
+        let protected = is_automated_status(&current_status)
+            || matches!(status_protection, BulkGoalStatusProtection::WorkflowOwned)
+                && matches!(current_status, GoalStatus::Review | GoalStatus::Done);
+        if protected {
+            return Ok(BulkGoalStatusMutation::Skipped(format!(
+                "status:{}",
+                current_status.as_str()
+            )));
+        }
+        if let Some(runtime_root) = &self.active_node_root {
+            let state = WorkflowEngine::new(runtime_root).load_state()?;
+            if let Some(claim) = state.active_claim(goal_id) {
+                return Ok(BulkGoalStatusMutation::Skipped(format!(
+                    "claim:{}",
+                    claim.claim_id
+                )));
+            }
+        }
+
+        let target = if raw_target == "__last_workflow_state" {
+            restore_last_workflow_status(&current_status)
+        } else {
+            GoalStatus::parse_wire(raw_target)
+                .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?
+        };
+        if target != current_status || raw_target != "__last_workflow_state" {
+            self.write_goal_status_value(&goal_path, &mut value, &target)?;
+        }
+        Ok(BulkGoalStatusMutation::Updated)
+    }
+
     fn set_goal_status_unchecked_locked(
         &self,
         goal_id: &str,
@@ -3096,7 +3228,7 @@ impl FileWorkItemService {
     fn select_bulk_goal_summaries(
         &self,
         selection: &BulkGoalSelection,
-        skip_workflow_owned: bool,
+        status_protection: BulkGoalStatusProtection,
     ) -> RefineResult<(Vec<GoalSummaryProjection>, Vec<BulkSkippedDetail>)> {
         let excluded: BTreeSet<_> = selection
             .exclude_ids
@@ -3123,18 +3255,13 @@ impl FileWorkItemService {
         };
         goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));
         let mut skipped_details = Vec::new();
-        if skip_workflow_owned {
+        if !matches!(status_protection, BulkGoalStatusProtection::None) {
             let mut retained = Vec::new();
             for goal in goals {
-                if matches!(
-                    goal.goal.status,
-                    GoalStatus::InProgress
-                        | GoalStatus::Qa
-                        | GoalStatus::ReadyMerge
-                        | GoalStatus::Build
-                        | GoalStatus::Review
-                        | GoalStatus::Done
-                ) {
+                let protected = is_automated_status(&goal.goal.status)
+                    || matches!(status_protection, BulkGoalStatusProtection::WorkflowOwned)
+                        && matches!(goal.goal.status, GoalStatus::Review | GoalStatus::Done);
+                if protected {
                     skipped_details.push(BulkSkippedDetail {
                         id: goal.goal.id,
                         reason: format!("status:{}", goal.goal.status.as_str()),

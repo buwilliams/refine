@@ -57,6 +57,7 @@ function browserRuntime({ refreshError = null } = {}) {
   vm.runInContext(`
     globalThis.goalsBulkReporterTest = {
       openReporter: () => openBulkModal("reporter"),
+      openStatus: () => openBulkModal("status"),
     };
   `, context);
   return {
@@ -66,6 +67,20 @@ function browserRuntime({ refreshError = null } = {}) {
     runtime: context.goalsBulkReporterTest,
   };
 }
+
+test("bulk status offers review and done without automated workflow states", async () => {
+  const browser = browserRuntime();
+
+  await browser.runtime.openStatus();
+
+  assert.deepEqual(browser.events, ["modal"]);
+  assert.match(browser.modalHtml(), /<option value="review">review<\/option>/);
+  assert.match(browser.modalHtml(), /<option value="done">done<\/option>/);
+  assert.doesNotMatch(browser.modalHtml(), /<option value="in-progress">/);
+  assert.doesNotMatch(browser.modalHtml(), /<option value="qa">/);
+  assert.doesNotMatch(browser.modalHtml(), /<option value="ready-merge">/);
+  assert.doesNotMatch(browser.modalHtml(), /<option value="build">/);
+});
 
 test("bulk reporter loads the reporter model before rendering its picker", async () => {
   const browser = browserRuntime();

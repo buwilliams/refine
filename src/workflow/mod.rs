@@ -119,6 +119,18 @@ pub struct WorkflowAutomationState {
     pub updated_at: Option<String>,
 }
 
+impl WorkflowAutomationState {
+    pub(crate) fn active_claim(&self, goal_id: &str) -> Option<&WorkflowClaim> {
+        self.claims.iter().find(|claim| {
+            claim.goal_id == goal_id
+                && matches!(
+                    claim.state,
+                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
+                )
+        })
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkflowExecutionFence {
     pub claim_id: String,
@@ -830,13 +842,7 @@ impl WorkflowEngine {
         state: &'a WorkflowAutomationState,
         goal_id: &str,
     ) -> Option<&'a WorkflowClaim> {
-        state.claims.iter().find(|claim| {
-            claim.goal_id == goal_id
-                && matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-        })
+        state.active_claim(goal_id)
     }
 
     fn claim_load(state: &WorkflowAutomationState, policy: &WorkflowPolicy) -> ClaimLoad {
@@ -2002,8 +2008,7 @@ const GOVERNANCE_VERDICT_KEYS: [&str; 5] = [
 const GOVERNANCE_VERDICT_FALLBACK_KEYS: [&str; 5] =
     ["ok", "result", "failed", "violates", "violation"];
 
-const GOVERNANCE_VERDICT_UNPARSABLE: &str =
-    "Governance verdict could not be parsed: the review did not return the required JSON verdict object.";
+const GOVERNANCE_VERDICT_UNPARSABLE: &str = "Governance verdict could not be parsed: the review did not return the required JSON verdict object.";
 
 fn parse_governance_provider_output(output: &str, rules_checked: usize) -> GovernanceEvaluation {
     let trimmed = output.trim();
