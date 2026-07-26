@@ -25,17 +25,20 @@ impl ProjectStateStore for FileProjectStateStore {
                 snapshot_path.display()
             ))
         })?;
-        let snapshot: ProjectionSnapshot = serde_json::from_slice(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse projection snapshot {}: {error}",
-                snapshot_path.display()
-            ))
-        })?;
-
-        if snapshot.version == PROJECTION_SNAPSHOT_VERSION {
-            Ok(Some(snapshot))
-        } else {
-            Ok(None)
+        // Projection snapshots are derived cache data, not durable project state.
+        // Inspect the version before deserializing the current schema so an older
+        // snapshot that lacks newly required fields is treated as a cache miss.
+        // Malformed or incomplete snapshots are likewise safe to rebuild.
+        let value: Value = match serde_json::from_slice(&bytes) {
+            Ok(value) => value,
+            Err(_) => return Ok(None),
+        };
+        if value.get("version").and_then(Value::as_u64) != Some(PROJECTION_SNAPSHOT_VERSION) {
+            return Ok(None);
+        }
+        match serde_json::from_value(value) {
+            Ok(snapshot) => Ok(Some(snapshot)),
+            Err(_) => Ok(None),
         }
     }
 
