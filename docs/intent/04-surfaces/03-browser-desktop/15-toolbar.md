@@ -53,10 +53,12 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
 - changing target apps stops live target-scoped interactive terminals before clearing project-specific browser state.
-- Todo List offers named-list selection and creation plus todo add, edit,
-  delete, done, and undo. Changing the selected Reporter reloads that
-  Reporter's lists, and explicit Refresh reconciles state synchronized from
-  another Node without polling.
+- Todo List keeps named lists in a compact rail and gives the selected list the
+  rest of the workspace. Adding and completing todos are primary actions;
+  completed items are visually separated, editing stays inline, and rename or
+  delete controls remain available from the selected list's options menu.
+  Changing the selected Reporter reloads that Reporter's lists, and explicit
+  Refresh reconciles state synchronized from another Node without polling.
 
 The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, lock, capacity leases, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
 
