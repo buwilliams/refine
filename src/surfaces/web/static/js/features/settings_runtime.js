@@ -291,9 +291,9 @@ async function refreshRuntimeUpgradeBanner() {
   if (!root) return;
   try {
     const result = await api("GET", "/api/upgrade");
-    root.innerHTML = renderRuntimeUpgradeBanner(result.upgrade || {});
+    renderInto(root, renderRuntimeUpgradeBanner(result.upgrade || {}));
   } catch (_e) {
-    root.innerHTML = "";
+    renderInto(root, "");
   }
 }
 

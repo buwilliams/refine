@@ -152,8 +152,11 @@ function bindSettingsGovernanceTab(tabSlug = "governance") {
         const r = await api("POST", "/api/governance/generate-rules", {
           product, constitution,
         });
-        $("#governance-rules-list").innerHTML = renderGovernanceRuleRows(r.rules || []);
-        bindGovernanceRuleButtons();
+        renderInto(
+          $("#governance-rules-list"),
+          renderGovernanceRuleRows(r.rules || []),
+          bindGovernanceRuleButtons,
+        );
         await autosaveSettingsGovernance();
         toast("Rules generated and saved", "info");
       } catch (e) { await showActionError(e); }

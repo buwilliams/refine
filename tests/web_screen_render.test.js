@@ -142,6 +142,30 @@ function apiFixture(pathname) {
   if (pathname.startsWith("/api/governance")) return {};
   if (pathname.startsWith("/api/guidance")) return { guidance: [] };
   if (pathname.startsWith("/api/processes")) return {};
+  if (pathname.startsWith("/api/performance")) {
+    return { events: [], summary: {}, backend: { store: "jsonl" } };
+  }
+  if (pathname.startsWith("/api/system/releases")) {
+    return { releases: { operations: [] } };
+  }
+  if (pathname.startsWith("/api/system/source")) {
+    return {
+      source: {
+        clean: true,
+        fast_forward: true,
+        update_available: false,
+        active_work: [],
+        checkout_path: "/tmp/refine",
+        current_commit: "1111111111111111111111111111111111111111",
+        available_commit: "1111111111111111111111111111111111111111",
+        remote: "origin",
+        branch: "main",
+      },
+      source_update: { visible: true, enabled: false, state: "current" },
+    };
+  }
+  if (pathname.startsWith("/api/target-app/status")) return { state: "stopped" };
+  if (pathname.startsWith("/api/upgrade")) return { upgrade: {} };
   return {};
 }
 
@@ -165,22 +189,24 @@ function serveStaticTree() {
   });
 }
 
-async function openApp() {
+async function openApp({ fixture = apiFixture, onRequest = null } = {}) {
   const server = await serveStaticTree();
   const browser = await BROWSER.chromium.launch({ executablePath: BROWSER.executablePath });
   const page = await browser.newPage();
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error.message).split("\n")[0]));
-  await page.route("**/api/**", (route) => {
+  await page.route("**/api/**", async (route) => {
     const { pathname } = new URL(route.request().url());
     if (pathname === "/api/sse") {
       route.fulfill({ status: 200, contentType: "text/event-stream", body: "" });
       return;
     }
+    if (onRequest) await onRequest(pathname, route.request());
+    const body = await fixture(pathname, route.request());
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(apiFixture(pathname)),
+      body: JSON.stringify(body),
     });
   });
   return {
@@ -293,6 +319,215 @@ test("every converted screen boots and paints", { skip: SKIP }, async () => {
     ]) {
       await assertScreenRenders(app, { route, marker });
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("every Node, Project, and legacy Settings tab renders and refreshes", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    for (const [route, marker] of [
+      ["#/node/application", '[data-testid="project-app-select"]'],
+      ["#/node/reporters", '[data-testid="reporters-table"]'],
+      ["#/node/processes", '[data-testid="settings-pane-processes"].active'],
+      ["#/node/performance", '[data-testid="performance-refresh"]'],
+      ["#/node/target-app", '[data-testid="target-app-copy-node"]'],
+      ["#/node/runtime", '[data-testid="runtime-recheck-auth"]'],
+      ["#/node/releases", '[data-testid="source-promotion-section"]'],
+      ["#/project/governance", '[data-testid="governance-explanation"]'],
+      ["#/project/quality", '[data-testid="quality-explanation"]'],
+      ["#/project/guidance", '[data-testid="guidance-list"]'],
+      ["#/settings", '[data-testid="settings-pane-processes"].active'],
+    ]) {
+      await assertScreenRenders(app, { route, marker });
+      await app.page.evaluate(() => refreshActiveSettingsTab({ force: true }));
+      await app.page.waitForSelector(marker, { timeout: 10000 });
+      assert.deepEqual(
+        app.pageErrors,
+        [],
+        `${route} raised an error while refreshing`,
+      );
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("Refine dev source refreshes morph identical and changed status without replacement", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, {
+      route: "#/node/releases",
+      marker: '[data-testid="source-promotion-readiness"]',
+    });
+    const result = await app.page.evaluate(async () => {
+      const source = {
+        clean: true,
+        fast_forward: true,
+        update_available: false,
+        active_work: [],
+        checkout_path: "/tmp/refine",
+        current_commit: "1111111111111111111111111111111111111111",
+        available_commit: "1111111111111111111111111111111111111111",
+        remote: "origin",
+        branch: "main",
+      };
+      applySourcePromotionStatus(source);
+      const root = document.getElementById("source-promotion-status");
+      const facts = root.querySelector(".source-promotion-facts");
+      const readiness = root.querySelector('[data-testid="source-promotion-readiness"]');
+      let identicalMutations = 0;
+      const observer = new MutationObserver((records) => {
+        identicalMutations += records.length;
+      });
+      observer.observe(root, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+      applySourcePromotionStatus(source);
+      await Promise.resolve();
+      observer.disconnect();
+      const identicalFacts = facts === root.querySelector(".source-promotion-facts");
+      const identicalReadiness =
+        readiness === root.querySelector('[data-testid="source-promotion-readiness"]');
+
+      applySourcePromotionStatus({
+        ...source,
+        update_available: true,
+        available_commit: "2222222222222222222222222222222222222222",
+      });
+      return {
+        identicalFacts,
+        identicalReadiness,
+        identicalMutations,
+        changedFacts: facts === root.querySelector(".source-promotion-facts"),
+        changedReadiness:
+          readiness === root.querySelector('[data-testid="source-promotion-readiness"]'),
+        changedText: root.textContent,
+      };
+    });
+
+    assert.deepEqual(
+      {
+        identicalFacts: result.identicalFacts,
+        identicalReadiness: result.identicalReadiness,
+        identicalMutations: result.identicalMutations,
+        changedFacts: result.changedFacts,
+        changedReadiness: result.changedReadiness,
+      },
+      {
+        identicalFacts: true,
+        identicalReadiness: true,
+        identicalMutations: 0,
+        changedFacts: true,
+        changedReadiness: true,
+      },
+    );
+    assert.match(result.changedText, /222222222222/);
+    assert.match(result.changedText, /Ready to build, promote, and restart/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("changed settings refresh preserves focus, dirty controls, scroll, and one live handler", { skip: SKIP }, async () => {
+  let settingsVersion = 1;
+  const settingsWrites = [];
+  const fixture = (pathname, request) => {
+    if (pathname.startsWith("/api/settings")) {
+      if (request.method() === "PATCH") return {};
+      return {
+        settings: {
+          parallel_run_cap: settingsVersion === 1 ? 2 : 7,
+          branch_name_pattern: settingsVersion === 1
+            ? "refine/{goal_id}"
+            : "server/{goal_id}",
+          agent_cli: "codex",
+        },
+      };
+    }
+    return apiFixture(pathname);
+  };
+  const app = await openApp({
+    fixture,
+    onRequest(pathname, request) {
+      if (pathname.startsWith("/api/settings") && request.method() === "PATCH") {
+        settingsWrites.push(request.postDataJSON());
+      }
+    },
+  });
+  try {
+    await assertScreenRenders(app, {
+      route: "#/node/runtime",
+      marker: '[data-testid="runtime-recheck-auth"]',
+    });
+    await app.page.locator(
+      '[data-settings-editable-field]:has(#s-pattern) [data-settings-editable-toggle]',
+    ).click();
+    await app.page.evaluate(() => {
+      const style = document.createElement("style");
+      style.textContent = ".settings-tab-card{height:120px;overflow:auto}";
+      document.head.appendChild(style);
+      const field = document.getElementById("s-pattern");
+      const card = field.closest(".settings-tab-card");
+      field.value = "mine/{goal_id}";
+      field.focus();
+      field.setSelectionRange(5, 5);
+      card.scrollTop = 120;
+      window.__settingsMorphBefore = {
+        card,
+        field,
+        save: field.closest("[data-settings-editable-field]")
+          .querySelector("[data-settings-editable-toggle]"),
+      };
+    });
+
+    settingsVersion = 2;
+    const preserved = await app.page.evaluate(async () => {
+      // SSE invalidates the screen cache before requesting a settings redraw.
+      invalidateScreenDataCache();
+      await refreshSettingsTab("runtime", { force: true });
+      const before = window.__settingsMorphBefore;
+      const field = document.getElementById("s-pattern");
+      const card = field.closest(".settings-tab-card");
+      return {
+        cardIdentity: card === before.card,
+        fieldIdentity: field === before.field,
+        handlerNodeIdentity:
+          field.closest("[data-settings-editable-field]")
+            .querySelector("[data-settings-editable-toggle]") === before.save,
+        focused: document.activeElement === field,
+        value: field.value,
+        selectionStart: field.selectionStart,
+        scrollTop: card.scrollTop,
+        cleanControlValue: document.getElementById("s-cap").value,
+      };
+    });
+
+    assert.deepEqual(
+      preserved,
+      {
+        cardIdentity: true,
+        fieldIdentity: true,
+        handlerNodeIdentity: true,
+        focused: true,
+        value: "mine/{goal_id}",
+        selectionStart: 5,
+        scrollTop: 120,
+        cleanControlValue: "7",
+      },
+    );
+
+    await app.page.locator(
+      '[data-settings-editable-field]:has(#s-pattern) [data-settings-editable-toggle]',
+    ).click();
+    await app.page.waitForTimeout(50);
+    assert.equal(settingsWrites.length, 1, "the surviving Save handler should fire once");
+    assert.equal(settingsWrites[0].branch_name_pattern, "mine/{goal_id}");
+    assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();
   }

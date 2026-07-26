@@ -891,13 +891,13 @@ function drawSqliteCacheProgress(progress = {}) {
     ? `${Math.min(completed, total)} / ${total} Goal${total === 1 ? "" : "s"} processed`
     : "Preparing rebuild";
   root.style.display = "";
-  root.innerHTML = `
+  renderInto(root, `
     <div class="loading-row" style="padding:0">
       <span class="loading-spinner"></span>
       <span>${htmlEscape(message)}</span>
     </div>
     <p class="muted small" style="margin:8px 0 0">${htmlEscape(detail)}</p>
-  `;
+  `);
 }
 
 function drawRuntimeRecovery(error) {
@@ -905,12 +905,13 @@ function drawRuntimeRecovery(error) {
   const activeSlug = surface.tabs.some((t) => t.slug === "runtime")
     ? "runtime"
     : surface.tabs[0]?.slug || "runtime";
-  $("#settings-content").innerHTML = `
+  renderInto($("#settings-content"), `
     ${renderSettingsTabStrip(activeSlug, surface)}
     ${renderSettingsPane(activeSlug, renderSqliteCacheSection(error), activeSlug)}
-  `;
-  bindSettingsTabHandlers();
-  bindRebuildCacheHandler();
+  `, () => {
+    bindSettingsTabHandlers();
+    bindRebuildCacheHandler();
+  });
 }
 
 function bindRebuildCacheHandler() {
@@ -1093,11 +1094,11 @@ function drawSettingsSurface(surface, data, activeSlugOverride = null) {
     tab.slug === activeSlug ? renderSettingsTabBody(surface, tab.slug, data) : "",
     activeSlug,
   );
-  $("#settings-content").innerHTML = `
+  renderInto(root, `
     ${tabStrip}
     ${surface.tabs.map(pane).join("")}
-  `;
-
-  bindSettingsTabHandlers();
-  bindSettingsTabBody(surface, activeSlug, data);
+  `, () => {
+    bindSettingsTabHandlers();
+    bindSettingsTabBody(surface, activeSlug, data);
+  });
 }
