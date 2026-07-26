@@ -1,6 +1,28 @@
 use super::*;
 
 impl FileProcessSupervisor {
+    fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        loop {
+            let reaper_owned = self
+                .reaper_owned
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("managed process reaper lock was poisoned".to_string())
+                })?
+                .contains(process_id);
+            if !reaper_owned {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                return Err(RefineError::Conflict(format!(
+                    "managed process reaper did not settle {process_id}"
+                )));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     fn wait_for_reaper_terminal(&self, process_id: &str) -> RefineResult<Option<ManagedProcess>> {
         let deadline = Instant::now() + Duration::from_secs(1);
         loop {
@@ -175,6 +197,11 @@ impl ProcessSupervisor for FileProcessSupervisor {
             }
             process.state = "stopped".to_string();
             self.write_process(&process)?;
+            // A process launched by this supervisor still has a background
+            // reaper that archives its exit. Let that writer finish before
+            // deleting its files so signal() cannot return while the runtime
+            // directory may still be recreated.
+            self.wait_for_reaper_idle(process_id)?;
             self.remove_process_artifacts(&process)?;
         } else {
             process.state = format!("signalled:{signal}");
