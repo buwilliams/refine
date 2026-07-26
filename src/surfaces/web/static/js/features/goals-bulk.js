@@ -9,6 +9,8 @@ const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
+  { value: "review", label: "review" },
+  { value: "done", label: "done" },
   { value: "failed", label: "failed" },
   { value: "cancelled", label: "cancelled" },
 ];

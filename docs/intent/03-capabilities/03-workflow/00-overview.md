@@ -39,6 +39,8 @@ Current implementation details that matter to intent:
 - Claims record which Goal is being worked, by which provider and node, for which target app.
 - Pause controls can stop agents, target-app work, or all automation.
 - Goal state rules distinguish manual transitions from automated transitions.
+- Bulk status correction can place non-automated Goals in review or done, while Goals in actively
+  automated states or with active claims remain protected from bulk status changes.
 - Feature ordering is respected so ordered Goals advance without losing Feature intent.
 - While agents are running, the engine periodically discovers newly eligible queued Goals and
   uses available capacity without waiting for the current agents to finish. Each replenishment

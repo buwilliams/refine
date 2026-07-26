@@ -198,15 +198,7 @@ pub fn user_status_transition(from: &GoalStatus, to: &GoalStatus) -> TransitionD
 }
 
 pub fn is_bulk_target_allowed(status: &GoalStatus) -> bool {
-    !matches!(
-        status,
-        GoalStatus::InProgress
-            | GoalStatus::Qa
-            | GoalStatus::ReadyMerge
-            | GoalStatus::Build
-            | GoalStatus::Review
-            | GoalStatus::Done
-    )
+    !is_automated_status(status)
 }
 
 pub fn is_automated_status(status: &GoalStatus) -> bool {
@@ -317,13 +309,13 @@ mod tests {
     }
 
     #[test]
-    fn bulk_targets_exclude_system_owned_states() {
+    fn bulk_targets_exclude_automated_states() {
         assert!(!is_bulk_target_allowed(&GoalStatus::InProgress));
         assert!(!is_bulk_target_allowed(&GoalStatus::Qa));
         assert!(!is_bulk_target_allowed(&GoalStatus::ReadyMerge));
         assert!(!is_bulk_target_allowed(&GoalStatus::Build));
-        assert!(!is_bulk_target_allowed(&GoalStatus::Review));
-        assert!(!is_bulk_target_allowed(&GoalStatus::Done));
+        assert!(is_bulk_target_allowed(&GoalStatus::Review));
+        assert!(is_bulk_target_allowed(&GoalStatus::Done));
         assert!(is_bulk_target_allowed(&GoalStatus::Todo));
     }
 
