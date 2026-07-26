@@ -20,7 +20,8 @@ The CLI should be the most stable surface for automation and system control. Bro
 
 Current implementation details that matter to intent:
 
-- command groups include project, goal, feature, workflow, node, cluster, log, agent, and system.
+- command groups include project, goal, feature, Todo, workflow, node, cluster, log, agent, and system.
+- Todo commands require an explicit Reporter and route list and item operations through the shared daemon API and `FileTodoService`, returning the same machine-usable JSON as other Todo surfaces.
 - `goal draft` turns Plan text into exactly one reviewable, unpersisted Goal draft through the shared import-extraction API.
 - `agent open` starts a general Agent by default. `--profile goal <goal-id>`
   attaches the current terminal to the workflow-owned Goal Agent, while

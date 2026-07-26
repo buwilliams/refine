@@ -165,6 +165,49 @@ mod tests {
     }
 
     #[test]
+    fn catalog_lists_the_complete_todo_command_family() {
+        let catalog = commands_catalog();
+        let todo = catalog["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|command| command["name"] == "todo")
+            .expect("todo command present");
+        let names: Vec<&str> = todo["subcommands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|subcommand| subcommand["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "list",
+                "create-list",
+                "rename-list",
+                "delete-list",
+                "add",
+                "edit",
+                "delete",
+                "done",
+                "undo"
+            ]
+        );
+        for subcommand in todo["subcommands"].as_array().unwrap() {
+            assert!(
+                subcommand["arguments"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|argument| {
+                        argument["name"] == "reporter" && argument["required"] == true
+                    }),
+                "missing required Reporter context: {subcommand:#}"
+            );
+        }
+    }
+
+    #[test]
     fn committed_cli_reference_matches_generated_output() {
         let path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/spec/cli-reference.md");
