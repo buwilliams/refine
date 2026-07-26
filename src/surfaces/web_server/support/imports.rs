@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::process::supervisor::errors::RefineResult;
-use crate::tools::product::work_items::{BulkGoalUpdate, FileWorkItemService};
+use crate::tools::product::imports::ImportFeatureDestination;
+use crate::tools::product::work_items::BulkGoalUpdate;
 
 use super::super::*;
 
@@ -14,33 +14,35 @@ pub(in crate::surfaces::web_server) fn body_text(body: &serde_json::Value) -> &s
         .unwrap_or("")
 }
 
-pub(in crate::surfaces::web_server) fn import_destination_feature_id(
-    service: &FileWorkItemService,
+pub(in crate::surfaces::web_server) fn import_feature_destination(
     body: &serde_json::Value,
-) -> RefineResult<Option<crate::tools::product::project_state::FeatureSummaryProjection>> {
+) -> ImportFeatureDestination {
     if let Some(name) = body
         .get("new_feature_name")
         .and_then(|value| value.as_str())
         .map(str::trim)
         .filter(|name| !name.is_empty())
     {
-        return service
-            .create_feature_summary(
-                name,
-                None,
-                body.get("new_feature_description")
-                    .or_else(|| body.get("feature_description"))
-                    .and_then(|value| value.as_str()),
-                body.get("feature_reporter")
-                    .or_else(|| body.get("reporter"))
-                    .and_then(|value| value.as_str()),
-                body.get("feature_assignee")
-                    .or_else(|| body.get("assignee"))
-                    .or_else(|| body.get("feature_reporter"))
-                    .or_else(|| body.get("reporter"))
-                    .and_then(|value| value.as_str()),
-            )
-            .map(Some);
+        return ImportFeatureDestination::New {
+            name: name.to_string(),
+            description: body
+                .get("new_feature_description")
+                .or_else(|| body.get("feature_description"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            reporter: body
+                .get("feature_reporter")
+                .or_else(|| body.get("reporter"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            assignee: body
+                .get("feature_assignee")
+                .or_else(|| body.get("assignee"))
+                .or_else(|| body.get("feature_reporter"))
+                .or_else(|| body.get("reporter"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+        };
     }
     if let Some(feature_id) = body
         .get("feature_id")
@@ -49,9 +51,9 @@ pub(in crate::surfaces::web_server) fn import_destination_feature_id(
         .map(str::trim)
         .filter(|feature_id| !feature_id.is_empty())
     {
-        return service.show_feature_summary(feature_id).map(Some);
+        return ImportFeatureDestination::Existing(feature_id.to_string());
     }
-    Ok(None)
+    ImportFeatureDestination::None
 }
 
 pub(in crate::surfaces::web_server) fn feature_import_response(

@@ -109,7 +109,10 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
   );
   if (failures.length) {
     const failedDrafts = failures.map((failure) => {
-      const original = payload[(failure.index || 1) - 1] || {};
+      const oneBasedIndex = Number.isInteger(failure.index) && failure.index > 0
+        ? failure.index
+        : 1;
+      const original = payload[oneBasedIndex - 1] || {};
       const duplicate = failure.code === "duplicate_goal"
         ? failure.duplicate?.match
         : null;

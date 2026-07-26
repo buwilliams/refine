@@ -40,7 +40,20 @@ Current implementation details that matter to intent:
 - Plan/spec-like extraction uses broader planning guidance before producing ordinary drafts;
 - CSV, issue-list, and simple AI extraction remain direct draft creation paths;
 - background extraction should be visible through operations and System notices;
-- final persistence should use shared Goal and Feature creation behavior.
+- one product import-persistence capability owns duplicate decisions, Goal and
+  Feature mutation, dependency ordering, progress/cancellation, created-record
+  accounting, and rollback evidence;
+- direct CLI imports and daemon-backed CLI/browser/API imports delegate to that
+  same persistence capability, while surfaces retain only input parsing,
+  operation lifecycle, projection refresh, and response formatting;
+- capability failure locations remain zero-based internal draft offsets, while
+  the public HTTP `failures[].index` contract is explicitly one-based so the
+  browser retry selection identifies the same draft;
+- cancellation is successful only after every import-created record is rolled
+  back. Incomplete cleanup is a durable partial failure with created,
+  rolled-back, and unrecovered Goal/Feature IDs, the exact rollback failures,
+  and recovery guidance; background operations must settle `Failed`, never
+  `Cancelled` or `Completed`, while imported records remain.
 
 ## Future Direction
 

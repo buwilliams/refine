@@ -54,7 +54,7 @@ fn same_turn_guidance_decision_resolves_candidates_without_an_extra_provider() {
         ]
     });
 
-    let decision = guidance_decision(&context, Some(&[0])).unwrap();
+    let decision = guidance_decision(&context, Some(&[0]), false).unwrap();
 
     assert_eq!(decision["context_version"], 1);
     assert_eq!(decision["applied"][0]["name"], "Architecture");
@@ -70,8 +70,64 @@ fn guidance_candidates_require_an_explicit_valid_completion_selection() {
         ]
     });
 
-    assert!(guidance_decision(&context, None).is_err());
-    assert!(guidance_decision(&context, Some(&[0, 0])).is_err());
-    assert!(guidance_decision(&context, Some(&[1])).is_err());
-    assert!(guidance_decision(&context, Some(&[])).is_ok());
+    assert!(guidance_decision(&context, None, false).is_err());
+    assert!(guidance_decision(&context, Some(&[0, 0]), false).is_err());
+    assert!(guidance_decision(&context, Some(&[1]), false).is_err());
+    assert!(guidance_decision(&context, Some(&[]), false).is_ok());
+}
+
+#[test]
+fn code_file_guidance_cannot_be_skipped_when_code_changed() {
+    let context = json!({
+        "version": 1,
+        "guidance_candidates": [
+            {
+                "name": "Cohesive code files",
+                "rule": CODE_FILE_GUIDANCE_RULE,
+                "instructions": "Keep each code file focused."
+            },
+            {
+                "name": "Mobile",
+                "rule": "Apply to mobile changes.",
+                "instructions": "Test touch behavior."
+            }
+        ]
+    });
+
+    let error = guidance_decision(&context, Some(&[]), true).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("requires it for changed code files")
+    );
+
+    let decision = guidance_decision(&context, Some(&[0]), true).unwrap();
+    assert_eq!(decision["applied"][0]["name"], "Cohesive code files");
+    assert_eq!(decision["skipped"][0]["name"], "Mobile");
+    assert_eq!(decision["code_files_changed"], true);
+}
+
+#[test]
+fn code_file_guidance_may_be_explicitly_skipped_for_no_code_change() {
+    let context = json!({
+        "version": 1,
+        "guidance_candidates": [{
+            "name": "Cohesive code files",
+            "rule": CODE_FILE_GUIDANCE_RULE,
+            "instructions": "Keep each code file focused."
+        }]
+    });
+
+    let decision = guidance_decision(&context, Some(&[]), false).unwrap();
+    assert_eq!(decision["skipped"][0]["name"], "Cohesive code files");
+    assert_eq!(decision["code_files_changed"], false);
+}
+
+#[test]
+fn code_path_detection_fails_safe_for_unlisted_languages() {
+    assert!(is_code_path("src/worker.exs"));
+    assert!(is_code_path("Makefile"));
+    assert!(is_code_path("config/toolchain.toml"));
+    assert!(!is_code_path("docs/architecture.md"));
+    assert!(!is_code_path("website/diagram.png"));
 }

@@ -1,4 +1,15 @@
-use super::*;
+use crate::model::feature::compare_feature_goal_order;
+use crate::model::workflow::GoalStatus;
+use crate::process::supervisor::coordination::acquire_workflow_coordination;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::FileOperationRegistry;
+use crate::tools::product::process_control::FileProcessControlService;
+use crate::tools::product::work_items::FileWorkItemService;
+
+use super::{
+    AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation, WorkflowClaim, WorkflowClaimState,
+    WorkflowEngine, new_claim_id, new_execution_id, now_timestamp, priority_rank,
+};
 
 impl WorkflowAutomation for WorkflowEngine {
     fn promote(&self) -> RefineResult<usize> {

@@ -341,6 +341,13 @@ impl FileProcessSupervisor {
             return Ok(OwnedProcessState::Exited);
         }
         let actual = os_process_identity(pid)?;
+        // The process can exit between the liveness probe and identity read,
+        // especially immediately after a termination signal. Confirm that
+        // exact transition before treating an unavailable observation as an
+        // identity mismatch. If the PID is still alive, fail closed below.
+        if actual.is_none() && !pid_alive(pid)? {
+            return Ok(OwnedProcessState::Exited);
+        }
         match (&identity.os_identity, &actual) {
             (Some(expected), Some(actual)) if expected != actual => {
                 Ok(OwnedProcessState::IdentityMismatch(Some(actual.clone())))

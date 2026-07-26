@@ -1,4 +1,19 @@
-use super::*;
+use std::fs::{self, OpenOptions};
+use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
+
+use serde_json::Value;
+
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+
+use super::{
+    ChatAttachment, ChatReadResult, ChatService, ChatSessionLock, ChatSessionRecord,
+    ChatSessionWorktree, FileChatService, default_chat_runtime_root, event_bool, event_text,
+    new_chat_id, now_timestamp, reject_retired_supervisor, unread_lines, unread_progress,
+    validate_session_id, write_chat_record_atomically,
+};
 
 impl FileChatService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {

@@ -1,4 +1,21 @@
-use super::*;
+use std::fs;
+use std::path::PathBuf;
+
+use serde_json::Value;
+
+use crate::model::workflow::GoalStatus;
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::host::project_layout::target_root_for_refine_dir;
+use crate::tools::product::project_state::GoalSummaryProjection;
+use crate::tools::product::work_items::FileWorkItemService;
+
+use super::{
+    ChatAttachment, ChatService, ChatSessionRecord, ChatSessionWorktree, FileChatService,
+    StandaloneReadyMergeRequest, StandaloneReadyMergeResult, derive_standalone_goal_name,
+};
 
 impl FileChatService {
     pub fn start_standalone_with_options(

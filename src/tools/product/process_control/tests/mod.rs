@@ -16,9 +16,10 @@ use crate::process::subprocess::{ManagedProcessSpec, managed_pid_is_alive};
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use crate::workflow::{WorkflowAutomation, WorkflowClaim, WorkflowPolicy};
 
+const TEST_AGENT_LIFETIME_SECONDS: &str = "300";
+
 #[cfg(unix)]
 #[cfg(target_os = "linux")]
-
 fn launch_agent(
     supervisor: &FileProcessSupervisor,
     goal_id: &str,
@@ -71,11 +72,14 @@ fn register_workflow_agent(
 ) -> ManagedProcess {
     let child = if cfg!(windows) {
         Command::new("cmd")
-            .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+            .args(["/C", "ping -n 300 127.0.0.1 >NUL"])
             .spawn()
             .unwrap()
     } else {
-        Command::new("sleep").arg("30").spawn().unwrap()
+        Command::new("sleep")
+            .arg(TEST_AGENT_LIFETIME_SECONDS)
+            .spawn()
+            .unwrap()
     };
     supervisor
         .register(ManagedProcess {
@@ -122,10 +126,13 @@ fn launch_agent_with_metadata(
             if cfg!(windows) {
                 (
                     "cmd".to_string(),
-                    vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()],
+                    vec!["/C".to_string(), "ping -n 300 127.0.0.1 >NUL".to_string()],
                 )
             } else {
-                ("sleep".to_string(), vec!["30".to_string()])
+                (
+                    "sleep".to_string(),
+                    vec![TEST_AGENT_LIFETIME_SECONDS.to_string()],
+                )
             }
         });
     let mut metadata = Map::from_iter([
