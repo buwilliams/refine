@@ -1439,6 +1439,7 @@ fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> b
             | "/governance"
             | "/guidance"
             | "/reporters"
+            | "/todos"
             | "/cluster"
             | "/quality"
             | "/upgrade"

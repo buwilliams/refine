@@ -258,6 +258,19 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       },
       tabIds() { return Object.keys(chatState.tabs); },
       setApi(nextApi) { api = nextApi; },
+      setReporter(name) { setLastReporter(name); },
+      todoState() {
+        return JSON.parse(JSON.stringify(todoState));
+      },
+      loadTodos(reporter) { return loadTodoListsForReporter(reporter); },
+      createTodoList(name) { return createTodoList(name); },
+      renameTodoList(listId, name) { return renameTodoList(listId, name); },
+      deleteTodoList(listId) { return deleteTodoList(listId); },
+      addTodoItem(listId, text) { return addTodoItem(listId, text); },
+      updateTodoItem(listId, itemId, update) {
+        return updateTodoItem(listId, itemId, update);
+      },
+      deleteTodoItem(listId, itemId) { return deleteTodoItem(listId, itemId); },
       installTerminalResizer(tabId, resize) {
         ensureTestTab(tabId);
         terminalStateFor(tabId).term = { resize };
@@ -395,19 +408,115 @@ test("Toolbar add button precedes the tab strip and exposes the exact lazy menu"
   assert.match(toolbarCss, /\.toolbar-dock-bar \.toolbar-tabs\s*\{[^}]*min-height:\s*36px/s);
   assert.deepEqual(
     [...initial.matchAll(/data-add-toolbar-tab="[^"]+">([^<]+)<\/button>/g)].map((match) => match[1]),
-    ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planing Agent"],
+    ["Agent", "Agent in Worktree", "System", "Files", "Todo List", "Terminal", "Planing Agent"],
   );
 
-  for (const mode of ["agent", "standalone", "system", "files", "terminal", "plan"]) {
+  for (const mode of ["agent", "standalone", "system", "files", "todo", "terminal", "plan"]) {
     await browser.runtime.create(mode);
   }
   assert.deepEqual(
     [...browser.runtime.tabIds()].map((id) => browser.runtime.tab(id).mode),
-    ["agent", "standalone", "system", "files", "terminal", "plan"],
+    ["agent", "standalone", "system", "files", "todo", "terminal", "plan"],
   );
-  assert.equal((browser.html().match(/data-testid="toolbar-tab-close"/g) || []).length, 6);
-  assert.equal((browser.html().match(/data-testid="toolbar-tab-close-icon"/g) || []).length, 6);
+  assert.equal((browser.html().match(/data-testid="toolbar-tab-close"/g) || []).length, 7);
+  assert.equal((browser.html().match(/data-testid="toolbar-tab-close-icon"/g) || []).length, 7);
   assert.doesNotMatch(browser.html(), />\[x\]</);
+});
+
+test("Todo List tab uses the selected Reporter and shared todo API for every action", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  let lists = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    const reporter = body?.reporter || new URL(`http://refine${requestPath}`).searchParams.get("reporter");
+    if (method === "GET") {
+      return { reporter, lists: reporter === "Buddy" ? lists : [] };
+    }
+    if (method === "POST" && requestPath === "/api/todos/lists") {
+      lists = [{
+        id: "list-1",
+        reporter,
+        name: body.name,
+        items: [],
+      }];
+      return { ok: true, reporter, lists, list: lists[0] };
+    }
+    if (method === "PATCH" && requestPath === "/api/todos/lists/list-1") {
+      lists[0].name = body.name;
+      return { ok: true, reporter, lists, list: lists[0] };
+    }
+    if (method === "POST" && requestPath === "/api/todos/lists/list-1/items") {
+      const item = { id: "item-1", text: body.text, done: false };
+      lists[0].items = [item];
+      return { ok: true, reporter, lists, list: lists[0], item };
+    }
+    if (method === "PATCH" && requestPath.endsWith("/items/item-1")) {
+      Object.assign(lists[0].items[0], body);
+      return {
+        ok: true,
+        reporter,
+        lists,
+        list: lists[0],
+        item: lists[0].items[0],
+      };
+    }
+    if (method === "DELETE" && requestPath.endsWith("/items/item-1")) {
+      lists[0].items = [];
+      return { ok: true, reporter, lists, list: lists[0] };
+    }
+    if (method === "DELETE" && requestPath === "/api/todos/lists/list-1") {
+      lists = [];
+      return { ok: true, reporter, lists };
+    }
+    throw new Error(`unexpected request ${method} ${requestPath}`);
+  });
+
+  browser.runtime.setReporter("Buddy");
+  const tabId = await browser.runtime.create("todo");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(browser.runtime.tab(tabId).label, "Todo List");
+  assert.match(browser.html(), /data-testid="toolbar-todo-panel"/);
+  assert.match(browser.html(), /Saved for this Reporter in the target app and available from other nodes/);
+  assert.equal(requests[0].path, "/api/todos?reporter=Buddy");
+
+  await browser.runtime.createTodoList("Release");
+  assert.match(browser.html(), /data-testid="todo-list-selector"/);
+  assert.match(browser.html(), /data-testid="todo-list-name"/);
+  assert.match(browser.html(), /data-testid="todo-add-item"/);
+  await browser.runtime.renameTodoList("list-1", "Ready for review");
+  await browser.runtime.addTodoItem("list-1", "Verify candidate");
+  assert.match(browser.html(), /Verify candidate/);
+  assert.match(browser.html(), />\s*Done\s*</);
+  assert.match(browser.html(), />Edit</);
+  assert.match(browser.html(), />Delete</);
+  await browser.runtime.updateTodoItem("list-1", "item-1", { done: true });
+  assert.match(browser.html(), />\s*Undo\s*</);
+  await browser.runtime.updateTodoItem("list-1", "item-1", { text: "Verify exact results" });
+  assert.match(browser.html(), /Verify exact results/);
+  await browser.runtime.deleteTodoItem("list-1", "item-1");
+  await browser.runtime.deleteTodoList("list-1");
+
+  const mutations = requests.filter((request) => request.method !== "GET");
+  assert.deepEqual(
+    mutations.map((request) => [request.method, request.path]),
+    [
+      ["POST", "/api/todos/lists"],
+      ["PATCH", "/api/todos/lists/list-1"],
+      ["POST", "/api/todos/lists/list-1/items"],
+      ["PATCH", "/api/todos/lists/list-1/items/item-1"],
+      ["PATCH", "/api/todos/lists/list-1/items/item-1"],
+      ["DELETE", "/api/todos/lists/list-1/items/item-1"],
+      ["DELETE", "/api/todos/lists/list-1"],
+    ],
+  );
+  assert.ok(mutations.every((request) => request.body.reporter === "Buddy"));
+
+  browser.runtime.setReporter("Alex");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(browser.runtime.todoState().reporter, "Alex");
+  assert.equal(browser.runtime.todoState().lists.length, 0);
+  assert.equal(requests.at(-1).path, "/api/todos?reporter=Alex");
 });
 
 test("closing a worktree Agent confirms stop, preserves its worktree, and forgets the tab", async () => {

@@ -325,6 +325,79 @@ Bulk-import Goal drafts from text, structured JSON, or CSV, optionally attaching
 - `--reporter` — Reporter recorded on the imported Goals
 - `--feature-id` — Feature id to attach the imported Goals to
 
+## `refine todo`
+
+Manage Reporter-owned Todo lists and items. Uses the same durable capability as the web UI and daemon API
+
+### `refine todo list`
+
+List all Todo lists and their items for one Reporter
+
+- `--reporter` (required) — Reporter whose Todo lists to return
+
+### `refine todo create-list`
+
+Create a named Todo list for one Reporter
+
+- `<NAME>` (required) — Name for the new list
+- `--reporter` (required) — Reporter who owns the new list
+
+### `refine todo rename-list`
+
+Rename a Reporter-owned Todo list
+
+- `<LIST_ID>` (required) — Todo list id
+- `<NAME>` (required) — New name for the list
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo delete-list`
+
+Delete a Reporter-owned Todo list and its items
+
+- `<LIST_ID>` (required) — Todo list id
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo add`
+
+Add an item to a Reporter-owned Todo list
+
+- `<LIST_ID>` (required) — Todo list id
+- `<TEXT>` (required) — Text for the new item
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo edit`
+
+Edit the text of a Reporter-owned Todo item
+
+- `<LIST_ID>` (required) — Todo list id
+- `<ITEM_ID>` (required) — Todo item id
+- `<TEXT>` (required) — Replacement item text
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo delete`
+
+Delete an item from a Reporter-owned Todo list
+
+- `<LIST_ID>` (required) — Todo list id
+- `<ITEM_ID>` (required) — Todo item id
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo done`
+
+Mark a Reporter-owned Todo item done
+
+- `<LIST_ID>` (required) — Todo list id
+- `<ITEM_ID>` (required) — Todo item id
+- `--reporter` (required) — Reporter who owns the list
+
+### `refine todo undo`
+
+Restore a Reporter-owned Todo item to not done
+
+- `<LIST_ID>` (required) — Todo list id
+- `<ITEM_ID>` (required) — Todo item id
+- `--reporter` (required) — Reporter who owns the list
+
 ## `refine workflow`
 
 Control the agent automation engine that advances Goals through their workflow (pause/resume)

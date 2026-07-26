@@ -54,6 +54,7 @@ use crate::tools::product::project_registry::{FileProjectRegistryService, Projec
 use crate::tools::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
 };
+use crate::tools::product::todos::FileTodoService;
 use crate::tools::product::work_items::FileWorkItemService;
 
 use super::actions::*;
@@ -78,6 +79,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Project { action } => return dispatch_project_daemon(action),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
+        Commands::Todo { action } => return dispatch_todo(action),
         Commands::Workflow { action } => return dispatch_workflow_daemon(action),
         Commands::Node { action } => return dispatch_node_daemon(action),
         Commands::Cluster { action } => return dispatch_cluster_daemon(action),
@@ -1861,6 +1863,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Goal { action } => dispatch_goal_daemon(action),
         Commands::Feature { action } => dispatch_feature_daemon(action),
+        Commands::Todo { action } => dispatch_todo(action),
         Commands::Workflow { action } => dispatch_workflow_daemon(action),
         Commands::Node { action } => dispatch_node_daemon(action),
         Commands::Cluster { action } => dispatch_cluster_daemon(action),
@@ -2460,6 +2463,166 @@ fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
     };
     print_json(&response);
     Ok(())
+}
+
+fn dispatch_todo(action: TodoAction) -> RefineResult<()> {
+    let response = match action {
+        TodoAction::List {
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => {
+                FileTodoService::new(refine_dir_for_target_root(&target_root)?).list(&reporter)?
+            }
+            None => daemon_json(
+                "GET",
+                &format!("/todos?reporter={}", query_component(&reporter)),
+                None,
+            )?,
+        },
+        TodoAction::CreateList {
+            name,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .create_list(&reporter, &name)?,
+            None => daemon_json(
+                "POST",
+                "/todos/lists",
+                Some(json!({
+                    "reporter": reporter,
+                    "name": name
+                })),
+            )?,
+        },
+        TodoAction::RenameList {
+            list_id,
+            name,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .rename_list(&reporter, &list_id, &name)?,
+            None => daemon_json(
+                "PATCH",
+                &format!("/todos/lists/{}", path_segment(&list_id)),
+                Some(json!({
+                    "reporter": reporter,
+                    "name": name
+                })),
+            )?,
+        },
+        TodoAction::DeleteList {
+            list_id,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .delete_list(&reporter, &list_id)?,
+            None => daemon_json(
+                "DELETE",
+                &format!("/todos/lists/{}", path_segment(&list_id)),
+                Some(json!({ "reporter": reporter })),
+            )?,
+        },
+        TodoAction::Add {
+            list_id,
+            text,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .add_item(&reporter, &list_id, &text)?,
+            None => daemon_json(
+                "POST",
+                &format!("/todos/lists/{}/items", path_segment(&list_id)),
+                Some(json!({
+                    "reporter": reporter,
+                    "text": text
+                })),
+            )?,
+        },
+        TodoAction::Edit {
+            list_id,
+            item_id,
+            text,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .update_item(&reporter, &list_id, &item_id, Some(&text), None)?,
+            None => daemon_json(
+                "PATCH",
+                &format!(
+                    "/todos/lists/{}/items/{}",
+                    path_segment(&list_id),
+                    path_segment(&item_id)
+                ),
+                Some(json!({
+                    "reporter": reporter,
+                    "text": text
+                })),
+            )?,
+        },
+        TodoAction::Delete {
+            list_id,
+            item_id,
+            reporter,
+            target_root,
+        } => match target_root {
+            Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+                .delete_item(&reporter, &list_id, &item_id)?,
+            None => daemon_json(
+                "DELETE",
+                &format!(
+                    "/todos/lists/{}/items/{}",
+                    path_segment(&list_id),
+                    path_segment(&item_id)
+                ),
+                Some(json!({ "reporter": reporter })),
+            )?,
+        },
+        TodoAction::Done {
+            list_id,
+            item_id,
+            reporter,
+            target_root,
+        } => dispatch_todo_done(target_root, &reporter, &list_id, &item_id, true)?,
+        TodoAction::Undo {
+            list_id,
+            item_id,
+            reporter,
+            target_root,
+        } => dispatch_todo_done(target_root, &reporter, &list_id, &item_id, false)?,
+    };
+    print_json(&response);
+    Ok(())
+}
+
+fn dispatch_todo_done(
+    target_root: Option<PathBuf>,
+    reporter: &str,
+    list_id: &str,
+    item_id: &str,
+    done: bool,
+) -> RefineResult<Value> {
+    match target_root {
+        Some(target_root) => FileTodoService::new(refine_dir_for_target_root(&target_root)?)
+            .update_item(reporter, list_id, item_id, None, Some(done)),
+        None => daemon_json(
+            "PATCH",
+            &format!(
+                "/todos/lists/{}/items/{}",
+                path_segment(list_id),
+                path_segment(item_id)
+            ),
+            Some(json!({
+                "reporter": reporter,
+                "done": done
+            })),
+        ),
+    }
 }
 
 fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
@@ -3642,6 +3805,17 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | FeatureAction::Cancel { target_root, .. }
             | FeatureAction::Delete { target_root, .. } => target_root.as_ref(),
             FeatureAction::Import { target_root, .. } => Some(target_root),
+        },
+        Commands::Todo { action } => match action {
+            TodoAction::List { target_root, .. }
+            | TodoAction::CreateList { target_root, .. }
+            | TodoAction::RenameList { target_root, .. }
+            | TodoAction::DeleteList { target_root, .. }
+            | TodoAction::Add { target_root, .. }
+            | TodoAction::Edit { target_root, .. }
+            | TodoAction::Delete { target_root, .. }
+            | TodoAction::Done { target_root, .. }
+            | TodoAction::Undo { target_root, .. } => target_root.as_ref(),
         },
         Commands::Workflow { action } => match action {
             WorkflowAction::Pause { .. } | WorkflowAction::Resume { .. } => None,

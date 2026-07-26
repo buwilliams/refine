@@ -562,6 +562,43 @@ impl InProcessWebServer {
             return self.handle_reporter_delete(request);
         }
 
+        if request.method == "GET" && request.path == "/todos" {
+            return self.handle_todos_list(&raw_path);
+        }
+
+        if request.method == "POST" && request.path == "/todos/lists" {
+            return self.handle_todo_list_create(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/todos/lists/")
+            && request.path.ends_with("/items")
+        {
+            return self.handle_todo_item_create(request);
+        }
+
+        if request.method == "PATCH"
+            && request.path.starts_with("/todos/lists/")
+            && request.path.contains("/items/")
+        {
+            return self.handle_todo_item_update(request);
+        }
+
+        if request.method == "DELETE"
+            && request.path.starts_with("/todos/lists/")
+            && request.path.contains("/items/")
+        {
+            return self.handle_todo_item_delete(request);
+        }
+
+        if request.method == "PATCH" && request.path.starts_with("/todos/lists/") {
+            return self.handle_todo_list_rename(request);
+        }
+
+        if request.method == "DELETE" && request.path.starts_with("/todos/lists/") {
+            return self.handle_todo_list_delete(request);
+        }
+
         if request.method == "GET" && request.path == "/quality" {
             return self.handle_quality_get();
         }

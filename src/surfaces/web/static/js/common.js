@@ -1597,6 +1597,7 @@ async function handleReporterAdd(sel) {
 
 function setLastReporter(name) {
   const wasEmpty = !state.lastReporter;
+  const changed = state.lastReporter !== name;
   state.lastReporter = name;
   if (name) localStorage.setItem("refine_last_reporter", name);
   else localStorage.removeItem("refine_last_reporter");
@@ -1616,6 +1617,9 @@ function setLastReporter(name) {
   // Dashboard's "Awaiting your review" section is reporter-scoped — refresh
   // it whenever the selection changes so the list re-targets immediately.
   if (state.currentRoute === "dashboard") refreshDashboard();
+  if (changed && typeof handleTodoReporterChanged === "function") {
+    handleTodoReporterChanged(name);
+  }
 }
 
 // react to "+ Add new reporter" selection on any dropdown
