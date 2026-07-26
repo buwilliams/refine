@@ -1,0 +1,375 @@
+use super::*;
+
+#[test]
+fn projection_query_filters_sorts_and_pages_goals_and_features() {
+    let mut goal_one = goal_projection("goal-1", GoalStatus::Todo, Some("default"));
+    goal_one.goal.name = "OAuth callback broken".to_string();
+    goal_one.goal.reporter = Some("Alice".to_string());
+    goal_one.goal.round_count = 2;
+    goal_one.goal.feature_id = Some("feature-1".to_string());
+    goal_one.goal.priority = GoalPriority::High;
+    goal_one.searchable_text = "OAuth callback broken login notes".to_string();
+    goal_one.activity_ids = vec!["act-1".to_string()];
+
+    let mut goal_two = goal_projection("goal-2", GoalStatus::Done, Some("node-b"));
+    goal_two.goal.name = "Settings polish".to_string();
+    goal_two.goal.reporter = Some("Bob".to_string());
+    goal_two.goal.round_count = 1;
+
+    let mut goals = BTreeMap::new();
+    goals.insert(goal_one.goal.id.clone(), goal_one);
+    goals.insert(goal_two.goal.id.clone(), goal_two);
+
+    let mut activity = BTreeMap::new();
+    activity.insert(
+        "act-1".to_string(),
+        ActivitySummaryProjection {
+            entry: ActivityEntry {
+                id: "act-1".to_string(),
+                datetime: "2026-01-01T00:00:00Z".to_string(),
+                severity: "error".to_string(),
+                category: "quality".to_string(),
+                message: "OAuth failed".to_string(),
+                goal_id: Some("goal-1".to_string()),
+                actor: Some("browser".to_string()),
+                details: None,
+                actions: Vec::new(),
+            },
+            searchable_text: "OAuth failed".to_string(),
+        },
+    );
+
+    let feature = FeatureSummaryProjection {
+        feature: FeatureIndexProjection {
+            id: "feature-1".to_string(),
+            name: "Auth work".to_string(),
+            description: Some("OAuth fixes".to_string()),
+            reporter: Some("Alice".to_string()),
+            assignee: Some("Alice".to_string()),
+            node_id: Some("default".to_string()),
+            created: "created".to_string(),
+            updated: "updated".to_string(),
+            json_path: "feature.json".to_string(),
+        },
+        status: GoalStatus::Todo,
+        goal_ids: vec!["goal-1".to_string()],
+        rollup: FeatureRollup {
+            status: GoalStatus::Todo,
+            goal_count: 1,
+            done_count: 0,
+            active_count: 0,
+            failed_count: 0,
+            cancelled_count: 0,
+            blocked_count: 0,
+            next_goal: Some("goal-1".to_string()),
+        },
+    };
+    let mut features = BTreeMap::new();
+    features.insert("feature-1".to_string(), feature);
+
+    let snapshot = ProjectionSnapshot {
+        version: PROJECTION_SNAPSHOT_VERSION,
+        generated_at: "now".to_string(),
+        source_fingerprints: BTreeMap::new(),
+        goals,
+        features,
+        activity,
+        changes: BTreeMap::new(),
+        dashboard: DashboardProjection::default(),
+        runtime: RuntimeProjection::default(),
+    };
+
+    let goals = snapshot.list_goals(GoalProjectionQuery {
+        q: Some("oauth".to_string()),
+        feature: Some("feature-1".to_string()),
+        severity: Some("error".to_string()),
+        category: Some("quality".to_string()),
+        actor: Some("browser".to_string()),
+        rounds_gte: Some(2),
+        page: PageRequest {
+            sort: "priority".to_string(),
+            dir: "desc".to_string(),
+            ..PageRequest::default()
+        },
+        ..GoalProjectionQuery::default()
+    });
+    assert_eq!(goals.total, 1);
+    assert_eq!(goals.goals[0].id, "goal-1");
+    assert_eq!(
+        goals.filtered_status_counts.get(&GoalStatus::Todo),
+        Some(&1)
+    );
+    assert_eq!(goals.matching_ids, vec!["goal-1"]);
+
+    let activity = snapshot.list_activity(ActivityProjectionQuery {
+        q: Some("oauth".to_string()),
+        severity: Some("error".to_string()),
+        category: Some("quality".to_string()),
+        actor: Some("browser".to_string()),
+        page: PageRequest {
+            sort: "message".to_string(),
+            dir: "asc".to_string(),
+            ..PageRequest::default()
+        },
+        ..ActivityProjectionQuery::default()
+    });
+    assert_eq!(activity.total, 1);
+    assert_eq!(activity.activity[0].id, "act-1");
+    assert_eq!(activity.matching_ids, vec!["act-1"]);
+    assert_eq!(activity.facets.categories, vec!["quality"]);
+    assert_eq!(activity.facets.severities, vec!["error"]);
+    assert_eq!(activity.facets.actors, vec!["browser"]);
+
+    let features = snapshot.list_features(FeatureProjectionQuery {
+        q: Some("oauth".to_string()),
+        reporter: Some("Alice".to_string()),
+        assignee: None,
+        status: Some(GoalStatus::Todo),
+        node: Some("current".to_string()),
+        current_node_id: Some("default".to_string()),
+        page: PageRequest::default(),
+    });
+    assert_eq!(features.total, 1);
+    assert_eq!(features.features[0].feature.id, "feature-1");
+}
+
+#[test]
+fn rebuild_projection_scans_python_style_goal_and_feature_records() {
+    let temp_root = unique_temp_dir("projection-rebuild");
+    let refine_dir = temp_root.join(".refine");
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
+    let remote_goal_dir = refine_dir.join("goals").join("02").join("GOAL2");
+    let feature_dir = refine_dir.join("features").join("01").join("FEATURE1");
+    fs::create_dir_all(&goal_dir).unwrap();
+    fs::create_dir_all(&remote_goal_dir).unwrap();
+    fs::create_dir_all(&feature_dir).unwrap();
+    fs::create_dir_all(refine_dir.join("logs")).unwrap();
+    fs::write(
+        goal_dir.join("goal.json"),
+        r#"{
+              "id": "GOAL1",
+              "name": "Fix login",
+              "status": "todo",
+              "priority": "high",
+              "created": "2026-01-01T00:00:00Z",
+              "updated": "2026-01-02T00:00:00Z",
+              "reporter": "Buddy",
+              "feature_id": "FEATURE1",
+              "feature_order": 2,
+              "rounds": [
+                {"reporter": "Buddy", "assignee": "Alice", "prompt": "Works"},
+                {"reporter": "Reviewer", "assignee": "Coder", "prompt": "Works"}
+              ],
+              "notes": [{"body": "OAuth path"}]
+            }"#,
+    )
+    .unwrap();
+    fs::write(
+        remote_goal_dir.join("goal.json"),
+        r#"{
+              "id": "GOAL2",
+              "name": "Remote failure",
+              "status": "failed",
+              "priority": "medium",
+              "node_id": "node-b",
+              "rounds": [{"reporter": "Remote", "prompt": "Fixed"}],
+              "notes": []
+            }"#,
+    )
+    .unwrap();
+    fs::write(
+        feature_dir.join("feature.json"),
+        r#"{
+              "id": "FEATURE1",
+              "name": "Authentication",
+              "description": "Login work",
+              "reporter": "Buddy",
+              "created": "2026-01-01T00:00:00Z",
+              "updated": "2026-01-02T00:00:00Z"
+            }"#,
+    )
+    .unwrap();
+    fs::write(
+            refine_dir.join(ACTIVITY_LOG_FILE),
+            concat!(
+                "{\"id\":\"act-1\",\"datetime\":\"2026-01-03T00:00:00Z\",\"severity\":\"error\",\"category\":\"quality\",\"message\":\"Remote QA failed\",\"goal_id\":\"GOAL2\",\"actor\":\"browser\",\"details\":{\"selector\":\"#app\"},\"actions\":[]}\n",
+                "{\"id\":\"act-2\",\"datetime\":\"2026-01-04T00:00:00Z\",\"severity\":\"info\",\"category\":\"state\",\"message\":\"Feature changed\",\"goal_id\":null,\"actor\":\"system\",\"details\":null,\"actions\":[]}\n"
+            ),
+        )
+        .unwrap();
+    FileLogService::new(&refine_dir)
+        .append_round_log(
+            "GOAL1",
+            1,
+            LogEntry {
+                datetime: "2026-01-05T00:00:00Z".to_string(),
+                severity: "warn".to_string(),
+                category: "workflow".to_string(),
+                message: "Round sidecar activity".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: Some("workflow".to_string()),
+                goal_id: None,
+            },
+        )
+        .unwrap();
+
+    let snapshot = FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    let goal = &snapshot.goals["GOAL1"];
+    assert_eq!(goal.goal.status, GoalStatus::Todo);
+    assert_eq!(goal.goal.priority, GoalPriority::High);
+    assert_eq!(goal.goal.reporter.as_deref(), Some("Buddy"));
+    assert_eq!(goal.goal.assignee.as_deref(), Some("Coder"));
+    assert_eq!(goal.goal.round_count, 2);
+    assert_eq!(goal.goal.node_id.as_deref(), Some("default"));
+    assert!(goal.searchable_text.contains("OAuth path"));
+    assert!(goal.searchable_text.contains("Coder"));
+
+    let feature = &snapshot.features["FEATURE1"];
+    assert_eq!(feature.goal_ids, vec!["GOAL1"]);
+    assert_eq!(feature.rollup.goal_count, 1);
+    assert_eq!(feature.rollup.next_goal.as_deref(), Some("GOAL1"));
+    assert!(
+        snapshot
+            .source_fingerprints
+            .contains_key("goals/01/GOAL1/goal.json")
+    );
+    assert!(
+        snapshot.source_fingerprints["goals/01/GOAL1/goal.json"]
+            .content_hash
+            .is_some()
+    );
+    assert_eq!(
+        snapshot
+            .dashboard
+            .all_node_status_counts
+            .get(&GoalStatus::Todo),
+        Some(&1)
+    );
+    assert_eq!(
+        snapshot
+            .dashboard
+            .all_node_status_counts
+            .get(&GoalStatus::Failed),
+        Some(&1)
+    );
+    assert_eq!(
+        snapshot
+            .dashboard
+            .current_node_status_counts
+            .get(&GoalStatus::Todo),
+        Some(&1)
+    );
+    assert_eq!(
+        snapshot
+            .dashboard
+            .current_node_status_counts
+            .get(&GoalStatus::Failed),
+        None
+    );
+    assert_eq!(snapshot.dashboard.attention_indicators.len(), 1);
+    assert_eq!(
+        snapshot
+            .dashboard
+            .assignee_stats
+            .get("Coder")
+            .and_then(|counts| counts.get(&GoalStatus::Todo)),
+        Some(&1)
+    );
+    let default_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("current".to_string()),
+        current_node_id: Some("default".to_string()),
+    });
+    assert_eq!(default_dashboard.node_filter, "current");
+    assert_eq!(default_dashboard.counts.get(&GoalStatus::Todo), Some(&1));
+    assert_eq!(default_dashboard.counts.get(&GoalStatus::Failed), None);
+    assert_eq!(
+        default_dashboard
+            .assignee_stats
+            .get("Coder")
+            .and_then(|counts| counts.get(&GoalStatus::Todo)),
+        Some(&1)
+    );
+    assert!(!default_dashboard.assignee_stats.contains_key("unassigned"));
+    assert_eq!(
+        default_dashboard.recent_activity_ids,
+        vec!["round-log:GOAL1:1:0".to_string()]
+    );
+    let remote_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("current".to_string()),
+        current_node_id: Some("node-b".to_string()),
+    });
+    assert_eq!(remote_dashboard.counts.get(&GoalStatus::Failed), Some(&1));
+    assert_eq!(remote_dashboard.counts.get(&GoalStatus::Todo), None);
+    assert_eq!(remote_dashboard.attention_indicators.len(), 1);
+    assert_eq!(
+        remote_dashboard.recent_activity_ids,
+        vec!["act-1".to_string()]
+    );
+    let all_dashboard = snapshot.dashboard_summary(DashboardProjectionQuery {
+        node: Some("all".to_string()),
+        current_node_id: Some("node-b".to_string()),
+    });
+    assert_eq!(all_dashboard.counts, all_dashboard.all_node_counts);
+    assert_eq!(
+        all_dashboard.recent_activity_ids,
+        vec![
+            "round-log:GOAL1:1:0".to_string(),
+            "act-2".to_string(),
+            "act-1".to_string()
+        ]
+    );
+    assert_eq!(snapshot.activity.len(), 3);
+    assert_eq!(
+        snapshot.goals["GOAL1"].activity_ids,
+        vec!["round-log:GOAL1:1:0"]
+    );
+    assert_eq!(snapshot.goals["GOAL2"].activity_ids, vec!["act-1"]);
+    assert!(snapshot.activity["act-1"].searchable_text.contains("#app"));
+    assert_eq!(
+        snapshot.activity["round-log:GOAL1:1:0"].entry.message,
+        "Round sidecar activity"
+    );
+    assert_eq!(
+        snapshot.activity["round-log:GOAL1:1:0"]
+            .entry
+            .goal_id
+            .as_deref(),
+        Some("GOAL1")
+    );
+    assert_eq!(
+        snapshot.dashboard.recent_activity_ids,
+        vec![
+            "round-log:GOAL1:1:0".to_string(),
+            "act-2".to_string(),
+            "act-1".to_string()
+        ]
+    );
+    assert!(
+        snapshot
+            .source_fingerprints
+            .contains_key("logs/activity.jsonl")
+    );
+    assert!(
+        snapshot
+            .source_fingerprints
+            .contains_key("goals/GO/AL1/logs.jsonl")
+    );
+    let goal_activity = snapshot.list_activity(ActivityProjectionQuery {
+        goal_id: Some("GOAL1".to_string()),
+        ..ActivityProjectionQuery::default()
+    });
+    assert_eq!(goal_activity.total, 1);
+    assert_eq!(goal_activity.activity[0].message, "Round sidecar activity");
+    let activity_filtered = snapshot.list_goals(GoalProjectionQuery {
+        severity: Some("error".to_string()),
+        category: Some("quality".to_string()),
+        actor: Some("browser".to_string()),
+        ..GoalProjectionQuery::default()
+    });
+    assert_eq!(activity_filtered.matching_ids, vec!["GOAL2"]);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}

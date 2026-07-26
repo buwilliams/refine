@@ -1,0 +1,305 @@
+use super::*;
+
+#[test]
+fn web_server_transitions_goal_and_refine_dir() {
+    let temp_root = unique_temp_dir("http-transition");
+    let refine_dir = temp_root.join(".refine");
+    let goal_dir = refine_dir.join("goals").join("01").join("GOAL1");
+    fs::create_dir_all(&goal_dir).unwrap();
+    fs::write(
+        goal_dir.join("goal.json"),
+        r#"{
+              "id": "GOAL1",
+              "name": "HTTP transition",
+              "status": "backlog",
+              "priority": "low",
+              "created": "2026-01-01T00:00:00Z",
+              "updated": "2026-01-01T00:00:00Z",
+              "rounds": []
+            }"#,
+    )
+    .unwrap();
+    let projection = FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    let mut server = server_with_projection();
+    server.projection = projection;
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+
+    let response = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/work/goals/GOAL1/transition".to_string(),
+        body: Some(json!({"status": "todo"})),
+    });
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["goal"]["status"], "todo");
+    assert!(
+        fs::read_to_string(goal_dir.join("goal.json"))
+            .unwrap()
+            .contains("\"status\": \"todo\"")
+    );
+
+    let patch_response = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/goals/GOAL1".to_string(),
+        body: Some(json!({"status": "backlog"})),
+    });
+    assert_eq!(patch_response.status, 200);
+    assert_eq!(patch_response.body["goal"]["status"], "backlog");
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let temp_root = unique_temp_dir("http-goal-agent-session");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8082");
+    let provider = temp_root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\nprintf 'goal-agent-ready\\n'\nread answer\nprintf 'goal-agent-answer:%s\\n' \"$answer\"\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+    }
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let runtime_for_thread = runtime_root.clone();
+    let app_for_thread = app_root.clone();
+    let session_thread = thread::spawn(move || {
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("goal_id".to_string(), json!("GOAL1"));
+        run_goal_agent(
+            GoalAgentLaunch {
+                runtime_root: runtime_for_thread,
+                cwd: app_for_thread,
+                provider: "smoke-ai".to_string(),
+                prompt: "Implement Goal GOAL1".to_string(),
+                metadata,
+            },
+            |_| {},
+        )
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while FileProcessSupervisor::new(&runtime_root)
+        .list()
+        .unwrap()
+        .is_empty()
+    {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(20));
+    }
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "goal", "goal_id": "GOAL1"})),
+    });
+    assert_eq!(opened.status, 200, "{}", opened.body);
+    assert_eq!(opened.body["profile"], "goal");
+    assert_eq!(opened.body["goal_id"], "GOAL1");
+    let session_id = opened.body["id"].as_str().unwrap();
+    let input = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/input"),
+        body: Some(json!({"data": "attached\r"})),
+    });
+    assert_eq!(input.status, 200, "{}", input.body);
+    let result = session_thread.join().unwrap().unwrap();
+    assert!(result.output.contains("goal-agent-answer:attached"));
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let temp_root = unique_temp_dir("http-goal-agent-terminal-stop");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    let provider = temp_root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\ntrap 'exit 0' TERM INT\nprintf 'goal-agent-ready\\n'\nwhile :; do sleep 1; done\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+    }
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Stop workflow Goal Agent", Some("GOAL-TERMINAL-STOP"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary(
+            "GOAL-TERMINAL-STOP",
+            "Browser test",
+            "Stop through the Goal terminal",
+        )
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-TERMINAL-STOP", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-TERMINAL-STOP", GoalStatus::InProgress)
+        .unwrap();
+    let workflow = WorkflowEngine::with_target_root(&runtime_root, &app_root);
+    let claim_id = workflow.claim("GOAL-TERMINAL-STOP").unwrap();
+    let execution_id = workflow.start_claim(&claim_id).unwrap();
+    assert_eq!(
+        AgentCapacityService::new(&runtime_root)
+            .snapshot()
+            .unwrap()
+            .leases
+            .len(),
+        1
+    );
+
+    let runtime_for_thread = runtime_root.clone();
+    let app_for_thread = app_root.clone();
+    let claim_for_thread = claim_id.clone();
+    let execution_for_thread = execution_id.clone();
+    let session_thread = thread::spawn(move || {
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("goal_id".to_string(), json!("GOAL-TERMINAL-STOP"));
+        metadata.insert("claim_id".to_string(), json!(claim_for_thread));
+        metadata.insert("execution_id".to_string(), json!(execution_for_thread));
+        metadata.insert("round_idx".to_string(), json!(0));
+        metadata.insert("workflow_state".to_string(), json!("in-progress"));
+        run_goal_agent(
+            GoalAgentLaunch {
+                runtime_root: runtime_for_thread,
+                cwd: app_for_thread,
+                provider: "smoke-ai".to_string(),
+                prompt: "Implement Goal GOAL-TERMINAL-STOP".to_string(),
+                metadata,
+            },
+            |_| {},
+        )
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while FileProcessSupervisor::new(&runtime_root)
+        .list()
+        .unwrap()
+        .is_empty()
+    {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(20));
+    }
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({
+            "profile": "goal",
+            "goal_id": "GOAL-TERMINAL-STOP"
+        })),
+    });
+    assert_eq!(opened.status, 200, "{}", opened.body);
+    let session_id = opened.body["id"].as_str().unwrap().to_string();
+    let process_id = opened.body["process_id"].as_str().unwrap().to_string();
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/stop"),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["stopped"], true);
+    assert_eq!(stopped.body["process"]["id"], process_id);
+    assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
+    assert_eq!(stopped.body["goal"]["id"], "GOAL-TERMINAL-STOP");
+    assert_eq!(stopped.body["goal"]["status"], "cancelled");
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .inspect(&process_id)
+            .is_err()
+    );
+    assert_eq!(
+        work_items
+            .show_goal_summary("GOAL-TERMINAL-STOP")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+    let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
+    let claim = state
+        .claims
+        .iter()
+        .find(|claim| claim.claim_id == claim_id)
+        .unwrap();
+    assert_eq!(claim.execution_id.as_deref(), Some(execution_id.as_str()));
+    assert_eq!(claim.state, WorkflowClaimState::Cancelled);
+    assert!(
+        AgentCapacityService::new(&runtime_root)
+            .snapshot()
+            .unwrap()
+            .leases
+            .is_empty()
+    );
+    let receipt: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("{process_id}.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(receipt["state"], "completed");
+    assert_eq!(receipt["confirmed_exit"], true);
+    assert_eq!(receipt["goal_cancelled"], true);
+    assert_eq!(receipt["claim_cancelled"], true);
+    assert_eq!(receipt["workflow"]["execution_id"], execution_id);
+    let _ = session_thread.join().unwrap();
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    remove_temp_dir(&temp_root);
+}
