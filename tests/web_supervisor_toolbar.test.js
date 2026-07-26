@@ -206,8 +206,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
     globalThis.toolbarTerminalTest = {
       activate(tabId) {
         ensureStandaloneTab();
-        if (tabId === "plan") ensurePlanTab();
-        else ensureTestTab(tabId);
+        ensureTestTab(tabId);
         return activateToolbarTab(tabId);
       },
       click(tabId) {
@@ -215,7 +214,6 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         return activateToolbarTab(tabId, { toggleIfActive: true });
       },
       draw: drawToolbar,
-      ensurePlan: ensurePlanTab,
       openGoal(goalId) { return openAgentDock({ goalId }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       create(mode) { return createToolbarTab(mode); },
@@ -374,6 +372,51 @@ test("Toolbar starts empty and creates independent general Agent tabs lazily", a
   assert.deepEqual(
     requests.map((request) => request.body.profile),
     ["agent", "agent"],
+  );
+});
+
+test("Agent, Agent in Worktree, and Planning Agent each open a fresh instance", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    const sequence = requests.length + 1;
+    requests.push({ body });
+    return {
+      id: `session-${sequence}`,
+      process_id: `process-${sequence}`,
+      cwd: body.profile === "standalone" ? `/tmp/worktree-${sequence}` : "/repo",
+      profile: body.profile,
+      provider: "codex",
+      worktree: body.profile === "standalone"
+        ? { branch: `refine/standalone/${sequence}`, path: `/tmp/worktree-${sequence}` }
+        : null,
+    };
+  });
+
+  const firstAgent = await browser.runtime.create("agent");
+  const secondAgent = await browser.runtime.create("agent");
+  const firstWorktree = await browser.runtime.create("standalone");
+  const secondWorktree = await browser.runtime.create("standalone");
+  const firstPlan = await browser.runtime.openPlan("First plan");
+  const secondPlan = await browser.runtime.openPlan("Second plan");
+
+  for (const [first, second] of [
+    [firstAgent, secondAgent],
+    [firstWorktree, secondWorktree],
+    [firstPlan, secondPlan],
+  ]) {
+    assert.notEqual(first, second);
+    assert.notEqual(browser.runtime.tab(first).sessionId, browser.runtime.tab(second).sessionId);
+  }
+  assert.deepEqual(
+    requests.map((request) => request.body.profile),
+    ["agent", "agent", "standalone", "standalone", "plan", "plan"],
+  );
+  assert.deepEqual(
+    requests.filter((request) => request.body.profile === "plan")
+      .map((request) => request.body.initial_prompt),
+    ["First plan", "Second plan"],
   );
 });
 
@@ -649,10 +692,10 @@ test("a missing background session does not prevent closing its tab", async () =
 
 test("Agent, Plan, Goal, and Standalone render the shared terminal surface", async () => {
   const browser = browserRuntime();
-  await browser.runtime.openPlan("Design a retry queue");
+  const planTabId = await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
 
-  for (const tabId of ["agent", "plan", "GOAL1", "standalone", "terminal"]) {
+  for (const tabId of ["agent", planTabId, "GOAL1", "standalone", "terminal"]) {
     await browser.runtime.activate(tabId);
     assert.match(browser.html(), /data-testid="toolbar-terminal-panel"/);
     assert.match(browser.html(), /data-testid="terminal-start"/);
@@ -663,10 +706,10 @@ test("Agent, Plan, Goal, and Standalone render the shared terminal surface", asy
 
 test("agent terminals follow at the bottom and preserve user scrollback until returned", async () => {
   const browser = browserRuntime();
-  await browser.runtime.openPlan("Design a retry queue");
+  const planTabId = await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
 
-  for (const tabId of ["agent", "plan", "GOAL1", "standalone"]) {
+  for (const tabId of ["agent", planTabId, "GOAL1", "standalone"]) {
     const scroll = browser.runtime.installTerminalScrollModel(tabId);
 
     browser.runtime.receive(tabId, "first line\n");

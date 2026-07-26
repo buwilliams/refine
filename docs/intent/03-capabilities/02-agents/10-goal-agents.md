@@ -38,7 +38,10 @@ infer needs-input from elapsed time or lack of terminal output. A silent Goal
 Agent remains working and should make the best decision supported by its current
 context.
 
-General toolbar Agents are independent sessions. Plan Mode and Standalone remain role-specific sessions. Goal Agents are keyed by Goal instance because several Goals may be implemented in parallel.
+General toolbar Agents, Plan Mode agents, and Standalone worktree agents are
+independent instances: every open action launches a new managed terminal session.
+Goal Agents are the intentional exception. They are keyed by Goal instance so
+every surface attaches to the one workflow-owned agent implementing that Goal.
 
 The pinned Round context is immutable for that implementation attempt. Post-implementation governance consumes the same pinned governance snapshot, so a mid-turn settings edit cannot make implementation and evaluation reason from different rules. Refine records applied and skipped guidance candidates as structured Round evidence.
 
