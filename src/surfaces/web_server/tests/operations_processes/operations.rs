@@ -2,13 +2,10 @@ use super::*;
 
 #[test]
 fn operation_cancel_route_is_a_thin_shared_capability_adapter() {
-    let routes = include_str!("../../operation_routes.rs");
+    let routes = include_str!("../../operation_routes/operations.rs");
     let handler = routes
-        .split("pub(super) fn handle_operation_cancel")
+        .split("pub(in crate::surfaces::web_server) fn handle_operation_cancel")
         .nth(1)
-        .unwrap()
-        .split("pub(super) fn handle_workflow_execution_retry")
-        .next()
         .unwrap();
 
     assert!(handler.contains("registry.cancel_supervised"));
