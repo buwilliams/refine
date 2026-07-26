@@ -175,17 +175,6 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(result) => result,
             Err(error) => return fail(ctx, "agent", error),
         };
-        let guidance_decision =
-            match guidance_decision(&agent_context, agent_result.guidance_applied.as_deref()) {
-                Ok(decision) => decision,
-                Err(error) => return fail(ctx, "guidance", error),
-            };
-        if let Err(error) = ctx.work_items.update_latest_goal_round_evaluation_summary(
-            &ctx.goal_id,
-            &json!({"guidance_decision": guidance_decision}),
-        ) {
-            return fail(ctx, "guidance", error);
-        }
         let provider_output = agent_result.output;
         if let Err(error) = ctx
             .work_items
@@ -222,6 +211,25 @@ impl WorkflowBehavior for WorkflowImplementation {
             .update_goal_candidate_commit(&ctx.goal_id, &commit.commit)
         {
             return fail(ctx, "commit", error);
+        }
+        let changed_paths = match worktree_git.changed_paths_since(&target_branch, &commit.commit) {
+            Ok(paths) => paths,
+            Err(error) => return fail(ctx, "guidance", error),
+        };
+        let code_changed = changed_paths.iter().any(|path| is_code_path(path));
+        let guidance_decision = match guidance_decision(
+            &agent_context,
+            agent_result.guidance_applied.as_deref(),
+            code_changed,
+        ) {
+            Ok(decision) => decision,
+            Err(error) => return fail(ctx, "guidance", error),
+        };
+        if let Err(error) = ctx.work_items.update_latest_goal_round_evaluation_summary(
+            &ctx.goal_id,
+            &json!({"guidance_decision": guidance_decision}),
+        ) {
+            return fail(ctx, "guidance", error);
         }
         if commit.has_changes_since_base {
             ctx.log(
@@ -604,7 +612,14 @@ fn goal_agent_context(
     }))
 }
 
-fn guidance_decision(agent_context: &Value, applied: Option<&[usize]>) -> RefineResult<Value> {
+const CODE_FILE_GUIDANCE_RULE: &str =
+    "Apply whenever an agent adds or changes code files in any language.";
+
+fn guidance_decision(
+    agent_context: &Value,
+    applied: Option<&[usize]>,
+    code_changed: bool,
+) -> RefineResult<Value> {
     let candidates = agent_context
         .get("guidance_candidates")
         .and_then(Value::as_array)
@@ -639,6 +654,19 @@ fn guidance_decision(agent_context: &Value, applied: Option<&[usize]>) -> Refine
                 .to_string(),
         ));
     }
+    let required_code_guidance = candidates
+        .iter()
+        .enumerate()
+        .find_map(|(index, candidate)| {
+            (candidate.get("rule").and_then(Value::as_str) == Some(CODE_FILE_GUIDANCE_RULE))
+                .then_some(index)
+        });
+    if code_changed && required_code_guidance.is_some_and(|index| !unique.contains(&index)) {
+        return Err(RefineError::InvalidInput(
+            "Goal Agent must apply enabled Guidance whose Rule requires it for changed code files"
+                .to_string(),
+        ));
+    }
     let applied_candidates = candidates
         .iter()
         .enumerate()
@@ -655,8 +683,37 @@ fn guidance_decision(agent_context: &Value, applied: Option<&[usize]>) -> Refine
         "context_version": 1,
         "applied": applied_candidates,
         "skipped": skipped_candidates,
+        "code_files_changed": code_changed,
         "recorded_at": now_timestamp(),
     }))
+}
+
+fn is_code_path(path: &str) -> bool {
+    let path = std::path::Path::new(path);
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_ascii_lowercase());
+    !matches!(
+        extension.as_deref(),
+        Some(
+            "adoc"
+                | "avif"
+                | "bmp"
+                | "gif"
+                | "ico"
+                | "jpeg"
+                | "jpg"
+                | "md"
+                | "mdx"
+                | "pdf"
+                | "png"
+                | "rst"
+                | "svg"
+                | "txt"
+                | "webp"
+        )
+    )
 }
 
 fn evaluate_workflow_governance(

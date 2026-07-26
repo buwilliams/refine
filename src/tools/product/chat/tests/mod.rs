@@ -3,11 +3,18 @@ mod queue;
 mod sessions;
 mod standalone;
 
+use std::fs;
 use std::io::Write;
+use std::path::Path;
 use std::process::Command;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use serde_json::Value;
 
 use super::*;
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::product::work_items::FileWorkItemService;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

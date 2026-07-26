@@ -1,6 +1,26 @@
 use super::*;
 
 #[test]
+fn changed_paths_since_reports_the_committed_candidate_diff() {
+    let temp_root = unique_temp_dir("git-changed-paths");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "README.md", "base\n", "initial");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    fs::create_dir_all(repo.join("src")).unwrap();
+    commit_file(&repo, "src/lib.rs", "pub fn changed() {}\n", "code");
+    let candidate = git_stdout(&repo, &["rev-parse", "HEAD"]);
+
+    let paths = FileGitWorktreeService::new(&repo)
+        .changed_paths_since(&base, &candidate)
+        .unwrap();
+
+    assert_eq!(paths, vec!["src/lib.rs"]);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_git_worktree_service_cleans_merged_branch_worktree() {
     let temp_root = unique_temp_dir("git-worktree-cleanup");
     let repo = temp_root.join("repo");

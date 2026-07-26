@@ -1,4 +1,21 @@
-use super::*;
+use std::fs;
+use std::path::PathBuf;
+
+use serde_json::{Value, json};
+
+use crate::model::JsonObject;
+use crate::process::subprocess::FileProcessSupervisor;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
+};
+use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderInvocationResult};
+
+use super::{
+    ChatCapacityPermit, ChatSessionRecord, FileChatService, chat_event, chat_operation_log,
+    chat_process_metadata, chat_session_id_from_operation, event_bool, event_text,
+    importable_artifacts_from_output, nonempty_or, now_timestamp,
+};
 
 impl FileChatService {
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {

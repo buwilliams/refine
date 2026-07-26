@@ -48,6 +48,23 @@ impl FileGitWorktreeService {
             .success)
     }
 
+    /// Return the paths changed by `commit` relative to the merge base with
+    /// `base`. Keeping this query in the Git capability lets workflow policy
+    /// classify the committed candidate without bypassing the shared command
+    /// and repository ownership boundary.
+    pub fn changed_paths_since(&self, base: &str, commit: &str) -> RefineResult<Vec<String>> {
+        validate_commitish(base)?;
+        validate_commitish(commit)?;
+        let range = format!("{base}...{commit}");
+        let output = self.git_output(&["diff", "--name-only", "-z", &range])?;
+        Ok(output
+            .stdout
+            .split(|byte| *byte == b'\0')
+            .filter(|path| !path.is_empty())
+            .map(|path| String::from_utf8_lossy(path).to_string())
+            .collect())
+    }
+
     pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
         validate_commitish(commit)?;
         let output = self.git_raw(&["merge", "--no-ff", "--no-edit", commit])?;

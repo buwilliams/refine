@@ -6,12 +6,21 @@ mod promotion;
 mod ready_merge;
 
 use super::*;
+use crate::model::workflow::GoalStatus;
+use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::subprocess::ManagedProcess;
 use crate::process::supervisor::config::{FileGovernanceService, FileSettingsService};
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
+use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
+use crate::workflow::capacity::AgentCapacityService;
+use serde_json::{Value, json};
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

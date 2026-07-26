@@ -1,4 +1,19 @@
-use super::*;
+use std::fs;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
+
+use fs2::FileExt;
+
+use crate::process::supervisor::coordination::acquire_workflow_coordination;
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
+
+use super::{
+    WORKFLOW_AUTOMATION_STATE_FILE, WORKFLOW_AUTOMATION_STATE_LOCK_FILE, WorkflowAutomationState,
+    WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowStateMutationLock, now_timestamp,
+    read_state, write_state,
+};
 
 impl WorkflowEngine {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {

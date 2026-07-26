@@ -1,4 +1,17 @@
-use super::*;
+use std::thread;
+use std::time::Duration;
+
+use serde_json::json;
+
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::OperationState;
+use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderInvocation};
+
+use super::{
+    ChatQueuedMessage, ChatSessionRecord, FileChatService, chat_event, chat_process_metadata,
+    combined_queued_message, event_bool, event_text, is_internal_queued_message,
+    new_queued_message_id, now_timestamp,
+};
 
 impl FileChatService {
     pub fn queue_internal_message(
