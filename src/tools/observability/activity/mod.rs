@@ -292,10 +292,13 @@ impl ActivityService for FileActivityService {
                     path.display()
                 ))
             })?;
-        let encoded = serde_json::to_string(&entry).map_err(|error| {
+        let mut encoded = serde_json::to_string(&entry).map_err(|error| {
             RefineError::Serialization(format!("failed to encode activity entry: {error}"))
         })?;
-        writeln!(file, "{encoded}").map_err(|error| {
+        // Keep each JSONL record in one write buffer so concurrent appenders
+        // cannot interleave another record between the payload and its newline.
+        encoded.push('\n');
+        file.write_all(encoded.as_bytes()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to append activity log {}: {error}",
                 path.display()
@@ -367,6 +370,43 @@ mod tests {
         assert_eq!(
             service.facets().unwrap()["categories"],
             serde_json::json!(["ui"])
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_activity_service_keeps_concurrent_appends_as_complete_jsonl_records() {
+        const WRITERS: usize = 8;
+        const ENTRIES_PER_WRITER: usize = 100;
+
+        let temp_root = unique_temp_dir("activity-concurrent");
+        let refine_dir = temp_root.join(".refine");
+        let mut writers = Vec::new();
+        for writer in 0..WRITERS {
+            let service = FileActivityService::new(&refine_dir);
+            writers.push(std::thread::spawn(move || {
+                for entry in 0..ENTRIES_PER_WRITER {
+                    service
+                        .append(service.new_entry(
+                            format!("writer {writer} entry {entry}"),
+                            "error",
+                            "ui",
+                            None,
+                            Some("browser".to_string()),
+                        ))
+                        .unwrap();
+                }
+            }));
+        }
+        for writer in writers {
+            writer.join().unwrap();
+        }
+
+        let service = FileActivityService::new(&refine_dir);
+        assert_eq!(
+            service.recent(WRITERS * ENTRIES_PER_WRITER).unwrap().len(),
+            WRITERS * ENTRIES_PER_WRITER
         );
 
         fs::remove_dir_all(temp_root).unwrap();
