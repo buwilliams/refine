@@ -69,8 +69,3 @@ pub(super) fn nonempty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
     let value = value.trim();
     if value.is_empty() { fallback } else { value }
 }
-
-pub(super) fn nonempty_option(value: &str) -> Option<&str> {
-    let value = value.trim();
-    (!value.is_empty()).then_some(value)
-}

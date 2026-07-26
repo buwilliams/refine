@@ -6,6 +6,7 @@ mod git_changes;
 mod goals;
 mod http_transport;
 mod imports;
+mod imports_parity;
 mod nodes_cluster;
 mod operations_processes;
 mod project_runtime;

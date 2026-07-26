@@ -1,4 +1,5 @@
 use super::*;
+use crate::tools::product::imports::ImportDraft;
 use crate::tools::product::imports::{ImportExtractionResult, PlanFeatureDestination};
 
 fn plan_goal_extraction_result(draft_count: usize) -> ImportExtractionResult {

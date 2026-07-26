@@ -72,7 +72,7 @@ files were introduced.
   retry/execution-context hydration, governance prompt/verdict handling, and
   Goal-agent prompt/context projection have responsibility-named owners.
 - Work routes now use the parent only for route-family composition and the
-  shared server node lookup. Import extraction/persistence support, terminal
+  shared server node lookup. Import extraction/transport support, terminal
   profile and standalone-worktree lifecycle, and Feature response/reorder
   codecs moved to named children.
 - Chat's public parent now contains only serialized session/queue contracts,
@@ -88,6 +88,21 @@ files were introduced.
   the actual item families and the invariant that keeps each exception
   reviewable.
 
+## Round 2 Governance recovery
+
+- Import persistence now has one responsibility-named owner at
+  `src/tools/product/imports/persistence.rs`. It owns duplicate-decision
+  validation and execution, Goal rounds and metadata, Feature destination
+  mutation, dependency order, progress/cancellation, created-record accounting,
+  and rollback evidence.
+- `FileImportService`, direct CLI imports, and synchronous/background daemon
+  imports delegate to that owner. The web import contract contains only
+  extraction/response formatting and the operation-registry observer adapter;
+  no web module writes Goals or Features for import.
+- Shared capability tests are separated from web transport and cross-surface
+  parity tests. The final inventory remains 33 files at or above the roughly
+  500-line review trigger; no new production or test exception was introduced.
+
 ## Post-round review-trigger dispositions
 
 The following inventory is measured from the complete candidate tree after
@@ -97,7 +112,7 @@ actual items and method families.
 | Lines | File | Exact disposition |
 | ---: | --- | --- |
 | 998 | `src/surfaces/web_server/server.rs` | Retained as the authoritative HTTP/MCP method-and-path dispatch catalog. Besides delegation it contains the MCP forwarding adapter, route-specific path extraction, and the mutation-to-projection-refresh classification; these items jointly enforce one ordered route/refresh contract. Any handler implementation or unrelated codec would reopen the boundary. |
-| 853 | `src/workflow/behaviors/mod.rs` | Retained as the closed `WorkflowBehavior` stage implementation and its shared stage-evaluation pipeline. The adjacent helpers assemble pinned Goal-agent context, enforce the applicable-Guidance decision, run Quality/governance evaluation, and record the evidence consumed by those stages. They share the same transition/evidence contract; unrelated Workflow persistence or scheduling remains outside. |
+| 837 | `src/workflow/behaviors/mod.rs` | Retained as the closed `WorkflowBehavior` stage implementation and its shared stage-evaluation pipeline. The adjacent helpers assemble pinned Goal-agent context, enforce the applicable-Guidance decision, run Quality/governance evaluation, and record the evidence consumed by those stages. They share the same transition/evidence contract; unrelated Workflow persistence or scheduling remains outside. |
 | 774 | `src/surfaces/web_server/http/docs.rs` | Retained as one static HTTP documentation catalog and renderer. Navigation identity, anchors, and rendered sections are checked as one ordered document; splitting would hide broken links and ordering drift across files. |
 | 761 | `src/tools/host/target_apps/mod.rs` | Retained as the target-app generated-configuration grammar: defaults, wrapper script rendering, command/environment encoding, and reachability derivation all produce one `TargetAppGeneratedConfig`. Lifecycle mutation is already in child modules; separating these mutually dependent render steps would obscure the generated-file contract. |
 | 748 | `src/workflow/tests/execution.rs` | Retained as the execution-state-machine test matrix sharing one deterministic Workflow fixture. The scenarios assert one ordered claim/start/settle evidence protocol; dividing the matrix would duplicate fixture mutation and make missing state transitions harder to see. |

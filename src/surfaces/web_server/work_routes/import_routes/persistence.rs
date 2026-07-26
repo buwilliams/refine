@@ -101,152 +101,37 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let draft_total = drafts.len();
-        let service = self.work_item_service(&refine_dir);
-        let mut failures = Vec::new();
-        let mut feature_response = serde_json::Value::Null;
-        let feature_id = match import_destination_feature_id(&service, &body) {
-            Ok(feature) => {
-                feature_response = feature
-                    .as_ref()
-                    .map(feature_import_response)
-                    .unwrap_or(serde_json::Value::Null);
-                feature.map(|feature| feature.feature.id)
-            }
-            Err(error) => {
-                failures.push(json!({
-                    "index": 0,
-                    "name": "feature",
-                    "message": error.to_string()
-                }));
-                None
-            }
+        let destination = import_feature_destination(&body);
+        let mut observer = WebImportPersistObserver {
+            registry,
+            operation_id,
         };
-        let mut created_goal_ids = Vec::new();
-        let mut duplicate_actions = ImportDuplicateActions::default();
-        if failures.is_empty() {
-            let mut context = ImportPersistContext {
-                feature_id: feature_id.as_deref(),
-                registry,
-                operation_id,
-                created_goal_ids: &mut created_goal_ids,
-                duplicate_actions: &mut duplicate_actions,
-            };
-            match self.persist_import_drafts_incrementally(&service, drafts, &mut context) {
-                Ok(()) => {}
-                Err(ImportPersistWorkerError::Cancelled) => {
-                    rollback_import_goals(&service, &created_goal_ids);
-                    if let Err(error) = self.refresh_projection_cache_after_mutation() {
-                        let _ = registry.fail_with_error(
-                            operation_id,
-                            json!({
-                                "code": "projection_refresh_failed",
-                                "message": error.to_string()
-                            }),
-                        );
-                        return error_response(error);
-                    }
-                    let _ = registry.update_progress(
+        let service = FileImportService::new(&refine_dir);
+        match service.persist_with_destination(drafts, destination, &mut observer) {
+            Ok(result) => self.import_persist_success_response(&refine_dir, result),
+            Err(failure) if failure.kind == ImportPersistFailureKind::Cancelled => {
+                if let Err(error) = self.refresh_projection_cache_after_mutation() {
+                    let _ = registry.fail_with_error(
                         operation_id,
                         json!({
-                            "message": "Import cancelled",
-                            "completed": 0,
-                            "total": draft_total
+                            "code": "projection_refresh_failed",
+                            "message": error.to_string()
                         }),
                     );
-                    return ApiResponse::json(499, json!({"cancelled": true}));
+                    return error_response(error);
                 }
-                Err(ImportPersistWorkerError::Failed(error)) => {
-                    failures.push(json!({
-                        "index": 0,
-                        "name": "import",
-                        "message": error.to_string()
-                    }));
-                }
+                let _ = registry.update_progress(
+                    operation_id,
+                    json!({
+                        "message": "Import cancelled",
+                        "completed": 0,
+                        "total": draft_total
+                    }),
+                );
+                ApiResponse::json(499, json!({"cancelled": true}))
             }
+            Err(failure) => self.import_persist_failure_response(failure),
         }
-        let mut promoted = 0;
-        if failures.is_empty() {
-            match self.promote_backlog_after_mutation() {
-                Ok(count) => promoted = count,
-                Err(error) => failures.push(json!({
-                    "index": 0,
-                    "name": "workflow",
-                    "message": error.to_string()
-                })),
-            }
-        }
-        let created = created_goal_ids
-            .iter()
-            .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
-            .collect::<Vec<_>>();
-        if let Some(feature_id) = feature_id.as_deref()
-            && let Ok(feature) = service.show_feature_summary(feature_id)
-        {
-            feature_response = feature_import_response(&feature);
-        }
-
-        ApiResponse::json(
-            if failures.is_empty() { 201 } else { 207 },
-            json!({
-                "ok": failures.is_empty(),
-                "count": created.len(),
-                "created": created,
-                "goals": created.iter().map(|goal| &goal.goal).collect::<Vec<_>>(),
-                "promoted": promoted,
-                "failures": failures,
-                "duplicate_actions": duplicate_actions.to_json(),
-                "feature": feature_response
-            }),
-        )
-    }
-
-    pub(super) fn persist_import_drafts_incrementally(
-        &self,
-        service: &FileWorkItemService,
-        drafts: Vec<ImportDraft>,
-        context: &mut ImportPersistContext<'_>,
-    ) -> Result<(), ImportPersistWorkerError> {
-        if let Some(feature_id) = context.feature_id {
-            service
-                .show_feature_summary(feature_id)
-                .map_err(ImportPersistWorkerError::Failed)?;
-        }
-        let total = drafts.len();
-        let mut created_drafts = Vec::new();
-        for draft in drafts {
-            if import_operation_cancelled(context.registry, context.operation_id) {
-                return Err(ImportPersistWorkerError::Cancelled);
-            }
-            if let Some(goal_id) = persist_import_draft_with_duplicate_decision(
-                service,
-                &draft,
-                context.feature_id,
-                context.duplicate_actions,
-                context.created_goal_ids,
-                &mut created_drafts,
-            )
-            .map_err(ImportPersistWorkerError::Failed)?
-            {
-                let _ = goal_id;
-            }
-            let _ = context.registry.update_progress(
-                context.operation_id,
-                json!({
-                    "message": "Saving import",
-                    "completed": context.created_goal_ids.len(),
-                    "total": total
-                }),
-            );
-            thread::sleep(Duration::from_millis(5));
-        }
-        if import_operation_cancelled(context.registry, context.operation_id) {
-            return Err(ImportPersistWorkerError::Cancelled);
-        }
-        if let Some(feature_id) = context.feature_id {
-            order_feature_dependency_drafts(service, feature_id, &created_drafts)
-                .map_err(ImportPersistWorkerError::Failed)?;
-        }
-        Ok(())
     }
 
     pub(crate) fn promote_backlog_after_mutation(&self) -> Result<usize, RefineError> {
@@ -264,96 +149,44 @@ impl InProcessWebServer {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),
         };
-        let service = self.work_item_service(&refine_dir);
+        let destination = import_feature_destination(&body);
+        let service = FileImportService::new(&refine_dir);
+        match service.persist_with_destination(drafts, destination, &mut ()) {
+            Ok(result) => self.import_persist_success_response(&refine_dir, result),
+            Err(failure) => self.import_persist_failure_response(failure),
+        }
+    }
+
+    fn import_persist_success_response(
+        &self,
+        refine_dir: &std::path::Path,
+        result: crate::tools::product::imports::ImportPersistResult,
+    ) -> ApiResponse {
+        let service = self.work_item_service(refine_dir);
         let mut failures = Vec::new();
-        let mut feature_response = serde_json::Value::Null;
-        let feature_id = match import_destination_feature_id(&service, &body) {
-            Ok(feature) => {
-                feature_response = feature
-                    .as_ref()
-                    .map(feature_import_response)
-                    .unwrap_or(serde_json::Value::Null);
-                feature.map(|feature| feature.feature.id)
-            }
+        let promoted = match self.promote_backlog_after_mutation() {
+            Ok(count) => count,
             Err(error) => {
                 failures.push(json!({
                     "index": 0,
-                    "name": "feature",
-                    "message": error.to_string()
-                }));
-                None
-            }
-        };
-        let import_result = if failures.is_empty() {
-            let mut goal_ids = Vec::new();
-            let mut created_drafts = Vec::new();
-            let mut duplicate_actions = ImportDuplicateActions::default();
-            let result: Result<crate::tools::product::imports::ImportPersistResult, RefineError> =
-                (|| {
-                    if let Some(feature_id) = feature_id.as_deref() {
-                        service.show_feature_summary(feature_id)?;
-                    }
-                    for draft in drafts {
-                        if let Some(goal_id) = persist_import_draft_with_duplicate_decision(
-                            &service,
-                            &draft,
-                            feature_id.as_deref(),
-                            &mut duplicate_actions,
-                            &mut goal_ids,
-                            &mut created_drafts,
-                        )? {
-                            let _ = goal_id;
-                        }
-                    }
-                    if let Some(feature_id) = feature_id.as_deref() {
-                        order_feature_dependency_drafts(&service, feature_id, &created_drafts)?;
-                    }
-                    Ok(crate::tools::product::imports::ImportPersistResult {
-                        created: goal_ids.len(),
-                        goal_ids,
-                        feature_id: feature_id.clone(),
-                    })
-                })();
-            match result {
-                Ok(result) => Some((result, duplicate_actions)),
-                Err(error) => {
-                    failures.push(json!({
-                        "index": 0,
-                        "name": "import",
-                        "message": error.to_string()
-                    }));
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        let mut promoted = 0;
-        if failures.is_empty() {
-            match self.promote_backlog_after_mutation() {
-                Ok(count) => promoted = count,
-                Err(error) => failures.push(json!({
-                    "index": 0,
                     "name": "workflow",
                     "message": error.to_string()
-                })),
+                }));
+                0
             }
-        }
-        let created = import_result
+        };
+        let created = result
+            .goal_ids
+            .iter()
+            .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
+            .collect::<Vec<_>>();
+        let feature = result
+            .feature_id
+            .as_deref()
+            .and_then(|feature_id| service.show_feature_summary(feature_id).ok())
             .as_ref()
-            .map(|(result, _)| {
-                result
-                    .goal_ids
-                    .iter()
-                    .filter_map(|goal_id| service.show_goal_summary(goal_id).ok())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        if let Some(feature_id) = feature_id.as_deref()
-            && let Ok(feature) = service.show_feature_summary(feature_id)
-        {
-            feature_response = feature_import_response(&feature);
-        }
+            .map(feature_import_response)
+            .unwrap_or(Value::Null);
 
         ApiResponse::json(
             if failures.is_empty() { 201 } else { 207 },
@@ -364,11 +197,36 @@ impl InProcessWebServer {
                 "goals": created.iter().map(|goal| &goal.goal).collect::<Vec<_>>(),
                 "promoted": promoted,
                 "failures": failures,
-                "duplicate_actions": import_result
-                    .as_ref()
-                    .map(|(_, actions)| actions.to_json())
-                    .unwrap_or_else(|| ImportDuplicateActions::default().to_json()),
-                "feature": feature_response
+                "duplicate_actions": result.duplicate_actions,
+                "feature": feature
+            }),
+        )
+    }
+
+    fn import_persist_failure_response(
+        &self,
+        failure: crate::tools::product::imports::ImportPersistFailure,
+    ) -> ApiResponse {
+        let message = failure
+            .error
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "import persistence was cancelled".to_string());
+        ApiResponse::json(
+            207,
+            json!({
+                "ok": false,
+                "count": 0,
+                "created": [],
+                "goals": [],
+                "promoted": 0,
+                "failures": [{
+                    "index": failure.failed_index.unwrap_or(0),
+                    "name": failure.failed_name.unwrap_or_else(|| "import".to_string()),
+                    "message": message
+                }],
+                "duplicate_actions": failure.duplicate_actions,
+                "feature": Value::Null
             }),
         )
     }

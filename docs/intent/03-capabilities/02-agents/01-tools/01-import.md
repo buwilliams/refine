@@ -40,7 +40,12 @@ Current implementation details that matter to intent:
 - Plan/spec-like extraction uses broader planning guidance before producing ordinary drafts;
 - CSV, issue-list, and simple AI extraction remain direct draft creation paths;
 - background extraction should be visible through operations and System notices;
-- final persistence should use shared Goal and Feature creation behavior.
+- one product import-persistence capability owns duplicate decisions, Goal and
+  Feature mutation, dependency ordering, progress/cancellation, created-record
+  accounting, and rollback evidence;
+- direct CLI imports and daemon-backed CLI/browser/API imports delegate to that
+  same persistence capability, while surfaces retain only input parsing,
+  operation lifecycle, projection refresh, and response formatting.
 
 ## Future Direction
 

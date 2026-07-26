@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::thread;
-use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -24,8 +23,8 @@ use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::imports::{
-    FileImportService, ImportDraft, import_drafts_from_value, import_extraction_prompt,
-    order_feature_dependency_drafts, parse_provider_import_result, parse_structured_import_result,
+    FileImportService, ImportPersistFailureKind, import_drafts_from_value,
+    import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
     validate_import_extraction_result,
 };
 use crate::tools::product::merging::FileMergerService;
@@ -91,10 +90,8 @@ mod tests;
 
 use feature_contract::{feature_detail_response_from_goals, feature_reorder_order_from_body};
 use import_contract::{
-    ImportDuplicateActions, ImportPersistContext, ImportPersistWorkerError,
-    import_extraction_response, import_extraction_text, import_operation_cancelled,
-    import_provider_from_settings, persist_import_draft_with_duplicate_decision,
-    rollback_import_goals,
+    WebImportPersistObserver, import_extraction_response, import_extraction_text,
+    import_provider_from_settings,
 };
 pub(super) use terminal_profiles::terminal_profile_prompt;
 use terminal_profiles::{

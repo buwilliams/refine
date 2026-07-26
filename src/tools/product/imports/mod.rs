@@ -7,8 +7,6 @@ use serde_json::{Map, Value, json};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
-use crate::tools::product::work_items::FileWorkItemService;
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImportDraft {
     pub name: String,
@@ -28,6 +26,12 @@ pub struct ImportPersistResult {
     pub created: usize,
     pub goal_ids: Vec<String>,
     pub feature_id: Option<String>,
+    #[serde(skip_serializing)]
+    pub feature: Option<ImportFeatureIdentity>,
+    #[serde(skip_serializing)]
+    pub duplicate_actions: ImportDuplicateActions,
+    #[serde(skip_serializing)]
+    pub duplicate_outcomes: Vec<ImportDuplicateOutcome>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,10 +75,16 @@ mod csv;
 mod drafts;
 mod extraction;
 mod normalization;
+mod persistence;
 
 pub use drafts::{import_drafts_from_value, order_feature_dependency_drafts};
 pub use extraction::{
     import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
+};
+pub use persistence::{
+    ImportDuplicateActions, ImportDuplicateOutcome, ImportFeatureDestination,
+    ImportFeatureIdentity, ImportPersistFailure, ImportPersistFailureKind, ImportPersistObserver,
+    ImportPersistProgress, ImportRollbackEvidence, persist_import_drafts,
 };
 
 use csv::*;
@@ -211,48 +221,25 @@ impl FileImportService {
         drafts: Vec<ImportDraft>,
         feature_id: Option<&str>,
     ) -> RefineResult<ImportPersistResult> {
-        let work_items = FileWorkItemService::new(&self.refine_dir);
-        let mut goal_ids = Vec::new();
-        let mut created_drafts = Vec::new();
-        if let Some(feature_id) = feature_id {
-            work_items.show_feature_summary(feature_id)?;
-        }
-        for draft in drafts {
-            let goal = work_items.create_goal_summary(&draft.name, None)?;
-            if !draft.prompt.trim().is_empty() {
-                work_items.append_goal_round_summary_with_assignee(
-                    &goal.goal.id,
-                    nonempty_or(&draft.reporter, "Imported"),
-                    draft.assignee.as_deref(),
-                    &draft.prompt,
-                )?;
-            }
-            if goal.goal.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
-                work_items.update_goal_metadata_summary(
-                    &goal.goal.id,
-                    None,
-                    (goal.goal.priority.as_str() != draft.priority)
-                        .then_some(draft.priority.as_str()),
-                    nonempty_option(&draft.reporter),
-                    None,
-                )?;
-            }
-            if let Some(feature_id) = feature_id {
-                work_items.assign_goal_to_feature(feature_id, &goal.goal.id)?;
-            }
-            goal_ids.push(goal.goal.id.clone());
-            created_drafts.push((draft, goal.goal.id));
-        }
-        if let Some(feature_id) = feature_id {
-            order_feature_dependency_drafts(&work_items, feature_id, &created_drafts)?;
-        }
-        Ok(ImportPersistResult {
-            created: goal_ids.len(),
-            goal_ids,
-            feature_id: feature_id.map(str::to_string),
-        })
+        let destination = feature_id
+            .map(str::to_string)
+            .map(ImportFeatureDestination::Existing)
+            .unwrap_or(ImportFeatureDestination::None);
+        self.persist_with_destination(drafts, destination, &mut ())
+            .map_err(ImportPersistFailure::into_refine_error)
+    }
+
+    pub fn persist_with_destination(
+        &self,
+        drafts: Vec<ImportDraft>,
+        destination: ImportFeatureDestination,
+        observer: &mut impl ImportPersistObserver,
+    ) -> Result<ImportPersistResult, ImportPersistFailure> {
+        persist_import_drafts(&self.refine_dir, drafts, destination, observer)
     }
 }
 
+#[cfg(test)]
+mod persistence_tests;
 #[cfg(test)]
 mod tests;
