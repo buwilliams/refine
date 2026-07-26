@@ -1,4 +1,4 @@
-# Promote Dogfood Source
+# Upgrade Refine Source
 
 Outcome: a running Refine source checkout advances to its latest configured
 upstream commit only after the candidate builds, then restarts and reports
@@ -23,7 +23,7 @@ when the running source is current or any promotion precondition is blocked,
 and enabled when the fetched update is safe to promote.
 
 1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
-   and find **Dogfood source** for the detailed status.
+   and find **Upgrade** for the detailed status.
 2. In the detailed view, select **Check for source updates**. Confirm the checkout, current commit,
    upstream remote/branch, and available commit.
 3. If the panel reports a blocker, resolve it without overwriting work and

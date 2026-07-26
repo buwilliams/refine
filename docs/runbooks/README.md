@@ -19,7 +19,7 @@ Runbooks:
 
 - [Install Refine](install.md) — install or update Refine, configure an agent
   provider, start the daemon, and verify the result.
-- [Promote dogfood source](promote-dogfood-source.md) — safely build,
+- [Upgrade Refine source](upgrade-refine-source.md) — safely build,
   fast-forward, and restart a running Refine source checkout from the UI or CLI.
 - [Prepare and publish a release](semantic-release.md) — preview a semantic
   increment, prepare and review the candidate, then explicitly publish it.

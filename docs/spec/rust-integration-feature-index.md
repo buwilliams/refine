@@ -120,7 +120,7 @@ Nav & Guide: Manage Drop-down
 				Runtime upgrade banner (current + latest versions, copy upgrade command)
 			Refine (dev)
 				Semantic releases: version preview, reviewable preparation Goal, persisted activity, explicitly confirmed publication
-				Dogfood source: checkout and upstream status, update check, promotion readiness, promote and restart controls
+				Upgrade: checkout and upstream status, update check, promotion readiness, promote and restart controls
 		Governance (#/project)
 			Tabs: Governance, Quality, Guidance
 			Governance
