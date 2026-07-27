@@ -241,6 +241,9 @@ impl FileProcessControlService {
                 true,
                 goal.as_ref()
                     .map(|settlement| &settlement.worktree_retention),
+                Some(intent),
+                goal.as_ref()
+                    .map(|settlement| settlement.termination_intent),
             )?;
         }
         self.workflow_termination_result(
@@ -253,6 +256,9 @@ impl FileProcessControlService {
                 "worktree_retention": goal.as_ref().map(|settlement| &settlement.worktree_retention)
             }),
             intent,
+            goal.as_ref()
+                .map(|settlement| settlement.termination_intent)
+                .unwrap_or(intent),
         )
     }
 
@@ -384,13 +390,22 @@ impl FileProcessControlService {
                 .is_some(),
             goal.as_ref()
                 .map(|settlement| &settlement.worktree_retention),
+            Some(intent),
+            goal.as_ref()
+                .map(|settlement| settlement.termination_intent),
         )?;
 
         let mut stopped_process = process;
         stopped_process.state = "stopped".to_string();
+        let authoritative_intent = goal
+            .as_ref()
+            .map(|settlement| settlement.termination_intent)
+            .unwrap_or(intent);
         let mut result = json!({
             "stopped": true,
-            "termination_intent": intent,
+            "requested_termination_intent": intent,
+            "termination_intent": authoritative_intent,
+            "intent_superseded": intent != authoritative_intent,
             "process": stopped_process.api_json(),
             "termination": termination
         });
@@ -403,7 +418,11 @@ impl FileProcessControlService {
                 json!(&settlement.worktree_retention),
             );
         }
-        Ok(result)
+        if result.get("goal").is_some() {
+            self.workflow_termination_result(result, intent, authoritative_intent)
+        } else {
+            Ok(result)
+        }
     }
 
     pub(super) fn stop_synthetic_chat(
@@ -567,12 +586,21 @@ impl FileProcessControlService {
                 !workflow_ownership.is_empty(),
                 goal.as_ref()
                     .map(|settlement| &settlement.worktree_retention),
+                Some(intent),
+                goal.as_ref()
+                    .map(|settlement| settlement.termination_intent),
             )?;
         }
         let already_idle = terminations.is_empty();
+        let authoritative_intent = goal
+            .as_ref()
+            .map(|settlement| settlement.termination_intent)
+            .unwrap_or(intent);
         let mut result = json!({
             "stopped": true,
-            "termination_intent": intent,
+            "requested_termination_intent": intent,
+            "termination_intent": authoritative_intent,
+            "intent_superseded": intent != authoritative_intent,
             "process": synthetic_chat_process_value(process_id, &stopped_session),
             "termination": {
                 "confirmed_exit": true,
@@ -590,7 +618,11 @@ impl FileProcessControlService {
                 json!(&settlement.worktree_retention),
             );
         }
-        Ok(result)
+        if result.get("goal").is_some() {
+            self.workflow_termination_result(result, intent, authoritative_intent)
+        } else {
+            Ok(result)
+        }
     }
 
     pub(super) fn terminate_with_retained_outcome(
@@ -617,6 +649,7 @@ impl FileProcessControlService {
                 "process_id": process.id,
                 "goal_id": goal_id,
                 "workflow": ownership.map(workflow_ownership_json),
+                "requested_termination_intent": intent,
                 "termination_intent": intent,
                 "goal_disposition": disposition,
                 "worktree": worktree,
@@ -676,6 +709,7 @@ impl FileProcessControlService {
                 "process_id": process.id,
                 "goal_id": goal_id,
                 "workflow": ownership.map(workflow_ownership_json),
+                "requested_termination_intent": intent,
                 "termination_intent": intent,
                 "goal_disposition": disposition,
                 "worktree": worktree,

@@ -46,6 +46,9 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - stopping an agent keeps the rest of the Toolbar interactive, and an
   authoritative terminal-exit event releases the terminal UI even while
   workflow stop settlement is still finishing;
+- when explicit cancellation already won, Stop reports the terminal cancelled
+  result and retained worktree evidence instead of promising that the Goal
+  returned to todo;
 - resizing remains continuous across terminal status and exit redraws;
 - the Add menu is anchored to its Toolbar control, so it follows the collapsed,
   resized, and fullscreen Toolbar positions;

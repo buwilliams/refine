@@ -27,7 +27,9 @@ Current implementation details that matter to intent:
   claim is released and its Goal returns to todo. Every workflow worktree and
   branch is retained with durable recovery evidence, which the surface reports
   as a successful shared-capability result. Cleanup remains a separate explicit
-  human-controlled operation;
+  human-controlled operation. If explicit cancellation already became durable,
+  the surface reports that terminal result and Stop never promises or performs a
+  requeue;
 - the Goal terminal Stop control resolves the attached managed process and uses
   the same confirmed-exit, Goal, claim, and capacity settlement response as the
   Processes API rather than a terminal-specific Goal-Agent signal path;

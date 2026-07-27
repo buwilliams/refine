@@ -33,7 +33,9 @@ When a Goal enters implementation, Refine:
   under its pinned Node owner, and retains every implementation worktree and
   branch with durable recovery evidence. This successful retention is visible
   through shared Process results; cleanup is a separate explicit
-  human-controlled operation.
+  human-controlled operation. A prior or racing explicit Goal cancellation
+  remains terminal: Stop can settle remaining execution resources but never
+  resurrects the Goal as todo.
 
 The completion and needs-input signals are control state, not a replacement transcript protocol. Durable product truth remains in Goal records, Git changes, logs, governance, quality evidence, and workflow state.
 

@@ -383,6 +383,67 @@ fn cancel_goal_without_active_claim_uses_explicit_cancellation_intent() {
 }
 
 #[test]
+fn bulk_cancellation_and_interactive_stop_are_monotonic_in_both_orderings() {
+    let temp_root = unique_temp_dir("process-control-bulk-stop-orderings");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let control = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir);
+
+    let stop_first_goal = "GOAL-STOP-THEN-BULK";
+    create_in_progress_goal(&refine_dir, stop_first_goal);
+    let stop_first_process = launch_agent(&supervisor, stop_first_goal, None);
+    let stopped = control.stop(&stop_first_process.id, "terminate").unwrap();
+    assert_eq!(stopped["goal"]["status"], "todo");
+    let bulk_after_stop = control
+        .bulk_cancel_goals(BulkGoalSelection {
+            selected_ids: Some(vec![stop_first_goal.to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(bulk_after_stop.updated, 1);
+    assert_eq!(
+        work_items
+            .show_goal_summary(stop_first_goal)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+
+    let bulk_first_goal = "GOAL-BULK-THEN-STOP";
+    create_in_progress_goal(&refine_dir, bulk_first_goal);
+    work_items.cancel_goal_summary(bulk_first_goal).unwrap();
+    let bulk_first_process = launch_agent(&supervisor, bulk_first_goal, None);
+    let bulk_before_stop = control
+        .bulk_cancel_goals(BulkGoalSelection {
+            selected_ids: Some(vec![bulk_first_goal.to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(bulk_before_stop.updated, 1);
+    assert!(managed_pid_is_alive(bulk_first_process.pid.unwrap()).unwrap());
+    let stopped_after_bulk = control.stop(&bulk_first_process.id, "terminate").unwrap();
+    assert_eq!(stopped_after_bulk["stopped"], true);
+    assert_eq!(
+        stopped_after_bulk["termination_intent"],
+        "explicit_cancellation"
+    );
+    assert_eq!(stopped_after_bulk["goal"]["status"], "cancelled");
+    assert_eq!(
+        work_items
+            .show_goal_summary(bulk_first_goal)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn cancel_goal_partial_failure_never_reports_cancelled_success() {
     let temp_root = unique_temp_dir("process-control-goal-cancel-partial");
     let runtime_root = temp_root.join("run/8080");

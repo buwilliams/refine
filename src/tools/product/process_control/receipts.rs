@@ -9,6 +9,8 @@ impl FileProcessControlService {
         goal_status: Option<&GoalStatus>,
         claim_cancelled: bool,
         worktree_retention: Option<&WorkflowWorktreeRetention>,
+        requested_intent: Option<TerminationIntent>,
+        termination_intent: Option<TerminationIntent>,
     ) -> RefineResult<()> {
         let retained = fs::read(
             self.runtime_root
@@ -23,7 +25,7 @@ impl FileProcessControlService {
         let disposition = retained
             .as_ref()
             .and_then(|receipt| receipt.get("goal_disposition").cloned());
-        let termination_intent = retained
+        let retained_termination_intent = retained
             .as_ref()
             .and_then(|receipt| receipt.get("termination_intent").cloned())
             .or_else(|| {
@@ -33,6 +35,21 @@ impl FileProcessControlService {
                     .map(TerminationIntent::from_legacy_disposition)
                     .map(|intent| json!(intent))
             });
+        let retained_requested_intent = retained
+            .as_ref()
+            .and_then(|receipt| receipt.get("requested_termination_intent").cloned())
+            .or_else(|| retained_termination_intent.clone());
+        let termination_intent = termination_intent
+            .map(|intent| json!(intent))
+            .or(retained_termination_intent);
+        let requested_intent = requested_intent
+            .map(|intent| json!(intent))
+            .or(retained_requested_intent);
+        let authoritative_disposition = termination_intent
+            .clone()
+            .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
+            .map(|intent| json!(intent.disposition()))
+            .or(disposition);
         let worktree = retained
             .as_ref()
             .and_then(|receipt| receipt.get("worktree").cloned());
@@ -52,8 +69,9 @@ impl FileProcessControlService {
                 "process_id": process_id,
                 "goal_id": goal_id,
                 "workflow": workflow,
+                "requested_termination_intent": requested_intent,
                 "termination_intent": termination_intent,
-                "goal_disposition": disposition,
+                "goal_disposition": authoritative_disposition,
                 "worktree": worktree,
                 "recorded_at": Utc::now().to_rfc3339(),
                 "termination": termination,
@@ -118,6 +136,10 @@ impl FileProcessControlService {
                     .map(TerminationIntent::from_legacy_disposition)
                     .map(|intent| json!(intent))
             });
+        let retained_requested_intent = retained_context
+            .as_ref()
+            .and_then(|receipt| receipt.get("requested_termination_intent").cloned())
+            .or_else(|| retained_intent.clone());
         let retained_worktree = retained_context
             .as_ref()
             .and_then(|receipt| receipt.get("worktree").cloned());
@@ -131,12 +153,49 @@ impl FileProcessControlService {
                     .flatten()
                     .map(|(_, journal)| journal)
             });
-        let goal_cancelled = settlement
+        let settlement_intent = settlement
             .as_ref()
-            .is_some_and(|journal| journal.goal_cancelled);
-        let goal_requeued = settlement
+            .and_then(|journal| journal.termination_intent)
+            .map(|intent| json!(intent))
+            .or(retained_intent);
+        let settlement_requested_intent = settlement
             .as_ref()
-            .is_some_and(|journal| journal.goal_requeued);
+            .and_then(|journal| journal.requested_termination_intent)
+            .map(|intent| json!(intent))
+            .or(retained_requested_intent);
+        let authoritative_disposition = settlement_intent
+            .clone()
+            .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
+            .map(|intent| json!(intent.disposition()))
+            .or(retained_disposition.clone());
+        let durable_goal_status = goal_id
+            .and_then(|goal_id| {
+                self.refine_dir
+                    .as_deref()
+                    .map(|refine_dir| (refine_dir, goal_id))
+            })
+            .and_then(|(refine_dir, goal_id)| {
+                FileWorkItemService::new(refine_dir)
+                    .show_goal_summary(goal_id)
+                    .ok()
+                    .map(|goal| goal.goal.status)
+            });
+        let goal_cancelled = durable_goal_status
+            .as_ref()
+            .map(|status| *status == GoalStatus::Cancelled)
+            .unwrap_or_else(|| {
+                settlement
+                    .as_ref()
+                    .is_some_and(|journal| journal.goal_cancelled)
+            });
+        let goal_requeued = durable_goal_status
+            .as_ref()
+            .map(|status| *status == GoalStatus::Todo)
+            .unwrap_or_else(|| {
+                settlement
+                    .as_ref()
+                    .is_some_and(|journal| journal.goal_requeued)
+            });
         let claim_cancelled = settlement
             .as_ref()
             .is_some_and(|journal| journal.claim_cancelled);
@@ -152,7 +211,9 @@ impl FileProcessControlService {
             retained_worktrees.push(worktree);
         }
         let retention = WorkflowWorktreeRetention::from_targets(&retained_worktrees);
-        let recovery = if retained_disposition.as_ref().and_then(Value::as_str) == Some("requeue") {
+        let recovery = if settlement_intent.as_ref().and_then(Value::as_str)
+            == Some("interactive_stop")
+        {
             "inspect the retained process and settlement receipts; retry Stop for the retained process id through the shared Process capability, which preserves the original interactive requeue and retained-worktree intent"
         } else {
             "inspect the retained process and settlement receipts; retry explicit Goal or workflow cancellation through the shared Process capability"
@@ -162,8 +223,9 @@ impl FileProcessControlService {
             "process_id": process_id,
             "goal_id": goal_id,
             "workflow": retained_workflow,
-            "termination_intent": retained_intent,
-            "goal_disposition": retained_disposition,
+            "requested_termination_intent": settlement_requested_intent,
+            "termination_intent": settlement_intent,
+            "goal_disposition": authoritative_disposition,
             "worktree": retained_worktree,
             "recorded_at": Utc::now().to_rfc3339(),
             "termination": termination,
@@ -172,6 +234,7 @@ impl FileProcessControlService {
             "identity_cleanup_completed": identity_cleanup,
             "goal_cancelled": goal_cancelled,
             "goal_requeued": goal_requeued,
+            "goal_status": durable_goal_status.map(|status| status.as_str().to_string()),
             "claim_cancelled": claim_cancelled,
             "worktree_retention": &retention,
             "cause": cause_message,

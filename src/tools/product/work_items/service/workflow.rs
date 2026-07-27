@@ -303,6 +303,7 @@ impl FileWorkItemService {
         original: &Value,
         settled: &Value,
         restored: Option<&Value>,
+        superseded: Option<&Value>,
     ) -> RefineResult<GoalCancellationTransaction> {
         let goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
@@ -314,6 +315,8 @@ impl FileWorkItemService {
             restored.expect("restored Goal replay state was checked")
         } else if &current_value == settled {
             original
+        } else if superseded.is_some_and(|superseded| current_value == *superseded) {
+            superseded.expect("superseded Goal replay state was checked")
         } else {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} changed outside the interrupted cancellation settlement; replay did not overwrite the newer Goal state"

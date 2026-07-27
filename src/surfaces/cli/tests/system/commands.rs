@@ -171,6 +171,60 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
         GoalStatus::Todo
     );
 
+    work_items
+        .create_goal_summary("CLI cancelled process stop", Some("GOAL-NESTED-CANCELLED"))
+        .unwrap();
+    work_items
+        .cancel_goal_summary("GOAL-NESTED-CANCELLED")
+        .unwrap();
+    let cancelled_process = agent_supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
+            } else {
+                vec!["30".to_string()]
+            },
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::Map::from_iter([(
+                "goal_id".to_string(),
+                serde_json::json!("GOAL-NESTED-CANCELLED"),
+            )]),
+        })
+        .unwrap();
+    let cancelled_stop = system_ps_response(
+        runtime_root.clone(),
+        Some(port),
+        Some(&cancelled_process.id),
+        "terminate",
+    )
+    .unwrap();
+    assert_eq!(cancelled_stop["stopped"], true);
+    assert_eq!(
+        cancelled_stop["requested_termination_intent"],
+        "interactive_stop"
+    );
+    assert_eq!(
+        cancelled_stop["termination_intent"],
+        "explicit_cancellation"
+    );
+    assert_eq!(cancelled_stop["cancelled"], true);
+    assert_eq!(cancelled_stop["goal"]["status"], "cancelled");
+    assert_eq!(
+        work_items
+            .show_goal_summary("GOAL-NESTED-CANCELLED")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+
     let missing = system_ps_response(
         runtime_root.clone(),
         Some(port),

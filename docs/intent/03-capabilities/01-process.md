@@ -43,7 +43,12 @@ Current implementation details that matter to intent:
   explicit authoritative input to the shared capability: interactive user Stop
   requeues, while explicit Goal or workflow cancellation remains terminal
   cancelled. Process discovery and claim presence are settlement evidence, never
-  a source for guessing that intent.
+  a source for guessing that intent. Explicit cancellation has monotonic
+  precedence: when durable Goal state is already cancelled, or becomes cancelled
+  after Stop preflight, Stop may finish process, operation, claim, and capacity
+  settlement but cannot return the Goal to todo. Journals, process receipts,
+  replay, partial evidence, and surface results record the requested intent
+  separately from the authoritative intent so recovery preserves that precedence.
   Workflow spawn-to-registration and cancellation share one execution fence:
   an empty target-bound process lookup is never treated as exit evidence, and a
   delayed worker cannot launch after its exact claim has settled.

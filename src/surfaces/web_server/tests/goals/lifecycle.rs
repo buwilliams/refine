@@ -385,3 +385,66 @@ fn public_goal_cancel_api_reports_managed_no_claim_goal_as_durably_cancelled() {
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn public_process_stop_api_does_not_requeue_already_cancelled_goal() {
+    let temp_root = unique_temp_dir("http-process-stop-cancelled-no-claim");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    let goal_id = "GOAL-API-STOP-CANCELLED";
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Stop cancelled managed Goal", Some(goal_id))
+        .unwrap();
+    work_items.cancel_goal_summary(goal_id).unwrap();
+    let process = FileProcessSupervisor::new(runtime_root.join("agents"))
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "ping -n 300 127.0.0.1 >NUL".to_string()]
+            } else {
+                vec!["300".to_string()]
+            },
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::Map::from_iter([
+                ("kind".to_string(), json!("interactive_session")),
+                ("provider".to_string(), json!("smoke-ai")),
+                ("goal_id".to_string(), json!(goal_id)),
+            ]),
+        })
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/processes/{}/stop", process.id),
+        body: Some(json!({"signal": "terminate"})),
+    });
+
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["stopped"], true);
+    assert_eq!(
+        stopped.body["requested_termination_intent"],
+        "interactive_stop"
+    );
+    assert_eq!(stopped.body["termination_intent"], "explicit_cancellation");
+    assert_eq!(stopped.body["intent_superseded"], true);
+    assert_eq!(stopped.body["cancelled"], true);
+    assert_eq!(stopped.body["goal"]["status"], "cancelled");
+    assert_eq!(
+        work_items.show_goal_summary(goal_id).unwrap().goal.status,
+        GoalStatus::Cancelled
+    );
+    assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+
+    remove_temp_dir(&temp_root);
+}

@@ -19,6 +19,8 @@ pub(super) struct CancellationSettlementJournal {
     pub(super) goal_disposition: GoalStopDisposition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) termination_intent: Option<TerminationIntent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) requested_termination_intent: Option<TerminationIntent>,
     #[serde(default)]
     pub(super) worktrees: Vec<WorkflowWorktree>,
     pub(super) recorded_at: String,
@@ -55,17 +57,43 @@ impl FileProcessControlService {
         goal_id: &str,
         expectation: &GoalCancellationExpectation,
         ownership: &[WorkflowGoalOwnership],
-        intent: TerminationIntent,
+        requested_intent: TerminationIntent,
         worktrees: &[WorkflowWorktree],
     ) -> RefineResult<GoalStopSettlement> {
-        let disposition = intent.disposition();
         let _coordination = acquire_workflow_coordination(refine_dir)?;
         let workflow = WorkflowEngine::new(&self.runtime_root);
         let _workflow_lock = workflow.acquire_state_mutation_lock()?;
         let work_items = FileWorkItemService::for_node(refine_dir, &expectation.node_id);
+        let current = work_items.show_goal_summary(goal_id)?;
+        let termination_intent =
+            requested_intent.authoritative_for_goal_status(&current.goal.status);
+        let disposition = termination_intent.disposition();
+        let authoritative_expectation = if termination_intent != requested_intent {
+            let current_node_id = current
+                .goal
+                .node_id
+                .clone()
+                .filter(|node_id| !node_id.is_empty())
+                .unwrap_or_else(|| "default".to_string());
+            if current.goal.round_count != expectation.round_count
+                || current_node_id != expectation.node_id
+            {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {goal_id} ownership changed before terminal cancellation precedence could be applied; the Goal was not requeued"
+                )));
+            }
+            GoalCancellationExpectation {
+                status: current.goal.status,
+                round_count: current.goal.round_count,
+                updated: current.goal.updated,
+                node_id: current_node_id,
+            }
+        } else {
+            expectation.clone()
+        };
         let mut goal_transaction = work_items.prepare_goal_cancellation_if_current(
             goal_id,
-            expectation,
+            &authoritative_expectation,
             disposition.goal_status(),
         )?;
         let state = workflow.load_state()?;
@@ -118,7 +146,7 @@ impl FileProcessControlService {
         let worktree_retention = WorkflowWorktreeRetention::from_targets(worktrees);
         let receipt_path = self.cancellation_settlement_receipt_path(goal_id, &claim_ids);
         let mut journal = CancellationSettlementJournal {
-            schema_version: 5,
+            schema_version: 6,
             state: "prepared".to_string(),
             goal_id: goal_id.to_string(),
             claim_ids: claim_ids.clone(),
@@ -130,7 +158,8 @@ impl FileProcessControlService {
             goal_before,
             goal_after,
             goal_disposition: disposition,
-            termination_intent: Some(intent),
+            termination_intent: Some(termination_intent),
+            requested_termination_intent: Some(requested_intent),
             worktrees: worktree_retention.worktrees.clone(),
             recorded_at: Utc::now().to_rfc3339(),
             goal_cancelled: false,
@@ -268,6 +297,8 @@ impl FileProcessControlService {
         Ok(GoalStopSettlement {
             goal: goal_transaction.projection()?,
             worktree_retention,
+            requested_intent,
+            termination_intent,
         })
     }
 
@@ -326,7 +357,13 @@ impl FileProcessControlService {
         let journal_intent = journal.termination_intent.unwrap_or_else(|| {
             TerminationIntent::from_legacy_disposition(journal.goal_disposition)
         });
-        if journal.state == "committed" && journal_intent != requested_intent {
+        let recorded_requested_intent = journal
+            .requested_termination_intent
+            .unwrap_or(journal_intent);
+        if journal.state == "committed"
+            && journal_intent == TerminationIntent::InteractiveStop
+            && requested_intent == TerminationIntent::ExplicitCancellation
+        {
             return Ok(None);
         }
 
@@ -340,28 +377,48 @@ impl FileProcessControlService {
             .filter(|node_id| !node_id.is_empty())
             .unwrap_or("default");
         let work_items = FileWorkItemService::for_node(refine_dir, node_id);
+        let durable_goal = work_items.show_goal_summary(&journal.goal_id)?;
+        let authoritative_intent = if journal.state == "committed" {
+            journal_intent
+        } else {
+            journal_intent
+                .with_authoritative_precedence(requested_intent)
+                .authoritative_for_goal_status(&durable_goal.goal.status)
+        };
         let replay_goal_before = journal
             .replay_goal_before
             .as_ref()
             .unwrap_or(&journal.goal_before)
             .clone();
-        let replay_goal_after = journal
+        let prior_replay_goal_after = journal
             .replay_goal_after
             .as_ref()
             .unwrap_or(&journal.goal_after)
             .clone();
+        let replay_goal_after = if authoritative_intent != journal_intent {
+            goal_value_with_status(
+                prior_replay_goal_after.clone(),
+                authoritative_intent.expected_goal_status(),
+            )?
+        } else {
+            prior_replay_goal_after.clone()
+        };
         let mut goal_transaction = work_items.prepare_goal_cancellation_replay(
             &journal.goal_id,
             &replay_goal_before,
             &replay_goal_after,
             journal.rollback_goal_state.as_ref(),
+            (authoritative_intent != journal_intent).then_some(&prior_replay_goal_after),
         )?;
         let exact_replay_before = goal_transaction.original_value();
         let exact_replay_after = goal_transaction.settled_value();
-        let schema_upgrade_required = journal.schema_version < 5;
-        journal.schema_version = 5;
-        journal.termination_intent = Some(journal_intent);
+        let schema_upgrade_required = journal.schema_version < 6;
+        journal.schema_version = 6;
+        journal.goal_disposition = authoritative_intent.disposition();
+        journal.termination_intent = Some(authoritative_intent);
+        journal.requested_termination_intent = Some(recorded_requested_intent);
         if schema_upgrade_required
+            || authoritative_intent != journal_intent
             || journal.replay_goal_before.as_ref() != Some(&exact_replay_before)
             || journal.replay_goal_after.as_ref() != Some(&exact_replay_after)
         {
@@ -477,24 +534,12 @@ impl FileProcessControlService {
                         Some(&goal.status),
                         true,
                         Some(&worktree_retention),
+                        Some(recorded_requested_intent),
+                        Some(authoritative_intent),
                     )?;
                     terminations.push(recovered.termination);
                 }
             }
-        }
-        if journal_intent != requested_intent {
-            if requested_intent == TerminationIntent::ExplicitCancellation
-                && journal_intent == TerminationIntent::InteractiveStop
-            {
-                return Ok(None);
-            }
-            return Err(RefineError::Conflict(format!(
-                "settlement journal {} completed {:?}, not requested {:?}; durable Goal status is {}",
-                receipt_path.display(),
-                journal_intent,
-                requested_intent,
-                goal.status.as_str()
-            )));
         }
         let mut result = json!({
             "execution_id": execution_id,
@@ -505,10 +550,13 @@ impl FileProcessControlService {
             "goal_requeued": goal.status == GoalStatus::Todo,
             "worktree_retention": worktree_retention,
             "replayed_settlement": true,
-            "termination_intent": journal_intent
+            "settled_after_claim_cancellation": true,
+            "requested_termination_intent": requested_intent,
+            "termination_intent": authoritative_intent,
+            "intent_superseded": requested_intent != authoritative_intent
         });
         if let Some(object) = result.as_object_mut() {
-            match journal_intent {
+            match requested_intent {
                 TerminationIntent::ExplicitCancellation => {
                     object.insert(
                         "cancelled".to_string(),
@@ -517,6 +565,12 @@ impl FileProcessControlService {
                 }
                 TerminationIntent::InteractiveStop => {
                     object.insert("stopped".to_string(), json!(true));
+                    if authoritative_intent == TerminationIntent::ExplicitCancellation {
+                        object.insert(
+                            "cancelled".to_string(),
+                            json!(goal.status == GoalStatus::Cancelled),
+                        );
+                    }
                 }
             }
         }
@@ -657,7 +711,7 @@ impl FileProcessControlService {
             })?;
             if !matches!(
                 value.get("schema_version").and_then(Value::as_u64),
-                Some(2 | 3 | 4 | 5)
+                Some(2 | 3 | 4 | 5 | 6)
             ) {
                 continue;
             }
@@ -759,4 +813,21 @@ impl FileProcessControlService {
         let _ = stage;
         Ok(())
     }
+}
+
+fn goal_value_with_status(mut goal: Value, status: GoalStatus) -> RefineResult<Value> {
+    let object = goal.as_object_mut().ok_or_else(|| {
+        RefineError::Serialization(
+            "cancellation settlement Goal replay state must be an object".to_string(),
+        )
+    })?;
+    object.insert(
+        "status".to_string(),
+        Value::String(status.as_str().to_string()),
+    );
+    object.insert(
+        "updated".to_string(),
+        Value::String(Utc::now().to_rfc3339()),
+    );
+    Ok(goal)
 }

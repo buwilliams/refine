@@ -938,7 +938,43 @@ test("Goal Stop surfaces successful retained-worktree evidence", async () => {
 
   assert.equal(browser.runtime.terminal("GOAL-PARTIAL").exited, true);
   assert.deepEqual(Array.from(browser.runtime.toasts().at(-1)), [
-    "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+    "Agent stopped. Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+    "info",
+  ]);
+});
+
+test("Goal Stop reports when explicit cancellation supersedes requeue", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "goal-cancelled-session",
+        process_id: "goal-cancelled-process",
+        cwd: "/repo/worktree",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) {
+      return {
+        stopped: true,
+        requested_termination_intent: "interactive_stop",
+        termination_intent: "explicit_cancellation",
+        intent_superseded: true,
+        worktree_retention: { retained: true },
+        goal: { id: "GOAL-CANCELLED", status: "cancelled" },
+        termination: { confirmed_exit: true },
+      };
+    }
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  await browser.runtime.openGoal("GOAL-CANCELLED");
+  await browser.runtime.stop("GOAL-CANCELLED");
+
+  assert.equal(browser.runtime.terminal("GOAL-CANCELLED").exited, true);
+  assert.deepEqual(Array.from(browser.runtime.toasts().at(-1)), [
+    "Agent stopped. Explicit Goal cancellation remains terminal. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
     "info",
   ]);
 });

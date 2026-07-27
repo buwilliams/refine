@@ -936,8 +936,11 @@ function bindSettingsProcessesTab(s) {
             signal: "terminate",
           });
           if (stopped?.worktree_retention?.retained) {
+            const goalOutcome = stopped?.goal?.status === "cancelled"
+              ? "Explicit Goal cancellation remains terminal."
+              : "Goal returned to todo.";
             toast(
-              "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+              `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`,
               "info",
             );
           }

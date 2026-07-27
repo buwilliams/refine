@@ -52,6 +52,24 @@ impl TerminationIntent {
             GoalStopDisposition::Requeue => Self::InteractiveStop,
         }
     }
+
+    /// Resolves the durable Goal outcome without allowing an interactive request to weaken
+    /// terminal explicit cancellation.
+    pub(super) fn authoritative_for_goal_status(self, status: &GoalStatus) -> Self {
+        if self == Self::InteractiveStop && *status == GoalStatus::Cancelled {
+            Self::ExplicitCancellation
+        } else {
+            self
+        }
+    }
+
+    pub(super) fn with_authoritative_precedence(self, other: Self) -> Self {
+        if self == Self::ExplicitCancellation || other == Self::ExplicitCancellation {
+            Self::ExplicitCancellation
+        } else {
+            Self::InteractiveStop
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -91,6 +109,8 @@ impl WorkflowWorktreeRetention {
 pub(super) struct GoalStopSettlement {
     pub(super) goal: crate::tools::product::project_state::GoalSummaryProjection,
     pub(super) worktree_retention: WorkflowWorktreeRetention,
+    pub(super) requested_intent: TerminationIntent,
+    pub(super) termination_intent: TerminationIntent,
 }
 
 pub(super) fn workflow_worktree(

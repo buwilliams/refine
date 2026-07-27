@@ -38,14 +38,6 @@ impl FileProcessControlService {
                     .map(TerminationIntent::from_legacy_disposition)
             })
             .unwrap_or(TerminationIntent::ExplicitCancellation);
-        if retained_intent != requested_intent {
-            return Err(RefineError::Conflict(format!(
-                "retained process outcome {} records {:?}, not the requested {:?}; durable Goal state was not changed or reported as settled",
-                receipt_path.display(),
-                retained_intent,
-                requested_intent
-            )));
-        }
         if receipt
             .get("registry_cleanup_completed")
             .and_then(Value::as_bool)
@@ -65,6 +57,29 @@ impl FileProcessControlService {
             .and_then(|workflow| workflow.get("execution_id"))
             .and_then(Value::as_str)
         else {
+            if let (Some(refine_dir), Some(goal_id)) = (
+                self.refine_dir.as_deref(),
+                receipt.get("goal_id").and_then(Value::as_str),
+            ) {
+                let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
+                let authoritative_intent = retained_intent.with_authoritative_precedence(
+                    requested_intent.authoritative_for_goal_status(&goal.goal.status),
+                );
+                if goal.goal.status == authoritative_intent.expected_goal_status() {
+                    let result = self.workflow_termination_result(
+                        json!({
+                            "recovered_process_id": process_id,
+                            "goal_id": goal_id,
+                            "goal": goal.goal,
+                            "termination": receipt.get("termination").cloned(),
+                            "worktree_retention": receipt.get("worktree_retention").cloned()
+                        }),
+                        requested_intent,
+                        authoritative_intent,
+                    )?;
+                    return Ok(Some(result));
+                }
+            }
             return Ok(None);
         };
         let mut recovered =
@@ -95,7 +110,8 @@ impl FileProcessControlService {
         };
         let work_items = FileWorkItemService::new(refine_dir);
         let current = work_items.show_goal_summary(&claim.goal_id)?;
-        if current.goal.status == intent.expected_goal_status() {
+        let authoritative_intent = intent.authoritative_for_goal_status(&current.goal.status);
+        if current.goal.status == authoritative_intent.expected_goal_status() {
             return self.workflow_termination_result(
                 json!({
                     "execution_id": execution_id,
@@ -105,12 +121,10 @@ impl FileProcessControlService {
                     "already_settled": true
                 }),
                 intent,
+                authoritative_intent,
             );
         }
-        if current.goal.status == GoalStatus::Done
-            || (intent == TerminationIntent::InteractiveStop
-                && current.goal.status == GoalStatus::Cancelled)
-        {
+        if current.goal.status == GoalStatus::Done {
             return Err(RefineError::Conflict(format!(
                 "workflow claim {} is cancelled but Goal {} is {}; {:?} did not overwrite terminal durable state",
                 claim.claim_id,
@@ -151,6 +165,8 @@ impl FileProcessControlService {
                 Some(&settlement.goal.goal.status),
                 true,
                 Some(&settlement.worktree_retention),
+                Some(settlement.requested_intent),
+                Some(settlement.termination_intent),
             )?;
         }
         self.workflow_termination_result(
@@ -163,13 +179,15 @@ impl FileProcessControlService {
                 "settled_after_claim_cancellation": true
             }),
             intent,
+            settlement.termination_intent,
         )
     }
 
     pub(super) fn workflow_termination_result(
         &self,
         mut result: Value,
-        intent: TerminationIntent,
+        requested_intent: TerminationIntent,
+        termination_intent: TerminationIntent,
     ) -> RefineResult<Value> {
         let goal_status = result
             .get("goal")
@@ -179,8 +197,16 @@ impl FileProcessControlService {
         let object = result.as_object_mut().ok_or_else(|| {
             RefineError::Serialization("workflow termination result must be an object".to_string())
         })?;
-        object.insert("termination_intent".to_string(), json!(intent));
-        match intent {
+        object.insert(
+            "requested_termination_intent".to_string(),
+            json!(requested_intent),
+        );
+        object.insert("termination_intent".to_string(), json!(termination_intent));
+        object.insert(
+            "intent_superseded".to_string(),
+            json!(requested_intent != termination_intent),
+        );
+        match requested_intent {
             TerminationIntent::ExplicitCancellation => {
                 if goal_status.as_deref() == Some(GoalStatus::Cancelled.as_str()) {
                     object.insert("cancelled".to_string(), json!(true));
@@ -196,16 +222,25 @@ impl FileProcessControlService {
                 }
             }
             TerminationIntent::InteractiveStop => {
-                if goal_status.is_some()
-                    && goal_status.as_deref() != Some(GoalStatus::Todo.as_str())
-                {
+                let expected = termination_intent.expected_goal_status();
+                if goal_status.is_some() && goal_status.as_deref() != Some(expected.as_str()) {
                     return Err(RefineError::Conflict(format!(
-                        "interactive Stop expected durable Goal status todo but observed {}",
+                        "interactive Stop resolved authoritative Goal status {} but observed {}",
+                        expected.as_str(),
                         goal_status.as_deref().unwrap_or("unknown")
                     )));
                 }
                 object.insert("stopped".to_string(), json!(true));
-                object.insert("goal_requeued".to_string(), json!(goal_status.is_some()));
+                object.insert(
+                    "goal_requeued".to_string(),
+                    json!(goal_status.as_deref() == Some(GoalStatus::Todo.as_str())),
+                );
+                if termination_intent == TerminationIntent::ExplicitCancellation {
+                    object.insert(
+                        "cancelled".to_string(),
+                        json!(goal_status.as_deref() == Some(GoalStatus::Cancelled.as_str())),
+                    );
+                }
             }
         }
         Ok(result)

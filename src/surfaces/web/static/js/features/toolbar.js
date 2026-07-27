@@ -1286,10 +1286,7 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
       throw new Error("Process termination was not confirmed.");
     }
     if (stopped?.worktree_retention?.retained) {
-      toast(
-        "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
-        "info",
-      );
+      toast(retainedGoalStopMessage(stopped), "info");
     }
     if (terminal.sessionId !== sessionId) return;
     finishTerminalExit(tab, terminal);
@@ -1305,6 +1302,13 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
       await showActionError(e);
     }
   }
+}
+
+function retainedGoalStopMessage(stopped) {
+  const goalOutcome = stopped?.goal?.status === "cancelled"
+    ? "Explicit Goal cancellation remains terminal."
+    : "Goal returned to todo.";
+  return `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`;
 }
 
 async function reattachTerminalSession(tab = currentToolbarTab(), existingTerminal = null) {
@@ -2872,10 +2876,7 @@ async function closeChatTab(tabId) {
       throw new Error("Process termination was not confirmed.");
     }
     if (stopped?.worktree_retention?.retained) {
-      toast(
-        "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
-        "info",
-      );
+      toast(retainedGoalStopMessage(stopped), "info");
     }
   } catch (error) {
     const sessionMissing = error?.code === "not_found" || error?.status === 404;

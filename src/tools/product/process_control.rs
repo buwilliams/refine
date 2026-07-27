@@ -333,7 +333,15 @@ fn preflight_goal_for_process(
         execution_id: Some(execution_id),
         round_idx: Some(round_idx),
     };
-    validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, phase)?;
+    let validation_phase = if phase == WorkflowOwnershipPhase::BeforeTermination
+        && claim.state == WorkflowClaimState::Cancelled
+        && goal.status == GoalStatus::Cancelled
+    {
+        WorkflowOwnershipPhase::BeforeCancellation
+    } else {
+        phase
+    };
+    validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, validation_phase)?;
     validate_expected_goal_round(&goal, goal_id, &ownership, phase)?;
     Ok(ProcessGoalFence {
         goal,
