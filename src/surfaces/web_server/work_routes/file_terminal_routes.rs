@@ -185,6 +185,7 @@ impl InProcessWebServer {
                 prompt_transport: None,
                 prompt_artifact: None,
                 authorization_command: None,
+                launch_environment: None,
             }
         } else {
             let provider = self
@@ -213,8 +214,18 @@ impl InProcessWebServer {
                     return error_response(error);
                 }
             };
+            let environment_overrides = vec![
+                ("TERM".to_string(), "xterm-256color".to_string()),
+                ("COLORTERM".to_string(), "truecolor".to_string()),
+                ("REFINE_TERMINAL".to_string(), "1".to_string()),
+                ("REFINE_SESSION_ROLE".to_string(), profile.clone()),
+            ];
             let provider_service = HostAgentProviderService::with_runtime_root(&runtime_root);
-            let command = match provider_service.interactive_command(&provider, &prompt) {
+            let command = match provider_service.interactive_command_with_environment(
+                &provider,
+                &prompt,
+                &environment_overrides,
+            ) {
                 Ok(command) => command,
                 Err(error) => {
                     if worktree_created && let Some(worktree) = worktree.as_ref() {
@@ -234,6 +245,7 @@ impl InProcessWebServer {
                 prompt_transport: Some(command.prompt_transport),
                 prompt_artifact: command.prompt_artifact,
                 authorization_command: Some(command.authorization_command),
+                launch_environment: Some(command.launch_environment),
             }
         };
 

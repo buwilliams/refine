@@ -72,6 +72,7 @@ pub(in crate::surfaces::web_server) struct TerminalLaunchSpec {
     pub prompt_transport: Option<PromptTransportMetadata>,
     pub prompt_artifact: Option<PromptArtifactLease>,
     pub authorization_command: Option<String>,
+    pub launch_environment: Option<crate::process::launch_environment::EffectiveLaunchEnvironment>,
 }
 
 pub(in crate::surfaces::web_server) fn terminal_session_start_response(
@@ -332,29 +333,15 @@ impl TerminalSession {
         let mut command = CommandBuilder::new(&launch.command);
         command.args(&launch.args);
         command.cwd(&cwd);
-        if owner == ProcessOwner::Agent {
-            // Same precedence as the managed-process and Goal Agent paths: the user's
-            // configured environment first, then refine's own per-process variables.
-            for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
-                command.env(key, value);
-            }
-        }
-        for (key, value) in &managed_spec.env {
-            command.env(key, value);
-        }
-        if owner == ProcessOwner::Agent {
-            for key in [
-                "ANTHROPIC_API_KEY",
-                "CLAUDE_API_KEY",
-                "CODEX_API_KEY",
-                "GEMINI_API_KEY",
-                "GOOGLE_API_KEY",
-                "GOOGLE_GENAI_API_KEY",
-                "OPENAI_API_KEY",
-            ] {
-                command.env_remove(key);
-            }
-        }
+        let environment = match launch.launch_environment.as_ref() {
+            Some(environment) => environment.clone(),
+            None => crate::process::launch_environment::EffectiveLaunchEnvironment::assemble(
+                &owner,
+                &managed_spec.env,
+            )?,
+        };
+        environment.validate_launch(&launch.command, &launch.args)?;
+        environment.apply_to_pty(&mut command);
         let mut child = pair.slave.spawn_command(command).map_err(|error| {
             RefineError::Io(format!(
                 "failed to start interactive {} session: {error}",
@@ -634,6 +621,8 @@ fn pty_size(cols: u16, rows: u16) -> PtySize {
 mod tests {
     use super::*;
     #[cfg(unix)]
+    use sha2::{Digest, Sha256};
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
@@ -653,6 +642,7 @@ mod tests {
                 prompt_transport: None,
                 prompt_artifact: None,
                 authorization_command: None,
+                launch_environment: None,
             };
             let first = terminal_session_start_response(launch(), 80, 24).unwrap();
             let second = terminal_session_start_response(launch(), 120, 36).unwrap();
@@ -710,6 +700,7 @@ mod tests {
                 prompt_transport: Some(command.prompt_transport),
                 prompt_artifact: command.prompt_artifact,
                 authorization_command: Some(command.authorization_command),
+                launch_environment: Some(command.launch_environment),
             },
             80,
             24,
@@ -731,6 +722,94 @@ mod tests {
             .collect::<String>();
         assert!(output.contains("prompt-bytes:158078"), "{output:?}");
         assert!(!artifact_path.exists());
+        sessions().lock().unwrap().remove(session_id);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn interactive_pty_reselects_file_transport_for_final_session_environment() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-terminal-final-environment-{}",
+            Uuid::new_v4()
+        ));
+        let runtime_root = root.join("run");
+        let bin_dir = root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let provider = bin_dir.join("smoke-ai");
+        fs::write(
+            &provider,
+            concat!(
+                "#!/bin/sh\n",
+                "prompt_path=$(printf '%s' \"$1\" | sed -n '4{s/^`//;s/`$//;p;}')\n",
+                "printf 'prompt-sha:%s\\n' \"$(sha256sum \"$prompt_path\" | cut -d' ' -f1)\"\n",
+                "printf 'session-role:%s\\n' \"$REFINE_SESSION_ROLE\"\n",
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
+        let mut environment = (0..23)
+            .map(|index| (format!("REFINE_LARGE_{index}"), "e".repeat(65_800)))
+            .collect::<Vec<_>>();
+        environment.extend([
+            ("TERM".to_string(), "xterm-256color".to_string()),
+            ("COLORTERM".to_string(), "truecolor".to_string()),
+            ("REFINE_TERMINAL".to_string(), "1".to_string()),
+            ("REFINE_SESSION_ROLE".to_string(), "agent".to_string()),
+        ]);
+        let prompt = format!(
+            "INTERACTIVE_FINAL_ENV_SECRET{}",
+            "x".repeat(60_000 - "INTERACTIVE_FINAL_ENV_SECRET".len())
+        );
+        let expected_digest = format!("{:x}", Sha256::digest(prompt.as_bytes()));
+        let service = crate::tools::host::agent_providers::HostAgentProviderService {
+            path_override: Some(bin_dir.display().to_string()),
+            runtime_root: Some(runtime_root.clone()),
+        };
+        let command = service
+            .interactive_command_with_environment("smoke-ai", &prompt, &environment)
+            .unwrap();
+        assert_eq!(
+            command.prompt_transport.kind,
+            crate::tools::host::agent_providers::PromptTransportKind::File
+        );
+        let response = terminal_session_start_response(
+            TerminalLaunchSpec {
+                runtime_root: runtime_root.clone(),
+                cwd: root.clone(),
+                profile: "agent".to_string(),
+                provider: Some("smoke-ai".to_string()),
+                command: command.binary,
+                args: command.args,
+                metadata: Map::new(),
+                prompt_transport: Some(command.prompt_transport),
+                prompt_artifact: command.prompt_artifact,
+                authorization_command: Some(command.authorization_command),
+                launch_environment: Some(command.launch_environment),
+            },
+            80,
+            24,
+        )
+        .unwrap();
+        let session_id = response["id"].as_str().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !terminal_status_response(&runtime_root, session_id).unwrap()["exited"]
+            .as_bool()
+            .unwrap()
+        {
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(10));
+        }
+        let output = terminal_events_since(&runtime_root, session_id, 0)
+            .unwrap()
+            .into_iter()
+            .filter_map(|event| event["data"].as_str().map(str::to_string))
+            .collect::<String>();
+        assert!(
+            output.contains(&format!("prompt-sha:{expected_digest}")),
+            "{output:?}"
+        );
+        assert!(output.contains("session-role:agent"), "{output:?}");
         sessions().lock().unwrap().remove(session_id);
         fs::remove_dir_all(root).unwrap();
     }

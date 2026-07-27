@@ -132,6 +132,138 @@ fn host_provider_service_invokes_smoke_ai_and_extracts_json_final_text() {
 
 #[cfg(unix)]
 #[test]
+fn supervised_launch_uses_final_environment_for_file_fallback_and_child_parity() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let temp_root = unique_temp_dir("provider-final-environment");
+    let bin_dir = temp_root.join("bin");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let smoke = bin_dir.join("smoke-ai");
+    fs::write(
+        &smoke,
+        concat!(
+            "#!/bin/sh\n",
+            "prompt_path=$(printf '%s' \"$1\" | sed -n '4{s/^`//;s/`$//;p;}')\n",
+            "test -r \"$prompt_path\" || exit 2\n",
+            "grep -q 'FINAL_ENV_PROMPT_SECRET' \"$prompt_path\" || exit 3\n",
+            "test \"$REFINE_INHERITED_KEY\" = override || exit 4\n",
+            "test \"$REFINE_DUPLICATE_KEY\" = final || exit 5\n",
+            "test \"$REFINE_SESSION_ROLE\" = supervised || exit 6\n",
+            "test \"$REFINE_MULTIBYTE\" = '🙂é' || exit 7\n",
+            "test \"${OPENAI_API_KEY-unset}\" = unset || exit 8\n",
+            "printf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"final environment prompt received\"}}'\n",
+        ),
+    )
+    .unwrap();
+    make_executable(&smoke);
+    let previous_inherited = std::env::var_os("REFINE_INHERITED_KEY");
+    let previous_api_key = std::env::var_os("OPENAI_API_KEY");
+    unsafe {
+        std::env::set_var("REFINE_INHERITED_KEY", "inherited");
+        std::env::set_var("OPENAI_API_KEY", "must-be-removed");
+    }
+    let mut environment = (0..23)
+        .map(|index| (format!("REFINE_LARGE_{index}"), "e".repeat(65_800)))
+        .collect::<Vec<_>>();
+    environment.extend([
+        ("REFINE_INHERITED_KEY".to_string(), "override".to_string()),
+        ("REFINE_DUPLICATE_KEY".to_string(), "first".to_string()),
+        ("REFINE_DUPLICATE_KEY".to_string(), "final".to_string()),
+        ("REFINE_SESSION_ROLE".to_string(), "supervised".to_string()),
+        ("REFINE_MULTIBYTE".to_string(), "🙂é".to_string()),
+        (
+            "OPENAI_API_KEY".to_string(),
+            "still-must-be-removed".to_string(),
+        ),
+    ]);
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: Some(runtime_root.clone()),
+    };
+    let secret = "FINAL_ENV_PROMPT_SECRET";
+    let prompt = format!("{secret}{}", "p".repeat(60_000 - secret.len()));
+    let result = service
+        .invoke_detailed_with_environment_and_output(
+            ProviderInvocation {
+                provider: "smoke-ai".to_string(),
+                prompt,
+                session_id: None,
+                cwd: None,
+                process_metadata: Default::default(),
+            },
+            &environment,
+            |_| {},
+        )
+        .unwrap();
+
+    assert!(result.output.contains("final environment prompt received"));
+    assert!(
+        fs::read_dir(runtime_root.join("agent-prompts"))
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    unsafe {
+        match previous_inherited {
+            Some(value) => std::env::set_var("REFINE_INHERITED_KEY", value),
+            None => std::env::remove_var("REFINE_INHERITED_KEY"),
+        }
+        match previous_api_key {
+            Some(value) => std::env::set_var("OPENAI_API_KEY", value),
+            None => std::env::remove_var("OPENAI_API_KEY"),
+        }
+    }
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn effective_environment_rejects_before_supervised_spawn_without_prompt_disclosure() {
+    let temp_root = unique_temp_dir("provider-environment-rejection");
+    let bin_dir = temp_root.join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let marker = temp_root.join("spawned");
+    let smoke = bin_dir.join("smoke-ai");
+    fs::write(
+        &smoke,
+        format!("#!/bin/sh\nprintf spawned > '{}'\n", marker.display()),
+    )
+    .unwrap();
+    make_executable(&smoke);
+    let environment = (0..24)
+        .map(|index| (format!("REFINE_TOO_LARGE_{index}"), "e".repeat(65_800)))
+        .collect::<Vec<_>>();
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: Some(temp_root.join("run/8080")),
+    };
+    let secret = "PRESPAWN_SECRET_MUST_NOT_LEAK";
+    let prompt = format!("{secret}{}", "p".repeat(60_000 - secret.len()));
+    let error = service
+        .invoke_detailed_with_environment_and_output(
+            ProviderInvocation {
+                provider: "smoke-ai".to_string(),
+                prompt,
+                session_id: None,
+                cwd: None,
+                process_metadata: Default::default(),
+            },
+            &environment,
+            |_| {},
+        )
+        .unwrap_err();
+    let message = error.to_string();
+
+    assert!(message.contains("effective-environment budget before spawn"));
+    assert!(!message.contains(secret));
+    assert!(!marker.exists());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
 fn host_provider_service_sends_large_codex_prompts_over_stdin() {
     let temp_root = unique_temp_dir("provider-large-codex-prompt");
     let bin_dir = temp_root.join("bin");

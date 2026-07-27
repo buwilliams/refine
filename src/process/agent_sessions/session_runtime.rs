@@ -95,7 +95,22 @@ where
 
     let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
     let protocol_prompt = goal_agent_protocol_prompt(&launch.prompt, &signal_path);
-    let command = match provider_service.interactive_command(&launch.provider, &protocol_prompt) {
+    let launch_env_overrides = vec![
+        ("TERM".to_string(), "xterm-256color".to_string()),
+        ("COLORTERM".to_string(), "truecolor".to_string()),
+        ("REFINE_TERMINAL".to_string(), "1".to_string()),
+        ("REFINE_SESSION_ROLE".to_string(), "goal".to_string()),
+        ("REFINE_AGENT_SESSION_ID".to_string(), session_id.clone()),
+        (
+            "REFINE_AGENT_SIGNAL_PATH".to_string(),
+            signal_path.display().to_string(),
+        ),
+    ];
+    let command = match provider_service.interactive_command_with_environment(
+        &launch.provider,
+        &protocol_prompt,
+        &launch_env_overrides,
+    ) {
         Ok(command) => command,
         Err(error) => {
             cleanup_session_artifacts(&command_path, &signal_path);
@@ -139,17 +154,7 @@ where
         command: command.binary.clone(),
         args: command.args.clone(),
         cwd: Some(cwd.display().to_string()),
-        env: vec![
-            ("TERM".to_string(), "xterm-256color".to_string()),
-            ("COLORTERM".to_string(), "truecolor".to_string()),
-            ("REFINE_TERMINAL".to_string(), "1".to_string()),
-            ("REFINE_SESSION_ROLE".to_string(), "goal".to_string()),
-            ("REFINE_AGENT_SESSION_ID".to_string(), session_id.clone()),
-            (
-                "REFINE_AGENT_SIGNAL_PATH".to_string(),
-                signal_path.display().to_string(),
-            ),
-        ],
+        env: launch_env_overrides,
         stdin: command.stdin.clone(),
         limits: Some(ProcessResourceLimits {
             kill_on_parent_exit: true,
@@ -188,25 +193,7 @@ where
     let mut pty_command = CommandBuilder::new(&command.binary);
     pty_command.args(&command.args);
     pty_command.cwd(&cwd);
-    // Same precedence as the managed-process path: the user's configured
-    // environment first, then refine's own per-process variables.
-    for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
-        pty_command.env(key, value);
-    }
-    for (key, value) in &managed_spec.env {
-        pty_command.env(key, value);
-    }
-    for key in [
-        "ANTHROPIC_API_KEY",
-        "CLAUDE_API_KEY",
-        "CODEX_API_KEY",
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "GOOGLE_GENAI_API_KEY",
-        "OPENAI_API_KEY",
-    ] {
-        pty_command.env_remove(key);
-    }
+    command.launch_environment.apply_to_pty(&mut pty_command);
     let mut child = match pair.slave.spawn_command(pty_command) {
         Ok(child) => child,
         Err(error) => {

@@ -48,8 +48,10 @@ Current implementation details that matter to intent:
 - one provider-aware host capability prepares every interactive and
   noninteractive agent launch. Codex can preserve its native stdin contract;
   Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs use bounded
-  inline prompts or the shared secure prompt-file bootstrap. Surfaces do not
-  choose thresholds or create prompt files.
+  inline prompts or the shared secure prompt-file bootstrap. The decision uses
+  Process's final effective environment, and the prepared launch carries that
+  same environment to the managed-process or PTY boundary. Surfaces do not
+  choose thresholds, merge environments, or create prompt files.
 - prompt-file payloads live under the selected runtime root, outside the source
   worktree, with private ownership, exact UTF-8 byte and SHA-256 evidence, and
   explicit failure when the handoff is missing, changed, unreadable, or cannot

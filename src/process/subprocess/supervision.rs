@@ -82,7 +82,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             ))
         })?;
 
-        let mut command = process_command(&spec);
+        let mut command = process_command(&spec)?;
         command.stdout(Stdio::from(stdout));
         command.stderr(Stdio::from(stderr));
         if spec.stdin.is_some() {

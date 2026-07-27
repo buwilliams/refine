@@ -17,6 +17,30 @@ impl FileProcessSupervisor {
     pub fn run_to_completion_with_output<F>(
         &self,
         spec: ManagedProcessSpec,
+        on_output: F,
+    ) -> RefineResult<ManagedProcessOutput>
+    where
+        F: FnMut(ManagedProcessOutputStream, &[u8]),
+    {
+        self.run_to_completion_with_output_and_environment(spec, None, on_output)
+    }
+
+    pub(crate) fn run_to_completion_with_prepared_environment<F>(
+        &self,
+        spec: ManagedProcessSpec,
+        environment: &crate::process::launch_environment::EffectiveLaunchEnvironment,
+        on_output: F,
+    ) -> RefineResult<ManagedProcessOutput>
+    where
+        F: FnMut(ManagedProcessOutputStream, &[u8]),
+    {
+        self.run_to_completion_with_output_and_environment(spec, Some(environment), on_output)
+    }
+
+    fn run_to_completion_with_output_and_environment<F>(
+        &self,
+        spec: ManagedProcessSpec,
+        environment: Option<&crate::process::launch_environment::EffectiveLaunchEnvironment>,
         mut on_output: F,
     ) -> RefineResult<ManagedProcessOutput>
     where
@@ -39,7 +63,10 @@ impl FileProcessSupervisor {
             .processes_dir()
             .join(format!("{process_id}.stderr.log"));
 
-        let mut command = process_command(&spec);
+        let mut command = match environment {
+            Some(environment) => process_command_with_environment(&spec, environment)?,
+            None => process_command(&spec)?,
+        };
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
         if spec.stdin.is_some() {
             command.stdin(Stdio::piped());

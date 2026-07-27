@@ -137,3 +137,63 @@ fn file_process_supervisor_strips_direct_api_keys_from_agent_processes() {
     assert_eq!(output.stdout, "unset:unset");
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn managed_child_observes_the_exact_preflighted_effective_environment() {
+    use std::collections::BTreeMap;
+
+    let temp_root = unique_temp_dir("process-effective-env-parity");
+    let runtime_root = temp_root.join("run/8080");
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let overrides = vec![
+        ("REFINE_ENV_PARITY".to_string(), "first-value".to_string()),
+        ("REFINE_ENV_PARITY".to_string(), "final-🙂é".to_string()),
+        ("REFINE_SESSION_ROLE".to_string(), "parity-test".to_string()),
+        (
+            "OPENAI_API_KEY".to_string(),
+            "must-not-be-observed".to_string(),
+        ),
+    ];
+    let expected = crate::process::launch_environment::EffectiveLaunchEnvironment::assemble(
+        &ProcessOwner::Agent,
+        &overrides,
+    )
+    .unwrap();
+    let output = supervisor
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: "/usr/bin/env".to_string(),
+            args: vec!["-0".to_string()],
+            cwd: None,
+            env: overrides,
+            stdin: None,
+            limits: None,
+            authorization_command: Some("env -0".to_string()),
+            sensitive: false,
+            metadata: Default::default(),
+        })
+        .unwrap();
+    let observed = output
+        .stdout
+        .split('\0')
+        .filter_map(|entry| entry.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect::<BTreeMap<_, _>>();
+    let expected = expected
+        .entries()
+        .iter()
+        .map(|(key, value)| {
+            (
+                key.to_string_lossy().to_string(),
+                value.to_string_lossy().to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    assert_eq!(observed, expected);
+    assert_eq!(observed["REFINE_ENV_PARITY"], "final-🙂é");
+    assert_eq!(observed["REFINE_SESSION_ROLE"], "parity-test");
+    assert!(!observed.contains_key("OPENAI_API_KEY"));
+    fs::remove_dir_all(temp_root).unwrap();
+}

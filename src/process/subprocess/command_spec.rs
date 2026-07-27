@@ -27,26 +27,27 @@ pub(super) fn process_details(spec: &ManagedProcessSpec) -> String {
     spec.args.join(" ")
 }
 
-pub(super) fn process_command(spec: &ManagedProcessSpec) -> Command {
+pub(super) fn process_command(spec: &ManagedProcessSpec) -> RefineResult<Command> {
+    let environment = crate::process::launch_environment::EffectiveLaunchEnvironment::assemble(
+        &spec.owner,
+        &spec.env,
+    )?;
+    process_command_with_environment(spec, &environment)
+}
+
+pub(super) fn process_command_with_environment(
+    spec: &ManagedProcessSpec,
+    environment: &crate::process::launch_environment::EffectiveLaunchEnvironment,
+) -> RefineResult<Command> {
+    environment.validate_launch(&spec.command, &spec.args)?;
     let mut command = Command::new(&spec.command);
     command.args(&spec.args);
     if let Some(cwd) = spec.cwd.as_deref().filter(|cwd| !cwd.trim().is_empty()) {
         command.current_dir(cwd);
     }
-    if spec.owner == ProcessOwner::Agent {
-        // The user's configured environment first, so an agent authenticates the
-        // same way it would from a terminal. Applied before `spec.env` so refine's
-        // own per-process variables still win.
-        command.envs(crate::process::agent_env::agent_env_overlay(None));
-    }
-    command.envs(spec.env.iter().map(|(key, value)| (key, value)));
-    if spec.owner == ProcessOwner::Agent {
-        for key in AGENT_DIRECT_API_KEY_ENV {
-            command.env_remove(key);
-        }
-    }
+    environment.apply_to_command(&mut command);
     configure_process_lifecycle(&mut command, spec);
-    command
+    Ok(command)
 }
 
 #[cfg(unix)]
@@ -100,16 +101,6 @@ pub(super) fn configure_process_lifecycle(command: &mut Command, spec: &ManagedP
 
 #[cfg(not(unix))]
 pub(super) fn configure_process_lifecycle(_command: &mut Command, _spec: &ManagedProcessSpec) {}
-
-const AGENT_DIRECT_API_KEY_ENV: &[&str] = &[
-    "ANTHROPIC_API_KEY",
-    "CLAUDE_API_KEY",
-    "CODEX_API_KEY",
-    "GEMINI_API_KEY",
-    "GOOGLE_API_KEY",
-    "GOOGLE_GENAI_API_KEY",
-    "OPENAI_API_KEY",
-];
 
 pub(super) fn process_isolation_label(limits: Option<&ProcessResourceLimits>) -> &'static str {
     if limits.is_some() {

@@ -4,9 +4,19 @@ struct ProviderCommandExecution<'a> {
     args: &'a [String],
     stdin: Option<String>,
     cwd: Option<&'a Path>,
+    launch_environment: &'a EffectiveLaunchEnvironment,
+    environment_overrides: &'a [(String, String)],
     output_format: &'a str,
     process_metadata: Map<String, Value>,
     authorization_command: Option<String>,
+}
+
+struct ProviderLaunchRequest<'a> {
+    prompt: &'a str,
+    session_id: Option<&'a str>,
+    cwd: Option<&'a Path>,
+    interactive: bool,
+    environment: EffectiveLaunchEnvironment,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -150,50 +160,74 @@ impl HostAgentProviderService {
         provider: &str,
         prompt: &str,
     ) -> RefineResult<InteractiveProviderCommand> {
+        self.interactive_command_with_environment(provider, prompt, &[])
+    }
+
+    pub fn interactive_command_with_environment(
+        &self,
+        provider: &str,
+        prompt: &str,
+        environment_overrides: &[(String, String)],
+    ) -> RefineResult<InteractiveProviderCommand> {
         let _ = self.reap_orphan_prompt_artifacts()?;
         let (spec, binary) = self.resolve_binary_for_provider(provider)?;
-        self.prepare_provider_launch(&spec, binary, prompt, None, None, true)
+        let environment =
+            EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, environment_overrides)?;
+        self.prepare_provider_launch(
+            &spec,
+            binary,
+            ProviderLaunchRequest {
+                prompt,
+                session_id: None,
+                cwd: None,
+                interactive: true,
+                environment,
+            },
+        )
     }
 
     fn prepare_provider_launch(
         &self,
         spec: &ProviderSpec,
         binary: String,
-        prompt: &str,
-        session_id: Option<&str>,
-        cwd: Option<&Path>,
-        interactive: bool,
+        request: ProviderLaunchRequest<'_>,
     ) -> RefineResult<PreparedProviderLaunch> {
-        let capability = if interactive {
+        let capability = if request.interactive {
             spec.interactive_prompt_capability()
         } else {
             spec.noninteractive_prompt_capability()
         };
-        let prepared = prepare_prompt(
+        let prepared = prepare_prompt_with_environment(
             &self.prompt_runtime_root(),
             capability,
-            prompt,
+            request.prompt,
+            &request.environment,
             |delivered| {
-                if interactive {
+                if request.interactive {
                     std::iter::once(binary.clone())
                         .chain(spec.interactive_args(delivered))
                         .collect()
                 } else {
-                    spec.chat_args(&binary, delivered, session_id, cwd)
+                    spec.chat_args(&binary, delivered, request.session_id, request.cwd)
                 }
             },
         )?;
-        let args = if interactive {
+        let args = if request.interactive {
             spec.interactive_args(&prepared.delivered_prompt)
         } else {
-            spec.chat_args(&binary, &prepared.delivered_prompt, session_id, cwd)
-                .into_iter()
-                .skip(1)
-                .collect()
+            spec.chat_args(
+                &binary,
+                &prepared.delivered_prompt,
+                request.session_id,
+                request.cwd,
+            )
+            .into_iter()
+            .skip(1)
+            .collect()
         };
-        validate_launch_strings(&binary, &args, &[])?;
+        request.environment.validate_launch(&binary, &args)?;
         let authorization_command =
-            safe_authorization_command(&binary, interactive, &prepared.metadata);
+            safe_authorization_command(&binary, request.interactive, &prepared.metadata);
         Ok(PreparedProviderLaunch {
             provider: spec.name.clone(),
             display_name: spec.display_name.to_string(),
@@ -203,6 +237,7 @@ impl HostAgentProviderService {
             prompt_transport: prepared.metadata.clone(),
             prompt_artifact: prepared.artifact,
             authorization_command,
+            launch_environment: request.environment,
         })
     }
 
@@ -221,6 +256,18 @@ impl HostAgentProviderService {
     where
         F: FnMut(String),
     {
+        self.invoke_detailed_with_environment_and_output(invocation, &[], on_output)
+    }
+
+    pub(crate) fn invoke_detailed_with_environment_and_output<F>(
+        &self,
+        invocation: ProviderInvocation,
+        environment_overrides: &[(String, String)],
+        on_output: F,
+    ) -> RefineResult<ProviderInvocationResult>
+    where
+        F: FnMut(String),
+    {
         let _ = self.reap_orphan_prompt_artifacts()?;
         let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
         if invocation
@@ -233,13 +280,18 @@ impl HostAgentProviderService {
             ));
         }
         let cwd = invocation.cwd.as_deref().map(Path::new);
+        let launch_environment =
+            EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, environment_overrides)?;
         let prepared = self.prepare_provider_launch(
             &spec,
             binary,
-            &invocation.prompt,
-            invocation.session_id.as_deref(),
-            cwd,
-            false,
+            ProviderLaunchRequest {
+                prompt: &invocation.prompt,
+                session_id: invocation.session_id.as_deref(),
+                cwd,
+                interactive: false,
+                environment: launch_environment,
+            },
         )?;
         prepared.validate_prompt_artifact()?;
         let mut process_metadata = invocation.process_metadata;
@@ -259,6 +311,8 @@ impl HostAgentProviderService {
                 args: &args,
                 stdin: prepared.stdin,
                 cwd,
+                launch_environment: &prepared.launch_environment,
+                environment_overrides,
                 output_format: &spec.output_format,
                 process_metadata,
                 authorization_command: Some(prepared.authorization_command.clone()),
@@ -310,11 +364,20 @@ impl HostAgentProviderService {
             )));
         }
         let args = spec.chat_args(&binary, "", Some(session_id), None);
+        let launch_environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?;
+        let Some((launch_binary, launch_args)) = args.split_first() else {
+            return Err(RefineError::InvalidInput(
+                "provider command cannot be empty".to_string(),
+            ));
+        };
+        launch_environment.validate_launch(launch_binary, launch_args)?;
         self.run_provider_command_result_with_output(
             ProviderCommandExecution {
                 args: &args,
                 stdin: None,
                 cwd: None,
+                launch_environment: &launch_environment,
+                environment_overrides: &[],
                 output_format: &spec.output_format,
                 process_metadata,
                 authorization_command: None,
@@ -338,30 +401,32 @@ impl HostAgentProviderService {
         };
         let runtime_root = self.prompt_runtime_root();
         let mut formatter = ProviderActivityFormatter::new(launch.output_format);
-        let output = FileProcessSupervisor::new(runtime_root).run_to_completion_with_output(
-            ManagedProcessSpec {
-                owner: ProcessOwner::Agent,
-                command: binary.to_string(),
-                args: rest.to_vec(),
-                cwd: launch.cwd.map(|path| path.display().to_string()),
-                env: Vec::new(),
-                stdin: launch.stdin,
-                limits: Some(ProcessResourceLimits {
-                    kill_on_parent_exit: true,
-                    ..Default::default()
-                }),
-                authorization_command: launch
-                    .authorization_command
-                    .or_else(|| Some(launch.args.join(" "))),
-                sensitive: false,
-                metadata: launch.process_metadata,
-            },
-            |stream, bytes| {
-                for line in formatter.push(stream, bytes) {
-                    on_output(line);
-                }
-            },
-        )?;
+        let output = FileProcessSupervisor::new(runtime_root)
+            .run_to_completion_with_prepared_environment(
+                ManagedProcessSpec {
+                    owner: ProcessOwner::Agent,
+                    command: binary.to_string(),
+                    args: rest.to_vec(),
+                    cwd: launch.cwd.map(|path| path.display().to_string()),
+                    env: launch.environment_overrides.to_vec(),
+                    stdin: launch.stdin,
+                    limits: Some(ProcessResourceLimits {
+                        kill_on_parent_exit: true,
+                        ..Default::default()
+                    }),
+                    authorization_command: launch
+                        .authorization_command
+                        .or_else(|| Some(launch.args.join(" "))),
+                    sensitive: false,
+                    metadata: launch.process_metadata,
+                },
+                launch.launch_environment,
+                |stream, bytes| {
+                    for line in formatter.push(stream, bytes) {
+                        on_output(line);
+                    }
+                },
+            )?;
         for line in formatter.finish() {
             on_output(line);
         }

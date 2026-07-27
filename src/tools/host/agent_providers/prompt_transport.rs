@@ -1,10 +1,7 @@
 use super::*;
 
-use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,8 +11,8 @@ use uuid::Uuid;
 
 const PORTABLE_INLINE_MAX_BYTES: usize = 64 * 1024;
 const FALLBACK_PER_ARGUMENT_LIMIT: usize = 128 * 1024;
+#[cfg(not(target_os = "linux"))]
 const FALLBACK_ARG_MAX: usize = 256 * 1024;
-const ARG_MAX_MARGIN_MIN: usize = 32 * 1024;
 const PROMPT_ARTIFACTS_DIR: &str = "agent-prompts";
 const PROMPT_FILE_NAME: &str = "prompt.md";
 const ORPHAN_REAP_GRACE_SECONDS: u64 = 60 * 60;
@@ -129,10 +126,22 @@ pub(super) struct PreparedPrompt {
     pub artifact: Option<PromptArtifactLease>,
 }
 
+#[cfg(test)]
 pub(super) fn prepare_prompt(
     runtime_root: &Path,
     capability: ProviderPromptCapability,
     prompt: &str,
+    inline_args: impl Fn(&str) -> Vec<String>,
+) -> RefineResult<PreparedPrompt> {
+    let environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?;
+    prepare_prompt_with_environment(runtime_root, capability, prompt, &environment, inline_args)
+}
+
+pub(super) fn prepare_prompt_with_environment(
+    runtime_root: &Path,
+    capability: ProviderPromptCapability,
+    prompt: &str,
+    environment: &EffectiveLaunchEnvironment,
     inline_args: impl Fn(&str) -> Vec<String>,
 ) -> RefineResult<PreparedPrompt> {
     reject_nul("agent prompt", prompt)?;
@@ -153,7 +162,7 @@ pub(super) fn prepare_prompt(
 
     let inline_budget = portable_inline_budget();
     let inline = inline_args(prompt);
-    if bytes.len() < inline_budget && argv_fits(&inline, environment_bytes())? {
+    if bytes.len() < inline_budget && invocation_fits(&inline, environment)? {
         return Ok(PreparedPrompt {
             delivered_prompt: prompt.to_string(),
             stdin: None,
@@ -169,9 +178,9 @@ pub(super) fn prepare_prompt(
         &artifact.inner.metadata.sha256,
     );
     let bootstrap_args = inline_args(&bootstrap);
-    if !argv_fits(&bootstrap_args, environment_bytes())? {
+    if !invocation_fits(&bootstrap_args, environment)? {
         return Err(RefineError::Degraded(
-            "provider launch cannot fit Refine's prompt-file bootstrap within the platform argv budget"
+            "provider launch cannot fit Refine's prompt-file bootstrap within the safe argv and effective-environment budget before spawn"
                 .to_string(),
         ));
     }
@@ -263,42 +272,6 @@ fn reap_orphan_prompt_artifacts_with_grace(
         reaped += 1;
     }
     Ok(reaped)
-}
-
-pub(super) fn validate_launch_strings(
-    binary: &str,
-    args: &[String],
-    env: &[(String, String)],
-) -> RefineResult<()> {
-    reject_nul("provider executable", binary)?;
-    for arg in args {
-        reject_nul("provider argv element", arg)?;
-    }
-    for (key, value) in env {
-        reject_nul("provider environment key", key)?;
-        reject_nul("provider environment value", value)?;
-        if key.contains('=') {
-            return Err(RefineError::InvalidInput(
-                "provider environment key cannot contain '='".to_string(),
-            ));
-        }
-    }
-    let mut all_args = Vec::with_capacity(args.len() + 1);
-    all_args.push(binary.to_string());
-    all_args.extend_from_slice(args);
-    let explicit_env_bytes = env
-        .iter()
-        .map(|(key, value)| key.len() + value.len() + 2)
-        .sum::<usize>();
-    if !argv_fits(
-        &all_args,
-        environment_bytes().saturating_add(explicit_env_bytes),
-    )? {
-        return Err(RefineError::Degraded(
-            "provider launch exceeds the safe aggregate argv and environment budget".to_string(),
-        ));
-    }
-    Ok(())
 }
 
 fn materialize_prompt(
@@ -469,23 +442,16 @@ fn portable_inline_budget() -> usize {
     PORTABLE_INLINE_MAX_BYTES.min(platform_per_argument_limit() / 2)
 }
 
-fn argv_fits(args: &[String], environment_bytes: usize) -> RefineResult<bool> {
-    for arg in args {
-        reject_nul("provider argv element", arg)?;
-        if arg.len().saturating_add(1) >= platform_per_argument_limit() {
-            return Ok(false);
-        }
-    }
-    let argv_bytes = args
-        .iter()
-        .map(|arg| arg.len().saturating_add(1))
-        .sum::<usize>();
-    let arg_max = platform_arg_max();
-    let margin = (arg_max / 4).max(ARG_MAX_MARGIN_MIN);
-    Ok(argv_bytes
-        .saturating_add(environment_bytes)
-        .saturating_add(margin)
-        < arg_max)
+fn invocation_fits(
+    invocation: &[String],
+    environment: &EffectiveLaunchEnvironment,
+) -> RefineResult<bool> {
+    let Some((binary, args)) = invocation.split_first() else {
+        return Err(RefineError::InvalidInput(
+            "provider command cannot be empty".to_string(),
+        ));
+    };
+    environment.launch_fits(binary, args)
 }
 
 fn platform_per_argument_limit() -> usize {
@@ -499,6 +465,7 @@ fn platform_per_argument_limit() -> usize {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn platform_arg_max() -> usize {
     #[cfg(unix)]
     {
@@ -508,22 +475,6 @@ fn platform_arg_max() -> usize {
         }
     }
     FALLBACK_ARG_MAX
-}
-
-fn environment_bytes() -> usize {
-    env::vars_os()
-        .map(|(key, value)| os_len(&key) + os_len(&value) + 2)
-        .sum()
-}
-
-#[cfg(unix)]
-fn os_len(value: &OsStr) -> usize {
-    value.as_bytes().len()
-}
-
-#[cfg(not(unix))]
-fn os_len(value: &OsStr) -> usize {
-    value.to_string_lossy().len()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -601,23 +552,20 @@ mod tests {
         let multibyte =
             prepare_prompt(&root, ProviderPromptCapability::InlineOrFile, "🙂é", args).unwrap();
         assert_eq!(multibyte.metadata.utf8_bytes, 6);
+        let environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[]).unwrap();
         assert!(
-            !argv_fits(
-                &[
-                    "provider".to_string(),
-                    "x".repeat(platform_per_argument_limit())
-                ],
-                0
-            )
-            .unwrap()
+            !environment
+                .launch_fits("provider", &["x".repeat(platform_per_argument_limit())],)
+                .unwrap()
         );
-        assert!(
-            !argv_fits(
-                &["provider".to_string()],
-                platform_arg_max().saturating_sub(ARG_MAX_MARGIN_MIN)
-            )
-            .unwrap()
-        );
+        let large_environment = EffectiveLaunchEnvironment::assemble(
+            &ProcessOwner::Agent,
+            &(0..32)
+                .map(|index| (format!("REFINE_LARGE_{index}"), "x".repeat(64 * 1024)))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert!(!large_environment.launch_fits("provider", &[]).unwrap());
         fs::remove_dir_all(root).unwrap();
     }
 

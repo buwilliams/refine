@@ -7,6 +7,7 @@ use std::sync::{Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::process::launch_environment::EffectiveLaunchEnvironment;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessOutputStream, ManagedProcessSpec, ProcessOwner,
     ProcessResourceLimits,
@@ -63,6 +64,7 @@ pub struct PreparedProviderLaunch {
     pub prompt_transport: PromptTransportMetadata,
     pub prompt_artifact: Option<PromptArtifactLease>,
     pub authorization_command: String,
+    pub launch_environment: EffectiveLaunchEnvironment,
 }
 
 impl PreparedProviderLaunch {
