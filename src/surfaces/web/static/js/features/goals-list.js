@@ -416,6 +416,12 @@ function renderGoalFeatureCell(goal) {
   return `<a href="#/features/${encodeURIComponent(featureId)}" title="${htmlEscape(featureId)}">${htmlEscape(featureLabel)}${htmlEscape(order)}</a>`;
 }
 
+function renderGoalNodeCell(goal) {
+  const nodeName = String(goal.node_display_name || goal.node_id || "Unknown");
+  const escapedNodeName = htmlEscape(nodeName);
+  return `<span class="goals-node-value" title="${escapedNodeName}">${escapedNodeName}</span>`;
+}
+
 function drawGoalsTable(goals, state) {
   const root = $("#goals-table");
   // Row and header handlers are bound once and outlive the render that bound
@@ -502,7 +508,7 @@ function drawGoalsTable(goals, state) {
               <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
               <td class="muted small" data-label="Assignee">${g.assignee ? htmlEscape(g.assignee) : "—"}</td>
               <td class="muted small" data-label="Feature">${renderGoalFeatureCell(g)}</td>
-              <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
+              <td class="muted small goals-node-cell" data-label="Node">${renderGoalNodeCell(g)}</td>
               <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
             </tr>`;
           }).join("")}
