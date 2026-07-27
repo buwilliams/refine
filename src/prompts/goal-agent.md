@@ -3,13 +3,4 @@ Complete ready Goal {{goal_id}} and leave it reviewable. The latest Round is the
 Pinned Goal Agent Context:
 {{agent_context}}
 
-Goal context:
-{{goal_context}}
-
-Previous Rounds:
-{{previous_rounds}}
-
-Latest Round to implement:
-{{latest_round}}
-
 Report what changed and the exact verification results.

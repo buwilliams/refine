@@ -11,6 +11,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationProjectionRefresher, OperationRegistry, OperationState,
 };
+use crate::tools::host::agent_providers::HostAgentProviderService;
 #[cfg(test)]
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::project_layout::prepare_refine_dir;
@@ -58,6 +59,13 @@ impl OperationProjectionRefresher for InProcessWebServer {
 }
 
 impl InProcessWebServer {
+    pub(super) fn agent_provider_service(&self) -> HostAgentProviderService {
+        self.runtime_root
+            .as_ref()
+            .map(HostAgentProviderService::with_runtime_root)
+            .unwrap_or_default()
+    }
+
     #[cfg(test)]
     pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
         let Some(target_root) = self.current_target_root()? else {

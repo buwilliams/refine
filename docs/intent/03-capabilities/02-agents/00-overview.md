@@ -45,6 +45,15 @@ The Agents capability should sit between Refine's intent and the outside world. 
 Current implementation details that matter to intent:
 
 - provider configuration is settings and diagnostics, not hardcoded behavior;
+- one provider-aware host capability prepares every interactive and
+  noninteractive agent launch. Codex can preserve its native stdin contract;
+  Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs use bounded
+  inline prompts or the shared secure prompt-file bootstrap. Surfaces do not
+  choose thresholds or create prompt files.
+- prompt-file payloads live under the selected runtime root, outside the source
+  worktree, with private ownership, exact UTF-8 byte and SHA-256 evidence, and
+  explicit failure when the handoff is missing, changed, unreadable, or cannot
+  fit the provider sandbox.
 - every internal agent prompt is a Markdown template under `src/prompts`, loaded through the shared prompt engine rather than embedded in consumer code;
 - agents should prefer installed local CLIs and host tools where possible;
 - chat and standalone sessions are agent behavior, not browser-only behavior;

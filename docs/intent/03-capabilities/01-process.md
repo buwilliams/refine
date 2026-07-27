@@ -23,6 +23,17 @@ Current implementation details that matter to intent:
 - managed processes have owners such as daemon, runner, target app, agent, quality, import, maintenance, and user helper.
 - process records include pid, state, label, details, output paths, limits, start time, and exit code.
 - process metadata can attach workflow, Goal, session, mode, and runner context.
+- managed agent launches carry prompt transport evidence rather than prompt
+  content: transport kind, UTF-8 byte count, SHA-256, owner, and lifecycle.
+  Authorization strings, routine process details, and persisted stdin redact the
+  authoritative prompt. Process and session ownership retain any secure prompt
+  file until the provider reaches a terminal handoff; recovery retains files
+  for verified live owners and reaps only verified orphans.
+- every final agent argv is preflighted against per-argument and aggregate
+  argv-plus-environment budgets before spawn. Native stdin remains available
+  where it preserves provider semantics; oversized argv prompts use an
+  operation-owned runtime file and a bounded bootstrap. Spawn errors preserve
+  their original OS cause and never trigger blind E2BIG retries.
 - workflow Goal Agents run as PTY-backed managed processes with shared transcript,
   input, resize, attention, and lifecycle state, so CLI and browser attachments
   observe the same process.

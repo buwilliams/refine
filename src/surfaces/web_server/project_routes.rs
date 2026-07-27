@@ -23,9 +23,7 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::prompts::{PromptTemplate, render};
-use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
+use crate::tools::host::agent_providers::{AgentProviderService, ProviderInvocation};
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::next_actions::FileNextActionsService;

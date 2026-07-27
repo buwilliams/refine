@@ -64,7 +64,7 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
-        match HostAgentProviderService::new().invoke(ProviderInvocation {
+        match self.agent_provider_service().invoke(ProviderInvocation {
             provider: provider.to_string(),
             prompt: prompt.to_string(),
             session_id: None,
@@ -89,7 +89,7 @@ impl InProcessWebServer {
                 "agent resume requires session_id".to_string(),
             ));
         };
-        match HostAgentProviderService::new().resume(provider, session_id) {
+        match self.agent_provider_service().resume(provider, session_id) {
             Ok(output) => ApiResponse::json(200, json!({"ok": true, "output": output})),
             Err(error) => error_response(error),
         }

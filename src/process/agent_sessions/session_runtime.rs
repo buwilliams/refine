@@ -103,6 +103,11 @@ where
             return Err(error);
         }
     };
+    if let Err(error) = command.validate_prompt_artifact() {
+        cleanup_session_artifacts(&command_path, &signal_path);
+        let _ = fs::remove_file(&stdout_path);
+        return Err(error);
+    }
     let mut metadata = launch.metadata;
     metadata.insert("kind".to_string(), json!("interactive_session"));
     metadata.insert("profile".to_string(), json!("goal"));
@@ -112,6 +117,14 @@ where
     metadata.insert("session_id".to_string(), json!(&session_id));
     metadata.insert("cwd".to_string(), json!(cwd.display().to_string()));
     metadata.insert("attention_state".to_string(), json!("working"));
+    metadata.insert(
+        "prompt_transport".to_string(),
+        serde_json::to_value(&command.prompt_transport).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode Goal Agent prompt transport metadata: {error}"
+            ))
+        })?,
+    );
     metadata.insert(
         "command_path".to_string(),
         json!(command_path.display().to_string()),
@@ -137,17 +150,12 @@ where
                 signal_path.display().to_string(),
             ),
         ],
-        stdin: None,
+        stdin: command.stdin.clone(),
         limits: Some(ProcessResourceLimits {
             kill_on_parent_exit: true,
             ..Default::default()
         }),
-        authorization_command: Some(
-            std::iter::once(command.binary.as_str())
-                .chain(command.args.iter().map(String::as_str))
-                .collect::<Vec<_>>()
-                .join(" "),
-        ),
+        authorization_command: Some(command.authorization_command.clone()),
         sensitive: false,
         metadata: metadata.clone(),
     };

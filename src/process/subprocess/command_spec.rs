@@ -13,9 +13,15 @@ pub(super) fn process_details(spec: &ManagedProcessSpec) -> String {
     }
     if !spec.metadata.is_empty() {
         let mut details = spec.metadata.clone();
-        details
-            .entry("command".to_string())
-            .or_insert_with(|| json!(process_command_line(spec)));
+        details.entry("command".to_string()).or_insert_with(|| {
+            json!(if spec.metadata.contains_key("prompt_transport") {
+                spec.authorization_command
+                    .clone()
+                    .unwrap_or_else(|| format!("{} [refine-managed-prompt]", spec.command))
+            } else {
+                process_command_line(spec)
+            })
+        });
         return serde_json::to_string(&details).unwrap_or_else(|_| spec.args.join(" "));
     }
     spec.args.join(" ")

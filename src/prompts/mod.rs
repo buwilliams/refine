@@ -177,13 +177,7 @@ mod tests {
     fn renders_embedded_markdown_template_variables() {
         let rendered = PromptEngine::render(
             PromptTemplate::GoalAgent,
-            &[
-                ("goal_id", "goal-123"),
-                ("agent_context", "{}"),
-                ("goal_context", "{}"),
-                ("previous_rounds", "[]"),
-                ("latest_round", "{\"round\":1}"),
-            ],
+            &[("goal_id", "goal-123"), ("agent_context", "{}")],
         )
         .unwrap();
 
@@ -203,9 +197,6 @@ mod tests {
                 &[
                     ("goal_id", "goal-123"),
                     ("agent_context", "{}"),
-                    ("goal_context", "{}"),
-                    ("previous_rounds", "[]"),
-                    ("latest_round", "{\"round\":1}"),
                     ("extra", "value"),
                 ]
             ),

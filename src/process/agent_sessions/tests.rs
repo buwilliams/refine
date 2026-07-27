@@ -289,6 +289,65 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-early-exec");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(&provider, "#!/definitely/missing/refine-interpreter\n").unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let error = run_goal_agent(
+        GoalAgentLaunch {
+            runtime_root: runtime_root.clone(),
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "large launch failure ".to_string() + &"x".repeat(158_078),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-EXEC-FAIL"))]),
+        },
+        |_| {},
+    )
+    .unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("No such file") || message.contains("os error 2"),
+        "{message}"
+    );
+    assert!(!message.contains("commands.jsonl"), "{message}");
+    let process_dir = runtime_root.join("processes");
+    assert!(
+        !process_dir.exists()
+            || fs::read_dir(&process_dir).unwrap().all(|entry| !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("commands"))
+    );
+    let prompts = runtime_root.join("agent-prompts");
+    assert!(!prompts.exists() || fs::read_dir(prompts).unwrap().next().is_none());
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn silent_goal_agent_remains_autonomous_without_requesting_input() {
     let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()

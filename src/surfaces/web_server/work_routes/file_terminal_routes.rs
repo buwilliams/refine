@@ -182,6 +182,9 @@ impl InProcessWebServer {
                 command: default_interactive_shell(),
                 args: vec!["-i".to_string()],
                 metadata,
+                prompt_transport: None,
+                prompt_artifact: None,
+                authorization_command: None,
             }
         } else {
             let provider = self
@@ -228,6 +231,9 @@ impl InProcessWebServer {
                 command: command.binary,
                 args: command.args,
                 metadata,
+                prompt_transport: Some(command.prompt_transport),
+                prompt_artifact: command.prompt_artifact,
+                authorization_command: Some(command.authorization_command),
             }
         };
 

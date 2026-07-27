@@ -20,6 +20,10 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
     assert!(updated["settings"].get("paused").is_none());
     assert!(service.path().exists());
     assert!(!refine_dir.join(SETTINGS_FILE).exists());
+    let generic = service
+        .update(&serde_json::json!({"agent_cli": "/opt/refine/custom-agent"}))
+        .unwrap();
+    assert_eq!(generic["settings"]["agent_cli"], "/opt/refine/custom-agent");
 
     fs::remove_dir_all(temp_root).unwrap();
 }

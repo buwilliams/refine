@@ -2,28 +2,28 @@ use super::*;
 
 #[derive(Clone, Debug)]
 pub(super) struct ProviderSpec {
-    pub(super) name: &'static str,
-    pub(super) display_name: &'static str,
-    pub(super) binary: &'static str,
-    pub(super) output_format: &'static str,
+    pub(super) name: String,
+    pub(super) display_name: String,
+    pub(super) binary: String,
+    pub(super) output_format: String,
     pub(super) supports_resume: bool,
     pub(super) supports_direct_api: bool,
 }
 
 impl ProviderSpec {
     pub(super) fn new(
-        name: &'static str,
-        display_name: &'static str,
-        binary: &'static str,
-        output_format: &'static str,
+        name: &str,
+        display_name: &str,
+        binary: &str,
+        output_format: &str,
         supports_resume: bool,
         supports_direct_api: bool,
     ) -> Self {
         Self {
-            name,
-            display_name,
-            binary,
-            output_format,
+            name: name.to_string(),
+            display_name: display_name.to_string(),
+            binary: binary.to_string(),
+            output_format: output_format.to_string(),
             supports_resume,
             supports_direct_api,
         }
@@ -35,7 +35,7 @@ impl ProviderSpec {
         prompt: &str,
         cwd: Option<&Path>,
     ) -> Vec<String> {
-        match self.name {
+        match self.name.as_str() {
             "claude" => vec![
                 binary_path.to_string(),
                 "--print".to_string(),
@@ -88,7 +88,7 @@ impl ProviderSpec {
     }
 
     pub(super) fn interactive_args(&self, prompt: &str) -> Vec<String> {
-        match self.name {
+        match self.name.as_str() {
             "claude" => with_initial_prompt(
                 vec!["--dangerously-skip-permissions".to_string()],
                 prompt,
@@ -113,7 +113,7 @@ impl ProviderSpec {
         session_id: Option<&str>,
         cwd: Option<&Path>,
     ) -> Vec<String> {
-        match self.name {
+        match self.name.as_str() {
             "claude" => {
                 let mut args = vec![
                     binary_path.to_string(),
@@ -165,9 +165,32 @@ impl ProviderSpec {
         }
     }
 
-    pub(super) fn prompt_stdin(&self, prompt: &str) -> Option<String> {
-        (self.name == "codex" && !prompt.is_empty()).then(|| prompt.to_string())
+    pub(super) fn interactive_prompt_capability(&self) -> ProviderPromptCapability {
+        // Every interactive provider receives an initial prompt in argv today,
+        // so built-ins and configured generic CLIs share the file fallback.
+        ProviderPromptCapability::InlineOrFile
     }
+
+    pub(super) fn noninteractive_prompt_capability(&self) -> ProviderPromptCapability {
+        match self.name.as_str() {
+            "codex" => ProviderPromptCapability::NativeStdin,
+            // Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs
+            // put their complete noninteractive prompt in argv.
+            _ => ProviderPromptCapability::InlineOrFile,
+        }
+    }
+}
+
+pub(super) fn safe_authorization_command(
+    binary: &str,
+    interactive: bool,
+    transport: &PromptTransportMetadata,
+) -> String {
+    let mode = if interactive { "interactive" } else { "invoke" };
+    format!(
+        "{} {mode} [refine-managed-prompt kind={:?} bytes={} sha256={}]",
+        binary, transport.kind, transport.utf8_bytes, transport.sha256
+    )
 }
 
 fn with_initial_prompt(mut args: Vec<String>, prompt: &str, interactive_flag: bool) -> Vec<String> {

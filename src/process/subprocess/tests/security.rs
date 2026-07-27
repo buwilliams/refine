@@ -61,6 +61,50 @@ fn file_process_supervisor_redacts_sensitive_process_details_and_stdin() {
 }
 
 #[test]
+fn file_process_supervisor_redacts_managed_prompt_argv_and_stdin_only() {
+    let temp_root = unique_temp_dir("process-prompt-sensitive");
+    let runtime_root = temp_root.join("run/8080");
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let secret = "PROMPT_CONTENT_MUST_NOT_PERSIST";
+    let process = supervisor
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: shell_binary().to_string(),
+            args: shell_args("cat >/dev/null")
+                .into_iter()
+                .chain([secret.to_string()])
+                .collect(),
+            cwd: None,
+            env: Vec::new(),
+            stdin: Some(secret.to_string()),
+            limits: None,
+            authorization_command: Some(
+                "sh [refine-managed-prompt kind=stdin bytes=31]".to_string(),
+            ),
+            sensitive: false,
+            metadata: Map::from_iter([(
+                "prompt_transport".to_string(),
+                json!({
+                    "kind": "stdin",
+                    "utf8_bytes": 31,
+                    "sha256": "safe-digest",
+                    "owner": "safe-owner",
+                    "lifecycle": "owned"
+                }),
+            )]),
+        })
+        .unwrap()
+        .process;
+
+    let details = process.details.unwrap();
+    assert!(!details.contains(secret));
+    assert!(details.contains("safe-digest"));
+    assert!(details.contains("refine-managed-prompt"));
+    assert!(process.stdin_path.is_none());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_process_supervisor_strips_direct_api_keys_from_agent_processes() {
     let temp_root = unique_temp_dir("process-agent-env");
     let runtime_root = temp_root.join("run/8080");

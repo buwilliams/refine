@@ -263,13 +263,23 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
         assert_eq!(auth.body["error"]["code"], "degraded");
     }
 
-    let invalid = server.handle(ApiRequest {
+    let generic = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/agents/not-a-provider/diagnostics".to_string(),
+        path: "/api/agents/configured-generic-agent/diagnostics".to_string(),
         body: None,
     });
-    assert_eq!(invalid.status, 400);
-    assert_eq!(invalid.body["error"]["code"], "invalid_input");
+    assert_eq!(generic.status, 200);
+    assert_eq!(generic.body["provider"], "configured-generic-agent");
+    assert!(
+        generic.body["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry
+                .as_str()
+                .unwrap_or("")
+                .contains("configured-generic-agent CLI not found"))
+    );
 
     let recheck = server.handle(ApiRequest {
         method: "POST".to_string(),

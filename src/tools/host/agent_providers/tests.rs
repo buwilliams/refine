@@ -12,7 +12,7 @@ fn host_provider_service_detects_known_provider_binaries() {
 
     let service = HostAgentProviderService {
         path_override: Some(bin_dir.display().to_string()),
-        ..HostAgentProviderService::default()
+        runtime_root: Some(temp_root.join("run/8080")),
     };
     let providers = service.detect().unwrap();
     let codex = providers
@@ -22,16 +22,32 @@ fn host_provider_service_detects_known_provider_binaries() {
     assert!(codex.installed);
     assert!(codex.supports_resume);
     assert_eq!(codex.output_format, "codex_json");
+    assert_eq!(
+        codex.prompt_transport,
+        ProviderPromptCapability::NativeStdin
+    );
     let smoke_ai = providers
         .iter()
         .find(|provider| provider.name == "smoke-ai")
         .unwrap();
     assert!(smoke_ai.installed);
+    assert_eq!(
+        smoke_ai.prompt_transport,
+        ProviderPromptCapability::InlineOrFile
+    );
     let claude = providers
         .iter()
         .find(|provider| provider.name == "claude")
         .unwrap();
     assert!(!claude.installed);
+    for provider in providers.iter().filter(|provider| provider.name != "codex") {
+        assert_eq!(
+            provider.prompt_transport,
+            ProviderPromptCapability::InlineOrFile,
+            "{}",
+            provider.name
+        );
+    }
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -48,7 +64,7 @@ fn interactive_provider_commands_keep_the_native_cli_conversation_mode() {
     }
     let service = HostAgentProviderService {
         path_override: Some(bin_dir.display().to_string()),
-        ..HostAgentProviderService::default()
+        runtime_root: Some(temp_root.join("run/8080")),
     };
 
     for (provider, expected_args) in [
@@ -151,6 +167,83 @@ fn host_provider_service_sends_large_codex_prompts_over_stdin() {
         assert_eq!(result.output, "large prompt received");
     }
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn oversized_argv_provider_uses_exact_prompt_file_without_metadata_disclosure() {
+    let temp_root = unique_temp_dir("provider-large-file-prompt");
+    let bin_dir = temp_root.join("bin");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let smoke = bin_dir.join("smoke-ai");
+    fs::write(
+        &smoke,
+        concat!(
+            "#!/bin/sh\n",
+            "test \"$(printf '%s' \"$1\" | wc -c)\" -lt 4096 || exit 2\n",
+            "prompt_path=$(printf '%s' \"$1\" | sed -n '4{s/^`//;s/`$//;p;}')\n",
+            "test -r \"$prompt_path\" || exit 3\n",
+            "test \"$(wc -c < \"$prompt_path\")\" -eq 158078 || exit 4\n",
+            "test \"$(sha256sum \"$prompt_path\" | cut -d' ' -f1)\" = ",
+            "\"$(printf '%s' \"$1\" | sed -n '8{s/^- SHA-256: `//;s/`$//;p;}')\" || exit 5\n",
+            "printf '%s' \"$1\" > \"$0.argv\"\n",
+            "printf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"file prompt received\"}}'\n",
+        ),
+    )
+    .unwrap();
+    make_executable(&smoke);
+
+    let secret = "ROUND7_SECRET_";
+    let prompt = format!("{secret}{}", "x".repeat(158_078 - secret.len()));
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: Some(runtime_root.clone()),
+    };
+    let result = service
+        .invoke_detailed(ProviderInvocation {
+            provider: "smoke-ai".to_string(),
+            prompt,
+            session_id: None,
+            cwd: None,
+            process_metadata: Default::default(),
+        })
+        .unwrap();
+    assert!(result.output.contains("file prompt received"));
+    let captured_argv = fs::read_to_string(format!("{}.argv", smoke.display())).unwrap();
+    assert!(!captured_argv.contains(secret));
+    assert!(captured_argv.contains("complete authoritative task prompt"));
+    assert!(
+        fs::read_dir(runtime_root.join("agent-prompts"))
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn portable_pty_preserves_original_exec_errno() {
+    use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+
+    let pair = native_pty_system()
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .unwrap();
+    let mut command = CommandBuilder::new("/bin/true");
+    command.arg("x".repeat(200_000));
+    let error = pair.slave.spawn_command(command).unwrap_err();
+    let message = format!("{error:#}");
+    assert!(
+        message.contains("Argument list too long") || message.contains("os error 7"),
+        "original E2BIG was not retained: {message}"
+    );
+    assert!(!message.contains("output.write"), "{message}");
 }
 
 #[test]

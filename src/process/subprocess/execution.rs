@@ -55,7 +55,7 @@ impl FileProcessSupervisor {
         })?;
         let stdin_path = if let Some(stdin) = spec.stdin.as_deref() {
             let path = self.processes_dir().join(format!("{process_id}.stdin.txt"));
-            if !spec.sensitive {
+            if !spec.sensitive && !spec.metadata.contains_key("prompt_transport") {
                 fs::write(&path, stdin).map_err(|error| {
                     RefineError::Io(format!(
                         "failed to write process stdin {}: {error}",
@@ -68,7 +68,7 @@ impl FileProcessSupervisor {
                     RefineError::Io(format!("failed to send managed process stdin: {error}"))
                 })?;
             }
-            if spec.sensitive {
+            if spec.sensitive || spec.metadata.contains_key("prompt_transport") {
                 None
             } else {
                 Some(path.display().to_string())
