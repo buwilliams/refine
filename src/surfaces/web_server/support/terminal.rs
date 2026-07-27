@@ -312,6 +312,13 @@ impl TerminalSession {
         let mut command = CommandBuilder::new(&launch.command);
         command.args(&launch.args);
         command.cwd(&cwd);
+        if owner == ProcessOwner::Agent {
+            // Same precedence as the managed-process and Goal Agent paths: the user's
+            // configured environment first, then refine's own per-process variables.
+            for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
+                command.env(key, value);
+            }
+        }
         for (key, value) in &managed_spec.env {
             command.env(key, value);
         }
