@@ -290,6 +290,19 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         ensureTestTab(tabId);
         terminalStateFor(tabId).term = { resize };
       },
+      installTerminalResizerWithUnavailableDimensions(tabId, resize) {
+        ensureTestTab(tabId);
+        terminalStateFor(tabId).term = {
+          resize,
+          _core: {
+            _renderService: {
+              get dimensions() {
+                throw new TypeError("Cannot read properties of undefined (reading 'dimensions')");
+              },
+            },
+          },
+        };
+      },
       installTerminalScrollModel(tabId) {
         ensureTestTab(tabId);
         const terminal = terminalStateFor(tabId);
@@ -1026,6 +1039,38 @@ test("terminal columns refit when its rendered width changes", async () => {
   const backendResize = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
   assert.equal(backendResize.body.cols, sizes[1].cols);
   assert.equal(backendResize.body.rows, sizes[1].rows);
+});
+
+test("terminal resize falls back when xterm renderer dimensions are unavailable", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  const sizes = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    return {
+      id: "fallback-terminal",
+      process_id: "interactive-fallback-terminal",
+      cwd: "/repo",
+      profile: "terminal",
+      provider: null,
+    };
+  });
+  await browser.runtime.click("terminal");
+  browser.runtime.installTerminalResizerWithUnavailableDimensions(
+    "terminal",
+    (cols, rows) => sizes.push({ cols, rows }),
+  );
+
+  assert.doesNotThrow(() => browser.runtime.resizeOutput(720, 320));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  assert.equal(sizes.length, 1);
+  assert.ok(sizes[0].cols >= 20);
+  assert.ok(sizes[0].rows >= 8);
+  const backendResize = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.equal(backendResize.body.cols, sizes[0].cols);
+  assert.equal(backendResize.body.rows, sizes[0].rows);
 });
 
 test("terminal output and exit events remain scoped to their tab", async () => {
