@@ -95,7 +95,22 @@ where
 
     let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
     let protocol_prompt = goal_agent_protocol_prompt(&launch.prompt, &signal_path);
-    let command = match provider_service.interactive_command(&launch.provider, &protocol_prompt) {
+    let launch_env_overrides = vec![
+        ("TERM".to_string(), "xterm-256color".to_string()),
+        ("COLORTERM".to_string(), "truecolor".to_string()),
+        ("REFINE_TERMINAL".to_string(), "1".to_string()),
+        ("REFINE_SESSION_ROLE".to_string(), "goal".to_string()),
+        ("REFINE_AGENT_SESSION_ID".to_string(), session_id.clone()),
+        (
+            "REFINE_AGENT_SIGNAL_PATH".to_string(),
+            signal_path.display().to_string(),
+        ),
+    ];
+    let command = match provider_service.interactive_command_with_environment(
+        &launch.provider,
+        &protocol_prompt,
+        &launch_env_overrides,
+    ) {
         Ok(command) => command,
         Err(error) => {
             cleanup_session_artifacts(&command_path, &signal_path);
@@ -103,6 +118,11 @@ where
             return Err(error);
         }
     };
+    if let Err(error) = command.validate_prompt_artifact() {
+        cleanup_session_artifacts(&command_path, &signal_path);
+        let _ = fs::remove_file(&stdout_path);
+        return Err(error);
+    }
     let mut metadata = launch.metadata;
     metadata.insert("kind".to_string(), json!("interactive_session"));
     metadata.insert("profile".to_string(), json!("goal"));
@@ -112,6 +132,14 @@ where
     metadata.insert("session_id".to_string(), json!(&session_id));
     metadata.insert("cwd".to_string(), json!(cwd.display().to_string()));
     metadata.insert("attention_state".to_string(), json!("working"));
+    metadata.insert(
+        "prompt_transport".to_string(),
+        serde_json::to_value(&command.prompt_transport).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode Goal Agent prompt transport metadata: {error}"
+            ))
+        })?,
+    );
     metadata.insert(
         "command_path".to_string(),
         json!(command_path.display().to_string()),
@@ -126,28 +154,13 @@ where
         command: command.binary.clone(),
         args: command.args.clone(),
         cwd: Some(cwd.display().to_string()),
-        env: vec![
-            ("TERM".to_string(), "xterm-256color".to_string()),
-            ("COLORTERM".to_string(), "truecolor".to_string()),
-            ("REFINE_TERMINAL".to_string(), "1".to_string()),
-            ("REFINE_SESSION_ROLE".to_string(), "goal".to_string()),
-            ("REFINE_AGENT_SESSION_ID".to_string(), session_id.clone()),
-            (
-                "REFINE_AGENT_SIGNAL_PATH".to_string(),
-                signal_path.display().to_string(),
-            ),
-        ],
-        stdin: None,
+        env: launch_env_overrides,
+        stdin: command.stdin.clone(),
         limits: Some(ProcessResourceLimits {
             kill_on_parent_exit: true,
             ..Default::default()
         }),
-        authorization_command: Some(
-            std::iter::once(command.binary.as_str())
-                .chain(command.args.iter().map(String::as_str))
-                .collect::<Vec<_>>()
-                .join(" "),
-        ),
+        authorization_command: Some(command.authorization_command.clone()),
         sensitive: false,
         metadata: metadata.clone(),
     };
@@ -180,25 +193,7 @@ where
     let mut pty_command = CommandBuilder::new(&command.binary);
     pty_command.args(&command.args);
     pty_command.cwd(&cwd);
-    // Same precedence as the managed-process path: the user's configured
-    // environment first, then refine's own per-process variables.
-    for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
-        pty_command.env(key, value);
-    }
-    for (key, value) in &managed_spec.env {
-        pty_command.env(key, value);
-    }
-    for key in [
-        "ANTHROPIC_API_KEY",
-        "CLAUDE_API_KEY",
-        "CODEX_API_KEY",
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "GOOGLE_GENAI_API_KEY",
-        "OPENAI_API_KEY",
-    ] {
-        pty_command.env_remove(key);
-    }
+    command.launch_environment.apply_to_pty(&mut pty_command);
     let mut child = match pair.slave.spawn_command(pty_command) {
         Ok(child) => child,
         Err(error) => {

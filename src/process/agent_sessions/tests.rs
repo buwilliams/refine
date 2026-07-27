@@ -289,6 +289,142 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn workflow_goal_agent_pty_uses_configured_final_environment_for_file_transport() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-final-environment");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let config_root = root.join("config");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::create_dir_all(config_root.join("refine")).unwrap();
+    let mut configured = (0..23)
+        .map(|index| format!("REFINE_CONFIGURED_{index}={}\n", "e".repeat(65_800)))
+        .collect::<String>();
+    configured.push_str("REFINE_SESSION_ROLE=configured-must-lose\n");
+    configured.push_str("OPENAI_API_KEY=configured-must-be-removed\n");
+    fs::write(config_root.join("refine/agent.env"), configured).unwrap();
+    fs::write(
+        &provider,
+        concat!(
+            "#!/bin/sh\n",
+            "prompt_path=$(printf '%s' \"$1\" | sed -n '4{s/^`//;s/`$//;p;}')\n",
+            "expected_bytes=$(printf '%s' \"$1\" | sed -n '7{s/^- UTF-8 bytes: `//;s/`$//;p;}')\n",
+            "expected_sha=$(printf '%s' \"$1\" | sed -n '8{s/^- SHA-256: `//;s/`$//;p;}')\n",
+            "test \"$(wc -c < \"$prompt_path\")\" = \"$expected_bytes\" || exit 2\n",
+            "test \"$(sha256sum \"$prompt_path\" | cut -d' ' -f1)\" = \"$expected_sha\" || exit 3\n",
+            "grep -q 'GOAL_FINAL_ENV_PROMPT_SECRET' \"$prompt_path\" || exit 4\n",
+            "test \"$(printf '%s' \"$REFINE_CONFIGURED_0\" | wc -c)\" -eq 65800 || exit 5\n",
+            "test \"$REFINE_SESSION_ROLE\" = goal || exit 6\n",
+            "test \"${OPENAI_API_KEY-unset}\" = unset || exit 7\n",
+            "printf 'goal-final-environment-prompt-received\\n'\n",
+        ),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    let previous_config = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+        std::env::set_var("XDG_CONFIG_HOME", &config_root);
+    }
+    let secret = "GOAL_FINAL_ENV_PROMPT_SECRET";
+    let prompt = format!("{secret}{}", "p".repeat(60_000 - secret.len()));
+    let result = run_goal_agent(
+        GoalAgentLaunch {
+            runtime_root,
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt,
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-FINAL-ENV"))]),
+        },
+        |_| {},
+    )
+    .unwrap();
+
+    assert!(
+        result
+            .output
+            .contains("goal-final-environment-prompt-received")
+    );
+    unsafe {
+        match previous_provider {
+            Some(value) => std::env::set_var("REFINE_SMOKE_AI_PATH", value),
+            None => std::env::remove_var("REFINE_SMOKE_AI_PATH"),
+        }
+        match previous_config {
+            Some(value) => std::env::set_var("XDG_CONFIG_HOME", value),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-early-exec");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(&provider, "#!/definitely/missing/refine-interpreter\n").unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let error = run_goal_agent(
+        GoalAgentLaunch {
+            runtime_root: runtime_root.clone(),
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "large launch failure ".to_string() + &"x".repeat(158_078),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-EXEC-FAIL"))]),
+        },
+        |_| {},
+    )
+    .unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("No such file") || message.contains("os error 2"),
+        "{message}"
+    );
+    assert!(!message.contains("commands.jsonl"), "{message}");
+    let process_dir = runtime_root.join("processes");
+    assert!(
+        !process_dir.exists()
+            || fs::read_dir(&process_dir).unwrap().all(|entry| !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("commands"))
+    );
+    let prompts = runtime_root.join("agent-prompts");
+    assert!(!prompts.exists() || fs::read_dir(prompts).unwrap().next().is_none());
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn silent_goal_agent_remains_autonomous_without_requesting_input() {
     let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()

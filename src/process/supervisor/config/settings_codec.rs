@@ -127,15 +127,26 @@ pub(super) fn legacy_setting_key(key: &str) -> Option<&'static str> {
 pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
     match key {
         "agent_cli" => {
-            let choice = as_string(value).trim().to_ascii_lowercase();
+            let raw = as_string(value);
+            let choice = raw.trim();
+            let known = choice.to_ascii_lowercase();
             if matches!(
-                choice.as_str(),
+                known.as_str(),
                 "claude" | "codex" | "gemini" | "copilot" | "smoke-ai"
             ) {
-                Ok(choice)
+                Ok(known)
+            } else if !choice.is_empty()
+                && !choice.as_bytes().contains(&0)
+                && !choice.chars().any(char::is_whitespace)
+            {
+                // A configured generic provider is one executable path/name.
+                // Provider-specific prompt semantics still remain centralized
+                // in HostAgentProviderService's generic capability contract.
+                Ok(choice.to_string())
             } else {
                 Err(RefineError::InvalidInput(
-                    "agent_cli must be one of claude, codex, gemini, copilot, smoke-ai".to_string(),
+                    "agent_cli must be a known provider or one generic CLI executable without whitespace"
+                        .to_string(),
                 ))
             }
         }

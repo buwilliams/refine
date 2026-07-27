@@ -52,14 +52,21 @@ fn goal_agent_prompt_uses_latest_round_with_goal_and_previous_round_context() {
     assert!(prompt.contains("Build the first version."));
     assert!(prompt.contains("Added the initial implementation."));
     assert!(prompt.contains("Focused tests passed."));
-    assert!(prompt.contains("Latest Round to implement:"));
+    assert!(prompt.contains("\"current_round\""));
     assert!(prompt.contains("Keep the implementation and add the missing edge case."));
     assert!(prompt.contains("If they conflict, the latest Round wins"));
     assert!(!prompt.contains("PREVIOUS LOGS MUST NOT ENTER THE PROMPT"));
     assert!(!prompt.contains("CURRENT LOGS MUST NOT ENTER THE PROMPT"));
     assert!(
         prompt.find("Build the first version.").unwrap()
-            < prompt.find("Latest Round to implement:").unwrap()
+            < prompt.find("\"current_round\"").unwrap()
+    );
+    assert_eq!(prompt.matches("Build the first version.").count(), 1);
+    assert_eq!(
+        prompt
+            .matches("Keep the implementation and add the missing edge case.")
+            .count(),
+        1
     );
 }
 

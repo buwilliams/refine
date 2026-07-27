@@ -74,6 +74,11 @@ uuid = { version = "1", features = ["v4"] }
 tokio-stream = "0.1"
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync"] }
-portable-pty = "0.8"
+portable-pty = "0.9"
 pulldown-cmark = "0.12"
 fs2 = "0.4"
+libc = "0.2"
+sha2 = "0.10"
+
+[patch.crates-io]
+portable-pty = { path = "vendor/portable-pty" }

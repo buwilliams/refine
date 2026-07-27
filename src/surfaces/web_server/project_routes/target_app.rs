@@ -187,7 +187,7 @@ impl InProcessWebServer {
                     self.runtime_root.as_deref(),
                     body,
                 );
-                match HostAgentProviderService::new().invoke(ProviderInvocation {
+                match self.agent_provider_service().invoke(ProviderInvocation {
                     provider: provider.clone(),
                     prompt: target_app_generation_prompt(&service.target_root),
                     session_id: None,
