@@ -1285,6 +1285,12 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
     if (stopped?.termination?.confirmed_exit === false) {
       throw new Error("Process termination was not confirmed.");
     }
+    if (stopped?.worktree_retention?.retained) {
+      toast(
+        "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+        "info",
+      );
+    }
     if (terminal.sessionId !== sessionId) return;
     finishTerminalExit(tab, terminal);
     refreshProcessesTabForChatChange();
@@ -2864,6 +2870,12 @@ async function closeChatTab(tabId) {
     const stopped = await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/stop`);
     if (stopped?.termination?.confirmed_exit === false) {
       throw new Error("Process termination was not confirmed.");
+    }
+    if (stopped?.worktree_retention?.retained) {
+      toast(
+        "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+        "info",
+      );
     }
   } catch (error) {
     const sessionMissing = error?.code === "not_found" || error?.status === 404;

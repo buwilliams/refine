@@ -250,6 +250,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         expected: &GoalCancellationExpectation,
+        target_status: GoalStatus,
     ) -> RefineResult<GoalCancellationTransaction> {
         let goal_lock = self.acquire_goal_mutation_lock()?;
         let current = self.show_goal_summary(goal_id)?;
@@ -259,7 +260,7 @@ impl FileWorkItemService {
             || current.goal.updated != expected.updated
         {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} ownership fence changed before cancellation (expected status {}, round {}, revision {}; observed status {}, round {}, revision {}); the Goal was not cancelled",
+                "Goal {goal_id} ownership fence changed before stop settlement (expected status {}, round {}, revision {}; observed status {}, round {}, revision {}); the Goal was not changed",
                 expected.status.as_str(),
                 expected.round_count,
                 expected.updated,
@@ -270,30 +271,28 @@ impl FileWorkItemService {
         }
         if current.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(format!(
-                "done Goal {goal_id} cannot be cancelled"
+                "done Goal {goal_id} cannot be settled to {} by process control",
+                target_status.as_str()
             )));
         }
         let (goal_path, original) = self.read_goal_value_unchecked_locked(&current)?;
-        let mut cancelled = original.clone();
-        let object = cancelled.as_object_mut().ok_or_else(|| {
+        let mut settled = original.clone();
+        let object = settled.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         object.insert(
             "status".to_string(),
-            Value::String(GoalStatus::Cancelled.as_str().to_string()),
+            Value::String(target_status.as_str().to_string()),
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
-        set_workflow_revision(
-            &mut cancelled,
-            workflow_revision(&original).saturating_add(1),
-        )?;
+        set_workflow_revision(&mut settled, workflow_revision(&original).saturating_add(1))?;
         Ok(GoalCancellationTransaction {
             service: self.clone(),
             _lock: goal_lock,
             goal_id: goal_id.to_string(),
             goal_path,
             original,
-            cancelled,
+            settled,
             committed: false,
         })
     }
@@ -302,7 +301,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         original: &Value,
-        cancelled: &Value,
+        settled: &Value,
         restored: Option<&Value>,
     ) -> RefineResult<GoalCancellationTransaction> {
         let goal_lock = self.acquire_goal_mutation_lock()?;
@@ -313,7 +312,7 @@ impl FileWorkItemService {
             original
         } else if restored.is_some_and(|restored| current_value == *restored) {
             restored.expect("restored Goal replay state was checked")
-        } else if &current_value == cancelled {
+        } else if &current_value == settled {
             original
         } else {
             return Err(RefineError::Conflict(format!(
@@ -326,8 +325,8 @@ impl FileWorkItemService {
             goal_id: goal_id.to_string(),
             goal_path,
             original: replay_original.clone(),
-            cancelled: cancelled.clone(),
-            committed: current_value == *cancelled,
+            settled: settled.clone(),
+            committed: current_value == *settled,
         })
     }
 }

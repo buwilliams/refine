@@ -84,7 +84,7 @@ fn cancellation_settlement_failures_restore_exact_durable_state_and_are_recovera
             transaction_receipt["recovery"]
                 .as_str()
                 .unwrap()
-                .contains("retry cancellation through the shared capability")
+                .contains("same explicit termination intent")
         );
         let process_receipt: Value = serde_json::from_slice(
             &fs::read(
@@ -205,7 +205,7 @@ fn rollback_failed_after_goal_restore_replays_from_exact_restored_revision() {
         .cancel_workflow_execution(execution_id)
         .unwrap();
     assert_eq!(replayed["cancelled"], true);
-    assert_eq!(replayed["replayed_settlement"], true);
+    assert_eq!(replayed["settled_after_claim_cancellation"], true);
     assert_eq!(replayed["goal"]["status"], "cancelled");
     let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
     assert_eq!(serde_json::to_vec(&state.policy).unwrap(), policy_bytes);
@@ -248,12 +248,13 @@ fn rollback_failed_after_goal_restore_replays_from_exact_restored_revision() {
     .unwrap();
     assert_eq!(process_receipt["state"], "completed");
     assert_eq!(process_receipt["goal_cancelled"], true);
+    assert_eq!(process_receipt["goal_requeued"], false);
     assert_eq!(process_receipt["claim_cancelled"], true);
     let repeated = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
         .cancel_workflow_execution(execution_id)
         .unwrap();
     assert_eq!(repeated["cancelled"], true);
-    assert_eq!(repeated["replayed_settlement"], true);
+    assert_eq!(repeated["goal"]["status"], "cancelled");
 
     remove_temp_dir(&temp_root);
 }
@@ -451,7 +452,7 @@ fn interrupted_settlement_replays_after_restart_before_cancelled_short_circuit()
             .cancel_workflow_execution(&execution_id)
             .unwrap();
         assert_eq!(replayed["cancelled"], true);
-        assert_eq!(replayed["replayed_settlement"], true);
+        assert_eq!(replayed["settled_after_claim_cancellation"], true);
         assert_eq!(replayed["goal"]["status"], "cancelled");
 
         let committed: CancellationSettlementJournal =
@@ -512,6 +513,7 @@ fn interrupted_settlement_replays_after_restart_before_cancelled_short_circuit()
         .unwrap();
         assert_eq!(process_receipt["state"], "completed");
         assert_eq!(process_receipt["goal_cancelled"], true);
+        assert_eq!(process_receipt["goal_requeued"], false);
         assert_eq!(process_receipt["claim_cancelled"], true);
 
         remove_temp_dir(&temp_root);

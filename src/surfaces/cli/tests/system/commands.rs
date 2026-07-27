@@ -159,7 +159,8 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
     assert_eq!(stopped["process"]["status"], "stopped");
     assert_eq!(stopped["termination"]["confirmed_exit"], true);
     assert_eq!(stopped["goal"]["id"], "GOAL-NESTED");
-    assert_eq!(stopped["goal"]["status"], "cancelled");
+    assert_eq!(stopped["goal"]["status"], "todo");
+    assert_eq!(stopped["worktree_retention"]["retained"], false);
     assert!(agent_supervisor.inspect(&stoppable.id).is_err());
     assert_eq!(
         work_items
@@ -167,7 +168,7 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
             .unwrap()
             .goal
             .status,
-        GoalStatus::Cancelled
+        GoalStatus::Todo
     );
 
     let missing = system_ps_response(

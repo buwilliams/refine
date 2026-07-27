@@ -114,6 +114,8 @@ test("agent Stop delegates to the shared process-control API route", () => {
     .split('$$("[data-stop-agent]")')[1]
     .split('$$("[data-cancel-agent]")')[0];
   assert.doesNotMatch(stopHandler, /\/api\/goals\//);
+  assert.match(stopHandler, /stopped\?\.worktree_retention\?\.retained/);
+  assert.match(stopHandler, /toast\(/);
 });
 
 test("Agents excludes terminals and completed provider processes", () => {

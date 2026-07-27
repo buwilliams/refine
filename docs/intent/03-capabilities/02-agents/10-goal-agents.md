@@ -28,6 +28,12 @@ When a Goal enters implementation, Refine:
 - lets the browser Open Agent action and `refine agent open <goal-id>` attach to that same session;
 - continues automated workflow when the agent completes;
 - keeps the session and workflow claim alive when the agent explicitly reports that user input is required.
+- treats an explicit process Stop as interruption rather than Goal cancellation:
+  after confirmed exit it releases the exact claim, returns the Goal to todo
+  under its pinned Node owner, and retains every implementation worktree and
+  branch with durable recovery evidence. This successful retention is visible
+  through shared Process results; cleanup is a separate explicit
+  human-controlled operation.
 
 The completion and needs-input signals are control state, not a replacement transcript protocol. Durable product truth remains in Goal records, Git changes, logs, governance, quality evidence, and workflow state.
 

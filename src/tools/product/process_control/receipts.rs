@@ -6,17 +6,45 @@ impl FileProcessControlService {
         process_id: &str,
         goal_id: Option<&str>,
         termination: &ConfirmedProcessExit,
-        goal_cancelled: bool,
+        goal_status: Option<&GoalStatus>,
         claim_cancelled: bool,
+        worktree_retention: Option<&WorkflowWorktreeRetention>,
     ) -> RefineResult<()> {
-        let workflow = fs::read(
+        let retained = fs::read(
             self.runtime_root
                 .join("process-stop-outcomes")
                 .join(format!("{process_id}.json")),
         )
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .and_then(|receipt| receipt.get("workflow").cloned());
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let workflow = retained
+            .as_ref()
+            .and_then(|receipt| receipt.get("workflow").cloned());
+        let disposition = retained
+            .as_ref()
+            .and_then(|receipt| receipt.get("goal_disposition").cloned());
+        let termination_intent = retained
+            .as_ref()
+            .and_then(|receipt| receipt.get("termination_intent").cloned())
+            .or_else(|| {
+                disposition
+                    .clone()
+                    .and_then(|value| serde_json::from_value(value).ok())
+                    .map(TerminationIntent::from_legacy_disposition)
+                    .map(|intent| json!(intent))
+            });
+        let worktree = retained
+            .as_ref()
+            .and_then(|receipt| receipt.get("worktree").cloned());
+        let retention = worktree_retention.cloned().unwrap_or_else(|| {
+            WorkflowWorktreeRetention::from_targets(
+                &worktree
+                    .clone()
+                    .and_then(|value| serde_json::from_value(value).ok())
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+            )
+        });
         self.write_outcome_receipt(
             process_id,
             json!({
@@ -24,13 +52,20 @@ impl FileProcessControlService {
                 "process_id": process_id,
                 "goal_id": goal_id,
                 "workflow": workflow,
+                "termination_intent": termination_intent,
+                "goal_disposition": disposition,
+                "worktree": worktree,
                 "recorded_at": Utc::now().to_rfc3339(),
                 "termination": termination,
                 "confirmed_exit": termination.confirmed_exit,
                 "registry_cleanup_completed": termination.registry_cleanup_completed,
                 "identity_cleanup_completed": termination.identity_cleanup_completed,
-                "goal_cancelled": goal_cancelled,
-                "claim_cancelled": claim_cancelled
+                "goal_cancelled": goal_status == Some(&GoalStatus::Cancelled),
+                "goal_requeued": goal_status == Some(&GoalStatus::Todo),
+                "goal_status": goal_status.map(GoalStatus::as_str),
+                "claim_cancelled": claim_cancelled,
+                "worktree_retention": &retention,
+                "recovery": retention.recovery.as_deref()
             }),
         )
     }
@@ -60,26 +95,85 @@ impl FileProcessControlService {
         let registry_cleanup = termination_outcome_flag(&termination, "registry_cleanup_completed");
         let identity_cleanup = termination_outcome_flag(&termination, "identity_cleanup_completed");
         let cause_message = cause.to_string();
-        let recovery = "inspect the retained receipt and current Goal round and workflow claims; if cancellation is still intended, request it through the current Goal owner";
-        let retained_workflow = fs::read(
+        let retained_context = fs::read(
             self.runtime_root
                 .join("process-stop-outcomes")
                 .join(format!("{process_id}.json")),
         )
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .and_then(|receipt| receipt.get("workflow").cloned());
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let retained_workflow = retained_context
+            .as_ref()
+            .and_then(|receipt| receipt.get("workflow").cloned());
+        let retained_disposition = retained_context
+            .as_ref()
+            .and_then(|receipt| receipt.get("goal_disposition").cloned());
+        let retained_intent = retained_context
+            .as_ref()
+            .and_then(|receipt| receipt.get("termination_intent").cloned())
+            .or_else(|| {
+                retained_disposition
+                    .clone()
+                    .and_then(|value| serde_json::from_value(value).ok())
+                    .map(TerminationIntent::from_legacy_disposition)
+                    .map(|intent| json!(intent))
+            });
+        let retained_worktree = retained_context
+            .as_ref()
+            .and_then(|receipt| receipt.get("worktree").cloned());
+        let settlement = retained_workflow
+            .as_ref()
+            .and_then(|workflow| workflow.get("execution_id"))
+            .and_then(Value::as_str)
+            .and_then(|execution_id| {
+                self.cancellation_settlement_journal_for_execution(execution_id)
+                    .ok()
+                    .flatten()
+                    .map(|(_, journal)| journal)
+            });
+        let goal_cancelled = settlement
+            .as_ref()
+            .is_some_and(|journal| journal.goal_cancelled);
+        let goal_requeued = settlement
+            .as_ref()
+            .is_some_and(|journal| journal.goal_requeued);
+        let claim_cancelled = settlement
+            .as_ref()
+            .is_some_and(|journal| journal.claim_cancelled);
+        let mut retained_worktrees = settlement
+            .as_ref()
+            .map(|journal| journal.worktrees.clone())
+            .unwrap_or_default();
+        if let Some(worktree) = retained_worktree
+            .clone()
+            .and_then(|value| serde_json::from_value(value).ok())
+            && !retained_worktrees.contains(&worktree)
+        {
+            retained_worktrees.push(worktree);
+        }
+        let retention = WorkflowWorktreeRetention::from_targets(&retained_worktrees);
+        let recovery = if retained_disposition.as_ref().and_then(Value::as_str) == Some("requeue") {
+            "inspect the retained process and settlement receipts; retry Stop for the retained process id through the shared Process capability, which preserves the original interactive requeue and retained-worktree intent"
+        } else {
+            "inspect the retained process and settlement receipts; retry explicit Goal or workflow cancellation through the shared Process capability"
+        };
         let receipt = json!({
             "state": "partial_failure",
             "process_id": process_id,
             "goal_id": goal_id,
             "workflow": retained_workflow,
+            "termination_intent": retained_intent,
+            "goal_disposition": retained_disposition,
+            "worktree": retained_worktree,
             "recorded_at": Utc::now().to_rfc3339(),
             "termination": termination,
             "confirmed_exit": confirmed_exit,
             "registry_cleanup_completed": registry_cleanup,
             "identity_cleanup_completed": identity_cleanup,
-            "goal_cancelled": false,
+            "goal_cancelled": goal_cancelled,
+            "goal_requeued": goal_requeued,
+            "claim_cancelled": claim_cancelled,
+            "worktree_retention": &retention,
             "cause": cause_message,
             "recovery": recovery
         });
@@ -101,7 +195,8 @@ impl FileProcessControlService {
         error_with_message(
             cause,
             format!(
-                "process stop reached a partial outcome{}: confirmed_exit={confirmed_exit}, registry_cleanup_completed={registry_cleanup}, identity_cleanup_completed={identity_cleanup}, goal_cancelled=false; post-exit settlement failed: {cause_message}; {retained}; supported recovery: {recovery}",
+                "process stop reached a partial outcome{}: confirmed_exit={confirmed_exit}, registry_cleanup_completed={registry_cleanup}, identity_cleanup_completed={identity_cleanup}, goal_cancelled={goal_cancelled}, goal_requeued={goal_requeued}, claim_cancelled={claim_cancelled}, worktrees_retained={}; post-exit settlement failed: {cause_message}; {retained}; supported recovery: {recovery}",
+                retention.retained,
                 goal_id
                     .map(|goal_id| format!(" for Goal {goal_id}"))
                     .unwrap_or_default()

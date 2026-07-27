@@ -146,7 +146,7 @@ fn ownership_change_after_confirmed_exit_retains_truthful_partial_outcome() {
         receipt["recovery"]
             .as_str()
             .unwrap()
-            .contains("current Goal owner")
+            .contains("shared Process capability")
     );
 
     remove_temp_dir(&temp_root);

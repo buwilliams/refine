@@ -924,7 +924,7 @@ function bindSettingsProcessesTab(s) {
       const goalId = b.dataset.stopAgentGoal;
       const ok = await modalConfirm(
         goalId
-          ? "Stop this agent process? Its Goal will be cancelled only after the exact process exits."
+          ? "Stop this agent process? After the exact process exits, Refine will return its Goal to todo and retain every workflow worktree and branch. Cleanup is a separate explicit operation."
           : "Stop this agent process?",
         { title: "Stop agent", okLabel: "Stop agent", danger: true,
           cancelLabel: "Keep running" },
@@ -932,9 +932,15 @@ function bindSettingsProcessesTab(s) {
       if (!ok) return;
       await withButtonBusy(b, "Stopping…", async () => {
         try {
-          await api("POST", `/api/processes/${encodeURIComponent(processId)}/stop`, {
+          const stopped = await api("POST", `/api/processes/${encodeURIComponent(processId)}/stop`, {
             signal: "terminate",
           });
+          if (stopped?.worktree_retention?.retained) {
+            toast(
+              "Agent stopped and Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+              "info",
+            );
+          }
           await refreshProcessesSettingsTab();
         } catch (e) { await showActionError(e); }
       });
