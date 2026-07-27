@@ -1,73 +1,218 @@
 use super::*;
 
 #[test]
-fn goal_agent_prompt_uses_latest_round_with_goal_and_previous_round_context() {
-    let goal = json!({
-        "id": "GOAL1",
-        "name": "Keep the whole Goal visible",
-        "status": "in-progress",
-        "priority": "high",
-        "reporter": "Product",
-        "notes": [{"id": "NOTE1", "author": "Reviewer", "body": "Preserve compatibility."}],
-        "rounds": [
-            {
-                "reporter": "Product",
-                "assignee": "Agent One",
-                "prompt": "Build the first version.",
-                "implementation_report": "Added the initial implementation.",
-                "quality_state": "passed",
-                "quality_message": "Focused tests passed.",
-                "logs": [{"message": "PREVIOUS LOGS MUST NOT ENTER THE PROMPT"}]
-            },
-            {
-                "reporter": "Reviewer",
-                "assignee": "Agent Two",
-                "prompt": "Keep the implementation and add the missing edge case.",
-                "logs": [{"message": "CURRENT LOGS MUST NOT ENTER THE PROMPT"}]
-            }
-        ]
-    });
-
+fn goal_agent_prompt_renders_one_ordered_flat_markdown_specification() {
+    let sentinels = [
+        "PRODUCT_SENTINEL",
+        "CONSTITUTION_SENTINEL",
+        "RULE_ONE_SENTINEL",
+        "RULE_TWO_SENTINEL",
+        "GOAL_NAME_SENTINEL",
+        "GOAL_NOTE_SENTINEL",
+        "GUIDANCE_ZERO_SENTINEL",
+        "GUIDANCE_TWO_SENTINEL",
+        "PREVIOUS_ONE_REQUEST_SENTINEL",
+        "PREVIOUS_ONE_REPORT_SENTINEL",
+        "PREVIOUS_TWO_REQUEST_SENTINEL",
+        "PREVIOUS_TWO_GOVERNANCE_SENTINEL",
+        "NESTED_QUALITY_SENTINEL",
+        "LATEST_REQUEST_SENTINEL",
+    ];
     let prompt = goal_agent_prompt(
         "GOAL1",
         &json!({
             "version": 1,
-            "governance": {"product": "Refine", "constitution": "Be useful", "rules": []},
-            "workflow_summary": "Implement, verify, and stop at Review.",
-            "guidance_candidates": [],
-            "goal": selected_agent_context(
-                &goal,
-                &["id", "name", "priority", "reporter", "assignee", "notes"],
-            ),
-            "previous_rounds": [round_agent_context(&goal["rounds"][0], 0)],
-            "current_round": round_agent_context(&goal["rounds"][1], 1),
+            "assembled_at": "TIMESTAMP_MUST_NOT_ENTER_THE_PROMPT",
+            "governance": {
+                "product": "PRODUCT_SENTINEL",
+                "constitution": "CONSTITUTION_SENTINEL",
+                "configured": true,
+                "rules": [
+                    {"id": "rule-1", "text": "RULE_ONE_SENTINEL", "created": "RULE_TIMESTAMP_MUST_NOT_ENTER"},
+                    {"id": "rule-2", "text": "RULE_TWO_SENTINEL"}
+                ]
+            },
+            "workflow_summary": "WORKFLOW_SENTINEL: isolated worktree through human Review.",
+            "guidance_candidates": [
+                {
+                    "enabled": true,
+                    "name": "GUIDANCE_ZERO_SENTINEL",
+                    "rule": "GUIDANCE_ZERO_RULE_SENTINEL",
+                    "instructions": "GUIDANCE_ZERO_INSTRUCTIONS_SENTINEL"
+                },
+                {
+                    "enabled": false,
+                    "name": "DISABLED_GUIDANCE_MUST_NOT_ENTER",
+                    "instructions": "DISABLED_INSTRUCTIONS_MUST_NOT_ENTER"
+                },
+                {
+                    "enabled": true,
+                    "name": "GUIDANCE_TWO_SENTINEL",
+                    "rule": "GUIDANCE_TWO_RULE_SENTINEL",
+                    "instructions": "GUIDANCE_TWO_INSTRUCTIONS_SENTINEL"
+                }
+            ],
+            "goal": {
+                "id": "GOAL1",
+                "name": "GOAL_NAME_SENTINEL",
+                "priority": "high",
+                "reporter": "GOAL_REPORTER_SENTINEL",
+                "assignee": "GOAL_ASSIGNEE_SENTINEL",
+                "node_id": "NODE_SENTINEL",
+                "notes": [{
+                    "author": "NOTE_AUTHOR_SENTINEL",
+                    "body": "GOAL_NOTE_SENTINEL\n\n- preserved Markdown"
+                }],
+                "empty": "",
+                "classification": "unclassified"
+            },
+            "previous_rounds": [
+                {
+                    "round": 1,
+                    "reporter": "ROUND_ONE_REPORTER_SENTINEL",
+                    "prompt": "PREVIOUS_ONE_REQUEST_SENTINEL",
+                    "implementation_report": "PREVIOUS_ONE_REPORT_SENTINEL",
+                    "quality_details": {
+                        "checks": [{
+                            "name": "NESTED_CHECK_NAME_SENTINEL",
+                            "outcome": "NESTED_QUALITY_SENTINEL"
+                        }]
+                    },
+                    "logs": [{"message": "RAW_PREVIOUS_LOG_MUST_NOT_ENTER"}]
+                },
+                {
+                    "round": 2,
+                    "prompt": "PREVIOUS_TWO_REQUEST_SENTINEL",
+                    "governance_message": "PREVIOUS_TWO_GOVERNANCE_SENTINEL"
+                }
+            ],
+            "current_round": {
+                "round": 3,
+                "reporter": "LATEST_REPORTER_SENTINEL",
+                "prompt": "LATEST_REQUEST_SENTINEL\n\n- Markdown with \"quotes\", {braces}, and Unicode café λ.",
+                "logs": [{"message": "RAW_CURRENT_LOG_MUST_NOT_ENTER"}]
+            }
         }),
     )
     .unwrap();
 
-    assert!(prompt.contains("Keep the whole Goal visible"));
-    assert!(prompt.contains("Be useful"));
-    assert!(prompt.contains("Implement, verify, and stop at Review."));
-    assert!(prompt.contains("Preserve compatibility."));
-    assert!(prompt.contains("Build the first version."));
-    assert!(prompt.contains("Added the initial implementation."));
-    assert!(prompt.contains("Focused tests passed."));
-    assert!(prompt.contains("\"current_round\""));
-    assert!(prompt.contains("Keep the implementation and add the missing edge case."));
-    assert!(prompt.contains("If they conflict, the latest Round wins"));
-    assert!(!prompt.contains("PREVIOUS LOGS MUST NOT ENTER THE PROMPT"));
-    assert!(!prompt.contains("CURRENT LOGS MUST NOT ENTER THE PROMPT"));
-    assert!(
-        prompt.find("Build the first version.").unwrap()
-            < prompt.find("\"current_round\"").unwrap()
-    );
-    assert_eq!(prompt.matches("Build the first version.").count(), 1);
+    for sentinel in sentinels {
+        assert_eq!(
+            prompt.matches(sentinel).count(),
+            1,
+            "{sentinel} must appear exactly once"
+        );
+    }
+    let headings = [
+        "## Refine Context",
+        "## What",
+        "## Why",
+        "## Rules",
+        "## Previous Rounds",
+        "## Latest Round",
+    ];
+    for pair in headings.windows(2) {
+        assert!(
+            prompt.find(pair[0]).unwrap() < prompt.find(pair[1]).unwrap(),
+            "{} must precede {}",
+            pair[0],
+            pair[1]
+        );
+    }
+    assert!(prompt.find("### Round 1").unwrap() < prompt.find("### Round 2").unwrap());
+    assert!(prompt.contains("#### 0. GUIDANCE_ZERO_SENTINEL"));
+    assert!(prompt.contains("#### 2. GUIDANCE_TWO_SENTINEL"));
+    assert!(prompt.contains("\"quotes\", {braces}, and Unicode café λ."));
+    assert!(prompt.trim_end().ends_with(
+        "LATEST_REQUEST_SENTINEL\n\n- Markdown with \"quotes\", {braces}, and Unicode café λ."
+    ));
+    for absent in [
+        "DISABLED_GUIDANCE_MUST_NOT_ENTER",
+        "DISABLED_INSTRUCTIONS_MUST_NOT_ENTER",
+        "RAW_PREVIOUS_LOG_MUST_NOT_ENTER",
+        "RAW_CURRENT_LOG_MUST_NOT_ENTER",
+        "TIMESTAMP_MUST_NOT_ENTER_THE_PROMPT",
+        "RULE_TIMESTAMP_MUST_NOT_ENTER",
+        "Pinned Goal Agent Context",
+        "\"agent_context\"",
+        "\"current_round\"",
+        "\"previous_rounds\"",
+        "\"goal\":",
+        "\\n",
+        "```json",
+        "{{",
+    ] {
+        assert!(!prompt.contains(absent), "{absent} must remain absent");
+    }
+}
+
+#[test]
+fn goal_agent_prompt_renders_empty_optional_context_cleanly() {
+    let latest = "LATEST_ONLY_SENTINEL";
+    let prompt = goal_agent_prompt(
+        "GOAL2",
+        &json!({
+            "version": 1,
+            "governance": {
+                "product": "",
+                "constitution": null,
+                "configured": false,
+                "rules": []
+            },
+            "workflow_summary": "",
+            "guidance_candidates": [],
+            "goal": {"id": "GOAL2", "notes": [], "priority": "unclassified"},
+            "previous_rounds": [],
+            "current_round": {"round": 1, "prompt": latest}
+        }),
+    )
+    .unwrap();
+
     assert_eq!(
-        prompt
-            .matches("Keep the implementation and add the missing edge case.")
-            .count(),
-        1
+        prompt,
+        r#"# Goal Agent Specification
+
+## Refine Context
+
+You are the workflow-owned Goal Agent for this implementation attempt. Work autonomously, implement and verify the ready Goal, leave the result reviewable, and ask nothing about routine decisions.
+
+### Goal Identity
+
+- **Pinned Context Version:** 1
+- **Goal ID:** GOAL2
+
+## What
+
+No additional product intent or Goal metadata was pinned.
+
+## Why
+
+- **Governance Configured:** No
+
+## Rules
+
+No governance rules or enabled Guidance candidates were pinned.
+
+## Previous Rounds
+
+No previous Rounds were pinned for this implementation attempt.
+
+## Latest Round
+
+This is the authoritative instruction to implement. It wins over conflicting Goal context or earlier Rounds.
+
+- **Round:** 1
+
+### Request
+
+LATEST_ONLY_SENTINEL"#
     );
+    assert!(prompt.contains("No previous Rounds were pinned"));
+    assert!(prompt.contains("No governance rules or enabled Guidance candidates were pinned."));
+    assert!(!prompt.contains("unclassified"));
+    assert!(!prompt.contains("null"));
+    assert_eq!(prompt.matches("# Goal Agent Specification").count(), 1);
+    assert!(prompt.trim_end().ends_with(latest));
 }
 
 #[test]

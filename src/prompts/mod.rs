@@ -17,6 +17,7 @@ pub enum PromptTemplate {
     ReleaseGoal,
     PostImplementationGovernance,
     PostImplementationQuality,
+    GoalAgentSpec,
     GoalAgent,
     GoalAgentSession,
     GovernanceGeneration,
@@ -44,6 +45,7 @@ impl PromptTemplate {
             Self::ReleaseGoal => "release-goal.md",
             Self::PostImplementationGovernance => "post-implementation-governance.md",
             Self::PostImplementationQuality => "post-implementation-quality.md",
+            Self::GoalAgentSpec => "spec.md",
             Self::GoalAgent => "goal-agent.md",
             Self::GoalAgentSession => "goal-agent-session.md",
             Self::GovernanceGeneration => "governance-generation.md",
@@ -73,6 +75,7 @@ impl PromptTemplate {
                 include_str!("post-implementation-governance.md")
             }
             Self::PostImplementationQuality => include_str!("post-implementation-quality.md"),
+            Self::GoalAgentSpec => include_str!("spec.md"),
             Self::GoalAgent => include_str!("goal-agent.md"),
             Self::GoalAgentSession => include_str!("goal-agent-session.md"),
             Self::GovernanceGeneration => include_str!("governance-generation.md"),
@@ -177,28 +180,24 @@ mod tests {
     fn renders_embedded_markdown_template_variables() {
         let rendered = PromptEngine::render(
             PromptTemplate::GoalAgent,
-            &[("goal_id", "goal-123"), ("agent_context", "{}")],
+            &[("spec", "# Goal Agent Specification")],
         )
         .unwrap();
 
-        assert!(rendered.contains("ready Goal goal-123"));
-        assert!(!rendered.contains("{{goal_id}}"));
+        assert_eq!(rendered, "# Goal Agent Specification");
+        assert!(!rendered.contains("{{spec}}"));
     }
 
     #[test]
     fn rejects_missing_and_unused_variables() {
         assert_eq!(
             PromptEngine::render(PromptTemplate::GoalAgent, &[]),
-            Err(PromptTemplateError::MissingVariable("goal_id".to_string()))
+            Err(PromptTemplateError::MissingVariable("spec".to_string()))
         );
         assert_eq!(
             PromptEngine::render(
                 PromptTemplate::GoalAgent,
-                &[
-                    ("goal_id", "goal-123"),
-                    ("agent_context", "{}"),
-                    ("extra", "value"),
-                ]
+                &[("spec", "specification"), ("extra", "value")]
             ),
             Err(PromptTemplateError::UnusedVariable("extra".to_string()))
         );
@@ -236,6 +235,7 @@ mod tests {
             PromptTemplate::ReleaseGoal,
             PromptTemplate::PostImplementationGovernance,
             PromptTemplate::PostImplementationQuality,
+            PromptTemplate::GoalAgentSpec,
             PromptTemplate::GoalAgent,
             PromptTemplate::GoalAgentSession,
             PromptTemplate::GovernanceGeneration,
