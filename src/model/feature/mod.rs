@@ -113,8 +113,15 @@ impl FeatureRollup {
             .iter()
             .find(|goal| matches!(goal.status, GoalStatus::Todo | GoalStatus::Backlog))
             .map(|goal| goal.id.clone());
+        let all_goals_final = goal_count > 0
+            && goals.iter().all(|goal| {
+                matches!(
+                    goal.status,
+                    GoalStatus::Done | GoalStatus::Failed | GoalStatus::Cancelled
+                )
+            });
 
-        let status = if goal_count > 0 && done_count == goal_count {
+        let status = if all_goals_final {
             GoalStatus::Done
         } else if active_count > 0 {
             GoalStatus::InProgress
@@ -202,6 +209,31 @@ pub fn failed_goal_feature_blocking_notice(
 mod tests {
     use super::*;
     use crate::model::goal::GoalPriority;
+
+    #[test]
+    fn feature_rollup_is_done_when_every_goal_has_a_final_status() {
+        let rollup = FeatureRollup::derive(&[
+            goal("GOAL1", GoalStatus::Done, Some(1)),
+            goal("GOAL2", GoalStatus::Failed, Some(2)),
+            goal("GOAL3", GoalStatus::Cancelled, Some(3)),
+        ]);
+
+        assert_eq!(rollup.status, GoalStatus::Done);
+        assert_eq!(rollup.done_count, 1);
+        assert_eq!(rollup.failed_count, 1);
+        assert_eq!(rollup.cancelled_count, 1);
+    }
+
+    #[test]
+    fn feature_rollup_is_not_done_when_any_goal_is_not_final() {
+        let rollup = FeatureRollup::derive(&[
+            goal("GOAL1", GoalStatus::Done, Some(1)),
+            goal("GOAL2", GoalStatus::Failed, Some(2)),
+            goal("GOAL3", GoalStatus::Todo, Some(3)),
+        ]);
+
+        assert_eq!(rollup.status, GoalStatus::Failed);
+    }
 
     #[test]
     fn failed_goal_feature_blocking_notice_names_later_feature_work() {

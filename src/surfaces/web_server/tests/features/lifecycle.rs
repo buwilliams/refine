@@ -134,6 +134,7 @@ fn web_server_cancels_and_deletes_features() {
         body: None,
     });
     assert_eq!(feature_cancel.status, 200);
+    assert_eq!(feature_cancel.body["rollup"]["status"], "done");
     assert_eq!(feature_cancel.body["rollup"]["cancelled_count"], 2);
     assert_eq!(feature_cancel.body["runtime_reconciled"]["processes"], 1);
     assert_eq!(feature_cancel.body["runtime_reconciled"]["operations"], 1);

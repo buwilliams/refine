@@ -22,6 +22,7 @@ Current implementation details that matter to intent:
 
 - Feature rows use shared table, filter, sort, bulk, and pagination behavior;
 - Feature details include a rollup, one always-visible inline Goal composer, and an ordered Goal list;
+- the state rollup treats done, failed, and cancelled Goals as final, so a non-empty Feature is done when every Goal has reached any of those final states while preserving the separate outcome counts;
 - the same inline composer creates Goals and edits editable Goal metadata, prompts, priority, and sequence placement without nesting another modal;
 - ordered placement expresses Feature dependencies as a visible “after” relationship while independent Goals remain unordered;
 - completed or protected Goals should not be casually disrupted by Feature-level actions;
