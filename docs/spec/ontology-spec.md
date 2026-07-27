@@ -1,4 +1,4 @@
-# Target-App Ontology And Ontology-Driven Implementation
+# Ontology-Driven Implementation
 
 ## Status
 
@@ -6,47 +6,48 @@ Draft.
 
 ## Summary
 
-Refine will add an optional target-app ontology to Governance. The ontology is a
-durable, structured description of the application: its entities, properties,
-relations, behaviors, rules, and current realization in the repository.
+Refine will add two things to Governance and one thing to implementation.
 
-Product, Constitution, and Ontology form the generative semantic specification
-for a target app:
+To Governance:
+
+- **Architecture** — a concise, human-owned statement of the target app's
+  intended shape: tech stack, surfaces, persistence, business logic and
+  authority, and integrations.
+- **Rules** — the existing plain-English Governance rules, unchanged in shape,
+  but supplied wherever implementation decisions are made rather than only at
+  final Governance.
+
+To implementation: Refine will replace the current single semantic Goal Agent
+completion with an optional, durable implementation sub-workflow driven by a
+**two-stage planner**.
 
 ```text
-Product       defines the intended outcomes and users
-Constitution  defines principles every realization must preserve
-Ontology      defines what exists, how it behaves, and what remains valid
-Source code   is one concrete realization of those semantics
+Product        the intended outcomes and users
+Constitution   the principles every realization must preserve
+Architecture   the intended shape of the system
+Rules          the constraints Governance enforces
+Source code    one concrete realization, which may currently violate any of them
 ```
 
-Rules become part of the ontology rather than a separate Governance data source.
-They reference ontology concepts and declare how Refine should establish
-compliance through structural validation, repository observations, behavioral
-evidence, Governance judgment, or human Review.
+Stage one derives a **plan model**: the concepts, seams, and authority
+boundaries relevant to one Goal, derived just-in-time from Governance, the
+repository, and Goal history. Stage two decomposes the work into steps cut along
+those seams. Refine validates and pins both stages, then executes the plan
+deterministically, one focused step at a time.
 
-The ontology is useful only when incorporated into implementation. Refine will
-replace the current single semantic Goal Agent completion with an optional,
-durable implementation sub-workflow:
+The plan model is derived per implementation attempt and discarded with the
+plan. Refine does not maintain a durable ontology graph. What persists across
+Goals is Architecture and Rules — the parts a repository cannot express — while
+the structural model that a specific Goal needs is derived fresh each time.
 
-1. A planning agent receives Product, Constitution, Ontology, Goal history, the
-   current Round, and repository access.
-2. It proposes an ontology-driven implementation plan in a constrained format.
-3. Refine validates and pins that plan.
-4. Refine executes one focused implementation step at a time, giving the active
-   agent only the relevant ontology slice, rules, prerequisites, and evidence.
-5. Refine deterministically observes changes, evaluates obligations, records
-   evidence, checkpoints successful steps, and either advances, replans, or
-   fails.
-6. Existing full Governance, Quality, Ready Merge, build, and human Review
-   boundaries remain authoritative.
+This is deliberate. A durable graph must choose one granularity for all future
+work, which is unsolvable in principle because the right granularity depends on
+the task. It also freezes today's model's articulation into a maintained
+artifact. Deriving per Goal fits granularity to the work, improves automatically
+as providers improve, and eliminates the maintenance burden that ends most
+ontology projects.
 
-The web surface will present the ontology visually with a bounded tldraw
-application. The canvas is a projection and editing surface over the same shared
-ontology capability used by CLI, API, MCP, agents, and Workflow. tldraw state is
-never the authoritative ontology.
-
-Refine continues to work normally when no ontology is configured.
+Refine continues to work normally when no Architecture is configured.
 
 ## Motivation
 
@@ -58,49 +59,103 @@ the internal implementation process remains one semantic step.
 
 This leaves several recurring failure modes:
 
-- the agent reconstructs the target app's conceptual model from prose and code;
+- the agent infers intended structure from current structure, and cannot
+  distinguish a deliberate seam from an accident of history;
 - relevant project-wide constraints compete with unrelated prompt context;
 - cross-capability and cross-surface effects are discovered late or missed;
 - the agent decides its own implementation sequence without durable checkpoints;
 - Governance detects violations only after the complete implementation attempt;
 - reviewers see code and workflow evidence without a shared semantic account of
   what application concepts changed;
-- incorrect or incomplete project understanding is not converted into a
-  reviewable target-app model improvement.
+- a violated intention is corrected in one Round and forgotten, rather than
+  becoming a durable constraint that holds for every later Goal.
 
 Refine's Workflow already demonstrates the desired control pattern. It is an
 executable ontology of delivery: Goals, Rounds, processes, candidates, evidence,
 states, transitions, and review boundaries have explicit meaning, and agents
 cannot bypass the deterministic engine that applies that meaning.
 
-The target-app ontology extends the same pattern to implementation semantics:
+Two-stage planning extends the same pattern to implementation semantics:
 
 ```text
 Workflow governs how implementation proceeds.
-Ontology governs what a valid implementation means.
+The plan model governs what a valid implementation means for this Goal.
+Rules govern what must remain true across every Goal.
 ```
+
+Decomposition quality is the mechanism. Implementation steps cut along declared
+seams produce checkpoints that are individually coherent: a plan that fails at
+step four of five leaves four complete, reviewable units and one unstarted
+piece. Steps cut by file-layout intuition instead produce partial states no one
+designed, which are harder to review than a single coherent failed attempt.
+Stage one exists so that stage two has seams to cut along.
 
 ## Design Principles
 
-### Optional Model, Mandatory Use When Present
+### Stochastically Derived, Deterministically Enforced
 
-Ontology configuration is optional. Its absence must preserve current Goal
-behavior and must not make Governance incomplete.
+This is the central axiom of the design.
 
-When an ontology is present and accepted, Goal Workflow must use it. An agent
-cannot opt out of impact classification, omit applicable ontology rules, or
-replace the pinned ontology revision with current mutable state.
+Semantics are **derived and judged stochastically** — an LLM proposes concepts,
+seams, granularity, and wording, and an LLM judges whether a change honors a
+rule. Selecting the right concepts at the right level of detail, and deciding
+whether prose intent was violated, are judgment problems that cannot be
+programmed. No deterministic procedure extracts intent from a repository or
+adjudicates it against a diff.
+
+Process is **enforced deterministically** — the model and plan are pinned as
+data, and everything structural about their execution is computed rather than
+argued: step readiness and sequencing, evidence obligations, Git and worktree
+observation, checkpoint creation, cancellation, recovery, immutability of
+completed work, and workflow transitions. An agent cannot advance a step, mark
+itself successful, skip a rule from its context, or alter what it was judged
+against.
+
+The distinction is precise and worth stating in the negative: **Refine is not
+deterministic about verdicts. It is deterministic about process.** Whether a
+change violates a rule is reasoned. Whether that reasoning was performed against
+the pinned context, recorded with evidence, and permitted to advance state is
+computed.
+
+Both halves are required. Stochastic semantics without deterministic process is
+a document nobody obeys. Deterministic process without stochastic semantics is a
+schema nobody can fill in usefully. The value comes from the seam between them:
+judgment good enough to be worth obeying, wrapped in machinery that cannot be
+talked out of applying it.
+
+### Durable Intent, Derived Structure
+
+Anything a competent reader could conclude from the repository is derived, not
+stored. Anything the repository cannot express is durable.
+
+```text
+Durable    Product, Constitution, Architecture, Rules
+           choices, boundaries, prohibitions, rationale
+           small, human-owned, slowly changing
+
+Derived    plan model, step decomposition, Governance findings
+           regenerated per implementation attempt
+           pinned for the life of a plan, then discarded
+```
+
+A durable artifact that describes current structure competes with the source
+code and loses, because the code is never stale. A durable artifact that
+declares intended structure competes with nothing and cannot be derived, because
+code cannot distinguish "this is how it is" from "this is how it must remain."
+
+When Governance and the repository disagree, the default reading is that the
+implementation is wrong. That inversion is why the durable half is worth
+enforcing, and why its accuracy matters more than a descriptive model's would.
 
 ### Deterministic Outer Engine, Probabilistic Inner Actors
 
-Agents propose ontology content, implementation plans, step results, and
-discrepancy classifications. Refine owns:
+Agents propose plan models, implementation plans, step results, discrepancy
+classifications, and rule proposals. Refine owns:
 
 - schema validation;
 - referential integrity;
-- revision checks;
 - applicable-rule closure;
-- step readiness and state transitions;
+- plan and step readiness and state transitions;
 - process ownership;
 - Git observation and checkpoints;
 - cancellation and recovery;
@@ -109,90 +164,118 @@ discrepancy classifications. Refine owns:
 
 No agent response independently advances durable state.
 
-### Semantic Model Over Implementation Catalog
+### One-Way Handoff
 
-The semantic ontology describes durable product meaning independent of the
-current framework, file layout, or implementation technique.
+Planning is where judgment lives. Once a plan is pinned, the engine reads it as
+a program. Agents execute individual steps but never choose the sequence, decide
+readiness, or declare success.
 
-Repository paths, symbols, tests, and runtime observations belong to a separate
-realization mapping. They explain where the semantics are currently implemented
-or demonstrated without making those locations part of the permanent meaning.
+Replanning is the single re-entry point where control returns to the stochastic
+side mid-execution, and it is bounded. Without a hard bound, deterministic
+execution quietly degrades into continuous renegotiation and the property is
+lost.
 
 ### One Authoritative Capability
 
-Ontology behavior belongs to one shared product capability. Web, CLI, API, MCP,
-Workflow, background operations, and agents must use that capability rather than
-implementing their own parsers, validators, mutation rules, or persistence.
+Architecture, rule, planning, and execution behavior belongs to one shared
+product capability. Web, CLI, API, MCP, Workflow, background operations, and
+agents must use that capability rather than implementing their own parsers,
+validators, mutation rules, or persistence.
 
-### Reviewable Evolution
+### Rules Stay Prose And Are Judged, Not Validated
 
-Generated or agent-proposed ontology changes are candidates. They never silently
-replace accepted ontology state.
+Rules remain plain-English statements, as they are today. They are not typed,
+scoped, or given machine-readable enforcement metadata, and they are never
+evaluated deterministically.
 
-An implementation failure cannot be made successful retroactively by changing
-the ontology revision that judged it. Ontology corrections apply to new Rounds
-or explicit reevaluation against a newly pinned revision.
+Rule evaluation is Governance judgment against an actual change — a stochastic
+reading of prose by an agent that can see the diff. Dressing rules in a schema
+would add machinery without changing that, and would falsely imply that a
+verdict was computed when it was reasoned. Product, Constitution, and
+Architecture are prose for the same reason; rules being the sole typed exception
+would be the odd choice.
+
+Two consequences, both simplifying:
+
+- **Every rule goes into every relevant context.** With no scope field there is
+  no selection step, so there is nothing for an agent to omit. Sending all rules
+  is strictly stronger than computed closure over a scoped set, and the rule
+  count is small enough that this is affordable.
+- **Mechanical verification lives in Quality, not in rules.** Refine already has
+  a registered Quality system for re-runnable checks. A constraint worth
+  checking mechanically becomes a Quality check; the rule stays prose. Rules and
+  checks reinforce each other without either absorbing the other's job.
 
 ### Focused Context
 
-Goal Agents receive a relevant ontology slice rather than an unbounded graph.
-Refine records why every entity, relation, behavior, and rule was selected.
+Each step receives the context relevant to its own work: its slice of the plan
+model, its prerequisites' outcomes, every applicable rule, and the repository
+locations it is likely to need.
+
+The full plan model, the full Goal history, and prior step transcripts are not
+repeated by default. A step that needs more may request it; a step cannot
+decline a rule Refine determines is applicable.
+
+Refine records why every record was selected, so a bad implementation can be
+traced to bad context rather than guessed at.
 
 ### Evidence Before Conclusions
 
-Ontology claims, implementation-plan outcomes, rule findings, and ontology
-updates cite repository, Git, test, runtime, or human evidence. Explanatory prose
+Plan-model claims, step outcomes, rule findings, and rule proposals cite
+repository, Git, test, Quality, runtime, or human evidence. Explanatory prose
 does not substitute for an observed result.
 
 ### Mitigation And Accountability
 
-The ontology should increase implementation quality, evidence, and review
-pressure without becoming a broad permission wall. Rule effects and enforcement
-modes remain explicit and proportional to the represented risk.
+The design should increase implementation quality, evidence, and review pressure
+without becoming a broad permission wall. Governance keeps the latitude it has
+today to weigh a finding's seriousness rather than treating every rule as an
+absolute gate.
 
 ## Goals
 
-- Give Refine and target-app agents a stable vocabulary for product semantics.
-- Represent entities, typed properties, relations, behaviors, and rules with
-  stable IDs.
-- Preserve semantic meaning separately from current repository realization.
-- Generate and refresh an ontology by inspecting the target app through an
-  installed agent provider.
-- Validate generated output before it becomes an ontology candidate.
-- Present structural diffs and require explicit application of a candidate.
-- Let humans, agents, programs, CLI, API, MCP, and web operate on the same model.
-- Identify ontology impact during Goal creation or before implementation.
-- Pin the exact ontology revision and selected slice to each Round.
-- Decompose implementation into a durable ontology-driven plan.
-- Execute focused steps with deterministic state, evidence, checkpoints,
-  cancellation, recovery, and bounded replanning.
-- Evaluate ontology rules against actual implementation evidence.
-- Show declared impact, observed impact, discrepancies, plan progress, and
-  semantic changes in Review.
-- Provide a tldraw visual projection and editing surface without making canvas
-  state authoritative.
-- Preserve existing behavior when no ontology exists.
-- Measure whether ontology-driven implementation materially improves candidate
-  quality before completing the full visual product investment.
+- Give Refine a durable, human-owned statement of intended system shape.
+- Keep rules as plain English, and supply them wherever implementation decisions
+  are made rather than only at final Governance.
+- Derive a Goal-scoped structural model just-in-time, at the granularity the
+  Goal requires.
+- Decompose implementation along the seams that model declares.
+- Execute the resulting plan deterministically, with durable state, evidence,
+  checkpoints, cancellation, recovery, and bounded replanning.
+- Give each step only the context relevant to its work.
+- Show declared impact, observed impact, plan progress, and semantic changes in
+  Review.
+- Convert recurring discrepancies into durable rules, so a lesson learned in one
+  Goal applies to the next.
+- Preserve existing behavior when no Architecture is configured.
+- Be useful with a one-paragraph Architecture and three rules.
+- Measure whether two-stage planning materially improves candidate quality
+  before investing further.
 
 ## Non-Goals
 
-- Guarantee that Product, Constitution, and Ontology can reproduce every detail
-  of an existing application in the first version.
-- Preserve source code, frameworks, module layout, styling, or algorithms that
-  are not part of the semantic contract.
+- Maintain a durable ontology graph, entity registry, or realization mapping.
+- Type, scope, or schematize Governance rules, or evaluate them
+  deterministically. Rules are prose and are judged by Governance.
+- Replace or absorb the existing Quality system. Mechanical checks stay there.
+- Describe the application as it currently is. Architecture states intent, not
+  structure; it is not a code map or an architecture snapshot.
+- Require a complete or comprehensive Architecture before the system is useful.
+- Guarantee that the implementation satisfies Architecture and Rules at adoption
+  time.
 - Replace Git, tests, Quality, Governance judgment, or human Review.
-- Treat an LLM-generated ontology or implementation plan as trusted execution
+- Treat an LLM-derived plan model or implementation plan as trusted execution
   authority.
-- Store arbitrary executable shell commands in generated ontology rules.
+- Store arbitrary executable shell commands in generated rules.
 - Make a graph database, RDF store, OWL reasoner, or external ontology service a
   runtime dependency.
-- Make tldraw snapshots the source of truth.
+- Surface plan models or plan steps as Rounds, Goal statuses, or any other
+  public workflow state.
 - Convert the rest of Refine's web surface to React.
 - Execute implementation steps concurrently in the same worktree in the first
   version.
-- Let an ontology update retroactively alter the evidence or outcome of a pinned
-  Round.
+- Let a rule change retroactively alter the evidence or outcome of a pinned
+  plan.
 - Require small or non-software Goals to use a multi-step implementation plan.
 
 ## Governance Model
@@ -200,117 +283,108 @@ modes remain explicit and proportional to the represented risk.
 Governance becomes:
 
 ```text
-Governance
-├── Product
-├── Constitution
-└── Ontology
-    ├── Semantic model
-    │   ├── Entities
-    │   ├── Property definitions and values
-    │   ├── Relations
-    │   ├── Behaviors
-    │   └── Rules
-    └── Realization mapping
-        ├── Paths and symbols
-        ├── Tests and commands
-        ├── Runtime observations
-        └── Evidence
+Governance (durable, human-owned, all prose)
+├── Product         intended outcomes and users            (Markdown)
+├── Constitution    principles every realization preserves (Markdown)
+├── Architecture    intended shape of the system           (Markdown, sectioned)
+└── Rules           constraints Governance judges          (plain-English list)
 ```
 
-Product and Constitution remain concise human-editable Markdown.
+All four are concise, human-editable prose. None is a typed model.
 
-The ontology is structured JSON with human-readable names, descriptions, and
-rule statements. The structured fields support deterministic validation,
-selection, mutation, and diffing; the prose fields support agent and human
-judgment.
+The division is one of use, not of form:
+
+- **Architecture is context.** Read during plan-model derivation and step
+  execution. It shapes what the agent understands the system to be.
+- **Rules are the standard.** Read by Governance when judging an actual change.
+  They shape the verdict.
+
+The same concern may appear in both, doing different jobs. An architectural
+statement becomes a rule when it is worth judging every change against. Nothing
+requires that every architectural statement have a rule, and most should not.
+
+Mechanical verification remains the existing Quality system's job. Where a
+constraint admits a re-runnable check, that check belongs in Quality; the rule
+stays prose.
 
 Governance remains configured when Product and Constitution are both present.
-Ontology presence does not affect the existing `configured` meaning.
+Architecture and Rules do not affect the existing `configured` meaning.
 
 ## Terminology
 
-### Accepted Ontology
+### Architecture
 
-The current authoritative ontology revision used for new Goal impact
-classification and new Round context.
+A concise Markdown statement of the target app's intended shape, in fixed
+sections. Durable, human-owned, optional.
 
-### Ontology Candidate
+### Rule
 
-A validated proposed replacement for the accepted ontology. A candidate records
-its base revision, provider, generation mode, raw output, validation result,
-computed diff, and evidence. It has no implementation authority until applied.
+A plain-English constraint every change is judged against. Durable,
+human-owned, unchanged in shape from today's Governance rules.
 
-### Semantic Ontology
+### Plan Model
 
-The application concepts and rules intended to survive implementation changes.
+The Goal-scoped structural model produced by stage one of planning: the
+concepts, relations, seams, and authority boundaries relevant to this
+implementation attempt. Derived, pinned to a plan revision, discarded with the
+plan. Never workflow state.
 
-### Realization Mapping
+### Seam
 
-Evidence-backed links from semantic ontology IDs to the paths, symbols, tests,
-interfaces, and runtime behavior that currently realize them.
-
-### Ontology Slice
-
-A bounded selection of ontology records and applicable rules assembled for a
-Goal or implementation step. A slice records selection reasons and the accepted
-ontology revision and digest.
-
-### Declared Impact
-
-The entities, relations, behaviors, properties, and rules believed to be
-affected before implementation.
-
-### Observed Impact
-
-The semantic impact supported by actual changed paths, agent reports, tests,
-runtime observations, and realization mappings after work occurs.
-
-### Semantic Discrepancy
-
-Durable evidence that observed behavior and expected ontology semantics do not
-align. A discrepancy may indicate an implementation violation, ontology gap,
-ontology error, Goal misclassification, realization-mapping drift, or evidence
-gap.
+A boundary in the plan model across which authority, ownership, or
+responsibility changes. Seams determine where step boundaries should fall.
 
 ### Implementation Plan
 
 A versioned, validated set of dependent implementation steps owned by one Goal
-Round and one ontology revision.
+Round, one plan model, and one Governance revision.
 
 ### Implementation Step
 
-A focused unit of inspection, change, reconciliation, or verification with an
-ontology scope, prerequisites, success conditions, required evidence, attempts,
-and durable outcome.
+A focused unit of inspection, change, reconciliation, or verification with a
+model scope, prerequisites, success conditions, required evidence, attempts, and
+durable outcome.
+
+### Declared Impact
+
+The concepts, seams, and rules the plan model identifies as affected before
+implementation.
+
+### Observed Impact
+
+The impact supported by actual changed paths, agent reports, tests, Quality
+results, and runtime observations after work occurs.
+
+### Semantic Discrepancy
+
+Durable evidence that observed behavior and declared intent do not align. The
+default reading is an implementation violation.
 
 ## Canonical Data Model
 
 ### Governance Document
 
-`governance.json` remains the authoritative Governance document. Its next schema
-adds `ontology` and removes `rules` as an independent write target after
-migration:
+`governance.json` remains the authoritative Governance document:
 
 ```json
 {
   "product": "Product intent in Markdown.",
   "constitution": "Constitution in Markdown.",
-  "ontology": {
+  "architecture": {
     "schema_version": 1,
     "revision": 3,
     "updated_at": "2026-07-27T18:00:00Z",
     "digest": "sha256:...",
-    "semantics": {
-      "entities": [],
-      "property_definitions": [],
-      "relations": [],
-      "behaviors": [],
-      "rules": []
-    },
-    "realization": {
-      "mappings": []
+    "sections": {
+      "tech_stack": "Markdown.",
+      "surfaces": "Markdown.",
+      "persistence": "Markdown.",
+      "business_logic": "Markdown.",
+      "integrations": "Markdown.",
+      "concurrency": "Markdown."
     }
   },
+  "rules": [],
   "configured": true
 }
 ```
@@ -320,184 +394,84 @@ migration:
 The server owns `schema_version`, `revision`, `updated_at`, and `digest`.
 Provider output cannot set authoritative metadata.
 
-### Entity
+### Architecture Document
 
-```json
-{
-  "id": "capability.workflow",
-  "kind": "Capability",
-  "name": "Workflow",
-  "description": "Coordinates durable Goal state advancement.",
-  "properties": {
-    "authoritative_for": ["concept.workflow-state"],
-    "shared": true
-  },
-  "aliases": ["workflow engine"]
-}
-```
+Architecture is Markdown in fixed, named sections so that step context assembly
+can select the relevant ones without parsing prose:
 
-Requirements:
+- `tech_stack`;
+- `surfaces`;
+- `persistence`;
+- `business_logic`;
+- `integrations`;
+- `concurrency` (optional).
 
-- `id` is stable, unique, non-empty, and safe for references.
-- `kind`, `name`, and `description` are required.
-- property keys refer to declared property definitions unless explicitly marked
-  as extension metadata.
-- renaming an entity does not change its ID.
-- replacing an ID is represented as remove plus add and is visible in the diff.
+Every section is optional. An empty section is better than a padded one — a
+fixed set of headings invites completionism, and Architecture is judged by
+whether it says something non-obvious, not by whether it is complete.
 
-### Property Definition
+Each section states decisions, boundaries, and prohibitions rather than
+describing current structure:
 
-```json
-{
-  "id": "authoritative_for",
-  "name": "Authoritative for",
-  "description": "Concepts for which the subject owns canonical semantics.",
-  "applies_to": ["Capability"],
-  "value_type": "entity_ref_list",
-  "cardinality": "many",
-  "required": false
-}
-```
+| Description (rots) | Architecture (holds) |
+|---|---|
+| The web surface is static HTML with SSE | Live browser updates use SSE only; polling is prohibited |
+| Workflow state lives in `src/workflow` | Only the workflow capability may transition Goal state |
+| We use tldraw for the canvas | Canvas state is never authoritative; one pinned version only |
 
-Supported first-version value types:
+Section-specific guidance:
 
-- `string`;
-- `string_list`;
-- `boolean`;
-- `integer`;
-- `number`;
-- `enum`;
-- `entity_ref`;
-- `entity_ref_list`;
-- `relation_ref`;
-- `relation_ref_list`;
-- `behavior_ref`;
-- `behavior_ref_list`.
+- **Tech stack** — the valuable half is the prohibitions. Chosen dependencies
+  are inferable from manifests; "no React outside one bounded island" is not.
+  Record what is forbidden and what is being migrated away from.
+- **Surfaces** — which surfaces exist and what they are permitted to do.
+  Surfaces quietly growing product logic is the failure this design targets.
+- **Persistence** — high-level only. Not a schema dump, which is derivable.
+  Record what is authoritative versus derived, durable versus cache, and which
+  invariants hold across stores.
+- **Business logic** — where authority lives: which capability owns which
+  decision. For most systems this is the load-bearing section, and the one a
+  repository is least able to state.
+- **Integrations** — trust boundaries and failure modes, not an API inventory.
+- **Concurrency** — process model, exclusivity, isolation, and recovery
+  expectations, where these carry risk.
 
-The validator rejects unknown referenced IDs, invalid cardinality, and values
-that do not match their definitions.
-
-### Relation
-
-```json
-{
-  "id": "relation.web-delegates-workflow",
-  "type": "delegates_to",
-  "name": "Web delegates to Workflow",
-  "description": "The web surface delegates workflow semantics to the shared capability.",
-  "from": "surface.web",
-  "to": "capability.workflow",
-  "properties": {}
-}
-```
-
-Relation endpoints must exist. Relation type definitions may be represented as
-entities or property-backed kinds in the first version; the validator must still
-apply endpoint and cardinality constraints consistently.
-
-### Behavior
-
-```json
-{
-  "id": "behavior.goal-transition",
-  "name": "Advance Goal state",
-  "description": "Advance a Goal only when required evidence is durable.",
-  "actors": ["capability.workflow"],
-  "inputs": ["entity.goal", "entity.round", "entity.evidence"],
-  "preconditions": ["rule.evidence-before-transition"],
-  "postconditions": ["relation.goal-has-new-state"],
-  "observables": ["goal status", "workflow log", "round evidence"]
-}
-```
-
-Behaviors capture operations, state transitions, causal ordering, and observable
-contracts that cannot be represented adequately as static relationships.
+Architecture is versioned and digested so that a plan can pin the exact revision
+it was derived against. It is edited as text; there is no structured mutation
+API, diff review workflow, or command batch. It changes on the order of monthly,
+by hand.
 
 ### Rule
 
-Rules are ontology records:
+Rules keep their existing shape:
 
 ```json
 {
-  "id": "rule.surface-delegation",
-  "kind": "invariant",
-  "statement": "Surfaces delegate product semantics to shared capabilities.",
-  "scope": {
-    "entity_ids": ["surface.web", "capability.workflow"],
-    "entity_kinds": ["Surface", "Capability"],
-    "relation_types": ["delegates_to"],
-    "behavior_ids": []
-  },
-  "effect": "block",
-  "enforcement": {
-    "mode": "judgment",
-    "checker_id": null,
-    "required_evidence": [
-      "affected adapters",
-      "shared capability verification"
-    ]
-  }
+  "id": "rule-9",
+  "text": "Use SSE as the only mechanism for live browser updates.",
+  "created": "2026-07-27T18:00:00Z",
+  "updated": "2026-07-27T18:00:00Z",
+  "source": "generated"
 }
 ```
 
-Supported rule kinds:
+No schema change, no migration, no scope, no effect, no enforcement metadata.
+Refine validates that `text` is non-empty and that IDs are unique, and nothing
+further. The constraint lives entirely in the prose.
 
-- `invariant`: a truth every valid realization must preserve;
-- `behavior`: a required transition, causal order, or observable outcome;
-- `policy`: an architectural or implementation constraint;
-- `evidence`: verification required for a represented risk;
-- `escalation`: a condition requiring explicit human judgment;
-- `inference`: a derivation Refine may make from ontology facts.
+Rules are supplied whole to plan-model derivation, to every implementation step,
+and to post-implementation Governance. Because there is no scope field there is
+no selection, and therefore no way for an agent to be handed an incomplete set.
 
-Supported effects:
+Writing guidance, enforced by nothing but review:
 
-- `inform`: record and display without changing progression;
-- `require_evidence`: block when required evidence is absent;
-- `require_review`: surface the finding prominently at human Review;
-- `block`: stop automated progression on an actual violation.
-
-Supported enforcement modes:
-
-- `structural`: evaluated by ontology schema and graph validators;
-- `repository`: evaluated against changed paths, symbols, Git observations, and
-  realization mappings;
-- `behavioral`: evaluated through registered Quality checks or runtime evidence;
-- `judgment`: evaluated by the Governance agent against actual changes;
-- `human`: decided only at Review.
-
-Generated rules may reference only registered checker IDs. Provider output must
-not create executable commands or silently register new checkers.
-
-### Realization Mapping
-
-```json
-{
-  "id": "mapping.workflow-capability",
-  "ontology_ids": [
-    "capability.workflow",
-    "behavior.goal-transition"
-  ],
-  "paths": ["src/workflow"],
-  "symbols": ["WorkflowEngine"],
-  "tests": ["workflow unit and full-workflow coverage"],
-  "interfaces": ["/api/goals/:id/approve"],
-  "evidence": [
-    {
-      "kind": "repository",
-      "reference": "src/workflow",
-      "claim": "Contains the shared workflow coordinator."
-    }
-  ]
-}
-```
-
-Realization mappings are accepted ontology data but remain explicitly distinct
-from semantic meaning. Repository refresh may update mappings without changing
-the meaning of referenced entities.
+- state the constraint and, where it is not obvious, why it exists — the reason
+  is what lets a future reader decide whether the rule still applies;
+- prefer constraints a Governance agent can check against a diff over aspirations
+  it cannot;
+- keep the list short enough that every rule can be read on every Goal.
 
 ### Evidence Reference
-
-Evidence references use typed, inspectable fields:
 
 ```json
 {
@@ -510,334 +484,227 @@ Evidence references use typed, inspectable fields:
 ```
 
 Supported evidence kinds initially include `document`, `path`, `symbol`, `git`,
-`test`, `runtime`, `review`, and `human`.
+`test`, `quality`, `runtime`, `review`, and `human`.
 
-An unavailable evidence reference does not automatically delete an ontology
-claim. It produces a realization-mapping discrepancy for review.
+An unavailable evidence reference never deletes or weakens a durable claim.
+Intent does not expire because the code that satisfied it moved. It becomes an
+evidence gap for Review.
 
-## Identity, Revisions, And Digests
+## Proposing Architecture And Rules
 
-- Ontology IDs are stable semantic identities, not array indexes.
-- Every accepted mutation increments the ontology revision.
-- The digest covers normalized semantic and realization content, excluding
-  server-owned timestamps.
-- All candidates record `base_revision` and `base_digest`.
-- Applying a stale candidate returns a conflict and leaves accepted state
-  unchanged.
-- A candidate is applied atomically through the shared service.
-- Round context records the accepted revision, digest, and exact selected slice.
-- Previously pinned Round context remains immutable when the accepted ontology
-  changes.
-- A new Round is required when an ontology change materially changes the
-  implementation contract for a failed or incomplete attempt.
+### Bootstrap And Proposal
 
-## Persistence And Layout
+Refine can propose Architecture sections and rules by inspecting the repository
+through an installed agent provider. Proposals are the on-ramp, not a
+maintenance mechanism — they run at adoption and occasionally afterward, never
+on the hot path of a Goal.
 
-Authoritative ontology state remains target-app control state outside the
-primary source worktree and follows existing Refine state synchronization and
-durability behavior.
+Both outputs are prose. Proposal generation produces text a user edits and
+accepts; there is no structured model to review, diff, or apply.
 
-Visual layout is stored separately from `governance.json`:
+Most teams cannot articulate their own architecture on demand, but nearly all
+can recognize a good articulation of it and correct a flawed one. Proposal
+generation exists to convert an authoring problem into a recognition problem.
+
+Because generation runs rarely, it should be slow, multi-pass, and expensive.
+Minutes and many provider invocations are acceptable for an artifact that shapes
+every subsequent Goal.
+
+The pipeline:
+
+```text
+1. Survey        map the repository: surfaces, capabilities, data flow,
+                 module boundaries, test topology, naming conventions
+2. Hypothesize   propose candidate constraints, each with a claim about what
+                 must remain true and why it might be intended
+3. Test          check each hypothesis against the repository: where does it
+                 hold, where does it fail, how many sites
+4. Classify      universal / partial / aspirational / refuted
+5. Rank          by non-derivability, blast radius, and violation cost
+6. Bound         emit the top N proposals; discard the tail
+7. Present       per-proposal review with evidence both ways
+```
+
+Stage 3 is what separates this from a description generator, and stage 4 is
+where the signal is.
+
+**Partial regularity is the highest-value output.** A pattern holding in eleven
+of thirteen surfaces is almost certainly intended structure plus two defects. A
+pattern holding everywhere may be intent or may be coincidence. A pattern
+holding nowhere is usually not intent. Refine surfaces partial regularities
+first, states the exception sites explicitly, and asks which reading is correct
+— that single question is the densest judgment a user supplies, and it produces
+both a rule and a list of sites to fix.
+
+Proposals are judged by parsimony first. Twenty constraints a user will read
+beat two hundred they will not; coverage that is never reviewed is worse than
+absent, because it carries apparent authority.
+
+### Proposal Record
+
+A proposal is the prose plus the evidence that justifies it. The record is
+transient scaffolding for the review decision, not durable state:
+
+```json
+{
+  "proposal_id": "prop-7",
+  "target": "rule",
+  "text": "Only the workflow capability may transition Goal state.",
+  "why": "Every transition is funneled through one module, and two surfaces call
+    it rather than reimplementing it.",
+  "classification": "partial",
+  "confidence": "high",
+  "non_derivable_because": "The repository shows the pattern but cannot show
+    whether the two exceptions are defects or intentional.",
+  "holds_at": ["src/surfaces/web", "src/surfaces/cli"],
+  "violated_at": ["src/surfaces/mcp/approve.rs"],
+  "question_for_user": "Is the MCP path a defect to fix, or a deliberate
+    exception to carve out?"
+}
+```
+
+Accepting a rule proposal appends its `text` to the rules list. Nothing else
+from the record persists — the evidence informed the decision and its job is
+done. Accepting an Architecture proposal inserts its text into the named
+section, where the user edits it like any other prose.
+
+`violated_at` is the adoption cost, visible at decision time rather than
+discovered on the next Goal. It is a list of places to fix or exceptions to
+reconsider, not stored state that Refine later reasons about.
+
+Review is per-proposal. Users accept, edit, or reject each one individually;
+there is no whole-document diff, because a whole-document diff is exactly the
+artifact users rubber-stamp. Rejections are durable, with reasons retained so
+later runs do not re-propose settled questions.
+
+Where evidence underdetermines intent, generation asks rather than guesses.
+Questions are bounded, skippable, and never block; a skipped question yields a
+lower-confidence proposal, not a fabricated answer.
+
+### On Aspirational Rules
+
+A newly accepted rule may describe something the codebase does not yet satisfy.
+This matters less than it would in a static-analysis system, because Governance
+judges the *change*, not the repository: a pre-existing violation the Goal did
+not touch generally does not surface at all.
+
+Where it does surface, the Governance agent has the diff and the rule and can
+say so in its finding, and Review can accept the explanation. No baseline
+tracking, debt counting, or ratchet mechanism is required. If the same
+pre-existing violation is repeatedly flagged and repeatedly dismissed, the
+signal is that the rule needs rewording — which is a prose edit.
+
+## Two-Stage Planning
+
+### Placement In Workflow
+
+Planning and step execution are a subordinate state machine inside the existing
+`InProgress` Workflow behavior.
+
+They introduce no new public Goal statuses, no new Round fields, and no new
+workflow state of any kind. The Goal is `InProgress` throughout. Only the
+existing Workflow may transition the Goal to QA, Ready Merge, Failed, Cancelled,
+or any later state.
+
+One Goal Round owns one active implementation plan. Distinct Goals may continue
+to execute concurrently. Steps within one plan execute sequentially in the first
+version.
+
+### Stage One: Plan Model Derivation
+
+A planning agent derives the structural model this Goal requires. It receives:
+
+- Product;
+- Constitution;
+- Architecture;
+- all accepted rules;
+- Goal identity and history, including all previous Rounds;
+- the current Round request;
+- target-app repository access;
+- the plan-model output schema.
+
+Derivation is read-only. Provider adapters should enforce read-only planning
+where supported. Refine verifies that planning did not mutate the worktree; an
+unexpected mutation fails planning and is retained as evidence rather than
+silently discarded.
+
+The agent inspects the repository. Architecture and Rules are the durable
+minimum, not a substitute for repository evidence — Architecture states what
+must be true, and the repository shows what currently is.
+
+### Plan Model
 
 ```json
 {
   "schema_version": 1,
-  "ontology_digest": "sha256:...",
-  "nodes": {
-    "capability.workflow": {"x": 120, "y": 240, "w": 280, "h": 160}
-  },
-  "groups": {},
-  "annotations": []
-}
-```
-
-Layout is a rebuildable shared projection keyed by ontology IDs. Failure to load
-or migrate layout must not make ontology state unavailable.
-
-Camera position, zoom, selection, open panels, and transient drawing state are
-browser-local and are not persisted as authoritative project state.
-
-Ontology candidates may be retained as durable operation results or dedicated
-candidate records. They are not embedded into the accepted ontology and do not
-participate in Goal context until applied.
-
-## Shared Capability Architecture
-
-The exact responsibility boundaries are required even if implementation file
-names evolve:
-
-```text
-Foundation
-  Ontology model, typed records, normalization, validation, revisions
-
-Ontology capability
-  Load, query, slice, diff, generate, refresh, candidate review,
-  command application, impact reconciliation, rule applicability
-
-Workflow capability
-  Implementation-plan state, step readiness, execution, replanning,
-  checkpoints, cancellation, recovery, final advancement
-
-Agents capability
-  Planner, step executor, Governance evaluator, native session contract
-
-Process capability
-  Managed provider processes, transcripts, input, cancellation, ownership
-
-Surfaces
-  Thin HTTP, CLI, MCP, web, desktop, and tldraw adapters
-```
-
-Suggested source organization:
-
-```text
-src/model/ontology.rs
-src/tools/product/ontology/
-  mod.rs
-  validation.rs
-  storage.rs
-  candidates.rs
-  generation.rs
-  diff.rs
-  commands.rs
-  slicing.rs
-  impact.rs
-src/workflow/implementation_plan/
-  mod.rs
-  model.rs
-  planning.rs
-  execution.rs
-  recovery.rs
-  evidence.rs
-```
-
-The shared capability may initially compose the existing Governance file service
-rather than require an unrelated Governance migration. Web routes must not own
-provider invocation, parsing, fallback generation, validation, or persistence.
-
-## Ontology Generation And Refresh
-
-### Prompt Template
-
-`src/prompts/ontology.md` is the agent-facing template for both initial
-generation and refresh.
-
-The prompt remains concise and uses the shared prompt engine. A representative
-contract is:
-
-```markdown
-Construct or revise the target app ontology from repository evidence. Return
-only JSON conforming to schema version {{schema_version}}. Model durable domain
-and architectural entities, relations, meaningful properties, behaviors, and
-rules; exclude incidental implementation trivia. Preserve stable IDs from the
-current ontology when meanings are unchanged. Cite evidence for material claims.
-Do not edit files.
-
-Mode: {{mode}}
-Product: {{product}}
-Constitution: {{constitution}}
-Repository: {{target_root}}
-Current ontology:
-{{current_ontology}}
-```
-
-The Rust model and validator define the schema. The prompt does not become a
-second schema authority.
-
-### Modes
-
-`generate`:
-
-- requires Product and Constitution;
-- runs when no accepted semantic ontology exists;
-- asks the provider for one complete candidate;
-- does not synthesize a static fallback.
-
-`refresh`:
-
-- requires an accepted ontology;
-- supplies the current ontology and repository;
-- asks for one complete replacement candidate;
-- instructs the provider to preserve stable IDs when meanings are unchanged;
-- allows semantic and realization changes;
-- relies on Refine, not the provider, to compute the diff.
-
-### Operation Lifecycle
-
-Generation and refresh are durable, cancellable, exclusively owned background
-operations:
-
-```text
-register operation with base revision
-  -> launch supervised provider in target-app context
-  -> retain raw output
-  -> parse candidate
-  -> normalize and validate
-  -> compute structural diff
-  -> finish with reviewable candidate
-```
-
-Only one generation or refresh operation may own an ontology base revision at a
-time. Other ontology reads remain available.
-
-Provider failure, authentication failure, malformed output, validation failure,
-or cancellation leaves accepted ontology state unchanged. There is no generic
-fallback ontology because plausible but false semantics are worse than explicit
-absence.
-
-### Candidate Review And Application
-
-Candidate review shows:
-
-- added, changed, and removed entities;
-- property-definition and property-value changes;
-- relation changes;
-- behavior changes;
-- rule and enforcement changes;
-- realization-mapping changes;
-- stable IDs preserved or replaced;
-- missing or weak evidence;
-- validation warnings;
-- provider and base revision.
-
-Apply requires explicit user action and a matching base revision. Discard retains
-the operation audit record but removes the candidate from active attention.
-
-## Semantic Discrepancies And Ontology Updates
-
-Humans, Goal Agents, Governance evaluators, verification programs, and observers
-may record a semantic discrepancy:
-
-```json
-{
-  "id": "discrepancy-...",
-  "goal_id": "GOAL1",
-  "round": 2,
-  "ontology_revision": 12,
-  "classification": "ontology_gap",
-  "expected": "Workflow transitions are evidence-backed.",
-  "observed": "A transition occurred before evidence persistence.",
-  "ontology_ids": [
-    "capability.workflow",
-    "rule.evidence-before-transition"
+  "entities": [
+    {
+      "id": "capability.workflow",
+      "kind": "Capability",
+      "name": "Workflow",
+      "description": "Coordinates durable Goal state advancement.",
+      "locations": ["src/workflow"]
+    }
   ],
-  "evidence": [],
-  "proposed_response": "ontology_candidate"
+  "relations": [
+    {
+      "id": "relation.web-delegates-workflow",
+      "type": "delegates_to",
+      "from": "surface.web",
+      "to": "capability.workflow"
+    }
+  ],
+  "seams": [
+    {
+      "id": "seam.workflow-authority",
+      "name": "Goal state transition authority",
+      "description": "Only the workflow capability may transition Goal state.",
+      "boundary_between": ["surface.web", "capability.workflow"]
+    }
+  ],
+  "declared_impact": {
+    "entity_ids": ["capability.workflow"],
+    "seam_ids": ["seam.workflow-authority"],
+    "rationale": "The Goal changes workflow state advancement."
+  }
 }
 ```
 
-Classifications:
+Properties of the plan model:
 
-- `implementation_violation`: correct the implementation against the same
-  pinned ontology;
-- `ontology_gap`: propose missing semantic content;
-- `ontology_error`: propose a correction to accepted meaning;
-- `goal_misclassification`: recompute declared impact or slice selection;
-- `realization_drift`: refresh repository mappings;
-- `evidence_gap`: gather evidence without changing semantic meaning.
+- IDs are stable within one plan and carry no meaning outside it;
+- it is scoped to this Goal, at whatever granularity the Goal requires;
+- `locations` are hints for context assembly, not claims that a constraint
+  holds;
+- seams are the output stage two consumes; an entity that participates in no
+  seam and no declared impact is probably noise.
 
-Discrepancy classification is a proposal subject to validation and Review.
+Granularity is a stage-one judgment. A settings-field Goal produces a small,
+shallow model; a state-ownership refactor produces a deeper one. Neither is
+wrong, and no fixed project-wide granularity would suit both.
 
-An ontology candidate created from a discrepancy records the discrepancy ID.
-Applying it never changes the historical Round's ontology revision or verdict.
+### Plan Model Validation
 
-## Goal Impact And Ontology Slicing
+Before decomposition, Refine validates:
 
-### Declared Impact
+- schema conformance and unique IDs;
+- referential integrity of relations, seams, and declared impact;
+- Architecture revision and digest;
+- base commit;
+- declared impact is non-empty for mutating Goals.
 
-When an accepted ontology exists, Goal creation, import, Plan drafting, or
-pre-implementation preparation proposes declared impact:
+Validation is structural only. Refine checks that the model is internally
+coherent and pinned to the right inputs. Whether the model is a *good* reading of
+the system is a judgment question, answered by whether the resulting
+implementation survives Governance and Review — not by a validator.
 
-```json
-{
-  "ontology_revision": 12,
-  "entity_ids": ["capability.workflow"],
-  "relation_ids": ["relation.workflow-owns-goal-state"],
-  "behavior_ids": ["behavior.goal-transition"],
-  "property_ids": [],
-  "rule_ids": ["rule.evidence-before-transition"],
-  "rationale": "The Goal changes workflow state advancement."
-}
-```
+There is no applicable-rule computation. All rules are attached to the pinned
+plan in full, so there is no selection step that could omit one.
 
-The proposal may be agent-generated, but Refine validates every ID. Goal creation
-must not fail solely because automatic impact classification cannot run; it may
-record an unresolved classification that must be resolved before ontology-driven
-implementation starts.
+### Stage Two: Decomposition
 
-### Slice Selection
-
-Refine computes a focused slice from:
-
-- declared impact;
-- direct relations between impacted entities;
-- required endpoint entities;
-- referenced property definitions;
-- relevant behaviors;
-- rules whose scope intersects selected concepts;
-- constitutional or project-wide rules;
-- realization mappings needed to locate current code and evidence;
-- an explicit token or record budget.
-
-Each included record carries one or more selection reasons.
-
-The agent may propose additional relevant IDs. Refine validates and expands the
-slice deterministically. The agent cannot remove rules that Refine determines
-are applicable.
-
-### Round Pinning
-
-The Round records:
-
-- ontology revision and digest;
-- declared impact;
-- exact selected ontology slice;
-- selection reasons;
-- unresolved classification warnings;
-- assembly time and context schema version.
-
-No accepted ontology is represented explicitly as absent context rather than an
-empty but configured ontology.
-
-## Ontology-Driven Implementation Planning
-
-### Placement In Workflow
-
-The implementation plan is a subordinate state machine inside the existing
-`InProgress` Workflow behavior.
-
-It does not introduce new public Goal statuses. Only the existing Workflow may
-transition the Goal to QA, Ready Merge, Failed, Cancelled, or any later state.
-
-One Goal Round owns one active implementation plan. Distinct Goals may continue
-to execute concurrently. Steps for one plan execute sequentially in the first
-version.
-
-### Planning Agent
-
-The planning agent receives:
-
-- Product;
-- Constitution;
-- current accepted ontology revision;
-- declared Goal impact and initial ontology slice;
-- Goal identity and history;
-- all previous Rounds;
-- current Round request;
-- Workflow and Review boundaries;
-- target-app repository access;
-- the implementation-plan output schema.
-
-Planning is read-only. Provider adapters should enforce read-only planning when
-supported. Refine verifies that planning did not mutate the worktree; an
-unexpected mutation fails planning and is retained as evidence rather than
-silently discarded.
-
-The planner may inspect the repository to reconcile semantics with the current
-realization. Product, Constitution, and Ontology are the semantic minimum, not a
-substitute for repository evidence.
-
-### Plan Model
+The same planning session decomposes the work into steps, cut along the seams
+stage one declared.
 
 ```json
 {
@@ -848,22 +715,21 @@ substitute for repository evidence.
   "goal_id": "GOAL1",
   "round": 2,
   "base_commit": "...",
-  "ontology_revision": 12,
-  "ontology_digest": "sha256:...",
+  "governance_revision": 3,
+  "governance_digest": "sha256:...",
   "provider": "codex",
   "created_at": "2026-07-27T18:00:00Z",
+  "model": {},
   "steps": []
 }
 ```
 
-Server-owned plan status values:
+The plan model is a field on the plan. It is versioned with the plan revision,
+retained as plan evidence, and discarded when the plan is. Nothing outside the
+plan reads it.
 
-- `planning`;
-- `active`;
-- `replanning`;
-- `completed`;
-- `failed`;
-- `cancelled`.
+Server-owned plan status values: `planning`, `active`, `replanning`,
+`completed`, `failed`, `cancelled`.
 
 ### Step Model
 
@@ -873,21 +739,16 @@ Server-owned plan status values:
   "kind": "implement",
   "objective": "Implement the behavior in the shared Workflow capability.",
   "depends_on": [],
-  "ontology_scope": {
+  "model_scope": {
     "entity_ids": ["capability.workflow"],
-    "relation_ids": [],
-    "behavior_ids": ["behavior.goal-transition"],
-    "rule_ids": ["rule.evidence-before-transition"]
+    "seam_ids": ["seam.workflow-authority"]
   },
   "expected_areas": ["src/workflow"],
   "success_conditions": [
     "The shared capability owns the behavior.",
     "Existing surfaces use the shared behavior."
   ],
-  "required_evidence": [
-    "focused tests",
-    "changed-path observation"
-  ],
+  "required_evidence": ["focused tests", "changed-path observation"],
   "status": "pending",
   "attempts": [],
   "checkpoint_commit": null
@@ -899,48 +760,41 @@ Step kinds:
 - `inspect`: establish repository or runtime facts without intended mutation;
 - `implement`: add or change behavior;
 - `reconcile`: correct an earlier step, integrate discoveries, or resolve a
-  semantic discrepancy;
+  discrepancy;
 - `verify`: gather focused behavioral evidence.
 
 `expected_areas` guide investigation and review. They do not prohibit justified
 changes elsewhere.
 
-Server-owned step statuses:
-
-- `pending`;
-- `ready`;
-- `running`;
-- `needs_input`;
-- `succeeded`;
-- `failed`;
-- `cancelled`;
-- `superseded`.
+Server-owned step statuses: `pending`, `ready`, `running`, `needs_input`,
+`succeeded`, `failed`, `cancelled`, `superseded`.
 
 ### Plan Validation
 
 Before execution, Refine validates:
 
-- Goal, Round, base commit, ontology revision, and digest;
-- all referenced ontology IDs;
+- Goal, Round, base commit, Governance revision, and digest;
+- all referenced plan-model IDs;
 - unique plan and step IDs;
 - acyclic step dependencies;
 - bounded step count and description sizes;
-- declared-impact coverage;
-- applicable-rule coverage;
+- declared-impact coverage across steps;
 - success conditions and evidence obligations;
 - no requested Goal transition, approval, merge, or other unavailable authority;
 - at least one verification path for mutating plans.
 
-The planner proposes `ontology_scope.rule_ids`. Refine computes applicable rules
-from the selected ontology scope and injects omissions before the plan is pinned.
-
 ### Adaptive Granularity
 
-The engine supports one-step plans. A small change should not be forced through
-artificial decomposition.
+Step size is a planning output, not an engine parameter. There is no minimum
+decomposition and no uniform granularity.
 
-Planning limits prevent both a single unbounded implementation step for a
-high-impact Goal and pathological micro-steps. Initial defaults should favor:
+A trivial Goal gets one step, and that is a correct plan rather than a
+degenerate one. A one-step plan degrades gracefully into one-shot execution with
+a derived model and explicit success conditions — which is a real improvement
+over today's behavior and does not force decomposition onto work that does not
+need it.
+
+Initial defaults should favor:
 
 - one step for trivial or non-software work;
 - two to four steps for ordinary feature work;
@@ -948,22 +802,42 @@ high-impact Goal and pathological micro-steps. Initial defaults should favor:
   cross-capability, persistence, concurrency, process, Git, migration, or
   cross-surface changes.
 
-Granularity is proposed by the planner and bounded by deterministic settings and
-validation.
+Planning limits prevent both a single unbounded step for a high-impact Goal and
+pathological micro-steps.
 
-## Dynamic Implementation Engine
+### Sizing Heuristics
+
+Two constraints govern where step boundaries fall:
+
+**Seam alignment.** Boundaries should land on seams the plan model declared. A
+step that completes one side of an authority boundary leaves a checkpoint that
+is coherent on its own: reviewable, testable, and a valid stopping point if the
+plan later fails. A step cut across a seam leaves a half-migrated state no one
+designed.
+
+**Redo cost.** A checkpoint lands at each step boundary, so step length sets
+recovery granularity — a failed step loses everything since the last checkpoint.
+A step should be a unit of work you would be willing to lose and repeat.
+Seam-coherent units tend to also be the ones cheap to redo in isolation, so the
+two heuristics usually agree; where they conflict, prefer the smaller step.
+
+Plan validation warns when a mutating step partially covers a seam it touches,
+or spans entities with no declared relation. These are warnings rather than
+failures, because legitimate work sometimes crosses seams. Crossing one silently
+is the problem.
+
+## Deterministic Implementation Engine
 
 ### Execution Cycle
 
 ```text
 select next dependency-ready step
-  -> compute focused ontology slice and applicable rules
-  -> assemble step prompt
+  -> assemble step context
   -> launch one managed native Goal Agent session
   -> receive step completion claim or needs-input signal
-  -> observe Git, paths, tests, and process evidence
-  -> validate observed ontology impact
-  -> evaluate step obligations
+  -> observe Git, paths, tests, Quality, and process evidence
+  -> validate observed impact against declared impact
+  -> evaluate step obligations and applicable rules
   -> checkpoint success, replan, retry, or fail
 ```
 
@@ -971,30 +845,41 @@ The engine, not the agent, marks a step succeeded.
 
 ### Step Context
 
-Each step receives only:
+Each step receives only what its own work requires:
 
-- Goal identity and current Round request;
+- Goal identity and the current Round request;
 - the step objective, prerequisites, and success conditions;
-- relevant summaries from completed prerequisite steps;
-- the focused ontology slice and selection reasons;
-- every deterministically applicable rule;
+- relevant summaries from completed prerequisite steps, not their transcripts;
+- the step's slice of the plan model — its entities, the seams it touches, and
+  the relations between them;
+- the complete rule list;
+- the Architecture sections relevant to the step's scope;
 - relevant Guidance candidates;
-- realization mappings for likely code and evidence;
+- likely repository locations from the plan model, marked as hints;
 - current branch, worktree, base commit, and latest checkpoint;
 - the step completion protocol.
 
-The full ontology and full prior transcripts are not repeated unless selected by
-an explicit context rule.
+The full plan model, the full Goal history, full Architecture, and prior step
+transcripts are not included by default.
+
+Rules are the exception to focusing: the complete list goes to every step. They
+are prose with no scope, the list is short, and any attempt to select a subset
+would reintroduce the possibility of dropping the one that mattered.
+
+Context assembly records the selection reason for every included record, so a
+failed step can be diagnosed as a context problem rather than assumed to be a
+capability problem. A step may request additional model records or Architecture
+sections; Refine validates and expands.
 
 ### Agent Sessions
 
 Each step uses a fresh managed native provider session by default. This provides
-context isolation and prevents the accumulated conversation from defeating
-focused slicing.
+context isolation and prevents accumulated conversation from defeating focused
+context assembly.
 
 The user experience remains one logical Goal Agent:
 
-- the CLI and web "Open Agent" actions attach to the currently active step;
+- CLI and web "Open Agent" actions attach to the currently active step;
 - process metadata includes Goal ID, Round, plan ID, plan revision, and step ID;
 - step transcripts aggregate under the Round;
 - exactly one step session may own a Goal at a time;
@@ -1007,8 +892,6 @@ not rebuild the agent interaction experience.
 
 ### Step Completion Contract
 
-A step agent claims completion through a structured signal:
-
 ```json
 {
   "state": "completed",
@@ -1018,16 +901,10 @@ A step agent claims completion through a structured signal:
   "message": "Implemented the shared behavior and ran focused tests.",
   "observed_impact": {
     "entity_ids": ["capability.workflow"],
-    "relation_ids": [],
-    "behavior_ids": ["behavior.goal-transition"],
-    "rule_ids": ["rule.evidence-before-transition"]
+    "seam_ids": ["seam.workflow-authority"]
   },
   "verification": [
-    {
-      "command": "cargo test ...",
-      "outcome": "passed",
-      "evidence": "..."
-    }
+    {"command": "cargo test ...", "outcome": "passed", "evidence": "..."}
   ],
   "guidance_applied": [],
   "discrepancies": [],
@@ -1035,8 +912,8 @@ A step agent claims completion through a structured signal:
 }
 ```
 
-The engine rejects wrong plan or step identity, unknown ontology IDs, malformed
-evidence, invalid Guidance selection, or a stale plan revision.
+The engine rejects wrong plan or step identity, unknown plan-model IDs,
+malformed evidence, invalid Guidance selection, or a stale plan revision.
 
 `needs_input` remains available only for an impossible missing decision or
 authority. Routine uncertainty should produce the best supported implementation
@@ -1051,15 +928,15 @@ After the agent claims completion, Refine observes:
 - Git diff and candidate commit ancestry;
 - registered test and Quality results;
 - process outcome and transcript;
-- declared versus observed ontology impact;
-- realization mappings;
-- rule-specific evidence.
+- declared versus observed impact.
 
-Structural and inexpensive repository rules run after every step.
+Everything in that list is a mechanical fact. The engine gathers facts; it does
+not judge whether a rule was honored.
 
-Behavioral and judgment checks may run at semantic milestones when their cost is
-proportional to the step risk. Full configured Governance and Quality still run
-after the entire plan.
+Rule judgment is a Governance-agent activity and may run at milestones when its
+cost is proportional to step risk. Registered Quality checks run according to
+existing Quality timing. Full configured Governance and Quality still run after
+the entire plan, and that final pass remains the authoritative rule evaluation.
 
 A discrepancy between declared and observed impact does not automatically fail
 when it represents a justified discovery. It must be explained, validated, and
@@ -1087,25 +964,27 @@ reconciliation commit covering remaining verified changes.
 
 ### Replanning
 
-A step may request replanning because of:
+Replanning is the only point at which control returns to the stochastic side
+during execution. A step may request it because of:
 
 - an unexpected dependency;
-- a newly affected ontology concept;
+- a seam the plan model missed or described incorrectly;
 - an invalid assumption;
-- an ontology or realization discrepancy;
 - failed required evidence;
 - a need for reconciliation.
 
-Replanning receives the original plan, immutable completed-step outcomes, current
-worktree and checkpoint state, discrepancies, and remaining Goal obligations.
+Replanning receives the original plan and plan model, immutable completed-step
+outcomes, current worktree and checkpoint state, discrepancies, and remaining
+Goal obligations.
 
 Plan revisions are append-only. A revision may add, change, reorder, or
-supersede pending steps. It cannot rewrite completed steps, their evidence, or
-their checkpoint commits.
+supersede pending steps, and may revise the plan model. It cannot rewrite
+completed steps, their evidence, their checkpoint commits, or the model version
+they were judged against. Each step records the plan revision that governed it.
 
-Refine validates every revision and recomputes applicable rules. Replanning has
-bounded attempts; exceeding the configured bound fails the implementation while
-preserving all evidence.
+Refine validates every revision, recomputes applicable-rule closure, and
+re-pins. Replanning has bounded attempts; exceeding the configured bound fails
+the implementation while preserving all evidence.
 
 ### Failure
 
@@ -1117,7 +996,7 @@ A failed step records:
 - worktree observation;
 - partial changed paths;
 - verification outcomes;
-- applicable rules;
+- applicable rules and their findings;
 - transcript and logs;
 - whether retry or replan is available.
 
@@ -1129,8 +1008,7 @@ Round behavior remains available after Goal failure.
 
 ### Cancellation
 
-Explicit Goal cancellation is terminal and has precedence over implementation
-plan progression.
+Explicit Goal cancellation is terminal and has precedence over plan progression.
 
 Cancellation:
 
@@ -1168,10 +1046,11 @@ After all required steps succeed:
 
 1. Refine verifies that no unexplained worktree changes remain outside the final
    checkpoint.
-2. It reconciles declared and observed ontology impact.
+2. It reconciles declared and observed impact.
 3. It records the complete implementation report from step outcomes rather than
    relying on one final agent narrative.
-4. It runs full post-implementation Governance against the pinned ontology.
+4. It runs full post-implementation Governance against the pinned Governance
+   revision.
 5. It advances to configured Quality timing only when Governance passes.
 6. Existing Ready Merge, build, post-build Quality, and human Review behavior
    continues unchanged.
@@ -1181,19 +1060,13 @@ accepted, or move the Goal directly to Done.
 
 ## Governance Findings
 
-Ontology-aware findings use stable references:
-
 ```json
 {
-  "rule_id": "rule.surface-delegation",
+  "rule_id": "rule-9",
   "message": "The web surface introduced product semantics outside the shared capability.",
-  "ontology_ids": [
-    "surface.web",
-    "capability.workflow",
-    "relation.web-delegates-workflow"
-  ],
   "plan_id": "plan-...",
   "step_id": "step.web-adapter",
+  "model_ids": ["surface.web", "seam.workflow-authority"],
   "evidence": [
     {
       "kind": "path",
@@ -1204,188 +1077,130 @@ Ontology-aware findings use stable references:
 }
 ```
 
-Governance evaluates actual changes against applicable pinned rules. It must not
-report preferences, hypothetical risks, or violations of unselected current
-ontology revisions.
+Governance judges actual changes against the rules pinned to the plan. It must
+not report preferences, hypothetical risks, or violations of rules adopted after
+pinning.
 
-The engine records:
+A finding is a reasoned claim, not a computed result. What the engine guarantees
+is that the judgment happened against the pinned rules and the observed diff,
+that it cites evidence, and that its verdict is recorded — not that the verdict
+is correct. Review remains the check on the judgment itself.
 
-- rules considered;
-- selection reasons;
-- enforcement mode;
-- checker or provider used;
-- evidence;
-- pass, fail, review-required, or informational result.
+Where a finding concerns a pre-existing condition the Goal did not introduce,
+the Governance agent should say so in the finding. Refine does not track this as
+structured state.
+
+The engine records rules supplied, provider used, evidence cited, and result.
+
+`model_ids` are plan-scoped and meaningful only alongside the retained plan
+model. Findings that need to outlive the plan cite rule IDs, paths, and commits.
 
 ## Review
 
-Review adds semantic evidence alongside the existing code and workflow evidence:
+Review adds semantic evidence alongside existing code and workflow evidence:
 
-- ontology revision and digest;
-- declared Goal impact;
-- implementation-plan revisions;
+- Governance revision and digest;
+- the pinned plan model and its declared impact;
+- plan revisions and the model version governing each step;
 - step statuses and checkpoint commits;
 - observed impact;
-- intended versus observed semantic diff;
-- applicable rules and findings;
+- intended versus observed diff;
+- the pinned rules and the findings against them;
 - discrepancies and their dispositions;
-- proposed ontology changes;
+- proposed rules arising from this Goal;
 - code diff, Quality, build, Git, and existing Governance evidence.
 
-Review may:
+Review may accept the integrated implementation through the existing approval
+path, request a new implementation Round, accept or reject proposed rules,
+record a follow-up Goal, or fail or cancel through existing actions.
 
-- accept the integrated implementation through the existing approval path;
-- request a new implementation Round;
-- request or apply a separately reviewed ontology candidate;
-- record a follow-up Goal;
-- fail or cancel through existing actions.
+Accepting an implementation does not implicitly accept a proposed rule.
+Accepting a rule does not implicitly accept an implementation.
 
-Accepting an implementation does not implicitly accept an ontology candidate.
-Accepting an ontology candidate does not implicitly accept an implementation.
+## Discrepancies And Rule Evolution
 
-## Web Ontology Surface
-
-### Product Placement
-
-Governance settings retain Product and Constitution fields and add an Ontology
-section. Rules are presented within Ontology rather than as an independent
-source of truth.
-
-The Ontology section provides:
-
-- empty-state explanation;
-- Generate action when absent;
-- Refresh action when accepted state exists;
-- current revision and validation status;
-- structured list/editor fallback;
-- candidate diff and explicit Apply or Discard;
-- link to a full visual ontology route.
-
-The full visual route presents the model, realization mappings, rules,
-discrepancies, and revision history.
-
-### tldraw Projection
-
-tldraw visual mappings:
-
-- entity -> custom node/card shape;
-- relation -> typed bound arrow;
-- property -> selected-record inspector field;
-- behavior -> behavior or state-transition shape;
-- rule -> constraint card connected to its scope;
-- realization mapping -> optional repository/evidence overlay;
-- domain or capability group -> frame;
-- candidate addition, change, or removal -> diff overlay.
-
-The ontology-to-tldraw adapter maps stable ontology IDs to stable visual shape
-metadata. Generated tldraw record IDs are never used as semantic identity.
-
-### Typed Canvas Commands
-
-Canvas gestures emit typed ontology commands:
+This is the only durable feedback path. Without it, each Goal re-derives its
+model from the same sources and can make the same mistake indefinitely.
 
 ```json
 {
-  "command": "add_relation",
-  "base_revision": 12,
-  "relation": {
-    "id": "relation.web-delegates-workflow",
-    "type": "delegates_to",
-    "from": "surface.web",
-    "to": "capability.workflow",
-    "name": "Web delegates to Workflow",
-    "description": "..."
-  }
+  "id": "discrepancy-...",
+  "goal_id": "GOAL1",
+  "round": 2,
+  "plan_id": "plan-...",
+  "step_id": "step.web-adapter",
+  "classification": "implementation_violation",
+  "expected": "Workflow transitions are evidence-backed.",
+  "observed": "A transition occurred before evidence persistence.",
+  "evidence": [],
+  "proposed_response": "rule_proposal"
 }
 ```
 
-The shared service validates every command. Connecting shapes does not directly
-write JSON. Deleting a referenced entity requires an explicit cascade candidate
-or fails with the dependent records listed.
+Classifications:
 
-Canvas edits remain a local draft until Save submits one atomic command batch
-against a base revision. A stale base produces a visible conflict and
-authoritative refresh; the client never overwrites newer state.
+- `implementation_violation`: correct the implementation. **This is the
+  default.**
+- `rule_gap`: a constraint exists in intent but was never written down; propose
+  a rule;
+- `rule_error`: an accepted rule is wrong; propose a correction;
+- `architecture_gap`: Architecture failed to state something a correct
+  derivation needed;
+- `model_error`: stage one derived the structure incorrectly; a planning-quality
+  signal, not a Governance change;
+- `evidence_gap`: gather evidence without changing intent.
 
-### React Island Boundary
+The default matters. `rule_error` requires explicit justification rather than
+being the path of least resistance — otherwise every inconvenient constraint is
+reclassified into nonexistence.
 
-tldraw is integrated as one compiled React island mounted inside Refine's
-existing static web surface.
+`model_error` has no durable target by design. It is recorded as a planning
+quality signal, and a pattern of them indicates that Architecture is
+underspecified, which is an `architecture_gap`.
 
-The island:
+A discrepancy that becomes a rule produces one sentence appended to the rules
+list, reviewed like any other proposal. That is the entire durable feedback
+mechanism, and its cheapness is the point: a lesson costs a line of prose, so
+recording one is never the expensive option.
 
-- mounts into one stable, morph-preserved host;
-- exposes a small JavaScript bridge for load, reconcile, save, selection, and
-  teardown;
-- receives authoritative ontology data through normal API reads and SSE
-  reconciliation;
-- emits typed commands only;
-- unmounts explicitly on route exit;
-- is not recreated during recurring Settings or SSE redraws;
-- keeps React and tldraw dependencies inside the bounded visual artifact.
+## Surfaces
 
-The broader Refine web surface does not migrate to React as part of this work.
+### Web
 
-The implementation must choose one compatible tldraw version and satisfy its
-license and attribution requirements. Existing Harmonic DAG code may inform the
-adapter design but must not be copied as an ontology data contract or introduce
-multiple tldraw major versions.
+Governance settings retain Product and Constitution and add:
 
-### Live Updates
+- an Architecture section with the fixed headings, edited as Markdown;
+- the existing Rules list, unchanged in shape and editing behavior;
+- a proposal review queue with per-proposal accept, edit, and reject;
+- empty-state explanation framing Architecture as intent, not documentation.
 
-SSE remains the only live browser update transport.
+Architecture is six textareas and Rules is the list that exists today. Neither
+needs a structured editor, a scope picker, or a validation panel, and adding one
+would misrepresent prose as data.
 
-When an agent or program changes accepted ontology state:
+Goal detail may summarize active plan progress. The plan model and step evidence
+appear in plan/step evidence views and logs — debuggable when you go looking,
+invisible when you are not. Neither appears as Round or Goal state.
 
-1. Refine emits the new revision.
-2. The browser performs one authoritative reconciliation read.
-3. The adapter updates shapes by ontology ID while preserving compatible layout.
-4. Added, changed, and removed semantic records are highlighted.
+The surface must be genuinely useful with one Architecture paragraph and two
+rules. Nothing should imply that Governance is invalid, unfinished, or unready
+because it is small.
 
-The canvas does not poll ontology or operation status.
+### API, CLI, And MCP
 
-### Accessibility And Non-Visual Parity
-
-The visual graph is not the only way to inspect or edit the ontology.
-
-The web surface also provides keyboard-accessible structured lists and property
-forms. CLI, API, and MCP expose the same records and commands. Essential model
-meaning must not depend on color, spatial placement, or pointer-only gestures.
-
-## API, CLI, And MCP Surface
-
-Exact naming may follow current command and route conventions, but all surfaces
-must expose the same shared operations.
-
-Required capability operations:
-
-- show accepted ontology;
-- validate a document or candidate;
-- generate;
-- refresh;
-- show operation and candidate status;
-- show structural diff;
-- apply candidate with base revision;
-- discard candidate;
-- apply typed command batch;
-- list and show entities, relations, behaviors, rules, mappings, and
-  discrepancies;
-- query a focused slice;
-- classify or amend Goal impact;
-- show implementation plan and step evidence.
-
-Representative CLI shape:
+All surfaces expose the same shared operations.
 
 ```text
-refine ontology show
-refine ontology validate
-refine ontology generate
-refine ontology refresh
-refine ontology diff <candidate-id>
-refine ontology apply <candidate-id>
-refine ontology discard <candidate-id>
-refine ontology discrepancy list
+refine governance architecture show
+refine governance architecture edit
+refine governance rules list
+refine governance propose [--scope <path>]
+refine governance proposals
+refine governance accept <proposal-id>
+refine governance reject <proposal-id> --reason <text>
 refine goal plan <goal-id>
+refine goal plan <goal-id> --model
+refine goal plan <goal-id> --steps
 ```
 
 CLI output supports structured JSON for agents and programs. MCP tools delegate
@@ -1393,134 +1208,167 @@ to the same service and return the same typed contracts.
 
 Surfaces never receive a private bypass that writes `governance.json` directly.
 
+### Visual Projection
+
+Deferred. If built, a plan model renders as a read-only diagram attached to plan
+evidence: entities, relations, seams, and step boundaries against them.
+
+Because the plan model is derived and discarded, there is no editing surface, no
+typed command protocol, no layout persistence, and no stale-revision conflict
+handling. This is a rendering, not an application, and it must not become the
+justification for introducing React or an external canvas dependency into the
+web surface.
+
 ## Prompt Templates
 
-Expected templates:
+- `governance-survey.md`: map repository structure for proposal generation;
+- `governance-hypothesize.md`: propose candidate Architecture and rules;
+- `governance-test.md`: check each hypothesis against the repository;
+- `governance-propose.md`: rank and emit bounded proposals;
+- `plan-model.md`: stage one — derive the Goal-scoped structural model;
+- `plan-steps.md`: stage two — decompose along seams;
+- `plan-step-execute.md`: execute one focused implementation step;
+- existing post-implementation Governance template extended with the pinned plan
+  model and observed impact.
 
-- `ontology.md`: generate or refresh an ontology candidate;
-- `ontology-plan.md`: produce a constrained implementation plan;
-- `ontology-step.md`: execute one focused implementation step;
-- existing post-implementation Governance template extended with the pinned
-  ontology slice and observed impact.
+A representative contract for stage one:
 
-Templates remain concise and task-specific. Large structured context is rendered
-as data sections by shared code rather than duplicated instruction prose.
+```markdown
+Derive the structural model needed to implement this Goal. Return only JSON
+conforming to schema version {{schema_version}}.
+
+Model only what this Goal requires, at the granularity this Goal requires.
+Identify seams: boundaries across which authority, ownership, or responsibility
+changes. Seams determine where implementation steps will be cut.
+
+Architecture states what must be true. The repository shows what currently is.
+Where they disagree, the implementation is wrong unless you have evidence
+otherwise; record the disagreement rather than modelling around it.
+
+Do not edit files.
+
+Product: {{product}}
+Constitution: {{constitution}}
+Architecture: {{architecture}}
+Rules: {{rules}}
+Goal: {{goal}}
+Previous rounds: {{rounds}}
+Current request: {{request}}
+Repository: {{target_root}}
+```
+
+The Rust model and validator define the schema. Prompts do not become a second
+schema authority.
 
 Prompt rendering tests enforce:
 
 - all required variables are used;
 - no undeclared variables are accepted;
 - output schema identity is explicit;
-- Product, Constitution, ontology revision, Goal, Round, plan, and step
-  identities are correctly pinned;
-- current mutable ontology is never substituted for Round-pinned context.
+- Product, Constitution, Architecture, Goal, Round, plan, and step identities
+  are correctly pinned;
+- current mutable Governance is never substituted for plan-pinned context.
 
 ## Migration And Compatibility
 
 ### Existing Governance Rules
 
-Existing top-level Governance rules migrate into `ontology.semantics.rules`:
+Rules do not migrate. Their shape, IDs, text, timestamps, source field,
+normalization, and editing behavior are unchanged, and existing rules continue
+to work exactly as they do today.
 
-```json
-{
-  "id": "rule-9",
-  "kind": "policy",
-  "statement": "Use SSE as the only mechanism for live browser updates.",
-  "scope": {
-    "entity_ids": [],
-    "entity_kinds": [],
-    "relation_types": [],
-    "behavior_ids": []
-  },
-  "effect": "block",
-  "enforcement": {
-    "mode": "judgment",
-    "checker_id": null,
-    "required_evidence": []
-  },
-  "source": "legacy-governance-rule"
-}
-```
+The only change is where they are consumed: rules are now also supplied to
+plan-model derivation and to every implementation step, in addition to
+post-implementation Governance.
 
-They remain project-wide until linked to more specific ontology scope. Existing
-IDs, text, created time, updated time, and source are preserved.
+The one addition worth making is to `generate_rules`, which currently returns
+two hardcoded placeholder rules. Proposal generation replaces it with rules
+actually derived from the repository. That is a behavior improvement inside the
+existing contract, not a schema change.
 
-The loader accepts the prior Governance schema and presents an in-memory
-normalized ontology view. A durable schema write occurs through an explicit
-migration or subsequent Governance mutation, following existing state migration
-rules.
+### Governance Document
+
+Adding `architecture` to `governance.json` is additive. The loader accepts
+documents without it, and `configured` continues to depend only on Product and
+Constitution.
 
 ### Existing Goals And Rounds
 
 - Existing Goal records remain valid.
 - Existing pinned context version 1 remains readable and immutable.
-- New ontology-aware Rounds use a new context version.
-- A Round without ontology context continues through legacy one-shot
-  implementation unless an explicit compatible migration is defined.
-- The first implementation rollout may allow a setting-controlled choice
-  between one-shot and plan execution for comparison and rollback.
+- New planned Rounds use a new context version.
+- A Round without plan context continues through legacy one-shot implementation.
+- The first rollout allows a setting-controlled choice between one-shot and
+  planned execution for comparison and rollback.
 
 ### Existing Surfaces
 
-Product and Constitution fields keep their wire meaning. Legacy `rules` reads may
-be provided temporarily as a projection of `ontology.semantics.rules`, but new
-writes use ontology commands.
+Product, Constitution, and `rules` keep their wire meaning and their read and
+write behavior. Surfaces gain an `architecture` field and the proposal
+operations; nothing existing changes shape.
 
 ## Security And Trust Boundaries
 
 - Provider output is untrusted input.
-- Generation and planning do not gain merge, approval, Goal transition, or
+- Derivation and planning do not gain merge, approval, Goal transition, or
   arbitrary state-write authority.
-- Generated checker IDs must resolve to registered capabilities.
-- Generated ontology content cannot define executable shell commands.
+- Generated Governance content is prose and is treated as prose. It is never
+  parsed into commands, checks, or executable content, which removes an entire
+  class of injection surface that typed enforcement metadata would have
+  introduced.
+- Proposals cannot write Governance. Acceptance is an explicit user action.
 - Planning is read-only and unexpected worktree mutation is an error.
 - Step agents retain normal implementation authority only inside the isolated
   Goal worktree.
-- Candidate application requires a matching base revision.
 - Raw provider output is retained as potentially sensitive operation evidence
   according to existing redaction and export rules.
-- API and remote-browser mutation origin rules apply to ontology mutations.
-- tldraw embeds and arbitrary external assets are disabled unless explicitly
-  supported by a separate security decision.
+- API and remote-browser mutation origin rules apply to Governance mutations.
 
 ## Observability
 
-Ontology and implementation-plan activity emits structured logs with:
+Plan and step activity emits structured logs with:
 
-- operation, Goal, Round, plan, step, and process identity;
+- operation, Goal, Round, plan, plan revision, step, and process identity;
 - provider;
-- ontology revision and digest;
-- candidate and base revision;
+- Governance revision and digest;
+- plan model digest and the model version governing each step;
 - state transition;
-- selected ontology IDs and reasons;
-- rule checks and evidence;
+- selected model records and Architecture sections, with reasons;
+- rule findings and their evidence;
 - checkpoint commits;
 - cancellation, interruption, retry, and replan details;
 - validation or conflict errors.
 
+Derivation inputs are recorded so a plan model is reproducible: Governance
+digest, base commit, and Goal history version.
+
 Dashboard and Goal detail may summarize active plan progress, but durable Round,
-operation, process, Git, and ontology state remain authoritative.
+operation, process, Git, and Governance state remain authoritative. Plan models
+and steps are traceable through plan evidence and logs, and are never promoted
+into workflow state.
 
 Provider or authentication failure must be visible as such and must not be
-reported as an ontology validation failure, plan failure, or workflow-capacity
-problem.
+reported as a validation failure, plan failure, or workflow-capacity problem.
 
 ## Efficacy Gate
 
-The first implementation stage tests the product hypothesis before building the
-generator and tldraw experience.
+The first stage tests the product hypothesis before further investment.
 
-Create a compact hand-authored Refine ontology and run representative historical
-Goals through:
+Hand-author a compact Refine Architecture and a small rule set, then run
+representative historical Goals through:
 
 1. current one-shot implementation;
-2. ontology-aware one-shot context;
-3. ontology-driven planned step execution.
+2. one-shot with a derived plan model as context;
+3. two-stage planned step execution.
 
 Use the same starting commit, model, provider configuration, authority, and
 budget. Repeat conditions enough to distinguish a consistent effect from one
-provider sample. Reviewers should evaluate candidates without knowing the
-condition.
+provider sample. Reviewers evaluate candidates without knowing the condition.
+
+Hand-authoring Architecture is the point, not a shortcut. It isolates the
+execution hypothesis from proposal-generation quality, which is measured
+separately. If planned execution does not help with Architecture authored by the
+person who knows the system best, better generation will not rescue it.
 
 Primary measures:
 
@@ -1529,152 +1377,153 @@ Primary measures:
 - missed affected capabilities or surfaces;
 - corrective Rounds required;
 - behavioral and failure-path coverage;
-- unnecessary changes.
+- unnecessary changes;
+- reviewability of partial state when a plan fails mid-execution, compared with
+  a coherent one-shot failure.
 
 Secondary measures:
 
 - elapsed time;
 - provider invocations;
 - token or budget usage where available;
-- plan and ontology classification accuracy;
+- plan-model and decomposition quality as judged at Review;
 - reviewer effort.
 
-Ontology citations, longer implementation reports, and visually richer Review
-are not success measures by themselves.
+Longer implementation reports and richer Review output are not success measures
+by themselves.
 
-Proceed to full generation and visual productization only if planned ontology
-execution materially reduces defects or rework across repeated runs with an
-acceptable execution-cost increase. Record the threshold and exact experiment
-results before changing the gate.
+### Thresholds
+
+Fixed before the first run, not after seeing results:
+
+- **Quality:** planned execution must materially reduce material defects or
+  corrective Rounds versus one-shot, consistently across repeated runs.
+- **Cost:** record the maximum acceptable multiple of provider invocations and
+  token spend per Goal before running. Cost is a gating measure — fresh sessions
+  per step pay repository-orientation cost N times, and users pay for it
+  directly. An unbounded "acceptable increase" is not a gate.
+- **Failure shape:** mid-plan failure must not produce partial state that
+  reviewers judge worse than a one-shot failure. Seam alignment is the
+  mechanism; this measures whether it works.
+
+Arm 2 matters independently. If a derived plan model as context captures most of
+the benefit without decomposition, that is a far cheaper product and the correct
+thing to ship.
+
+Record thresholds, experiment design, and exact results before changing the
+gate.
 
 ## Implementation Order
 
 ### Phase 0: Efficacy Prototype
 
-- Hand-author a minimal Refine ontology.
-- Add typed model and slice rendering sufficient for experiments.
-- Add a feature-gated plan schema and sequential step executor.
-- Use existing provider and native session capabilities.
-- Run and record the efficacy comparison.
-- Stop or revise the approach if implementation outcomes do not improve.
+- Hand-author a compact Refine Architecture and a few rules.
+- Add typed plan-model and plan schemas behind a feature gate.
+- Add a sequential step executor using existing provider and session
+  capabilities.
+- Fix thresholds, then run and record the efficacy comparison.
+- Stop or revise if implementation outcomes do not improve.
 
-### Phase 1: Canonical Ontology Foundation
+### Phase 1: Governance Foundation
 
-- Add typed ontology model, validation, normalization, IDs, revisions, and
-  digests.
-- Normalize legacy Governance rules into ontology rules.
-- Add shared storage, query, command, diff, and slice services.
-- Preserve no-ontology behavior and old Round compatibility.
+- Add the Architecture document, sections, revision, and digest.
+- Leave rules untouched; extend only where they are consumed.
+- Preserve no-Architecture behavior and old Round compatibility.
 - Add CLI and API read/validate coverage.
 
-### Phase 2: Generation And Candidate Review
+This phase is deliberately small. Governance gains one prose document and no new
+data model.
 
-- Add `ontology.md`.
-- Add durable generation and refresh operations.
-- Parse and validate complete provider candidates.
-- Add structural diff, stale-base conflict, explicit Apply, and Discard.
-- Add discrepancy records and candidate provenance.
-- Expose shared behavior through CLI, API, MCP, and basic web forms.
+### Phase 2: Two-Stage Planning
 
-### Phase 3: Goal Impact And Planning
-
-- Add declared-impact classification.
-- Pin ontology revisions and slices to new Rounds.
-- Add `ontology-plan.md`, plan validation, and durable plan revisions.
+- Add `plan-model.md` and `plan-steps.md`.
+- Add plan-model derivation, validation, and applicable-rule closure.
+- Add plan validation, pinning, and durable plan revisions.
 - Keep one-step compatibility for small Goals.
 - Expose plan state in Goal detail and process metadata.
 
-### Phase 4: Dynamic Step Execution
+### Phase 3: Deterministic Step Execution
 
-- Add `ontology-step.md` and structured step completion.
+- Add `plan-step-execute.md` and structured step completion.
+- Add focused step context assembly with recorded selection reasons.
 - Launch fresh managed native sessions per step.
-- Add deterministic observations, applicable-rule closure, step checkpoints,
-  replanning, retry bounds, cancellation, and restart recovery.
+- Add deterministic observation, checkpoints, replanning, retry bounds,
+  cancellation, and restart recovery.
 - Aggregate step evidence into the implementation report.
 - Preserve final Governance, Quality, integration, and Review boundaries.
 
-### Phase 5: Ontology-Aware Governance And Review
+### Phase 4: Proposal Generation
 
-- Extend Governance findings with ontology and evidence references.
+- Add the staged proposal pipeline and its prompt templates.
+- Add hypothesis testing and universal/partial/aspirational classification.
+- Add proposal records with evidence both ways and violation sites.
+- Add per-proposal accept, edit, reject, and durable rejection memory.
+- Add interview mode for underdetermined intent.
+- Replace the hardcoded `generate_rules` placeholders.
+- Add proposal quality metrics.
+- Evaluate against repositories other than Refine before proceeding.
+
+### Phase 5: Governance-Aware Review
+
+- Extend findings with rule, plan, step, and evidence references.
 - Reconcile declared and observed impact.
-- Add semantic diff, discrepancy disposition, plan history, and checkpoint
+- Add discrepancy disposition, plan history, model versions, and checkpoint
   evidence to Review.
-- Ensure ontology candidates and implementation approval remain separate.
-
-### Phase 6: tldraw Visual Surface
-
-- Select and pin one compatible tldraw version.
-- Build the ontology-specific adapter and custom shapes.
-- Add the bounded React island and vanilla bridge.
-- Add typed command batches, visual candidate diff, and layout projection.
-- Add SSE reconciliation and stable mounted-canvas behavior.
-- Add accessible structured-editor parity.
+- Add the discrepancy-to-rule-proposal loop.
+- Ensure rule acceptance and implementation approval remain separate.
 
 ## Verification Strategy
 
-### Model And Validation
+### Governance Model And Validation
 
-- valid and invalid entity, property, relation, behavior, rule, and mapping
-  documents;
-- duplicate and malformed IDs;
-- unknown references;
-- cardinality and value-type failures;
-- cyclic or invalid semantic references where prohibited;
-- normalization and stable digest behavior;
-- rule effect and enforcement validation;
-- legacy Governance rule normalization.
+- Architecture sections present, absent, empty, and unknown;
+- Architecture revision, digest stability, and normalization;
+- documents with no `architecture` key load unchanged;
+- `configured` unaffected by Architecture presence or absence;
+- existing rule normalization, IDs, and round-trip behavior unchanged;
+- existing Governance read and write contracts unchanged.
 
-### Persistence And Concurrency
+### Proposal Generation
 
-- atomic save and readback;
-- monotonic revisions;
-- stale candidate and stale command-batch conflict;
-- two-daemon concurrent application;
-- interrupted write recovery;
-- state sync and migration behavior;
-- accepted ontology unchanged on provider, parse, validation, or cancellation
-  failure;
-- layout failure isolated from ontology state.
-
-### Generation
-
-- concise prompt contract;
-- generate and refresh modes;
-- stable-ID preservation;
+- concise prompt contract per pipeline stage;
+- proposal bounding and ranking;
+- accepting a rule proposal appends prose and persists nothing else;
+- accepting an Architecture proposal writes into the named section;
+- per-proposal accept, edit, and reject;
+- rejection memory suppresses re-proposal across runs;
+- interview questions are skippable and never fabricate an answer;
 - malformed and prose-wrapped provider output;
-- missing evidence warnings;
 - provider authentication failure;
 - no static fallback;
 - operation cancellation, interruption, retry, and result retention.
 
-### Slicing And Goal Context
+### Plan-Model Derivation
 
-- declared-impact validation;
-- deterministic relation and rule closure;
-- token or record budgeting;
-- selection-reason retention;
-- agent-proposed expansion;
-- agent inability to remove applicable rules;
-- exact revision and digest pinning;
-- no-ontology no-op behavior;
-- old Round context compatibility.
+- valid shallow and deep models for differently scoped Goals;
+- referential integrity of relations, seams, and declared impact;
+- the complete rule list is attached to every pinned plan;
+- read-only enforcement and worktree mutation detection;
+- exact Governance revision, digest, and base commit pinning;
+- no-Architecture behavior;
+- derivation reproducibility from recorded inputs.
 
 ### Planning
 
 - valid one-step and multi-step plans;
-- unknown ontology references;
+- unknown plan-model references;
 - cyclic dependencies;
-- omitted applicable rules injected by Refine;
-- missing declared-impact coverage;
+- seam-coherence warnings for steps partially covering a boundary;
+- declared-impact coverage across steps;
 - forbidden authority requests;
-- planning worktree mutation detection;
-- plan revision history;
-- completed-step immutability;
+- plan revision history and model versioning;
+- completed-step immutability across model revision;
 - bounded replanning.
 
 ### Step Execution
 
-- focused context assembly;
+- focused context assembly and recorded selection reasons;
+- every step receives the complete rule list;
+- step-requested context expansion;
 - one active step per Goal;
 - distinct Goals executing concurrently;
 - attach and detach from the active native session;
@@ -1682,15 +1531,14 @@ results before changing the gate.
 - wrong plan, revision, or step signal;
 - observed-impact validation;
 - changed-path reconciliation;
-- structural, repository, behavioral, judgment, and human rule modes;
 - checkpoint creation and final candidate selection;
 - no-change and non-software steps;
 - provider failure and partial work retention.
 
 ### Cancellation And Recovery
 
-- cancellation before launch, during planning, during a step, during
-  verification, and between steps;
+- cancellation before launch, during derivation, during decomposition, during a
+  step, during verification, and between steps;
 - late completion after cancellation cannot restart or succeed the plan;
 - process-settlement failure;
 - restart with running, exited, interrupted, and missing processes;
@@ -1700,65 +1548,69 @@ results before changing the gate.
 
 ### Governance And Review
 
-- findings cite valid rule and ontology IDs;
-- current ontology changes cannot alter pinned evaluation;
-- discrepancy classifications and candidate linkage;
-- semantic and code diff presentation;
-- ontology candidate application independent from implementation approval;
+- findings cite valid rule IDs and actual evidence;
+- Governance changes after pinning cannot alter a pinned plan's evaluation;
+- `implementation_violation` is the default discrepancy classification;
+- `rule_error` requires explicit justification;
+- `model_error` produces no Governance change;
+- discrepancy-to-rule-proposal linkage;
+- rule acceptance independent from implementation approval;
 - final full Governance and Quality still gate progression.
 
-### Web And tldraw
+### Workflow Boundaries
 
-- typed ontology commands rather than raw canvas persistence;
-- stable ID mapping;
-- entity, relation, behavior, rule, and diff rendering;
-- atomic save and stale revision conflict;
-- SSE reconciliation without polling;
-- mounted canvas survives recurring Refine redraws;
-- route exit unmounts exactly one canvas instance;
-- agent-originated updates preserve compatible layout;
-- keyboard-accessible structured fallback;
-- real-browser validation for mounted shapes, bindings, selection, editing, and
-  renderer-instance isolation.
+- no new Goal status, Round field, or public workflow state is introduced;
+- plan and step state is reachable only through plan evidence and logs;
+- the engine cannot integrate, approve, merge, or advance the Goal.
 
 ### Surface Parity
 
 - CLI, API, MCP, and web use the shared service;
 - equivalent validation errors and revision conflicts;
-- thin adapters contain no ontology business rules;
-- Smoke AI can deterministically generate an ontology, a plan, step results,
+- thin adapters contain no Governance business rules;
+- Smoke AI can deterministically generate a plan model, a plan, step results,
   discrepancies, and Governance verdicts for integration coverage.
 
 ## Acceptance Criteria
 
-- Governance has Product, Constitution, and Ontology as its authoritative model.
-- Existing rules are preserved as typed ontology rules.
-- Refine works normally with no ontology.
-- Ontology generation and refresh produce candidates and never silently mutate
-  accepted state.
-- Candidates are validated, diffed, explicitly applied, revision-checked, and
-  auditable.
-- Humans and programs mutate ontology through one shared capability.
-- New ontology-aware Rounds pin an exact revision, digest, slice, and selection
-  reasons.
-- Goal impact and applicable-rule selection cannot reference unknown IDs or be
-  silently bypassed by an agent.
-- The planner emits a constrained plan; Refine validates and owns its execution.
-- The implementation sub-workflow remains subordinate to the existing
-  `InProgress` state and cannot transition or approve the Goal.
-- Each active step receives focused context and produces validated evidence.
+- Governance has Product, Constitution, Architecture, and Rules as its
+  authoritative, durable model.
+- Architecture states intent in fixed Markdown sections and is useful at one
+  paragraph.
+- Semantics are derived and judged stochastically; process is enforced
+  deterministically. Refine is deterministic about state, evidence, and
+  transitions, never about verdicts.
+- Rules remain plain English, unchanged in shape, and are never validated
+  deterministically.
+- No durable ontology graph, entity registry, or realization mapping exists.
+- Plan models are derived per implementation attempt, pinned to a plan revision,
+  and discarded with the plan.
+- Plan models, plans, and steps introduce no Round, Goal status, or other public
+  workflow state, and remain traceable through evidence and logs.
+- Existing rules, and every existing Governance read and write contract,
+  continue to work without migration.
+- Every step and the planner receive the complete rule list, so no selection
+  step exists that could drop one.
+- Refine works normally with no Architecture configured.
+- Rule and Architecture proposals are reviewed individually, never as a
+  whole-document diff, and rejections are not re-proposed.
+- Planning emits a validated model and a plan cut along its seams; once pinned,
+  the engine executes the plan as a program.
+- Step size varies with complexity and redo cost; a one-step plan is valid.
+- Replanning is the only mid-execution return to stochastic control, and it is
+  bounded.
+- Each step receives only the context relevant to its work, with recorded
+  selection reasons.
 - Successful mutating steps create auditable checkpoints.
-- Replanning preserves completed history.
+- Replanning preserves completed history and the model version that governed it.
 - Cancellation and restart recovery remain monotonic, durable, and
   process-aware.
 - Final Governance, Quality, Ready Merge, build, and human Review boundaries
   remain intact.
-- Governance findings and Review cite ontology concepts, rules, plan steps, and
-  actual evidence.
-- Ontology changes cannot retroactively change a Round's contract or outcome.
-- tldraw is a replaceable projection over authoritative ontology state.
-- Canvas changes become typed, atomic, revision-checked ontology commands.
-- The visual surface uses SSE, survives redraws without duplicate renderers, and
-  has non-visual accessible parity.
-- Efficacy results demonstrate material implementation-quality improvement
-  before full visual productization is considered complete.
+- Findings and Review cite rules, plan steps, and actual evidence.
+- Governance changes cannot retroactively alter a pinned plan's contract or
+  outcome.
+- Discrepancies convert into durable rule proposals, so a lesson from one Goal
+  applies to the next.
+- Efficacy results meet pre-registered quality, cost, and failure-shape
+  thresholds before further investment.
