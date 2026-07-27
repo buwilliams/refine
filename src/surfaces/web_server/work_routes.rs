@@ -28,13 +28,14 @@ use crate::tools::product::imports::{
     validate_import_extraction_result,
 };
 use crate::tools::product::merging::FileMergerService;
+use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GoalProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::tools::product::work_items::{
-    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FeatureGoalAuthoringRequest,
-    FileWorkItemService, GoalAuthoringRequest,
+    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, BulkGoalUpdate,
+    FeatureGoalAuthoringRequest, FileWorkItemService, GoalAuthoringRequest,
 };
 use crate::workflow::WorkflowEngine;
 use crate::workflow::promotion::BacklogPromotionService;

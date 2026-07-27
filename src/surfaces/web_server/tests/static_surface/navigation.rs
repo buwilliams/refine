@@ -306,6 +306,7 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(temp_root.join("run/8080"));
 
     let create_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -353,7 +354,12 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    for (id, name) in [("GOAL1", "Bulk One"), ("GOAL2", "Bulk Two")] {
+    server.runtime_root = Some(temp_root.join("run/8080"));
+    for (id, name) in [
+        ("GOAL1", "Bulk One"),
+        ("GOAL2", "Bulk Two"),
+        ("GOAL3", "Bulk Active"),
+    ] {
         let create = server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/goals".to_string(),
@@ -406,6 +412,34 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     });
     assert_eq!(bulk_done.status, 200);
     assert_eq!(bulk_done.body["updated"], 2);
+
+    FileWorkItemService::new(&refine_dir)
+        .set_goal_status_unchecked("GOAL3", &GoalStatus::InProgress)
+        .unwrap();
+    let bulk_cancel = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GOAL1", "GOAL3"],
+            "update": {"status": "cancelled"}
+        })),
+    });
+    assert_eq!(bulk_cancel.status, 200);
+    assert_eq!(bulk_cancel.body["updated"], 1);
+    assert_eq!(bulk_cancel.body["ids"], json!(["GOAL3"]));
+    assert_eq!(bulk_cancel.body["skipped"], 1);
+    assert_eq!(
+        bulk_cancel.body["skipped_details"][0],
+        json!({"id": "GOAL1", "reason": "status:done"})
+    );
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary("GOAL3")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
 
     let bulk_assign = server.handle(ApiRequest {
         method: "POST".to_string(),

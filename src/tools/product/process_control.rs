@@ -17,22 +17,29 @@ use crate::process::subprocess::{
 };
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
+use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 #[cfg(test)]
 use crate::tools::product::work_items::workflow_revision;
-use crate::tools::product::work_items::{FileWorkItemService, GoalCancellationExpectation};
+use crate::tools::product::work_items::{
+    BulkGoalSelection, BulkSkippedDetail, BulkUpdateResult, FileWorkItemService,
+    GoalCancellationExpectation,
+};
 use crate::workflow::capacity::AgentCapacityState;
 use crate::workflow::{WorkflowAutomationState, WorkflowClaimState, WorkflowEngine};
 
 const DEFAULT_AGENT_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
 
+mod bulk_cancellation;
+
 #[derive(Clone, Debug)]
 struct WorkflowGoalOwnership {
     process_id: String,
     claim_id: String,
-    execution_id: String,
+    execution_id: Option<String>,
     round_idx: Option<usize>,
 }
 
@@ -132,6 +139,8 @@ pub struct FileProcessControlService {
     settlement_interruption: Option<CancellationSettlementFailureStage>,
     #[cfg(test)]
     rollback_failure: Option<CancellationRollbackFailureStage>,
+    #[cfg(test)]
+    after_bulk_goal_selection_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl FileProcessControlService {
@@ -152,6 +161,8 @@ impl FileProcessControlService {
             settlement_interruption: None,
             #[cfg(test)]
             rollback_failure: None,
+            #[cfg(test)]
+            after_bulk_goal_selection_hook: None,
         }
     }
 
@@ -175,6 +186,8 @@ impl FileProcessControlService {
             settlement_interruption: None,
             #[cfg(test)]
             rollback_failure: None,
+            #[cfg(test)]
+            after_bulk_goal_selection_hook: None,
         }
     }
 
@@ -219,6 +232,15 @@ impl FileProcessControlService {
         self.rollback_failure = Some(stage);
         self
     }
+
+    #[cfg(test)]
+    fn with_after_bulk_goal_selection_hook(
+        mut self,
+        hook: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        self.after_bulk_goal_selection_hook = Some(std::sync::Arc::new(hook));
+        self
+    }
 }
 
 fn workflow_ownership_json(ownership: &WorkflowGoalOwnership) -> Value {
@@ -260,6 +282,13 @@ fn preflight_goal_state(
     goal_id: &str,
 ) -> RefineResult<GoalCancellationExpectation> {
     let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
+    let active_node = FileNodeRegistryService::new(refine_dir).active_node_id()?;
+    let owner = goal.goal.node_id.as_deref().unwrap_or("default");
+    if owner != active_node {
+        return Err(RefineError::Conflict(format!(
+            "Goal {goal_id} is owned by node {owner}; its linked process was left running and Goal state was not changed"
+        )));
+    }
     if goal.goal.status == GoalStatus::Done {
         return Err(RefineError::InvalidInput(format!(
             "done Goal {goal_id} cannot be cancelled; its linked process was left running"
@@ -339,7 +368,7 @@ fn preflight_goal_for_process(
     let ownership = WorkflowGoalOwnership {
         process_id: process.id.clone(),
         claim_id: claim.claim_id.clone(),
-        execution_id,
+        execution_id: Some(execution_id),
         round_idx: Some(round_idx),
     };
     validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, phase)?;
@@ -415,9 +444,7 @@ fn validate_workflow_goal_ownership_in_state(
         .ok_or_else(|| {
             stale_workflow_ownership(goal_id, ownership, "claim is no longer present", phase)
         })?;
-    if claim.goal_id != goal_id
-        || claim.execution_id.as_deref() != Some(ownership.execution_id.as_str())
-    {
+    if claim.goal_id != goal_id || claim.execution_id != ownership.execution_id {
         return Err(stale_workflow_ownership(
             goal_id,
             ownership,
@@ -496,7 +523,7 @@ fn stale_workflow_ownership(
         "managed process {} has stale workflow ownership for Goal {goal_id} (claim {}, execution {}, round {}): {reason}; {outcome}",
         ownership.process_id,
         ownership.claim_id,
-        ownership.execution_id,
+        ownership.execution_id.as_deref().unwrap_or("not-started"),
         ownership
             .round_idx
             .map(|round_idx| (round_idx + 1).to_string())

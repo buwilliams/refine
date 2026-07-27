@@ -2,7 +2,6 @@ use crate::model::feature::compare_feature_goal_order;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::work_items::FileWorkItemService;
 
@@ -227,21 +226,13 @@ impl WorkflowAutomation for WorkflowEngine {
     }
 
     fn cancel(&self, execution_id: &str) -> RefineResult<()> {
-        let execution_id = execution_id.trim();
-        let operations = FileOperationRegistry::new(&self.runtime_root);
-        // Persist the operation tombstone first so Ready Merge cannot register new operation-owned
-        // work while the shared process/claim/Goal cancellation capability settles.
-        operations.cancel_workflow_execution_operations(execution_id)?;
         let control = match self.refine_dir()? {
             Some(refine_dir) => {
                 FileProcessControlService::with_refine_dir(&self.runtime_root, refine_dir)
             }
             None => FileProcessControlService::new(&self.runtime_root),
         };
-        control.cancel_workflow_execution(execution_id)?;
-        // Repeat after settlement to catch an operation that was already inside registration when
-        // the first scan began. The durable tombstone prevents any later registration.
-        operations.cancel_workflow_execution_operations(execution_id)?;
+        control.cancel_workflow_execution_managed(execution_id)?;
         Ok(())
     }
 

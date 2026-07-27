@@ -67,7 +67,9 @@ async function openBulkModal(field) {
       <p class="muted small" style="margin-top:6px">
         Last workflow state sends failed QA attempts back to qa, failed merge
         attempts back to ready-merge, other failed Goals back to todo, and leaves active
-        automation and Review alone. Decline Review by submitting a new round.
+        automation and Review alone. Cancelled intentionally stops selected active,
+        failed, or Review Goals; Done remains protected. Decline Review by submitting
+        a new round when the work should continue.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])
@@ -123,7 +125,13 @@ async function openBulkModal(field) {
       r,
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );
-    toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    const failedN = Number(r.failed || (r.failures || []).length || 0);
+    if (failedN) {
+      toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}; ` +
+            `${failedN} failed or need attention.`, "warn");
+    } else {
+      toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    }
     await refreshGoalsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk update failed");

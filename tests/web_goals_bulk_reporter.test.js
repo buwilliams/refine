@@ -4,13 +4,19 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
-function browserRuntime({ refreshError = null } = {}) {
+function browserRuntime({
+  apiResult = null,
+  modalValue = null,
+  refreshError = null,
+} = {}) {
   const events = [];
+  const toasts = [];
   let modalHtml = "";
   let actionError = null;
   const context = vm.createContext({
     URLSearchParams,
     api: async () => {
+      if (apiResult) return apiResult;
       throw new Error("The modal should be cancelled before an update");
     },
     describeGoalsFilter: () => "all goals",
@@ -41,12 +47,12 @@ function browserRuntime({ refreshError = null } = {}) {
       actionError = { error, title };
     },
     state: { reporters: [] },
-    toast() {},
+    toast: (message, kind) => toasts.push({ message, kind }),
     _lastGoalsRender: null,
     _openModal: async (body) => {
       events.push("modal");
       modalHtml = body();
-      return null;
+      return modalValue;
     },
   });
   const source = fs.readFileSync(
@@ -65,6 +71,7 @@ function browserRuntime({ refreshError = null } = {}) {
     events,
     modalHtml: () => modalHtml,
     runtime: context.goalsBulkReporterTest,
+    toasts,
   };
 }
 
@@ -76,6 +83,9 @@ test("bulk status offers review and done without automated workflow states", asy
   assert.deepEqual(browser.events, ["modal"]);
   assert.match(browser.modalHtml(), /<option value="review">review<\/option>/);
   assert.match(browser.modalHtml(), /<option value="done">done<\/option>/);
+  assert.match(browser.modalHtml(), /<option value="cancelled">cancelled<\/option>/);
+  assert.match(browser.modalHtml(), /Cancelled intentionally stops selected active/);
+  assert.match(browser.modalHtml(), /Done remains protected/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="in-progress">/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="qa">/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="ready-merge">/);
@@ -102,4 +112,18 @@ test("bulk reporter reports a model-load failure instead of showing an empty pic
   assert.equal(browser.modalHtml(), "");
   assert.equal(browser.actionError().error, failure);
   assert.equal(browser.actionError().title, "Could not load reporters");
+});
+
+test("bulk cancellation surfaces per-Goal partial failure", async () => {
+  const browser = browserRuntime({
+    modalValue: "cancelled",
+    apiResult: { updated: 2, failed: 1, failures: [{ id: "GOAL3" }] },
+  });
+
+  await browser.runtime.openStatus();
+
+  assert.deepEqual(browser.toasts, [{
+    message: "Updated 2 goals; 1 failed or need attention.",
+    kind: "warn",
+  }]);
 });
