@@ -9,6 +9,7 @@
 - **Automation With Escalation**: routine judgment and uncertainty remain autonomous. Only work that is impossible without a missing decision or authority becomes an explicit needs-input state.
 - **One Agent Truth**: opening a Goal Agent never launches a second conversational agent for that Goal.
 - **Pinned Context Contract**: before launch, the current Round records the exact governance, workflow summary, enabled guidance candidates, Goal fields, previous Rounds, and current request used by the agent.
+- **One Shared Specification**: every workflow-owned Goal Agent receives that pinned object through the same flat Markdown specification, independent of provider or attachment surface.
 - **Same-Turn Guidance**: the implementing agent selects applicable guidance while implementing and returns that selection with its completion signal; Refine does not spend a separate provider turn classifying guidance.
 
 ## Purpose
@@ -51,7 +52,19 @@ independent instances: every open action launches a new managed terminal session
 Goal Agents are the intentional exception. They are keyed by Goal instance so
 every surface attaches to the one workflow-owned agent implementing that Goal.
 
-The pinned Round context is immutable for that implementation attempt. Post-implementation governance consumes the same pinned governance snapshot, so a mid-turn settings edit cannot make implementation and evaluation reason from different rules. Refine records applied and skipped guidance candidates as structured Round evidence.
+The pinned Round context is immutable for that implementation attempt. It
+remains a durable, versioned internal object, while the shared prompt capability
+renders it once through `src/prompts/spec.md` as readable Markdown. The
+specification presents Refine context, product intent, rationale, rules and
+zero-based Guidance candidates, chronological previous Rounds, and the
+authoritative latest Round. The latest Round request is the final substantive
+instruction. Provider launch code and CLI or browser attachment surfaces do not
+serialize a second representation.
+
+Post-implementation governance consumes the same pinned governance snapshot, so
+a mid-turn settings edit cannot make implementation and evaluation reason from
+different rules. Refine records applied and skipped guidance candidates as
+structured Round evidence.
 
 The CLI opens a general Agent by default. `--profile plan|standalone` opens the
 role-specific sessions, while `--profile goal` takes a Goal id and attaches to

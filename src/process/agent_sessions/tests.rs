@@ -8,15 +8,73 @@ fn unique_temp_dir(name: &str) -> PathBuf {
 
 #[test]
 fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
-    let prompt = goal_agent_protocol_prompt(
-        "Implement Goal GOAL1",
-        Path::new("/runtime/processes/goal-agent.signal.json"),
-    );
+    let spec = "# Goal Agent Specification\n\n## Latest Round\n\n### Request\n\nLATEST_SENTINEL";
+    let prompt =
+        goal_agent_protocol_prompt(spec, Path::new("/runtime/processes/goal-agent.signal.json"));
 
     assert!(!prompt.contains("Active Refine executable"));
     assert!(!prompt.contains("checkout-local `./r`"));
     assert!(prompt.contains("/runtime/processes/goal-agent.signal.json"));
     assert!(!prompt.contains("{{"));
+    assert_eq!(prompt.matches("# Goal Agent Specification").count(), 1);
+    assert_eq!(prompt.matches("LATEST_SENTINEL").count(), 1);
+    assert!(
+        prompt.find("guidance_applied").unwrap()
+            < prompt.find("# Goal Agent Specification").unwrap()
+    );
+    assert!(prompt.trim_end().ends_with("LATEST_SENTINEL"));
+}
+
+#[test]
+fn workflow_goal_agent_providers_receive_the_same_composed_specification() {
+    let root = unique_temp_dir("goal-agent-provider-prompt");
+    let bin_dir = root.join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    for binary in [
+        "claude",
+        "codex",
+        "gemini",
+        "copilot",
+        "smoke-ai",
+        "custom-agent",
+    ] {
+        let path = bin_dir.join(binary);
+        fs::write(&path, "#!/bin/sh\n").unwrap();
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&path, permissions).unwrap();
+    }
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: Some(root.join("run/8082/agents")),
+    };
+    let spec =
+        "# Goal Agent Specification\n\n## Latest Round\n\n### Request\n\nLATEST_PROVIDER_SENTINEL";
+    let prompt =
+        goal_agent_protocol_prompt(spec, Path::new("/runtime/processes/goal-agent.signal.json"));
+
+    for provider in [
+        "claude",
+        "codex",
+        "gemini",
+        "copilot",
+        "smoke-ai",
+        "custom-agent",
+    ] {
+        let command = service.interactive_command(provider, &prompt).unwrap();
+        assert_eq!(
+            command
+                .args
+                .iter()
+                .filter(|argument| argument.as_str() == prompt)
+                .count(),
+            1,
+            "{provider} must receive the one shared composed prompt"
+        );
+        assert!(command.stdin.is_none());
+    }
+
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

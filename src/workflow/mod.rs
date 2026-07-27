@@ -249,6 +249,7 @@ mod automation;
 mod execution;
 mod execution_context;
 mod goal_agent_context;
+mod goal_agent_spec;
 mod governance;
 mod policy;
 mod ready_merge;
@@ -261,7 +262,8 @@ mod tests;
 use execution_context::{
     agent_worktree_cwd, ensure_workflow_round, hydrate_retry_context, implementation_branch_name,
 };
-use goal_agent_context::{goal_agent_prompt, round_agent_context, selected_agent_context};
+use goal_agent_context::{round_agent_context, selected_agent_context};
+use goal_agent_spec::goal_agent_prompt;
 #[cfg(test)]
 use governance::GOVERNANCE_VERDICT_UNPARSABLE;
 use governance::{

@@ -29,12 +29,14 @@ When a Goal is in-progress:
 - Before the PTY starts, Refine pins the Round's context contract: governance
   product, constitution, and rules; a short workflow summary; enabled guidance
   candidates; Goal context; previous Rounds; and the current Round request.
-- The pinned agent-context value is the single rendering of Goal, earlier-Round,
-  and authoritative latest-Round data. The Goal Agent frame does not duplicate
-  those values. Large composed frames use the shared provider prompt transport,
-  and the workflow-owned PTY retains its artifact lease through terminal
-  handoff so early exec or command-channel cleanup cannot replace the real
-  provider failure.
+- The pinned agent-context value remains the durable internal snapshot. One
+  shared prompt serializer maps it into a flat Markdown specification without a
+  JSON representation or duplicated Goal and Round sections. The authoritative
+  latest-Round request remains the final substantive instruction. Large
+  composed frames use the shared provider prompt transport, and the
+  workflow-owned PTY retains its artifact lease through terminal handoff so
+  early exec or command-channel cleanup cannot replace the real provider
+  failure.
 - Guidance selection happens inside the implementation turn and is returned in
   the completion signal. It never requires a separate provider invocation.
 - Post-implementation governance evaluates against the pinned governance
