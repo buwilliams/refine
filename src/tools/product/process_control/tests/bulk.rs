@@ -326,3 +326,161 @@ fn bulk_cancellation_replays_interrupted_settlement_and_revalidates_done_race() 
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn cancel_goal_without_active_claim_uses_explicit_cancellation_intent() {
+    let temp_root = unique_temp_dir("process-control-goal-cancel-no-claim");
+    let runtime_root = temp_root.join("run/8080");
+    let (target_root, refine_dir) = init_git_target(&temp_root);
+    let goal_id = "GOAL-CANCEL-NO-CLAIM";
+    let branch = "refine/cancel-no-claim";
+    create_in_progress_goal(&refine_dir, goal_id);
+    let worktree = add_test_worktree(&target_root, branch, "cancel-no-claim");
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = launch_agent_with_metadata(
+        &supervisor,
+        goal_id,
+        None,
+        Map::from_iter([(
+            "worktree".to_string(),
+            json!({"path": worktree, "branch": branch}),
+        )]),
+    );
+
+    let result = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+        .cancel_goal(goal_id)
+        .unwrap();
+
+    assert_eq!(result["cancelled"], true);
+    assert_eq!(result["termination_intent"], "explicit_cancellation");
+    assert_eq!(result["goal"]["status"], "cancelled");
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary(goal_id)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+    assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+    assert!(worktree.exists());
+    assert_branch_exists(&target_root, branch);
+    let receipt: Value = serde_json::from_slice(
+        &fs::read(
+            runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("{}.json", process.id)),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(receipt["termination_intent"], "explicit_cancellation");
+    assert_eq!(receipt["goal_cancelled"], true);
+    assert_eq!(receipt["goal_requeued"], false);
+    assert_eq!(receipt["worktree_retention"]["retained"], true);
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn bulk_cancellation_and_interactive_stop_are_monotonic_in_both_orderings() {
+    let temp_root = unique_temp_dir("process-control-bulk-stop-orderings");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let control = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir);
+
+    let stop_first_goal = "GOAL-STOP-THEN-BULK";
+    create_in_progress_goal(&refine_dir, stop_first_goal);
+    let stop_first_process = launch_agent(&supervisor, stop_first_goal, None);
+    let stopped = control.stop(&stop_first_process.id, "terminate").unwrap();
+    assert_eq!(stopped["goal"]["status"], "todo");
+    let bulk_after_stop = control
+        .bulk_cancel_goals(BulkGoalSelection {
+            selected_ids: Some(vec![stop_first_goal.to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(bulk_after_stop.updated, 1);
+    assert_eq!(
+        work_items
+            .show_goal_summary(stop_first_goal)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+
+    let bulk_first_goal = "GOAL-BULK-THEN-STOP";
+    create_in_progress_goal(&refine_dir, bulk_first_goal);
+    work_items.cancel_goal_summary(bulk_first_goal).unwrap();
+    let bulk_first_process = launch_agent(&supervisor, bulk_first_goal, None);
+    let bulk_before_stop = control
+        .bulk_cancel_goals(BulkGoalSelection {
+            selected_ids: Some(vec![bulk_first_goal.to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(bulk_before_stop.updated, 1);
+    assert!(managed_pid_is_alive(bulk_first_process.pid.unwrap()).unwrap());
+    let stopped_after_bulk = control.stop(&bulk_first_process.id, "terminate").unwrap();
+    assert_eq!(stopped_after_bulk["stopped"], true);
+    assert_eq!(
+        stopped_after_bulk["termination_intent"],
+        "explicit_cancellation"
+    );
+    assert_eq!(stopped_after_bulk["goal"]["status"], "cancelled");
+    assert_eq!(
+        work_items
+            .show_goal_summary(bulk_first_goal)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Cancelled
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn cancel_goal_partial_failure_never_reports_cancelled_success() {
+    let temp_root = unique_temp_dir("process-control-goal-cancel-partial");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let goal_id = "GOAL-CANCEL-PARTIAL";
+    create_in_progress_goal(&refine_dir, goal_id);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = launch_agent(&supervisor, goal_id, None);
+
+    let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+        .with_settlement_failure(CancellationSettlementFailureStage::AfterGoalPersistence)
+        .cancel_goal(goal_id)
+        .unwrap_err();
+
+    assert!(error.to_string().contains("partial outcome"), "{error}");
+    assert_eq!(
+        FileWorkItemService::new(&refine_dir)
+            .show_goal_summary(goal_id)
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::InProgress
+    );
+    assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
+    let receipt: Value = serde_json::from_slice(
+        &fs::read(
+            runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("{}.json", process.id)),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(receipt["state"], "partial_failure");
+    assert_eq!(receipt["termination_intent"], "explicit_cancellation");
+    assert_eq!(receipt["goal_cancelled"], false);
+    assert_eq!(receipt["goal_requeued"], false);
+
+    remove_temp_dir(&temp_root);
+}

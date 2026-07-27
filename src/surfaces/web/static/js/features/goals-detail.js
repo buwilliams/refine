@@ -589,7 +589,7 @@ function bindGoalDetailControls() {
     const btn = $("#btn-cancel");
     if (btn.disabled) return;
     const ok = await modalConfirm(
-      "Cancel this Goal? Any running subprocess will be stopped and the worktree + branch cleaned up.",
+      "Cancel this Goal? Any running subprocess will be stopped. Workflow worktrees and branches will be retained for inspection or explicit cleanup.",
       { title: "Cancel Goal", okLabel: "Cancel Goal", danger: true,
         cancelLabel: "Keep working" },
     );

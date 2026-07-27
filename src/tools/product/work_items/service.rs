@@ -57,6 +57,7 @@ pub(crate) struct GoalCancellationExpectation {
     pub status: GoalStatus,
     pub round_count: usize,
     pub updated: String,
+    pub node_id: String,
 }
 
 struct GoalMutationLock {
@@ -88,7 +89,7 @@ pub(crate) struct GoalCancellationTransaction {
     goal_id: String,
     goal_path: PathBuf,
     original: Value,
-    cancelled: Value,
+    settled: Value,
     committed: bool,
 }
 
@@ -97,7 +98,7 @@ impl GoalCancellationTransaction {
         if self.committed {
             return Ok(());
         }
-        let mut expected = self.cancelled.clone();
+        let mut expected = self.settled.clone();
         set_workflow_revision(&mut expected, workflow_revision(&self.original))?;
         write_json_atomically(&self.goal_path, &expected)?;
         self.committed = true;
@@ -107,7 +108,7 @@ impl GoalCancellationTransaction {
     pub(crate) fn restore(&mut self) -> RefineResult<Value> {
         if self.committed {
             let mut expected = self.original.clone();
-            set_workflow_revision(&mut expected, workflow_revision(&self.cancelled))?;
+            set_workflow_revision(&mut expected, workflow_revision(&self.settled))?;
             write_json_atomically(&self.goal_path, &expected)?;
             self.committed = false;
         }
@@ -133,15 +134,15 @@ impl GoalCancellationTransaction {
         self.original.clone()
     }
 
-    pub(crate) fn cancelled_value(&self) -> Value {
-        let mut cancelled = self.cancelled.clone();
-        if let Some(object) = cancelled.as_object_mut() {
+    pub(crate) fn settled_value(&self) -> Value {
+        let mut settled = self.settled.clone();
+        if let Some(object) = settled.as_object_mut() {
             object.insert(
                 "workflow_revision".to_string(),
                 Value::from(workflow_revision(&self.original).saturating_add(1)),
             );
         }
-        cancelled
+        settled
     }
 }
 

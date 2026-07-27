@@ -29,17 +29,38 @@ Current implementation details that matter to intent:
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
-  capability, including Workflow execution cancellation, rather than splitting
-  process and Workflow semantics. It retains ownership evidence, confirms exact
-  process exit, and records that outcome before registry or identity cleanup.
+  capability, including Workflow claim settlement, rather than splitting
+  process and Workflow semantics. A user Stop retains ownership evidence,
+  confirms exact process exit, and records that outcome before registry or
+  identity cleanup. It then releases the exact claim and capacity, returns the
+  Goal to todo under the Node owner pinned before exit, and settles the operation
+  and receipts. Stop never removes workflow worktrees or branches, regardless of
+  whether they are pristine, tracked-dirty, untracked, ignored, or changing
+  concurrently. Every recorded worktree and branch remains available with
+  explicit durable retention and recovery evidence. Worktree cleanup is a
+  separate explicit human-controlled operation outside Stop; ordinary retention
+  is a successful result, not a partial failure. Termination intent is an
+  explicit authoritative input to the shared capability: interactive user Stop
+  requeues, while explicit Goal or workflow cancellation remains terminal
+  cancelled. Process discovery and claim presence are settlement evidence, never
+  a source for guessing that intent. Explicit cancellation has monotonic
+  precedence: when durable Goal state is already cancelled, or becomes cancelled
+  after Stop preflight, Stop may finish process, operation, claim, and capacity
+  settlement but cannot return the Goal to todo. Journals, process receipts,
+  replay, partial evidence, and surface results record the requested intent
+  separately from the authoritative intent so recovery preserves that precedence.
   Workflow spawn-to-registration and cancellation share one execution fence:
   an empty target-bound process lookup is never treated as exit evidence, and a
   delayed worker cannot launch after its exact claim has settled.
-  Only then does it atomically validate and cancel the exact claim and linked
-  Goal, release claim capacity, and preserve the execution, round, Goal
-  revision/status, and competing-owner fences. Claim, capacity, and Goal writes
-  are journaled with their exact before/after states as one settlement. A write
-  failure restores the exact semantic pre-settlement state while advancing
+  Settlement atomically validates and cancels the exact claim, applies the
+  requested linked-Goal outcome, releases claim capacity, and preserves the
+  execution, round, pinned Node owner, Goal revision/status, competing-owner,
+  and retained-worktree fences. Claim, capacity, Goal, and retention evidence
+  are journaled with their exact before/after states as one semantic settlement.
+  Schema-compatible replay accepts prior cancellation and cleanup journals but
+  never resumes their destructive worktree-removal stages; all still-present
+  targets become retained recovery evidence. A semantic write failure restores
+  the exact semantic pre-settlement state while advancing
   monotonic workflow, claim-decision, and Goal revisions to record the attempted
   settlement and rollback. An interruption is replayed before terminal-state
   shortcuts after restart. Settlement journals synchronize their temporary file
@@ -51,14 +72,19 @@ Current implementation details that matter to intent:
   and Goal mutation locks, including concurrent Ready Merge work, so settlement
   cannot deadlock or bypass those fences. Both normal persistence and replay
   preserve the complete existing workflow policy and target-app context, and
-  confirmed process exit remains explicit. Missing registration-time PID
+  confirmed process exit remains explicit. A stop uses the Goal owner pinned by
+  the validated process/claim fence instead of rediscovering whichever Node the
+  serving daemon currently calls active. Missing registration-time PID
   identity, mismatched or stale workflow ownership, failed or resisted stops,
-  and cleanup failures keep the Goal active, while every post-exit failure
+  and process cleanup failures keep the Goal active, while every post-exit failure
   retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,
-  cause, and supported recovery evidence.
+  retained-worktree, cause, and supported recovery evidence.
   Single and bulk Goal cancellation both delegate to this capability. Bulk
   cancellation settles each selected Goal independently and returns explicit
   per-Goal failures, so one partial outcome is never reported as batch success.
+  Public cancellation results report `cancelled: true` only after reading back a
+  durably cancelled Goal; partial process, claim, capacity, or replay outcomes
+  retain structured evidence without claiming terminal Goal success.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 - live observers enumerate and capture output through the shared Process
   capability. A listed process record or output artifact removed by ordinary

@@ -179,10 +179,88 @@ impl FileProcessControlService {
                         .and_then(|value| usize::try_from(value).ok()),
                 },
                 termination,
+                worktree: receipt
+                    .get("worktree")
+                    .cloned()
+                    .and_then(|value| serde_json::from_value(value).ok()),
             });
         }
         recovered.sort_by(|a, b| a.ownership.process_id.cmp(&b.ownership.process_id));
         Ok(recovered)
+    }
+
+    pub(super) fn retained_worktrees_for_goal(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<Vec<WorkflowWorktree>> {
+        let directory = self.runtime_root.join("process-stop-outcomes");
+        let entries = match fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect retained worktree evidence {}: {error}",
+                    directory.display()
+                )));
+            }
+        };
+        let mut worktrees = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to inspect retained worktree evidence entry: {error}"
+                ))
+            })?;
+            if entry
+                .path()
+                .extension()
+                .and_then(|extension| extension.to_str())
+                != Some("json")
+            {
+                continue;
+            }
+            let bytes = fs::read(entry.path()).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read retained worktree evidence {}: {error}",
+                    entry.path().display()
+                ))
+            })?;
+            let receipt: Value = serde_json::from_slice(&bytes).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse retained worktree evidence {}: {error}",
+                    entry.path().display()
+                ))
+            })?;
+            if receipt.get("goal_id").and_then(Value::as_str) != Some(goal_id) {
+                continue;
+            }
+            let mut candidates: Vec<WorkflowWorktree> = receipt
+                .get("worktrees")
+                .cloned()
+                .and_then(|value| serde_json::from_value(value).ok())
+                .unwrap_or_default();
+            if let Some(worktree) = receipt
+                .get("worktree")
+                .cloned()
+                .and_then(|value| serde_json::from_value(value).ok())
+            {
+                candidates.push(worktree);
+            }
+            if let Some(retained) = receipt
+                .get("worktree_retention")
+                .and_then(|retention| retention.get("worktrees"))
+                .cloned()
+                .and_then(|value| serde_json::from_value::<Vec<WorkflowWorktree>>(value).ok())
+            {
+                candidates.extend(retained);
+            }
+            for worktree in candidates {
+                if !worktrees.contains(&worktree) {
+                    worktrees.push(worktree);
+                }
+            }
+        }
+        Ok(worktrees)
     }
 
     pub(super) fn resolve_refine_dir(&self) -> RefineResult<PathBuf> {

@@ -22,8 +22,14 @@ Current implementation details that matter to intent:
 - `/api/processes` exposes managed process state;
 - process rows can include owner, pid, state, label, details, output availability, resource labels, and actions;
 - chat, workflow, runner, target-app, and UI contexts should be surfaced where available;
-- every active agent row exposes a process-specific Stop action through the shared
-  process capability; linked Goals cancel only after confirmed process exit;
+- every active agent row exposes a process-specific Stop action through the
+  shared process capability; after confirmed process exit, a linked workflow
+  claim is released and its Goal returns to todo. Every workflow worktree and
+  branch is retained with durable recovery evidence, which the surface reports
+  as a successful shared-capability result. Cleanup remains a separate explicit
+  human-controlled operation. If explicit cancellation already became durable,
+  the surface reports that terminal result and Stop never promises or performs a
+  requeue;
 - the Goal terminal Stop control resolves the attached managed process and uses
   the same confirmed-exit, Goal, claim, and capacity settlement response as the
   Processes API rather than a terminal-specific Goal-Agent signal path;

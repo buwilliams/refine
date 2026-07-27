@@ -15,20 +15,27 @@ impl FileProcessControlService {
         }
         let refine_dir = self.resolve_refine_dir()?;
         let registration_lock = acquire_workflow_process_registration_lock(&self.runtime_root)?;
-        if let Some(replayed) =
-            self.replay_cancellation_settlement_for_goal(&refine_dir, goal_id)?
-        {
+        if let Some(replayed) = self.replay_cancellation_settlement_for_goal(
+            &refine_dir,
+            goal_id,
+            TerminationIntent::ExplicitCancellation,
+        )? {
             return Ok(replayed);
         }
 
         let work_items = FileWorkItemService::new(&refine_dir);
         let current = work_items.show_goal_summary(goal_id)?;
         if current.goal.status == GoalStatus::Cancelled {
+            let worktree_retention = WorkflowWorktreeRetention::from_targets(
+                &self.retained_worktrees_for_goal(goal_id)?,
+            );
             return Ok(json!({
                 "cancelled": true,
                 "goal_id": goal_id,
                 "goal": current.goal,
-                "already_cancelled": true
+                "already_cancelled": true,
+                "termination_intent": TerminationIntent::ExplicitCancellation,
+                "worktree_retention": worktree_retention
             }));
         }
         let expectation = preflight_goal_state(&refine_dir, goal_id)?;
@@ -60,7 +67,8 @@ impl FileProcessControlService {
                     ))
                 })?;
                 drop(registration_lock);
-                return self.cancel_workflow_execution_managed(execution_id);
+                let result = self.cancel_workflow_execution_managed(execution_id)?;
+                return self.require_durable_goal_cancellation(goal_id, result);
             }
             if claim.execution_id.is_some() {
                 return Err(RefineError::Conflict(format!(
@@ -79,15 +87,25 @@ impl FileProcessControlService {
                 execution_id: None,
                 round_idx: claim.round_idx,
             }];
-            let goal =
-                self.settle_goal_cancellation(&refine_dir, goal_id, &expectation, &ownership)?;
-            return Ok(json!({
-                "cancelled": true,
-                "goal_id": goal_id,
-                "claim_id": claim.claim_id,
-                "processes": [],
-                "goal": goal.goal
-            }));
+            let worktrees = self.retained_worktrees_for_goal(goal_id)?;
+            let goal = self.settle_goal_cancellation(
+                &refine_dir,
+                goal_id,
+                &expectation,
+                &ownership,
+                TerminationIntent::ExplicitCancellation,
+                &worktrees,
+            )?;
+            return self.require_durable_goal_cancellation(
+                goal_id,
+                json!({
+                    "goal_id": goal_id,
+                    "claim_id": claim.claim_id,
+                    "processes": [],
+                    "goal": goal.goal,
+                    "worktree_retention": goal.worktree_retention
+                }),
+            );
         }
 
         let managed_process_ids = self
@@ -99,24 +117,45 @@ impl FileProcessControlService {
             drop(registration_lock);
             let mut processes = Vec::new();
             for process_id in managed_process_ids {
-                processes.push(self.stop(&process_id, "terminate")?);
+                processes.push(self.terminate_process(
+                    &process_id,
+                    "terminate",
+                    TerminationIntent::ExplicitCancellation,
+                )?);
             }
             let goal = work_items.show_goal_summary(goal_id)?;
-            return Ok(json!({
-                "cancelled": true,
-                "goal_id": goal_id,
-                "processes": processes,
-                "goal": goal.goal
-            }));
+            let worktree_retention = WorkflowWorktreeRetention::from_targets(
+                &self.retained_worktrees_for_goal(goal_id)?,
+            );
+            return self.require_durable_goal_cancellation(
+                goal_id,
+                json!({
+                    "goal_id": goal_id,
+                    "processes": processes,
+                    "goal": goal.goal,
+                    "worktree_retention": worktree_retention
+                }),
+            );
         }
 
-        let goal = self.settle_goal_cancellation(&refine_dir, goal_id, &expectation, &[])?;
-        Ok(json!({
-            "cancelled": true,
-            "goal_id": goal_id,
-            "processes": [],
-            "goal": goal.goal
-        }))
+        let worktrees = self.retained_worktrees_for_goal(goal_id)?;
+        let goal = self.settle_goal_cancellation(
+            &refine_dir,
+            goal_id,
+            &expectation,
+            &[],
+            TerminationIntent::ExplicitCancellation,
+            &worktrees,
+        )?;
+        self.require_durable_goal_cancellation(
+            goal_id,
+            json!({
+                "goal_id": goal_id,
+                "processes": [],
+                "goal": goal.goal,
+                "worktree_retention": goal.worktree_retention
+            }),
+        )
     }
 
     /// Applies cancellation independently so one unsafe or failed Goal cannot be reported as
@@ -176,7 +215,17 @@ impl FileProcessControlService {
                 continue;
             }
             match self.cancel_goal(&goal_id) {
-                Ok(_) => updated_ids.push(goal_id),
+                Ok(result) if result.get("cancelled").and_then(Value::as_bool) == Some(true) => {
+                    updated_ids.push(goal_id)
+                }
+                Ok(result) => failures.push(json!({
+                    "id": goal_id,
+                    "error": {
+                        "code": "partial",
+                        "message": "Goal cancellation did not reach verified durable cancelled state",
+                        "evidence": result
+                    }
+                })),
                 Err(error) => failures.push(bulk_goal_failure(&goal_id, &error)),
             }
         }
@@ -190,6 +239,31 @@ impl FileProcessControlService {
             failed: failures.len(),
             failures,
         })
+    }
+
+    fn require_durable_goal_cancellation(
+        &self,
+        goal_id: &str,
+        mut result: Value,
+    ) -> RefineResult<Value> {
+        let refine_dir = self.resolve_refine_dir()?;
+        let durable = FileWorkItemService::new(&refine_dir).show_goal_summary(goal_id)?;
+        if durable.goal.status != GoalStatus::Cancelled {
+            return Err(RefineError::Degraded(format!(
+                "Goal {goal_id} cancellation reached a partial outcome: durable status is {}, not cancelled; cancelled:true was not reported",
+                durable.goal.status.as_str()
+            )));
+        }
+        let object = result.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization("Goal cancellation result must be an object".to_string())
+        })?;
+        object.insert("cancelled".to_string(), json!(true));
+        object.insert(
+            "termination_intent".to_string(),
+            json!(TerminationIntent::ExplicitCancellation),
+        );
+        object.insert("goal".to_string(), json!(durable.goal));
+        Ok(result)
     }
 }
 

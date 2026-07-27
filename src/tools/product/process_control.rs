@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
@@ -53,6 +52,7 @@ struct ProcessGoalFence {
 struct RecoveredWorkflowTermination {
     ownership: WorkflowGoalOwnership,
     termination: ConfirmedProcessExit,
+    worktree: Option<WorkflowWorktree>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,46 +81,10 @@ enum DurableReceiptBoundary {
     DirectorySynced,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct CancellationSettlementJournal {
-    schema_version: u32,
-    state: String,
-    goal_id: String,
-    claim_ids: Vec<String>,
-    execution_ids: Vec<String>,
-    workflow_before: WorkflowAutomationState,
-    workflow_after: WorkflowAutomationState,
-    capacity_before: AgentCapacityState,
-    capacity_after: AgentCapacityState,
-    goal_before: Value,
-    goal_after: Value,
-    recorded_at: String,
-    goal_cancelled: bool,
-    claim_cancelled: bool,
-    capacity_released: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    cause: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rollback_failure: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rollback_goal_restored: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rollback_capacity_restored: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rollback_claim_restored: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rollback_goal_state: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    replay_goal_before: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    replay_goal_after: Option<Value>,
-    recovery: String,
-}
-
 /// Authoritative process-stop capability.
 ///
 /// Agent records are resolved across the port and nested agent registries, terminated with exact
-/// PID identity confirmation, and only then allowed to close linked chat state or cancel a Goal.
+/// PID identity confirmation, and only then allowed to close linked chat state or settle a Goal.
 /// Surfaces adapt this one result rather than composing process and workflow mutations themselves.
 #[derive(Clone)]
 pub struct FileProcessControlService {
@@ -282,22 +246,20 @@ fn preflight_goal_state(
     goal_id: &str,
 ) -> RefineResult<GoalCancellationExpectation> {
     let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
-    let active_node = FileNodeRegistryService::new(refine_dir).active_node_id()?;
-    let owner = goal.goal.node_id.as_deref().unwrap_or("default");
-    if owner != active_node {
-        return Err(RefineError::Conflict(format!(
-            "Goal {goal_id} is owned by node {owner}; its linked process was left running and Goal state was not changed"
-        )));
-    }
     if goal.goal.status == GoalStatus::Done {
         return Err(RefineError::InvalidInput(format!(
-            "done Goal {goal_id} cannot be cancelled; its linked process was left running"
+            "done Goal {goal_id} cannot be settled by process control; its linked process was left running"
         )));
     }
     Ok(GoalCancellationExpectation {
         status: goal.goal.status,
         round_count: goal.goal.round_count,
         updated: goal.goal.updated,
+        node_id: goal
+            .goal
+            .node_id
+            .filter(|node_id| !node_id.is_empty())
+            .unwrap_or_else(|| "default".to_string()),
     })
 }
 
@@ -371,7 +333,15 @@ fn preflight_goal_for_process(
         execution_id: Some(execution_id),
         round_idx: Some(round_idx),
     };
-    validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, phase)?;
+    let validation_phase = if phase == WorkflowOwnershipPhase::BeforeTermination
+        && claim.state == WorkflowClaimState::Cancelled
+        && goal.status == GoalStatus::Cancelled
+    {
+        WorkflowOwnershipPhase::BeforeCancellation
+    } else {
+        phase
+    };
+    validate_workflow_goal_ownership(runtime_root, goal_id, &ownership, validation_phase)?;
     validate_expected_goal_round(&goal, goal_id, &ownership, phase)?;
     Ok(ProcessGoalFence {
         goal,
@@ -553,12 +523,14 @@ fn cancellation_settlement_stage_label(stage: CancellationSettlementFailureStage
 
 fn cancellation_settlement_recovery(state: &str) -> &'static str {
     match state {
-        "committed" => "no recovery required",
+        "committed" => {
+            "Goal, claim, capacity, and receipts are settled; all workflow worktrees and branches remain available for inspection, commit, preservation, or a separate explicit human-controlled cleanup operation"
+        }
         "rolled_back" => {
-            "the exact pre-settlement Goal, claim, capacity, workflow policy, and target context were restored; retry cancellation through the shared capability after resolving the cause"
+            "the exact pre-settlement Goal, claim, capacity, workflow policy, and target context were restored; retry the same explicit termination intent through the shared Process capability after resolving the cause"
         }
         _ => {
-            "retry through the shared cancellation capability; it will replay this journal before any already-cancelled short circuit and deterministically finish the exact Goal, claim, capacity, workflow policy, and target-context outcome"
+            "retry the same explicit termination intent through the shared Process capability; it will replay this journal before any terminal-state shortcut and deterministically finish the exact Goal, claim, capacity, workflow policy, target context, and retained-worktree evidence"
         }
     }
 }
@@ -732,6 +704,12 @@ fn validate_process_id(process_id: &str) -> RefineResult<()> {
 mod discovery;
 mod receipts;
 mod settlement;
+mod stop_intent;
 mod termination;
+mod termination_recovery;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+use settlement::CancellationSettlementJournal;
+use stop_intent::*;

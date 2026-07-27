@@ -38,14 +38,17 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - a tab whose process already exited or no longer exists closes locally without
   requiring a successful stop request;
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
-  workflow cancellation, claim-settlement, and audit semantics after the
-  browser surface detaches;
+  workflow claim settlement, worktree and branch retention, Goal requeue, and audit
+  semantics after the browser surface detaches;
 - when an explicit Stop is already in progress, closing its tab only detaches
   the browser surface and never sends a duplicate Stop; the original
-  workflow-aware cancellation continues and any late failure remains visible;
+  workflow-aware stop settlement continues and any late failure remains visible;
 - stopping an agent keeps the rest of the Toolbar interactive, and an
   authoritative terminal-exit event releases the terminal UI even while
-  workflow cancellation settlement is still finishing;
+  workflow stop settlement is still finishing;
+- when explicit cancellation already won, Stop reports the terminal cancelled
+  result and retained worktree evidence instead of promising that the Goal
+  returned to todo;
 - resizing remains continuous across terminal status and exit redraws;
 - the Add menu is anchored to its Toolbar control, so it follows the collapsed,
   resized, and fullscreen Toolbar positions;

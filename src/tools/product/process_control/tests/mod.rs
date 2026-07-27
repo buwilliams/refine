@@ -1,8 +1,10 @@
 mod bulk;
 mod cleanup;
+mod intent;
 mod ownership;
 mod settlement;
 mod termination;
+mod worktree_retention;
 
 use std::fs;
 use std::process::Command;
@@ -171,7 +173,16 @@ fn create_in_progress_goal(refine_dir: &Path, goal_id: &str) {
 }
 
 fn create_in_progress_goal_with_rounds(refine_dir: &Path, goal_id: &str, rounds: usize) {
-    let service = FileWorkItemService::new(refine_dir);
+    create_in_progress_goal_with_rounds_for_node(refine_dir, goal_id, rounds, "default");
+}
+
+fn create_in_progress_goal_with_rounds_for_node(
+    refine_dir: &Path,
+    goal_id: &str,
+    rounds: usize,
+    node_id: &str,
+) {
+    let service = FileWorkItemService::for_node(refine_dir, node_id);
     service
         .create_goal_summary("Process control workflow test", Some(goal_id))
         .unwrap();
@@ -274,7 +285,69 @@ fn assert_partial_cleanup_receipt(
         receipt["recovery"]
             .as_str()
             .unwrap()
-            .contains("current Goal owner")
+            .contains("shared Process capability")
+    );
+}
+
+fn init_git_target(temp_root: &Path) -> (PathBuf, PathBuf) {
+    let target_root = temp_root.join("target");
+    let refine_dir = target_root.join(".refine");
+    fs::create_dir_all(&target_root).unwrap();
+    for args in [
+        vec!["init", "-q"],
+        vec!["config", "user.email", "refine@example.invalid"],
+        vec!["config", "user.name", "Refine Test"],
+        vec!["commit", "--allow-empty", "-q", "-m", "base"],
+    ] {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    (target_root, refine_dir)
+}
+
+fn add_test_worktree(target_root: &Path, branch: &str, name: &str) -> PathBuf {
+    let worktree = target_root.join(".git/refine-worktrees").join(name);
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(target_root)
+        .args([
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            branch,
+            worktree.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    worktree
+}
+
+fn assert_branch_exists(target_root: &Path, branch: &str) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(target_root)
+        .args(["rev-parse", "--verify", &format!("refs/heads/{branch}")])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 

@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn confirmed_agent_exit_precedes_linked_goal_cancellation() {
+fn confirmed_agent_exit_precedes_linked_goal_requeue() {
     let temp_root = unique_temp_dir("process-control-confirmed");
     let runtime_root = temp_root.join("run/8080");
     let refine_dir = temp_root.join(".refine");
@@ -19,21 +19,21 @@ fn confirmed_agent_exit_precedes_linked_goal_cancellation() {
     assert_eq!(result["termination"]["registry_retained_until_exit"], true);
     assert!(!managed_pid_is_alive(pid).unwrap());
     assert!(supervisor.inspect(&process.id).is_err());
-    assert_eq!(result["goal"]["status"], "cancelled");
+    assert_eq!(result["goal"]["status"], "todo");
     assert_eq!(
         FileWorkItemService::new(&refine_dir)
             .show_goal_summary("GOAL-CONFIRMED")
             .unwrap()
             .goal
             .status,
-        GoalStatus::Cancelled
+        GoalStatus::Todo
     );
 
     remove_temp_dir(&temp_root);
 }
 
 #[test]
-fn current_workflow_execution_can_stop_and_cancel_its_goal() {
+fn current_workflow_execution_can_stop_and_requeue_its_goal() {
     let temp_root = unique_temp_dir("process-control-current-execution");
     let runtime_root = temp_root.join("run/8080");
     let refine_dir = temp_root.join(".refine");
@@ -64,7 +64,7 @@ fn current_workflow_execution_can_stop_and_cancel_its_goal() {
 
     assert_eq!(result["termination"]["confirmed_exit"], true);
     assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
-    assert_eq!(result["goal"]["status"], "cancelled");
+    assert_eq!(result["goal"]["status"], "todo");
     let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
     assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
     assert!(
@@ -142,7 +142,7 @@ fn target_bound_cancellation_before_worker_registration_fails_closed() {
     );
     assert!(managed_pid_is_alive(process.pid.unwrap()).unwrap());
     let stopped = control.stop(&process.id, "terminate").unwrap();
-    assert_eq!(stopped["goal"]["status"], "cancelled");
+    assert_eq!(stopped["goal"]["status"], "todo");
     assert_eq!(
         WorkflowEngine::new(&runtime_root)
             .load_state()
@@ -199,10 +199,12 @@ fn successful_cancellation_preserves_complete_non_default_workflow_policy() {
                 execution_id: Some("exec-policy-success".to_string()),
                 round_idx: Some(0),
             }],
+            TerminationIntent::ExplicitCancellation,
+            &[],
         )
         .unwrap();
 
-    assert_eq!(cancelled.goal.status, GoalStatus::Cancelled);
+    assert_eq!(cancelled.goal.goal.status, GoalStatus::Cancelled);
     let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
     assert_eq!(serde_json::to_vec(&state.policy).unwrap(), policy_bytes);
     assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
@@ -216,7 +218,7 @@ fn successful_cancellation_preserves_complete_non_default_workflow_policy() {
 }
 
 #[test]
-fn final_ownership_and_goal_fence_are_atomic_with_cancellation() {
+fn final_ownership_and_goal_fence_are_atomic_with_requeue() {
     let temp_root = unique_temp_dir("process-control-atomic-settlement");
     let runtime_root = temp_root.join("run/8080");
     let refine_dir = temp_root.join(".refine");
@@ -274,43 +276,42 @@ fn final_ownership_and_goal_fence_are_atomic_with_cancellation() {
     let mut attempted = vec![attempted_rx.recv().unwrap(), attempted_rx.recv().unwrap()];
     attempted.sort_unstable();
     assert_eq!(attempted, vec!["retry", "round"]);
+    thread::sleep(Duration::from_millis(20));
+    assert!(!round_thread.is_finished());
+    assert!(!retry_thread.is_finished());
 
     release_tx.send(()).unwrap();
     let stop_result = stop_thread.join().unwrap().unwrap();
-    let round_error = round_thread.join().unwrap().unwrap_err();
-    let retry_error = retry_thread.join().unwrap().unwrap_err();
+    let round = round_thread.join().unwrap().unwrap();
+    let retried_execution_id = retry_thread.join().unwrap().unwrap();
 
     assert_eq!(stop_result["termination"]["confirmed_exit"], true);
-    assert_eq!(stop_result["goal"]["status"], "cancelled");
-    assert!(
-        round_error.to_string().contains("not allowed"),
-        "{round_error}"
-    );
-    assert!(
-        retry_error
-            .to_string()
-            .contains("workflow execution cannot be retried"),
-        "{retry_error}"
-    );
+    assert_eq!(stop_result["goal"]["status"], "todo");
+    assert_eq!(round.goal.status, GoalStatus::Todo);
+    assert_ne!(retried_execution_id, "exec-current");
     let goal = FileWorkItemService::new(&refine_dir)
         .show_goal_summary("GOAL-ATOMIC")
         .unwrap();
-    assert_eq!(goal.goal.status, GoalStatus::Cancelled);
-    assert_eq!(goal.goal.round_count, 1);
+    assert_eq!(goal.goal.status, GoalStatus::Todo);
+    assert_eq!(goal.goal.round_count, 2);
     let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
     let claim = state
         .claims
         .iter()
         .find(|claim| claim.claim_id == "claim-current")
         .unwrap();
-    assert_eq!(claim.execution_id.as_deref(), Some("exec-current"));
-    assert_eq!(claim.state, WorkflowClaimState::Cancelled);
+    assert_eq!(
+        claim.execution_id.as_deref(),
+        Some(retried_execution_id.as_str())
+    );
+    assert_eq!(claim.state, WorkflowClaimState::Running);
     assert!(
         crate::workflow::capacity::AgentCapacityService::new(&runtime_root)
             .snapshot()
             .unwrap()
             .leases
-            .is_empty()
+            .iter()
+            .any(|lease| lease.owner_id == "workflow:claim-current")
     );
 
     remove_temp_dir(&temp_root);
