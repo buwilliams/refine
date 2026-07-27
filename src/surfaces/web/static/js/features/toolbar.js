@@ -539,7 +539,12 @@ function drawToolbar() {
     chatState.bodyHeight = defaultToolbarBodyHeight();
   }
   if (!terminalActive) {
-    releaseAfterMorph(root.querySelector(".terminal-output"));
+    const output = root.querySelector(".terminal-output");
+    // Keep the inactive xterm's DOM with its terminal instance. If Idiomorph
+    // consumes that subtree while replacing the terminal panel, xterm loses
+    // its renderer and returning to the tab creates an empty replacement.
+    output?.replaceChildren();
+    releaseAfterMorph(output);
   }
   renderInto(root, `
     <div class="toolbar-dock-resize" id="toolbar-dock-resize"
