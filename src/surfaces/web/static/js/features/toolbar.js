@@ -244,6 +244,13 @@ function initToolbar() {
 
 function initChatDock() { initToolbar(); }
 
+function closeToolbarAddMenuOnOutsideClick(event) {
+  const menu = $("#toolbar-dock")?.querySelector(".toolbar-add-menu");
+  if (menu?.open && !menu.contains(event.target)) menu.open = false;
+}
+
+document.addEventListener("click", closeToolbarAddMenuOnOutsideClick);
+
 function resetChatForProjectSwitch() {
   chatState.tabs = {};
   chatState.activeTabId = null;

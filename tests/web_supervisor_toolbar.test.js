@@ -31,6 +31,8 @@ class FakeElement {
   get innerHTML() { return this._innerHTML; }
   set innerHTML(value) { this._innerHTML = String(value); }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
+  closest() { return null; }
+  contains(element) { return element === this; }
   focus() {}
   remove() {}
   getBoundingClientRect() {
@@ -79,6 +81,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   const terminalOutput = new FakeElement();
   let toolbarResize = null;
   let toolbarBody = null;
+  let toolbarAddMenu = null;
   Object.defineProperty(toolbar, "innerHTML", {
     get() { return toolbar._innerHTML; },
     set(value) {
@@ -87,6 +90,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         ? new FakeElement()
         : null;
       toolbarBody = toolbar._innerHTML.includes('data-testid="toolbar-body"')
+        ? new FakeElement()
+        : null;
+      toolbarAddMenu = toolbar._innerHTML.includes('data-testid="toolbar-add-menu"')
         ? new FakeElement()
         : null;
       const height = toolbar._innerHTML.match(/data-testid="toolbar-body"[^>]*style="height:(\d+)px"/);
@@ -123,6 +129,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
     if (selector === ".terminal-output" && toolbar.innerHTML.includes("terminal-output")) return terminalOutput;
     if (selector === "#toolbar-dock-resize") return toolbarResize;
     if (selector === ".toolbar-dock-body") return toolbarBody;
+    if (selector === ".toolbar-add-menu") return toolbarAddMenu;
     return null;
   };
   const context = vm.createContext({
@@ -360,6 +367,20 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       endToolbarResize(clientY, pointerId = 1) {
         document.dispatchTestEvent("pointerup", { clientY, pointerId });
       },
+      openAddMenu() {
+        const menu = document.querySelector("#toolbar-dock")?.querySelector(".toolbar-add-menu");
+        if (menu) menu.open = true;
+      },
+      addMenuOpen() {
+        return !!document.querySelector("#toolbar-dock")?.querySelector(".toolbar-add-menu")?.open;
+      },
+      clickInsideAddMenu() {
+        const menu = document.querySelector("#toolbar-dock")?.querySelector(".toolbar-add-menu");
+        document.dispatchTestEvent("click", { target: menu });
+      },
+      clickOutsideAddMenu() {
+        document.dispatchTestEvent("click", { target: document.createElement("div") });
+      },
       toolbarBodyHeight() {
         const body = document.querySelector(".toolbar-dock-body");
         return Number.parseInt(body?.style.height || "", 10) || body?.clientHeight || 0;
@@ -494,6 +515,18 @@ test("Toolbar add button precedes the tab strip and exposes the exact lazy menu"
   assert.equal((browser.html().match(/data-testid="toolbar-tab-close"/g) || []).length, 7);
   assert.equal((browser.html().match(/data-testid="toolbar-tab-close-icon"/g) || []).length, 7);
   assert.doesNotMatch(browser.html(), />\[x\]</);
+});
+
+test("clicking outside the Toolbar add menu closes it while inside clicks keep it open", () => {
+  const browser = browserRuntime();
+  browser.runtime.draw();
+
+  browser.runtime.openAddMenu();
+  browser.runtime.clickInsideAddMenu();
+  assert.equal(browser.runtime.addMenuOpen(), true);
+
+  browser.runtime.clickOutsideAddMenu();
+  assert.equal(browser.runtime.addMenuOpen(), false);
 });
 
 test("Todo List tab uses the selected Reporter and shared todo API for every action", async () => {

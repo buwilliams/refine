@@ -302,6 +302,23 @@ test("feature detail renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("Toolbar add menu closes when the user clicks outside it", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    const menu = app.page.locator('[data-testid="toolbar-add-menu"]');
+
+    await app.page.locator('[data-testid="toolbar-add"]').click();
+    assert.equal(await menu.evaluate((element) => element.open), true);
+
+    await app.page.locator(".toolbar-dock-label").click();
+    assert.equal(await menu.evaluate((element) => element.open), false);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
