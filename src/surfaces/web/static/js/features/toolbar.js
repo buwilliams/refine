@@ -1848,16 +1848,31 @@ function terminalSize(
     + (parseFloat(styles.paddingBottom) || 0);
   const contentWidth = Math.max(0, output.clientWidth - horizontalPadding);
   const contentHeight = Math.max(0, output.clientHeight - verticalPadding);
-  const cellWidth = terminal?.term?._core?._renderService?.dimensions?.css?.cell?.width
+  const renderedCell = terminalRenderedCellSize(terminal);
+  const cellWidth = renderedCell.width
     || measuredTerminalCellWidth(styles, fontSize)
     || fontSize * 0.61;
-  const cellHeight = terminal?.term?._core?._renderService?.dimensions?.css?.cell?.height
+  const cellHeight = renderedCell.height
     || fontSize * TERMINAL_LINE_HEIGHT;
   const scrollbarWidth = terminal?.term?._core?._viewport?._scrollBarWidth || 16;
   return {
     cols: Math.max(20, Math.floor((contentWidth - scrollbarWidth) / cellWidth)),
     rows: Math.max(8, Math.floor(contentHeight / cellHeight)),
   };
+}
+
+function terminalRenderedCellSize(terminal) {
+  try {
+    const cell = terminal?.term?._core?._renderService?.dimensions?.css?.cell;
+    return {
+      width: Number.isFinite(cell?.width) && cell.width > 0 ? cell.width : 0,
+      height: Number.isFinite(cell?.height) && cell.height > 0 ? cell.height : 0,
+    };
+  } catch {
+    // xterm's private dimensions getter can be temporarily unavailable while
+    // its renderer is detached or changing. Fall back to DOM font metrics.
+    return { width: 0, height: 0 };
+  }
 }
 
 function measuredTerminalCellWidth(styles, fontSize) {
