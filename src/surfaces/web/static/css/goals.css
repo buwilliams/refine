@@ -227,6 +227,25 @@
 .goals-status-cell {
   white-space: nowrap;
 }
+.goals-node-cell {
+  min-width: 0;
+}
+.goals-node-value {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .mobile-card-table .goals-node-value {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
 
 .features-table {
   --work-item-name-width: 20%;

@@ -77,6 +77,7 @@ const GOAL = {
   reporter: "Reporter",
   assignee: "Reporter",
   node_id: "node-a",
+  node_display_name: "A very long remote node name that must stay inside its column",
   created: "2026-07-01T00:00:00Z",
   updated: "2026-07-02T00:00:00Z",
   notes: [{ id: "NOTE1", author: "Reviewer", body: "A note." }],
@@ -603,6 +604,38 @@ test("every converted screen boots and paints", { skip: SKIP }, async () => {
     ]) {
       await assertScreenRenders(app, { route, marker });
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("Goals truncate long Node names without overflowing Updated", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, {
+      route: "#/goals",
+      marker: ".goals-node-value",
+    });
+    const layout = await app.page.locator(".goals-node-value").evaluate((node) => {
+      const nodeRect = node.getBoundingClientRect();
+      const updatedRect = node.closest("tr").querySelector('[data-label="Updated"]')
+        .getBoundingClientRect();
+      return {
+        fullName: node.title,
+        textOverflow: getComputedStyle(node).textOverflow,
+        whiteSpace: getComputedStyle(node).whiteSpace,
+        isTruncated: node.scrollWidth > node.clientWidth,
+        staysBeforeUpdated: nodeRect.right <= updatedRect.left,
+      };
+    });
+    assert.deepEqual(layout, {
+      fullName: GOAL.node_display_name,
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      isTruncated: true,
+      staysBeforeUpdated: true,
+    });
+    assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();
   }
