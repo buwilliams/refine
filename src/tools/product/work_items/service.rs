@@ -327,16 +327,27 @@ impl FileWorkItemService {
         if owner != active_node {
             return Ok(BulkGoalStatusMutation::Skipped(format!("node:{owner}")));
         }
-        let protected = is_automated_status(&current_status)
-            || matches!(status_protection, BulkGoalStatusProtection::WorkflowOwned)
-                && matches!(current_status, GoalStatus::Review | GoalStatus::Done);
+        let target = if raw_target == "__last_workflow_state" {
+            restore_last_workflow_status(&current_status)
+        } else {
+            GoalStatus::parse_wire(raw_target)
+                .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?
+        };
+        let cancellation = target == GoalStatus::Cancelled;
+        let protected = if cancellation {
+            current_status == GoalStatus::Done
+        } else {
+            is_automated_status(&current_status)
+                || matches!(status_protection, BulkGoalStatusProtection::WorkflowOwned)
+                    && matches!(current_status, GoalStatus::Review | GoalStatus::Done)
+        };
         if protected {
             return Ok(BulkGoalStatusMutation::Skipped(format!(
                 "status:{}",
                 current_status.as_str()
             )));
         }
-        if let Some(runtime_root) = &self.active_node_root {
+        if !cancellation && let Some(runtime_root) = &self.active_node_root {
             let state = WorkflowEngine::new(runtime_root).load_state()?;
             if let Some(claim) = state.active_claim(goal_id) {
                 return Ok(BulkGoalStatusMutation::Skipped(format!(
@@ -346,12 +357,6 @@ impl FileWorkItemService {
             }
         }
 
-        let target = if raw_target == "__last_workflow_state" {
-            restore_last_workflow_status(&current_status)
-        } else {
-            GoalStatus::parse_wire(raw_target)
-                .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?
-        };
         if target != current_status || raw_target != "__last_workflow_state" {
             self.write_goal_status_value(&goal_path, &mut value, &target)?;
         }

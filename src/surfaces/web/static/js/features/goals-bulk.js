@@ -67,7 +67,9 @@ async function openBulkModal(field) {
       <p class="muted small" style="margin-top:6px">
         Last workflow state sends failed QA attempts back to qa, failed merge
         attempts back to ready-merge, other failed Goals back to todo, and leaves active
-        automation and Review alone. Decline Review by submitting a new round.
+        automation and Review alone. Cancelled intentionally stops selected active,
+        failed, or Review Goals; Done remains protected. Decline Review by submitting
+        a new round when the work should continue.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])
