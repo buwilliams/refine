@@ -120,6 +120,7 @@ impl ProviderSpec {
                     "--print".to_string(),
                     "--output-format=stream-json".to_string(),
                     "--verbose".to_string(),
+                    "--dangerously-skip-permissions".to_string(),
                 ];
                 if let Some(session_id) = session_id {
                     args.extend(["--resume".to_string(), session_id.to_string()]);

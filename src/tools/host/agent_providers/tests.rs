@@ -99,6 +99,42 @@ fn interactive_provider_commands_keep_the_native_cli_conversation_mode() {
 }
 
 #[test]
+fn claude_noninteractive_chat_commands_skip_permissions() {
+    let spec = ProviderSpec::new(
+        "claude",
+        "Claude",
+        "claude",
+        "claude_stream_json",
+        true,
+        false,
+    );
+
+    assert_eq!(
+        spec.chat_args("/usr/bin/claude", "review", None, None),
+        vec![
+            "/usr/bin/claude",
+            "--print",
+            "--output-format=stream-json",
+            "--verbose",
+            "--dangerously-skip-permissions",
+            "review",
+        ]
+    );
+    assert_eq!(
+        spec.chat_args("/usr/bin/claude", "", Some("session-123"), None),
+        vec![
+            "/usr/bin/claude",
+            "--print",
+            "--output-format=stream-json",
+            "--verbose",
+            "--dangerously-skip-permissions",
+            "--resume",
+            "session-123",
+        ]
+    );
+}
+
+#[test]
 fn host_provider_service_invokes_smoke_ai_and_extracts_json_final_text() {
     let temp_root = unique_temp_dir("provider-invoke");
     let bin_dir = temp_root.join("bin");
