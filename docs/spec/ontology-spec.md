@@ -35,10 +35,15 @@ repository, and Goal history. Stage two decomposes the work into steps cut along
 those seams. Refine validates and pins both stages, then executes the plan
 deterministically, one focused step at a time.
 
-The plan model is derived per implementation attempt and discarded with the
-plan. Refine does not maintain a durable ontology graph. What persists across
-Goals is Architecture and Rules — the parts a repository cannot express — while
-the structural model that a specific Goal needs is derived fresh each time.
+The plan model is derived per implementation attempt and retained on its Round
+as evidence. Refine does not maintain a durable ontology graph. What persists
+across Goals is Architecture and Rules — the parts a repository cannot express —
+while the structural model that a specific Goal needs is derived fresh each
+time.
+
+Retention is not authority. A Round's plan is durable history that later Rounds
+of the same Goal read to learn what was tried and how it went. It is never a
+model that a later Round starts from and edits.
 
 This is deliberate. A durable graph must choose one granularity for all future
 work, which is unsolvable in principle because the right granularity depends on
@@ -135,7 +140,7 @@ Durable    Product, Constitution, Architecture, Rules
 
 Derived    plan model, step decomposition, Governance findings
            regenerated per implementation attempt
-           pinned for the life of a plan, then discarded
+           pinned for the life of a plan, retained on its Round as evidence
 ```
 
 A durable artifact that describes current structure competes with the source
@@ -270,7 +275,10 @@ absolute gate.
 - Make a graph database, RDF store, OWL reasoner, or external ontology service a
   runtime dependency.
 - Surface plan models or plan steps as Rounds, Goal statuses, or any other
-  public workflow state.
+  public workflow state. A plan is recorded on a Round as evidence; it is not a
+  Round and does not behave like one.
+- Carry a plan model forward as the starting point for a later Round's
+  derivation.
 - Convert the rest of Refine's web surface to React.
 - Execute implementation steps concurrently in the same worktree in the first
   version.
@@ -326,8 +334,9 @@ human-owned, unchanged in shape from today's Governance rules.
 
 The Goal-scoped structural model produced by stage one of planning: the
 concepts, relations, seams, and authority boundaries relevant to this
-implementation attempt. Derived, pinned to a plan revision, discarded with the
-plan. Never workflow state.
+implementation attempt. Derived, pinned to a plan revision, retained on its
+Round. Never workflow state, and never authoritative for a later Round's
+derivation.
 
 ### Seam
 
@@ -601,10 +610,14 @@ signal is that the rule needs rewording — which is a prose edit.
 Planning and step execution are a subordinate state machine inside the existing
 `InProgress` Workflow behavior.
 
-They introduce no new public Goal statuses, no new Round fields, and no new
-workflow state of any kind. The Goal is `InProgress` throughout. Only the
-existing Workflow may transition the Goal to QA, Ready Merge, Failed, Cancelled,
-or any later state.
+They introduce no new public Goal statuses and no new workflow state. The Goal
+is `InProgress` throughout. Only the existing Workflow may transition the Goal
+to QA, Ready Merge, Failed, Cancelled, or any later state.
+
+The plan is recorded on its Round as durable evidence, alongside the Round's
+existing `governance`, `quality`, and `logs` artifacts. A plan is a thing a
+Round produced, not a kind of Round: steps are never surfaced as Rounds, never
+carry Round semantics, and never appear in any Round count.
 
 One Goal Round owns one active implementation plan. Distinct Goals may continue
 to execute concurrently. Steps within one plan execute sequentially in the first
@@ -619,6 +632,8 @@ A planning agent derives the structural model this Goal requires. It receives:
 - Architecture;
 - all accepted rules;
 - Goal identity and history, including all previous Rounds;
+- previous Rounds' plans with their outcomes: the model derived, the steps cut,
+  which succeeded and checkpointed, which failed and why;
 - the current Round request;
 - target-app repository access;
 - the plan-model output schema.
@@ -631,6 +646,35 @@ silently discarded.
 The agent inspects the repository. Architecture and Rules are the durable
 minimum, not a substitute for repository evidence — Architecture states what
 must be true, and the repository shows what currently is.
+
+### Prior Plans Are History, Not A Seed
+
+Every Round derives its model fresh. Prior plans are supplied as evidence of
+what was tried and what happened; a later Round does not start from an earlier
+model and edit it.
+
+The distinction is load-bearing. If Round 2 refines Round 1's model and Round 3
+refines Round 2's, the result is a durable, incrementally maintained ontology
+reassembled through the back door, without any of the review discipline that
+would make one trustworthy. Fresh derivation is the property that keeps
+granularity fitted to each attempt and keeps a wrong model from outliving the
+Round that produced it.
+
+What carries forward is the *outcome*, which is why bare prior models are less
+useful than annotated ones. "Steps one through three checkpointed clean; step
+four failed twice on a dependency the model did not represent" tells the next
+planner something. The model alone does not, and a model from a failed Round is
+often wrong in exactly the way that caused the failure.
+
+Refine therefore supplies prior plans with per-step outcomes, failure detail,
+checkpoint SHAs, and any recorded discrepancies attached. Where Goal history is
+long, older Rounds reduce to outcome summaries rather than full models, so
+context stays bounded as attempts accumulate.
+
+This gives within-Goal accumulation through Round history and leaves cross-Goal
+accumulation to rules. The split is deliberate: a Goal's own failed attempts are
+specific enough to replay in detail, while anything worth carrying to a
+different Goal must be general enough to state as a rule.
 
 ### Plan Model
 
@@ -724,9 +768,37 @@ stage one declared.
 }
 ```
 
-The plan model is a field on the plan. It is versioned with the plan revision,
-retained as plan evidence, and discarded when the plan is. Nothing outside the
-plan reads it.
+The plan model is a field on the plan, versioned with the plan revision. During
+execution, nothing outside the plan reads it.
+
+The plan itself is recorded on its Round, following the existing `governance`
+and `quality` pattern:
+
+```json
+{
+  "reporter": "...",
+  "prompt": "...",
+  "governance": {},
+  "quality": {},
+  "plan": {
+    "plan_id": "plan-...",
+    "revisions": [],
+    "model": {},
+    "steps": [],
+    "outcome": "failed",
+    "failed_step_id": "step.persistence",
+    "checkpoints": ["sha", "sha"],
+    "discrepancies": []
+  },
+  "logs": []
+}
+```
+
+`plan` is nullable, exactly as `governance` and `quality` are. A Round that ran
+legacy one-shot implementation has none, and old Round records remain valid
+without migration.
+
+Later Rounds of the same Goal read this field as history. Nothing else does.
 
 Server-owned plan status values: `planning`, `active`, `replanning`,
 `completed`, `failed`, `cancelled`.
@@ -1154,9 +1226,14 @@ The default matters. `rule_error` requires explicit justification rather than
 being the path of least resistance — otherwise every inconvenient constraint is
 reclassified into nonexistence.
 
-`model_error` has no durable target by design. It is recorded as a planning
-quality signal, and a pattern of them indicates that Architecture is
-underspecified, which is an `architecture_gap`.
+`model_error` changes no durable Governance, but it is not lost. It is recorded
+on the Round's plan, so the next Round of the same Goal sees both the model that
+was wrong and the discrepancy explaining how — which is precisely the history
+that keeps a second attempt from repeating the first one's structural mistake.
+
+A pattern of `model_error` across different Goals is a different signal: it
+indicates Architecture is underspecified, which is an `architecture_gap` and
+does have a durable target.
 
 A discrepancy that becomes a rule produces one sentence appended to the rules
 list, reviewed like any other proposal. That is the entire durable feedback
@@ -1213,9 +1290,9 @@ Surfaces never receive a private bypass that writes `governance.json` directly.
 Deferred. If built, a plan model renders as a read-only diagram attached to plan
 evidence: entities, relations, seams, and step boundaries against them.
 
-Because the plan model is derived and discarded, there is no editing surface, no
-typed command protocol, no layout persistence, and no stale-revision conflict
-handling. This is a rendering, not an application, and it must not become the
+Because the plan model is derived rather than authored, there is no editing
+surface, no typed command protocol, no layout persistence, and no stale-revision
+conflict handling. It renders what a Round did; it is not a model anyone edits. This is a rendering, not an application, and it must not become the
 justification for introducing React or an external canvas dependency into the
 web surface.
 
@@ -1245,6 +1322,10 @@ Architecture states what must be true. The repository shows what currently is.
 Where they disagree, the implementation is wrong unless you have evidence
 otherwise; record the disagreement rather than modelling around it.
 
+Derive this model fresh. Previous plans tell you what was attempted and how it
+turned out — reuse what the outcomes taught you, not the structure they assumed.
+A model from a failed attempt is often wrong in the way that caused the failure.
+
 Do not edit files.
 
 Product: {{product}}
@@ -1253,6 +1334,7 @@ Architecture: {{architecture}}
 Rules: {{rules}}
 Goal: {{goal}}
 Previous rounds: {{rounds}}
+Previous plans and outcomes: {{prior_plans}}
 Current request: {{request}}
 Repository: {{target_root}}
 ```
@@ -1343,9 +1425,13 @@ Derivation inputs are recorded so a plan model is reproducible: Governance
 digest, base commit, and Goal history version.
 
 Dashboard and Goal detail may summarize active plan progress, but durable Round,
-operation, process, Git, and Governance state remain authoritative. Plan models
-and steps are traceable through plan evidence and logs, and are never promoted
-into workflow state.
+operation, process, Git, and Governance state remain authoritative.
+
+A completed plan is readable from its Round alongside that Round's Governance
+and Quality records. This is what makes a failed attempt debuggable after the
+fact and what later Rounds read as history. It does not make plans or steps
+workflow state: nothing transitions on them, and no surface presents them as
+Rounds.
 
 Provider or authentication failure must be visible as such and must not be
 reported as a validation failure, plan failure, or workflow-capacity problem.
@@ -1502,6 +1588,9 @@ data model.
 - valid shallow and deep models for differently scoped Goals;
 - referential integrity of relations, seams, and declared impact;
 - the complete rule list is attached to every pinned plan;
+- prior plans reach the planner with per-step outcomes and failure detail;
+- a later Round's model is derived fresh rather than seeded from an earlier one;
+- long Goal histories reduce older plans to outcome summaries within budget;
 - read-only enforcement and worktree mutation detection;
 - exact Governance revision, digest, and base commit pinning;
 - no-Architecture behavior;
@@ -1559,8 +1648,10 @@ data model.
 
 ### Workflow Boundaries
 
-- no new Goal status, Round field, or public workflow state is introduced;
-- plan and step state is reachable only through plan evidence and logs;
+- no new Goal status or public workflow state is introduced;
+- the Round `plan` field is nullable and old Round records load unmigrated;
+- a Round that ran legacy one-shot implementation has no plan;
+- plan steps never appear as Rounds or in any Round count;
 - the engine cannot integrate, approve, merge, or advance the Goal.
 
 ### Surface Parity
@@ -1583,10 +1674,14 @@ data model.
 - Rules remain plain English, unchanged in shape, and are never validated
   deterministically.
 - No durable ontology graph, entity registry, or realization mapping exists.
-- Plan models are derived per implementation attempt, pinned to a plan revision,
-  and discarded with the plan.
-- Plan models, plans, and steps introduce no Round, Goal status, or other public
-  workflow state, and remain traceable through evidence and logs.
+- Plan models are derived per implementation attempt and pinned to a plan
+  revision.
+- Each Round records its plan, model, step outcomes, and checkpoints as durable
+  evidence, in the same way it records Governance and Quality.
+- Later Rounds of a Goal read prior plans as outcome-annotated history and
+  derive their own model fresh, never seeded from an earlier one.
+- Plans and steps introduce no Goal status or other public workflow state, and
+  are never surfaced as Rounds.
 - Existing rules, and every existing Governance read and write contract,
   continue to work without migration.
 - Every step and the planner receive the complete rule list, so no selection
