@@ -1,6 +1,19 @@
 use super::*;
 
 impl FileProcessControlService {
+    /// Cancels a workflow execution through the complete shared lifecycle boundary.
+    ///
+    /// The durable operation tombstone brackets process/claim/Goal settlement so operation
+    /// registration cannot race cancellation and publish success afterward.
+    pub fn cancel_workflow_execution_managed(&self, execution_id: &str) -> RefineResult<Value> {
+        let execution_id = execution_id.trim();
+        let operations = FileOperationRegistry::new(&self.runtime_root);
+        operations.cancel_workflow_execution_operations(execution_id)?;
+        let result = self.cancel_workflow_execution(execution_id)?;
+        operations.cancel_workflow_execution_operations(execution_id)?;
+        Ok(result)
+    }
+
     pub fn stop(&self, process_id: &str, signal: &str) -> RefineResult<Value> {
         validate_process_id(process_id)?;
         if !matches!(signal, "stop" | "terminate" | "kill") {
@@ -107,7 +120,7 @@ impl FileProcessControlService {
                     ))
                 })?;
                 if process_ownership.claim_id != claim.claim_id
-                    || process_ownership.execution_id != execution_id
+                    || process_ownership.execution_id.as_deref() != Some(execution_id)
                 {
                     return Err(stale_workflow_ownership(
                         &claim.goal_id,
@@ -122,7 +135,7 @@ impl FileProcessControlService {
             ownership.push(WorkflowGoalOwnership {
                 process_id: format!("workflow execution {execution_id}"),
                 claim_id: claim.claim_id.clone(),
-                execution_id: execution_id.to_string(),
+                execution_id: Some(execution_id.to_string()),
                 round_idx: None,
             });
         }
@@ -130,7 +143,7 @@ impl FileProcessControlService {
             ownership.push(WorkflowGoalOwnership {
                 process_id: format!("workflow execution {execution_id}"),
                 claim_id: claim.claim_id.clone(),
-                execution_id: execution_id.to_string(),
+                execution_id: Some(execution_id.to_string()),
                 round_idx: None,
             });
         }

@@ -125,7 +125,13 @@ async function openBulkModal(field) {
       r,
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );
-    toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    const failedN = Number(r.failed || (r.failures || []).length || 0);
+    if (failedN) {
+      toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}; ` +
+            `${failedN} failed or need attention.`, "warn");
+    } else {
+      toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
+    }
     await refreshGoalsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk update failed");

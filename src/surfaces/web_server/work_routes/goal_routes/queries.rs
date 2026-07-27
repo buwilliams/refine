@@ -13,6 +13,20 @@ impl InProcessWebServer {
         let Some(update) = parse_bulk_goal_update(body) else {
             return invalid_bulk_body();
         };
+        if matches!(
+            &update,
+            BulkGoalUpdate::Status(status) if status.trim().eq_ignore_ascii_case("cancelled")
+        ) {
+            let Some(runtime_root) = &self.runtime_root else {
+                return runtime_root_unavailable("cancel Goals");
+            };
+            return match FileProcessControlService::with_refine_dir(runtime_root, &refine_dir)
+                .bulk_cancel_goals(selection)
+            {
+                Ok(result) => ApiResponse::json(200, json!(result)),
+                Err(error) => error_response(error),
+            };
+        }
         match self
             .work_item_service(refine_dir)
             .bulk_update_goals(selection, update)

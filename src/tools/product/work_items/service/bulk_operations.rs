@@ -39,10 +39,6 @@ impl FileWorkItemService {
         }
 
         let status_protection = match (field.as_str(), raw_value.as_str()) {
-            // Cancellation is a lifecycle stop, not a generic status
-            // replacement. It is allowed from active workflow states just as
-            // the single-Goal cancel action is.
-            ("status", "cancelled") => BulkGoalStatusProtection::None,
             ("status", "review" | "done") => BulkGoalStatusProtection::Automated,
             ("status", _) => BulkGoalStatusProtection::WorkflowOwned,
             _ => BulkGoalStatusProtection::None,

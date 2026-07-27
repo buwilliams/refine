@@ -57,7 +57,7 @@ impl FileProcessControlService {
         let goal_after = goal_transaction.cancelled_value();
         let mut execution_ids = ownership
             .iter()
-            .map(|ownership| ownership.execution_id.clone())
+            .filter_map(|ownership| ownership.execution_id.clone())
             .collect::<Vec<_>>();
         execution_ids.sort();
         execution_ids.dedup();
@@ -213,11 +213,45 @@ impl FileProcessControlService {
         refine_dir: &Path,
         execution_id: &str,
     ) -> RefineResult<Option<Value>> {
-        let Some((receipt_path, mut journal)) =
+        let Some((receipt_path, journal)) =
             self.cancellation_settlement_journal_for_execution(execution_id)?
         else {
             return Ok(None);
         };
+        self.replay_cancellation_settlement_journal(
+            refine_dir,
+            receipt_path,
+            journal,
+            Some(execution_id),
+        )
+    }
+
+    pub(super) fn replay_cancellation_settlement_for_goal(
+        &self,
+        refine_dir: &Path,
+        goal_id: &str,
+    ) -> RefineResult<Option<Value>> {
+        let Some((receipt_path, journal)) =
+            self.cancellation_settlement_journal_for_goal(goal_id)?
+        else {
+            return Ok(None);
+        };
+        let execution_id = journal.execution_ids.first().cloned();
+        self.replay_cancellation_settlement_journal(
+            refine_dir,
+            receipt_path,
+            journal,
+            execution_id.as_deref(),
+        )
+    }
+
+    fn replay_cancellation_settlement_journal(
+        &self,
+        refine_dir: &Path,
+        receipt_path: PathBuf,
+        mut journal: CancellationSettlementJournal,
+        execution_id: Option<&str>,
+    ) -> RefineResult<Option<Value>> {
         if journal.state == "rolled_back" {
             return Ok(None);
         }
@@ -343,18 +377,22 @@ impl FileProcessControlService {
         )?;
 
         let mut terminations = Vec::new();
-        for claim_id in &journal.claim_ids {
-            for recovered in
-                self.recoverable_workflow_terminations(&journal.goal_id, claim_id, execution_id)?
-            {
-                self.complete_outcome_receipt(
-                    &recovered.ownership.process_id,
-                    Some(&journal.goal_id),
-                    &recovered.termination,
-                    true,
-                    true,
-                )?;
-                terminations.push(recovered.termination);
+        if let Some(execution_id) = execution_id {
+            for claim_id in &journal.claim_ids {
+                for recovered in self.recoverable_workflow_terminations(
+                    &journal.goal_id,
+                    claim_id,
+                    execution_id,
+                )? {
+                    self.complete_outcome_receipt(
+                        &recovered.ownership.process_id,
+                        Some(&journal.goal_id),
+                        &recovered.termination,
+                        true,
+                        true,
+                    )?;
+                    terminations.push(recovered.termination);
+                }
             }
         }
         let goal = goal_transaction.projection()?.goal;
@@ -420,10 +458,51 @@ impl FileProcessControlService {
         &self,
         execution_id: &str,
     ) -> RefineResult<Option<(PathBuf, CancellationSettlementJournal)>> {
+        let mut matching = self
+            .cancellation_settlement_journals()?
+            .into_iter()
+            .filter(|(_, journal)| {
+                journal
+                    .execution_ids
+                    .iter()
+                    .any(|candidate| candidate == execution_id)
+            })
+            .collect::<Vec<_>>();
+        if matching.len() > 1 {
+            return Err(RefineError::Conflict(format!(
+                "multiple cancellation settlement journals match workflow execution {execution_id}; recovery requires operator inspection"
+            )));
+        }
+        Ok(matching.pop())
+    }
+
+    pub(super) fn cancellation_settlement_journal_for_goal(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<Option<(PathBuf, CancellationSettlementJournal)>> {
+        let mut matching = self
+            .cancellation_settlement_journals()?
+            .into_iter()
+            .filter(|(_, journal)| {
+                journal.goal_id == goal_id
+                    && !matches!(journal.state.as_str(), "committed" | "rolled_back")
+            })
+            .collect::<Vec<_>>();
+        if matching.len() > 1 {
+            return Err(RefineError::Conflict(format!(
+                "multiple unfinished cancellation settlement journals match Goal {goal_id}; recovery requires operator inspection"
+            )));
+        }
+        Ok(matching.pop())
+    }
+
+    fn cancellation_settlement_journals(
+        &self,
+    ) -> RefineResult<Vec<(PathBuf, CancellationSettlementJournal)>> {
         let directory = self.runtime_root.join("process-stop-outcomes");
         let entries = match fs::read_dir(&directory) {
             Ok(entries) => entries,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => {
                 return Err(RefineError::Io(format!(
                     "failed to inspect cancellation settlement journals {}: {error}",
@@ -431,7 +510,7 @@ impl FileProcessControlService {
                 )));
             }
         };
-        let mut matching = Vec::new();
+        let mut journals = Vec::new();
         for entry in entries {
             let entry = entry.map_err(|error| {
                 RefineError::Io(format!(
@@ -470,20 +549,9 @@ impl FileProcessControlService {
                         path.display()
                     ))
                 })?;
-            if journal
-                .execution_ids
-                .iter()
-                .any(|candidate| candidate == execution_id)
-            {
-                matching.push((path, journal));
-            }
+            journals.push((path, journal));
         }
-        if matching.len() > 1 {
-            return Err(RefineError::Conflict(format!(
-                "multiple cancellation settlement journals match workflow execution {execution_id}; recovery requires operator inspection"
-            )));
-        }
-        Ok(matching.pop())
+        Ok(journals)
     }
 
     pub(super) fn write_cancellation_settlement_journal(

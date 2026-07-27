@@ -22,6 +22,8 @@ When a Goal is cancelled:
 
 - Refine removes it from active workflow consideration.
 - Active claims, relevant processes, and pending automation should be stopped or released where appropriate.
+- Single and bulk cancellation use the same durable operation, process, claim, capacity, Goal,
+  receipt, and replay settlement; bulk callers receive an outcome for each selected Goal.
 - The cancellation reason, history, logs, and relationships should remain inspectable.
 - Feature rollups and ordered work should account for the cancellation explicitly.
 - Future work may replace or supersede the cancelled Goal, but cancellation should not silently delete the record.

@@ -27,7 +27,8 @@ Current implementation details that matter to intent:
 - bulk operations should use shared work item behavior and preserve node/Feature constraints;
 - the bulk status picker should include review and done while the shared workflow capability
   protects actively automated or claimed Goals from generic status replacement; cancelled is the
-  lifecycle exception that stops selected active, failed, or review Goals while preserving done;
+  lifecycle exception that delegates selected active, claimed, failed, or review Goals to shared
+  cancellation settlement, preserves done, and surfaces per-Goal partial failures;
 - each implemented round should retain a timestamped, plain-language report of what changed, why, and the deterministic verification outcomes; the report should be visible with that round when the Goal opens.
 - Goals bulk actions should export all or a selected subset as Jira-importable SOC 2 evidence containing each request, implementation reports, review outcomes, notes, and exact commit range without requiring users to reconstruct delivery history manually. Each row should fit Jira by preserving Goal identity and commit traceability first, compacting repeated machine verdict payloads, and visibly marking any lower-priority evidence shortened at a valid character boundary. One Goal's verbose history should not abort the other selected rows. The export should run as a visible, cancellable operation that survives page reloads and can recover after daemon interruption.
 

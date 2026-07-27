@@ -56,6 +56,9 @@ Current implementation details that matter to intent:
   and cleanup failures keep the Goal active, while every post-exit failure
   retains a truthful receipt with exit, registry/identity cleanup, claim/Goal,
   cause, and supported recovery evidence.
+  Single and bulk Goal cancellation both delegate to this capability. Bulk
+  cancellation settles each selected Goal independently and returns explicit
+  per-Goal failures, so one partial outcome is never reported as batch success.
 - the browser System and Processes surfaces read shared process state rather than inventing their own status.
 - live observers enumerate and capture output through the shared Process
   capability. A listed process record or output artifact removed by ordinary

@@ -150,11 +150,13 @@ impl InProcessWebServer {
         else {
             return goal_id_required();
         };
-        match self
-            .work_item_service(refine_dir)
-            .cancel_goal_summary(goal_id)
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("cancel Goals");
+        };
+        match FileProcessControlService::with_refine_dir(runtime_root, refine_dir)
+            .cancel_goal(goal_id)
         {
-            Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
+            Ok(result) => ApiResponse::json(200, result),
             Err(error) => error_response(error),
         }
     }

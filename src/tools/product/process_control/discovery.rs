@@ -56,6 +56,28 @@ impl FileProcessControlService {
         Ok(matches)
     }
 
+    pub(super) fn managed_processes_for_goal(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<Vec<(FileProcessSupervisor, ManagedProcess)>> {
+        let mut matches = Vec::new();
+        for root in managed_process_roots(&self.runtime_root) {
+            let supervisor = FileProcessSupervisor::new(root);
+            for process in supervisor.list()? {
+                if is_agent_process(&process)
+                    && process_metadata(&process)
+                        .get("goal_id")
+                        .and_then(Value::as_str)
+                        == Some(goal_id)
+                {
+                    matches.push((supervisor.clone(), process));
+                }
+            }
+        }
+        matches.sort_by(|a, b| a.1.id.cmp(&b.1.id));
+        Ok(matches)
+    }
+
     pub(super) fn recoverable_workflow_terminations(
         &self,
         goal_id: &str,
@@ -150,7 +172,7 @@ impl FileProcessControlService {
                 ownership: WorkflowGoalOwnership {
                     process_id,
                     claim_id: claim_id.to_string(),
-                    execution_id: execution_id.to_string(),
+                    execution_id: Some(execution_id.to_string()),
                     round_idx: workflow
                         .get("round_idx")
                         .and_then(Value::as_u64)

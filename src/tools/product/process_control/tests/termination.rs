@@ -196,7 +196,7 @@ fn successful_cancellation_preserves_complete_non_default_workflow_policy() {
             &[WorkflowGoalOwnership {
                 process_id: "confirmed-policy-process".to_string(),
                 claim_id: "claim-policy-success".to_string(),
-                execution_id: "exec-policy-success".to_string(),
+                execution_id: Some("exec-policy-success".to_string()),
                 round_idx: Some(0),
             }],
         )

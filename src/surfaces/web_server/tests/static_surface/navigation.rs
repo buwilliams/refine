@@ -306,6 +306,7 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(temp_root.join("run/8080"));
 
     let create_goal = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -353,6 +354,7 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(temp_root.join("run/8080"));
     for (id, name) in [
         ("GOAL1", "Bulk One"),
         ("GOAL2", "Bulk Two"),

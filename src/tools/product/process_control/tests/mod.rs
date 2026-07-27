@@ -1,3 +1,4 @@
+mod bulk;
 mod cleanup;
 mod ownership;
 mod settlement;
