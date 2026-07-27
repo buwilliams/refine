@@ -538,6 +538,9 @@ function drawToolbar() {
   if (chatState.open && !chatState.bodyHeight) {
     chatState.bodyHeight = defaultToolbarBodyHeight();
   }
+  if (!terminalActive) {
+    releaseAfterMorph(root.querySelector(".terminal-output"));
+  }
   renderInto(root, `
     <div class="toolbar-dock-resize" id="toolbar-dock-resize"
          role="separator" aria-orientation="horizontal"
