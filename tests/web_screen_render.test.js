@@ -515,11 +515,11 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
   }
 });
 
-test("switching directly from Agent to Files replaces the preserved terminal panel", { skip: SKIP }, async () => {
+test("switching from Agent to Files and back restores the terminal renderer", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
-    await app.page.evaluate(() => {
+    await app.page.evaluate(async () => {
       chatState.tabs = {
         agent: normalizeInteractiveTerminalTab({
           goalId: null,
@@ -538,7 +538,16 @@ test("switching directly from Agent to Files replaces the preserved terminal pan
       chatState.open = true;
       chatState.bodyHeight = 420;
       filesState.entriesByPath[""] = [];
+      const terminal = terminalStateFor("agent");
+      terminal.sessionId = "agent-session";
+      terminal.connected = true;
+      terminal.statusChecked = true;
+      terminal.reattaching = false;
+      terminal.eventSource = { close() {} };
       drawToolbar();
+      window.__agentTermBeforeFiles = terminal.term;
+      terminalReceiveOutput("AGENT-CONTENT-BEFORE-FILES", terminal);
+      await new Promise((resolve) => terminal.term.write("", resolve));
     });
 
     assert.equal(await app.page.locator('[data-testid="toolbar-terminal-panel"]').count(), 1);
@@ -548,6 +557,29 @@ test("switching directly from Agent to Files replaces the preserved terminal pan
     assert.equal(await app.page.locator('[data-testid="toolbar-files-panel"]').count(), 1);
     assert.equal(await app.page.locator('[data-testid="toolbar-terminal-panel"]').count(), 0);
     assert.equal(await app.page.locator('[data-testid="terminal-output"]').count(), 0);
+
+    await app.page.locator('[data-testid="toolbar-tab-agent"]').click();
+    await app.page.waitForSelector('[data-testid="toolbar-terminal-panel"]');
+    const restored = await app.page.evaluate(() => {
+      const terminal = terminalStateFor("agent");
+      const host = document.querySelector('[data-testid="terminal-output"]');
+      return {
+        sameInstance: terminal.term === window.__agentTermBeforeFiles,
+        mounted: terminal.term.element?.parentElement === host,
+        mountCount: host.querySelectorAll(":scope > .xterm").length,
+        showsAgentContent:
+          host.querySelector(".xterm-rows")?.textContent.includes("AGENT-CONTENT-BEFORE-FILES")
+          || false,
+        filesPanelCount: document.querySelectorAll('[data-testid="toolbar-files-panel"]').length,
+      };
+    });
+    assert.deepEqual(restored, {
+      sameInstance: true,
+      mounted: true,
+      mountCount: 1,
+      showsAgentContent: true,
+      filesPanelCount: 0,
+    });
     assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();

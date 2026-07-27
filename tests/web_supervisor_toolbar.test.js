@@ -35,6 +35,7 @@ class FakeElement {
   contains(element) { return element === this; }
   focus() {}
   remove() {}
+  replaceChildren() {}
   getBoundingClientRect() {
     return {
       width: this.clientWidth,
