@@ -26,6 +26,7 @@ fn file_work_item_service_cancels_and_deletes_features_through_goal_paths() {
         .unwrap();
 
     let cancelled = service.cancel_feature_summary("FEA1").unwrap();
+    assert_eq!(cancelled.rollup.status, GoalStatus::Done);
     assert_eq!(cancelled.rollup.cancelled_count, 2);
     assert_eq!(
         service.show_goal_summary("GOAL1").unwrap().goal.status,

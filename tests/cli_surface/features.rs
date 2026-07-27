@@ -126,10 +126,7 @@ pub(crate) fn feature_show_edit_reorder_move_cancel_and_import(fixture: &Integra
     fixture.assert_success("feature cancel", &cancel);
     let cancelled = fixture.run_refine(&["feature", "show", &feature_id]);
     fixture.assert_success("feature show after cancel", &cancelled);
-    assert_eq!(
-        fixture.json_stdout(&cancelled)["feature"]["status"],
-        "cancelled"
-    );
+    assert_eq!(fixture.json_stdout(&cancelled)["feature"]["status"], "done");
 
     let import = fixture.run_refine(&[
         "feature",
