@@ -141,6 +141,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       root.innerHTML = html;
       if (typeof bind === "function") bind();
     },
+    releaseAfterMorph(el) {
+      if (el) delete el.dataset.morphPreserve;
+    },
     bindOnce(el, event, handler) {
       if (!el) return;
       el.addEventListener(event, handler);

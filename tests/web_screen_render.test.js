@@ -515,6 +515,45 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
   }
 });
 
+test("switching directly from Agent to Files replaces the preserved terminal panel", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    await app.page.evaluate(() => {
+      chatState.tabs = {
+        agent: normalizeInteractiveTerminalTab({
+          goalId: null,
+          label: "Agent",
+          mode: "agent",
+          sessionId: null,
+        }),
+        files: {
+          goalId: null,
+          label: "Files",
+          mode: "files",
+          sessionId: null,
+        },
+      };
+      chatState.activeTabId = "agent";
+      chatState.open = true;
+      chatState.bodyHeight = 420;
+      filesState.entriesByPath[""] = [];
+      drawToolbar();
+    });
+
+    assert.equal(await app.page.locator('[data-testid="toolbar-terminal-panel"]').count(), 1);
+    await app.page.locator('[data-testid="toolbar-tab-files"]').click();
+    await app.page.waitForSelector('[data-testid="toolbar-files-panel"]');
+
+    assert.equal(await app.page.locator('[data-testid="toolbar-files-panel"]').count(), 1);
+    assert.equal(await app.page.locator('[data-testid="toolbar-terminal-panel"]').count(), 0);
+    assert.equal(await app.page.locator('[data-testid="terminal-output"]').count(), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 // The remaining screens moved onto the redraw pattern. One browser for all of
 // them: each assertion is a scaffold element that paints regardless of whether the
 // screen has data, so an empty fixture still proves the route booted, rendered,
