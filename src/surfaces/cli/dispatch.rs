@@ -55,8 +55,8 @@ use crate::model::workflow::GoalStatus;
 use crate::process::runner::run_worker;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
-    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
-    current_launch_executable, current_launch_mode, http_probe,
+    BackgroundDaemonConfig, DaemonStatus, FileDaemonLifecycleService, current_launch_executable,
+    current_launch_mode,
 };
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::surfaces::web_server::{
@@ -66,6 +66,9 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
+use crate::tools::host::daemon_lifecycle::{
+    DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
+};
 use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
 };
@@ -160,15 +163,22 @@ pub(super) fn run_system_start(
     let cache_dir = cache_dir.map(absolute_cli_path).transpose()?;
     let static_root = static_root.map(absolute_cli_path).transpose()?;
     if !foreground && !once {
-        let status = FileDaemonLifecycleService::new(RuntimeRoot {
-            root: runtime_root.clone(),
-        })
-        .start_background_daemon(BackgroundDaemonConfig {
-            port,
-            bind_address,
-            cache_dir,
-            static_root,
-        })?;
+        let lifecycle = FileHostDaemonLifecycleService::new(
+            RuntimeRoot {
+                root: runtime_root.clone(),
+            },
+            env!("CARGO_PKG_VERSION"),
+        );
+        let status = execute_daemon_lifecycle(
+            &lifecycle,
+            DaemonLifecycleAction::Start,
+            BackgroundDaemonConfig {
+                port,
+                bind_address,
+                cache_dir,
+                static_root,
+            },
+        )?;
         println!(
             "{}",
             serde_json::to_string_pretty(&web_response(status)).unwrap()
@@ -566,6 +576,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | SystemAction::SourceStatus { .. }
             | SystemAction::SourcePromote { .. }
             | SystemAction::SourcePromoteHelper { .. }
+            | SystemAction::DaemonLifecycleHelper { .. }
             | SystemAction::RunnerWorker { .. }
             | SystemAction::Rollback { .. }
             | SystemAction::Uninstall { .. }

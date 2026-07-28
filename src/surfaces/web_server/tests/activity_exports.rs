@@ -108,6 +108,12 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
         rollback_attempted: false,
         rollback_succeeded: None,
         recovery: None,
+        candidate_executable: None,
+        service_manager: None,
+        registration_updated: false,
+        registration_rollback_succeeded: None,
+        observed_executable: None,
+        rollback_evidence: None,
     };
     fs::write(
         runtime_root.join(SOURCE_PROMOTION_STATE_FILE),

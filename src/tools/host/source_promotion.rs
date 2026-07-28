@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -11,10 +11,15 @@ use uuid::Uuid;
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::{
-    DaemonLifecycleService, FileDaemonLifecycleService, http_probe,
-};
+use crate::process::supervisor::lifecycle::http_probe;
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::daemon_lifecycle::{
+    HostRestartSafeHandoffLauncher, RestartSafeHandoff, RestartSafeHandoffLauncher,
+    live_daemon_executable,
+};
+use crate::tools::host::installation::{
+    FileInstallationService, InstalledServiceAction, ServiceRegistrationUpdate,
+};
 
 pub const SOURCE_PROMOTION_STATE_FILE: &str = "source-promotion.json";
 
@@ -76,6 +81,62 @@ pub struct SourcePromotionOperation {
     pub rollback_succeeded: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candidate_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_manager: Option<String>,
+    #[serde(default)]
+    pub registration_updated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registration_rollback_succeeded: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_evidence: Option<SourcePromotionRollbackEvidence>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SourcePromotionRollbackEvidence {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_restored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registration_restored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registration_verified: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registered_executable: Option<String>,
+    #[serde(default)]
+    pub replacement_attempted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replacement_succeeded: Option<bool>,
+    #[serde(default)]
+    pub reachability: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_matches: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SourcePromotionDaemonObservation {
+    pub reachability: String,
+    pub expected_executable: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_matches: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl SourcePromotionDaemonObservation {
+    fn verified(&self) -> bool {
+        self.reachability == "reachable" && self.identity_matches == Some(true)
+    }
 }
 
 impl SourcePromotionOperation {
@@ -95,6 +156,12 @@ impl SourcePromotionOperation {
             rollback_attempted: false,
             rollback_succeeded: None,
             recovery: None,
+            candidate_executable: None,
+            service_manager: None,
+            registration_updated: false,
+            registration_rollback_succeeded: None,
+            observed_executable: None,
+            rollback_evidence: None,
         }
     }
 }
@@ -181,25 +248,29 @@ fn short_commit(commit: &str) -> &str {
 pub trait SourcePromotionHost {
     fn build_candidate(&mut self, commit: &str) -> RefineResult<PathBuf>;
     fn verify_preconditions(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;
+    fn prepare_restart(
+        &mut self,
+        executable: &Path,
+    ) -> RefineResult<Option<ServiceRegistrationUpdate>>;
     fn stop_daemon(&mut self) -> RefineResult<()>;
     fn activate(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;
     fn restart_daemon(&mut self, executable: &Path) -> RefineResult<()>;
-    fn verify_daemon(&mut self, expected_commit: &str) -> RefineResult<()>;
+    fn verify_daemon(
+        &mut self,
+        expected_commit: &str,
+        expected_executable: &Path,
+    ) -> RefineResult<PathBuf>;
+    fn complete_restart_registration(&mut self) -> RefineResult<()>;
+    fn restore_restart_registration(&mut self) -> RefineResult<bool>;
+    fn verify_previous_registration(&mut self) -> RefineResult<PathBuf>;
+    fn verify_previous_source(&mut self, expected_commit: &str) -> RefineResult<()>;
     fn rollback(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;
     fn restart_previous_daemon(&mut self) -> RefineResult<()>;
-}
-
-pub(crate) trait SourcePromotionHelperLauncher {
-    fn launch(&self, command: &mut Command) -> std::io::Result<()>;
-}
-
-struct ProcessSourcePromotionHelperLauncher;
-
-impl SourcePromotionHelperLauncher for ProcessSourcePromotionHelperLauncher {
-    fn launch(&self, command: &mut Command) -> std::io::Result<()> {
-        command.spawn().map(|_| ())
-    }
+    fn observe_previous_daemon(&mut self) -> SourcePromotionDaemonObservation;
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+mod systemd_tests;

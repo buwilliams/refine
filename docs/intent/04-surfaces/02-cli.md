@@ -28,7 +28,7 @@ Current implementation details that matter to intent:
   `--profile plan` and `--profile standalone` open those role sessions. Ctrl-]
   detaches without stopping the agent.
 - normal target-state mutations are routed to the daemon instead of directly writing files in normal operation.
-- system commands handle lifecycle, install, repair, update, rollback, uninstall, doctor, and API group discovery.
+- system commands handle lifecycle, install, repair, update, rollback, uninstall, doctor, and API group discovery. They are thin callers of the same port-scoped host lifecycle and installation capabilities used by HTTP/API, Desktop, update, and maintenance paths. The shared lifecycle authority selects activated systemd or launchd control versus direct-process fallback, reconciles durable state with fresh post-control reachability, keeps command failures visible without replacing a still-reachable daemon's healthy state, fails closed on unreachable or ambiguous observations with partial recovery evidence, and preserves restart-specific evidence. It reports stopped only after shutdown is confirmed. Explicit foreground and one-request starts remain direct bootstrap paths. launchd labels are installation-port scoped, while a recorded legacy registration is migrated or controlled only when exact parsed arguments prove that it belongs to the selected installation; adjacent textual ports never count as ownership.
 - CLI tests verify daemon routing and shared service behavior.
 
 The CLI should avoid becoming a second implementation of Refine. It should remain a reliable adapter to the same daemon, model, workflow, process, and tool capabilities.

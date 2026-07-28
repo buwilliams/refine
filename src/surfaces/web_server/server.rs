@@ -2,6 +2,7 @@ use serde_json::json;
 
 use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
 use crate::surfaces::mcp;
+use crate::tools::host::daemon_lifecycle::DaemonLifecycleAction;
 
 use super::support::*;
 use super::*;
@@ -136,6 +137,26 @@ impl InProcessWebServer {
 
         if request.method == "POST" && request.path == "/system/repair" {
             return self.handle_install_repair();
+        }
+
+        if request.method == "POST" && request.path == "/system/start" {
+            return self.handle_daemon_lifecycle(DaemonLifecycleAction::Start);
+        }
+
+        if request.method == "POST" && request.path == "/system/stop" {
+            return self.handle_daemon_lifecycle(DaemonLifecycleAction::Stop);
+        }
+
+        if request.method == "POST" && request.path == "/system/restart" {
+            return self.handle_daemon_lifecycle(DaemonLifecycleAction::Restart);
+        }
+
+        if request.method == "GET"
+            && let Some(operation_id) = request.path.strip_prefix("/system/lifecycle/")
+            && !operation_id.is_empty()
+            && !operation_id.contains('/')
+        {
+            return self.handle_daemon_lifecycle_operation(operation_id);
         }
 
         if request.method == "POST" && request.path == "/system/update" {

@@ -5,10 +5,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
-    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    BackgroundDaemonConfig, DaemonRuntimeService, DaemonStatus, FileDaemonLifecycleService,
     http_probe,
 };
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::daemon_lifecycle::{
+    DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
+};
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DeployedUpdateSummary {
@@ -303,16 +306,25 @@ impl FileDeployedUpdateHost {
         }
     }
 
-    fn lifecycle(&self) -> FileDaemonLifecycleService {
+    fn runtime_lifecycle(&self) -> FileDaemonLifecycleService {
         FileDaemonLifecycleService::new(RuntimeRoot {
             root: self.runtime_root.clone(),
         })
+    }
+
+    fn lifecycle(&self) -> FileHostDaemonLifecycleService {
+        FileHostDaemonLifecycleService::new(
+            RuntimeRoot {
+                root: self.runtime_root.clone(),
+            },
+            env!("CARGO_PKG_VERSION"),
+        )
     }
 }
 
 impl DeployedUpdateHost for FileDeployedUpdateHost {
     fn running_ports(&mut self) -> RefineResult<Vec<u16>> {
-        let statuses = self.lifecycle().known_statuses()?;
+        let statuses = self.runtime_lifecycle().known_statuses()?;
         Ok(statuses
             .into_iter()
             .filter(|status| status.daemon_healthy && status.web_available)
@@ -321,11 +333,19 @@ impl DeployedUpdateHost for FileDeployedUpdateHost {
     }
 
     fn stop_port(&mut self, port: u16) -> RefineResult<()> {
-        self.lifecycle().stop(port).map(|_| ())
+        execute_daemon_lifecycle(
+            &self.lifecycle(),
+            DaemonLifecycleAction::Stop,
+            BackgroundDaemonConfig {
+                port,
+                ..Default::default()
+            },
+        )
+        .map(|_| ())
     }
 
     fn port_stopped(&mut self, port: u16) -> RefineResult<bool> {
-        let status = self.lifecycle().status(port)?;
+        let status = self.runtime_lifecycle().status(port)?;
         Ok(!status.daemon_healthy && http_probe(port).is_err())
     }
 
@@ -390,11 +410,14 @@ impl DeployedUpdateHost for FileDeployedUpdateHost {
     }
 
     fn restart_port(&mut self, port: u16) -> RefineResult<DaemonStatus> {
-        self.lifecycle()
-            .start_background_daemon(BackgroundDaemonConfig {
+        execute_daemon_lifecycle(
+            &self.lifecycle(),
+            DaemonLifecycleAction::Start,
+            BackgroundDaemonConfig {
                 port,
                 ..Default::default()
-            })
+            },
+        )
     }
 }
 

@@ -1,4 +1,7 @@
+use super::os_backend::ServiceCommandOutput;
+use super::service_control::launchd_label;
 use super::*;
+use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -87,6 +90,594 @@ fn file_installation_service_persists_update_and_rollback_state() {
 }
 
 #[test]
+fn installed_systemd_service_owns_daemon_lifecycle_commands() {
+    let temp_root = unique_temp_dir("installation-systemd-control");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+
+    assert!(
+        service
+            .control_installed_service(InstalledServiceAction::Start)
+            .unwrap()
+            .is_none()
+    );
+    service.install(InstallTarget::LinuxCliWeb).unwrap();
+
+    for (action, verb) in [
+        (InstalledServiceAction::Start, "start"),
+        (InstalledServiceAction::Stop, "stop"),
+        (InstalledServiceAction::Restart, "restart"),
+    ] {
+        let control = service.control_installed_service(action).unwrap().unwrap();
+        assert_eq!(control.service_manager, "systemd_user");
+        assert_eq!(control.action, action);
+        assert_eq!(
+            control.commands,
+            vec![format!(
+                "'systemctl' '--user' '{verb}' 'refine-4557.service'"
+            )]
+        );
+    }
+
+    let mut backend = service.load_backend().unwrap().unwrap();
+    backend.activated = false;
+    service.save_backend(&backend).unwrap();
+    assert!(
+        service
+            .control_installed_service(InstalledServiceAction::Start)
+            .unwrap()
+            .is_none(),
+        "partial installations must retain direct-process fallback"
+    );
+    assert!(
+        service
+            .control_installed_service(InstalledServiceAction::Stop)
+            .unwrap()
+            .is_none(),
+        "an inactive registration must not intercept shutdown of the direct fallback runtime"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn source_promotion_registration_swap_is_durable_and_restorable_for_systemd() {
+    let temp_root = unique_temp_dir("installation-systemd-source-registration");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+    let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
+    let metadata_path = PathBuf::from(
+        installed
+            .backend
+            .as_ref()
+            .unwrap()
+            .service_metadata_path
+            .as_ref()
+            .unwrap(),
+    );
+    let original = fs::read_to_string(&metadata_path).unwrap();
+    let candidate = temp_root.join("candidate/refine");
+    fs::create_dir_all(candidate.parent().unwrap()).unwrap();
+    fs::write(&candidate, "candidate fixture").unwrap();
+
+    let update = service
+        .prepare_service_executable(&candidate)
+        .unwrap()
+        .unwrap();
+    assert_eq!(update.service_manager, "systemd_user");
+    assert_eq!(update.candidate_executable, candidate);
+    let prepared = fs::read_to_string(&metadata_path).unwrap();
+    assert!(prepared.contains(&candidate.display().to_string()));
+    assert!(!prepared.contains("candidate/refine.pending"));
+    let second = service
+        .prepare_service_executable(Path::new("/other/candidate/refine"))
+        .unwrap_err();
+    assert!(second.to_string().contains("prior source-promotion"));
+    assert_eq!(fs::read_to_string(&metadata_path).unwrap(), prepared);
+
+    assert!(service.restore_service_executable().unwrap());
+    assert_eq!(fs::read_to_string(&metadata_path).unwrap(), original);
+    let mismatch = service
+        .verify_restored_service_executable(&candidate)
+        .unwrap_err();
+    assert!(
+        mismatch.to_string().contains("expected prior executable"),
+        "{mismatch}"
+    );
+    assert!(
+        service.restore_service_executable().unwrap(),
+        "failed verification must retain the durable registration backup"
+    );
+    let prior = PathBuf::from(daemon_executable_string().unwrap());
+    assert_eq!(
+        service.verify_restored_service_executable(&prior).unwrap(),
+        fs::canonicalize(prior).unwrap()
+    );
+    service.complete_service_executable_update().unwrap();
+    assert!(!service.restore_service_executable().unwrap());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn source_promotion_registration_swap_renders_launchd_candidate_without_loading_it_early() {
+    let temp_root = unique_temp_dir("installation-launchd-source-registration");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    let installed = service.install(InstallTarget::MacOsAppBundle).unwrap();
+    let metadata_path = PathBuf::from(
+        installed
+            .backend
+            .as_ref()
+            .unwrap()
+            .service_metadata_path
+            .as_ref()
+            .unwrap(),
+    );
+    let original = fs::read_to_string(&metadata_path).unwrap();
+    let candidate = temp_root.join("candidate/refine & next");
+
+    let update = service
+        .prepare_service_executable(&candidate)
+        .unwrap()
+        .unwrap();
+    assert_eq!(update.service_manager, "launchd_login_item");
+    let prepared = fs::read_to_string(&metadata_path).unwrap();
+    assert!(prepared.contains("candidate/refine &amp; next"));
+    assert!(service.restore_service_executable().unwrap());
+    assert_eq!(fs::read_to_string(&metadata_path).unwrap(), original);
+    let prior = PathBuf::from(daemon_executable_string().unwrap());
+    assert_eq!(
+        service.verify_restored_service_executable(&prior).unwrap(),
+        fs::canonicalize(prior).unwrap()
+    );
+    service.complete_service_executable_update().unwrap();
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn inactive_registration_does_not_intercept_candidate_direct_fallback() {
+    let temp_root = unique_temp_dir("installation-inactive-source-registration");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+    let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
+    let metadata_path = PathBuf::from(
+        installed
+            .backend
+            .as_ref()
+            .unwrap()
+            .service_metadata_path
+            .as_ref()
+            .unwrap(),
+    );
+    let original = fs::read_to_string(&metadata_path).unwrap();
+    let mut backend = installed.backend.unwrap();
+    backend.activated = false;
+    backend.activation_error = Some("systemd user manager unavailable".to_string());
+    service.save_backend(&backend).unwrap();
+
+    assert_eq!(
+        service
+            .prepare_service_executable(Path::new("/candidate/refine"))
+            .unwrap(),
+        None
+    );
+    assert_eq!(fs::read_to_string(metadata_path).unwrap(), original);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn installed_launchd_service_is_port_scoped_and_owns_lifecycle_commands() {
+    let temp_root = unique_temp_dir("installation-launchd-control");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    let installed = service.install(InstallTarget::MacOsAppBundle).unwrap();
+    let backend = installed.backend.unwrap();
+    let plist = fs::read_to_string(backend.service_metadata_path.unwrap()).unwrap();
+    let target = format!("{}/com.refine.daemon.4558", launchctl_gui_domain());
+
+    assert!(plist.contains("<string>com.refine.daemon.4558</string>"));
+    assert!(plist.contains(
+        "<string>--port</string>\n    <string>4558</string>\n    <string>--runtime-root</string>"
+    ));
+
+    let start = service
+        .control_installed_service(InstalledServiceAction::Start)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        start.commands,
+        vec![
+            format!("'launchctl' 'print' '{target}'"),
+            format!("'launchctl' 'kickstart' '{target}'"),
+        ]
+    );
+
+    let stop = service
+        .control_installed_service(InstalledServiceAction::Stop)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stop.commands,
+        vec![
+            format!("'launchctl' 'print' '{target}'"),
+            format!("'launchctl' 'disable' '{target}'"),
+            format!("'launchctl' 'bootout' '{target}'"),
+        ]
+    );
+
+    let restart = service
+        .control_installed_service(InstalledServiceAction::Restart)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        restart.commands,
+        vec![
+            format!("'launchctl' 'print' '{target}'"),
+            format!("'launchctl' 'kickstart' '-k' '{target}'"),
+        ]
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn launchd_installations_and_controls_are_isolated_by_port() {
+    let temp_root = unique_temp_dir("installation-launchd-port-isolation");
+    let runtime_root = temp_root.join("run");
+    let first = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    let second = test_installation_service_for_port(&runtime_root, "1.0.0", 4559, &temp_root);
+
+    let first_backend = first
+        .install(InstallTarget::MacOsAppBundle)
+        .unwrap()
+        .backend
+        .unwrap();
+    let second_backend = second
+        .install(InstallTarget::MacOsAppBundle)
+        .unwrap()
+        .backend
+        .unwrap();
+    let first_label = launchd_label(&first_backend);
+    let second_label = launchd_label(&second_backend);
+    assert_eq!(first_label, "com.refine.daemon.4558");
+    assert_eq!(second_label, "com.refine.daemon.4559");
+    assert_ne!(first_label, second_label);
+
+    let first_plist =
+        fs::read_to_string(first_backend.service_metadata_path.as_ref().unwrap()).unwrap();
+    let second_plist =
+        fs::read_to_string(second_backend.service_metadata_path.as_ref().unwrap()).unwrap();
+    assert!(first_plist.contains("<string>com.refine.daemon.4558</string>"));
+    assert!(!first_plist.contains("<string>com.refine.daemon.4559</string>"));
+    assert!(second_plist.contains("<string>com.refine.daemon.4559</string>"));
+    assert!(!second_plist.contains("<string>com.refine.daemon.4558</string>"));
+
+    let first_commands = first
+        .control_installed_service(InstalledServiceAction::Restart)
+        .unwrap()
+        .unwrap()
+        .commands;
+    let second_commands = second
+        .control_installed_service(InstalledServiceAction::Restart)
+        .unwrap()
+        .unwrap()
+        .commands;
+    assert!(
+        first_commands
+            .iter()
+            .all(|command| !command.contains("4559"))
+    );
+    assert!(
+        second_commands
+            .iter()
+            .all(|command| !command.contains("4558"))
+    );
+    assert!(
+        first_commands
+            .iter()
+            .all(|command| command.contains("com.refine.daemon.4558"))
+    );
+    assert!(
+        second_commands
+            .iter()
+            .all(|command| command.contains("com.refine.daemon.4559"))
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn launchd_legacy_label_is_migrated_only_when_registration_path_matches() {
+    let temp_root = unique_temp_dir("installation-launchd-legacy-migration");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    let installed = service.install(InstallTarget::MacOsAppBundle).unwrap();
+    let original_backend = installed.backend.unwrap();
+    let plist_path = original_backend.service_metadata_path.as_ref().unwrap();
+    let scoped_plist = fs::read_to_string(plist_path).unwrap();
+    fs::write(
+        plist_path,
+        scoped_plist.replace(
+            "<key>Label</key><string>com.refine.daemon.4558</string>",
+            "<key>Label</key><string>com.refine.daemon</string>",
+        ),
+    )
+    .unwrap();
+
+    let repaired = service.repair().unwrap();
+    let backend = repaired.backend.unwrap();
+    assert_eq!(
+        backend.legacy_service_label.as_deref(),
+        Some("com.refine.daemon")
+    );
+    assert!(
+        fs::read_to_string(plist_path)
+            .unwrap()
+            .contains("<key>Label</key><string>com.refine.daemon.4558</string>")
+    );
+
+    let metadata_path = backend.service_metadata_path.as_deref().unwrap();
+    let mut outcomes = VecDeque::from([
+        Ok(ServiceCommandOutput::exited(
+            113,
+            "",
+            "Could not find service \"com.refine.daemon.4558\" in domain for user gui: 501",
+        )),
+        Ok(ServiceCommandOutput::exited(
+            0,
+            format!("path = {metadata_path}"),
+            "",
+        )),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+    ]);
+    let mut commands = Vec::new();
+    service
+        .control_installed_service_with(InstalledServiceAction::Start, &mut |command| {
+            commands.push(command.display());
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap();
+    let legacy_target = format!("{}/com.refine.daemon", launchctl_gui_domain());
+    let scoped_target = format!("{}/com.refine.daemon.4558", launchctl_gui_domain());
+    assert_eq!(
+        commands,
+        vec![
+            format!("'launchctl' 'print' '{scoped_target}'"),
+            format!("'launchctl' 'print' '{legacy_target}'"),
+            format!("'launchctl' 'disable' '{legacy_target}'"),
+            format!("'launchctl' 'bootout' '{legacy_target}'"),
+            format!("'launchctl' 'enable' '{scoped_target}'"),
+            format!(
+                "'launchctl' 'bootstrap' '{}' '{}'",
+                launchctl_gui_domain(),
+                metadata_path
+            ),
+        ]
+    );
+
+    let mut outcomes = VecDeque::from([
+        Ok(ServiceCommandOutput::exited(
+            113,
+            "",
+            "Could not find service \"com.refine.daemon.4558\" in domain for user gui: 501",
+        )),
+        Ok(ServiceCommandOutput::exited(
+            0,
+            "path = /Library/LaunchAgents/unrelated.plist",
+            "",
+        )),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+    ]);
+    let mut commands = Vec::new();
+    service
+        .control_installed_service_with(InstalledServiceAction::Start, &mut |command| {
+            commands.push(command.display());
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap();
+    assert!(
+        commands
+            .iter()
+            .all(|command| !command.contains(&format!("'disable' '{legacy_target}'")))
+    );
+    assert!(
+        commands
+            .iter()
+            .all(|command| !command.contains(&format!("'bootout' '{legacy_target}'")))
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn service_control_reports_systemd_and_launchd_command_failures() {
+    let temp_root = unique_temp_dir("installation-service-command-failures");
+    let runtime_root = temp_root.join("run");
+    let systemd = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+    systemd.install(InstallTarget::LinuxCliWeb).unwrap();
+    let mut systemd_commands = Vec::new();
+    let systemd_error = systemd
+        .control_installed_service_with(InstalledServiceAction::Start, &mut |command| {
+            systemd_commands.push(command.display());
+            Ok(ServiceCommandOutput::exited(
+                1,
+                "",
+                "Failed to start refine-4557.service",
+            ))
+        })
+        .unwrap_err();
+    assert_eq!(
+        systemd_commands,
+        vec!["'systemctl' '--user' 'start' 'refine-4557.service'"]
+    );
+    assert!(
+        systemd_error
+            .to_string()
+            .contains("Failed to start refine-4557.service"),
+        "{systemd_error}"
+    );
+
+    let launchd = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    launchd.install(InstallTarget::MacOsAppBundle).unwrap();
+    let mut launchd_commands = Vec::new();
+    let launchd_error = launchd
+        .control_installed_service_with(InstalledServiceAction::Start, &mut |command| {
+            launchd_commands.push(command.display());
+            if command.args.first().map(String::as_str) == Some("print") {
+                Ok(ServiceCommandOutput::success())
+            } else {
+                Ok(ServiceCommandOutput::exited(
+                    5,
+                    "",
+                    "kickstart failed: input/output error",
+                ))
+            }
+        })
+        .unwrap_err();
+    assert_eq!(launchd_commands.len(), 2);
+    assert!(launchd_commands[0].contains("'launchctl' 'print'"));
+    assert!(launchd_commands[1].contains("'launchctl' 'kickstart'"));
+    assert!(
+        launchd_error
+            .to_string()
+            .contains("kickstart failed: input/output error"),
+        "{launchd_error}"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn launchd_query_distinguishes_not_loaded_from_operational_failure() {
+    let temp_root = unique_temp_dir("installation-launchd-query");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    service.install(InstallTarget::MacOsAppBundle).unwrap();
+
+    let not_loaded = ServiceCommandOutput::exited(
+        113,
+        "",
+        "Could not find service \"com.refine.daemon\" in domain for user gui: 501",
+    );
+    let mut outcomes = VecDeque::from([
+        Ok(not_loaded),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+    ]);
+    let mut commands = Vec::new();
+    let control = service
+        .control_installed_service_with(InstalledServiceAction::Start, &mut |command| {
+            commands.push(command.display());
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(control.commands, commands);
+    assert!(commands[1].contains("'launchctl' 'enable'"));
+    assert!(commands[2].contains("'launchctl' 'bootstrap'"));
+
+    let mut commands = Vec::new();
+    let query_error = service
+        .control_installed_service_with(InstalledServiceAction::Restart, &mut |command| {
+            commands.push(command.display());
+            Ok(ServiceCommandOutput::exited(
+                1,
+                "",
+                "Operation not permitted while accessing domain",
+            ))
+        })
+        .unwrap_err();
+    assert_eq!(
+        commands.len(),
+        1,
+        "an uncertain query must not be treated as an unloaded service"
+    );
+    assert!(
+        query_error
+            .to_string()
+            .contains("Operation not permitted while accessing domain"),
+        "{query_error}"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn launchd_stop_attempts_safety_commands_and_aggregates_failures() {
+    let temp_root = unique_temp_dir("installation-launchd-stop-failures");
+    let runtime_root = temp_root.join("run");
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    service.install(InstallTarget::MacOsAppBundle).unwrap();
+
+    let mut outcomes = VecDeque::from([
+        Ok(ServiceCommandOutput::exited(
+            1,
+            "",
+            "launchd query transport failed",
+        )),
+        Ok(ServiceCommandOutput::exited(1, "", "disable denied")),
+        Ok(ServiceCommandOutput::success()),
+    ]);
+    let mut commands = Vec::new();
+    let error = service
+        .control_installed_service_with(InstalledServiceAction::Stop, &mut |command| {
+            commands.push(command.display());
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap_err();
+    assert_eq!(commands.len(), 3);
+    assert!(commands[0].contains("'launchctl' 'print'"));
+    assert!(commands[1].contains("'launchctl' 'disable'"));
+    assert!(
+        commands[2].contains("'launchctl' 'bootout'"),
+        "bootout must still run after a query or disable failure"
+    );
+    assert!(
+        error.to_string().contains("service query failed")
+            && error.to_string().contains("disable denied"),
+        "{error}"
+    );
+
+    let mut outcomes = VecDeque::from([
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::success()),
+        Ok(ServiceCommandOutput::exited(5, "", "bootout failed")),
+    ]);
+    let error = service
+        .control_installed_service_with(InstalledServiceAction::Stop, &mut |_| {
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap_err();
+    assert!(error.to_string().contains("bootout failed"), "{error}");
+
+    let mut outcomes = VecDeque::from([
+        Ok(ServiceCommandOutput::exited(
+            113,
+            "",
+            "Could not find service \"com.refine.daemon\" in domain for user gui: 501",
+        )),
+        Ok(ServiceCommandOutput::success()),
+    ]);
+    let mut commands = Vec::new();
+    let control = service
+        .control_installed_service_with(InstalledServiceAction::Stop, &mut |command| {
+            commands.push(command.display());
+            outcomes.pop_front().unwrap()
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(control.commands, commands);
+    assert_eq!(commands.len(), 2);
+    assert!(commands[1].contains("'launchctl' 'disable'"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn service_metadata_uses_deployed_binary_executable_when_launched_from_wrapper() {
     let _guard = ENV_LOCK.lock().unwrap();
     let old_mode = std::env::var("REFINE_LAUNCH_MODE").ok();
@@ -167,7 +758,7 @@ fn port_scoped_repair_can_migrate_legacy_root_install_state() {
     let temp_root = unique_temp_dir("installation-legacy-port-migration");
     let runtime_root = temp_root.join("run");
     let legacy = test_installation_service(&runtime_root, "1.0.0", &temp_root);
-    let scoped = test_installation_service_for_port(&runtime_root, "1.1.0", 8080, &temp_root);
+    let scoped = test_installation_service_for_port(&runtime_root, "1.1.0", 8082, &temp_root);
 
     legacy.install(InstallTarget::LinuxCliWeb).unwrap();
     assert!(runtime_root.join(INSTALL_STATE_FILE).exists());
@@ -175,7 +766,7 @@ fn port_scoped_repair_can_migrate_legacy_root_install_state() {
 
     let repaired = scoped.repair().unwrap();
 
-    assert_eq!(repaired.port, Some(8080));
+    assert_eq!(repaired.port, Some(8082));
     assert_eq!(repaired.version.as_deref(), Some("1.0.0"));
     assert!(scoped.path().exists());
     assert!(scoped.backend_path().exists());
@@ -191,7 +782,86 @@ fn port_scoped_repair_can_migrate_legacy_root_install_state() {
             .unwrap(),
     )
     .unwrap();
-    assert!(unit.contains("--port 8080 --runtime-root"));
+    assert!(unit.contains("--port 8082 --runtime-root"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn non_default_port_repair_does_not_claim_unscoped_legacy_registration() {
+    let temp_root = unique_temp_dir("installation-legacy-owner-isolation");
+    let runtime_root = temp_root.join("run");
+    let legacy = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+    let scoped = test_installation_service_for_port(&runtime_root, "1.1.0", 8080, &temp_root);
+
+    let legacy_status = legacy.install(InstallTarget::LinuxCliWeb).unwrap();
+    let legacy_metadata = legacy_status
+        .backend
+        .as_ref()
+        .unwrap()
+        .service_metadata_path
+        .clone()
+        .unwrap();
+    let repaired = scoped.repair().unwrap();
+
+    assert_eq!(repaired.port, Some(8080));
+    assert_eq!(repaired.version.as_deref(), Some("1.1.0"));
+    assert!(runtime_root.join(INSTALL_STATE_FILE).exists());
+    assert!(runtime_root.join(INSTALL_BACKEND_FILE).exists());
+    assert!(scoped.path().exists());
+    assert!(scoped.backend_path().exists());
+    assert_ne!(
+        repaired
+            .backend
+            .as_ref()
+            .unwrap()
+            .service_metadata_path
+            .as_deref(),
+        Some(legacy_metadata.as_str())
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn adjacent_port_does_not_claim_or_remove_legacy_systemd_registration() {
+    let temp_root = unique_temp_dir("installation-legacy-adjacent-port");
+    let runtime_root = temp_root.join("run");
+    let legacy = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+    let legacy_status = legacy.install(InstallTarget::LinuxCliWeb).unwrap();
+    let legacy_metadata = PathBuf::from(
+        legacy_status
+            .backend
+            .as_ref()
+            .unwrap()
+            .service_metadata_path
+            .as_ref()
+            .unwrap(),
+    );
+    let unit = fs::read_to_string(&legacy_metadata)
+        .unwrap()
+        .replace("--runtime-root", "--port 45570 --runtime-root");
+    fs::write(&legacy_metadata, unit).unwrap();
+
+    let adjacent = test_installation_service_for_port(&runtime_root, "2.0.0", 4557, &temp_root);
+    let adjacent_status = adjacent.repair().unwrap();
+    assert_eq!(adjacent_status.version.as_deref(), Some("2.0.0"));
+    assert!(runtime_root.join(INSTALL_STATE_FILE).exists());
+    assert!(runtime_root.join(INSTALL_BACKEND_FILE).exists());
+    assert!(legacy_metadata.exists());
+
+    adjacent.uninstall().unwrap();
+    assert!(
+        legacy_metadata.exists(),
+        "uninstalling 4557 must not remove 45570 legacy metadata"
+    );
+    assert!(runtime_root.join(INSTALL_BACKEND_FILE).exists());
+
+    let exact = test_installation_service_for_port(&runtime_root, "2.0.0", 45570, &temp_root);
+    let exact_status = exact.repair().unwrap();
+    assert_eq!(exact_status.version.as_deref(), Some("1.0.0"));
+    assert!(!runtime_root.join(INSTALL_STATE_FILE).exists());
+    assert!(!runtime_root.join(INSTALL_BACKEND_FILE).exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

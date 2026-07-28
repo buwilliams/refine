@@ -41,7 +41,7 @@ use crate::process::runner::{FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKFLOW_
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
-    DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    DaemonRuntimeService, DaemonStatus, FileDaemonLifecycleService,
 };
 use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::tools::host::quality::QualityOperationRunner;

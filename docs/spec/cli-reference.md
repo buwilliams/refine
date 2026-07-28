@@ -741,6 +741,15 @@ Continue source promotion outside the daemon process
 - `--port` (required) — Refine daemon port to stop, restart, and verify
 - `--operation-id` (required) — Durable source-promotion operation identifier
 
+### `refine system daemon-lifecycle-helper`
+
+Complete a durable daemon stop or restart outside the managed daemon service
+
+- `--action` (required) — Lifecycle action queued by the daemon
+- `--port` (required) — Refine daemon port controlled by the operation
+- `--runtime-root` (required) — Canonical runtime directory containing port-scoped lifecycle state
+- `--operation-id` (required) — Durable daemon-lifecycle operation identifier
+
 ### `refine system runner-worker`
 
 Run a supervised background worker outside the daemon process
@@ -769,7 +778,7 @@ Uninstall Refine from this machine
 
 ### `refine system start`
 
-Start the Refine daemon (background by default; --foreground or --once run it in-process)
+Start the Refine daemon (through its port-scoped systemd/launchd installation when present; command failures stay visible even when the daemon is already healthy)
 
 - `--port` — Port for the daemon to listen on
 - `--bind-address` — IP address to bind the listener to
@@ -781,14 +790,14 @@ Start the Refine daemon (background by default; --foreground or --once run it in
 
 ### `refine system stop`
 
-Stop the Refine daemon running on the given port
+Stop the Refine daemon and its port-scoped systemd/launchd service; stopped is reported only after shutdown is confirmed
 
 - `--port` — Port the daemon is listening on
 - `--runtime-root` — Runtime directory where Refine keeps daemon state
 
 ### `refine system restart`
 
-Restart the Refine daemon on the given port
+Restart the Refine daemon on the given port through its activated systemd/launchd service when present
 
 - `--port` — Port the daemon is listening on
 - `--runtime-root` — Runtime directory where Refine keeps daemon state

@@ -34,6 +34,7 @@ pub(super) fn run_website(
                 executable_path: current_launch_executable(),
                 active_operations: Vec::new(),
                 degraded_integrations: Vec::new(),
+                lifecycle_evidence: None,
             },
             projection: ProjectionSnapshot::default(),
             target_root: None,

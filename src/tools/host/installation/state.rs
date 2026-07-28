@@ -80,6 +80,7 @@ impl FileInstallationService {
         if !path.exists()
             && let Some(legacy_path) = self.legacy_path()
             && legacy_path.exists()
+            && self.legacy_registration_belongs_to_selected_port()?
         {
             path = legacy_path;
         }
@@ -105,6 +106,7 @@ impl FileInstallationService {
     }
 
     pub(super) fn save(&self, state: &InstallStateDocument) -> RefineResult<()> {
+        let migrate_legacy = self.legacy_registration_belongs_to_selected_port()?;
         let state_root = self.state_root();
         fs::create_dir_all(&state_root).map_err(|error| {
             RefineError::Io(format!(
@@ -123,6 +125,9 @@ impl FileInstallationService {
         })?;
         if let Some(legacy_path) = self.legacy_path()
             && legacy_path.exists()
+            && (migrate_legacy
+                || (self.backend_path().exists()
+                    && self.legacy_backend_path().is_none_or(|path| !path.exists())))
         {
             fs::remove_file(&legacy_path).map_err(|error| {
                 RefineError::Io(format!(
@@ -139,6 +144,7 @@ impl FileInstallationService {
         if !path.exists()
             && let Some(legacy_path) = self.legacy_backend_path()
             && legacy_path.exists()
+            && self.legacy_registration_belongs_to_selected_port()?
         {
             path = legacy_path;
         }
@@ -162,6 +168,7 @@ impl FileInstallationService {
     }
 
     pub(super) fn save_backend(&self, backend: &InstallBackendRegistration) -> RefineResult<()> {
+        let migrate_legacy = self.legacy_registration_belongs_to_selected_port()?;
         let state_root = self.state_root();
         fs::create_dir_all(&state_root).map_err(|error| {
             RefineError::Io(format!(
@@ -180,6 +187,7 @@ impl FileInstallationService {
         })?;
         if let Some(legacy_backend_path) = self.legacy_backend_path()
             && legacy_backend_path.exists()
+            && migrate_legacy
         {
             fs::remove_file(&legacy_backend_path).map_err(|error| {
                 RefineError::Io(format!(
@@ -199,13 +207,69 @@ impl FileInstallationService {
         let mut backend = backend_for_target(target, &now, self.path_inputs.clone(), self.port);
         if let Some(existing) = self.load_backend()? {
             backend.created_at = existing.created_at;
+            backend.legacy_service_label = existing.legacy_service_label.or_else(|| {
+                let path = existing.service_metadata_path?;
+                let metadata = fs::read_to_string(path).ok()?;
+                (existing.target == InstallTarget::MacOsAppBundle
+                    && metadata.contains("<key>Label</key><string>com.refine.daemon</string>")
+                    && service_control::launchd_label(&backend) != "com.refine.daemon")
+                    .then(|| "com.refine.daemon".to_string())
+            });
         }
         self.register_os_backend(&mut backend)?;
         self.save_backend(&backend)?;
         Ok(backend)
     }
 
+    fn legacy_registration_belongs_to_selected_port(&self) -> RefineResult<bool> {
+        const LEGACY_DEFAULT_PORT: u16 = 8082;
+        let Some(selected_port) = self.port else {
+            return Ok(true);
+        };
+        let Some(path) = self.legacy_backend_path() else {
+            return Ok(false);
+        };
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read legacy install backend {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let backend =
+            serde_json::from_slice::<InstallBackendRegistration>(&bytes).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse legacy install backend {}: {error}",
+                    path.display()
+                ))
+            })?;
+        if let Some(port) = backend.port {
+            return Ok(port == selected_port);
+        }
+        let Some(metadata_path) = backend.service_metadata_path.as_deref() else {
+            return Ok(false);
+        };
+        let metadata = match fs::read_to_string(metadata_path) {
+            Ok(metadata) => metadata,
+            Err(_) => return Ok(false),
+        };
+        let explicit_ports = match backend.target {
+            InstallTarget::LinuxCliWeb => systemd_exec_ports(&metadata),
+            InstallTarget::MacOsAppBundle => launchd_program_ports(&metadata),
+            InstallTarget::WindowsInstaller => Vec::new(),
+        };
+        if explicit_ports.contains(&selected_port) {
+            return Ok(true);
+        }
+        let has_any_explicit_port = !explicit_ports.is_empty();
+        Ok(selected_port == LEGACY_DEFAULT_PORT && !has_any_explicit_port)
+    }
+
     pub(super) fn unregister_backend(&self) -> RefineResult<()> {
+        let remove_legacy = self.legacy_registration_belongs_to_selected_port()?;
         if let Some(backend) = self.load_backend()?
             && let Some(path) = backend.service_metadata_path.clone()
         {
@@ -231,6 +295,7 @@ impl FileInstallationService {
         }
         if let Some(legacy_backend_path) = self.legacy_backend_path()
             && legacy_backend_path.exists()
+            && remove_legacy
         {
             fs::remove_file(&legacy_backend_path).map_err(|error| {
                 RefineError::Io(format!(
@@ -241,4 +306,88 @@ impl FileInstallationService {
         }
         Ok(())
     }
+}
+
+fn systemd_exec_ports(metadata: &str) -> Vec<u16> {
+    metadata
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("ExecStart="))
+        .flat_map(parse_systemd_exec_arguments)
+        .collect::<Vec<_>>()
+        .windows(2)
+        .filter_map(|pair| {
+            (pair[0] == "--port")
+                .then(|| pair[1].parse::<u16>().ok())
+                .flatten()
+        })
+        .chain(
+            metadata
+                .lines()
+                .filter_map(|line| line.trim().strip_prefix("ExecStart="))
+                .flat_map(parse_systemd_exec_arguments)
+                .filter_map(|argument| {
+                    argument
+                        .strip_prefix("--port=")
+                        .and_then(|port| port.parse::<u16>().ok())
+                }),
+        )
+        .collect()
+}
+
+pub(super) fn parse_systemd_exec_arguments(command: &str) -> Vec<String> {
+    let mut arguments = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    let mut escaped = false;
+    for ch in command.chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            if ch == delimiter {
+                quote = None;
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+        if matches!(ch, '\'' | '"') {
+            quote = Some(ch);
+        } else if ch.is_whitespace() {
+            if !current.is_empty() {
+                arguments.push(std::mem::take(&mut current));
+            }
+        } else {
+            current.push(ch);
+        }
+    }
+    if escaped {
+        current.push('\\');
+    }
+    if !current.is_empty() {
+        arguments.push(current);
+    }
+    arguments
+}
+
+fn launchd_program_ports(metadata: &str) -> Vec<u16> {
+    let arguments = metadata
+        .split("<string>")
+        .skip(1)
+        .filter_map(|value| value.split_once("</string>").map(|(value, _)| value.trim()))
+        .collect::<Vec<_>>();
+    arguments
+        .windows(2)
+        .filter_map(|pair| {
+            (pair[0] == "--port")
+                .then(|| pair[1].parse::<u16>().ok())
+                .flatten()
+        })
+        .collect()
 }

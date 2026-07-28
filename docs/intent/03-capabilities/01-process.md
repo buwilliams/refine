@@ -42,6 +42,28 @@ Current implementation details that matter to intent:
   input, resize, attention, and lifecycle state, so CLI and browser attachments
   observe the same process.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
+- one shared host daemon-lifecycle capability selects port-scoped systemd or
+  launchd control versus supervised direct-process fallback from the selected
+  runtime and installation context. CLI, HTTP/API, Desktop, update, and
+  maintenance callers submit lifecycle intent without owning parallel
+  reachability, confirmation, evidence, recovery, or legacy-migration state
+  machines. Work initiated inside the managed daemon that must stop or restart
+  it first persists its operation receipt and moves execution into a separate
+  systemd transient service, launchd submitted job, or detached direct-process
+  session. The handoff then records the same observed lifecycle status,
+  evidence, failure, and recovery guidance as synchronous host callers. Source
+  promotion durably backs up and replaces an activated service registration
+  with the built candidate before shutdown. If candidate verification fails,
+  rollback retains the backup until the prior registration is restored and
+  verified, forcibly replaces the live candidate through the shared
+  service-manager restart path, and fresh-probes reachability and live
+  executable identity. It records success only when the registered and live
+  executables both resolve to the prior binary; command failures, a surviving
+  candidate, and indeterminate identity remain explicit partial evidence with
+  actionable recovery. Promotion success likewise requires the live daemon to
+  identify the candidate executable.
+  Direct fallback shutdown retains signal errors and uses a fresh tri-state
+  reachability probe; only observed non-reachability is persisted as stopped.
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
   capability, including Workflow claim settlement, rather than splitting

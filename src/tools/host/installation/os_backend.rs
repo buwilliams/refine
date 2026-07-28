@@ -1,5 +1,65 @@
 use super::*;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct ServiceCommandOutput {
+    pub(super) exit_code: Option<i32>,
+    pub(super) stdout: String,
+    pub(super) stderr: String,
+}
+
+impl ServiceCommandOutput {
+    #[cfg(test)]
+    pub(super) fn success() -> Self {
+        Self {
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn exited(
+        exit_code: i32,
+        stdout: impl Into<String>,
+        stderr: impl Into<String>,
+    ) -> Self {
+        Self {
+            exit_code: Some(exit_code),
+            stdout: stdout.into(),
+            stderr: stderr.into(),
+        }
+    }
+
+    pub(super) fn succeeded(&self) -> bool {
+        self.exit_code == Some(0)
+    }
+
+    pub(super) fn failure_detail(&self) -> String {
+        let stderr = self.stderr.trim();
+        let stdout = self.stdout.trim();
+        if !stderr.is_empty() {
+            stderr.to_string()
+        } else if !stdout.is_empty() {
+            stdout.to_string()
+        } else {
+            format!(
+                "exited with {}",
+                self.exit_code
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "unknown status".to_string())
+            )
+        }
+    }
+
+    pub(super) fn require_success(self) -> Result<(), String> {
+        if self.succeeded() {
+            Ok(())
+        } else {
+            Err(self.failure_detail())
+        }
+    }
+}
+
 impl FileInstallationService {
     pub(super) fn register_os_backend(
         &self,
@@ -109,18 +169,28 @@ impl FileInstallationService {
         &self,
         backend: &InstallBackendRegistration,
     ) -> RefineResult<String> {
+        let executable = PathBuf::from(daemon_executable_string()?);
+        self.service_metadata_for_executable(backend, &executable)
+    }
+
+    pub(super) fn service_metadata_for_executable(
+        &self,
+        backend: &InstallBackendRegistration,
+        executable: &std::path::Path,
+    ) -> RefineResult<String> {
         match backend.target {
-            InstallTarget::LinuxCliWeb => self.systemd_user_unit(backend),
-            InstallTarget::MacOsAppBundle => self.launchd_plist(backend),
-            InstallTarget::WindowsInstaller => self.windows_service_manifest(backend),
+            InstallTarget::LinuxCliWeb => self.systemd_user_unit(backend, executable),
+            InstallTarget::MacOsAppBundle => self.launchd_plist(backend, executable),
+            InstallTarget::WindowsInstaller => self.windows_service_manifest(backend, executable),
         }
     }
 
     pub(super) fn systemd_user_unit(
         &self,
         backend: &InstallBackendRegistration,
+        executable: &std::path::Path,
     ) -> RefineResult<String> {
-        let exe = daemon_executable_string()?;
+        let exe = executable.display().to_string();
         let logs_dir = backend.logs_dir.as_deref().unwrap_or(".");
         let port_args = backend
             .port
@@ -140,23 +210,34 @@ impl FileInstallationService {
     pub(super) fn launchd_plist(
         &self,
         backend: &InstallBackendRegistration,
+        executable: &std::path::Path,
     ) -> RefineResult<String> {
-        let exe = xml_escape(&daemon_executable_string()?);
+        let exe = xml_escape(&executable.display().to_string());
         let runtime_root = xml_escape(&self.runtime_root.display().to_string());
         let logs_dir = xml_escape(backend.logs_dir.as_deref().unwrap_or("."));
+        let label = xml_escape(&service_control::launchd_label(backend));
+        let port_arguments = backend
+            .port
+            .map(|port| {
+                format!(
+                    "    <string>--port</string>\n    <string>{}</string>\n",
+                    xml_escape(&port.to_string())
+                )
+            })
+            .unwrap_or_default();
         Ok(format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.refine.daemon</string>
+  <key>Label</key><string>{label}</string>
   <key>ProgramArguments</key>
   <array>
     <string>{exe}</string>
     <string>system</string>
     <string>start</string>
     <string>--foreground</string>
-    <string>--runtime-root</string>
+{port_arguments}    <string>--runtime-root</string>
     <string>{runtime_root}</string>
   </array>
   <key>RunAtLoad</key><true/>
@@ -172,11 +253,12 @@ impl FileInstallationService {
     pub(super) fn windows_service_manifest(
         &self,
         backend: &InstallBackendRegistration,
+        executable: &std::path::Path,
     ) -> RefineResult<String> {
         let manifest = serde_json::json!({
             "service_name": "Refine",
             "display_name": "Refine daemon",
-            "executable": daemon_executable_string()?,
+            "executable": executable.display().to_string(),
             "arguments": ["system", "start", "--foreground", "--runtime-root", self.runtime_root.display().to_string()],
             "app_support_dir": backend.app_support_dir,
             "logs_dir": backend.logs_dir,
@@ -198,10 +280,17 @@ impl FileInstallationService {
     }
 
     pub(super) fn run_service_command(&self, command: &ServiceCommand) -> Result<(), String> {
+        self.execute_service_command(command)?.require_success()
+    }
+
+    pub(super) fn execute_service_command(
+        &self,
+        command: &ServiceCommand,
+    ) -> Result<ServiceCommandOutput, String> {
         #[cfg(test)]
         {
             let _ = command;
-            Ok(())
+            Ok(ServiceCommandOutput::success())
         }
 
         #[cfg(not(test))]
@@ -220,24 +309,11 @@ impl FileInstallationService {
                     metadata: Default::default(),
                 })
                 .map_err(|error| error.to_string())?;
-            if output.success() {
-                return Ok(());
-            }
-            let stderr = output.stderr.trim().to_string();
-            let stdout = output.stdout.trim().to_string();
-            let detail = if stderr.is_empty() { stdout } else { stderr };
-            if detail.is_empty() {
-                Err(format!(
-                    "exited with {}",
-                    output
-                        .process
-                        .exit_code
-                        .map(|code| code.to_string())
-                        .unwrap_or_else(|| "unknown".to_string())
-                ))
-            } else {
-                Err(detail)
-            }
+            Ok(ServiceCommandOutput {
+                exit_code: output.process.exit_code,
+                stdout: output.stdout,
+                stderr: output.stderr,
+            })
         }
     }
 }

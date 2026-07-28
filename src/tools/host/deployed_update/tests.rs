@@ -83,6 +83,7 @@ impl DeployedUpdateHost for FakeUpdateHost {
             executable_path: Some("/tmp/refine/bin/refine".to_string()),
             active_operations: Vec::new(),
             degraded_integrations: Vec::new(),
+            lifecycle_evidence: None,
         })
     }
 }

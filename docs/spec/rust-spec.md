@@ -151,7 +151,21 @@ single-request, static-asset, cache, runtime-root, and port options needed by
 development, tests, installers, and service managers. There should not be a
 separate public `refine system web` command. Service metadata and daemon
 bootstrap paths should use `refine system start --foreground` when they need a
-long-running foreground process.
+long-running foreground process. The shared host daemon-lifecycle capability
+detects an activated port-scoped systemd or launchd installation and delegates
+start, stop, and restart to that service manager so Refine's runtime state and
+the native service remain synchronized. CLI, HTTP/API, Desktop, update, and
+maintenance surfaces are thin callers of this same authority. A
+service-manager command failure remains an
+operation failure even when an authoritative probe says the daemon is healthy,
+and stop persists `stopped` only after authoritative non-reachability. launchd
+labels and control targets include the installation port. An unscoped legacy
+registration may be migrated only when its metadata proves that it belongs to
+the selected port and installation through exact parsed arguments; textual
+substring matches, including adjacent ports, are not ownership evidence.
+launchd mutation additionally requires its reported plist path to match.
+Foreground and single-request starts bypass this delegation because they are
+service-manager and test bootstrap paths.
 
 ## System Model
 
@@ -530,6 +544,10 @@ Requirements:
 - Detect and report stale, partial, or conflicting installs.
 - Support rollback when an update fails before state migration completes.
 - Preserve user data and target-app state across upgrades.
+- Derive one exact port-scoped installation context from the selected runtime
+  for CLI and HTTP/API install, repair, update, rollback, uninstall, and
+  lifecycle operations. Never create or control global `refine.service` or
+  `com.refine.daemon` registrations for a port-scoped request.
 
 Source/dogfood promotion is a separate update channel owned by
 `tools::host::source_promotion`; it must not change the published-release
@@ -568,7 +586,10 @@ OS backends:
 
 ### Daemon Lifecycle
 
-Module: `tools::supervisor::lifecycle`; path: `src/tools/supervisor/lifecycle/`.
+Authoritative host orchestration: `tools::host::daemon_lifecycle`; path:
+`src/tools/host/daemon_lifecycle/`. Direct runtime/process primitives:
+`process::supervisor::lifecycle`; path:
+`src/process/supervisor/lifecycle/`.
 
 Owns abstractions for: start, stop, restart, status, health, recover.
 
@@ -584,11 +605,46 @@ Requirements:
 - Foreground daemon execution is a lifecycle option for service managers,
   tests, and development, not a separate daemon mode.
 - Status distinguishes daemon health, web availability, worker state, target-app
-  state, active operations, and degraded integrations.
+  state, active operations, and degraded integrations. The optional durable
+  `lifecycle_evidence` record contains `action`, `service_manager`, `outcome`,
+  `command_error`, `readiness_error`, nullable `observed_reachable`, and
+  `recovery`, allowing command or readiness failure evidence to coexist with
+  authoritative observed health. Managed control failures always trigger a
+  fresh reachability observation: reachable and unreachable are persisted as
+  such, while probe errors or timeouts persist unknown reachability and fail
+  closed. Start and restart retain their requested action in success, command
+  failure, readiness evidence, recovery guidance, and failure logs.
 - Restart preserves attached app selection and running operation records.
 - Crash recovery reconciles persisted state with OS process reality.
 - Stop terminates or detaches managed processes according to their ownership
-  policy.
+  policy. Service-managed stop keeps observed active state and recovery evidence
+  on command failure or shutdown timeout and marks stopped only after shutdown
+  confirmation. Registered-but-inactive installations route to direct runtime
+  control; terminate and kill failures remain actionable, every attempt ends
+  with a fresh reachable, unreachable, or unknown probe, and restart cannot
+  launch until that stop settlement succeeds.
+- Surface callers never select service-manager versus direct semantics or
+  implement reachability and evidence handling. The host lifecycle authority
+  composes the port-scoped installation service with the direct runtime
+  primitive and owns that decision once.
+- HTTP stop and restart persist and return a port-scoped operation receipt
+  before daemon termination. A restart-safe helper outside the daemon's systemd
+  control group or launchd job owns control, authoritative post-control probes,
+  and durable settlement. Reconciliation returns the same `DaemonStatus` and
+  `lifecycle_evidence` contract as synchronous CLI, Desktop, update, and
+  maintenance callers.
+- Source promotion prepares an activated systemd or launchd registration with
+  the preserved built candidate before stopping the daemon. The previous
+  registration is durably backed up and retained until rollback settles. After
+  a candidate restart or identity failure, rollback restores and verifies the
+  prior registration, forces a service-manager restart, then fresh-probes
+  reachability and `/system/version`. `rollback_succeeded` is true only when
+  source restoration, registration identity, restart, reachability, and prior
+  live executable identity all settle; restart errors, a surviving candidate,
+  and unknown identity retain structured partial evidence and recovery.
+  Promotion success requires the live `/system/version` executable identity to
+  resolve to the candidate path; checkout `HEAD` plus HTTP reachability is
+  insufficient.
 
 ### Surface Events
 
@@ -1045,6 +1101,7 @@ refine/
         imports/
         nodes/
       host/
+        daemon_lifecycle/
         installation/
         process_supervision/
         target_apps/

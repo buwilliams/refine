@@ -21,11 +21,17 @@ use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor, managed_pid_is_alive,
 };
-use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::process::supervisor::lifecycle::{
+    DaemonReachability, DaemonRuntimeService, FileDaemonLifecycleService,
+};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::daemon_lifecycle::{
+    run_service_managed_daemon_with, stop_service_managed_daemon_with,
+};
+use crate::tools::host::installation::InstalledServiceAction;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::activity::ActivityService;
 use crate::tools::observability::activity::FileActivityService;

@@ -58,6 +58,17 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert_eq!(install.status, 200);
     assert_eq!(install.body["install"]["installed"], true);
     assert_eq!(install.body["install"]["target"], "linux_cli_web");
+    assert_eq!(install.body["install"]["port"], 8080);
+    assert!(
+        install.body["install"]["backend"]["service_metadata_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("refine-8080.service")
+    );
+    assert!(
+        !temp_root.join("run/install-state.json").exists(),
+        "HTTP installation must not create an unscoped install record"
+    );
 
     let install_status = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -66,6 +77,21 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     });
     assert_eq!(install_status.status, 200);
     assert_eq!(install_status.body["install"]["installed"], true);
+    assert_eq!(install_status.body["install"]["port"], 8080);
+
+    let repair = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/system/repair".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(repair.status, 200);
+    assert_eq!(repair.body["install"]["port"], 8080);
+    assert!(
+        repair.body["install"]["backend"]["service_metadata_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("refine-8080.service")
+    );
 
     let update = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -187,6 +213,155 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("SSE chat event"));
 
     remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn http_lifecycle_routes_preserve_shared_status_and_evidence_for_every_action() {
+    #[derive(Default)]
+    struct RecordingLifecycle {
+        actions: std::cell::RefCell<Vec<&'static str>>,
+    }
+
+    impl crate::tools::host::daemon_lifecycle::HostDaemonLifecycleService for RecordingLifecycle {
+        fn start(
+            &self,
+            config: crate::process::supervisor::lifecycle::BackgroundDaemonConfig,
+        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+            self.actions.borrow_mut().push("start");
+            Ok(http_lifecycle_status(config.port, "start"))
+        }
+
+        fn stop(
+            &self,
+            port: u16,
+        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+            self.actions.borrow_mut().push("stop");
+            Ok(http_lifecycle_status(port, "stop"))
+        }
+
+        fn restart(
+            &self,
+            config: crate::process::supervisor::lifecycle::BackgroundDaemonConfig,
+        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+            self.actions.borrow_mut().push("restart");
+            Ok(http_lifecycle_status(config.port, "restart"))
+        }
+    }
+
+    let server = server_with_projection();
+    let lifecycle = RecordingLifecycle::default();
+    for (action, expected) in [
+        (
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Start,
+            "start",
+        ),
+        (
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Stop,
+            "stop",
+        ),
+        (
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Restart,
+            "restart",
+        ),
+    ] {
+        let response = server.handle_daemon_lifecycle_with(action, &lifecycle);
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body["status"]["port"], 8080);
+        assert_eq!(response.body["status"]["worker_state"], expected);
+        assert_eq!(
+            response.body["status"]["lifecycle_evidence"]["action"],
+            expected
+        );
+        assert_eq!(
+            response.body["status"]["lifecycle_evidence"]["outcome"],
+            format!("{expected}_shared")
+        );
+    }
+    assert_eq!(
+        lifecycle.actions.into_inner(),
+        vec!["start", "stop", "restart"]
+    );
+}
+
+#[test]
+fn http_stop_and_restart_return_durable_receipts_before_control_handoff() {
+    #[derive(Default)]
+    struct RecordingHandoff {
+        actions: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl crate::tools::host::daemon_lifecycle::RestartSafeHandoffLauncher for RecordingHandoff {
+        fn launch(
+            &self,
+            handoff: &crate::tools::host::daemon_lifecycle::RestartSafeHandoff,
+            service_manager: Option<&str>,
+        ) -> RefineResult<()> {
+            assert_eq!(service_manager, Some("systemd_user"));
+            self.actions.borrow_mut().push(handoff.args[3].clone());
+            Ok(())
+        }
+    }
+
+    let temp_root = unique_temp_dir("http-lifecycle-handoff");
+    let mut server = server_with_projection();
+    server.runtime_root = Some(temp_root.join("run/8080"));
+    let handoff = RecordingHandoff::default();
+
+    for (action, expected) in [
+        (
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Stop,
+            "stop",
+        ),
+        (
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Restart,
+            "restart",
+        ),
+    ] {
+        let response = server.handle_daemon_lifecycle_handoff_with(
+            action,
+            Path::new("/mock/refine"),
+            Some("systemd_user"),
+            &handoff,
+        );
+        assert_eq!(response.status, 202);
+        assert_eq!(response.body["operation"]["action"], expected);
+        assert_eq!(response.body["operation"]["status"], "queued");
+        let operation_id = response.body["operation"]["id"].as_str().unwrap();
+        let reconciled = server.handle_daemon_lifecycle_operation(operation_id);
+        assert_eq!(reconciled.status, 200);
+        assert_eq!(reconciled.body["operation"], response.body["operation"]);
+    }
+    assert_eq!(handoff.actions.into_inner(), vec!["stop", "restart"]);
+
+    remove_temp_dir(&temp_root);
+}
+
+fn http_lifecycle_status(
+    port: u16,
+    action: &str,
+) -> crate::process::supervisor::lifecycle::DaemonStatus {
+    crate::process::supervisor::lifecycle::DaemonStatus {
+        port,
+        daemon_healthy: action != "stop",
+        web_available: action != "stop",
+        worker_state: action.to_string(),
+        target_app_state: "detached".to_string(),
+        launch_mode: "test".to_string(),
+        executable_path: None,
+        active_operations: Vec::new(),
+        degraded_integrations: Vec::new(),
+        lifecycle_evidence: Some(
+            crate::process::supervisor::lifecycle::DaemonLifecycleEvidence {
+                action: action.to_string(),
+                service_manager: "test".to_string(),
+                outcome: format!("{action}_shared"),
+                command_error: None,
+                readiness_error: None,
+                observed_reachable: Some(action != "stop"),
+                recovery: None,
+            },
+        ),
+    }
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -31,6 +31,30 @@ pub struct DaemonStatus {
     pub executable_path: Option<String>,
     pub active_operations: Vec<String>,
     pub degraded_integrations: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifecycle_evidence: Option<DaemonLifecycleEvidence>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DaemonLifecycleEvidence {
+    pub action: String,
+    pub service_manager: String,
+    pub outcome: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readiness_error: Option<String>,
+    #[serde(default)]
+    pub observed_reachable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DaemonReachability {
+    Reachable,
+    Unreachable(String),
+    Unknown(String),
 }
 
 #[derive(Clone, Debug)]
@@ -52,10 +76,12 @@ impl Default for BackgroundDaemonConfig {
     }
 }
 
-pub trait DaemonLifecycleService {
-    fn start(&self, port: u16) -> RefineResult<DaemonStatus>;
-    fn stop(&self, port: u16) -> RefineResult<DaemonStatus>;
-    fn restart(&self, port: u16) -> RefineResult<DaemonStatus>;
+/// Direct port-runtime primitives used by the host lifecycle authority.
+///
+/// This layer never chooses installed service-manager semantics and is not a
+/// surface lifecycle API.
+pub trait DaemonRuntimeService {
+    fn stop_runtime(&self, port: u16) -> RefineResult<DaemonStatus>;
     fn status(&self, port: u16) -> RefineResult<DaemonStatus>;
     fn health(&self, port: u16) -> RefineResult<DaemonStatus>;
     fn recover(&self, port: u16) -> RefineResult<DaemonStatus>;
@@ -315,6 +341,7 @@ impl FileDaemonLifecycleService {
         status.web_available = false;
         status.worker_state = "starting".to_string();
         status.active_operations.clear();
+        status.lifecycle_evidence = None;
         self.write_status(&status)?;
         Ok(status)
     }
@@ -324,6 +351,7 @@ impl FileDaemonLifecycleService {
         status.daemon_healthy = false;
         status.web_available = false;
         status.worker_state = "starting".to_string();
+        status.lifecycle_evidence = None;
         self.write_status(&status)?;
         Ok(status)
     }
@@ -332,11 +360,59 @@ impl FileDaemonLifecycleService {
         status.daemon_healthy = true;
         status.web_available = true;
         status.worker_state = "idle".to_string();
+        status.lifecycle_evidence = None;
+        self.write_status(&status)?;
+        Ok(status)
+    }
+
+    /// Persist the readiness established by an authoritative daemon probe.
+    ///
+    /// An idempotent service-manager start may not restart the daemon, so the
+    /// foreground startup path has no opportunity to replace stale lifecycle
+    /// state. Preserve unrelated degradation and operation evidence while
+    /// discarding failures from superseded startup attempts.
+    pub fn mark_observed_ready(&self, port: u16) -> RefineResult<DaemonStatus> {
+        self.mark_observed_ready_with_evidence(port, None)
+    }
+
+    pub fn mark_observed_ready_with_evidence(
+        &self,
+        port: u16,
+        evidence: Option<DaemonLifecycleEvidence>,
+    ) -> RefineResult<DaemonStatus> {
+        let mut status = self
+            .read_status(port)
+            .unwrap_or_else(|_| running_status(port));
+        status.degraded_integrations.retain(|detail| {
+            !detail.starts_with("startup-failed:") && !detail.starts_with("restart-failed:")
+        });
+        status.daemon_healthy = true;
+        status.web_available = true;
+        status.worker_state = "idle".to_string();
+        status.lifecycle_evidence = evidence;
         self.write_status(&status)?;
         Ok(status)
     }
 
     pub fn mark_start_failed(&self, port: u16, error: &RefineError) -> RefineResult<DaemonStatus> {
+        self.mark_start_failed_with_evidence(port, error, None)
+    }
+
+    pub fn mark_start_failed_with_evidence(
+        &self,
+        port: u16,
+        error: &RefineError,
+        evidence: Option<DaemonLifecycleEvidence>,
+    ) -> RefineResult<DaemonStatus> {
+        self.mark_observed_failed_with_evidence(port, format!("startup-failed:{error}"), evidence)
+    }
+
+    pub fn mark_observed_failed_with_evidence(
+        &self,
+        port: u16,
+        degradation: String,
+        evidence: Option<DaemonLifecycleEvidence>,
+    ) -> RefineResult<DaemonStatus> {
         let mut status = self
             .read_status(port)
             .unwrap_or_else(|_| stopped_status(port, Vec::new()));
@@ -344,20 +420,61 @@ impl FileDaemonLifecycleService {
         status.web_available = false;
         status.worker_state = "failed".to_string();
         status.active_operations.clear();
-        status
-            .degraded_integrations
-            .push(format!("startup-failed:{error}"));
+        status.degraded_integrations.push(degradation);
+        status.lifecycle_evidence = evidence;
+        self.write_status(&status)?;
+        Ok(status)
+    }
+
+    pub fn mark_observed_stopped(
+        &self,
+        port: u16,
+        evidence: Option<DaemonLifecycleEvidence>,
+    ) -> RefineResult<DaemonStatus> {
+        let mut status = self
+            .read_status(port)
+            .unwrap_or_else(|_| stopped_status(port, Vec::new()));
+        status.daemon_healthy = false;
+        status.web_available = false;
+        status.worker_state = "stopped".to_string();
+        status.active_operations.clear();
+        status.lifecycle_evidence = evidence;
         self.write_status(&status)?;
         Ok(status)
     }
 }
 
 pub fn http_probe(port: u16) -> RefineResult<()> {
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
-        RefineError::Io(format!(
-            "daemon is not reachable on 127.0.0.1:{port}: {error}"
-        ))
-    })?;
+    match http_reachability_probe(port) {
+        DaemonReachability::Reachable => Ok(()),
+        DaemonReachability::Unreachable(detail) | DaemonReachability::Unknown(detail) => {
+            Err(RefineError::Io(detail))
+        }
+    }
+}
+
+pub fn http_reachability_probe(port: u16) -> DaemonReachability {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    let mut stream = match TcpStream::connect_timeout(&address, Duration::from_secs(1)) {
+        Ok(stream) => stream,
+        Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+            return DaemonReachability::Unreachable(format!(
+                "daemon is not reachable on 127.0.0.1:{port}: {error}"
+            ));
+        }
+        Err(error) => {
+            return DaemonReachability::Unknown(format!(
+                "daemon reachability probe failed on 127.0.0.1:{port}: {error}"
+            ));
+        }
+    };
+    match probe_connected_daemon(&mut stream, port) {
+        Ok(()) => DaemonReachability::Reachable,
+        Err(error) => DaemonReachability::Unknown(error.to_string()),
+    }
+}
+
+fn probe_connected_daemon(stream: &mut TcpStream, port: u16) -> RefineResult<()> {
     stream
         .set_read_timeout(Some(Duration::from_secs(1)))
         .map_err(|error| RefineError::Io(format!("failed to set daemon probe timeout: {error}")))?;
@@ -406,12 +523,8 @@ fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) {
     }
 }
 
-impl DaemonLifecycleService for FileDaemonLifecycleService {
-    fn start(&self, port: u16) -> RefineResult<DaemonStatus> {
-        self.recover(port)
-    }
-
-    fn stop(&self, port: u16) -> RefineResult<DaemonStatus> {
+impl DaemonRuntimeService for FileDaemonLifecycleService {
+    fn stop_runtime(&self, port: u16) -> RefineResult<DaemonStatus> {
         let supervisor = FileProcessSupervisor::new(self.runtime_root.port_root(port));
         let processes = supervisor.list()?;
         for process in processes
@@ -446,13 +559,9 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
         status.web_available = false;
         status.worker_state = "stopped".to_string();
         status.active_operations.clear();
+        status.lifecycle_evidence = None;
         self.write_status(&status)?;
         Ok(status)
-    }
-
-    fn restart(&self, port: u16) -> RefineResult<DaemonStatus> {
-        let _ = self.stop(port)?;
-        self.start(port)
     }
 
     fn status(&self, port: u16) -> RefineResult<DaemonStatus> {
@@ -487,6 +596,7 @@ pub fn running_status(port: u16) -> DaemonStatus {
         executable_path: current_launch_executable(),
         active_operations: Vec::new(),
         degraded_integrations: Vec::new(),
+        lifecycle_evidence: None,
     }
 }
 
@@ -501,6 +611,7 @@ pub fn stopped_status(port: u16, degraded_integrations: Vec<String>) -> DaemonSt
         executable_path: current_launch_executable(),
         active_operations: Vec::new(),
         degraded_integrations,
+        lifecycle_evidence: None,
     }
 }
 

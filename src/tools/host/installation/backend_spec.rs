@@ -84,6 +84,7 @@ pub(super) fn backend_for_target(
         activation_commands: Vec::new(),
         deactivation_commands: Vec::new(),
         activation_error: None,
+        legacy_service_label: None,
         created_at: timestamp.to_string(),
         updated_at: timestamp.to_string(),
         notes,
@@ -134,12 +135,6 @@ impl ServiceCommand {
 pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<ServiceCommand> {
     match backend.target {
         InstallTarget::LinuxCliWeb => {
-            let unit = backend
-                .service_metadata_path
-                .as_deref()
-                .and_then(|path| PathBuf::from(path).file_name().map(|name| name.to_owned()))
-                .and_then(|name| name.to_str().map(str::to_string))
-                .unwrap_or_else(|| "refine.service".to_string());
             vec![
                 ServiceCommand::new(
                     "systemctl",
@@ -151,7 +146,7 @@ pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<S
                         "--user".to_string(),
                         "enable".to_string(),
                         "--now".to_string(),
-                        unit,
+                        service_control::systemd_unit_name(backend),
                     ],
                 ),
             ]
@@ -160,15 +155,16 @@ pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<S
             let Some(plist) = backend.service_metadata_path.clone() else {
                 return Vec::new();
             };
-            let domain = launchctl_gui_domain();
+            let target = format!(
+                "{}/{}",
+                launchctl_gui_domain(),
+                service_control::launchd_label(backend)
+            );
             vec![
+                ServiceCommand::new("launchctl", vec!["enable".to_string(), target]),
                 ServiceCommand::new(
                     "launchctl",
-                    vec!["bootstrap".to_string(), domain.clone(), plist],
-                ),
-                ServiceCommand::new(
-                    "launchctl",
-                    vec!["enable".to_string(), format!("{domain}/com.refine.daemon")],
+                    vec!["bootstrap".to_string(), launchctl_gui_domain(), plist],
                 ),
             ]
         }
@@ -179,12 +175,6 @@ pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<S
 pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec<ServiceCommand> {
     match backend.target {
         InstallTarget::LinuxCliWeb => {
-            let unit = backend
-                .service_metadata_path
-                .as_deref()
-                .and_then(|path| PathBuf::from(path).file_name().map(|name| name.to_owned()))
-                .and_then(|name| name.to_str().map(str::to_string))
-                .unwrap_or_else(|| "refine.service".to_string());
             vec![
                 ServiceCommand::new(
                     "systemctl",
@@ -192,7 +182,7 @@ pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec
                         "--user".to_string(),
                         "disable".to_string(),
                         "--now".to_string(),
-                        unit,
+                        service_control::systemd_unit_name(backend),
                     ],
                 ),
                 ServiceCommand::new(
@@ -205,10 +195,18 @@ pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec
             let Some(plist) = backend.service_metadata_path.clone() else {
                 return Vec::new();
             };
-            vec![ServiceCommand::new(
-                "launchctl",
-                vec!["bootout".to_string(), launchctl_gui_domain(), plist],
-            )]
+            let target = format!(
+                "{}/{}",
+                launchctl_gui_domain(),
+                service_control::launchd_label(backend)
+            );
+            vec![
+                ServiceCommand::new("launchctl", vec!["disable".to_string(), target]),
+                ServiceCommand::new(
+                    "launchctl",
+                    vec!["bootout".to_string(), launchctl_gui_domain(), plist],
+                ),
+            ]
         }
         InstallTarget::WindowsInstaller => Vec::new(),
     }
