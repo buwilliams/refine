@@ -4,7 +4,8 @@
 
 Design specification for the v5 browser and desktop experience. It depends on
 [`model.md`](model.md) and is implemented according to [`code.md`](code.md).
-The CLI equivalent is [`cli-surface.md`](cli-surface.md).
+The CLI equivalent is [`cli-surface.md`](cli-surface.md); concrete refactor and
+local-editor gates are in [`refactor.md`](refactor.md).
 
 ## Decision
 
@@ -255,7 +256,7 @@ Project detail contains:
 ```text
 Header
 ├── Project identity, ownership, and projected rollup
-├── edit, transfer, and archive actions
+├── edit, transfer, cancel, and archive actions
 └── attention indicators
 
 Overview

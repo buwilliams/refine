@@ -5,12 +5,14 @@
 Design specification and implementation target for Refine v5. This document is
 not a description of the current v4 model.
 
-This is one of four coordinated specifications:
+This is one of five coordinated specifications:
 
 - [`model.md`](model.md) defines the domain model and invariants.
 - [`cli-surface.md`](cli-surface.md) defines the command-line contract.
 - [`browser-surface.md`](browser-surface.md) defines the browser/desktop UX.
 - [`code.md`](code.md) defines the implementation architecture and rollout.
+- [`refactor.md`](refactor.md) closes codecs, migration, parity, and checkpoint
+  details required for implementation.
 
 Where these documents disagree, the model and authority boundaries in this
 document win; surface ergonomics do not override shared semantics.
@@ -163,8 +165,12 @@ exist without a Project.
 
 Project rollups are projections from member Jobs. A Project does not directly
 claim steps, run a Workflow, or acquire execution authority. Transferring a
-Project between Nodes transfers its mutable member Jobs using the same fenced,
-reviewable aggregate operation as the current Feature transfer.
+Project between Nodes transfers all member Jobs after refusing active fenced
+work, using the same reviewable aggregate operation as the current Feature
+transfer.
+
+Cancelling a Project is a system-owned cascade over eligible non-terminal Jobs.
+It retains the Project, Jobs, Job Revisions, executions, and evidence.
 
 ## Domain Workflow
 
@@ -194,6 +200,7 @@ contains or pins:
 
 - workflow schema version;
 - compatible Job type and property schema;
+- optional Project type and property schema;
 - start step;
 - Step Definitions;
 - Transition Definitions and guards;
@@ -258,12 +265,20 @@ A **Transition Definition** connects one step outcome to another step.
 {
   "from": "diagnose",
   "outcome": "diagnosis_complete",
-  "guard": "$.output.confidence >= 0.8",
+  "guard": {
+    "op": "gte",
+    "left": {
+      "path": "attempt.output.confidence_percent"
+    },
+    "right": {
+      "value": 80
+    }
+  },
   "to": "plan",
   "job_patch": [
     {
-      "from": "$.output.severity",
-      "to": "$.job.properties.severity"
+      "from": "attempt.output.severity",
+      "to": "job.properties.severity"
     }
   ]
 }
@@ -273,7 +288,7 @@ Transition evaluation is deterministic:
 
 1. validate the step output;
 2. select transitions matching the declared outcome;
-3. evaluate guards in stable definition order;
+3. evaluate guards in stable priority and transition-ID order;
 4. require exactly one matching transition unless the step explicitly fans out;
 5. validate any durable Job property patch;
 6. atomically settle the attempt and create the next activation(s).

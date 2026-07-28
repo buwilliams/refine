@@ -7,7 +7,9 @@ translates the contracts in:
 
 - [`model.md`](model.md);
 - [`cli-surface.md`](cli-surface.md);
-- [`browser-surface.md`](browser-surface.md).
+- [`browser-surface.md`](browser-surface.md);
+- [`refactor.md`](refactor.md), which fixes the concrete codec, compatibility,
+  migration, parity, and checkpoint choices used during implementation.
 
 It is a design for the `next` branch, not a claim about current `main`.
 
@@ -73,6 +75,10 @@ Rules:
 5. Product services own durable aggregate mutation.
 6. The process substrate owns OS observation and cancellation.
 7. Git sync owns durable publication, not runtime locking.
+8. Registered actions perform one bounded mechanism and never select or invoke
+   the next workflow action.
+9. Schema-3 runtime and surfaces never branch on a Workflow ID or domain Step
+   ID; the built-in software-delivery procedure exists only as Workflow data.
 
 ## Proposed Source Organization
 
@@ -261,6 +267,8 @@ trait ProjectService {
         -> Result<ProjectDetail>;
     fn transfer(&self, request: TransferProjectRequest)
         -> Result<ProjectTransferReceipt>;
+    fn cancel(&self, request: CancelProjectRequest)
+        -> Result<ProjectCancellationReceipt>;
 }
 ```
 
@@ -423,8 +431,9 @@ The compiler accepts only a Workflow candidate with:
    versions.
 3. **Validate schemas** and step input/output mappings.
 4. **Compile guards** into a bounded typed expression AST.
-5. **Build graph** and validate start, reachability, terminal paths, cycles,
-   fan-out, joins, and subworkflow recursion.
+5. **Build graph**; validate start, reachability, terminal paths, bounded
+   fan-out, and joins; reject definition-version-1 cycles and subworkflow
+   recursion.
 6. **Check effects** against grants, Node eligibility, idempotency, recovery,
    and human-gate policy.
 7. **Check data flow** for required values and illegal writes across scopes.
@@ -440,17 +449,16 @@ same compiled output and diagnostics.
 The first guard language supports:
 
 - JSON scalar access through declared paths;
-- equality/ordering;
-- boolean operations;
+- strict-type equality and string/signed-integer ordering;
+- boolean `all`, `any`, and `not`;
 - null/presence checks;
-- bounded collection `any`/`all` where schemas permit;
-- deterministic string/number/date predicates.
+- literal-array membership.
 
 It excludes:
 
 - arbitrary scripting;
 - I/O;
-- time except explicit engine-supplied timestamp values;
+- time;
 - randomness;
 - model calls;
 - mutation.
@@ -534,18 +542,20 @@ Fan-out materializes a bounded collection before creating branches. Each branch
 receives a stable key. Join declares:
 
 - branch set;
-- all/any/quorum policy;
+- all-branch policy in definition version 1;
 - failure and cancellation behavior;
 - output aggregation schema.
 
-Dynamic unbounded spawning is not permitted in v5.
+Later definition versions may add `any` or quorum policy. Dynamic unbounded
+spawning is not permitted in v5.
 
 ### Subworkflows
 
-A subworkflow Step pins an approved Workflow Version and creates a child Job
-Execution or child execution context according to its definition. Parent-child
-correlation and cancellation are explicit. Recursive cycles require a compiler
-depth bound and are disabled initially.
+A subworkflow Step pins an approved Workflow Version and creates a nested
+execution context under the parent Step Activation. It has its own plan,
+Activations, Attempts, and Fence suffix but no second Job identity. Parent-child
+correlation and cancellation are explicit. Recursive references are rejected in
+definition version 1.
 
 ## Agent Call Executor
 
@@ -1096,7 +1106,7 @@ software-delivery case.
 - unreachable/missing terminal steps;
 - ambiguous and no-match transitions;
 - guard type errors;
-- unbounded cycle/fan-out;
+- any definition-version-1 cycle or unbounded fan-out;
 - join mismatch;
 - unresolved capability/profile/Artifact;
 - unsafe effects and missing human gate;
@@ -1105,7 +1115,7 @@ software-delivery case.
 
 ### Runtime
 
-- linear, branch, loop, wait, timer, fan-out/join, and subworkflow;
+- linear, branch, wait, timer, fan-out/join, and subworkflow;
 - retry versus new Job Revision;
 - concurrent Claims and capacity;
 - stale Fence rejection;

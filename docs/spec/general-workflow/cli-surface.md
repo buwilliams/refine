@@ -4,7 +4,8 @@
 
 Design specification for the v5 CLI. It depends on the entities and authority
 rules in [`model.md`](model.md) and the implementation sequencing in
-[`code.md`](code.md).
+[`code.md`](code.md). Exact codecs, compatibility behavior, and checkpoint
+gates are defined in [`refactor.md`](refactor.md).
 
 ## Decision
 
@@ -186,11 +187,14 @@ refine project list [--node <id>] [--property <path=value>] [--attention]
 refine project show <project-id> [--attachments] [--jobs]
 refine project edit <project-id> [metadata/property patch options]
 refine project transfer <project-id> --node <node-id>
+refine project cancel <project-id>
 refine project archive <project-id>
 ```
 
 `list` includes projected member-Job counts and rollup state. `transfer` is a
-fenced aggregate operation over the Project and its mutable member Jobs.
+fenced aggregate operation over the Project and all member Jobs and refuses
+active claimed work.
+`cancel` settles eligible member Jobs through shared Job cancellation.
 Archiving a Project does not delete its Jobs or Attachments.
 
 ### Project membership and ordering
@@ -332,7 +336,7 @@ Compiles and validates a candidate against:
 - resolved capabilities and grants;
 - exact Artifact/Attachment availability and digests;
 - Agent input/output contracts;
-- bounded cycles/fan-out and join definitions;
+- cycle rejection, bounded fan-out, and join definitions;
 - configured approval and intervention policy.
 
 Validation is read-only and repeatable for an unchanged candidate digest.
