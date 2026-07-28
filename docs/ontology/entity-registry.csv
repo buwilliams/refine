@@ -1,0 +1,66 @@
+term,kind,label,layer,authority,persistence,code_reference,notes
+DomainEntity,class,Domain Entity,conceptual,ontology,,,Root class for the documented domain
+DurableProjectEntity,class,Durable Project Entity,project-durable,project state,,,Operational truth is in target-app Refine state
+RuntimeEntity,class,Runtime Entity,runtime,runtime root,,,Local operational authority
+DerivedEntity,class,Derived Entity,derived,rebuildable projection,,,Never mutation authority
+ExternalEntity,class,External Entity,external,external system,,,Acted upon but not owned as Refine project state
+VocabularyConcept,class,Vocabulary Concept,vocabulary,code enums,,,Closed implemented wire values
+RefineRuntime,class,Refine Runtime,runtime,runtime root,run/<port>/,src/process/supervisor/runtime/mod.rs#RuntimeBootstrap,Local daemon/control plane
+AppRegistry,class,App Registry,runtime,apps registry,apps.json,src/model/project/mod.rs#AppRegistry,Local target-app registry
+RegisteredApp,class,Registered App,runtime,apps registry,apps.json#apps,src/model/project/mod.rs#RegisteredApp,Name and repository path
+TargetApp,class,Target App,external,target Git repository,,src/tools/host/target_apps/mod.rs,Identified by repository path
+ProjectState,class,Project State,project-durable,refine/state,<git-common-dir>/refine-live-state,src/tools/host/project_layout.rs,Live projection of .refine on refine/state
+ProjectConfig,class,Project Config,project-durable,refine.json,refine.json,src/model/project/mod.rs#ProjectConfig,Schema version and settings envelope
+TargetAppSnapshot,class,Target App Snapshot,runtime,target-app observation,target-app-state.json,src/tools/host/target_apps/mod.rs#TargetAppSnapshot,Latest local lifecycle and health observation
+IntentArtifact,class,Intent Artifact,project-durable,project state,,,Abstract intent superclass
+Governance,class,Governance,project-durable,governance.json,governance.json,src/process/supervisor/config/governance.rs,Product plus Constitution plus Rules
+ProductIntent,class,Product Intent,project-durable,governance.json,governance.json#product,src/process/supervisor/config/governance_codec.rs,Embedded prose field
+Constitution,class,Constitution,project-durable,governance.json,governance.json#constitution,src/process/supervisor/config/governance_codec.rs,Embedded prose field
+Rule,class,Rule,project-durable,governance.json,governance.json#rules,src/process/supervisor/config/governance_codec.rs#normalize_rules,Normalized prose constraint
+GuidanceItem,class,Guidance Item,project-durable,guidance.json,guidance.json,src/process/supervisor/config/guidance_codec.rs,Conditional agent instructions
+QualitySettings,class,Quality Settings,project-durable,quality settings,quality/settings.json,src/tools/host/quality/types.rs#QualitySettings,Requirements tests enablement and timing
+ReporterRegistry,class,Reporter Registry,project-durable,reporters.json,reporters.json,src/process/supervisor/config/reporters.rs,Registry of named actors
+Reporter,class,Reporter,project-durable,reporters.json,reporters.json,src/process/supervisor/config/reporter_codec.rs,Work records refer to names not IDs
+NodeRegistry,class,Node Registry,project-durable,nodes.json,nodes.json,src/model/node/mod.rs#NodeRegistry,Durable Node records
+Node,class,Node,project-durable,nodes.json,nodes.json#nodes,src/model/node/mod.rs#Node,Ownership and distributed-execution unit
+NodeHealth,class,Node Health,derived,observation,nodes.json#nodes[].health,src/model/node/mod.rs#NodeHealth,Does not determine ownership
+ActiveNodeSelection,class,Active Node Selection,runtime,active-node selection,active-node.json,src/model/node/mod.rs#ActiveNodeSelection,Runtime admission identity
+ClusterView,class,Cluster View,derived,Node registry projection,,src/model/cluster/mod.rs#Cluster,ClusterNode aliases Node
+WorkItem,class,Work Item,conceptual,ontology,,,Ontology-only superclass
+Feature,class,Feature,project-durable,feature.json,features/<prefix>/<suffix>/feature.json,src/model/feature/mod.rs#Feature,Membership is inverse through Goal.feature_id
+Goal,class,Goal,project-durable,goal.json,goals/<prefix>/<suffix>/goal.json,src/model/goal/mod.rs#Goal,Smallest schedulable work item
+GoalNote,class,Goal Note,project-durable,goal.json,goal.json#notes,src/model/goal/mod.rs#GoalNote,Embedded in one Goal
+GoalRound,class,Goal Round,project-durable,goal.json,goal.json#rounds,src/tools/product/work_items/service/round_helpers.rs#new_round_value,Array index is workflow identity
+TodoList,class,Todo List,project-durable,todo-lists.json,todo-lists.json#lists,src/tools/product/todos/mod.rs#TodoList,Reporter-name scoped and outside Goal workflow
+TodoItem,class,Todo Item,project-durable,todo-lists.json,todo-lists.json#lists[].items,src/tools/product/todos/mod.rs#TodoItem,No Goal or workflow relation
+WorkflowAutomationState,class,Workflow Automation State,runtime,workflow state,workflow-automation-state.json,src/workflow/mod.rs#WorkflowAutomationState,Versioned policy and claim history
+WorkflowClaim,class,Workflow Claim,runtime,workflow state,workflow-automation-state.json#claims,src/workflow/mod.rs#WorkflowClaim,Reserves one Goal and pins execution context
+WorkflowExecution,class,Workflow Execution,runtime,correlated identifiers,,src/workflow/automation.rs,Not a standalone persisted Rust record
+WorkflowExecutionFence,class,Workflow Execution Fence,runtime,in-memory and operation evidence,,src/workflow/mod.rs#WorkflowExecutionFence,Guards consequential work
+AgentCapacityState,class,Agent Capacity State,runtime,capacity state,agent-capacity-state.json,src/workflow/capacity.rs#AgentCapacityState,Collection of leases
+AgentCapacityLease,class,Agent Capacity Lease,runtime,capacity state,agent-capacity-state.json#leases,src/workflow/capacity.rs#AgentCapacityLease,Owner role Node provider target app and PID
+Operation,class,Operation,runtime,operation registry,operations/<id>.json,src/process/supervisor/operations/mod.rs#OperationHandle,Cancellable recoverable background action
+ManagedProcess,class,Managed Process,runtime,process registry,processes/<id>.json,src/process/subprocess/mod.rs#ManagedProcess,Metadata carries domain correlations
+GitWorktree,class,Git Worktree,external,target Git repository,,src/tools/host/git_worktrees/mod.rs,Isolated Goal or standalone checkout
+AgentSession,class,Agent Session,runtime,managed Agent process,,src/process/agent_sessions.rs#AgentSessionSnapshot,PTY-backed interactive view
+ChatSession,class,Chat Session,project-durable,chat session,chat/sessions/<id>.json,src/tools/product/chat/mod.rs#ChatSessionRecord,Conversation attached to domain context
+Evidence,class,Evidence,conceptual,ontology,,,Abstract evidence superclass
+RoundEvidence,class,Round Evidence,project-durable,Goal Round,,,Evidence belonging to one Round
+ImplementationReport,class,Implementation Report,project-durable,goal.json,goal.json#rounds[].implementation_report,src/tools/product/work_items/service/rounds_and_metadata.rs,Goal Agent completion output
+GuidanceDecision,class,Guidance Decision,project-durable,goal.json,goal.json#rounds[].guidance_decision,src/workflow/behaviors/mod.rs,Applied and skipped Guidance
+GovernanceEvaluation,class,Governance Evaluation,project-durable,goal.json,goal.json#rounds[] governance fields,src/workflow/behaviors/mod.rs,Post-implementation judgment
+QualityEvaluation,class,Quality Evaluation,project-durable,goal.json,goal.json#rounds[] quality fields,src/tools/host/quality/service.rs,Exact-candidate Quality evidence
+FailureEvidence,class,Failure Evidence,project-durable,goal.json,goal.json#rounds[] failure fields,src/workflow/context.rs,Failure category message and time
+RoundIntegration,class,Round Integration,project-durable,goal.json,goal.json#rounds[].workflow_integration,src/model/goal/mod.rs#RoundIntegration,Exact integration evidence
+RoundLogEntry,class,Round Log Entry,project-durable,Goal log sidecar,goals/<prefix>/<suffix>/logs.jsonl,src/model/log/mod.rs#RoundLogEntry,Append-only Round evidence
+ActivityEntry,class,Activity Entry,runtime,local activity log,logs/activity.jsonl,src/model/log/mod.rs#ActivityEntry,Excluded from refine/state sync
+ProjectionSnapshot,class,Projection Snapshot,derived,cache,cache/projection-snapshot.json,src/tools/product/project_state/types.rs#ProjectionSnapshot,Fingerprint-guarded rebuildable view
+FeatureRollup,class,Feature Rollup,derived,computed,,src/model/feature/mod.rs#FeatureRollup,Derived status counts blocking and next Goal
+DashboardProjection,class,Dashboard Projection,derived,computed,,src/tools/product/project_state/types.rs#DashboardProjection,Counts actor stats attention and activity
+GitChangeProjection,class,Git Change Projection,derived,computed from Git,,src/tools/product/project_state/types.rs#ChangeSummaryProjection,Heuristic Goal join for display
+GoalStatus,vocabulary,Goal Status,vocabulary,Rust enum,,src/model/workflow/mod.rs#GoalStatus,Ten public Goal status values
+GoalPriority,vocabulary,Goal Priority,vocabulary,Rust enum,,src/model/goal/mod.rs#GoalPriority,low medium high
+QualityTiming,vocabulary,Quality Timing,vocabulary,Rust enum,,src/model/goal/mod.rs#WorkflowQualityTiming,pre_merge or post_build
+WorkflowClaimState,vocabulary,Workflow Claim State,vocabulary,Rust enum,,src/workflow/mod.rs#WorkflowClaimState,claimed running completed failed cancelled interrupted
+OperationState,vocabulary,Operation State,vocabulary,Rust enum/API mapping,,src/process/supervisor/operations/mod.rs#OperationState,Seven operation states
+ProcessOwnerKind,vocabulary,Process Owner Kind,vocabulary,Rust enum,,src/process/subprocess/mod.rs#ProcessOwner,Eight managed-process owners
