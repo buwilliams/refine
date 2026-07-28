@@ -8,9 +8,12 @@ use serde_json::json;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
-    DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    BackgroundDaemonConfig, DaemonRuntimeService, DaemonStatus, FileDaemonLifecycleService,
 };
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::daemon_lifecycle::{
+    DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
+};
 
 pub const DESKTOP_STATE_FILE: &str = "desktop-state.json";
 pub const DESKTOP_EVENTS_FILE: &str = "desktop-events.jsonl";
@@ -167,10 +170,19 @@ impl FileDesktopShellBridge {
 
 impl DesktopShellBridge for FileDesktopShellBridge {
     fn bootstrap_daemon(&self) -> RefineResult<DaemonStatus> {
-        let status = FileDaemonLifecycleService::new(RuntimeRoot {
-            root: self.runtime_root.clone(),
-        })
-        .start(self.port)?;
+        let status = execute_daemon_lifecycle(
+            &FileHostDaemonLifecycleService::new(
+                RuntimeRoot {
+                    root: self.runtime_root.clone(),
+                },
+                env!("CARGO_PKG_VERSION"),
+            ),
+            DaemonLifecycleAction::Start,
+            BackgroundDaemonConfig {
+                port: self.port,
+                ..Default::default()
+            },
+        )?;
         self.append_event(
             "daemon_bootstrap",
             json!({"port": self.port, "status": status}),
@@ -362,20 +374,34 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, TcpListener};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn file_desktop_shell_bridge_bootstraps_daemon_and_records_shell_events() {
         let temp_root = unique_temp_dir("desktop-bridge");
         let runtime_root = temp_root.join("run");
-        let bridge = FileDesktopShellBridge::new(&runtime_root, 8123);
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let responder = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0_u8; 1024];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+                .unwrap();
+        });
+        let bridge = FileDesktopShellBridge::new(&runtime_root, port);
 
         let status = bridge.bootstrap_daemon().unwrap();
-        assert_eq!(status.port, 8123);
+        responder.join().unwrap();
+        assert_eq!(status.port, port);
         assert!(status.daemon_healthy);
         assert!(bridge.daemon_status().unwrap().daemon_healthy);
 
-        bridge.open_webview("http://127.0.0.1:8123").unwrap();
+        let local_url = format!("http://127.0.0.1:{port}");
+        bridge.open_webview(&local_url).unwrap();
         bridge.notify("Refine", "Ready").unwrap();
         bridge.tray_menu_action("show").unwrap();
         bridge.handle_deep_link("refine://goal/GOAL1").unwrap();
@@ -391,7 +417,7 @@ mod tests {
         assert_eq!(subscribed.tray_status.as_deref(), Some("updated"));
 
         let state = bridge.load_state().unwrap();
-        assert_eq!(state.local_url.as_deref(), Some("http://127.0.0.1:8123"));
+        assert_eq!(state.local_url.as_deref(), Some(local_url.as_str()));
         assert_eq!(state.badge_count, 2);
         assert_eq!(state.last_notification_title.as_deref(), Some("Refine"));
         assert_eq!(state.last_tray_action.as_deref(), Some("show"));

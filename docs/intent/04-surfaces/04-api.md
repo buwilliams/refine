@@ -20,6 +20,14 @@ The API should expose system capability groups that match Refine's product desig
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
+Daemon lifecycle routes use the shared host authority. Start may return its
+observed result directly. Stop and restart first persist and return a
+port-scoped operation receipt, then a restart-safe helper performs service
+control outside the daemon's systemd control group or launchd job. A caller can
+read the durable lifecycle operation after shutdown or reconnection and obtain
+the same observed status, lifecycle evidence, failure, and recovery guidance as
+a synchronous CLI caller.
+
 Plan-to-Goal drafting uses the shared `/import/extract` route with purpose `plan_goal`; it returns exactly one unpersisted Goal draft so browser, CLI, and agent adapters can preserve their own explicit review boundary.
 
 The Goals screen sends its filter-scoped bulk selection to `POST /work/goals/export/jira`, which returns a durable operation immediately. The supervised runner records ownership, progress, logs, cancellation, failures, and the completed Jira CSV result; interrupted exports can be retried through `/work/goals/export/jira/{operation_id}/retry`. The result contains one row per selected Goal plus the filename, content type, selected Goal ids, and aggregate counts. Existing single-Goal CLI and agent adapters reuse the same row renderer and evidence rules rather than formatting separate reports. That renderer budgets every Description to Jira's Unicode-character limit, prioritizes audit identity and commit traceability before normalized round outcomes and narrative, and marks every shortened section or field explicitly. Raw provider payloads are not replayed, and verbose history in one Goal must not fail the rest of a valid bulk selection.

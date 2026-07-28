@@ -57,6 +57,8 @@ pub struct InstallBackendRegistration {
     pub deactivation_commands: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activation_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_service_label: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub notes: Vec<String>,
@@ -69,6 +71,10 @@ pub trait InstallationService {
     fn rollback(&self) -> RefineResult<InstallStatus>;
     fn uninstall(&self) -> RefineResult<()>;
     fn status(&self) -> RefineResult<InstallStatus>;
+    fn control_installed_service(
+        &self,
+        action: InstalledServiceAction,
+    ) -> RefineResult<Option<ServiceManagerControl>>;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -90,9 +96,13 @@ pub struct FileInstallationService {
 mod backend_spec;
 mod lifecycle;
 mod os_backend;
+mod service_control;
+mod service_registration;
 mod state;
 
 use backend_spec::*;
+pub use service_control::{InstalledServiceAction, ServiceManagerControl};
+pub use service_registration::ServiceRegistrationUpdate;
 
 #[cfg(test)]
 mod tests;

@@ -122,4 +122,11 @@ impl InstallationService for FileInstallationService {
         state.status.backend = backend;
         Ok(state.status)
     }
+
+    fn control_installed_service(
+        &self,
+        action: InstalledServiceAction,
+    ) -> RefineResult<Option<ServiceManagerControl>> {
+        FileInstallationService::control_installed_service(self, action)
+    }
 }

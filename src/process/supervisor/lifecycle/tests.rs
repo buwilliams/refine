@@ -9,12 +9,12 @@ fn file_lifecycle_persists_port_scoped_status() {
     };
     let service = FileDaemonLifecycleService::new(runtime_root);
 
-    let started = service.start(4555).unwrap();
+    let started = service.recover(4555).unwrap();
     assert!(started.daemon_healthy);
     assert!(service.status_path(4555).exists());
     assert_eq!(service.status(4555).unwrap().worker_state, "idle");
 
-    let stopped = service.stop(4555).unwrap();
+    let stopped = service.stop_runtime(4555).unwrap();
     assert!(!stopped.daemon_healthy);
     assert_eq!(service.status(4555).unwrap().worker_state, "stopped");
 
@@ -55,6 +55,38 @@ fn startup_status_is_not_healthy_until_explicitly_ready() {
             .iter()
             .any(|entry| entry.contains("startup recovery failed"))
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn observed_readiness_recovers_stale_startup_state_without_hiding_other_evidence() {
+    let temp_root = unique_temp_dir("lifecycle-observed-readiness");
+    let runtime_root = RuntimeRoot {
+        root: temp_root.join("run"),
+    };
+    let service = FileDaemonLifecycleService::new(runtime_root);
+    let mut stale = service
+        .mark_start_failed(
+            4555,
+            &RefineError::Io("failure from an earlier start".to_string()),
+        )
+        .unwrap();
+    stale
+        .degraded_integrations
+        .push("unrelated-degradation".to_string());
+    service.write_status(&stale).unwrap();
+
+    let ready = service.mark_observed_ready(4555).unwrap();
+
+    assert!(ready.daemon_healthy);
+    assert!(ready.web_available);
+    assert_eq!(ready.worker_state, "idle");
+    assert_eq!(
+        ready.degraded_integrations,
+        vec!["unrelated-degradation".to_string()]
+    );
+    assert_eq!(service.status(4555).unwrap(), ready);
 
     fs::remove_dir_all(temp_root).unwrap();
 }

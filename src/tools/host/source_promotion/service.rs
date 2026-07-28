@@ -92,44 +92,41 @@ impl FileSourcePromotionService {
                 "failed to locate source-promotion helper executable: {error}"
             ))
         })?;
-        self.queue_validated(
-            &snapshot,
-            &executable,
-            &ProcessSourcePromotionHelperLauncher,
-        )
+        self.queue_validated(&snapshot, &executable, &HostRestartSafeHandoffLauncher)
     }
 
     pub(crate) fn queue_validated(
         &self,
         snapshot: &SourcePromotionSnapshot,
         executable: &Path,
-        launcher: &dyn SourcePromotionHelperLauncher,
+        launcher: &dyn RestartSafeHandoffLauncher,
     ) -> RefineResult<SourcePromotionOperation> {
         let operation = SourcePromotionOperation::queued(snapshot);
         self.save_operation(&operation)?;
-        let mut command = Command::new(executable);
-        command
-            .args([
-                "system",
-                "source-promote-helper",
-                "--checkout",
-                &snapshot.checkout_path,
-                "--port-runtime-root",
-                &self.port_runtime_root.display().to_string(),
-                "--port",
-                &self.port.to_string(),
-                "--operation-id",
-                &operation.id,
-            ])
-            .current_dir(&self.checkout_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        if let Err(error) = launcher.launch(&mut command) {
-            let launch_error = RefineError::Io(format!(
-                "failed to launch restart-safe source-promotion helper {}: {error}",
-                executable.display()
-            ));
+        let runtime_root = self.port_runtime_root.parent().ok_or_else(|| {
+            RefineError::InvalidInput("port runtime root has no parent".to_string())
+        })?;
+        let service_manager =
+            FileInstallationService::for_port(runtime_root, env!("CARGO_PKG_VERSION"), self.port)
+                .installed_service_manager_for(InstalledServiceAction::Stop)?;
+        let handoff = RestartSafeHandoff {
+            executable: executable.to_path_buf(),
+            args: vec![
+                "system".to_string(),
+                "source-promote-helper".to_string(),
+                "--checkout".to_string(),
+                snapshot.checkout_path.clone(),
+                "--port-runtime-root".to_string(),
+                self.port_runtime_root.display().to_string(),
+                "--port".to_string(),
+                self.port.to_string(),
+                "--operation-id".to_string(),
+                operation.id.clone(),
+            ],
+            cwd: self.checkout_path.clone(),
+            label: operation.id.clone(),
+        };
+        if let Err(launch_error) = launcher.launch(&handoff, service_manager.as_deref()) {
             let mut failed = operation.clone();
             failed.status = "failed".to_string();
             failed.stage = "launch_helper".to_string();

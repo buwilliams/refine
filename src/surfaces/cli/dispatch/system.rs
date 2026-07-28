@@ -165,6 +165,39 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             .map(|_| ()),
         Commands::System {
             action:
+                SystemAction::DaemonLifecycleHelper {
+                    action,
+                    port,
+                    runtime_root,
+                    operation_id,
+                },
+        } => {
+            let action = match action.as_str() {
+                "stop" => DaemonLifecycleAction::Stop,
+                "restart" => DaemonLifecycleAction::Restart,
+                other => {
+                    return Err(RefineError::InvalidInput(format!(
+                        "unsupported daemon lifecycle helper action {other}"
+                    )));
+                }
+            };
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            crate::tools::host::daemon_lifecycle::FileDaemonLifecycleOperationService::new(
+                RuntimeRoot { root: runtime_root },
+                env!("CARGO_PKG_VERSION"),
+            )
+            .run_helper(
+                &operation_id,
+                action,
+                BackgroundDaemonConfig {
+                    port,
+                    ..Default::default()
+                },
+            )
+            .map(|_| ())
+        }
+        Commands::System {
+            action:
                 SystemAction::RunnerWorker {
                     kind,
                     port_runtime_root,
@@ -243,27 +276,38 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         Commands::System {
             action: SystemAction::Stop { port, runtime_root },
         } => {
-            let status = FileDaemonLifecycleService::new(RuntimeRoot {
-                root: runtime_root.clone(),
-            })
-            .stop(port)?;
-            let _ = http_probe(port);
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let lifecycle = FileHostDaemonLifecycleService::new(
+                RuntimeRoot { root: runtime_root },
+                env!("CARGO_PKG_VERSION"),
+            );
+            let status = execute_daemon_lifecycle(
+                &lifecycle,
+                DaemonLifecycleAction::Stop,
+                BackgroundDaemonConfig {
+                    port,
+                    ..Default::default()
+                },
+            )?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
         Commands::System {
             action: SystemAction::Restart { port, runtime_root },
         } => {
-            let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
-                root: runtime_root.clone(),
-            });
-            let _ = lifecycle.stop(port)?;
-            let _ = http_probe(port);
-            let status = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
-                .start_background_daemon(BackgroundDaemonConfig {
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let lifecycle = FileHostDaemonLifecycleService::new(
+                RuntimeRoot { root: runtime_root },
+                env!("CARGO_PKG_VERSION"),
+            );
+            let status = execute_daemon_lifecycle(
+                &lifecycle,
+                DaemonLifecycleAction::Restart,
+                BackgroundDaemonConfig {
                     port,
                     ..Default::default()
-                })?;
+                },
+            )?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }

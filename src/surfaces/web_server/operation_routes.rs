@@ -6,10 +6,16 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::lifecycle::BackgroundDaemonConfig;
 use crate::process::supervisor::operations::FileOperationRegistry;
+use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
+use crate::tools::host::daemon_lifecycle::{
+    DaemonLifecycleAction, FileDaemonLifecycleOperationService, FileHostDaemonLifecycleService,
+    execute_daemon_lifecycle,
 };
 use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_checkout};
 use crate::tools::host::installation::{FileInstallationService, InstallationService};

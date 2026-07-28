@@ -194,7 +194,7 @@ fn web_server_delegates_cancel_and_recovers_durable_jira_exports() {
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: temp_root.join("run"),
     });
-    let recovery_status = lifecycle.restart(8080).unwrap();
+    let recovery_status = lifecycle.recover(8080).unwrap();
     wait_for_managed_pid_exit(interrupted_pid);
     assert!(!managed_pid_is_alive(interrupted_pid).unwrap());
     assert!(
@@ -443,7 +443,7 @@ fn concurrent_jira_retry_posts_share_one_durable_replacement_and_worker_after_re
     FileDaemonLifecycleService::new(RuntimeRoot {
         root: temp_root.join("run"),
     })
-    .restart(8080)
+    .recover(8080)
     .unwrap();
     let processes_before_replay = supervisor.list().unwrap();
     let mut restarted_server = server_with_projection();

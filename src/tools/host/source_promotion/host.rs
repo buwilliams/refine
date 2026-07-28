@@ -142,10 +142,31 @@ impl SourcePromotionHost for FileSourcePromotionHost {
         validate_promotion(&snapshot)
     }
 
+    fn prepare_restart(
+        &mut self,
+        executable: &Path,
+    ) -> RefineResult<Option<ServiceRegistrationUpdate>> {
+        FileInstallationService::for_port(
+            self.runtime_root()?,
+            env!("CARGO_PKG_VERSION"),
+            self.service.port,
+        )
+        .prepare_service_executable(executable)
+    }
+
     fn stop_daemon(&mut self) -> RefineResult<()> {
         let runtime_root = self.runtime_root()?;
-        FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
-            .stop(self.service.port)?;
+        crate::tools::host::daemon_lifecycle::execute_daemon_lifecycle(
+            &crate::tools::host::daemon_lifecycle::FileHostDaemonLifecycleService::new(
+                RuntimeRoot { root: runtime_root },
+                env!("CARGO_PKG_VERSION"),
+            ),
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Stop,
+            crate::process::supervisor::lifecycle::BackgroundDaemonConfig {
+                port: self.service.port,
+                ..Default::default()
+            },
+        )?;
         for _ in 0..50 {
             if http_probe(self.service.port).is_err() {
                 return Ok(());
@@ -187,14 +208,78 @@ impl SourcePromotionHost for FileSourcePromotionHost {
         self.launch(executable)
     }
 
-    fn verify_daemon(&mut self, expected_commit: &str) -> RefineResult<()> {
+    fn verify_daemon(
+        &mut self,
+        expected_commit: &str,
+        expected_executable: &Path,
+    ) -> RefineResult<PathBuf> {
         http_probe(self.service.port)?;
+        let observed_executable = live_daemon_executable(self.service.port)?;
+        let expected_identity = fs::canonicalize(expected_executable).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to canonicalize candidate executable {}: {error}",
+                expected_executable.display()
+            ))
+        })?;
+        let observed_identity = fs::canonicalize(&observed_executable).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to canonicalize live daemon executable {}: {error}",
+                observed_executable.display()
+            ))
+        })?;
+        if observed_identity != expected_identity {
+            return Err(RefineError::Degraded(format!(
+                "daemon is reachable from {}, but the candidate executable is {}",
+                observed_identity.display(),
+                expected_identity.display()
+            )));
+        }
         let actual = git_text(&self.service.checkout_path, &["rev-parse", "HEAD"])?;
         if actual == expected_commit {
-            Ok(())
+            Ok(observed_identity)
         } else {
             Err(RefineError::Degraded(format!(
                 "daemon restarted but checkout commit is {actual}, expected {expected_commit}"
+            )))
+        }
+    }
+
+    fn complete_restart_registration(&mut self) -> RefineResult<()> {
+        FileInstallationService::for_port(
+            self.runtime_root()?,
+            env!("CARGO_PKG_VERSION"),
+            self.service.port,
+        )
+        .complete_service_executable_update()
+    }
+
+    fn restore_restart_registration(&mut self) -> RefineResult<bool> {
+        FileInstallationService::for_port(
+            self.runtime_root()?,
+            env!("CARGO_PKG_VERSION"),
+            self.service.port,
+        )
+        .restore_service_executable()
+    }
+
+    fn verify_previous_registration(&mut self) -> RefineResult<PathBuf> {
+        FileInstallationService::for_port(
+            self.runtime_root()?,
+            env!("CARGO_PKG_VERSION"),
+            self.service.port,
+        )
+        .verify_restored_service_executable(&self.previous_executable)
+    }
+
+    fn verify_previous_source(&mut self, expected_commit: &str) -> RefineResult<()> {
+        let actual_commit = git_text(&self.service.checkout_path, &["rev-parse", "HEAD"])?;
+        let status = git_text(&self.service.checkout_path, &["status", "--porcelain"])?;
+        if actual_commit == expected_commit && status.is_empty() {
+            Ok(())
+        } else {
+            Err(RefineError::Degraded(format!(
+                "prior source is not authoritatively restored: checkout commit is {actual_commit}, expected {expected_commit}, clean={}",
+                status.is_empty()
             )))
         }
     }
@@ -213,7 +298,99 @@ impl SourcePromotionHost for FileSourcePromotionHost {
     }
 
     fn restart_previous_daemon(&mut self) -> RefineResult<()> {
-        let executable = self.previous_executable.clone();
-        self.launch(&executable)
+        crate::tools::host::daemon_lifecycle::execute_daemon_lifecycle(
+            &crate::tools::host::daemon_lifecycle::FileHostDaemonLifecycleService::new(
+                RuntimeRoot {
+                    root: self.runtime_root()?,
+                },
+                env!("CARGO_PKG_VERSION"),
+            ),
+            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Restart,
+            crate::process::supervisor::lifecycle::BackgroundDaemonConfig {
+                port: self.service.port,
+                ..Default::default()
+            },
+        )
+        .map(|_| ())
+    }
+
+    fn observe_previous_daemon(&mut self) -> SourcePromotionDaemonObservation {
+        let expected_executable = self.previous_executable.display().to_string();
+        match crate::process::supervisor::lifecycle::http_reachability_probe(self.service.port) {
+            crate::process::supervisor::lifecycle::DaemonReachability::Reachable => {
+                match live_daemon_executable(self.service.port) {
+                    Ok(observed) => {
+                        let observed_executable = Some(observed.display().to_string());
+                        match (
+                            fs::canonicalize(&self.previous_executable),
+                            fs::canonicalize(&observed),
+                        ) {
+                            (Ok(expected), Ok(actual)) => SourcePromotionDaemonObservation {
+                                reachability: "reachable".to_string(),
+                                expected_executable,
+                                observed_executable,
+                                identity_matches: Some(expected == actual),
+                                error: (expected != actual).then(|| {
+                                    format!(
+                                        "live daemon executable {} does not match restored prior executable {}",
+                                        actual.display(),
+                                        expected.display()
+                                    )
+                                }),
+                            },
+                            (expected, actual) => SourcePromotionDaemonObservation {
+                                reachability: "reachable".to_string(),
+                                expected_executable,
+                                observed_executable,
+                                identity_matches: None,
+                                error: Some(format!(
+                                    "daemon is reachable but executable identity is indeterminate: expected canonicalization={}; observed canonicalization={}",
+                                    canonicalization_result(expected),
+                                    canonicalization_result(actual)
+                                )),
+                            },
+                        }
+                    }
+                    Err(error) => SourcePromotionDaemonObservation {
+                        reachability: "reachable".to_string(),
+                        expected_executable,
+                        observed_executable: None,
+                        identity_matches: None,
+                        error: Some(format!(
+                            "daemon is reachable but live executable identity is indeterminate: {error}"
+                        )),
+                    },
+                }
+            }
+            crate::process::supervisor::lifecycle::DaemonReachability::Unreachable(error) => {
+                SourcePromotionDaemonObservation {
+                    reachability: "unreachable".to_string(),
+                    expected_executable,
+                    observed_executable: None,
+                    identity_matches: None,
+                    error: Some(format!(
+                        "restored prior daemon is not reachable after replacement: {error}"
+                    )),
+                }
+            }
+            crate::process::supervisor::lifecycle::DaemonReachability::Unknown(error) => {
+                SourcePromotionDaemonObservation {
+                    reachability: "unknown".to_string(),
+                    expected_executable,
+                    observed_executable: None,
+                    identity_matches: None,
+                    error: Some(format!(
+                        "restored prior daemon reachability is indeterminate after replacement: {error}"
+                    )),
+                }
+            }
+        }
+    }
+}
+
+fn canonicalization_result(result: std::io::Result<PathBuf>) -> String {
+    match result {
+        Ok(path) => path.display().to_string(),
+        Err(error) => format!("error ({error})"),
     }
 }

@@ -49,7 +49,7 @@ use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor, install_after_process_enumeration_hook, managed_pid_is_alive,
 };
-use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::process::supervisor::lifecycle::{DaemonRuntimeService, FileDaemonLifecycleService};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::surfaces::web_server::support::{
     recent_operation_sse_events, runtime_process_status_value, runtime_process_summary_value,
@@ -211,6 +211,7 @@ fn server_with_projection() -> InProcessWebServer {
             executable_path: Some("cargo".to_string()),
             active_operations: Vec::new(),
             degraded_integrations: Vec::new(),
+            lifecycle_evidence: None,
         },
         projection: ProjectionSnapshot {
             version: PROJECTION_SNAPSHOT_VERSION,

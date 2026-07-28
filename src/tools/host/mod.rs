@@ -1,5 +1,6 @@
 pub mod agent_providers;
 pub mod cluster;
+pub mod daemon_lifecycle;
 pub mod deployed_update;
 pub mod git_sync;
 pub mod git_worktrees;

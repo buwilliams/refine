@@ -120,6 +120,22 @@ pub enum SystemAction {
         #[arg(long)]
         operation_id: String,
     },
+    /// Complete a durable daemon stop or restart outside the managed daemon service.
+    #[command(hide = true)]
+    DaemonLifecycleHelper {
+        /// Lifecycle action queued by the daemon.
+        #[arg(long)]
+        action: String,
+        /// Refine daemon port controlled by the operation.
+        #[arg(long)]
+        port: u16,
+        /// Canonical runtime directory containing port-scoped lifecycle state.
+        #[arg(long)]
+        runtime_root: PathBuf,
+        /// Durable daemon-lifecycle operation identifier.
+        #[arg(long)]
+        operation_id: String,
+    },
     /// Run a supervised background worker outside the daemon process.
     #[command(hide = true)]
     RunnerWorker {
@@ -163,7 +179,8 @@ pub enum SystemAction {
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
         version: String,
     },
-    /// Start the Refine daemon (background by default; --foreground or --once run it in-process).
+    /// Start the Refine daemon (through its port-scoped systemd/launchd installation when present;
+    /// command failures stay visible even when the daemon is already healthy).
     Start {
         /// Port for the daemon to listen on.
         #[arg(long, default_value_t = 8082)]
@@ -187,7 +204,8 @@ pub enum SystemAction {
         #[arg(long)]
         foreground: bool,
     },
-    /// Stop the Refine daemon running on the given port.
+    /// Stop the Refine daemon and its port-scoped systemd/launchd service; stopped is reported only
+    /// after shutdown is confirmed.
     Stop {
         /// Port the daemon is listening on.
         #[arg(long, default_value_t = 8082)]
@@ -196,7 +214,8 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Restart the Refine daemon on the given port.
+    /// Restart the Refine daemon on the given port through its activated systemd/launchd service
+    /// when present.
     Restart {
         /// Port the daemon is listening on.
         #[arg(long, default_value_t = 8082)]
