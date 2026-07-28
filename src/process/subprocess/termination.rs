@@ -164,6 +164,9 @@ impl FileProcessSupervisor {
     }
 
     #[cfg_attr(test, allow(dead_code))]
+    // Cleanup failure deliberately carries the confirmed exit evidence inline
+    // so callers cannot lose it while settling a process.
+    #[allow(clippy::result_large_err)]
     pub(crate) fn cleanup_confirmed_exit(
         &self,
         expected: &ManagedProcess,
@@ -172,6 +175,7 @@ impl FileProcessSupervisor {
         self.cleanup_confirmed_exit_with(expected, outcome, |_| Ok(()))
     }
 
+    #[allow(clippy::result_large_err)]
     pub(crate) fn cleanup_confirmed_exit_with<F>(
         &self,
         expected: &ManagedProcess,

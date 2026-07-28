@@ -1,6 +1,66 @@
 use super::*;
 
 impl FileGitWorktreeService {
+    pub fn list_linked_worktrees(&self) -> RefineResult<Vec<GitLinkedWorktree>> {
+        let output = stdout(self.git_output(&["worktree", "list", "--porcelain"])?)?;
+        let mut worktrees = Vec::new();
+        let mut current_path = None;
+        let mut current_branch = None;
+        for line in output.lines().chain(std::iter::once("")) {
+            if let Some(path) = line.strip_prefix("worktree ") {
+                if let Some(path) = current_path.take() {
+                    worktrees.push(GitLinkedWorktree {
+                        path,
+                        branch: current_branch.take(),
+                    });
+                }
+                current_path = Some(PathBuf::from(path));
+            } else if let Some(branch) = line.strip_prefix("branch refs/heads/") {
+                current_branch = Some(branch.to_string());
+            } else if line.is_empty()
+                && let Some(path) = current_path.take()
+            {
+                worktrees.push(GitLinkedWorktree {
+                    path,
+                    branch: current_branch.take(),
+                });
+            }
+        }
+        Ok(worktrees)
+    }
+
+    pub fn worktree_is_clean(&self, path: &Path) -> RefineResult<bool> {
+        let service = FileGitWorktreeService {
+            root: path.to_path_buf(),
+            runtime_root: self.runtime_root.clone(),
+            operation_id: self.operation_id.clone(),
+            process_metadata: self.process_metadata.clone(),
+        };
+        service.is_clean()
+    }
+
+    pub fn worktree_ignored_paths(&self, path: &Path) -> RefineResult<Vec<String>> {
+        let service = FileGitWorktreeService {
+            root: path.to_path_buf(),
+            runtime_root: self.runtime_root.clone(),
+            operation_id: self.operation_id.clone(),
+            process_metadata: self.process_metadata.clone(),
+        };
+        let status = stdout(service.git_output(&[
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--ignored=matching",
+        ])?)?;
+        Ok(status
+            .split('\0')
+            .filter_map(|entry| entry.strip_prefix("!! "))
+            .map(|path| path.trim_end_matches('/').replace('\\', "/"))
+            .filter(|path| !path.is_empty())
+            .collect())
+    }
+
     pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
         let target = path.to_str().unwrap_or("");
         if target.trim().is_empty() {

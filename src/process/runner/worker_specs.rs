@@ -60,6 +60,7 @@ pub(super) fn managed_worker_kind(process: &ManagedProcess) -> Option<&str> {
         })
         .and_then(|kind| match kind.as_str() {
             WORKFLOW_RUNNER => Some(WORKFLOW_RUNNER),
+            WORKTREE_CLEANUP_RUNNER => Some(WORKTREE_CLEANUP_RUNNER),
             GIT_SYNC_RUNNER => Some(GIT_SYNC_RUNNER),
             PROJECT_SYNC_RUNNER => Some(PROJECT_SYNC_RUNNER),
             _ => None,

@@ -154,6 +154,17 @@ fn runner_specs_create_real_runner_processes() {
             .windows(2)
             .any(|args| args == ["--project-registry-root", "/tmp/run"])
     );
+    let cleanup_spec = background_worker_spec(
+        Path::new("/opt/refine"),
+        Path::new("/tmp/run/8082"),
+        Some(Path::new("/tmp/run")),
+        WORKTREE_CLEANUP_RUNNER,
+    );
+    assert_eq!(
+        cleanup_spec.metadata["worker_kind"],
+        WORKTREE_CLEANUP_RUNNER
+    );
+    assert!(validate_worker_kind(WORKTREE_CLEANUP_RUNNER, false).is_ok());
 
     let spec = project_sync_worker_spec(
         Path::new("/opt/refine"),
@@ -223,4 +234,88 @@ fn runner_target_resolution_uses_canonical_registry_over_stale_port_registry() {
     );
 
     std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn cleanup_runner_applies_configured_terminal_worktree_retention() {
+    let target_root = std::env::temp_dir().join(format!(
+        "refine-runner-worktree-cleanup-{}",
+        uuid::Uuid::new_v4()
+    ));
+    std::fs::create_dir_all(&target_root).unwrap();
+    for args in [
+        vec!["init", "-b", "main"],
+        vec!["config", "user.email", "test@example.com"],
+        vec!["config", "user.name", "Test User"],
+    ] {
+        assert!(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&target_root)
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    std::fs::write(target_root.join("README.md"), "base\n").unwrap();
+    for args in [vec!["add", "README.md"], vec!["commit", "-m", "base"]] {
+        assert!(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&target_root)
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    std::fs::create_dir_all(&refine_dir).unwrap();
+    let runtime_root = target_root.join("runtime");
+    FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+        .update(&json!({"worktree_cleanup_after_seconds": "0"}))
+        .unwrap();
+    let work_items = crate::tools::product::work_items::FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Runner cleanup", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Tester", "Implement")
+        .unwrap();
+    work_items
+        .set_goal_branch_name("GOAL1", "refine/GOAL1/round-1")
+        .unwrap();
+    work_items.cancel_goal_summary("GOAL1").unwrap();
+    let worktree = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    std::fs::create_dir_all(worktree.parent().unwrap()).unwrap();
+    assert!(
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                "refine/GOAL1/round-1",
+                worktree.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+
+    run_configured_worktree_cleanup(&runtime_root, &target_root);
+
+    assert!(!worktree.exists());
+    assert!(
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args(["rev-parse", "--verify", "refs/heads/refine/GOAL1/round-1"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(target_root).unwrap();
 }

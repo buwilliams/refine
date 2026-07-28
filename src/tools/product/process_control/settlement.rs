@@ -188,9 +188,7 @@ impl FileProcessControlService {
                 None,
                 None,
             )?;
-            self.inject_settlement_failure(
-                CancellationSettlementFailureStage::AfterClaimPersistence,
-            )?;
+            self.inject_settlement_failure(CancellationSettlementFailureStage::ClaimPersistence)?;
 
             capacity.release_claims(&claim_ids)?;
             self.update_cancellation_settlement_journal(
@@ -200,9 +198,7 @@ impl FileProcessControlService {
                 None,
                 None,
             )?;
-            self.inject_settlement_failure(
-                CancellationSettlementFailureStage::AfterCapacityRelease,
-            )?;
+            self.inject_settlement_failure(CancellationSettlementFailureStage::CapacityRelease)?;
 
             goal_transaction.commit()?;
             self.update_cancellation_settlement_journal(
@@ -212,9 +208,7 @@ impl FileProcessControlService {
                 None,
                 None,
             )?;
-            self.inject_settlement_failure(
-                CancellationSettlementFailureStage::AfterGoalPersistence,
-            )?;
+            self.inject_settlement_failure(CancellationSettlementFailureStage::GoalPersistence)?;
             self.update_cancellation_settlement_journal(
                 &receipt_path,
                 &mut journal,
@@ -602,9 +596,7 @@ impl FileProcessControlService {
         let mut capacity = workflow
             .capacity_service_for_settlement()
             .begin_cancellation_settlement()?;
-        if let Err(cause) = workflow.persist_claims_cancelled_locked(&mut state, &claim_ids) {
-            return Err(cause);
-        }
+        workflow.persist_claims_cancelled_locked(&mut state, &claim_ids)?;
         if let Err(cause) = capacity.release_claims(&claim_ids) {
             let _ = capacity.restore();
             let _ = workflow.restore_state_locked(&original_state);
@@ -711,7 +703,7 @@ impl FileProcessControlService {
             })?;
             if !matches!(
                 value.get("schema_version").and_then(Value::as_u64),
-                Some(2 | 3 | 4 | 5 | 6)
+                Some(2..=6)
             ) {
                 continue;
             }

@@ -29,6 +29,34 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
 }
 
 #[test]
+fn file_settings_service_validates_generated_worktree_cleanup_paths() {
+    let temp_root = unique_temp_dir("settings-worktree-cleanup-paths");
+    let service = FileSettingsService::new(temp_root.join("state"));
+
+    let updated = service
+        .update(&json!({
+            "worktree_cleanup_generated_paths": " build, .venv\nbuild "
+        }))
+        .unwrap();
+    assert_eq!(
+        updated["settings"]["worktree_cleanup_generated_paths"],
+        ".venv, build"
+    );
+    assert!(
+        service
+            .update(&json!({"worktree_cleanup_generated_paths": "../outside"}))
+            .is_err()
+    );
+    assert!(
+        service
+            .update(&json!({"worktree_cleanup_generated_paths": "/absolute"}))
+            .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_settings_service_can_hold_one_resolved_non_default_node_identity() {
     let temp_root = unique_temp_dir("settings-fixed-node");
     let refine_dir = temp_root.join(".refine");

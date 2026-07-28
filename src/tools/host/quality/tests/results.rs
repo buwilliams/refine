@@ -368,9 +368,7 @@ fn quality_evidence_persistence_failures_remain_nonterminal_and_recoverable() {
             fixture.refine_dir.join("goals/GO/AL1/logs.jsonl")
         };
         let backup = blocked_path.with_extension("backup");
-        if failure == "summary" {
-            fs::rename(&blocked_path, &backup).unwrap();
-        } else if blocked_path.exists() {
+        if failure == "summary" || blocked_path.exists() {
             fs::rename(&blocked_path, &backup).unwrap();
         }
         fs::create_dir_all(&blocked_path).unwrap();

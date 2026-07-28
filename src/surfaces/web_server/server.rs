@@ -520,6 +520,10 @@ impl InProcessWebServer {
             return self.handle_project_sync();
         }
 
+        if request.method == "POST" && request.path == "/project/worktrees/cleanup" {
+            return self.handle_project_worktree_cleanup(request);
+        }
+
         if request.method == "GET" && request.path == "/settings" {
             return self.handle_settings_get();
         }

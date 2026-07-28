@@ -5,17 +5,17 @@ fn cancellation_settlement_failures_restore_exact_durable_state_and_are_recovera
     for (suffix, stage, expected_cause) in [
         (
             "claim",
-            CancellationSettlementFailureStage::AfterClaimPersistence,
+            CancellationSettlementFailureStage::ClaimPersistence,
             "after claim persistence",
         ),
         (
             "capacity",
-            CancellationSettlementFailureStage::AfterCapacityRelease,
+            CancellationSettlementFailureStage::CapacityRelease,
             "after capacity release",
         ),
         (
             "goal",
-            CancellationSettlementFailureStage::AfterGoalPersistence,
+            CancellationSettlementFailureStage::GoalPersistence,
             "after Goal persistence",
         ),
     ] {
@@ -162,7 +162,7 @@ fn rollback_failed_after_goal_restore_replays_from_exact_restored_revision() {
     let policy_bytes = serde_json::to_vec(&policy).unwrap();
 
     let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-        .with_settlement_failure(CancellationSettlementFailureStage::AfterGoalPersistence)
+        .with_settlement_failure(CancellationSettlementFailureStage::GoalPersistence)
         .with_rollback_failure(CancellationRollbackFailureStage::CapacityRestore)
         .stop(&process.id, "terminate")
         .unwrap_err();
@@ -345,17 +345,17 @@ fn interrupted_settlement_replays_after_restart_before_cancelled_short_circuit()
     for (suffix, stage, interrupted_state) in [
         (
             "claim",
-            CancellationSettlementFailureStage::AfterClaimPersistence,
+            CancellationSettlementFailureStage::ClaimPersistence,
             "claim_persisted",
         ),
         (
             "capacity",
-            CancellationSettlementFailureStage::AfterCapacityRelease,
+            CancellationSettlementFailureStage::CapacityRelease,
             "capacity_released",
         ),
         (
             "goal",
-            CancellationSettlementFailureStage::AfterGoalPersistence,
+            CancellationSettlementFailureStage::GoalPersistence,
             "goal_persisted",
         ),
     ] {

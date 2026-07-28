@@ -64,6 +64,10 @@ Current implementation details that matter to intent:
   identify the candidate executable.
   Direct fallback shutdown retains signal errors and uses a fresh tri-state
   reachability probe; only observed non-reachability is persisted as stopped.
+- todo is a state-only queue. Promotion and claiming do not create a repository
+  copy; only a capacity-admitted running claim may durably transition its Goal
+  to in-progress and then materialize that Goal round's implementation worktree.
+  A large todo queue therefore consumes workflow state, not one worktree per Goal.
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
   capability, including Workflow claim settlement, rather than splitting
@@ -75,8 +79,16 @@ Current implementation details that matter to intent:
   whether they are pristine, tracked-dirty, untracked, ignored, or changing
   concurrently. Every recorded worktree and branch remains available with
   explicit durable retention and recovery evidence. Worktree cleanup is a
-  separate explicit human-controlled operation outside Stop; ordinary retention
-  is a successful result, not a partial failure. Termination intent is an
+  separate shared maintenance operation outside Stop; ordinary retention is a
+  successful result, not a partial failure. The operation is dry-run by default
+  when invoked directly and a separately supervised cleanup worker applies the
+  configured terminal-worktree retention delay even while the workflow worker
+  is occupied. The default makes terminal worktrees eligible immediately and
+  the cleanup worker scans at least once per minute. Only clean worktrees belonging to durably
+  done or cancelled Goals are eligible. Recognized or explicitly configured
+  generated cache paths may be removed first, but any other ignored content
+  protects the worktree. Running managed processes and review work are
+  protected, and cleanup never deletes branch refs. Termination intent is an
   explicit authoritative input to the shared capability: interactive user Stop
   requeues, while explicit Goal or workflow cancellation remains terminal
   cancelled. Process discovery and claim presence are settlement evidence, never

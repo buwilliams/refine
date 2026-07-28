@@ -19,12 +19,21 @@ Git is central because it is existing infrastructure users already trust. Refine
 This capability should connect workflow with the user's source repository:
 
 - implementation work can happen in an isolated branch or worktree;
+- todo Goals remain state-only regardless of queue size; an implementation
+  worktree is created only after scheduler capacity is acquired and the Goal is
+  durably in-progress;
 - ready-merge should be a serialized merger-owned queue with a reviewable exact candidate and enough evidence;
 - ready-merge should merge and push the isolated candidate exactly once before optionally rebuilding the composed target app;
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;
 - standalone worktree output should be able to become structured ready-merge work.
+- clean worktrees for durably done or cancelled Goals should be reclaimed by the
+  shared maintenance capability after the configured retention delay, while
+  branches, dirty work, active processes, Review candidates, standalone
+  worktrees, the state worktree, and unrecognized ignored content remain
+  protected. Generated cache paths are removable only when recognized by
+  Refine or explicitly configured for the target app;
 
 Review should be a real boundary in workflow. It lets later ordered Feature work proceed when appropriate, but it should not erase the need for evidence or final judgment.
 

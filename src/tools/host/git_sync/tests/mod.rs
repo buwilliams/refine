@@ -7,7 +7,6 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(unix)]
-
 struct SyncFixture {
     root: PathBuf,
     a: PathBuf,

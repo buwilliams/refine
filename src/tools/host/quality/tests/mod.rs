@@ -14,7 +14,7 @@ use crate::workflow::WorkflowPolicy;
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use serde_json::{Value, json};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -213,7 +213,7 @@ fn wait_for_operation_process(
     panic!("managed process for operation {operation_id} was not observed");
 }
 
-fn wait_for_path(path: &PathBuf) {
+fn wait_for_path(path: &Path) {
     for _ in 0..200 {
         if path.exists() {
             return;

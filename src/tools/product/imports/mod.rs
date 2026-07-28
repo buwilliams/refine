@@ -229,6 +229,7 @@ impl FileImportService {
             .map_err(ImportPersistFailure::into_refine_error)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn persist_with_destination(
         &self,
         drafts: Vec<ImportDraft>,

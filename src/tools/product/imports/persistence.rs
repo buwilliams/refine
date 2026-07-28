@@ -96,6 +96,9 @@ impl ImportPersistFailure {
     }
 }
 
+// Failure is an evidence envelope used directly by rollback-aware callers.
+// Boxing it would make every consumer less explicit for a cold error path.
+#[allow(clippy::result_large_err)]
 pub fn persist_import_drafts(
     refine_dir: &Path,
     drafts: Vec<ImportDraft>,
@@ -106,6 +109,7 @@ pub fn persist_import_drafts(
     persist_with_service(&service, drafts, destination, observer)
 }
 
+#[allow(clippy::result_large_err)]
 fn persist_with_service(
     service: &FileWorkItemService,
     drafts: Vec<ImportDraft>,

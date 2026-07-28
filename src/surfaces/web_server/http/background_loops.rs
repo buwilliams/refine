@@ -16,20 +16,32 @@ impl LocalHttpDaemon {
                     if let Some(project_registry_root) = &project_registry_root {
                         workers = workers.with_project_registry_root(project_registry_root);
                     }
-                    match workers.ensure_background_worker(WORKFLOW_RUNNER) {
-                        Ok(_) => last_reported_failure = None,
-                        // A stall here means nothing is ticking the workflow, which
-                        // otherwise looks exactly like an idle queue. Report it, but
-                        // only when it changes: this loop runs every second.
-                        Err(error) => {
-                            let error = error.to_string();
-                            if last_reported_failure.as_deref() != Some(error.as_str()) {
-                                eprintln!(
-                                    "refine workflow supervision: could not ensure the workflow runner is running: {error}"
-                                );
-                                last_reported_failure = Some(error);
-                            }
+                    // Supervise these independently: cleanup must keep running
+                    // even if workflow execution itself cannot be launched.
+                    let workflow_error = workers
+                        .ensure_background_worker(WORKFLOW_RUNNER)
+                        .err()
+                        .map(|error| format!("workflow runner: {error}"));
+                    let cleanup_error = workers
+                        .ensure_background_worker(WORKTREE_CLEANUP_RUNNER)
+                        .err()
+                        .map(|error| format!("worktree cleanup runner: {error}"));
+                    let error = match (workflow_error, cleanup_error) {
+                        (Some(workflow), Some(cleanup)) => Some(format!("{workflow}; {cleanup}")),
+                        (Some(error), None) | (None, Some(error)) => Some(error),
+                        (None, None) => None,
+                    };
+                    if let Some(error) = error {
+                        // A stall otherwise looks exactly like an idle queue.
+                        // Report it only when it changes: this loop runs every second.
+                        if last_reported_failure.as_deref() != Some(error.as_str()) {
+                            eprintln!(
+                                "refine runner supervision: could not ensure a background runner is running: {error}"
+                            );
+                            last_reported_failure = Some(error);
                         }
+                    } else {
+                        last_reported_failure = None;
                     }
                 }
                 sleep_until_stopped(&thread_stop, interval);

@@ -37,6 +37,12 @@ pub struct GitHeadRef {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GitLinkedWorktree {
+    pub path: PathBuf,
+    pub branch: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct GitCommitOutcome {
     pub commit: String,
     pub has_changes_since_base: bool,

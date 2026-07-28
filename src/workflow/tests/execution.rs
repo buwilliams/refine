@@ -436,6 +436,11 @@ fn file_automation_accepts_agent_precommitted_implementation_branch() {
         .unwrap();
 
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Todo
+    );
+    assert!(!target_root.join(".git/refine-worktrees").exists());
     let result = automation.evaluate_workflow().unwrap();
     let worktree_path = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
     assert_eq!(result.steps.len(), 1);

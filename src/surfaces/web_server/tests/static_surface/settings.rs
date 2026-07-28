@@ -10,13 +10,24 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
     assert!(runtime.contains(r#"data-testid="runtime-project-update-pulse""#));
+    assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-delay""#));
+    assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-generated-paths""#));
+    assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-now""#));
     assert!(runtime.contains(r#"api("POST", "/api/project/sync", {})"#));
+    assert!(runtime.contains(r#""/api/project/worktrees/cleanup""#));
     assert!(runtime.contains("resolveBackgroundOperationResponse"));
     assert!(
         runtime.contains(r##"state_sync_debounce_seconds: $("#s-state-sync-debounce").value"##)
     );
     assert!(runtime.contains(
         r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
+    ));
+    assert!(
+        runtime
+            .contains(r##"worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value"##)
+    );
+    assert!(runtime.contains(
+        r##"worktree_cleanup_generated_paths: $("#s-worktree-cleanup-generated-paths").value"##
     ));
     assert!(!runtime.contains(r#"data-testid="source-upgrade-section""#));
     assert!(releases.contains(r#"data-testid="source-upgrade-section""#));

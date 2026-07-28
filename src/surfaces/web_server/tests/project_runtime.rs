@@ -333,3 +333,68 @@ fn web_server_applies_runtime_settings_updates_immediately() {
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn web_server_worktree_cleanup_routes_to_the_attached_target_app() {
+    let temp_root = unique_temp_dir("http-worktree-cleanup");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&app_root);
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Clean terminal worktree", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Tester", "Implement")
+        .unwrap();
+    work_items
+        .set_goal_branch_name("GOAL1", "refine/GOAL1/round-1")
+        .unwrap();
+    work_items.cancel_goal_summary("GOAL1").unwrap();
+    let worktree = app_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    fs::create_dir_all(worktree.parent().unwrap()).unwrap();
+    git(
+        &app_root,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            worktree.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root.clone());
+    server.runtime_root = Some(runtime_root);
+    let preview = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/worktrees/cleanup".to_string(),
+        body: Some(json!({"apply": false})),
+    });
+    assert_eq!(preview.status, 200, "{:#}", preview.body);
+    assert_eq!(preview.body["eligible"], 1);
+    assert_eq!(preview.body["removed"], 0);
+    assert!(worktree.exists());
+
+    let applied = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/worktrees/cleanup".to_string(),
+        body: Some(json!({"apply": true})),
+    });
+    assert_eq!(applied.status, 200, "{:#}", applied.body);
+    assert_eq!(applied.body["removed"], 1);
+    assert_eq!(applied.body["branches_deleted"], 0);
+    assert!(!worktree.exists());
+    assert!(
+        git(
+            &app_root,
+            &["rev-parse", "--verify", "refs/heads/refine/GOAL1/round-1"]
+        )
+        .is_ok()
+    );
+
+    remove_temp_dir(&temp_root);
+}

@@ -52,6 +52,8 @@ impl FileMergerService {
     /// The repository lock serializes fetch/merge/push across processes. Successful evidence is
     /// written before the caller advances the Goal, so a crash after push is recovered by proving
     /// that the exact candidate already belongs to the configured target branch.
+    // Each argument is an independently verified execution fence component.
+    #[allow(clippy::too_many_arguments)]
     pub fn integrate_workflow_candidate(
         &self,
         goal_id: &str,
@@ -268,6 +270,7 @@ impl FileMergerService {
         work_items.verify_goal_summary(goal_id)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn integrate_workflow_candidate_locked(
         &self,
         target_root: &Path,

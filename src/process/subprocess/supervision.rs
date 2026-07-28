@@ -216,7 +216,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             Err(RefineError::NotFound(error)) => {
                 return self
                     .wait_for_reaper_terminal(process_id)?
-                    .ok_or_else(|| RefineError::NotFound(error));
+                    .ok_or(RefineError::NotFound(error));
             }
             Err(error) => return Err(error),
         };

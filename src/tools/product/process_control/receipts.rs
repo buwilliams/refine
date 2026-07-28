@@ -1,6 +1,9 @@
 use super::*;
 
 impl FileProcessControlService {
+    // Receipt fields intentionally mirror the durable settlement facts instead
+    // of hiding them in a positional tuple or lossy intermediate object.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn complete_outcome_receipt(
         &self,
         process_id: &str,
@@ -168,18 +171,16 @@ impl FileProcessControlService {
             .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
             .map(|intent| json!(intent.disposition()))
             .or(retained_disposition.clone());
-        let durable_goal_status = goal_id
-            .and_then(|goal_id| {
-                self.refine_dir
-                    .as_deref()
-                    .map(|refine_dir| (refine_dir, goal_id))
-            })
-            .and_then(|(refine_dir, goal_id)| {
-                FileWorkItemService::new(refine_dir)
-                    .show_goal_summary(goal_id)
-                    .ok()
-                    .map(|goal| goal.goal.status)
-            });
+        let durable_goal_status =
+            self.refine_dir
+                .as_deref()
+                .zip(goal_id)
+                .and_then(|(refine_dir, goal_id)| {
+                    FileWorkItemService::new(refine_dir)
+                        .show_goal_summary(goal_id)
+                        .ok()
+                        .map(|goal| goal.goal.status)
+                });
         let goal_cancelled = durable_goal_status
             .as_ref()
             .map(|status| *status == GoalStatus::Cancelled)

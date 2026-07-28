@@ -80,14 +80,12 @@ impl WorkflowBehavior for WorkflowTodo {
             Ok(commit) => commit,
             Err(error) => return fail(ctx, "branch", error),
         };
+        // Todo is a queue, not an execution workspace. The scheduler has already
+        // acquired capacity for this Running claim before this transition, and
+        // the durable Goal state must cross into in-progress before Git is
+        // allowed to materialize a repository copy.
         ctx.request_transition(GoalStatus::Todo, GoalStatus::InProgress)?;
-        let worktree_target = match app_git.git_path("refine-worktrees") {
-            Ok(root) => root.join(branch.replace('/', "-")),
-            Err(error) => return fail(ctx, "branch", error),
-        };
-        let worktree_path = match with_repository_git_lock(ctx.target_root, || {
-            app_git.ensure_worktree(&branch, &worktree_target)
-        }) {
+        let worktree_path = match materialize_in_progress_worktree(ctx, &app_git, &branch) {
             Ok(path) => path,
             Err(error) => return fail(ctx, "branch", error),
         };
@@ -116,6 +114,27 @@ impl WorkflowBehavior for WorkflowTodo {
             reason: "Goal entered implementation".to_string(),
         })
     }
+}
+
+fn materialize_in_progress_worktree(
+    ctx: &WorkflowContext<'_>,
+    app_git: &FileGitWorktreeService,
+    branch: &str,
+) -> RefineResult<String> {
+    let status = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
+    if status != GoalStatus::InProgress {
+        return Err(RefineError::Conflict(format!(
+            "refusing to create an implementation worktree for Goal {} while it is {}; worktrees are materialized only after admission to in-progress",
+            ctx.goal_id,
+            status.as_str()
+        )));
+    }
+    let worktree_target = app_git
+        .git_path("refine-worktrees")?
+        .join(branch.replace('/', "-"));
+    with_repository_git_lock(ctx.target_root, || {
+        app_git.ensure_worktree(branch, &worktree_target)
+    })
 }
 
 impl WorkflowBehavior for WorkflowImplementation {

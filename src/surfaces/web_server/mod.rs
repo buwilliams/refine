@@ -27,7 +27,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/project",
-        capability: "active app status, app attach helpers, migration, sync",
+        capability: "active app status, app attach helpers, migration, sync, managed worktree cleanup",
     },
     ApiRouteGroup {
         prefix: "/target-app",

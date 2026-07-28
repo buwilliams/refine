@@ -50,7 +50,6 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(not(windows))]
-
 fn cli_operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {
     #[cfg(windows)]
     let (command, args) = (

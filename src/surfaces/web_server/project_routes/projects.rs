@@ -259,4 +259,27 @@ impl InProcessWebServer {
             Err(error) => error_response(error),
         }
     }
+
+    pub(crate) fn handle_project_worktree_cleanup(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("clean target-app worktrees");
+        };
+        let target_root = match self.current_target_root() {
+            Ok(Some(target_root)) => target_root,
+            Ok(None) => return target_root_unavailable("clean target-app worktrees"),
+            Err(error) => return error_response(error),
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let options = WorktreeCleanupOptions {
+            apply: body.get("apply").and_then(Value::as_bool).unwrap_or(false),
+            older_than_seconds: body
+                .get("older_than_seconds")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        };
+        match FileWorktreeCleanupService::new(target_root, runtime_root).run(options) {
+            Ok(report) => ApiResponse::json(200, serde_json::to_value(report).unwrap()),
+            Err(error) => error_response(error),
+        }
+    }
 }

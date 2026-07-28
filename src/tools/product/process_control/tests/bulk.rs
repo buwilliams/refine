@@ -247,7 +247,7 @@ fn bulk_cancellation_replays_interrupted_settlement_and_revalidates_done_race() 
     reserve_workflow_capacity(&runtime_root, claim_id);
 
     let interrupted = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-        .with_settlement_interruption(CancellationSettlementFailureStage::AfterClaimPersistence);
+        .with_settlement_interruption(CancellationSettlementFailureStage::ClaimPersistence);
     let first = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         interrupted.bulk_cancel_goals(BulkGoalSelection {
             selected_ids: Some(vec![replay_goal.to_string()]),
@@ -454,7 +454,7 @@ fn cancel_goal_partial_failure_never_reports_cancelled_success() {
     let process = launch_agent(&supervisor, goal_id, None);
 
     let error = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-        .with_settlement_failure(CancellationSettlementFailureStage::AfterGoalPersistence)
+        .with_settlement_failure(CancellationSettlementFailureStage::GoalPersistence)
         .cancel_goal(goal_id)
         .unwrap_err();
 

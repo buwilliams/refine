@@ -36,7 +36,9 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::process::agent_sessions::find_agent_session;
 #[cfg(not(test))]
-use crate::process::runner::{FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKFLOW_RUNNER};
+use crate::process::runner::{
+    FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKFLOW_RUNNER, WORKTREE_CLEANUP_RUNNER,
+};
 #[cfg(test)]
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};

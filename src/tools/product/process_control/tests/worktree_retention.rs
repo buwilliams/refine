@@ -252,7 +252,7 @@ fn legacy_multi_target_cleanup_journal_replays_as_retention_without_removal() {
 
     let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-            .with_settlement_interruption(CancellationSettlementFailureStage::AfterGoalPersistence)
+            .with_settlement_interruption(CancellationSettlementFailureStage::GoalPersistence)
             .stop(&process.id, "terminate")
             .unwrap();
     }));

@@ -63,9 +63,9 @@ enum WorkflowOwnershipPhase {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CancellationSettlementFailureStage {
-    AfterClaimPersistence,
-    AfterCapacityRelease,
-    AfterGoalPersistence,
+    ClaimPersistence,
+    CapacityRelease,
+    GoalPersistence,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -515,9 +515,9 @@ fn workflow_claim_state_label(state: &WorkflowClaimState) -> &'static str {
 #[cfg(test)]
 fn cancellation_settlement_stage_label(stage: CancellationSettlementFailureStage) -> &'static str {
     match stage {
-        CancellationSettlementFailureStage::AfterClaimPersistence => "claim persistence",
-        CancellationSettlementFailureStage::AfterCapacityRelease => "capacity release",
-        CancellationSettlementFailureStage::AfterGoalPersistence => "Goal persistence",
+        CancellationSettlementFailureStage::ClaimPersistence => "claim persistence",
+        CancellationSettlementFailureStage::CapacityRelease => "capacity release",
+        CancellationSettlementFailureStage::GoalPersistence => "Goal persistence",
     }
 }
 

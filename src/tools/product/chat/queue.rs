@@ -87,7 +87,7 @@ impl FileChatService {
 
     pub(super) fn dispatch_queued_messages(&self, session_id: &str) -> RefineResult<()> {
         loop {
-            let capacity = loop {
+            let _capacity = loop {
                 let record = {
                     let _guard = self.acquire_session_lock(session_id)?;
                     let mut record = self.load_record(session_id)?;
@@ -215,7 +215,6 @@ impl FileChatService {
             latest.updated_at = now_timestamp();
             self.write_record(&latest)?;
             drop(_guard);
-            drop(capacity);
         }
     }
 

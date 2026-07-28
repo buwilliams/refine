@@ -13,7 +13,7 @@ pub const WORKFLOW_COORDINATION_LOCK: &str = ".workflow-coordination.lock";
 
 thread_local! {
     static HELD_COORDINATION_LOCKS: RefCell<BTreeMap<PathBuf, usize>> =
-        RefCell::new(BTreeMap::new());
+        const { RefCell::new(BTreeMap::new()) };
 }
 
 pub fn with_workflow_coordination<T>(

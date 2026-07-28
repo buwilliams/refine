@@ -37,6 +37,43 @@ fn file_automation_promotes_todo_goals_and_starts_executions() {
 }
 
 #[test]
+fn promoting_a_large_todo_queue_does_not_materialize_worktrees() {
+    let temp_root = unique_temp_dir("large-todo-queue");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    for index in 0..128 {
+        let id = format!("GOAL{index:04}");
+        work_items.create_goal_summary(&id, Some(&id)).unwrap();
+        work_items
+            .transition_goal_status(&id, GoalStatus::Todo)
+            .unwrap();
+    }
+
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    assert_eq!(automation.promote().unwrap(), 2);
+    let state = automation.load_state().unwrap();
+    assert_eq!(state.claims.len(), 2);
+    assert!(
+        state
+            .claims
+            .iter()
+            .all(|claim| claim.state == WorkflowClaimState::Claimed)
+    );
+    assert!(!target_root.join(".git/refine-worktrees").exists());
+    for index in 0..128 {
+        let id = format!("GOAL{index:04}");
+        assert_eq!(
+            work_items.show_goal_summary(&id).unwrap().goal.status,
+            GoalStatus::Todo
+        );
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_automation_auto_promotes_backlog_goals_when_configured() {
     let temp_root = unique_temp_dir("automation-backlog-promote");
     let target_root = temp_root.join("target");

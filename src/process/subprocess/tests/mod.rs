@@ -7,7 +7,6 @@ use super::*;
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
-
 fn shell_binary() -> &'static str {
     if cfg!(windows) { "cmd" } else { "sh" }
 }

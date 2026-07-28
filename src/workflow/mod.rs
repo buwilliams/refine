@@ -145,12 +145,15 @@ pub trait WorkflowAutomation {
     fn retry(&self, execution_id: &str) -> RefineResult<String>;
 }
 
+#[cfg(test)]
+type BeforeWorkerPrepareHook = std::sync::Arc<dyn Fn(&str, &str) + Send + Sync>;
+
 #[derive(Clone)]
 pub struct WorkflowEngine {
     pub runtime_root: PathBuf,
     pub target_root: Option<PathBuf>,
     #[cfg(test)]
-    before_worker_prepare_hook: Option<std::sync::Arc<dyn Fn(&str, &str) + Send + Sync>>,
+    before_worker_prepare_hook: Option<BeforeWorkerPrepareHook>,
 }
 
 impl std::fmt::Debug for WorkflowEngine {

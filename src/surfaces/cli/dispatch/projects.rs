@@ -173,6 +173,44 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             print_json(&response);
             Ok(())
         }
+        Commands::Project {
+            action:
+                ProjectAction::CleanupWorktrees {
+                    apply,
+                    older_than_seconds,
+                    runtime_root,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let report = FileWorktreeCleanupService::new(target_root, runtime_root).run(
+                WorktreeCleanupOptions {
+                    apply,
+                    older_than_seconds,
+                },
+            )?;
+            print_json(&serde_json::to_value(report).unwrap());
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::CleanupWorktrees {
+                    apply,
+                    older_than_seconds,
+                    target_root: None,
+                    ..
+                },
+        } => {
+            let response = daemon_json(
+                "POST",
+                "/project/worktrees/cleanup",
+                Some(json!({
+                    "apply": apply,
+                    "older_than_seconds": older_than_seconds
+                })),
+            )?;
+            print_json(&response);
+            Ok(())
+        }
         _ => unreachable!("command family was routed incorrectly"),
     }
 }
@@ -217,6 +255,18 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
         }
         ProjectAction::Migrate { .. } => daemon_json("POST", "/project/migrate", None)?,
         ProjectAction::Sync { .. } => daemon_json("POST", "/project/sync", None)?,
+        ProjectAction::CleanupWorktrees {
+            apply,
+            older_than_seconds,
+            ..
+        } => daemon_json(
+            "POST",
+            "/project/worktrees/cleanup",
+            Some(json!({
+                "apply": apply,
+                "older_than_seconds": older_than_seconds
+            })),
+        )?,
         ProjectAction::Doctor { .. } => daemon_json("GET", "/diagnostics", None)?,
     };
     print_json(&response);

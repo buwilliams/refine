@@ -33,6 +33,16 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["21600", "6 hours"],
     ["86400", "24 hours"],
   ];
+  const worktreeCleanupOptions = [
+    ["-1",    "Manual only"],
+    ["0",     "Immediately"],
+    ["300",   "5 minutes"],
+    ["1800",  "30 minutes"],
+    ["3600",  "1 hour"],
+    ["10800", "3 hours"],
+    ["21600", "6 hours"],
+    ["86400", "24 hours"],
+  ];
   const stateDebounceOptions = [
     ["1",  "1 second"],
     ["5",  "5 seconds"],
@@ -58,6 +68,8 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
   const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
+  const worktreeCleanup = String(s.worktree_cleanup_after_seconds ?? "0");
+  const worktreeCleanupGeneratedPaths = String(s.worktree_cleanup_generated_paths ?? "");
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   return `
@@ -67,6 +79,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-runtime-copy-node">Copy from node</button>
         <button class="secondary" id="s-state-sync-now" data-testid="runtime-state-sync-now">Sync state now</button>
+        <button class="secondary" id="s-worktree-cleanup-now" data-testid="runtime-worktree-cleanup-now">Clean worktrees now</button>
       </div>
       ${renderSettingsEditableField({
         id: "s-cap",
@@ -161,6 +174,27 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         control: `<select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${backlogOptions.map(([v, lbl]) => `<option value="${v}" ${backlogPromote === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-worktree-cleanup-delay",
+        label: "Terminal worktree retention",
+        guideItemId: "runtime-worktree-cleanup",
+        description: "clean done or cancelled Goal worktrees only after this delay. Dirty, active, review, standalone, and state worktrees are always retained.",
+        valueLabel: optionLabel(worktreeCleanupOptions, worktreeCleanup),
+        control: `<select id="s-worktree-cleanup-delay" data-testid="runtime-worktree-cleanup-delay">
+          ${worktreeCleanupOptions.map(([v, lbl]) => `<option value="${v}" ${worktreeCleanup === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-worktree-cleanup-generated-paths",
+        label: "Additional generated worktree paths",
+        guideItemId: "runtime-worktree-cleanup",
+        description: "optional comma-delimited relative cache paths that may be deleted before a terminal worktree. Cargo target directories and Node node_modules are detected automatically; all other ignored content blocks cleanup.",
+        valueLabel: worktreeCleanupGeneratedPaths || "None",
+        control: `<input type="text" id="s-worktree-cleanup-generated-paths"
+                         data-testid="runtime-worktree-cleanup-generated-paths"
+                         placeholder=".venv, build"
+                         value="${htmlEscape(worktreeCleanupGeneratedPaths)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-state-sync-debounce",
@@ -311,6 +345,8 @@ async function autosaveSettingsRuntime(options = {}) {
     agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
+    worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value,
+    worktree_cleanup_generated_paths: $("#s-worktree-cleanup-generated-paths").value,
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
@@ -326,7 +362,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-state-sync-debounce, #s-project-update-pulse, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-worktree-cleanup-generated-paths, #s-state-sync-debounce, #s-project-update-pulse, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );
@@ -357,6 +393,33 @@ function bindNodeRuntimeConfigControls() {
         );
       } catch (error) {
         toast(error.message || "State synchronization failed", "error");
+      }
+    });
+  });
+  const cleanupNow = document.querySelector("#s-worktree-cleanup-now");
+  bindOnce(cleanupNow, "click", async () => {
+    await withButtonBusy(cleanupNow, "Inspecting…", async () => {
+      try {
+        const preview = await api("POST", "/api/project/worktrees/cleanup", {
+          apply: false,
+          older_than_seconds: 0,
+        });
+        if (!preview.eligible) {
+          toast("No clean terminal Goal worktrees are eligible for cleanup.", "info");
+          return;
+        }
+        const ok = await modalConfirm(
+          `Remove ${preview.eligible} clean terminal Goal worktree${preview.eligible === 1 ? "" : "s"}? Branches and commits remain available. Dirty, active, review, standalone, and state worktrees are preserved.`,
+          { title: "Clean worktrees", okLabel: "Clean worktrees", danger: true },
+        );
+        if (!ok) return;
+        const result = await api("POST", "/api/project/worktrees/cleanup", {
+          apply: true,
+          older_than_seconds: 0,
+        });
+        toast(`Removed ${result.removed} worktree${result.removed === 1 ? "" : "s"}.`, result.failed ? "error" : "info");
+      } catch (error) {
+        await showActionError(error);
       }
     });
   });

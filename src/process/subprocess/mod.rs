@@ -104,6 +104,9 @@ pub struct ManagedProcessOutput {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+// Observations are passed briefly between the supervisor and adapters. Keeping
+// the process value inline avoids heap allocation on every live output poll.
+#[allow(clippy::large_enum_variant)]
 pub enum ProcessOutputObservation {
     Observed {
         process: ManagedProcess,

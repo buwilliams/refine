@@ -32,6 +32,7 @@ use crate::tools::product::project_registry::{ProjectRegistryService, registry_a
 use crate::tools::product::project_state::{DashboardProjectionQuery, ProjectionQuery};
 use crate::tools::product::todos::FileTodoService;
 use crate::tools::product::work_items::BulkGoalSelection;
+use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
 use crate::workflow::WorkflowEngine;
 
 use super::support::*;

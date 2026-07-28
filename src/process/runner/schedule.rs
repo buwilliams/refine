@@ -1,8 +1,10 @@
 use super::*;
 
 pub(super) fn validate_worker_kind(worker_kind: &str, allow_one_shot: bool) -> RefineResult<()> {
-    if matches!(worker_kind, WORKFLOW_RUNNER | GIT_SYNC_RUNNER)
-        || (allow_one_shot && matches!(worker_kind, PROJECT_SYNC_RUNNER | JIRA_EXPORT_RUNNER))
+    if matches!(
+        worker_kind,
+        WORKFLOW_RUNNER | WORKTREE_CLEANUP_RUNNER | GIT_SYNC_RUNNER
+    ) || (allow_one_shot && matches!(worker_kind, PROJECT_SYNC_RUNNER | JIRA_EXPORT_RUNNER))
     {
         return Ok(());
     }

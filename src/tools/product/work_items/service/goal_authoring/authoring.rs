@@ -382,6 +382,8 @@ impl FileWorkItemService {
         None
     }
 
+    // Authoring keeps the public Goal fields explicit at the persistence edge.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_authored_goal(
         &self,
         name: &str,

@@ -94,6 +94,7 @@ use crate::tools::product::project_state::{
 };
 use crate::tools::product::todos::FileTodoService;
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
 
 use super::actions::*;
 use super::helpers::*;
@@ -473,6 +474,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Remove { target_root, .. }
             | ProjectAction::Migrate { target_root, .. }
             | ProjectAction::Sync { target_root, .. }
+            | ProjectAction::CleanupWorktrees { target_root, .. }
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
         },
         Commands::Goal { action } => match action {

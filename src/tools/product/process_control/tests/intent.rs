@@ -15,7 +15,7 @@ fn interactive_stop_replay_preserves_authoritative_requeue_intent() {
 
     let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-            .with_settlement_interruption(CancellationSettlementFailureStage::AfterClaimPersistence)
+            .with_settlement_interruption(CancellationSettlementFailureStage::ClaimPersistence)
             .stop(&process.id, "terminate")
             .unwrap();
     }));
@@ -231,7 +231,7 @@ fn interrupted_interactive_settlement_replay_is_superseded_by_explicit_cancellat
 
     let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-            .with_settlement_interruption(CancellationSettlementFailureStage::AfterClaimPersistence)
+            .with_settlement_interruption(CancellationSettlementFailureStage::ClaimPersistence)
             .stop(&process.id, "terminate")
             .unwrap();
     }));
@@ -288,7 +288,7 @@ fn interrupted_explicit_settlement_replay_satisfies_later_interactive_stop() {
 
     let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
-            .with_settlement_interruption(CancellationSettlementFailureStage::AfterClaimPersistence)
+            .with_settlement_interruption(CancellationSettlementFailureStage::ClaimPersistence)
             .cancel_workflow_execution(execution_id)
             .unwrap();
     }));
@@ -327,7 +327,7 @@ fn superseded_stop_partial_failure_reports_durable_cancelled_truth() {
                 .cancel_goal_summary(goal_id)
                 .unwrap();
         })
-        .with_settlement_failure(CancellationSettlementFailureStage::AfterClaimPersistence)
+        .with_settlement_failure(CancellationSettlementFailureStage::ClaimPersistence)
         .stop(&process.id, "terminate")
         .unwrap_err();
 

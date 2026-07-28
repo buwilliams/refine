@@ -10,3 +10,4 @@ pub mod project_registry;
 pub mod project_state;
 pub mod todos;
 pub mod work_items;
+pub mod worktree_cleanup;

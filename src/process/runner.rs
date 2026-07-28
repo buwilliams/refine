@@ -16,20 +16,27 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
-use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::goal_exports::FileGoalExportService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
 use crate::tools::product::work_items::BulkGoalSelection;
+use crate::tools::product::worktree_cleanup::{
+    FileWorktreeCleanupService, WorktreeCleanupOptions, automatic_cleanup_delay_seconds,
+    cleanup_failure_summary,
+};
 use crate::workflow::WorkflowEngine;
 
 pub const WORKFLOW_RUNNER: &str = "workflow";
+pub const WORKTREE_CLEANUP_RUNNER: &str = "worktree-cleanup";
 pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
 pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
+const WORKTREE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
+const WORKTREE_CLEANUP_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
 const DEFAULT_GIT_SYNC_DEBOUNCE: Duration = Duration::from_secs(5);
 const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -59,6 +66,7 @@ mod project_sync;
 mod schedule;
 mod worker_specs;
 mod workflow;
+mod worktree_cleanup;
 
 pub use dispatch::run_worker;
 
@@ -68,6 +76,7 @@ use project_sync::*;
 use schedule::*;
 use worker_specs::*;
 use workflow::*;
+use worktree_cleanup::*;
 
 impl FileRunnerWorkerService {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {

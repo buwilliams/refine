@@ -19,7 +19,7 @@ use super::{
 
 impl FileChatService {
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
-        let capacity = self
+        let _capacity = self
             .try_turn_capacity(&self.load_record(session_id)?)?
             .ok_or_else(|| {
                 RefineError::Conflict("automation concurrency limit reached".to_string())
@@ -108,7 +108,6 @@ impl FileChatService {
         latest.updated_at = now_timestamp();
         self.write_record(&latest)?;
         drop(_guard);
-        drop(capacity);
         Ok(latest)
     }
 

@@ -625,6 +625,8 @@ impl FileProcessControlService {
         }
     }
 
+    // These values form the complete pre-termination ownership fence.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn terminate_with_retained_outcome(
         &self,
         supervisor: &FileProcessSupervisor,

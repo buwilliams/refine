@@ -57,6 +57,42 @@ fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
 }
 
 #[test]
+fn project_worktree_cleanup_is_dry_run_by_default_and_requires_explicit_apply() {
+    let parsed = Cli::try_parse_from(["refine", "project", "cleanup-worktrees"]).unwrap();
+    assert!(matches!(
+        parsed.command,
+        Commands::Project {
+            action: ProjectAction::CleanupWorktrees {
+                apply: false,
+                older_than_seconds: 0,
+                target_root: None,
+                ..
+            }
+        }
+    ));
+
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "project",
+        "cleanup-worktrees",
+        "--apply",
+        "--older-than-seconds",
+        "3600",
+    ])
+    .unwrap();
+    assert!(matches!(
+        parsed.command,
+        Commands::Project {
+            action: ProjectAction::CleanupWorktrees {
+                apply: true,
+                older_than_seconds: 3600,
+                ..
+            }
+        }
+    ));
+}
+
+#[test]
 fn todo_commands_parse_explicit_reporter_and_identifiers() {
     let parsed = Cli::try_parse_from([
         "refine",

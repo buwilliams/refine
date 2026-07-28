@@ -17,6 +17,8 @@ pub(super) fn default_settings() -> JsonObject {
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
         ("backlog_promote_after_seconds", "3600"),
+        ("worktree_cleanup_after_seconds", "0"),
+        ("worktree_cleanup_generated_paths", ""),
         ("state_sync_debounce_seconds", "5"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
@@ -73,6 +75,8 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "resource_isolation_mode",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
+        "worktree_cleanup_after_seconds",
+        "worktree_cleanup_generated_paths",
         "state_sync_debounce_seconds",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
@@ -176,6 +180,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             Ok(parsed.to_string())
         }
         "target_app_test_commands" => normalize_target_app_test_commands(value),
+        "worktree_cleanup_generated_paths" => normalize_worktree_cleanup_generated_paths(value),
         "parallel_run_cap"
         | "parallel_per_node_cap"
         | "parallel_per_provider_cap"
@@ -196,6 +201,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                     | "agent_hard_cap_seconds"
                     | "agent_limit_pause_seconds"
                     | "backlog_promote_after_seconds"
+                    | "worktree_cleanup_after_seconds"
                     | "state_sync_debounce_seconds"
                     | "project_update_pulse_interval_seconds"
             ) =>
@@ -204,6 +210,29 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
         }
         _ => Ok(as_string(value).trim().to_string()),
     }
+}
+
+fn normalize_worktree_cleanup_generated_paths(value: &Value) -> RefineResult<String> {
+    let mut paths = BTreeSet::new();
+    for raw in as_string(value).split([',', '\n']) {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+        let path = Path::new(raw);
+        if path.is_absolute()
+            || path
+                .components()
+                .any(|component| !matches!(component, std::path::Component::Normal(_)))
+        {
+            return Err(RefineError::InvalidInput(
+                "worktree_cleanup_generated_paths must contain only relative paths without . or .."
+                    .to_string(),
+            ));
+        }
+        paths.insert(raw.replace('\\', "/"));
+    }
+    Ok(paths.into_iter().collect::<Vec<_>>().join(", "))
 }
 
 pub(super) fn normalize_quality_timing_lossy(value: &str) -> String {
