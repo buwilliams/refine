@@ -7,8 +7,11 @@ Code-derived reference, current at commit
 
 This document describes the ontology that the current implementation actually
 enforces. It is not a proposal. In particular,
-[`ontology-spec.md`](ontology-spec.md) is a future design for ontology-driven
+[`ontology-spec.md`](../spec/ontology-spec.md) is a future design for ontology-driven
 implementation and must not be read as the current Refine domain model.
+
+The machine-readable companion is the
+[`docs/ontology` OWL/RDF package](README.md).
 
 ## How To Read This Reference
 
@@ -593,9 +596,12 @@ None alone is sufficient:
 
 ## Negative Space: Concepts The Code Does Not Have
 
-The absence of these concepts is part of the current ontology:
+The absence of these concepts from Refine's runtime model is part of the
+current ontology:
 
-- no maintained ontology graph, RDF/OWL layer, or entity registry;
+- no runtime-maintained or operationally authoritative ontology graph; the
+  descriptive [`docs/ontology`](README.md) OWL/RDF layer does not
+  replace Refine's JSON, JSONL, Git, or runtime services;
 - no durable Architecture document;
 - no generic persistent `WorkItem` supertype—Feature and Goal are separate
   records despite `WorkItemService` naming;

@@ -1,0 +1,1454 @@
+@prefix refine: <https://github.com/buwilliams/refine/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://github.com/buwilliams/refine/ontology>
+    a owl:Ontology ;
+    dcterms:title "Refine As-Implemented Ontology"@en ;
+    dcterms:description
+        "A descriptive OWL 2 ontology derived from Refine's durable records, shared product services, workflow rules, runtime authority, and projections."@en ;
+    dcterms:source
+        <https://github.com/buwilliams/refine/blob/6ca7315707519b77ef951ad4fe3e250cec6acad7/docs/ontology/refine-ontology.md> ;
+    dcterms:created "2026-07-28"^^xsd:date ;
+    dcterms:modified "2026-07-28"^^xsd:date ;
+    owl:versionInfo
+        "As-implemented ontology based on Refine commit 6ca7315707519b77ef951ad4fe3e250cec6acad7."@en ;
+    rdfs:comment
+        "This graph is documentation and interchange vocabulary. Refine's JSON, JSONL, Git, and runtime services remain operational authority. OWL open-world semantics do not replace Refine mutation validation."@en .
+
+#################################################################
+# Annotation properties
+#################################################################
+
+refine:authorityLayer
+    a owl:AnnotationProperty ;
+    rdfs:label "authority layer"@en ;
+    rdfs:comment
+        "The implemented authority category: project-durable, runtime, derived, external, conceptual, or vocabulary."@en .
+
+refine:codeReference
+    a owl:AnnotationProperty ;
+    rdfs:label "code reference"@en ;
+    rdfs:comment "Repository-relative implementation evidence for a term."@en .
+
+refine:persistencePath
+    a owl:AnnotationProperty ;
+    rdfs:label "persistence path"@en ;
+    rdfs:comment "Implemented persistence location or path pattern."@en .
+
+refine:wireToken
+    a owl:AnnotationProperty ;
+    rdfs:label "wire token"@en ;
+    rdfs:comment "Serialized token used by Refine's current wire or durable format."@en .
+
+refine:implementedAs
+    a owl:AnnotationProperty ;
+    rdfs:label "implemented as"@en ;
+    rdfs:comment
+        "Notes where the implementation is an embedded value, string correlation, inverse reference, alias, or projection rather than an independent record."@en .
+
+#################################################################
+# Top-level classes and authority layers
+#################################################################
+
+refine:DomainEntity
+    a owl:Class ;
+    rdfs:label "Domain Entity"@en ;
+    rdfs:comment "Any concept in Refine's implemented domain vocabulary."@en ;
+    refine:authorityLayer "conceptual" .
+
+refine:DurableProjectEntity
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "Durable Project Entity"@en ;
+    rdfs:comment
+        "An entity whose operational source of truth is in the target app's Refine project-state tree."@en ;
+    refine:authorityLayer "project-durable" .
+
+refine:RuntimeEntity
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "Runtime Entity"@en ;
+    rdfs:comment
+        "Local operational authority such as claims, leases, operations, processes, or app selection."@en ;
+    refine:authorityLayer "runtime" .
+
+refine:DerivedEntity
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "Derived Entity"@en ;
+    rdfs:comment
+        "A rebuildable view computed from durable state, runtime observations, or Git."@en ;
+    refine:authorityLayer "derived" .
+
+refine:ExternalEntity
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "External Entity"@en ;
+    rdfs:comment "A thing Refine acts upon but does not model as project-state authority."@en ;
+    refine:authorityLayer "external" .
+
+refine:VocabularyConcept
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "Vocabulary Concept"@en ;
+    rdfs:comment "A closed set of implemented wire values."@en ;
+    refine:authorityLayer "vocabulary" .
+
+#################################################################
+# Runtime, target app, and project classes
+#################################################################
+
+refine:RefineRuntime
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Refine Runtime"@en ;
+    rdfs:comment
+        "One local daemon/control-plane instance with a port-scoped runtime root."@en ;
+    refine:codeReference "src/process/supervisor/runtime/mod.rs#RuntimeBootstrap" ;
+    refine:persistencePath "run/<port>/" .
+
+refine:AppRegistry
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "App Registry"@en ;
+    rdfs:comment "The local registry of target repositories known to one runtime."@en ;
+    refine:codeReference "src/model/project/mod.rs#AppRegistry" ;
+    refine:persistencePath "apps.json" .
+
+refine:RegisteredApp
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Registered App"@en ;
+    rdfs:comment "A locally registered target-repository name and path."@en ;
+    refine:codeReference "src/model/project/mod.rs#RegisteredApp" ;
+    refine:persistencePath "apps.json#apps" .
+
+refine:TargetApp
+    a owl:Class ;
+    rdfs:subClassOf refine:ExternalEntity ;
+    rdfs:label "Target App"@en ;
+    rdfs:comment
+        "The Git repository and application lifecycle that Refine changes and may operate."@en ;
+    refine:codeReference "src/tools/host/target_apps/mod.rs" ;
+    refine:implementedAs "Identified operationally by repository path; no independent project-state ID." .
+
+refine:ProjectState
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Project State"@en ;
+    rdfs:comment
+        "The durable Refine model for one target app, mirrored to the refine/state branch."@en ;
+    refine:codeReference "src/tools/host/project_layout.rs" ;
+    refine:persistencePath "<git-common-dir>/refine-live-state; .refine/ on refine/state" .
+
+refine:ProjectConfig
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Project Config"@en ;
+    rdfs:comment "Project schema, Refine version, timestamps, and settings envelope."@en ;
+    refine:codeReference "src/model/project/mod.rs#ProjectConfig" ;
+    refine:persistencePath "refine.json" .
+
+refine:TargetAppSnapshot
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Target App Snapshot"@en ;
+    rdfs:comment "The latest local target-app lifecycle and health observation."@en ;
+    refine:codeReference "src/tools/host/target_apps/mod.rs#TargetAppSnapshot" ;
+    refine:persistencePath "target-app-state.json" .
+
+#################################################################
+# Intent and people classes
+#################################################################
+
+refine:IntentArtifact
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Intent Artifact"@en ;
+    rdfs:comment "Human-readable durable intent used by Governance or implementation."@en .
+
+refine:Governance
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Governance"@en ;
+    rdfs:comment "Project-wide Product, Constitution, and Rules."@en ;
+    refine:codeReference "src/process/supervisor/config/governance.rs" ;
+    refine:persistencePath "governance.json" .
+
+refine:ProductIntent
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Product Intent"@en ;
+    rdfs:comment "The outcomes and users the target app is intended to serve."@en ;
+    refine:persistencePath "governance.json#product" ;
+    refine:implementedAs "A normalized Markdown/plain-text field, not an independent record." .
+
+refine:Constitution
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Constitution"@en ;
+    rdfs:comment "The principles each realization is expected to preserve."@en ;
+    refine:persistencePath "governance.json#constitution" ;
+    refine:implementedAs "A normalized Markdown/plain-text field, not an independent record." .
+
+refine:Rule
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Rule"@en ;
+    rdfs:comment "A normalized prose constraint judged by Governance."@en ;
+    refine:codeReference "src/process/supervisor/config/governance_codec.rs#normalize_rules" ;
+    refine:persistencePath "governance.json#rules" .
+
+refine:GuidanceItem
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Guidance Item"@en ;
+    rdfs:comment
+        "Conditional agent instructions with a name, rule, instructions, and enabled flag."@en ;
+    refine:codeReference "src/process/supervisor/config/guidance_codec.rs" ;
+    refine:persistencePath "guidance.json" .
+
+refine:QualitySettings
+    a owl:Class ;
+    rdfs:subClassOf refine:IntentArtifact ;
+    rdfs:label "Quality Settings"@en ;
+    rdfs:comment
+        "Project-wide requirements, instructions, tests, enablement, and Quality timing."@en ;
+    refine:codeReference "src/tools/host/quality/types.rs#QualitySettings" ;
+    refine:persistencePath "quality/settings.json" .
+
+refine:ReporterRegistry
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Reporter Registry"@en ;
+    rdfs:comment "The registry of named human or actor records."@en ;
+    refine:codeReference "src/process/supervisor/config/reporters.rs" ;
+    refine:persistencePath "reporters.json" .
+
+refine:Reporter
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Reporter"@en ;
+    rdfs:comment
+        "A registry record with numeric ID and name. Work records refer to the name, not this ID."@en ;
+    refine:codeReference "src/process/supervisor/config/reporter_codec.rs" ;
+    refine:persistencePath "reporters.json" .
+
+#################################################################
+# Node and distribution classes
+#################################################################
+
+refine:NodeRegistry
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Node Registry"@en ;
+    rdfs:comment "The durable collection of Node ownership records."@en ;
+    refine:codeReference "src/model/node/mod.rs#NodeRegistry" ;
+    refine:persistencePath "nodes.json" .
+
+refine:Node
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Node"@en ;
+    rdfs:comment
+        "The durable ownership and distributed-execution unit for Features and Goals."@en ;
+    refine:codeReference "src/model/node/mod.rs#Node" ;
+    refine:persistencePath "nodes.json#nodes" .
+
+refine:NodeHealth
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Node Health"@en ;
+    rdfs:comment "A timestamped observation embedded in a Node record."@en ;
+    refine:codeReference "src/model/node/mod.rs#NodeHealth" ;
+    refine:implementedAs "Observed value; it does not determine work ownership." .
+
+refine:ActiveNodeSelection
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Active Node Selection"@en ;
+    rdfs:comment "The Node this runtime currently admits work for."@en ;
+    refine:codeReference "src/model/node/mod.rs#ActiveNodeSelection" ;
+    refine:persistencePath "active-node.json" .
+
+refine:ClusterView
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Cluster View"@en ;
+    rdfs:comment "A timestamped list view over Nodes; not a second machine registry."@en ;
+    refine:codeReference "src/model/cluster/mod.rs#Cluster" ;
+    refine:implementedAs "ClusterNode is a type alias for Node." .
+
+#################################################################
+# Work classes
+#################################################################
+
+refine:WorkItem
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Work Item"@en ;
+    rdfs:comment
+        "A conceptual superclass for ontology queries. Refine does not persist a generic WorkItem record."@en ;
+    refine:implementedAs "Ontology-only superclass for Feature and Goal." .
+
+refine:Feature
+    a owl:Class ;
+    rdfs:subClassOf refine:WorkItem ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:ownedByNode ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Node
+        ] ;
+    rdfs:label "Feature"@en ;
+    rdfs:comment
+        "A durable larger outcome that groups Goals through inverse Goal.feature_id references."@en ;
+    refine:codeReference "src/model/feature/mod.rs#Feature" ;
+    refine:persistencePath "features/<id-prefix>/<id-suffix>/feature.json" .
+
+refine:Goal
+    a owl:Class ;
+    rdfs:subClassOf refine:WorkItem ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:ownedByNode ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Node
+        ] ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:hasStatus ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:GoalStatus
+        ] ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:hasPriority ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:GoalPriority
+        ] ;
+    rdfs:label "Goal"@en ;
+    rdfs:comment "The smallest schedulable and workflow-governed unit of work."@en ;
+    refine:codeReference "src/model/goal/mod.rs#Goal" ;
+    refine:persistencePath "goals/<id-prefix>/<id-suffix>/goal.json" .
+
+refine:GoalNote
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:noteOfGoal ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Goal
+        ] ;
+    rdfs:label "Goal Note"@en ;
+    rdfs:comment "An annotation embedded in one Goal."@en ;
+    refine:codeReference "src/model/goal/mod.rs#GoalNote" ;
+    refine:persistencePath "goal.json#notes" .
+
+refine:GoalRound
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:roundOfGoal ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Goal
+        ] ;
+    rdfs:label "Goal Round"@en ;
+    rdfs:comment
+        "One ordered implementation request/attempt embedded in a Goal. Its array index is its workflow identity."@en ;
+    refine:codeReference "src/tools/product/work_items/service/round_helpers.rs#new_round_value" ;
+    refine:persistencePath "goal.json#rounds" .
+
+refine:TodoList
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Todo List"@en ;
+    rdfs:comment "A Reporter-name-scoped personal list outside Goal workflow."@en ;
+    refine:codeReference "src/tools/product/todos/mod.rs#TodoList" ;
+    refine:persistencePath "todo-lists.json#lists" .
+
+refine:TodoItem
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:itemOfTodoList ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:TodoList
+        ] ;
+    rdfs:label "Todo Item"@en ;
+    rdfs:comment "A lightweight text/done item with no Goal or workflow relation."@en ;
+    refine:codeReference "src/tools/product/todos/mod.rs#TodoItem" ;
+    refine:persistencePath "todo-lists.json#lists[].items" .
+
+#################################################################
+# Workflow and execution classes
+#################################################################
+
+refine:WorkflowAutomationState
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Workflow Automation State"@en ;
+    rdfs:comment "Versioned runtime policy and Claim history."@en ;
+    refine:codeReference "src/workflow/mod.rs#WorkflowAutomationState" ;
+    refine:persistencePath "workflow-automation-state.json" .
+
+refine:WorkflowClaim
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:claimForGoal ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Goal
+        ] ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:claimPinsNode ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:Node
+        ] ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:hasClaimState ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:WorkflowClaimState
+        ] ;
+    rdfs:label "Workflow Claim"@en ;
+    rdfs:comment
+        "Runtime authority reserving one Goal and pinning Node, provider, target app, and optionally Execution/Round/revision."@en ;
+    refine:codeReference "src/workflow/mod.rs#WorkflowClaim" ;
+    refine:persistencePath "workflow-automation-state.json#claims" .
+
+refine:WorkflowExecution
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Workflow Execution"@en ;
+    rdfs:comment
+        "The correlated execution identity shared by Claim, context, processes, operations, logs, and cancellation."@en ;
+    refine:codeReference "src/workflow/automation.rs" ;
+    refine:implementedAs "A correlation ID and shared evidence, not a standalone persisted Rust record." .
+
+refine:WorkflowExecutionFence
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Workflow Execution Fence"@en ;
+    rdfs:comment
+        "A pinned Claim/Execution/Goal/Node/Round/revision/decision tuple guarding consequential work."@en ;
+    refine:codeReference "src/workflow/mod.rs#WorkflowExecutionFence" .
+
+refine:AgentCapacityState
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Agent Capacity State"@en ;
+    rdfs:comment "The local collection of live capacity Leases."@en ;
+    refine:codeReference "src/workflow/capacity.rs#AgentCapacityState" ;
+    refine:persistencePath "agent-capacity-state.json" .
+
+refine:AgentCapacityLease
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Agent Capacity Lease"@en ;
+    rdfs:comment
+        "A runtime reservation scoped by owner, role, Node, provider, target app, and holder PID."@en ;
+    refine:codeReference "src/workflow/capacity.rs#AgentCapacityLease" ;
+    refine:persistencePath "agent-capacity-state.json#leases" .
+
+refine:Operation
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:hasOperationState ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:OperationState
+        ] ;
+    rdfs:label "Operation"@en ;
+    rdfs:comment
+        "A cancellable and recoverable background-action envelope with request, progress, result, and error."@en ;
+    refine:codeReference "src/process/supervisor/operations/mod.rs#OperationHandle" ;
+    refine:persistencePath "operations/<operation-id>.json" .
+
+refine:ManagedProcess
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ,
+        [
+            a owl:Restriction ;
+            owl:onProperty refine:hasProcessOwnerKind ;
+            owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+            owl:onClass refine:ProcessOwnerKind
+        ] ;
+    rdfs:label "Managed Process"@en ;
+    rdfs:comment
+        "Refine's observable OS-execution record. Metadata carries domain correlations."@en ;
+    refine:codeReference "src/process/subprocess/mod.rs#ManagedProcess" ;
+    refine:persistencePath "processes/<process-id>.json" .
+
+refine:GitWorktree
+    a owl:Class ;
+    rdfs:subClassOf refine:ExternalEntity ;
+    rdfs:label "Git Worktree"@en ;
+    rdfs:comment "An isolated checkout realizing concurrent Goal or standalone work."@en ;
+    refine:codeReference "src/tools/host/git_worktrees/mod.rs" .
+
+refine:AgentSession
+    a owl:Class ;
+    rdfs:subClassOf refine:RuntimeEntity ;
+    rdfs:label "Agent Session"@en ;
+    rdfs:comment "A PTY-backed interactive view over a managed Agent process."@en ;
+    refine:codeReference "src/process/agent_sessions.rs#AgentSessionSnapshot" .
+
+refine:ChatSession
+    a owl:Class ;
+    rdfs:subClassOf refine:DurableProjectEntity ;
+    rdfs:label "Chat Session"@en ;
+    rdfs:comment
+        "A durable conversation attached to Goal, Feature, Standalone, or legacy Supervisor context."@en ;
+    refine:codeReference "src/tools/product/chat/mod.rs#ChatSessionRecord" ;
+    refine:persistencePath "chat/sessions/<session-id>.json" .
+
+#################################################################
+# Evidence classes
+#################################################################
+
+refine:Evidence
+    a owl:Class ;
+    rdfs:subClassOf refine:DomainEntity ;
+    rdfs:label "Evidence"@en ;
+    rdfs:comment "An observed or recorded basis for workflow, review, or recovery."@en .
+
+refine:RoundEvidence
+    a owl:Class ;
+    rdfs:subClassOf refine:Evidence , refine:DurableProjectEntity ;
+    rdfs:label "Round Evidence"@en ;
+    rdfs:comment "Evidence belonging to one Goal Round."@en .
+
+refine:ImplementationReport
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Implementation Report"@en ;
+    refine:persistencePath "goal.json#rounds[].implementation_report" .
+
+refine:GuidanceDecision
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Guidance Decision"@en ;
+    refine:persistencePath "goal.json#rounds[].guidance_decision" .
+
+refine:GovernanceEvaluation
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Governance Evaluation"@en ;
+    refine:persistencePath "goal.json#rounds[] governance fields" .
+
+refine:QualityEvaluation
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Quality Evaluation"@en ;
+    refine:persistencePath "goal.json#rounds[] quality fields" .
+
+refine:FailureEvidence
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Failure Evidence"@en ;
+    refine:persistencePath "goal.json#rounds[] failure fields" .
+
+refine:RoundIntegration
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Round Integration"@en ;
+    rdfs:comment
+        "Exact candidate/target commits, target branch, remote, push result, time, and merge result."@en ;
+    refine:codeReference "src/model/goal/mod.rs#RoundIntegration" ;
+    refine:persistencePath "goal.json#rounds[].workflow_integration" .
+
+refine:RoundLogEntry
+    a owl:Class ;
+    rdfs:subClassOf refine:RoundEvidence ;
+    rdfs:label "Round Log Entry"@en ;
+    rdfs:comment "Append-only Goal and Round scoped evidence."@en ;
+    refine:codeReference "src/model/log/mod.rs#RoundLogEntry" ;
+    refine:persistencePath "goals/<id-prefix>/<id-suffix>/logs.jsonl" .
+
+refine:ActivityEntry
+    a owl:Class ;
+    rdfs:subClassOf refine:Evidence , refine:RuntimeEntity ;
+    rdfs:label "Activity Entry"@en ;
+    rdfs:comment "Local project observability, optionally correlated to a Goal."@en ;
+    refine:codeReference "src/model/log/mod.rs#ActivityEntry" ;
+    refine:persistencePath "logs/activity.jsonl" .
+
+#################################################################
+# Derived read-model classes
+#################################################################
+
+refine:ProjectionSnapshot
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Projection Snapshot"@en ;
+    rdfs:comment "A versioned, fingerprint-guarded, rebuildable project read model."@en ;
+    refine:codeReference "src/tools/product/project_state/types.rs#ProjectionSnapshot" ;
+    refine:persistencePath "cache/projection-snapshot.json" .
+
+refine:FeatureRollup
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Feature Rollup"@en ;
+    rdfs:comment "Derived Feature status, counts, blocked count, and next Goal."@en ;
+    refine:codeReference "src/model/feature/mod.rs#FeatureRollup" .
+
+refine:DashboardProjection
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Dashboard Projection"@en ;
+    rdfs:comment "Derived status counts, actor statistics, attention, and recent activity."@en ;
+    refine:codeReference "src/tools/product/project_state/types.rs#DashboardProjection" .
+
+refine:GitChangeProjection
+    a owl:Class ;
+    rdfs:subClassOf refine:DerivedEntity ;
+    rdfs:label "Git Change Projection"@en ;
+    rdfs:comment "A recent Git commit heuristically joined to Goal metadata for display."@en ;
+    refine:codeReference "src/tools/product/project_state/types.rs#ChangeSummaryProjection" .
+
+#################################################################
+# Object properties: project containment and intent
+#################################################################
+
+refine:runtimeHasAppRegistry
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:RefineRuntime ;
+    rdfs:range refine:AppRegistry ;
+    rdfs:label "runtime has app registry"@en .
+
+refine:registryHasApp
+    a owl:ObjectProperty ;
+    rdfs:domain refine:AppRegistry ;
+    rdfs:range refine:RegisteredApp ;
+    rdfs:label "registry has app"@en .
+
+refine:runtimeSelectsApp
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:RefineRuntime ;
+    rdfs:range refine:RegisteredApp ;
+    rdfs:label "runtime selects app"@en .
+
+refine:locatesTargetApp
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:RegisteredApp ;
+    rdfs:range refine:TargetApp ;
+    rdfs:label "locates target app"@en .
+
+refine:targetAppHasProjectState
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:TargetApp ;
+    rdfs:range refine:ProjectState ;
+    rdfs:label "target app has project state"@en .
+
+refine:hasProjectConfig
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:ProjectConfig ;
+    rdfs:label "has project config"@en .
+
+refine:hasGovernance
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:Governance ;
+    rdfs:label "has governance"@en .
+
+refine:hasQualitySettings
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:QualitySettings ;
+    rdfs:label "has Quality settings"@en .
+
+refine:hasReporterRegistry
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:ReporterRegistry ;
+    rdfs:label "has Reporter registry"@en .
+
+refine:hasNodeRegistry
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:NodeRegistry ;
+    rdfs:label "has Node registry"@en .
+
+refine:hasProductIntent
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Governance ;
+    rdfs:range refine:ProductIntent ;
+    rdfs:label "has Product intent"@en .
+
+refine:hasConstitution
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Governance ;
+    rdfs:range refine:Constitution ;
+    rdfs:label "has Constitution"@en .
+
+refine:hasRule
+    a owl:ObjectProperty ;
+    rdfs:domain refine:Governance ;
+    rdfs:range refine:Rule ;
+    rdfs:label "has Rule"@en .
+
+refine:hasGuidanceItem
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:GuidanceItem ;
+    rdfs:label "has Guidance item"@en .
+
+refine:registryHasReporter
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ReporterRegistry ;
+    rdfs:range refine:Reporter ;
+    rdfs:label "registry has Reporter"@en .
+
+refine:registryHasNode
+    a owl:ObjectProperty ;
+    rdfs:domain refine:NodeRegistry ;
+    rdfs:range refine:Node ;
+    rdfs:label "registry has Node"@en .
+
+refine:hasNodeHealth
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Node ;
+    rdfs:range refine:NodeHealth ;
+    rdfs:label "has Node health observation"@en .
+
+refine:activeSelectionSelectsNode
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ActiveNodeSelection ;
+    rdfs:range refine:Node ;
+    rdfs:label "active selection selects Node"@en .
+
+refine:clusterViewIncludesNode
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ClusterView ;
+    rdfs:range refine:Node ;
+    rdfs:label "cluster view includes Node"@en .
+
+refine:projectHasFeature
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:Feature ;
+    rdfs:label "project has Feature"@en .
+
+refine:projectHasGoal
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:Goal ;
+    rdfs:label "project has Goal"@en .
+
+refine:projectHasTodoList
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:TodoList ;
+    rdfs:label "project has Todo list"@en .
+
+refine:projectHasChatSession
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ProjectState ;
+    rdfs:range refine:ChatSession ;
+    rdfs:label "project has Chat session"@en .
+
+#################################################################
+# Object properties: work, ownership, and evidence
+#################################################################
+
+refine:ownedByNode
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Feature refine:Goal )
+    ] ;
+    rdfs:range refine:Node ;
+    rdfs:label "owned by Node"@en .
+
+refine:groupsGoal
+    a owl:ObjectProperty ;
+    owl:inverseOf refine:memberOfFeature ;
+    rdfs:domain refine:Feature ;
+    rdfs:range refine:Goal ;
+    rdfs:label "groups Goal"@en ;
+    refine:implementedAs "Derived inverse of Goal.feature_id; not embedded in feature.json." .
+
+refine:memberOfFeature
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:Feature ;
+    rdfs:label "member of Feature"@en .
+
+refine:hasNote
+    a owl:ObjectProperty ;
+    owl:inverseOf refine:noteOfGoal ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:GoalNote ;
+    rdfs:label "has Note"@en .
+
+refine:noteOfGoal
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:GoalNote ;
+    rdfs:range refine:Goal ;
+    rdfs:label "Note of Goal"@en .
+
+refine:hasRound
+    a owl:ObjectProperty ;
+    owl:inverseOf refine:roundOfGoal ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:GoalRound ;
+    rdfs:label "has Round"@en .
+
+refine:roundOfGoal
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range refine:Goal ;
+    rdfs:label "Round of Goal"@en .
+
+refine:hasStatus
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:GoalStatus ;
+    rdfs:label "has status"@en .
+
+refine:hasPriority
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:GoalPriority ;
+    rdfs:label "has priority"@en .
+
+refine:hasQualityTiming
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range refine:QualityTiming ;
+    rdfs:label "has pinned Quality timing"@en .
+
+refine:hasRoundEvidence
+    a owl:ObjectProperty ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range refine:RoundEvidence ;
+    rdfs:label "has Round evidence"@en .
+
+refine:hasIntegrationEvidence
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:subPropertyOf refine:hasRoundEvidence ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range refine:RoundIntegration ;
+    rdfs:label "has integration evidence"@en .
+
+refine:hasRoundLogEntry
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf refine:hasRoundEvidence ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range refine:RoundLogEntry ;
+    rdfs:label "has Round log entry"@en .
+
+refine:hasTodoItem
+    a owl:ObjectProperty ;
+    owl:inverseOf refine:itemOfTodoList ;
+    rdfs:domain refine:TodoList ;
+    rdfs:range refine:TodoItem ;
+    rdfs:label "has Todo item"@en .
+
+refine:itemOfTodoList
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:TodoItem ;
+    rdfs:range refine:TodoList ;
+    rdfs:label "item of Todo list"@en .
+
+#################################################################
+# Object properties: workflow and execution
+#################################################################
+
+refine:automationHasClaim
+    a owl:ObjectProperty ;
+    rdfs:domain refine:WorkflowAutomationState ;
+    rdfs:range refine:WorkflowClaim ;
+    rdfs:label "automation has Claim"@en .
+
+refine:claimForGoal
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range refine:Goal ;
+    rdfs:label "Claim for Goal"@en .
+
+refine:claimPinsNode
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range refine:Node ;
+    rdfs:label "Claim pins Node"@en .
+
+refine:claimPinsRound
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range refine:GoalRound ;
+    rdfs:label "Claim pins Round"@en .
+
+refine:claimHasExecution
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range refine:WorkflowExecution ;
+    rdfs:label "Claim has Execution"@en .
+
+refine:hasClaimState
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range refine:WorkflowClaimState ;
+    rdfs:label "has Claim state"@en .
+
+refine:executionFencedBy
+    a owl:ObjectProperty ;
+    rdfs:domain refine:WorkflowExecution ;
+    rdfs:range refine:WorkflowExecutionFence ;
+    rdfs:label "Execution fenced by"@en .
+
+refine:executionUsesLease
+    a owl:ObjectProperty ;
+    rdfs:domain refine:WorkflowExecution ;
+    rdfs:range refine:AgentCapacityLease ;
+    rdfs:label "Execution uses Lease"@en .
+
+refine:capacityStateHasLease
+    a owl:ObjectProperty ;
+    rdfs:domain refine:AgentCapacityState ;
+    rdfs:range refine:AgentCapacityLease ;
+    rdfs:label "capacity state has Lease"@en .
+
+refine:operationForExecution
+    a owl:ObjectProperty ;
+    rdfs:domain refine:Operation ;
+    rdfs:range refine:WorkflowExecution ;
+    rdfs:label "Operation for Execution"@en .
+
+refine:operationRunsProcess
+    a owl:ObjectProperty ;
+    rdfs:domain refine:Operation ;
+    rdfs:range refine:ManagedProcess ;
+    rdfs:label "Operation runs Process"@en .
+
+refine:hasOperationState
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:Operation ;
+    rdfs:range refine:OperationState ;
+    rdfs:label "has Operation state"@en .
+
+refine:hasProcessOwnerKind
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:ManagedProcess ;
+    rdfs:range refine:ProcessOwnerKind ;
+    rdfs:label "has Process owner kind"@en .
+
+refine:processForGoal
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ManagedProcess ;
+    rdfs:range refine:Goal ;
+    rdfs:label "Process for Goal"@en ;
+    refine:implementedAs "Correlation in structured process metadata." .
+
+refine:processForClaim
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ManagedProcess ;
+    rdfs:range refine:WorkflowClaim ;
+    rdfs:label "Process for Claim"@en ;
+    refine:implementedAs "Correlation in structured process metadata." .
+
+refine:processForExecution
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ManagedProcess ;
+    rdfs:range refine:WorkflowExecution ;
+    rdfs:label "Process for Execution"@en ;
+    refine:implementedAs "Correlation in structured process metadata." .
+
+refine:goalHasWorktree
+    a owl:ObjectProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range refine:GitWorktree ;
+    rdfs:label "Goal has worktree"@en .
+
+refine:agentSessionBackedByProcess
+    a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:AgentSession ;
+    rdfs:range refine:ManagedProcess ;
+    rdfs:label "Agent session backed by Process"@en .
+
+refine:agentSessionForGoal
+    a owl:ObjectProperty ;
+    rdfs:domain refine:AgentSession ;
+    rdfs:range refine:Goal ;
+    rdfs:label "Agent session for Goal"@en .
+
+refine:chatAttachedTo
+    a owl:ObjectProperty ;
+    rdfs:domain refine:ChatSession ;
+    rdfs:range refine:DomainEntity ;
+    rdfs:label "Chat attached to"@en ;
+    refine:implementedAs "The durable attachment enum also supports Standalone and legacy Supervisor values without a target entity." .
+
+refine:derivedFrom
+    a owl:ObjectProperty ;
+    rdfs:domain refine:DerivedEntity ;
+    rdfs:range refine:DomainEntity ;
+    rdfs:label "derived from"@en .
+
+#################################################################
+# Datatype properties
+#################################################################
+
+refine:identifier
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:DomainEntity ;
+    rdfs:range xsd:string ;
+    rdfs:label "identifier"@en .
+
+refine:name
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:DomainEntity ;
+    rdfs:range xsd:string ;
+    rdfs:label "name"@en .
+
+refine:reporterName
+    a owl:DatatypeProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Feature refine:Goal refine:GoalRound refine:TodoList )
+    ] ;
+    rdfs:range xsd:string ;
+    rdfs:label "Reporter name"@en ;
+    rdfs:comment
+        "A denormalized name reference. It is not an RDF object link to a Reporter registry ID."@en .
+
+refine:assigneeName
+    a owl:DatatypeProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Feature refine:Goal refine:GoalRound )
+    ] ;
+    rdfs:range xsd:string ;
+    rdfs:label "Assignee name"@en ;
+    rdfs:comment
+        "A denormalized actor name; current Goal assignment is derived primarily from the latest Round."@en .
+
+refine:featureOrder
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range xsd:integer ;
+    rdfs:label "Feature order"@en ;
+    rdfs:comment "Absence means unordered; a value means ordered placement."@en .
+
+refine:roundIndex
+    a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain refine:GoalRound ;
+    rdfs:range xsd:nonNegativeInteger ;
+    rdfs:label "Round index"@en ;
+    rdfs:comment "Zero-based array index and workflow identity of the Round."@en .
+
+refine:workflowRevision
+    a owl:DatatypeProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Feature refine:Goal )
+    ] ;
+    rdfs:range xsd:nonNegativeInteger ;
+    rdfs:label "workflow revision"@en .
+
+refine:decisionVersion
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:WorkflowClaim ;
+    rdfs:range xsd:nonNegativeInteger ;
+    rdfs:label "decision version"@en .
+
+refine:branchName
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "branch name"@en .
+
+refine:targetBranch
+    a owl:DatatypeProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Goal refine:RoundIntegration )
+    ] ;
+    rdfs:range xsd:string ;
+    rdfs:label "target branch"@en .
+
+refine:baseCommit
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "base commit"@en .
+
+refine:candidateCommit
+    a owl:DatatypeProperty ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( refine:Goal refine:RoundIntegration )
+    ] ;
+    rdfs:range xsd:string ;
+    rdfs:label "candidate commit"@en .
+
+refine:targetCommit
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:RoundIntegration ;
+    rdfs:range xsd:string ;
+    rdfs:label "target commit"@en .
+
+refine:createdAt
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:DomainEntity ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "created at"@en .
+
+refine:updatedAt
+    a owl:DatatypeProperty ;
+    rdfs:domain refine:DomainEntity ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "updated at"@en .
+
+#################################################################
+# Status and value properties
+#################################################################
+
+refine:manualTransitionTo
+    a owl:ObjectProperty ;
+    rdfs:domain refine:GoalStatus ;
+    rdfs:range refine:GoalStatus ;
+    rdfs:label "manual transition to"@en .
+
+refine:automatedTransitionTo
+    a owl:ObjectProperty ;
+    rdfs:domain refine:GoalStatus ;
+    rdfs:range refine:GoalStatus ;
+    rdfs:label "automated transition to"@en .
+
+refine:promotionTransitionTo
+    a owl:ObjectProperty ;
+    rdfs:domain refine:GoalStatus ;
+    rdfs:range refine:GoalStatus ;
+    rdfs:label "promotion transition to"@en .
+
+refine:approvalTransitionTo
+    a owl:ObjectProperty ;
+    rdfs:domain refine:GoalStatus ;
+    rdfs:range refine:GoalStatus ;
+    rdfs:label "approval transition to"@en .
+
+#################################################################
+# Goal status vocabulary and transition graph
+#################################################################
+
+refine:GoalStatus
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:statusBacklog
+        refine:statusTodo
+        refine:statusInProgress
+        refine:statusQa
+        refine:statusReadyMerge
+        refine:statusBuild
+        refine:statusReview
+        refine:statusDone
+        refine:statusFailed
+        refine:statusCancelled
+    ) ;
+    rdfs:label "Goal Status"@en ;
+    refine:codeReference "src/model/workflow/mod.rs#GoalStatus" .
+
+refine:statusBacklog
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Backlog"@en ;
+    refine:wireToken "backlog" ;
+    refine:manualTransitionTo refine:statusTodo ;
+    refine:promotionTransitionTo refine:statusTodo .
+
+refine:statusTodo
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Todo"@en ;
+    refine:wireToken "todo" ;
+    refine:manualTransitionTo refine:statusBacklog ;
+    refine:automatedTransitionTo refine:statusInProgress .
+
+refine:statusInProgress
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "In Progress"@en ;
+    refine:wireToken "in-progress" ;
+    refine:automatedTransitionTo
+        refine:statusQa ,
+        refine:statusReadyMerge ,
+        refine:statusFailed .
+
+refine:statusQa
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "QA"@en ;
+    refine:wireToken "qa" ;
+    refine:automatedTransitionTo
+        refine:statusReadyMerge ,
+        refine:statusReview ,
+        refine:statusBuild ,
+        refine:statusFailed .
+
+refine:statusReadyMerge
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Ready Merge"@en ;
+    refine:wireToken "ready-merge" ;
+    refine:automatedTransitionTo
+        refine:statusBuild ,
+        refine:statusQa ,
+        refine:statusFailed .
+
+refine:statusBuild
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Build"@en ;
+    refine:wireToken "build" ;
+    refine:automatedTransitionTo
+        refine:statusQa ,
+        refine:statusReview ,
+        refine:statusFailed .
+
+refine:statusReview
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Review"@en ;
+    refine:wireToken "review" ;
+    refine:approvalTransitionTo refine:statusDone .
+
+refine:statusDone
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Done"@en ;
+    refine:wireToken "done" ;
+    refine:manualTransitionTo refine:statusReview .
+
+refine:statusFailed
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Failed"@en ;
+    refine:wireToken "failed" ;
+    refine:manualTransitionTo refine:statusTodo .
+
+refine:statusCancelled
+    a owl:NamedIndividual , refine:GoalStatus ;
+    rdfs:label "Cancelled"@en ;
+    refine:wireToken "cancelled" ;
+    refine:manualTransitionTo refine:statusTodo .
+
+#################################################################
+# Goal priority vocabulary
+#################################################################
+
+refine:GoalPriority
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:priorityLow
+        refine:priorityMedium
+        refine:priorityHigh
+    ) ;
+    rdfs:label "Goal Priority"@en ;
+    refine:codeReference "src/model/goal/mod.rs#GoalPriority" .
+
+refine:priorityLow
+    a owl:NamedIndividual , refine:GoalPriority ;
+    rdfs:label "Low"@en ;
+    refine:wireToken "low" .
+
+refine:priorityMedium
+    a owl:NamedIndividual , refine:GoalPriority ;
+    rdfs:label "Medium"@en ;
+    refine:wireToken "medium" .
+
+refine:priorityHigh
+    a owl:NamedIndividual , refine:GoalPriority ;
+    rdfs:label "High"@en ;
+    refine:wireToken "high" .
+
+#################################################################
+# Quality timing vocabulary
+#################################################################
+
+refine:QualityTiming
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:qualityPreMerge
+        refine:qualityPostBuild
+    ) ;
+    rdfs:label "Quality Timing"@en ;
+    refine:codeReference "src/model/goal/mod.rs#WorkflowQualityTiming" .
+
+refine:qualityPreMerge
+    a owl:NamedIndividual , refine:QualityTiming ;
+    rdfs:label "Pre Merge"@en ;
+    refine:wireToken "pre_merge" .
+
+refine:qualityPostBuild
+    a owl:NamedIndividual , refine:QualityTiming ;
+    rdfs:label "Post Build"@en ;
+    refine:wireToken "post_build" .
+
+#################################################################
+# Workflow Claim state vocabulary
+#################################################################
+
+refine:WorkflowClaimState
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:claimClaimed
+        refine:claimRunning
+        refine:claimCompleted
+        refine:claimFailed
+        refine:claimCancelled
+        refine:claimInterrupted
+    ) ;
+    rdfs:label "Workflow Claim State"@en ;
+    refine:codeReference "src/workflow/mod.rs#WorkflowClaimState" .
+
+refine:claimClaimed
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Claimed"@en ;
+    refine:wireToken "claimed" .
+
+refine:claimRunning
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Running"@en ;
+    refine:wireToken "running" .
+
+refine:claimCompleted
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Completed"@en ;
+    refine:wireToken "completed" .
+
+refine:claimFailed
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Failed"@en ;
+    refine:wireToken "failed" .
+
+refine:claimCancelled
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Cancelled"@en ;
+    refine:wireToken "cancelled" .
+
+refine:claimInterrupted
+    a owl:NamedIndividual , refine:WorkflowClaimState ;
+    rdfs:label "Interrupted"@en ;
+    refine:wireToken "interrupted" .
+
+#################################################################
+# Operation state vocabulary
+#################################################################
+
+refine:OperationState
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:operationPending
+        refine:operationRunning
+        refine:operationCancelling
+        refine:operationSucceeded
+        refine:operationFailed
+        refine:operationCancelled
+        refine:operationInterrupted
+    ) ;
+    rdfs:label "Operation State"@en ;
+    refine:codeReference "src/process/supervisor/operations/mod.rs#OperationState" .
+
+refine:operationPending
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Pending"@en ;
+    refine:wireToken "pending" .
+
+refine:operationRunning
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Running"@en ;
+    refine:wireToken "running" .
+
+refine:operationCancelling
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Cancelling"@en ;
+    refine:wireToken "cancelling" .
+
+refine:operationSucceeded
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Succeeded"@en ;
+    refine:wireToken "complete" .
+
+refine:operationFailed
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Failed"@en ;
+    refine:wireToken "failed" .
+
+refine:operationCancelled
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Cancelled"@en ;
+    refine:wireToken "cancelled" .
+
+refine:operationInterrupted
+    a owl:NamedIndividual , refine:OperationState ;
+    rdfs:label "Interrupted"@en ;
+    refine:wireToken "interrupted" .
+
+#################################################################
+# Managed Process owner vocabulary
+#################################################################
+
+refine:ProcessOwnerKind
+    a owl:Class ;
+    rdfs:subClassOf refine:VocabularyConcept ;
+    owl:oneOf (
+        refine:ownerDaemon
+        refine:ownerRunner
+        refine:ownerTargetApp
+        refine:ownerAgent
+        refine:ownerQuality
+        refine:ownerImport
+        refine:ownerMaintenance
+        refine:ownerUserHelper
+    ) ;
+    rdfs:label "Process Owner Kind"@en ;
+    refine:codeReference "src/process/subprocess/mod.rs#ProcessOwner" .
+
+refine:ownerDaemon
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Daemon"@en ;
+    refine:wireToken "daemon" .
+
+refine:ownerRunner
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Runner"@en ;
+    refine:wireToken "runner" .
+
+refine:ownerTargetApp
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Target App"@en ;
+    refine:wireToken "target_app" .
+
+refine:ownerAgent
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Agent"@en ;
+    refine:wireToken "agent" .
+
+refine:ownerQuality
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Quality"@en ;
+    refine:wireToken "quality" .
+
+refine:ownerImport
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Import"@en ;
+    refine:wireToken "import" .
+
+refine:ownerMaintenance
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "Maintenance"@en ;
+    refine:wireToken "maintenance" .
+
+refine:ownerUserHelper
+    a owl:NamedIndividual , refine:ProcessOwnerKind ;
+    rdfs:label "User Helper"@en ;
+    refine:wireToken "user_helper" .
