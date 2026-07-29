@@ -256,6 +256,7 @@ mod goal_agent_spec;
 mod governance;
 mod policy;
 mod ready_merge;
+mod reconciliation;
 mod settings;
 mod state;
 mod state_persistence;

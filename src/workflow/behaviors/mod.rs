@@ -14,6 +14,7 @@ use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
+use crate::workflow::reconciliation::IntegratedTargetReconciliationLease;
 use crate::workflow::{
     GovernanceEvaluation, agent_worktree_cwd, goal_agent_prompt, implementation_branch_name,
     json_object, now_timestamp, parse_governance_provider_output,
@@ -488,6 +489,17 @@ impl WorkflowBehavior for WorkflowQa {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        let _reconciliation_lease = if ctx.reconciliation.is_some() {
+            let lease = IntegratedTargetReconciliationLease::acquire(ctx.target_root)?;
+            ctx.log(
+                "reconcile",
+                "Acquired exclusive integrated-target reconciliation lease",
+                None,
+            )?;
+            Some(lease)
+        } else {
+            None
+        };
         let quality = match run_workflow_quality(ctx) {
             Ok(result) => result,
             Err(error) if ctx.reconciliation.is_some() => {

@@ -122,6 +122,230 @@ fn requeued_already_merged_goal_runs_quality_on_target_and_finishes_done() {
 }
 
 #[test]
+fn parallel_already_merged_reconciliations_serialize_shared_target_quality() {
+    let (temp_root, target_root, first_worktree, work_items, _, _) =
+        failed_goal_with_integrated_candidate("already-merged-reconcile-parallel");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    fs::create_dir_all(&runtime_root).unwrap();
+
+    let second_base = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+    let second_branch = "refine/GOAL2/round-1";
+    let second_worktree = target_root
+        .join(".git/refine-worktrees")
+        .join(second_branch.replace('/', "-"));
+    fs::create_dir_all(second_worktree.parent().unwrap()).unwrap();
+    git(
+        &target_root,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            second_branch,
+            second_worktree.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    fs::write(
+        second_worktree.join("feature-two.txt"),
+        "second candidate\n",
+    )
+    .unwrap();
+    git(&second_worktree, &["add", "feature-two.txt"]).unwrap();
+    git(
+        &second_worktree,
+        &["commit", "-q", "-m", "second candidate"],
+    )
+    .unwrap();
+    let second_candidate = git_stdout(&second_worktree, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+    git(
+        &target_root,
+        &[
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "merge second candidate",
+            second_branch,
+        ],
+    )
+    .unwrap();
+    let second_merge = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+
+    work_items
+        .create_goal_summary("Second integrated Goal", Some("GOAL2"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL2", "Reporter", "Prompt")
+        .unwrap();
+    work_items
+        .update_latest_goal_round_implementation_report("GOAL2", "Implementation completed")
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL2", GoalStatus::InProgress)
+        .unwrap();
+    work_items
+        .update_goal_git_refs(
+            "GOAL2",
+            second_branch,
+            "main",
+            &second_base,
+            Some(&second_candidate),
+        )
+        .unwrap();
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL2",
+            0,
+            &json!({
+                "workflow_quality_timing": "pre_merge",
+                "workflow_git_remote": "origin",
+                "workflow_integration": {
+                    "candidate_commit": second_candidate,
+                    "target_branch": "main",
+                    "target_commit": second_merge,
+                    "remote": "origin",
+                    "pushed": false,
+                    "integrated_at": now_timestamp(),
+                    "merge": {
+                        "ok": true,
+                        "conflicts": [],
+                        "message": "Integrated second candidate before post-merge failure"
+                    }
+                }
+            }),
+        )
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL2", GoalStatus::ReadyMerge)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL2", GoalStatus::Failed)
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
+        .unwrap();
+
+    let collision = runtime_root.join("quality-collision");
+    let active = runtime_root.join("quality-active");
+    let quality_command = runtime_root.join("quality-command");
+    fs::write(
+        &quality_command,
+        format!(
+            "#!/bin/sh\nif mkdir '{}' 2>/dev/null; then\n  trap 'rmdir \"{}\" 2>/dev/null' EXIT\n  attempt=0\n  while [ ! -f '{}' ] && [ \"$attempt\" -lt 100 ]; do\n    sleep 0.01\n    attempt=$((attempt + 1))\n  done\n  exit 0\nfi\ntouch '{}'\nexit 1\n",
+            active.display(),
+            active.display(),
+            collision.display(),
+            collision.display()
+        ),
+    )
+    .unwrap();
+    let smoke_ai = runtime_root.join("quality-smoke-ai");
+    fs::write(
+        &smoke_ai,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' '{{\"ok\":true,\"summary\":\"Quality planned.\",\"results\":[{{\"test\":\"Shared target build is exclusive\",\"status\":\"passed\",\"evidence\":\"planned supervised check\",\"command\":\"{}\"}}]}}'\n",
+            quality_command.display()
+        ),
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for script in [&quality_command, &smoke_ai] {
+            let mut permissions = fs::metadata(script).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(script, permissions).unwrap();
+        }
+    }
+    FileQualityService::new(test_refine_dir(&target_root))
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["Shared target build is exclusive".to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    FileSettingsService::new(test_refine_dir(&target_root))
+        .update(&json!({
+            "agent_cli": "smoke-ai",
+            "parallel_run_cap": 2,
+            "parallel_per_node_cap": 2,
+            "parallel_per_provider_cap": 2,
+            "parallel_per_target_app_cap": 2
+        }))
+        .unwrap();
+    let original_target = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+
+    let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap();
+
+    assert_eq!(result.steps.len(), 2);
+    assert!(result.steps.iter().all(|step| step.final_status == "done"));
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Done
+    );
+    assert_eq!(
+        work_items.show_goal_summary("GOAL2").unwrap().goal.status,
+        GoalStatus::Done
+    );
+    for goal_id in ["GOAL1", "GOAL2"] {
+        let detail = work_items.show_goal_detail(goal_id).unwrap();
+        assert_eq!(
+            detail["rounds"][0]["workflow_reconciliation"]["state"],
+            "completed"
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| log["message"].as_str()
+                    == Some("Acquired exclusive integrated-target reconciliation lease"))
+        );
+    }
+    assert!(!collision.exists());
+    assert!(target_root.join("feature.txt").exists());
+    assert!(target_root.join("feature-two.txt").exists());
+    assert_eq!(
+        git_stdout(&target_root, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim(),
+        original_target
+    );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(&first_worktree).ok();
+    fs::remove_dir_all(&second_worktree).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn direct_quality_retry_also_reconciles_an_already_merged_candidate() {
     let (temp_root, target_root, worktree_path, work_items, candidate_commit, _merge_commit) =
         failed_goal_with_integrated_candidate("already-merged-direct-quality-retry");
