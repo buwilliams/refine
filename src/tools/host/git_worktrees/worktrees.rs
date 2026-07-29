@@ -1,6 +1,20 @@
 use super::*;
 
 impl FileGitWorktreeService {
+    pub fn list_refine_owned_branches(&self) -> RefineResult<Vec<String>> {
+        let output = stdout(self.git_output(&[
+            "for-each-ref",
+            "--format=%(refname:short)",
+            "refs/heads/refine/",
+        ])?)?;
+        Ok(output
+            .lines()
+            .map(str::trim)
+            .filter(|branch| !branch.is_empty())
+            .map(str::to_string)
+            .collect())
+    }
+
     pub fn list_linked_worktrees(&self) -> RefineResult<Vec<GitLinkedWorktree>> {
         let output = stdout(self.git_output(&["worktree", "list", "--porcelain"])?)?;
         let mut worktrees = Vec::new();
@@ -88,6 +102,26 @@ impl FileGitWorktreeService {
             "branch_delete",
             "ok",
             json!({"branch": branch, "force": force}),
+        )
+    }
+
+    pub fn delete_branch_if_matches(
+        &self,
+        branch: &str,
+        expected_commit: &str,
+    ) -> RefineResult<()> {
+        validate_branch_name(branch)?;
+        validate_commitish(expected_commit)?;
+        let reference = format!("refs/heads/{branch}");
+        self.git_output(&["update-ref", "-d", &reference, expected_commit])?;
+        self.audit(
+            "branch_delete",
+            "ok",
+            json!({
+                "branch": branch,
+                "expected_commit": expected_commit,
+                "exact_sha_fence": true
+            }),
         )
     }
 

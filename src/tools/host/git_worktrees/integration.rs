@@ -23,6 +23,48 @@ impl FileGitWorktreeService {
         )
     }
 
+    pub fn remote_branch_commit(&self, remote: &str, branch: &str) -> RefineResult<Option<String>> {
+        validate_branch_name(branch)?;
+        if !self.remote_exists(remote)? {
+            return Ok(None);
+        }
+        let reference = format!("refs/heads/{branch}");
+        let output = stdout(self.git_output(&["ls-remote", "--refs", remote, &reference])?)?;
+        Ok(output
+            .split_whitespace()
+            .next()
+            .map(str::to_string)
+            .filter(|commit| !commit.is_empty()))
+    }
+
+    /// Delete only the exact Refine-owned remote ref previously inspected.
+    ///
+    /// The force-with-lease is a compare-and-delete fence, not a history
+    /// rewrite: if another process advances the branch, Git rejects deletion.
+    pub fn delete_remote_branch_if_matches(
+        &self,
+        remote: &str,
+        branch: &str,
+        expected_commit: &str,
+    ) -> RefineResult<()> {
+        validate_branch_name(branch)?;
+        validate_commitish(expected_commit)?;
+        let reference = format!("refs/heads/{branch}");
+        let lease = format!("--force-with-lease={reference}:{expected_commit}");
+        let deletion = format!(":{reference}");
+        self.git_output(&["push", &lease, remote, &deletion])?;
+        self.audit(
+            "remote_branch_delete",
+            "ok",
+            json!({
+                "remote": remote,
+                "branch": branch,
+                "expected_commit": expected_commit,
+                "exact_sha_fence": true
+            }),
+        )
+    }
+
     pub fn fast_forward_from_remote(&self, remote: &str, branch: &str) -> RefineResult<()> {
         self.fetch_branch(remote, branch)?;
         let remote_branch = format!("{remote}/{branch}");

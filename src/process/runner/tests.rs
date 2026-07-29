@@ -237,7 +237,7 @@ fn runner_target_resolution_uses_canonical_registry_over_stale_port_registry() {
 }
 
 #[test]
-fn cleanup_runner_applies_configured_terminal_worktree_retention() {
+fn cleanup_runner_applies_configured_inactive_worktree_retention() {
     let target_root = std::env::temp_dir().join(format!(
         "refine-runner-worktree-cleanup-{}",
         uuid::Uuid::new_v4()
@@ -318,4 +318,51 @@ fn cleanup_runner_applies_configured_terminal_worktree_retention() {
             .success()
     );
     std::fs::remove_dir_all(target_root).unwrap();
+}
+
+#[test]
+fn cleanup_runner_scans_every_registered_target_app_once() {
+    let root = std::env::temp_dir().join(format!(
+        "refine-runner-registered-cleanup-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let registry_root = root.join("registry");
+    let first = root.join("first");
+    let second = root.join("second");
+    std::fs::create_dir_all(&first).unwrap();
+    std::fs::create_dir_all(&second).unwrap();
+    let first = first.canonicalize().unwrap();
+    let second = second.canonicalize().unwrap();
+    let registry = crate::model::project::AppRegistry {
+        version: 1,
+        active_app: Some(first.display().to_string()),
+        apps: std::collections::BTreeMap::from([
+            (
+                first.display().to_string(),
+                crate::model::project::RegisteredApp {
+                    name: "first".to_string(),
+                    path: first.display().to_string(),
+                    added_at: "2026-01-01T00:00:00Z".to_string(),
+                    last_used_at: None,
+                },
+            ),
+            (
+                second.display().to_string(),
+                crate::model::project::RegisteredApp {
+                    name: "second".to_string(),
+                    path: second.display().to_string(),
+                    added_at: "2026-01-01T00:00:00Z".to_string(),
+                    last_used_at: None,
+                },
+            ),
+        ]),
+    };
+    FileProjectRegistryService::new(&registry_root, None)
+        .save(&registry)
+        .unwrap();
+
+    let roots = registered_target_roots(&root.join("runtime"), Some(&registry_root)).unwrap();
+
+    assert_eq!(roots, vec![first, second]);
+    std::fs::remove_dir_all(root).unwrap();
 }

@@ -107,14 +107,14 @@ pub enum ProjectAction {
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
-    /// Inspect or remove clean terminal Goal worktrees for the attached target app.
+    /// Inspect or hibernate clean inactive Goal worktrees for the attached target app.
     ///
-    /// Dry-run is the default. Use --apply to remove eligible worktrees while preserving branches.
+    /// Dry-run is the default. Recoverable branches remain; exact integrated refs may be retired.
     CleanupWorktrees {
         /// Remove eligible worktrees instead of only reporting them.
         #[arg(long)]
         apply: bool,
-        /// Preserve terminal worktrees newer than this many seconds.
+        /// Preserve inactive worktrees newer than this many seconds.
         #[arg(long, default_value_t = 0)]
         older_than_seconds: u64,
         /// Runtime directory where Refine keeps daemon and process state.

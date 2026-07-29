@@ -82,13 +82,20 @@ Current implementation details that matter to intent:
   separate shared maintenance operation outside Stop; ordinary retention is a
   successful result, not a partial failure. The operation is dry-run by default
   when invoked directly and a separately supervised cleanup worker applies the
-  configured terminal-worktree retention delay even while the workflow worker
-  is occupied. The default makes terminal worktrees eligible immediately and
-  the cleanup worker scans at least once per minute. Only clean worktrees belonging to durably
-  done or cancelled Goals are eligible. Recognized or explicitly configured
+  configured inactive-worktree retention delay even while the workflow worker
+  is occupied. The default makes inactive worktrees eligible immediately and
+  the cleanup worker scans every registered target app at least once per
+  minute. Goal status controls workflow semantics, not physical checkout
+  retention: any clean managed Goal worktree without a live Workflow claim,
+  operation, or process may be hibernated. Recognized or explicitly configured
   generated cache paths may be removed first, but any other ignored content
-  protects the worktree. Running managed processes and review work are
-  protected, and cleanup never deletes branch refs. Termination intent is an
+  protects the worktree. Dirty, ambiguously owned, standalone, and state
+  worktrees are retained. Recoverable candidate branches remain available for
+  lazy recreation. A Refine-owned branch may be deleted locally and upstream
+  only when durable integration evidence names its exact candidate, that exact
+  SHA is still the branch tip, and the candidate is an ancestor of the local
+  and remote target tips. Both deletions use exact-SHA compare-and-delete
+  fences, so an advanced branch is retained. Termination intent is an
   explicit authoritative input to the shared capability: interactive user Stop
   requeues, while explicit Goal or workflow cancellation remains terminal
   cancelled. Process discovery and claim presence are settlement evidence, never

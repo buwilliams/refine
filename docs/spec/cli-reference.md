@@ -75,12 +75,12 @@ Publish and pull Refine control state now
 
 ### `refine project cleanup-worktrees`
 
-Inspect or remove clean terminal Goal worktrees for the attached target app.
+Inspect or hibernate clean inactive Goal worktrees for the attached target app.
 
-Dry-run is the default. Use --apply to remove eligible worktrees while preserving branches.
+Dry-run is the default. Recoverable branches remain; exact integrated refs may be retired.
 
 - `--apply` — Remove eligible worktrees instead of only reporting them
-- `--older-than-seconds` — Preserve terminal worktrees newer than this many seconds
+- `--older-than-seconds` — Preserve inactive worktrees newer than this many seconds
 - `--runtime-root` — Runtime directory where Refine keeps daemon and process state
 
 ### `refine project doctor`

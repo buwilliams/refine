@@ -6,10 +6,14 @@ use serde_json::json;
 use super::*;
 use crate::process::subprocess::{ManagedProcess, ProcessOwner};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
+use crate::workflow::{
+    WORKFLOW_AUTOMATION_STATE_FILE, WorkflowAutomationState, WorkflowClaim, WorkflowClaimState,
+    WorkflowPolicy,
+};
 
 #[test]
-fn cleanup_removes_all_clean_terminal_round_worktrees_and_preserves_branches() {
-    let fixture = Fixture::new("terminal-rounds");
+fn cleanup_hibernates_all_clean_inactive_round_worktrees_and_preserves_branches() {
+    let fixture = Fixture::new("inactive-rounds");
     fixture.create_goal("GOAL1", "refine/GOAL1/round-2", true);
     let first = fixture.add_worktree("refine/GOAL1/round-1");
     let second = fixture.add_worktree("refine/GOAL1/round-2");
@@ -41,20 +45,311 @@ fn cleanup_removes_all_clean_terminal_round_worktrees_and_preserves_branches() {
         &fixture.repo,
         &["rev-parse", "--verify", "refs/heads/refine/GOAL1/round-2"]
     ));
+    git(
+        &fixture.repo,
+        &[
+            "worktree",
+            "add",
+            first.to_str().unwrap(),
+            "refine/GOAL1/round-1",
+        ],
+    );
+    assert!(first.exists(), "preserved branch can restore the checkout");
 }
 
 #[test]
-fn cleanup_preserves_dirty_nonterminal_missing_and_process_owned_worktrees() {
+fn cleanup_retires_exact_integrated_candidate_refs_locally_and_upstream() {
+    let fixture = Fixture::new("integrated-refs");
+    let remote = fixture.root.join("origin.git");
+    git(&fixture.root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(
+        &fixture.repo,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    fixture.create_goal("MERGED", "refine/MERGED/round-1", false);
+    let worktree = fixture.add_worktree("refine/MERGED/round-1");
+    fs::write(worktree.join("merged.txt"), "candidate\n").unwrap();
+    git(&worktree, &["add", "merged.txt"]);
+    git(&worktree, &["commit", "-m", "candidate"]);
+    let candidate = git_output(&worktree, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    git(
+        &fixture.repo,
+        &["merge", "--no-ff", "--no-edit", &candidate],
+    );
+    let target = git_output(&fixture.repo, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    git(&fixture.repo, &["push", "origin", "main"]);
+    git(&fixture.repo, &["push", "origin", "refine/MERGED/round-1"]);
+    FileWorkItemService::new(&fixture.refine_dir)
+        .update_goal_round_evaluation_summary(
+            "MERGED",
+            0,
+            &json!({
+                "workflow_integration": {
+                    "candidate_commit": candidate,
+                    "target_branch": "main",
+                    "target_commit": target,
+                    "remote": "origin",
+                    "pushed": true,
+                    "integrated_at": "2026-01-01T00:00:00Z",
+                    "merge": {
+                        "ok": true,
+                        "conflicts": [],
+                        "message": "merged"
+                    }
+                }
+            }),
+        )
+        .unwrap();
+
+    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+
+    assert_eq!(report.removed, 1);
+    assert_eq!(report.branches_deleted, 1);
+    assert_eq!(report.local_branches_deleted, 1);
+    assert_eq!(report.remote_branches_deleted, 1);
+    assert_eq!(
+        report.entries[0].branch_cleanup_reason.as_deref(),
+        Some("integrated_branch_retired")
+    );
+    assert!(!worktree.exists());
+    assert!(!git_succeeds(
+        &fixture.repo,
+        &["rev-parse", "--verify", "refs/heads/refine/MERGED/round-1"]
+    ));
+    assert!(
+        git_output(
+            &fixture.repo,
+            &["ls-remote", "--heads", "origin", "refine/MERGED/round-1"]
+        )
+        .trim()
+        .is_empty()
+    );
+    assert!(git_succeeds(
+        &fixture.repo,
+        &["merge-base", "--is-ancestor", &candidate, "main"]
+    ));
+}
+
+#[test]
+fn cleanup_discovers_and_retires_an_integrated_branch_after_its_worktree_is_gone() {
+    let fixture = Fixture::new("orphaned-integrated-ref");
+    fixture.create_goal("ORPHANED", "refine/ORPHANED/round-1", false);
+    let worktree = fixture.add_worktree("refine/ORPHANED/round-1");
+    fs::write(worktree.join("candidate.txt"), "candidate\n").unwrap();
+    git(&worktree, &["add", "candidate.txt"]);
+    git(&worktree, &["commit", "-m", "candidate"]);
+    let candidate = git_output(&worktree, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    git(
+        &fixture.repo,
+        &["merge", "--no-ff", "--no-edit", &candidate],
+    );
+    let target = git_output(&fixture.repo, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    FileWorkItemService::new(&fixture.refine_dir)
+        .update_goal_round_evaluation_summary(
+            "ORPHANED",
+            0,
+            &json!({
+                "workflow_integration": {
+                    "candidate_commit": candidate,
+                    "target_branch": "main",
+                    "target_commit": target,
+                    "remote": "origin",
+                    "pushed": false,
+                    "integrated_at": "2026-01-01T00:00:00Z",
+                    "merge": {
+                        "ok": true,
+                        "conflicts": [],
+                        "message": "merged"
+                    }
+                }
+            }),
+        )
+        .unwrap();
+    git(
+        &fixture.repo,
+        &["worktree", "remove", worktree.to_str().unwrap()],
+    );
+    let service = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root);
+
+    let preview = service.run(WorktreeCleanupOptions::default()).unwrap();
+    assert_eq!(preview.inspected, 0);
+    assert_eq!(preview.branch_inspected, 1);
+    assert_eq!(preview.branch_eligible, 1);
+    assert_eq!(
+        preview.branch_entries[0].reason,
+        "integrated_branch_eligible"
+    );
+
+    let report = service
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+    assert_eq!(report.removed, 0);
+    assert_eq!(report.branches_deleted, 1);
+    assert_eq!(report.local_branches_deleted, 1);
+    assert_eq!(report.remote_branches_deleted, 0);
+    assert!(!git_succeeds(
+        &fixture.repo,
+        &[
+            "rev-parse",
+            "--verify",
+            "refs/heads/refine/ORPHANED/round-1"
+        ]
+    ));
+}
+
+#[test]
+fn cleanup_keeps_an_integrated_branch_that_advanced_beyond_recorded_candidate() {
+    let fixture = Fixture::new("advanced-integrated-ref");
+    fixture.create_goal("ADVANCED", "refine/ADVANCED/round-1", false);
+    let worktree = fixture.add_worktree("refine/ADVANCED/round-1");
+    fs::write(worktree.join("candidate.txt"), "candidate\n").unwrap();
+    git(&worktree, &["add", "candidate.txt"]);
+    git(&worktree, &["commit", "-m", "candidate"]);
+    let candidate = git_output(&worktree, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    git(
+        &fixture.repo,
+        &["merge", "--no-ff", "--no-edit", &candidate],
+    );
+    let target = git_output(&fixture.repo, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    FileWorkItemService::new(&fixture.refine_dir)
+        .update_goal_round_evaluation_summary(
+            "ADVANCED",
+            0,
+            &json!({
+                "workflow_integration": {
+                    "candidate_commit": candidate,
+                    "target_branch": "main",
+                    "target_commit": target,
+                    "remote": "origin",
+                    "pushed": false,
+                    "integrated_at": "2026-01-01T00:00:00Z",
+                    "merge": {
+                        "ok": true,
+                        "conflicts": [],
+                        "message": "merged"
+                    }
+                }
+            }),
+        )
+        .unwrap();
+    fs::write(worktree.join("later.txt"), "later work\n").unwrap();
+    git(&worktree, &["add", "later.txt"]);
+    git(&worktree, &["commit", "-m", "later candidate work"]);
+    let advanced = git_output(&worktree, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+
+    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+
+    assert_eq!(report.removed, 1);
+    assert_eq!(report.branches_deleted, 0);
+    assert_eq!(
+        report.entries[0].branch_cleanup_reason.as_deref(),
+        Some("candidate_not_integrated")
+    );
+    assert_eq!(
+        git_output(&fixture.repo, &["rev-parse", "refine/ADVANCED/round-1"]).trim(),
+        advanced
+    );
+}
+
+#[test]
+fn cleanup_preserves_dirty_missing_and_owned_worktrees_but_hibernates_inactive_statuses() {
     let fixture = Fixture::new("safety");
     fixture.create_goal("DIRTY", "refine/DIRTY/round-1", true);
     fixture.create_goal("ACTIVE", "refine/ACTIVE/round-1", true);
     fixture.create_goal("REVIEW", "refine/REVIEW/round-1", false);
+    fixture.create_goal("OPERATION", "refine/OPERATION/round-1", false);
     let dirty = fixture.add_worktree("refine/DIRTY/round-1");
     let active = fixture.add_worktree("refine/ACTIVE/round-1");
     let review = fixture.add_worktree("refine/REVIEW/round-1");
+    let operation = fixture.add_worktree("refine/OPERATION/round-1");
     let missing = fixture.add_worktree("refine/MISSING/round-1");
     fs::write(dirty.join("untracked.txt"), "preserve me\n").unwrap();
     fixture.register_active_process(&active);
+    FileOperationRegistry::new(&fixture.runtime_root)
+        .register_with_request("quality", json!({"nested": {"goal_id": "OPERATION"}}))
+        .unwrap();
+
+    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+
+    assert_eq!(report.removed, 1);
+    let reasons = report
+        .entries
+        .iter()
+        .map(|entry| (entry.goal_id.as_deref(), entry.reason.as_str()))
+        .collect::<Vec<_>>();
+    assert!(reasons.contains(&(Some("DIRTY"), "dirty_worktree")));
+    assert!(reasons.contains(&(Some("ACTIVE"), "active_process")));
+    assert!(reasons.contains(&(Some("REVIEW"), "eligible")));
+    assert!(reasons.contains(&(Some("OPERATION"), "active_owner")));
+    assert!(reasons.contains(&(None, "goal_not_found")));
+    assert!(!review.exists(), "hibernated {}", review.display());
+    for path in [dirty, active, operation, missing] {
+        assert!(path.exists(), "preserved {}", path.display());
+    }
+}
+
+#[test]
+fn cleanup_preserves_a_worktree_owned_by_an_active_workflow_claim() {
+    let fixture = Fixture::new("active-claim");
+    fixture.create_goal("CLAIMED", "refine/CLAIMED/round-1", false);
+    let worktree = fixture.add_worktree("refine/CLAIMED/round-1");
+    let state = WorkflowAutomationState {
+        version: 1,
+        policy: WorkflowPolicy::default(),
+        claims: vec![WorkflowClaim {
+            claim_id: "claim-1".to_string(),
+            goal_id: "CLAIMED".to_string(),
+            node_id: "default".to_string(),
+            provider: "claude".to_string(),
+            target_app_id: "default".to_string(),
+            execution_id: None,
+            round_idx: Some(0),
+            goal_revision: None,
+            decision_version: 1,
+            state: WorkflowClaimState::Claimed,
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        }],
+        updated_at: Some("2026-01-01T00:00:00Z".to_string()),
+    };
+    fs::create_dir_all(&fixture.runtime_root).unwrap();
+    fs::write(
+        fixture.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
+        serde_json::to_vec_pretty(&state).unwrap(),
+    )
+    .unwrap();
 
     let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
         .run(WorktreeCleanupOptions {
@@ -64,18 +359,8 @@ fn cleanup_preserves_dirty_nonterminal_missing_and_process_owned_worktrees() {
         .unwrap();
 
     assert_eq!(report.removed, 0);
-    let reasons = report
-        .entries
-        .iter()
-        .map(|entry| (entry.goal_id.as_deref(), entry.reason.as_str()))
-        .collect::<Vec<_>>();
-    assert!(reasons.contains(&(Some("DIRTY"), "dirty_worktree")));
-    assert!(reasons.contains(&(Some("ACTIVE"), "active_process")));
-    assert!(reasons.contains(&(Some("REVIEW"), "goal_not_terminal")));
-    assert!(reasons.contains(&(None, "goal_not_found")));
-    for path in [dirty, active, review, missing] {
-        assert!(path.exists(), "preserved {}", path.display());
-    }
+    assert_eq!(report.entries[0].reason, "active_owner");
+    assert!(worktree.exists());
 }
 
 #[test]
@@ -102,7 +387,7 @@ fn cleanup_retention_window_and_disable_setting_fail_closed() {
 }
 
 #[test]
-fn cleanup_preserves_terminal_worktree_with_unrecognized_ignored_content() {
+fn cleanup_preserves_inactive_worktree_with_unrecognized_ignored_content() {
     let fixture = Fixture::new("ignored-user-content");
     fixture.commit_files(&[(".gitignore", ".env\n")]);
     fixture.create_goal("GOAL1", "refine/GOAL1/round-1", true);
@@ -122,7 +407,7 @@ fn cleanup_preserves_terminal_worktree_with_unrecognized_ignored_content() {
 }
 
 #[test]
-fn cleanup_removes_detected_generated_cache_before_terminal_worktree() {
+fn cleanup_removes_detected_generated_cache_before_inactive_worktree() {
     let fixture = Fixture::new("generated-cache");
     fixture.commit_files(&[
         (".gitignore", "/target/\n"),

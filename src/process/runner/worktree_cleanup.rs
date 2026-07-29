@@ -4,27 +4,49 @@ pub(super) fn run_worktree_cleanup_worker(
     runtime_root: &Path,
     project_registry_root: Option<&Path>,
 ) -> RefineResult<()> {
-    let mut cleanup_root = None;
     let mut next_cleanup = Instant::now();
     loop {
-        match current_target_root(runtime_root, project_registry_root) {
-            Ok(Some(target_root)) => {
-                let root = target_root
-                    .canonicalize()
-                    .unwrap_or_else(|_| target_root.clone());
-                if cleanup_root.as_ref() != Some(&root) || Instant::now() >= next_cleanup {
-                    run_configured_worktree_cleanup(runtime_root, &target_root);
-                    cleanup_root = Some(root);
-                    next_cleanup = Instant::now() + WORKTREE_CLEANUP_INTERVAL;
+        if Instant::now() >= next_cleanup {
+            match registered_target_roots(runtime_root, project_registry_root) {
+                Ok(target_roots) => {
+                    for target_root in target_roots {
+                        // Each app is independently fail-closed so one unavailable
+                        // repository does not prevent reclaiming inactive worktrees
+                        // belonging to the other registered apps.
+                        run_configured_worktree_cleanup(runtime_root, &target_root);
+                    }
+                }
+                Err(error) => {
+                    eprintln!("refine worktree cleanup: failed to read registered apps: {error}");
                 }
             }
-            Ok(None) => cleanup_root = None,
-            Err(error) => {
-                eprintln!("refine worktree cleanup: failed to read the active app: {error}");
-            }
+            next_cleanup = Instant::now() + WORKTREE_CLEANUP_INTERVAL;
         }
         thread::sleep(WORKTREE_CLEANUP_POLL_INTERVAL);
     }
+}
+
+pub(super) fn registered_target_roots(
+    runtime_root: &Path,
+    project_registry_root: Option<&Path>,
+) -> RefineResult<Vec<PathBuf>> {
+    let registry =
+        FileProjectRegistryService::new(project_registry_root.unwrap_or(runtime_root), None)
+            .load()?;
+    let mut roots = registry
+        .apps
+        .values()
+        .map(|app| PathBuf::from(&app.path))
+        .collect::<Vec<_>>();
+    if let Some(active) = registry.active_app {
+        roots.push(PathBuf::from(active));
+    }
+    for root in &mut roots {
+        *root = root.canonicalize().unwrap_or_else(|_| root.clone());
+    }
+    roots.sort();
+    roots.dedup();
+    Ok(roots)
 }
 
 pub(super) fn run_configured_worktree_cleanup(runtime_root: &Path, target_root: &Path) {

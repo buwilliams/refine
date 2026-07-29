@@ -177,9 +177,9 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       })}
       ${renderSettingsEditableField({
         id: "s-worktree-cleanup-delay",
-        label: "Terminal worktree retention",
+        label: "Inactive worktree retention",
         guideItemId: "runtime-worktree-cleanup",
-        description: "clean done or cancelled Goal worktrees only after this delay. Dirty, active, review, standalone, and state worktrees are always retained.",
+        description: "hibernate clean Goal worktrees with no live claim, operation, or process after this delay. Dirty, standalone, state, and unrecognized ignored content remain protected.",
         valueLabel: optionLabel(worktreeCleanupOptions, worktreeCleanup),
         control: `<select id="s-worktree-cleanup-delay" data-testid="runtime-worktree-cleanup-delay">
           ${worktreeCleanupOptions.map(([v, lbl]) => `<option value="${v}" ${worktreeCleanup === v ? "selected" : ""}>${lbl}</option>`).join("")}
@@ -189,7 +189,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-worktree-cleanup-generated-paths",
         label: "Additional generated worktree paths",
         guideItemId: "runtime-worktree-cleanup",
-        description: "optional comma-delimited relative cache paths that may be deleted before a terminal worktree. Cargo target directories and Node node_modules are detected automatically; all other ignored content blocks cleanup.",
+        description: "optional comma-delimited relative cache paths that may be deleted before an inactive worktree. Cargo target directories and Node node_modules are detected automatically; all other ignored content blocks cleanup.",
         valueLabel: worktreeCleanupGeneratedPaths || "None",
         control: `<input type="text" id="s-worktree-cleanup-generated-paths"
                          data-testid="runtime-worktree-cleanup-generated-paths"
@@ -404,12 +404,14 @@ function bindNodeRuntimeConfigControls() {
           apply: false,
           older_than_seconds: 0,
         });
-        if (!preview.eligible) {
-          toast("No clean terminal Goal worktrees are eligible for cleanup.", "info");
+        const eligibleWorktrees = Number(preview.eligible || 0);
+        const eligibleBranches = Number(preview.branch_eligible || 0);
+        if (!eligibleWorktrees && !eligibleBranches) {
+          toast("No clean inactive Goal worktrees or integrated Refine branches are eligible for cleanup.", "info");
           return;
         }
         const ok = await modalConfirm(
-          `Remove ${preview.eligible} clean terminal Goal worktree${preview.eligible === 1 ? "" : "s"}? Branches and commits remain available. Dirty, active, review, standalone, and state worktrees are preserved.`,
+          `Hibernate ${eligibleWorktrees} clean inactive Goal worktree${eligibleWorktrees === 1 ? "" : "s"} and retire ${eligibleBranches} already-integrated Refine branch${eligibleBranches === 1 ? "" : "es"}? Recoverable branches and commits remain available. Dirty, actively owned, standalone, and state worktrees are preserved.`,
           { title: "Clean worktrees", okLabel: "Clean worktrees", danger: true },
         );
         if (!ok) return;
@@ -417,7 +419,7 @@ function bindNodeRuntimeConfigControls() {
           apply: true,
           older_than_seconds: 0,
         });
-        toast(`Removed ${result.removed} worktree${result.removed === 1 ? "" : "s"}.`, result.failed ? "error" : "info");
+        toast(`Hibernated ${result.removed} worktree${result.removed === 1 ? "" : "s"}; retired ${result.branches_deleted || 0} integrated branch${result.branches_deleted === 1 ? "" : "es"}.`, result.failed ? "error" : "info");
       } catch (error) {
         await showActionError(error);
       }
