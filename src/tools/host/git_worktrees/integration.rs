@@ -48,6 +48,16 @@ impl FileGitWorktreeService {
             .success)
     }
 
+    pub fn commit_parents(&self, commit: &str) -> RefineResult<Vec<String>> {
+        validate_commitish(commit)?;
+        let output = stdout(self.git_output(&["rev-list", "--parents", "-n", "1", commit])?)?;
+        Ok(output
+            .split_whitespace()
+            .skip(1)
+            .map(ToString::to_string)
+            .collect())
+    }
+
     /// Return the paths changed by `commit` relative to the merge base with
     /// `base`. Keeping this query in the Git capability lets workflow policy
     /// classify the committed candidate without bypassing the shared command
@@ -138,6 +148,47 @@ impl FileGitWorktreeService {
             json!({"commit": commit, "result": &result}),
         );
         Ok(result)
+    }
+
+    pub fn revert_merge_commit(&self, commit: &str, mainline: usize) -> RefineResult<MergeResult> {
+        validate_commitish(commit)?;
+        if mainline == 0 {
+            return Err(RefineError::InvalidInput(
+                "Git revert mainline must be at least 1".to_string(),
+            ));
+        }
+        let mainline = mainline.to_string();
+        let output = self.git_raw(&["revert", "--no-edit", "-m", &mainline, commit])?;
+        if output.success {
+            let result = MergeResult {
+                ok: true,
+                conflicts: Vec::new(),
+                message: Some(trimmed_command_text(&output)),
+            };
+            self.audit(
+                "revert_merge",
+                "ok",
+                json!({"commit": commit, "mainline": mainline, "result": &result}),
+            )?;
+            return Ok(result);
+        }
+        let result = MergeResult {
+            ok: false,
+            conflicts: self.conflicts().unwrap_or_default(),
+            message: Some(trimmed_command_text(&output)),
+        };
+        let _ = self.audit(
+            "revert_merge",
+            "conflict",
+            json!({"commit": commit, "mainline": mainline, "result": &result}),
+        );
+        Ok(result)
+    }
+
+    pub fn reset_hard_to(&self, commit: &str) -> RefineResult<()> {
+        validate_commitish(commit)?;
+        self.git_output(&["reset", "--hard", commit])?;
+        self.audit("reset_hard_to", "ok", json!({"commit": commit}))
     }
 
     pub fn commit_or_clean_noop_since(

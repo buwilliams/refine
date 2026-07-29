@@ -1,5 +1,300 @@
 use super::*;
 
+fn failed_goal_with_integrated_candidate(
+    label: &str,
+) -> (
+    PathBuf,
+    PathBuf,
+    PathBuf,
+    FileWorkItemService,
+    String,
+    String,
+) {
+    let (temp_root, target_root, worktree_path, work_items, candidate_commit) =
+        ready_merge_goal_with_advanced_target(label, true);
+    let merge_commit = git_stdout(
+        &target_root,
+        &["rev-list", "--first-parent", "--merges", "-n", "1", "HEAD"],
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({
+                "workflow_integration": {
+                    "candidate_commit": candidate_commit,
+                    "target_branch": "main",
+                    "target_commit": merge_commit,
+                    "remote": "origin",
+                    "pushed": false,
+                    "integrated_at": now_timestamp(),
+                    "merge": {
+                        "ok": true,
+                        "conflicts": [],
+                        "message": "Integrated candidate before post-merge failure"
+                    }
+                }
+            }),
+        )
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    (
+        temp_root,
+        target_root,
+        worktree_path,
+        work_items,
+        candidate_commit,
+        merge_commit,
+    )
+}
+
+fn reconciliation_runtime_root(temp_root: &Path) -> PathBuf {
+    temp_root.with_file_name(format!(
+        "{}-runtime",
+        temp_root.file_name().unwrap().to_string_lossy()
+    ))
+}
+
+#[test]
+fn requeued_already_merged_goal_runs_quality_on_target_and_finishes_done() {
+    let (temp_root, target_root, worktree_path, work_items, candidate_commit, _merge_commit) =
+        failed_goal_with_integrated_candidate("already-merged-reconcile-pass");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    let original_target = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+
+    let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap();
+
+    assert_eq!(result.steps.len(), 1);
+    assert_eq!(result.steps[0].commit, candidate_commit);
+    assert_eq!(result.steps[0].final_status, "done");
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Done
+    );
+    assert_eq!(
+        git_stdout(&target_root, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim(),
+        original_target
+    );
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["state"],
+        "completed"
+    );
+    assert_eq!(
+        detail["rounds"][0]["quality_details"]["evaluation_scope"],
+        "integrated_target_reconciliation"
+    );
+    let messages = detail["rounds"][0]["logs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|log| log["message"].as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("Detected already-merged candidate"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("reconciled as done"))
+    );
+
+    fs::remove_dir_all(&worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
+fn direct_quality_retry_also_reconciles_an_already_merged_candidate() {
+    let (temp_root, target_root, worktree_path, work_items, candidate_commit, _merge_commit) =
+        failed_goal_with_integrated_candidate("already-merged-direct-quality-retry");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+        .unwrap();
+    work_items.retry_goal_quality_summary("GOAL1").unwrap();
+
+    let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap();
+
+    assert_eq!(result.steps.len(), 1);
+    assert_eq!(result.steps[0].commit, candidate_commit);
+    assert_eq!(result.steps[0].final_status, "done");
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Done
+    );
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["state"],
+        "completed"
+    );
+    assert!(
+        detail["rounds"][0]["logs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|log| log["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("while resuming workflow")))
+    );
+
+    fs::remove_dir_all(&worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
+fn requeued_already_merged_goal_reverts_exact_merge_before_failing_quality() {
+    let (temp_root, target_root, worktree_path, work_items, candidate_commit, merge_commit) =
+        failed_goal_with_integrated_candidate("already-merged-reconcile-fail");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    fs::create_dir_all(&runtime_root).unwrap();
+    let smoke_ai = runtime_root.join("quality-smoke-ai");
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":false,\"summary\":\"Quality failed.\",\"results\":[{\"test\":\"Feature remains valid\",\"status\":\"failed\",\"evidence\":\"observed failure\",\"command\":\"false\"}]}'\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    FileQualityService::new(test_refine_dir(&target_root))
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["Feature remains valid".to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+    FileSettingsService::new(test_refine_dir(&target_root))
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+
+    let error = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("already-merged candidate was reverted")
+    );
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Failed
+    );
+    assert!(!target_root.join("feature.txt").exists());
+    assert!(target_root.join("unrelated.txt").exists());
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["state"],
+        "reverted"
+    );
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["candidate_commit"],
+        candidate_commit
+    );
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["merge_commit"],
+        merge_commit
+    );
+    let revert_commit = detail["rounds"][0]["workflow_reconciliation"]["revert_commit"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        git_stdout(&target_root, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim(),
+        revert_commit
+    );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(&worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
+fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_revert() {
+    let (temp_root, target_root, worktree_path, work_items, _candidate_commit, _merge_commit) =
+        failed_goal_with_integrated_candidate("already-merged-reconcile-dirty");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    fs::write(target_root.join("operator.txt"), "preserve me\n").unwrap();
+
+    let error = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("dirty candidate index or worktree")
+    );
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Qa
+    );
+    assert!(target_root.join("feature.txt").exists());
+    assert_eq!(
+        fs::read_to_string(target_root.join("operator.txt")).unwrap(),
+        "preserve me\n"
+    );
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["state"],
+        "detected"
+    );
+    assert_eq!(detail["rounds"][0]["quality_state"], "failed");
+    assert!(
+        detail["rounds"][0]["logs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|log| log["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("Goal status were preserved")))
+    );
+
+    fs::remove_file(target_root.join("operator.txt")).unwrap();
+    fs::remove_dir_all(&worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
 #[test]
 fn file_automation_resumes_supported_ready_merge_retry_without_rerunning_implementation() {
     let temp_root = unique_temp_dir("automation-ready-merge-retry");

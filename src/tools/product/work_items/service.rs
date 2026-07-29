@@ -178,6 +178,7 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
     let allowed = matches!(
         (from, to),
         (GoalStatus::Todo, GoalStatus::InProgress)
+            | (GoalStatus::Todo, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
             | (GoalStatus::Qa, GoalStatus::ReadyMerge)
@@ -187,6 +188,7 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
             | (GoalStatus::Build, GoalStatus::Review)
             | (GoalStatus::Qa, GoalStatus::Review)
             | (GoalStatus::Qa, GoalStatus::Build)
+            | (GoalStatus::Qa, GoalStatus::Done)
             | (GoalStatus::InProgress, GoalStatus::Failed)
             | (GoalStatus::Qa, GoalStatus::Failed)
             | (GoalStatus::ReadyMerge, GoalStatus::Failed)

@@ -26,6 +26,23 @@ pub struct FileMergerService {
     pub target_root: Option<PathBuf>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReconciliationRevert {
+    pub merge_commit: String,
+    pub revert_commit: String,
+    pub result: MergeResult,
+}
+
+pub struct ReconciliationRequest<'a> {
+    pub goal_id: &'a str,
+    pub round_idx: usize,
+    pub claim_id: &'a str,
+    pub execution_id: &'a str,
+    pub node_id: &'a str,
+    pub integration: &'a RoundIntegration,
+    pub expected_target_commit: &'a str,
+}
+
 impl FileMergerService {
     pub fn new(runtime_root: impl Into<PathBuf>, refine_dir: impl Into<PathBuf>) -> Self {
         Self {
@@ -268,6 +285,161 @@ impl FileMergerService {
         })?;
 
         work_items.verify_goal_summary(goal_id)
+    }
+
+    /// Revert one already-integrated Goal without rewriting shared history.
+    ///
+    /// Automatic reconciliation is intentionally limited to integration evidence that identifies
+    /// an exact two-parent merge commit whose first parent did not contain the candidate and whose
+    /// second parent does. That proves which shared-branch delta belongs to this Goal. Any
+    /// ambiguity, dirty target, concurrent branch movement, or revert conflict is surfaced without
+    /// pushing or changing Goal status.
+    pub fn revert_reconciled_candidate_and_settle<T>(
+        &self,
+        request: ReconciliationRequest<'_>,
+        settlement: impl FnOnce(&ReconciliationRevert) -> RefineResult<T>,
+    ) -> RefineResult<(ReconciliationRevert, T)> {
+        let ReconciliationRequest {
+            goal_id,
+            round_idx,
+            claim_id,
+            execution_id,
+            node_id,
+            integration,
+            expected_target_commit,
+        } = request;
+        let target_root = match &self.target_root {
+            Some(target_root) => target_root.clone(),
+            None => target_root(&self.refine_dir)?,
+        };
+        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
+        let workflow =
+            WorkflowEngine::with_target_root(&self.runtime_root, &target_root).load_state()?;
+        let owns_reconciliation = workflow.claims.iter().any(|claim| {
+            claim.claim_id == claim_id
+                && claim.execution_id.as_deref() == Some(execution_id)
+                && claim.goal_id == goal_id
+                && claim.node_id == node_id
+                && claim.state == crate::workflow::WorkflowClaimState::Running
+        });
+        if !owns_reconciliation {
+            return Err(RefineError::Conflict(format!(
+                "execution {execution_id} no longer owns already-merged reconciliation for Goal {goal_id}"
+            )));
+        }
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
+        let summary = work_items.show_goal_summary(goal_id)?;
+        if summary.goal.status != GoalStatus::Qa {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} changed from qa to {} before its reconciliation revert",
+                summary.goal.status.as_str()
+            )));
+        }
+        let detail = work_items.show_goal_detail(goal_id)?;
+        let round = detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(round_idx))
+            .ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} has no round {} for reconciliation",
+                    round_idx + 1
+                ))
+            })?;
+        let recorded_integration = round_integration(round)?.ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {goal_id} has no Ready Merge evidence for reconciliation"
+            ))
+        })?;
+        if &recorded_integration != integration {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} integration evidence changed before its reconciliation revert"
+            )));
+        }
+        with_repository_git_lock(&target_root, || {
+            let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
+            let status = git.inspect(target_root.to_str().unwrap_or(""))?;
+            if status.branch.as_deref() != Some(integration.target_branch.as_str()) {
+                return Err(RefineError::Conflict(format!(
+                    "already-merged reconciliation requires target worktree {} to be on branch {}, found {}; user work was preserved",
+                    target_root.display(),
+                    integration.target_branch,
+                    status.branch.as_deref().unwrap_or("<detached>")
+                )));
+            }
+            if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
+                return Err(RefineError::Conflict(format!(
+                    "already-merged reconciliation found a dirty target index or worktree at {}; user work was preserved",
+                    target_root.display()
+                )));
+            }
+            let current_target = git.resolve_commit(&integration.target_branch)?;
+            if current_target != expected_target_commit {
+                return Err(RefineError::Conflict(format!(
+                    "already-merged reconciliation target changed from {expected_target_commit} to {current_target}; no revert was attempted"
+                )));
+            }
+            if integration.pushed {
+                git.fetch_branch(&integration.remote, &integration.target_branch)?;
+                let published = git.resolve_commit(&format!(
+                    "{}/{}",
+                    integration.remote, integration.target_branch
+                ))?;
+                if published != expected_target_commit {
+                    return Err(RefineError::Conflict(format!(
+                        "published target {}/{} changed from {expected_target_commit} to {published}; no revert was attempted",
+                        integration.remote, integration.target_branch
+                    )));
+                }
+            }
+            if !git.commit_is_ancestor(&integration.target_commit, &current_target)? {
+                return Err(RefineError::Conflict(format!(
+                    "recorded integration commit {} is absent from {}; no revert was attempted",
+                    integration.target_commit, integration.target_branch
+                )));
+            }
+            let parents = git.commit_parents(&integration.target_commit)?;
+            if parents.len() != 2
+                || git.commit_is_ancestor(&integration.candidate_commit, &parents[0])?
+                || !git.commit_is_ancestor(&integration.candidate_commit, &parents[1])?
+            {
+                return Err(RefineError::Conflict(format!(
+                    "recorded integration commit {} does not uniquely identify a two-parent merge for candidate {}; no revert was attempted",
+                    integration.target_commit, integration.candidate_commit
+                )));
+            }
+            let result = git.revert_merge_commit(&integration.target_commit, 1)?;
+            if !result.ok {
+                let _ = git.recover();
+                return Err(merge_failure(
+                    "already-merged reconciliation revert",
+                    result,
+                ));
+            }
+            let revert_commit = git.resolve_commit(&integration.target_branch)?;
+            if integration.pushed
+                && let Err(error) = git.push(&integration.remote, &integration.target_branch)
+            {
+                let rollback = git.reset_hard_to(expected_target_commit);
+                if let Err(rollback) = rollback {
+                    return Err(RefineError::Conflict(format!(
+                        "reconciliation revert {revert_commit} could not be pushed to {}/{} ({error}) and the clean local target could not be restored to {expected_target_commit} ({rollback})",
+                        integration.remote, integration.target_branch
+                    )));
+                }
+                return Err(RefineError::Conflict(format!(
+                    "reconciliation revert {revert_commit} could not be pushed to {}/{}; the clean local target was restored to {expected_target_commit}: {error}",
+                    integration.remote, integration.target_branch
+                )));
+            }
+            let reverted = ReconciliationRevert {
+                merge_commit: integration.target_commit.clone(),
+                revert_commit,
+                result,
+            };
+            let settled = settlement(&reverted)?;
+            Ok((reverted, settled))
+        })
     }
 
     #[allow(clippy::too_many_arguments)]

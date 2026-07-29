@@ -171,9 +171,18 @@ impl QualityOperationRunner {
                     round_idx + 1
                 ))
             })?;
+        let reconciliation = round
+            .get("workflow_reconciliation")
+            .and_then(Value::as_object)
+            .filter(|evidence| {
+                matches!(
+                    evidence.get("state").and_then(Value::as_str),
+                    Some("detected" | "revert_blocked")
+                )
+            });
         let post_build =
             round.get("workflow_quality_timing").and_then(Value::as_str) == Some(POST_BUILD);
-        let (cwd, evaluated_commit, evaluation_scope) = if post_build {
+        let (cwd, evaluated_commit, evaluation_scope) = if post_build || reconciliation.is_some() {
             let integration = round
                 .get("workflow_integration")
                 .and_then(Value::as_object)
@@ -195,18 +204,55 @@ impl QualityOperationRunner {
                     "Goal {goal_id} post-build Quality candidate changed from {integrated_candidate} to {source_candidate_commit}"
                 )));
             }
-            let target_commit = integration
-                .get("target_commit")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| {
+            let (target_commit, evaluation_scope) = if reconciliation.is_some() {
+                let git = FileGitWorktreeService::with_runtime_root(
+                    &self.target_root,
+                    &self.runtime_root,
+                );
+                let target_branch = integration
+                    .get("target_branch")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RefineError::Conflict(format!(
+                            "Goal {goal_id} integration evidence has no target branch"
+                        ))
+                    })?;
+                let head = git.head_ref()?;
+                if head.branch.as_deref() != Some(target_branch) {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {goal_id} already-merged reconciliation requires target worktree {} to be on branch {target_branch}, found {}",
+                        self.target_root.display(),
+                        head.branch.as_deref().unwrap_or("<detached>")
+                    )));
+                }
+                let target_commit = head.commit.ok_or_else(|| {
                     RefineError::Conflict(format!(
-                        "Goal {goal_id} integration evidence has no target commit"
+                        "Goal {goal_id} target branch {target_branch} has no commit"
                     ))
-                })?
-                .to_string();
-            (self.target_root.clone(), target_commit, "integrated_target")
+                })?;
+                if !git.commit_is_ancestor(integrated_candidate, &target_commit)? {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {goal_id} candidate {integrated_candidate} is no longer present in target branch {target_branch}"
+                    )));
+                }
+                (target_commit, "integrated_target_reconciliation")
+            } else {
+                let target_commit = integration
+                    .get("target_commit")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RefineError::Conflict(format!(
+                            "Goal {goal_id} integration evidence has no target commit"
+                        ))
+                    })?
+                    .to_string();
+                (target_commit, "integrated_target")
+            };
+            (self.target_root.clone(), target_commit, evaluation_scope)
         } else {
             let branch = summary.goal.branch_name.as_deref().ok_or_else(|| {
                 RefineError::Conflict(format!(

@@ -8,8 +8,8 @@ use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
-    WorkflowBuild, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge, WorkflowReview,
-    WorkflowTodo,
+    WorkflowBuild, WorkflowDone, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge,
+    WorkflowReview, WorkflowTodo,
 };
 use crate::workflow::context::WorkflowContext;
 
@@ -227,6 +227,9 @@ impl WorkflowEngine {
                 WorkflowAdvanceOutcome::Transition {
                     to: GoalStatus::InProgress,
                     ..
+                }
+                | WorkflowAdvanceOutcome::Transition {
+                    to: GoalStatus::Qa, ..
                 } => Ok(ctx),
                 WorkflowAdvanceOutcome::Noop { reason }
                 | WorkflowAdvanceOutcome::Blocked { reason }
@@ -301,8 +304,9 @@ impl WorkflowEngine {
         let build = WorkflowBuild;
         let qa = WorkflowQa;
         let review = WorkflowReview;
-        let behaviors: [&dyn WorkflowBehavior; 5] =
-            [&implementation, &ready_merge, &build, &qa, &review];
+        let done = WorkflowDone;
+        let behaviors: [&dyn WorkflowBehavior; 6] =
+            [&implementation, &ready_merge, &build, &qa, &review, &done];
         loop {
             let Some(behavior) = behaviors
                 .iter()

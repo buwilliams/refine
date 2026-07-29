@@ -11,7 +11,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::{POST_BUILD, QualityCheckResult, QualityOperationRunner};
 use crate::tools::host::target_apps::FileTargetAppService;
-use crate::tools::product::merging::FileMergerService;
+use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
@@ -69,12 +69,15 @@ impl WorkflowBehavior for WorkflowTodo {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+        if let Some(outcome) = prepare_already_merged_reconciliation(ctx, &app_git)? {
+            return Ok(outcome);
+        }
         let branch = implementation_branch_name(
             setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}").as_str(),
             &ctx.goal_id,
             ctx.round_idx,
         );
-        let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
         let base_commit = match app_git.resolve_commit(&target_branch) {
             Ok(commit) => commit,
@@ -114,6 +117,157 @@ impl WorkflowBehavior for WorkflowTodo {
             reason: "Goal entered implementation".to_string(),
         })
     }
+}
+
+fn prepare_already_merged_reconciliation(
+    ctx: &mut WorkflowContext<'_>,
+    app_git: &FileGitWorktreeService,
+) -> RefineResult<Option<WorkflowAdvanceOutcome>> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let Some(round) = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+    else {
+        return Ok(None);
+    };
+    let Some(integration_value) = round
+        .get("workflow_integration")
+        .filter(|value| !value.is_null())
+    else {
+        return Ok(None);
+    };
+    let integration =
+        serde_json::from_value::<crate::model::goal::RoundIntegration>(integration_value.clone())
+            .map_err(|error| {
+            RefineError::Serialization(format!(
+                "Goal {} has invalid Ready Merge evidence: {error}",
+                ctx.goal_id
+            ))
+        })?;
+    if let Some(state) = round
+        .get("workflow_reconciliation")
+        .and_then(Value::as_object)
+        .and_then(|evidence| evidence.get("state"))
+        .and_then(Value::as_str)
+        .filter(|state| matches!(*state, "reverted" | "completed"))
+    {
+        return Err(RefineError::Conflict(format!(
+            "Goal {} round {} reconciliation is already {state}; submit a new round instead of replaying its integration",
+            ctx.goal_id,
+            ctx.round_idx + 1
+        )));
+    }
+    let candidate = detail
+        .get("candidate_commit")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {} has integration evidence but no recorded candidate",
+                ctx.goal_id
+            ))
+        })?;
+    if candidate != integration.candidate_commit {
+        return Err(RefineError::Conflict(format!(
+            "Goal {} candidate changed from integrated commit {} to {}; reconciliation was not started",
+            ctx.goal_id, integration.candidate_commit, candidate
+        )));
+    }
+    let (target_commit, published_commit) = with_repository_git_lock(
+        ctx.target_root,
+        || -> RefineResult<(String, Option<String>)> {
+            let target_commit = app_git.resolve_commit(&integration.target_branch)?;
+            if !app_git.commit_is_ancestor(candidate, &target_commit)? {
+                return Ok((target_commit, None));
+            }
+            let head = app_git.head_ref()?;
+            if head.branch.as_deref() != Some(integration.target_branch.as_str())
+                || head.commit.as_deref() != Some(target_commit.as_str())
+            {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {} already-merged reconciliation requires target worktree {} at {} on branch {}, found {} at {}; user work was preserved",
+                    ctx.goal_id,
+                    ctx.target_root.display(),
+                    target_commit,
+                    integration.target_branch,
+                    head.branch.as_deref().unwrap_or("<detached>"),
+                    head.commit.as_deref().unwrap_or("<unborn>")
+                )));
+            }
+            let published = if integration.pushed {
+                app_git.fetch_branch(&integration.remote, &integration.target_branch)?;
+                let published = app_git.resolve_commit(&format!(
+                    "{}/{}",
+                    integration.remote, integration.target_branch
+                ))?;
+                if published != target_commit {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {} cannot reconcile while local {} ({target_commit}) differs from {}/{} ({published})",
+                        ctx.goal_id,
+                        integration.target_branch,
+                        integration.remote,
+                        integration.target_branch
+                    )));
+                }
+                Some(published)
+            } else {
+                None
+            };
+            Ok((target_commit, published))
+        },
+    )?;
+    if !app_git.commit_is_ancestor(candidate, &target_commit)? {
+        return Ok(None);
+    }
+    ctx.work_items.update_goal_round_evaluation_summary(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &json!({
+            "workflow_reconciliation": {
+                "state": "detected",
+                "candidate_commit": candidate,
+                "target_branch": integration.target_branch,
+                "detected_target_commit": target_commit,
+                "published_target_commit": published_commit,
+                "detected_at": now_timestamp()
+            }
+        }),
+    )?;
+    ctx.log(
+        "reconcile",
+        "Detected already-merged candidate; routing round to merged-target Quality",
+        Some(json_object(json!({
+            "candidate_commit": candidate,
+            "target_branch": integration.target_branch,
+            "target_commit": target_commit,
+            "published_target_commit": published_commit
+        }))),
+    )?;
+    ctx.branch = detail
+        .get("branch_name")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+    ctx.provider_output = Some(
+        round
+            .get("implementation_report")
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "Reconciled existing integrated candidate".to_string()),
+    );
+    ctx.commit = Some(candidate.to_string());
+    ctx.implementation_changed = true;
+    ctx.merge = Some(integration.merge.clone());
+    ctx.reconciliation = Some(integration);
+    ctx.reconciliation_state = Some("detected".to_string());
+    ctx.start_status = GoalStatus::Qa;
+    ctx.request_transition(GoalStatus::Todo, GoalStatus::Qa)?;
+    Ok(Some(WorkflowAdvanceOutcome::Transition {
+        from: GoalStatus::Todo,
+        to: GoalStatus::Qa,
+        reason: "Already-merged candidate requires reconciliation".to_string(),
+    }))
 }
 
 fn materialize_in_progress_worktree(
@@ -336,8 +490,146 @@ impl WorkflowBehavior for WorkflowQa {
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let quality = match run_workflow_quality(ctx) {
             Ok(result) => result,
+            Err(error) if ctx.reconciliation.is_some() => {
+                let _ = ctx.log(
+                    "reconcile",
+                    "Already-merged reconciliation Quality could not run; target and Goal status were preserved",
+                    Some(json_object(json!({"error": error.to_string()}))),
+                );
+                return Err(error);
+            }
             Err(error) => return fail(ctx, "quality", error),
         };
+        if let Some(integration) = ctx.reconciliation.clone() {
+            if quality.ok {
+                ctx.work_items.update_goal_round_evaluation_summary(
+                    &ctx.goal_id,
+                    ctx.round_idx,
+                    &json!({
+                        "workflow_reconciliation": {
+                            "state": "completed",
+                            "candidate_commit": integration.candidate_commit,
+                            "target_branch": integration.target_branch,
+                            "quality_target_commit": quality.candidate_commit,
+                            "completed_at": now_timestamp()
+                        }
+                    }),
+                )?;
+                ctx.log(
+                    "reconcile",
+                    "Already-merged candidate passed Quality; Goal reconciled as done",
+                    Some(json_object(json!({
+                        "candidate_commit": integration.candidate_commit,
+                        "target_branch": integration.target_branch,
+                        "quality_target_commit": quality.candidate_commit
+                    }))),
+                )?;
+                ctx.reconciliation_state = Some("completed".to_string());
+                ctx.request_transition(GoalStatus::Qa, GoalStatus::Done)?;
+                return Ok(WorkflowAdvanceOutcome::Transition {
+                    from: GoalStatus::Qa,
+                    to: GoalStatus::Done,
+                    reason: "Already-merged candidate passed reconciliation Quality".to_string(),
+                });
+            }
+
+            let merger = FileMergerService::with_target_root(
+                ctx.runtime_root,
+                ctx.refine_dir(),
+                ctx.target_root,
+            );
+            let reconciliation_failure = RefineError::Conflict(
+                "quality checks failed; the already-merged candidate was reverted and evidence was preserved"
+                    .to_string(),
+            );
+            let goal_id = ctx.goal_id.clone();
+            let round_idx = ctx.round_idx;
+            let claim_id = ctx.claim_id.clone();
+            let execution_id = ctx.execution_id.clone();
+            let node_id = ctx.node_id.clone();
+            let reverted = match merger.revert_reconciled_candidate_and_settle(
+                ReconciliationRequest {
+                    goal_id: &goal_id,
+                    round_idx,
+                    claim_id: &claim_id,
+                    execution_id: &execution_id,
+                    node_id: &node_id,
+                    integration: &integration,
+                    expected_target_commit: &quality.candidate_commit,
+                },
+                |reverted| {
+                    ctx.work_items.update_goal_round_evaluation_summary(
+                        &ctx.goal_id,
+                        ctx.round_idx,
+                        &json!({
+                            "workflow_reconciliation": {
+                                "state": "reverted",
+                                "candidate_commit": integration.candidate_commit,
+                                "target_branch": integration.target_branch,
+                                "quality_target_commit": quality.candidate_commit,
+                                "merge_commit": reverted.merge_commit,
+                                "revert_commit": reverted.revert_commit,
+                                "revert": reverted.result,
+                                "completed_at": now_timestamp()
+                            }
+                        }),
+                    )?;
+                    ctx.log(
+                        "reconcile",
+                        "Already-merged candidate failed Quality and was reverted from the target branch",
+                        Some(json_object(json!({
+                            "candidate_commit": integration.candidate_commit,
+                            "target_branch": integration.target_branch,
+                            "quality_target_commit": quality.candidate_commit,
+                            "merge_commit": reverted.merge_commit,
+                            "revert_commit": reverted.revert_commit,
+                            "revert": reverted.result
+                        }))),
+                    )?;
+                    ctx.reconciliation_state = Some("reverted".to_string());
+                    ctx.fail("quality", &reconciliation_failure)
+                },
+            ) {
+                Ok((reverted, ())) => reverted,
+                Err(error) => {
+                    let goal_status = ctx
+                        .work_items
+                        .show_goal_summary(&ctx.goal_id)
+                        .ok()
+                        .map(|summary| summary.goal.status);
+                    if goal_status == Some(GoalStatus::Failed) {
+                        return Err(reconciliation_failure);
+                    }
+                    let _ = ctx.work_items.update_goal_round_evaluation_summary(
+                        &ctx.goal_id,
+                        ctx.round_idx,
+                        &json!({
+                            "workflow_reconciliation": {
+                                "state": "revert_blocked",
+                                "candidate_commit": integration.candidate_commit,
+                                "target_branch": integration.target_branch,
+                                "quality_target_commit": quality.candidate_commit,
+                                "error": error.to_string(),
+                                "updated_at": now_timestamp()
+                            }
+                        }),
+                    );
+                    let _ = ctx.log(
+                        "reconcile",
+                        "Quality failed but the exact safe revert was blocked; target and Goal status were preserved",
+                        Some(json_object(json!({
+                            "candidate_commit": integration.candidate_commit,
+                            "target_branch": integration.target_branch,
+                            "quality_target_commit": quality.candidate_commit,
+                            "error": error.to_string()
+                        }))),
+                    );
+                    return Err(error);
+                }
+            };
+            let _ = reverted;
+            return Err(reconciliation_failure);
+        }
         if !quality.ok {
             return fail(
                 ctx,

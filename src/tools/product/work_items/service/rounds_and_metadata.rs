@@ -478,6 +478,7 @@ impl FileWorkItemService {
             "workflow_quality_timing",
             "workflow_git_remote",
             "workflow_integration",
+            "workflow_reconciliation",
             "failure_category",
             "failure_message",
             "failure_at",

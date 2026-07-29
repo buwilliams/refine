@@ -103,6 +103,9 @@ pub struct GoalRound {
     /// Successful Ready Merge integration evidence for this exact candidate.
     #[serde(default)]
     pub workflow_integration: Option<RoundIntegration>,
+    /// Durable evidence for replaying a round whose candidate is already integrated.
+    #[serde(default)]
+    pub workflow_reconciliation: Option<serde_json::Value>,
     pub governance: Option<RoundGovernance>,
     pub quality: Option<RoundQuality>,
     pub logs: Vec<RoundLogEntry>,

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 
 use crate::model::JsonObject;
-use crate::model::goal::WorkflowQualityTiming;
+use crate::model::goal::{RoundIntegration, WorkflowQualityTiming};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
@@ -32,6 +32,10 @@ pub struct WorkflowContext<'a> {
     pub commit: Option<String>,
     pub implementation_changed: bool,
     pub merge: Option<MergeResult>,
+    /// Existing integration evidence when a failed round is being reconciled instead of
+    /// implemented again.
+    pub reconciliation: Option<RoundIntegration>,
+    pub reconciliation_state: Option<String>,
     pub final_status: Option<GoalStatus>,
     pub start_status: GoalStatus,
     quality_timing: Option<String>,
@@ -66,6 +70,8 @@ impl<'a> WorkflowContext<'a> {
             commit: None,
             implementation_changed: false,
             merge: None,
+            reconciliation: None,
+            reconciliation_state: None,
             final_status: None,
             start_status: GoalStatus::InProgress,
             quality_timing: None,

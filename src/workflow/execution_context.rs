@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::context::WorkflowContext;
@@ -63,20 +64,105 @@ pub(super) fn hydrate_retry_context(
     );
     ctx.commit = Some(candidate.clone());
     ctx.implementation_changed = candidate != base;
-    ctx.merge = round
+    let integration = round
         .get("workflow_integration")
         .filter(|value| !value.is_null())
         .map(|value| {
-            serde_json::from_value::<RoundIntegration>(value.clone())
-                .map(|integration| integration.merge)
-                .map_err(|error| {
-                    RefineError::Serialization(format!(
-                        "Goal {} has invalid Ready Merge evidence: {error}",
-                        ctx.goal_id
-                    ))
-                })
+            serde_json::from_value::<RoundIntegration>(value.clone()).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "Goal {} has invalid Ready Merge evidence: {error}",
+                    ctx.goal_id
+                ))
+            })
         })
         .transpose()?;
+    ctx.merge = integration
+        .as_ref()
+        .map(|integration| integration.merge.clone());
+    let reconciliation_state = round
+        .get("workflow_reconciliation")
+        .and_then(Value::as_object)
+        .and_then(|evidence| evidence.get("state"))
+        .and_then(Value::as_str);
+    if let Some(state) =
+        reconciliation_state.filter(|state| matches!(*state, "detected" | "revert_blocked"))
+    {
+        ctx.reconciliation = integration.clone();
+        ctx.reconciliation_state = Some(state.to_string());
+    } else if reconciliation_state.is_none()
+        && let Some(integration) = integration.clone()
+    {
+        let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+        let detected = with_repository_git_lock(ctx.target_root, || {
+            let target_commit = app_git.resolve_commit(&integration.target_branch)?;
+            if !app_git.commit_is_ancestor(&integration.candidate_commit, &target_commit)? {
+                return Ok(None);
+            }
+            let head = app_git.head_ref()?;
+            if head.branch.as_deref() != Some(integration.target_branch.as_str())
+                || head.commit.as_deref() != Some(target_commit.as_str())
+            {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {} already-merged reconciliation requires target worktree {} at {} on branch {}, found {} at {}; user work was preserved",
+                    ctx.goal_id,
+                    ctx.target_root.display(),
+                    target_commit,
+                    integration.target_branch,
+                    head.branch.as_deref().unwrap_or("<detached>"),
+                    head.commit.as_deref().unwrap_or("<unborn>")
+                )));
+            }
+            let published = if integration.pushed {
+                app_git.fetch_branch(&integration.remote, &integration.target_branch)?;
+                let published = app_git.resolve_commit(&format!(
+                    "{}/{}",
+                    integration.remote, integration.target_branch
+                ))?;
+                if published != target_commit {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {} cannot reconcile while local {} ({target_commit}) differs from {}/{} ({published})",
+                        ctx.goal_id,
+                        integration.target_branch,
+                        integration.remote,
+                        integration.target_branch
+                    )));
+                }
+                Some(published)
+            } else {
+                None
+            };
+            Ok(Some((target_commit, published)))
+        })?;
+        if let Some((target_commit, published_commit)) = detected {
+            ctx.work_items.update_goal_round_evaluation_summary(
+                &ctx.goal_id,
+                ctx.round_idx,
+                &json!({
+                    "workflow_reconciliation": {
+                        "state": "detected",
+                        "candidate_commit": integration.candidate_commit,
+                        "target_branch": integration.target_branch,
+                        "detected_target_commit": target_commit,
+                        "published_target_commit": published_commit,
+                        "detected_at": crate::workflow::now_timestamp()
+                    }
+                }),
+            )?;
+            ctx.log(
+                "reconcile",
+                "Detected already-merged candidate while resuming workflow; routing Quality to the merged target",
+                Some(json_object(json!({
+                    "resumed_status": current.as_str(),
+                    "candidate_commit": integration.candidate_commit,
+                    "target_branch": integration.target_branch,
+                    "target_commit": target_commit,
+                    "published_target_commit": published_commit
+                }))),
+            )?;
+            ctx.reconciliation = Some(integration);
+            ctx.reconciliation_state = Some("detected".to_string());
+        }
+    }
     ctx.start_status = current.clone();
     ctx.log(
         "workflow",
