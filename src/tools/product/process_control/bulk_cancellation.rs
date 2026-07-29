@@ -272,7 +272,7 @@ fn bulk_goal_failure(goal_id: &str, error: &RefineError) -> Value {
         RefineError::InvalidInput(_) => "invalid_input",
         RefineError::NotFound(_) => "not_found",
         RefineError::Unauthorized(_) => "unauthorized",
-        RefineError::Conflict(_) => "conflict",
+        RefineError::Conflict(_) | RefineError::StaleCandidate { .. } => "conflict",
         RefineError::Degraded(_) => "degraded",
         RefineError::Io(_) | RefineError::Serialization(_) => "storage_error",
         RefineError::NotImplemented(_) => "not_implemented",

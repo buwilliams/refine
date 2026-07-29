@@ -106,6 +106,9 @@ pub struct GoalRound {
     /// Durable evidence for replaying a round whose candidate is already integrated.
     #[serde(default)]
     pub workflow_reconciliation: Option<serde_json::Value>,
+    /// Durable evidence linking a stale Ready Merge round to its automatically queued successor.
+    #[serde(default)]
+    pub workflow_recovery: Option<serde_json::Value>,
     pub governance: Option<RoundGovernance>,
     pub quality: Option<RoundQuality>,
     pub logs: Vec<RoundLogEntry>,
@@ -194,6 +197,7 @@ mod tests {
         assert_eq!(legacy_round.workflow_quality_timing, None);
         assert_eq!(legacy_round.workflow_git_remote, None);
         assert_eq!(legacy_round.workflow_integration, None);
+        assert_eq!(legacy_round.workflow_recovery, None);
 
         let mut current = serde_json::to_value(legacy_round).unwrap();
         current["workflow_quality_timing"] = serde_json::json!("post_build");

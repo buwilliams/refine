@@ -583,7 +583,9 @@ fn error_with_message(error: RefineError, message: String) -> RefineError {
         RefineError::InvalidInput(_) => RefineError::InvalidInput(message),
         RefineError::NotFound(_) => RefineError::NotFound(message),
         RefineError::Unauthorized(_) => RefineError::Unauthorized(message),
-        RefineError::Conflict(_) => RefineError::Conflict(message),
+        RefineError::Conflict(_) | RefineError::StaleCandidate { .. } => {
+            RefineError::Conflict(message)
+        }
         RefineError::Degraded(_) => RefineError::Degraded(message),
         RefineError::Io(_) => RefineError::Io(message),
         RefineError::Serialization(_) => RefineError::Serialization(message),

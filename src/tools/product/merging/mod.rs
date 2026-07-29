@@ -200,10 +200,15 @@ impl FileMergerService {
                         "Ready Merge execution {execution_id} was cancelled: {error}"
                     )));
                 } else {
+                    let code = if matches!(&error, RefineError::StaleCandidate { .. }) {
+                        "ready_merge_candidate_stale"
+                    } else {
+                        "ready_merge_integration_failed"
+                    };
                     let _ = operations.fail_with_error(
                         &operation.id,
                         json!({
-                            "code": "ready_merge_integration_failed",
+                            "code": code,
                             "message": error.to_string(),
                             "execution_id": execution_id
                         }),
@@ -638,9 +643,12 @@ impl FileMergerService {
             // Reject only when the work is genuinely absent from the target.
             let local_target = git.resolve_commit(&target_branch)?;
             if !git.commit_is_ancestor(&candidate_commit, &local_target)? {
-                return Err(RefineError::Conflict(format!(
-                    "Candidate {candidate_commit} is stale: recorded base {base_commit} is not its ancestor"
-                )));
+                return Err(RefineError::StaleCandidate {
+                    candidate_commit,
+                    recorded_base: base_commit,
+                    target_branch,
+                    target_commit: local_target,
+                });
             }
         }
 

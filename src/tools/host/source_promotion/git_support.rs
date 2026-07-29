@@ -115,6 +115,9 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
         RefineError::NotFound(message) => RefineError::NotFound(append(message)),
         RefineError::Unauthorized(message) => RefineError::Unauthorized(append(message)),
         RefineError::Conflict(message) => RefineError::Conflict(append(message)),
+        stale @ RefineError::StaleCandidate { .. } => {
+            RefineError::Conflict(append(stale.to_string()))
+        }
         RefineError::Degraded(message) => RefineError::Degraded(append(message)),
         RefineError::Io(message) => RefineError::Io(append(message)),
         RefineError::Serialization(message) => RefineError::Serialization(append(message)),

@@ -10,6 +10,15 @@ pub enum RefineError {
     Unauthorized(String),
     #[error("{0}")]
     Conflict(String),
+    #[error(
+        "Candidate {candidate_commit} is stale: recorded base {recorded_base} is not its ancestor"
+    )]
+    StaleCandidate {
+        candidate_commit: String,
+        recorded_base: String,
+        target_branch: String,
+        target_commit: String,
+    },
     #[error("{0}")]
     Degraded(String),
     #[error("{0}")]
@@ -40,7 +49,7 @@ impl RefineError {
             Self::InvalidInput(_) => ErrorCategory::InvalidInput,
             Self::NotFound(_) => ErrorCategory::NotFound,
             Self::Unauthorized(_) => ErrorCategory::Unauthorized,
-            Self::Conflict(_) => ErrorCategory::Conflict,
+            Self::Conflict(_) | Self::StaleCandidate { .. } => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,
             Self::Io(_) => ErrorCategory::Io,
             Self::Serialization(_) => ErrorCategory::Serialization,

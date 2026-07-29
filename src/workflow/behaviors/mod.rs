@@ -709,6 +709,55 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             },
         ) {
             Ok((integration, _)) => integration,
+            Err(RefineError::StaleCandidate {
+                candidate_commit,
+                recorded_base,
+                target_branch,
+                target_commit,
+            }) => {
+                let stale_error = RefineError::StaleCandidate {
+                    candidate_commit: candidate_commit.clone(),
+                    recorded_base: recorded_base.clone(),
+                    target_branch: target_branch.clone(),
+                    target_commit: target_commit.clone(),
+                };
+                if let Err(recovery_error) = ctx.work_items.queue_stale_candidate_recovery_summary(
+                    &ctx.goal_id,
+                    ctx.round_idx,
+                    &candidate_commit,
+                    &recorded_base,
+                    &target_branch,
+                    &target_commit,
+                    &stale_error.to_string(),
+                ) {
+                    return fail(
+                        ctx,
+                        "merge",
+                        RefineError::Conflict(format!(
+                            "{stale_error}; automatic fresh-round recovery failed: {recovery_error}"
+                        )),
+                    );
+                }
+                ctx.log(
+                    "merge",
+                    "Ready Merge rejected a stale candidate and queued a fresh recovery round",
+                    Some(json_object(json!({
+                        "candidate_commit": candidate_commit,
+                        "recorded_base": recorded_base,
+                        "target_branch": target_branch,
+                        "target_commit": target_commit,
+                        "successor_round": ctx.round_idx + 2,
+                        "error": stale_error.to_string()
+                    }))),
+                )?;
+                ctx.final_status = Some(GoalStatus::Todo);
+                return Ok(WorkflowAdvanceOutcome::Completed {
+                    final_status: GoalStatus::Todo,
+                    reason:
+                        "Stale candidate preserved; fresh recovery round queued from current target"
+                            .to_string(),
+                });
+            }
             Err(error)
                 if error.to_string().contains("Ready Merge execution")
                     && error.to_string().contains("was cancelled") =>

@@ -666,28 +666,39 @@ fn ready_merge_accepts_a_candidate_already_present_in_the_target_branch() {
 }
 
 #[test]
-fn ready_merge_still_rejects_a_candidate_missing_from_the_target_branch() {
-    let (temp_root, target_root, worktree_path, work_items, _candidate_commit) =
+fn ready_merge_queues_a_fresh_round_when_the_candidate_is_stale() {
+    let (temp_root, target_root, worktree_path, work_items, candidate_commit) =
         ready_merge_goal_with_advanced_target("ready-merge-genuinely-stale", false);
     let runtime_root = temp_root.join("run/8080");
+    let current_target = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
 
-    let error = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+    let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
         .evaluate_workflow()
-        .unwrap_err();
+        .unwrap();
 
-    // Work that is genuinely absent from the target must still be refused:
-    // merging it would risk dropping what moved the tip in between.
-    assert!(
-        error.to_string().contains("is stale"),
-        "expected the staleness guard to hold, got {error}"
-    );
+    // Work that is genuinely absent from the target must still be refused, but
+    // branch movement is recoverable: preserve the candidate and queue a fresh
+    // auditable round from the current target instead of terminally failing it.
+    assert_eq!(result.steps.len(), 1);
+    assert_eq!(result.steps[0].final_status, "todo");
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Failed
+        GoalStatus::Todo
     );
     assert!(!target_root.join("feature.txt").exists());
+    assert!(worktree_path.join("feature.txt").exists());
+    assert_eq!(
+        git_stdout(&worktree_path, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim(),
+        candidate_commit
+    );
     let detail = work_items.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(detail["rounds"][0]["failure_category"], "merge");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+    assert_eq!(detail["rounds"][0]["failure_category"], "stale_candidate");
     assert!(
         detail["rounds"][0]["failure_message"]
             .as_str()
@@ -696,6 +707,49 @@ fn ready_merge_still_rejects_a_candidate_missing_from_the_target_branch() {
         "the Goal must record why it failed, got {:?}",
         detail["rounds"][0]["failure_message"]
     );
+    assert_eq!(
+        detail["rounds"][0]["workflow_recovery"]["state"],
+        "superseded"
+    );
+    assert_eq!(detail["rounds"][1]["workflow_recovery"]["state"], "queued");
+    assert_eq!(
+        detail["rounds"][1]["workflow_recovery"]["candidate_commit"],
+        candidate_commit
+    );
+    assert_eq!(
+        detail["rounds"][1]["workflow_recovery"]["target_commit"],
+        current_target
+    );
+    assert!(
+        detail["rounds"][1]["prompt"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(&candidate_commit)
+    );
+    assert!(
+        detail["rounds"][0]["logs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|log| log["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("queued a fresh recovery round")))
+    );
+    let operation_errors = fs::read_dir(runtime_root.join("operations"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().and_then(|value| value.to_str()) == Some("json"))
+        .map(|entry| {
+            serde_json::from_str::<Value>(&fs::read_to_string(entry.path()).unwrap()).unwrap()
+        })
+        .filter_map(|operation| operation.get("error").cloned())
+        .collect::<Vec<_>>();
+    assert!(operation_errors.iter().any(|error| {
+        error["code"] == "ready_merge_candidate_stale"
+            && error["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("is stale"))
+    }));
 
     fs::remove_dir_all(&worktree_path).ok();
     fs::remove_dir_all(temp_root).unwrap();
