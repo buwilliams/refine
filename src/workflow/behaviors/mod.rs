@@ -146,19 +146,13 @@ fn prepare_already_merged_reconciliation(
                 ctx.goal_id
             ))
         })?;
-    if let Some(state) = round
+    let recorded_reconciliation_state = round
         .get("workflow_reconciliation")
         .and_then(Value::as_object)
         .and_then(|evidence| evidence.get("state"))
         .and_then(Value::as_str)
         .filter(|state| matches!(*state, "reverted" | "completed"))
-    {
-        return Err(RefineError::Conflict(format!(
-            "Goal {} round {} reconciliation is already {state}; submit a new round instead of replaying its integration",
-            ctx.goal_id,
-            ctx.round_idx + 1
-        )));
-    }
+        .map(str::to_string);
     let candidate = detail
         .get("candidate_commit")
         .and_then(Value::as_str)
@@ -176,12 +170,12 @@ fn prepare_already_merged_reconciliation(
             ctx.goal_id, integration.candidate_commit, candidate
         )));
     }
-    let (target_commit, published_commit) = with_repository_git_lock(
+    let (target_commit, published_commit, candidate_present) = with_repository_git_lock(
         ctx.target_root,
-        || -> RefineResult<(String, Option<String>)> {
+        || -> RefineResult<(String, Option<String>, bool)> {
             let target_commit = app_git.resolve_commit(&integration.target_branch)?;
             if !app_git.commit_is_ancestor(candidate, &target_commit)? {
-                return Ok((target_commit, None));
+                return Ok((target_commit, None, false));
             }
             let head = app_git.head_ref()?;
             if head.branch.as_deref() != Some(integration.target_branch.as_str())
@@ -216,11 +210,66 @@ fn prepare_already_merged_reconciliation(
             } else {
                 None
             };
-            Ok((target_commit, published))
+            Ok((target_commit, published, true))
         },
     )?;
-    if !app_git.commit_is_ancestor(candidate, &target_commit)? {
-        return Ok(None);
+    if !candidate_present {
+        let Some(recorded_state) = recorded_reconciliation_state.as_deref() else {
+            return Ok(None);
+        };
+        ctx.work_items
+            .queue_missing_reconciled_candidate_recovery_summary(
+                &ctx.goal_id,
+                ctx.round_idx,
+                recorded_state,
+                candidate,
+                &integration.target_branch,
+                &target_commit,
+            )?;
+        ctx.log(
+            "reconcile",
+            "Recorded reconciliation state disagreed with the target branch; queued a fresh recovery round",
+            Some(json_object(json!({
+                "recorded_reconciliation_state": recorded_state,
+                "candidate_commit": candidate,
+                "target_branch": integration.target_branch,
+                "target_commit": target_commit,
+                "successor_round": ctx.round_idx + 2
+            }))),
+        )?;
+        ctx.branch = detail
+            .get("branch_name")
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+        ctx.provider_output = Some(
+            round
+                .get("implementation_report")
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "Queued recovery for absent integrated candidate".to_string()),
+        );
+        ctx.commit = Some(candidate.to_string());
+        ctx.implementation_changed = true;
+        ctx.merge = Some(integration.merge.clone());
+        ctx.final_status = Some(GoalStatus::Todo);
+        return Ok(Some(WorkflowAdvanceOutcome::Completed {
+            final_status: GoalStatus::Todo,
+            reason:
+                "Reconciliation evidence superseded; fresh recovery round queued from current target"
+                    .to_string(),
+        }));
+    }
+    if let Some(recorded_state) = recorded_reconciliation_state.as_deref() {
+        ctx.log(
+            "reconcile",
+            "Recorded reconciliation state was stale; the candidate is currently present in the target branch",
+            Some(json_object(json!({
+                "recorded_reconciliation_state": recorded_state,
+                "candidate_commit": candidate,
+                "target_branch": integration.target_branch,
+                "target_commit": target_commit
+            }))),
+        )?;
     }
     ctx.work_items.update_goal_round_evaluation_summary(
         &ctx.goal_id,
@@ -232,6 +281,7 @@ fn prepare_already_merged_reconciliation(
                 "target_branch": integration.target_branch,
                 "detected_target_commit": target_commit,
                 "published_target_commit": published_commit,
+                "recorded_reconciliation_state": recorded_reconciliation_state,
                 "detected_at": now_timestamp()
             }
         }),

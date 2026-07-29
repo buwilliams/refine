@@ -122,19 +122,174 @@ fn requeued_already_merged_goal_runs_quality_on_target_and_finishes_done() {
 }
 
 #[test]
-fn preparation_failure_is_quarantined_without_starving_the_next_goal() {
+fn terminal_reconciliation_is_rechecked_when_the_candidate_is_present() {
+    for recorded_state in ["reverted", "completed"] {
+        let label = format!("terminal-reconciliation-present-{recorded_state}");
+        let (temp_root, target_root, worktree_path, work_items, candidate_commit, _) =
+            failed_goal_with_integrated_candidate(&label);
+        let runtime_root = reconciliation_runtime_root(&temp_root);
+        work_items
+            .update_goal_round_evaluation_summary(
+                "GOAL1",
+                0,
+                &json!({
+                    "workflow_reconciliation": {
+                        "state": recorded_state
+                    }
+                }),
+            )
+            .unwrap();
+
+        let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+            .evaluate_workflow()
+            .unwrap();
+
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].final_status, "done");
+        assert_eq!(result.steps[0].commit, candidate_commit);
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Done
+        );
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(
+            detail["rounds"][0]["workflow_reconciliation"]["state"],
+            "completed"
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| {
+                    log["message"].as_str().is_some_and(|message| {
+                        message.contains(
+                            "Recorded reconciliation state was stale; the candidate is currently present",
+                        )
+                    }) && log["details"]["recorded_reconciliation_state"] == recorded_state
+                })
+        );
+
+        fs::remove_dir_all(&worktree_path).ok();
+        fs::remove_dir_all(temp_root).unwrap();
+        fs::remove_dir_all(runtime_root).unwrap();
+    }
+}
+
+#[test]
+fn absent_terminal_reconciliation_queues_a_fresh_round_without_a_retryable_conflict() {
+    for recorded_state in ["reverted", "completed"] {
+        let label = format!("terminal-reconciliation-absent-{recorded_state}");
+        let (temp_root, target_root, worktree_path, work_items, candidate_commit) =
+            ready_merge_goal_with_advanced_target(&label, false);
+        let runtime_root = reconciliation_runtime_root(&temp_root);
+        let target_commit = git_stdout(&target_root, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+        work_items
+            .update_goal_round_evaluation_summary(
+                "GOAL1",
+                0,
+                &json!({
+                    "workflow_integration": {
+                        "candidate_commit": candidate_commit,
+                        "target_branch": "main",
+                        "target_commit": target_commit,
+                        "remote": "origin",
+                        "pushed": false,
+                        "integrated_at": now_timestamp(),
+                        "merge": {
+                            "ok": true,
+                            "conflicts": [],
+                            "message": "Recorded prior integration"
+                        }
+                    },
+                    "workflow_reconciliation": {
+                        "state": recorded_state
+                    }
+                }),
+            )
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
+            .unwrap();
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+
+        let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+            .evaluate_workflow()
+            .unwrap();
+
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].final_status, "todo");
+        assert_eq!(
+            work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+            GoalStatus::Todo
+        );
+        assert!(!target_root.join("feature.txt").exists());
+        assert!(worktree_path.join("feature.txt").exists());
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            detail["rounds"][0]["failure_category"],
+            "reconciliation_candidate_absent"
+        );
+        assert_eq!(
+            detail["rounds"][0]["workflow_recovery"]["state"],
+            "superseded"
+        );
+        assert_eq!(
+            detail["rounds"][0]["workflow_recovery"]["recorded_reconciliation_state"],
+            recorded_state
+        );
+        assert_eq!(detail["rounds"][1]["workflow_recovery"]["state"], "queued");
+        assert_eq!(
+            detail["rounds"][1]["workflow_recovery"]["candidate_commit"],
+            candidate_commit
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| log["message"]
+                    .as_str()
+                    .is_some_and(|message| { message.contains("queued a fresh recovery round") }))
+        );
+        assert!(
+            result
+                .claims
+                .iter()
+                .all(|claim| { claim.failure_stage.as_deref() != Some("preparation") })
+        );
+        assert!(result.claims.iter().any(|claim| {
+            claim.goal_id == "GOAL1" && claim.state == WorkflowClaimState::Completed
+        }));
+
+        fs::remove_dir_all(&worktree_path).ok();
+        fs::remove_dir_all(temp_root).unwrap();
+        fs::remove_dir_all(runtime_root).unwrap();
+    }
+}
+
+#[test]
+fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_next_goal() {
     let (temp_root, target_root, worktree_path, work_items, _, _) =
-        failed_goal_with_integrated_candidate("already-reverted-preparation-quarantine");
+        failed_goal_with_integrated_candidate("candidate-mismatch-preparation-quarantine");
     let runtime_root = reconciliation_runtime_root(&temp_root);
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    let branch = detail["branch_name"].as_str().unwrap();
+    let target_branch = detail["target_branch"].as_str().unwrap();
+    let base_commit = detail["base_commit"].as_str().unwrap();
     work_items
-        .update_goal_round_evaluation_summary(
+        .update_goal_git_refs(
             "GOAL1",
-            0,
-            &json!({
-                "workflow_reconciliation": {
-                    "state": "reverted"
-                }
-            }),
+            branch,
+            target_branch,
+            base_commit,
+            Some("1111111111111111111111111111111111111111"),
         )
         .unwrap();
     work_items
@@ -163,7 +318,7 @@ fn preparation_failure_is_quarantined_without_starving_the_next_goal() {
     assert!(
         error
             .to_string()
-            .contains("reconciliation is already reverted; submit a new round")
+            .contains("candidate changed from integrated commit")
     );
 
     let state = automation.load_state().unwrap();
@@ -176,10 +331,9 @@ fn preparation_failure_is_quarantined_without_starving_the_next_goal() {
     assert_eq!(failed.failure_stage.as_deref(), Some("preparation"));
     assert!(failed.goal_revision.is_some());
     assert!(
-        failed
-            .failure_message
-            .as_deref()
-            .is_some_and(|message| { message.contains("reconciliation is already reverted") })
+        failed.failure_message.as_deref().is_some_and(|message| {
+            message.contains("candidate changed from integrated commit")
+        })
     );
     assert_eq!(
         automation.preparation_failures_needing_attention().unwrap(),

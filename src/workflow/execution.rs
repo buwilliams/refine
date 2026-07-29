@@ -19,6 +19,11 @@ use super::{
     ensure_workflow_round, hydrate_retry_context, missing_workflow_artifact, now_timestamp,
 };
 
+enum PreparedClaim<'a> {
+    Execute(Box<WorkflowContext<'a>>),
+    Completed(Box<WorkflowStepResult>),
+}
+
 impl WorkflowEngine {
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
         self.evaluate_workflow_locked()
@@ -101,7 +106,7 @@ impl WorkflowEngine {
                                 let preparation =
                                     self.prepare_started_claim(&claim_id, &execution_id);
                                 match preparation {
-                                    Ok(ctx) => {
+                                    Ok(PreparedClaim::Execute(ctx)) => {
                                         running += 1;
                                         launched_any = true;
                                         let outcome_tx = outcome_tx.clone();
@@ -109,7 +114,7 @@ impl WorkflowEngine {
                                         scope.spawn(move || {
                                             let outcome = std::panic::catch_unwind(
                                                 std::panic::AssertUnwindSafe(|| {
-                                                    self.execute_prepared_claim(ctx)
+                                                    self.execute_prepared_claim(*ctx)
                                                 }),
                                             )
                                             .unwrap_or_else(|_| {
@@ -124,6 +129,18 @@ impl WorkflowEngine {
                                                 outcome,
                                             ));
                                         });
+                                    }
+                                    Ok(PreparedClaim::Completed(result)) => {
+                                        launched_any = true;
+                                        if let Err(error) = self.mark_claim_state(
+                                            &claim_id,
+                                            Some(&execution_id),
+                                            WorkflowClaimState::Completed,
+                                        ) {
+                                            errors.push((order, error));
+                                        } else {
+                                            results.push((order, *result));
+                                        }
                                     }
                                     Err(error) => {
                                         let _ = self.mark_claim_preparation_failed(
@@ -190,11 +207,11 @@ impl WorkflowEngine {
         Ok(results.into_iter().map(|(_, result)| result).collect())
     }
 
-    pub(super) fn prepare_started_claim<'a>(
+    fn prepare_started_claim<'a>(
         &'a self,
         claim_id: &str,
         execution_id: &str,
-    ) -> RefineResult<WorkflowContext<'a>> {
+    ) -> RefineResult<PreparedClaim<'a>> {
         let claim = self.claim_by_id(claim_id)?;
         let target_root = self.target_root.as_ref().ok_or_else(|| {
             RefineError::InvalidInput(
@@ -230,11 +247,16 @@ impl WorkflowEngine {
                 }
                 | WorkflowAdvanceOutcome::Transition {
                     to: GoalStatus::Qa, ..
-                } => Ok(ctx),
+                } => Ok(PreparedClaim::Execute(Box::new(ctx))),
+                WorkflowAdvanceOutcome::Completed { final_status, .. } => {
+                    ctx.final_status = Some(final_status);
+                    Ok(PreparedClaim::Completed(Box::new(
+                        Self::workflow_step_result(ctx)?,
+                    )))
+                }
                 WorkflowAdvanceOutcome::Noop { reason }
                 | WorkflowAdvanceOutcome::Blocked { reason }
                 | WorkflowAdvanceOutcome::Failed { reason }
-                | WorkflowAdvanceOutcome::Completed { reason, .. }
                 | WorkflowAdvanceOutcome::Transition { reason, .. } => {
                     Err(RefineError::Conflict(reason))
                 }
@@ -251,7 +273,7 @@ impl WorkflowEngine {
             )));
         }
         hydrate_retry_context(&mut ctx, current)?;
-        Ok(ctx)
+        Ok(PreparedClaim::Execute(Box::new(ctx)))
     }
 
     pub(super) fn execute_prepared_claim(
@@ -260,6 +282,10 @@ impl WorkflowEngine {
     ) -> RefineResult<WorkflowStepResult> {
         let start_status = ctx.start_status.clone();
         self.advance_claim_behaviors(&mut ctx, start_status)?;
+        Self::workflow_step_result(ctx)
+    }
+
+    fn workflow_step_result(ctx: WorkflowContext<'_>) -> RefineResult<WorkflowStepResult> {
         let execution_id = ctx.execution_id.clone();
         let branch = ctx
             .branch
