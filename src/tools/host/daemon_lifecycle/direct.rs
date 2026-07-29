@@ -46,6 +46,7 @@ fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> Ref
         thread::sleep(Duration::from_millis(100));
         let still_running = match supervisor.wait(&process.id) {
             Ok(observed) => observed.state == "running",
+            Err(RefineError::NotFound(_)) => false,
             Err(error) => {
                 failures.push(format!(
                     "failed to confirm process {} after terminate: {error}",
@@ -68,6 +69,7 @@ fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> Ref
                 process.id
             )),
             Ok(_) => {}
+            Err(RefineError::NotFound(_)) => {}
             Err(error) => failures.push(format!(
                 "failed to confirm process {} after kill: {error}",
                 process.id
@@ -174,11 +176,44 @@ fn stop_direct_daemon_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::process::subprocess::ManagedProcess;
     use crate::process::supervisor::lifecycle::{DaemonRuntimeService, running_status};
     use crate::process::supervisor::runtime::RuntimeRoot;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn direct_stop_accepts_a_process_deregistered_during_terminate_confirmation() {
+        let (root, lifecycle) = lifecycle("deregistered-confirmation");
+        let port = 4557;
+        let supervisor = FileProcessSupervisor::new(lifecycle.runtime_root.port_root(port));
+        supervisor
+            .register(ManagedProcess {
+                id: "direct-daemon".to_string(),
+                owner: ProcessOwner::Daemon,
+                pid: None,
+                state: "running".to_string(),
+                label: Some("refine daemon".to_string()),
+                details: None,
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+
+        stop_direct_runtime(&lifecycle, port).unwrap();
+
+        assert!(supervisor.list().unwrap().is_empty());
+        assert!(matches!(
+            supervisor.wait("direct-daemon"),
+            Err(RefineError::NotFound(_))
+        ));
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn surviving_direct_runtime_is_not_persisted_as_stopped() {
