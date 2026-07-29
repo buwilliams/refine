@@ -406,6 +406,8 @@ fn interrupted_settlement_replays_after_restart_before_cancelled_short_circuit()
             execution_id: None,
             round_idx: None,
             goal_revision: None,
+            failure_stage: None,
+            failure_message: None,
             decision_version: 1,
             state: WorkflowClaimState::Claimed,
             created_at: "2026-07-23T00:03:00Z".to_string(),

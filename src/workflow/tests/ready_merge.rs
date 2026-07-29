@@ -122,6 +122,130 @@ fn requeued_already_merged_goal_runs_quality_on_target_and_finishes_done() {
 }
 
 #[test]
+fn preparation_failure_is_quarantined_without_starving_the_next_goal() {
+    let (temp_root, target_root, worktree_path, work_items, _, _) =
+        failed_goal_with_integrated_candidate("already-reverted-preparation-quarantine");
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({
+                "workflow_reconciliation": {
+                    "state": "reverted"
+                }
+            }),
+        )
+        .unwrap();
+    work_items
+        .create_goal_summary("Runnable sibling", Some("GOAL2"))
+        .unwrap();
+    work_items
+        .update_goal_metadata_summary("GOAL1", None, Some("high"), None, None)
+        .unwrap();
+    work_items
+        .update_goal_metadata_summary("GOAL2", None, Some("low"), None, None)
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
+        .unwrap();
+    FileSettingsService::new(test_refine_dir(&target_root))
+        .update(&json!({
+            "parallel_run_cap": 1,
+            "parallel_per_node_cap": 1,
+            "parallel_per_provider_cap": 1,
+            "parallel_per_target_app_cap": 1
+        }))
+        .unwrap();
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+
+    let error = automation.evaluate_workflow().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("reconciliation is already reverted; submit a new round")
+    );
+
+    let state = automation.load_state().unwrap();
+    let failed = state
+        .claims
+        .iter()
+        .find(|claim| claim.goal_id == "GOAL1")
+        .unwrap();
+    assert_eq!(failed.state, WorkflowClaimState::Failed);
+    assert_eq!(failed.failure_stage.as_deref(), Some("preparation"));
+    assert!(failed.goal_revision.is_some());
+    assert!(
+        failed
+            .failure_message
+            .as_deref()
+            .is_some_and(|message| { message.contains("reconciliation is already reverted") })
+    );
+    assert_eq!(
+        automation.preparation_failures_needing_attention().unwrap(),
+        vec![failed.clone()]
+    );
+
+    // The deterministic failure is quarantined at this exact Goal revision.
+    // The next pass can admit its sibling instead of reclaiming GOAL1 forever.
+    assert_eq!(automation.promote().unwrap(), 1);
+    let state = automation.load_state().unwrap();
+    assert_eq!(
+        state
+            .claims
+            .iter()
+            .filter(|claim| claim.goal_id == "GOAL1")
+            .count(),
+        1
+    );
+    assert!(
+        state.claims.iter().any(|claim| {
+            claim.goal_id == "GOAL2" && claim.state == WorkflowClaimState::Claimed
+        })
+    );
+
+    // A durable Goal mutation changes its revision and makes an automated retry
+    // eligible again once the sibling no longer occupies the only slot.
+    let sibling_claim = state
+        .claims
+        .iter()
+        .find(|claim| claim.goal_id == "GOAL2")
+        .unwrap()
+        .claim_id
+        .clone();
+    automation
+        .mark_claim_state(&sibling_claim, None, WorkflowClaimState::Cancelled)
+        .unwrap();
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"operator_recovery_evidence": "fresh"}),
+        )
+        .unwrap();
+    assert_eq!(automation.promote().unwrap(), 1);
+    let state = automation.load_state().unwrap();
+    assert_eq!(
+        state
+            .claims
+            .iter()
+            .filter(|claim| claim.goal_id == "GOAL1")
+            .count(),
+        2
+    );
+    assert!(
+        automation
+            .preparation_failures_needing_attention()
+            .unwrap()
+            .is_empty()
+    );
+
+    fs::remove_dir_all(&worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn parallel_already_merged_reconciliations_serialize_shared_target_quality() {
     let (temp_root, target_root, first_worktree, work_items, _, _) =
         failed_goal_with_integrated_candidate("already-merged-reconcile-parallel");
@@ -791,6 +915,8 @@ fn ready_merge_fence_rejects_cancellation_replacement_and_unequal_claims() {
         execution_id: Some("unequal-execution".to_string()),
         round_idx: Some(0),
         goal_revision: Some(9),
+        failure_stage: None,
+        failure_message: None,
         decision_version: 1,
         state: WorkflowClaimState::Running,
         created_at: now_timestamp(),

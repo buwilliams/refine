@@ -37,6 +37,41 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
 }
 
 #[test]
+fn dashboard_surfaces_quarantined_claim_preparation_failures() {
+    let claim = crate::workflow::WorkflowClaim {
+        claim_id: "claim-poisoned".to_string(),
+        goal_id: "GOAL-POISONED".to_string(),
+        node_id: "node-1".to_string(),
+        provider: "smoke-ai".to_string(),
+        target_app_id: "app-1".to_string(),
+        execution_id: Some("execution-poisoned".to_string()),
+        round_idx: Some(0),
+        goal_revision: Some(7),
+        failure_stage: Some("preparation".to_string()),
+        failure_message: Some("round reconciliation is already reverted".to_string()),
+        decision_version: 2,
+        state: crate::workflow::WorkflowClaimState::Failed,
+        created_at: "2026-07-29T00:00:00Z".to_string(),
+        updated_at: "2026-07-29T00:00:01Z".to_string(),
+    };
+
+    let attention =
+        crate::surfaces::web_server::project_routes::dashboard_attention_items(&[], &[claim], true);
+    assert_eq!(attention.len(), 1);
+    assert_eq!(attention[0]["kind"], "filter");
+    assert_eq!(attention[0]["severity"], "error");
+    assert_eq!(attention[0]["goal_id"], "GOAL-POISONED");
+    assert_eq!(attention[0]["claim_id"], "claim-poisoned");
+    assert_eq!(attention[0]["filter"], json!({"status": "todo"}));
+    assert!(
+        attention[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("round reconciliation is already reverted")
+    );
+}
+
+#[test]
 fn web_server_reports_project_registry_and_updates_settings() {
     let temp_root = unique_temp_dir("http-project-settings");
     let app_root = temp_root.join("app");

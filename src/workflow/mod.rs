@@ -51,6 +51,10 @@ pub struct WorkflowClaim {
     pub round_idx: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_revision: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_stage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_message: Option<String>,
     #[serde(default)]
     pub decision_version: u64,
     pub state: WorkflowClaimState,
@@ -102,6 +106,17 @@ impl WorkflowAutomationState {
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
                 )
         })
+    }
+
+    pub(crate) fn latest_preparation_failure(&self, goal_id: &str) -> Option<&WorkflowClaim> {
+        let latest = self
+            .claims
+            .iter()
+            .rev()
+            .find(|claim| claim.goal_id == goal_id)?;
+        (latest.state == WorkflowClaimState::Failed
+            && latest.failure_stage.as_deref() == Some("preparation"))
+        .then_some(latest)
     }
 }
 

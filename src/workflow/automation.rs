@@ -1,9 +1,11 @@
+use std::collections::BTreeSet;
+
 use crate::model::feature::compare_feature_goal_order;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::process_control::FileProcessControlService;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 
 use super::{
     AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation, WorkflowClaim, WorkflowClaimState,
@@ -27,6 +29,21 @@ impl WorkflowAutomation for WorkflowEngine {
         };
         self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?;
         let snapshot = self.projection_snapshot(&refine_dir)?;
+        let work_items = FileWorkItemService::new(&refine_dir);
+        let mut quarantined_goal_ids = BTreeSet::new();
+        for projection in snapshot.goals.values() {
+            let Some(failure) = state.latest_preparation_failure(&projection.goal.id) else {
+                continue;
+            };
+            if failure.goal_revision.is_none()
+                || failure.goal_revision
+                    == Some(workflow_revision(
+                        &work_items.show_goal_detail(&projection.goal.id)?,
+                    ))
+            {
+                quarantined_goal_ids.insert(projection.goal.id.clone());
+            }
+        }
         let mut eligible = snapshot
             .goals
             .values()
@@ -37,7 +54,13 @@ impl WorkflowAutomation for WorkflowEngine {
                 )
             })
             .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
-            .filter(|projection| Self::priority_claim_eligible(&snapshot, projection))
+            .filter(|projection| {
+                Self::priority_claim_eligible_excluding(
+                    &snapshot,
+                    projection,
+                    &quarantined_goal_ids,
+                )
+            })
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
@@ -53,6 +76,9 @@ impl WorkflowAutomation for WorkflowEngine {
         let mut promoted = 0;
         for goal in eligible {
             if Self::active_claim(&state, &goal.goal.id).is_some() {
+                continue;
+            }
+            if quarantined_goal_ids.contains(&goal.goal.id) {
                 continue;
             }
             let metadata = match self.claim_metadata(Some(&goal), &policy) {
@@ -79,6 +105,8 @@ impl WorkflowAutomation for WorkflowEngine {
                 execution_id: None,
                 round_idx: None,
                 goal_revision: None,
+                failure_stage: None,
+                failure_message: None,
                 decision_version: 1,
                 state: WorkflowClaimState::Claimed,
                 created_at: now.clone(),
@@ -147,6 +175,8 @@ impl WorkflowAutomation for WorkflowEngine {
             execution_id: None,
             round_idx: None,
             goal_revision: None,
+            failure_stage: None,
+            failure_message: None,
             decision_version: 1,
             state: WorkflowClaimState::Claimed,
             created_at: now.clone(),

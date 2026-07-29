@@ -75,7 +75,11 @@ fn configured_provider_from_settings(
         .unwrap_or_else(|| "claude".to_string())
 }
 
-fn dashboard_attention_items(indicators: &[String], runner_reachable: bool) -> Vec<Value> {
+pub(super) fn dashboard_attention_items(
+    indicators: &[String],
+    preparation_failures: &[crate::workflow::WorkflowClaim],
+    runner_reachable: bool,
+) -> Vec<Value> {
     let mut items = indicators
         .iter()
         .map(|message| {
@@ -89,6 +93,26 @@ fn dashboard_attention_items(indicators: &[String], runner_reachable: bool) -> V
             })
         })
         .collect::<Vec<_>>();
+    items.extend(preparation_failures.iter().map(|claim| {
+        let reason = claim
+            .failure_message
+            .as_deref()
+            .unwrap_or("claim preparation failed");
+        json!({
+            "kind": "filter",
+            "severity": "error",
+            "message": format!(
+                "Goal {} needs attention: {}",
+                claim.goal_id, reason
+            ),
+            "filter": {
+                "status": "todo"
+            },
+            "goal_id": claim.goal_id,
+            "claim_id": claim.claim_id,
+            "reason": reason
+        })
+    }));
     if !runner_reachable {
         items.push(json!({
             "kind": "banner",

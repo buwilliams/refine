@@ -5,7 +5,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
     WorkflowBuild, WorkflowDone, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge,
@@ -126,10 +126,10 @@ impl WorkflowEngine {
                                         });
                                     }
                                     Err(error) => {
-                                        let _ = self.mark_claim_state(
+                                        let _ = self.mark_claim_preparation_failed(
                                             &claim_id,
-                                            Some(&execution_id),
-                                            WorkflowClaimState::Failed,
+                                            &execution_id,
+                                            &error,
                                         );
                                         errors.push((order, error));
                                     }
@@ -383,6 +383,57 @@ impl WorkflowEngine {
         if terminal {
             self.release_claim_capacity(claim_id)?;
         }
+        Ok(())
+    }
+
+    fn mark_claim_preparation_failed(
+        &self,
+        claim_id: &str,
+        expected_execution_id: &str,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        let goal_id = self.claim_by_id(claim_id)?.goal_id;
+        // Preparation can fail because the target or Goal record itself cannot
+        // be read. Terminalize the claim even then; an unavailable revision is
+        // conservatively quarantined until an operator explicitly retries it.
+        let goal_revision = self
+            .target_root
+            .as_ref()
+            .and_then(|target_root| prepare_refine_dir(target_root).ok())
+            .and_then(|refine_dir| {
+                FileWorkItemService::new(refine_dir)
+                    .show_goal_detail(&goal_id)
+                    .ok()
+            })
+            .map(|detail| workflow_revision(&detail));
+
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
+        let mut state = self.load_state()?;
+        let Some(claim) = state
+            .claims
+            .iter_mut()
+            .find(|claim| claim.claim_id == claim_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "claim {claim_id} was not found"
+            )));
+        };
+        if claim.state != WorkflowClaimState::Running
+            || claim.execution_id.as_deref() != Some(expected_execution_id)
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {expected_execution_id} no longer owns claim {claim_id}"
+            )));
+        }
+        claim.goal_revision = goal_revision;
+        claim.failure_stage = Some("preparation".to_string());
+        claim.failure_message = Some(error.to_string());
+        claim.decision_version = claim.decision_version.saturating_add(1);
+        claim.state = WorkflowClaimState::Failed;
+        claim.updated_at = now_timestamp();
+        self.save_state(&mut state)?;
+        self.release_claim_capacity(claim_id)?;
         Ok(())
     }
 

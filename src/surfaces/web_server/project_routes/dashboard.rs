@@ -51,6 +51,20 @@ impl InProcessWebServer {
             .get("runner_reachable")
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
+        let preparation_failures = match (&self.runtime_root, &current_target_root) {
+            (Some(runtime_root), Some(target_root)) => {
+                match WorkflowEngine::with_target_root(runtime_root, target_root)
+                    .preparation_failures_needing_attention()
+                {
+                    Ok(failures) => failures
+                        .into_iter()
+                        .filter(|claim| node_filter == "all" || claim.node_id == active_node_id)
+                        .collect::<Vec<_>>(),
+                    Err(error) => return error_response(error),
+                }
+            }
+            _ => Vec::new(),
+        };
         ApiResponse::json(
             200,
             json!({
@@ -71,6 +85,7 @@ impl InProcessWebServer {
                 "active_node_display_name": active_node_display_name,
                 "needs_attention": dashboard_attention_items(
                     &dashboard.attention_indicators,
+                    &preparation_failures,
                     runner_reachable
                 ),
                 "attached": attached

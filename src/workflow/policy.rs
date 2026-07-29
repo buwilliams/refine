@@ -534,9 +534,18 @@ impl WorkflowEngine {
         snapshot: &ProjectionSnapshot,
         goal: &GoalSummaryProjection,
     ) -> bool {
+        Self::priority_claim_eligible_excluding(snapshot, goal, &BTreeSet::new())
+    }
+
+    pub(super) fn priority_claim_eligible_excluding(
+        snapshot: &ProjectionSnapshot,
+        goal: &GoalSummaryProjection,
+        excluded_goal_ids: &BTreeSet<String>,
+    ) -> bool {
         let node_id = goal.goal.node_id.as_deref().unwrap_or("default");
         !snapshot.goals.values().any(|other| {
             other.goal.id != goal.goal.id
+                && !excluded_goal_ids.contains(&other.goal.id)
                 && other.goal.status == GoalStatus::Todo
                 && other.goal.node_id.as_deref().unwrap_or("default") == node_id
                 && priority_rank(&other.goal.priority) > priority_rank(&goal.goal.priority)

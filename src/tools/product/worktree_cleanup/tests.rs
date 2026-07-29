@@ -337,6 +337,8 @@ fn cleanup_preserves_a_worktree_owned_by_an_active_workflow_claim() {
             execution_id: None,
             round_idx: Some(0),
             goal_revision: None,
+            failure_stage: None,
+            failure_message: None,
             decision_version: 1,
             state: WorkflowClaimState::Claimed,
             created_at: "2026-01-01T00:00:00Z".to_string(),

@@ -7,6 +7,7 @@ use fs2::FileExt;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 use super::{
@@ -155,6 +156,38 @@ impl WorkflowEngine {
 
     pub fn load_state(&self) -> RefineResult<WorkflowAutomationState> {
         read_state(&self.state_path())
+    }
+
+    pub fn preparation_failures_needing_attention(&self) -> RefineResult<Vec<WorkflowClaim>> {
+        let Some(refine_dir) = self.refine_dir()? else {
+            return Ok(Vec::new());
+        };
+        let state = self.load_state()?;
+        let work_items = FileWorkItemService::new(refine_dir);
+        let mut seen = std::collections::BTreeSet::new();
+        let mut failures = Vec::new();
+        for claim in state.claims.iter().rev() {
+            if !seen.insert(claim.goal_id.clone()) {
+                continue;
+            }
+            if claim.state != WorkflowClaimState::Failed
+                || claim.failure_stage.as_deref() != Some("preparation")
+            {
+                continue;
+            }
+            let still_current = match claim.goal_revision {
+                None => true,
+                Some(failed_revision) => work_items
+                    .show_goal_detail(&claim.goal_id)
+                    .map(|detail| workflow_revision(&detail) == failed_revision)
+                    .unwrap_or(true),
+            };
+            if still_current {
+                failures.push(claim.clone());
+            }
+        }
+        failures.reverse();
+        Ok(failures)
     }
 
     pub(crate) fn acquire_state_mutation_lock(&self) -> RefineResult<WorkflowStateMutationLock> {
