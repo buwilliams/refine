@@ -189,3 +189,39 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
+
+// A fixed wall-clock deadline measures the host, not the work: a daemon that
+// starts comfortably inside the budget on a workstation exceeds it on a loaded
+// two-core node and is then recovered as though it had failed. Readiness is
+// therefore decided by absence of progress.
+#[test]
+fn readiness_survives_a_slow_start_that_keeps_making_progress() {
+    let start = Instant::now();
+    let stall_timeout = Duration::from_secs(120);
+    let mut progress = ReadinessProgress::new(stall_timeout, start);
+
+    // Far past any total budget, but still reporting progress each minute.
+    let mut now = start;
+    for _ in 0..10 {
+        now += Duration::from_secs(60);
+        assert!(
+            !progress.stalled(now),
+            "a daemon still producing startup output must not be called failed"
+        );
+        progress.record_progress(now);
+    }
+
+    // Silence past the stall budget is what a genuine stall looks like.
+    assert!(!progress.stalled(now + stall_timeout - Duration::from_millis(1)));
+    assert!(progress.stalled(now + stall_timeout));
+}
+
+#[test]
+fn readiness_stalls_when_startup_never_reports_progress() {
+    let start = Instant::now();
+    let stall_timeout = Duration::from_secs(120);
+    let progress = ReadinessProgress::new(stall_timeout, start);
+
+    assert!(!progress.stalled(start + Duration::from_secs(119)));
+    assert!(progress.stalled(start + stall_timeout));
+}

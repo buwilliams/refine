@@ -15,8 +15,41 @@ use crate::process::supervisor::operations::{FileOperationRegistry, OperationReg
 use crate::process::supervisor::runtime::RuntimeRoot;
 
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
-const BACKGROUND_DAEMON_READY_TIMEOUT: Duration = Duration::from_secs(120);
+/// How long startup may go without observable progress before it is called a
+/// failure. This is a stall budget, not a total budget: a host slow enough to
+/// need several minutes to bind its port is still starting, not broken, and
+/// reporting it as failed is what makes recovery machinery act on healthy work.
+const BACKGROUND_DAEMON_READY_STALL_TIMEOUT: Duration = Duration::from_secs(120);
 const BACKGROUND_DAEMON_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Tracks whether a startup is still making observable progress.
+///
+/// A fixed wall-clock deadline measures the machine rather than the work: the
+/// same daemon that starts well inside the budget on a developer workstation
+/// exceeds it on a loaded two-core node, and is then killed and recovered as
+/// though it had failed. Progress resets the budget, so slower hosts take
+/// longer and only genuine silence is treated as a stall.
+struct ReadinessProgress {
+    last_progress: Instant,
+    stall_timeout: Duration,
+}
+
+impl ReadinessProgress {
+    fn new(stall_timeout: Duration, now: Instant) -> Self {
+        Self {
+            last_progress: now,
+            stall_timeout,
+        }
+    }
+
+    fn record_progress(&mut self, now: Instant) {
+        self.last_progress = now;
+    }
+
+    fn stalled(&self, now: Instant) -> bool {
+        now.duration_since(self.last_progress) >= self.stall_timeout
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DaemonStatus {
@@ -213,9 +246,12 @@ impl FileDaemonLifecycleService {
             config.bind_address, port
         );
         let mut stderr_offset = 0;
-        let deadline = Instant::now() + BACKGROUND_DAEMON_READY_TIMEOUT;
+        let mut progress =
+            ReadinessProgress::new(BACKGROUND_DAEMON_READY_STALL_TIMEOUT, Instant::now());
         loop {
-            relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
+            if relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset) {
+                progress.record_progress(Instant::now());
+            }
             let managed = supervisor.wait(&process.id)?;
             if managed.state != "running" {
                 relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
@@ -232,14 +268,15 @@ impl FileDaemonLifecycleService {
                 relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
                 return self.status(port);
             }
-            if Instant::now() >= deadline {
+            if progress.stalled(Instant::now()) {
                 break;
             }
             thread::sleep(BACKGROUND_DAEMON_READY_POLL_INTERVAL);
         }
         relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
         Err(RefineError::Degraded(format!(
-            "daemon did not become reachable on 127.0.0.1:{port}"
+            "daemon produced no startup progress for {}s and is not reachable on 127.0.0.1:{port}",
+            BACKGROUND_DAEMON_READY_STALL_TIMEOUT.as_secs()
         )))
     }
 
@@ -506,21 +543,25 @@ fn detached_command_parts(exe: &std::path::Path) -> (String, Vec<String>) {
     (exe.display().to_string(), Vec::new())
 }
 
-fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) {
+/// Relays any new startup output and reports whether there was any. New output
+/// is the daemon demonstrating it is still working, which is what distinguishes
+/// a slow start from a stalled one.
+fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) -> bool {
     let Some(path) = path else {
-        return;
+        return false;
     };
     let Ok(output) = fs::read_to_string(path) else {
-        return;
+        return false;
     };
     if output.len() <= *offset {
-        return;
+        return false;
     }
     let next = &output[*offset..];
     *offset = output.len();
     for line in next.lines().filter(|line| !line.trim().is_empty()) {
         eprintln!("{line}");
     }
+    true
 }
 
 impl DaemonRuntimeService for FileDaemonLifecycleService {
