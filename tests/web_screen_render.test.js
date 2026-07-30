@@ -320,6 +320,72 @@ test("Toolbar add menu closes when the user clicks outside it", { skip: SKIP }, 
   }
 });
 
+test("a toolbar Agent's morphed Start button dispatches Stop", { skip: SKIP }, async () => {
+  const requests = [];
+  const app = await openApp({
+    fixture(pathname, request) {
+      if (pathname === "/api/terminal/session" && request.method() === "POST") {
+        return {
+          id: "browser-agent-session",
+          process_id: "browser-agent-process",
+          cwd: "/repo",
+          profile: "agent",
+          provider: "codex",
+        };
+      }
+      if (pathname === "/api/terminal/browser-agent-session/stop") return { ok: true };
+      return apiFixture(pathname);
+    },
+    onRequest(pathname, request) {
+      requests.push([request.method(), pathname]);
+    },
+  });
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    await app.page.evaluate(() => {
+      window.EventSource = class {
+        addEventListener() {}
+        close() {}
+      };
+      chatState.tabs = {
+        agent: normalizeInteractiveTerminalTab({
+          goalId: null,
+          label: "Agent",
+          mode: "agent",
+          sessionId: null,
+        }),
+      };
+      chatState.activeTabId = "agent";
+      chatState.open = true;
+      chatState.bodyHeight = 420;
+      drawToolbar();
+    });
+
+    await app.page.locator('[data-testid="terminal-start"]').click();
+    await app.page.waitForSelector('[data-testid="terminal-stop"]');
+    await app.page.locator('[data-testid="terminal-stop"]').click();
+    await app.page.waitForSelector('[data-testid="terminal-start"]');
+
+    assert.equal(
+      await app.page.locator('[data-testid="terminal-start"]').textContent(),
+      "Restart",
+    );
+    assert.deepEqual(
+      requests.filter(([, pathname]) => (
+        pathname === "/api/terminal/session"
+        || pathname === "/api/terminal/browser-agent-session/stop"
+      )),
+      [
+        ["POST", "/api/terminal/session"],
+        ["POST", "/api/terminal/browser-agent-session/stop"],
+      ],
+    );
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
