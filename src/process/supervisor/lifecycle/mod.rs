@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +15,7 @@ use crate::process::supervisor::operations::{FileOperationRegistry, OperationReg
 use crate::process::supervisor::runtime::RuntimeRoot;
 
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
+pub const DAEMON_STARTUP_PROGRESS_FILE: &str = "daemon-startup-progress";
 /// How long startup may go without observable progress before it is called a
 /// failure. This is a stall budget, not a total budget: a host slow enough to
 /// need several minutes to bind its port is still starting, not broken, and
@@ -29,24 +30,24 @@ const BACKGROUND_DAEMON_READY_POLL_INTERVAL: Duration = Duration::from_millis(10
 /// exceeds it on a loaded two-core node, and is then killed and recovered as
 /// though it had failed. Progress resets the budget, so slower hosts take
 /// longer and only genuine silence is treated as a stall.
-struct ReadinessProgress {
+pub(crate) struct ReadinessProgress {
     last_progress: Instant,
     stall_timeout: Duration,
 }
 
 impl ReadinessProgress {
-    fn new(stall_timeout: Duration, now: Instant) -> Self {
+    pub(crate) fn new(stall_timeout: Duration, now: Instant) -> Self {
         Self {
             last_progress: now,
             stall_timeout,
         }
     }
 
-    fn record_progress(&mut self, now: Instant) {
+    pub(crate) fn record_progress(&mut self, now: Instant) {
         self.last_progress = now;
     }
 
-    fn stalled(&self, now: Instant) -> bool {
+    pub(crate) fn stalled(&self, now: Instant) -> bool {
         now.duration_since(self.last_progress) >= self.stall_timeout
     }
 }
@@ -138,6 +139,50 @@ impl FileDaemonLifecycleService {
 
     pub fn status_path(&self, port: u16) -> PathBuf {
         self.runtime_root.port_root(port).join(DAEMON_STATUS_FILE)
+    }
+
+    pub fn startup_progress_path(&self, port: u16) -> PathBuf {
+        self.runtime_root
+            .port_root(port)
+            .join(DAEMON_STARTUP_PROGRESS_FILE)
+    }
+
+    /// Publish a startup milestone so a waiter can tell slow from stalled.
+    ///
+    /// The direct launcher reads the daemon's stderr for this, but a
+    /// service-managed daemon writes to the journal, which Refine cannot see.
+    /// Its readiness wait therefore had nothing to observe: the status file is
+    /// written once at "starting" and not again until "idle", so a slow start
+    /// was indistinguishable from a hung one and was reported as a failure.
+    ///
+    /// Best effort. A daemon that cannot record progress should still start;
+    /// the cost is only that its waiter falls back to timing out.
+    pub fn record_startup_progress(&self, port: u16, step: &str) {
+        let path = self.startup_progress_path(port);
+        let Some(parent) = path.parent() else {
+            return;
+        };
+        if fs::create_dir_all(parent).is_err() {
+            return;
+        }
+        let _ = fs::write(&path, format!("{step}\n"));
+    }
+
+    /// A token that changes whenever startup reports progress.
+    ///
+    /// Content rather than modification time: a step repeating within one
+    /// filesystem timestamp granule would otherwise look like no progress at
+    /// all.
+    pub fn startup_progress_token(&self, port: u16) -> Option<String> {
+        let path = self.startup_progress_path(port);
+        let content = fs::read_to_string(&path).ok()?;
+        let modified = fs::metadata(&path)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        Some(format!("{modified}:{content}"))
     }
 
     pub fn running_statuses(&self) -> RefineResult<Vec<DaemonStatus>> {

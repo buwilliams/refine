@@ -197,8 +197,13 @@ pub(super) fn run_system_start(
         root: runtime_root.clone(),
     });
     lifecycle.begin_start(actual_port)?;
+    // Each milestone is published as well as printed. A service-managed daemon's
+    // stderr goes to the journal, where its readiness waiter cannot see it, so
+    // without this a slow start is indistinguishable from a hung one.
+    lifecycle.record_startup_progress(actual_port, "preparing");
     eprintln!("refine: preparing daemon at http://{addr}");
     let project_preparation = (|| -> RefineResult<_> {
+        lifecycle.record_startup_progress(actual_port, "loading-project-registry");
         eprintln!("refine: loading active project registry");
         let project_registry = FileProjectRegistryService::new(&runtime_root, None);
         let legacy_project_registry = FileProjectRegistryService::new(&port_runtime_root, None);
@@ -238,6 +243,9 @@ pub(super) fn run_system_start(
             },
         };
         let snapshot = if let Some(target_root) = target_root {
+            // The longest step by far on a large project, and the one whose
+            // slowness a fixed deadline used to misread as failure.
+            lifecycle.record_startup_progress(actual_port, "warming-project-cache");
             eprintln!("refine: warming project cache for {target_root}");
             let target_root = PathBuf::from(target_root);
             let refine_dir = refine_dir_for_target_root(&target_root)?;
@@ -280,6 +288,7 @@ pub(super) fn run_system_start(
         static_root: static_root.or_else(default_static_root),
     };
     if let Err(error) = daemon.recover_runtime_state_with_progress(|message| {
+        lifecycle.record_startup_progress(actual_port, message);
         eprintln!("refine: {message}");
     }) {
         let _ = lifecycle.mark_start_failed(actual_port, &error);

@@ -357,3 +357,82 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nonce}", std::process::id()))
 }
+
+// A service-managed daemon writes its startup output to the journal, where this
+// waiter cannot read it, so its readiness budget had nothing to observe and a
+// slow start on a constrained host was reported as a failure to start. Startup
+// milestones are published instead, and reporting one resets the budget.
+#[test]
+fn managed_readiness_waits_while_startup_keeps_reporting_progress() {
+    let temp_root = unique_temp_dir("cli-system-managed-progress");
+    let runtime_root = temp_root.join("run");
+    let port = 4561;
+    let lifecycle = ready_lifecycle(&runtime_root, port);
+    let probe_calls = std::cell::Cell::new(0);
+
+    // Startup runs well past the budget in total, but never goes quiet for a
+    // whole budget's worth. Without milestones resetting it, this exceeds the
+    // deadline around the fourth poll and is reported as a failed start.
+    let status = run_service_managed_daemon_with(
+        &lifecycle,
+        port,
+        "systemd_user",
+        InstalledServiceAction::Restart,
+        std::time::Duration::from_millis(400),
+        std::time::Duration::from_millis(100),
+        || Ok(()),
+        |_| {
+            probe_calls.set(probe_calls.get() + 1);
+            match probe_calls.get() {
+                // Still starting, but reporting a distinct milestone each poll.
+                1..=8 => {
+                    lifecycle.record_startup_progress(
+                        port,
+                        &format!("warming-project-cache-{}", probe_calls.get()),
+                    );
+                    DaemonReachability::Unreachable("still starting".to_string())
+                }
+                _ => DaemonReachability::Reachable,
+            }
+        },
+    )
+    .expect("a daemon still reporting startup progress must not be called failed");
+
+    assert!(status.daemon_healthy);
+    assert_eq!(status.worker_state, "idle");
+    assert!(
+        probe_calls.get() > 8,
+        "readiness gave up before the daemon became reachable"
+    );
+
+    let _ = fs::remove_dir_all(&temp_root);
+}
+
+// The converse: silence past the budget is still a stall, so a genuinely hung
+// startup is not waited on forever.
+#[test]
+fn managed_readiness_still_gives_up_when_startup_reports_nothing() {
+    let temp_root = unique_temp_dir("cli-system-managed-silent");
+    let runtime_root = temp_root.join("run");
+    let port = 4562;
+    let lifecycle = ready_lifecycle(&runtime_root, port);
+
+    let error = run_service_managed_daemon_with(
+        &lifecycle,
+        port,
+        "systemd_user",
+        InstalledServiceAction::Restart,
+        std::time::Duration::ZERO,
+        std::time::Duration::ZERO,
+        || Ok(()),
+        |_| DaemonReachability::Unreachable("silent".to_string()),
+    )
+    .unwrap_err();
+
+    assert!(
+        error.to_string().contains("did not become reachable"),
+        "{error}"
+    );
+
+    let _ = fs::remove_dir_all(&temp_root);
+}

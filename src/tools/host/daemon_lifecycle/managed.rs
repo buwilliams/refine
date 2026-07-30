@@ -269,7 +269,12 @@ fn wait_for_service_managed_daemon_with(
     mut probe: impl FnMut(u16) -> DaemonReachability,
 ) -> RefineResult<DaemonStatus> {
     let action_name = managed_action_name(action)?;
-    let deadline = std::time::Instant::now() + timeout;
+    // A service-managed daemon reports startup through a published progress
+    // token rather than through stderr, which goes to the journal where this
+    // waiter cannot read it. Treating the budget as a stall budget means a slow
+    // host takes longer instead of being reported as having failed to start.
+    let mut progress = ReadinessProgress::new(timeout, std::time::Instant::now());
+    let mut last_token = lifecycle.startup_progress_token(port);
     loop {
         let observation = probe(port);
         if observation == DaemonReachability::Reachable {
@@ -303,7 +308,12 @@ fn wait_for_service_managed_daemon_with(
             )?;
             return Err(error);
         }
-        if std::time::Instant::now() >= deadline {
+        let token = lifecycle.startup_progress_token(port);
+        if token != last_token {
+            last_token = token;
+            progress.record_progress(std::time::Instant::now());
+        }
+        if progress.stalled(std::time::Instant::now()) {
             let (error, outcome) = match &observation {
                 DaemonReachability::Unreachable(_) => (
                     RefineError::Degraded(format!(

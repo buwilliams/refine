@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     BackgroundDaemonConfig, DaemonReachability, DaemonStatus, FileDaemonLifecycleService,
-    http_reachability_probe,
+    ReadinessProgress, http_reachability_probe,
 };
 use crate::process::supervisor::runtime::{RuntimePathInputs, RuntimeRoot};
 use crate::tools::host::installation::{FileInstallationService, InstalledServiceAction};
