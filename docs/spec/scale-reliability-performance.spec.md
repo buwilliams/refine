@@ -590,6 +590,7 @@ Implemented, with tests, as of this revision:
 | D4 — Per-claim projection caches collapsed to one shared cache | Done |
 | D3 — Source delta; Goal writes patch rather than rebuild | Done |
 | D5 — Git stall budget; coordination and repository lock deadlines | Done |
+| D5 — Goal records locked individually rather than project-wide | Done |
 | D6 — Concurrency, disk headroom, and cadence derived from host capacity | Done |
 | D7 — Synchronization stops rehashing unmoved records | Done |
 | D8b — Goal logs relocated under `runtime/` | Done |
@@ -598,11 +599,19 @@ Implemented, with tests, as of this revision:
 
 Not implemented, and why:
 
-- **Single-writer claim state and asynchronous mutations (D5).** Lock
-  acquisition is now bounded and Git can no longer hang indefinitely, which
-  removes the failure these were meant to address. The intent queue and the
-  `202 Accepted` contract remain a scale change rather than a reliability one,
-  and they touch every mutating surface in the web UI.
+- **Single-writer claim state and asynchronous mutations (D5).** Goal writes no
+  longer take the coordination lock at all, so what remains under it is claim
+  state: short read-modify-write passes with no Git and no record scanning, and
+  reconstruction of the scheduler index happens before the lock is taken. An
+  intent queue would remove even that serialization, but the contention it was
+  specified against is gone, and the `202 Accepted` contract it implies touches
+  every mutating surface in the web UI. Worth revisiting against measurements
+  rather than in advance.
+
+  Worth recording for whoever does: worktree cleanup locks on the runtime root
+  while the workflow engine locks on the state directory's parent. Those are
+  different lock files, so the two never contended, and the spec's account of
+  cleanup blocking promotion was wrong.
 
 Scheduling no longer reads a projection of the whole project on any path:
 promotion, backlog promotion, claiming, starting a claim, and interrupted-Goal
