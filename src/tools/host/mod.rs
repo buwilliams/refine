@@ -4,6 +4,7 @@ pub mod daemon_lifecycle;
 pub mod deployed_update;
 pub mod git_sync;
 pub mod git_worktrees;
+pub mod host_resources;
 pub mod installation;
 pub mod node_init;
 pub mod project_layout;

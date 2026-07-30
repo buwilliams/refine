@@ -12,6 +12,7 @@ pub use crate::model::goal::MergeResult;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
+use crate::tools::host::host_resources::HostResources;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
@@ -102,6 +103,21 @@ fn create_worktree_parent(target: &Path) -> RefineResult<()> {
     let Some(parent) = target.parent() else {
         return Ok(());
     };
+    // Checking out a worktree writes a full copy of the target application. On a
+    // volume already at its reserve that fails partway through and leaves a
+    // half-written tree that later runs then have to reason about. Refusing to
+    // start is backpressure; a partial worktree is corruption.
+    //
+    // This does not attempt to predict the checkout's size — that would mean
+    // measuring the working tree on every creation. It refuses only when the
+    // volume has no headroom left at all, which is the case that actually
+    // corrupts.
+    if !HostResources::sample(parent).has_disk_headroom(0) {
+        return Err(RefineError::Degraded(format!(
+            "not enough free disk space under {} to check out a worktree",
+            parent.display()
+        )));
+    }
     fs::create_dir_all(parent).map_err(|error| {
         RefineError::Io(format!(
             "failed to create worktree parent {}: {error}",

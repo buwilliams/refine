@@ -11,6 +11,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -55,7 +56,14 @@ impl WorkflowEngine {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
             let settings = FileSettingsService::for_node(refine_dir, node_id).load()?;
-            policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
+            // Concurrency defaults to what this host can actually support rather
+            // than to a fixed number. The same constant previously applied to a
+            // two-core node and a thirty-two-core one, wasting the capable host
+            // and overcommitting the constrained one. An explicit setting still
+            // wins: the governor supplies the fallback, not an override.
+            let governed_limit = HostResources::current(&self.runtime_root)
+                .recommended_agent_concurrency(observed_agent_memory_bytes(&self.runtime_root));
+            policy.global_limit = setting_usize(&settings, "parallel_run_cap", governed_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,
                 "parallel_per_node_cap",
