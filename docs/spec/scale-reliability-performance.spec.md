@@ -579,6 +579,12 @@ that is when the projection stops fingerprinting them anyway.
 
 ## Implementation Status
 
+Upgrading an existing node needs
+[scale-reliability-performance.migration.md](scale-reliability-performance.migration.md):
+two on-disk locations moved and two are obsolete. Durable project state is
+untouched; what moves is node-local evidence.
+
+
 Implemented, with tests, as of this revision:
 
 | Item | State |
