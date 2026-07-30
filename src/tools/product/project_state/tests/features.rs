@@ -357,7 +357,7 @@ fn rebuild_projection_scans_python_style_goal_and_feature_records() {
     assert!(
         snapshot
             .source_fingerprints
-            .contains_key("goals/GO/AL1/logs.jsonl")
+            .contains_key("runtime/goals/GO/AL1/logs.jsonl")
     );
     let goal_activity = snapshot.list_activity(ActivityProjectionQuery {
         goal_id: Some("GOAL1".to_string()),

@@ -100,7 +100,11 @@ fn projected_round_log_activity_keeps_a_bounded_newest_window() {
             index % 60
         ));
     }
-    fs::write(goal_dir.join("logs.jsonl"), sidecar).unwrap();
+    // Log sidecars are node-local, so they live under runtime/ rather than
+    // beside the Goal record.
+    let logs_dir = refine_dir.join("runtime").join("goals").join("GO").join("AL1");
+    fs::create_dir_all(&logs_dir).unwrap();
+    fs::write(logs_dir.join("logs.jsonl"), sidecar).unwrap();
 
     let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()

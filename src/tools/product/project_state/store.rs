@@ -19,7 +19,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
-use crate::tools::observability::logs::FileLogService;
+use crate::tools::observability::logs::{FileLogService, goal_logs_root};
 
 use super::helpers::*;
 use super::types::*;

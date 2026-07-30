@@ -265,13 +265,25 @@ fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-fn goal_logs_path(refine_dir: &Path, goal_id: &str) -> PathBuf {
+/// Where a Goal's log sidecar lives, relative to the live state directory.
+///
+/// Under `runtime/` rather than beside the Goal record. Logs are node-local
+/// evidence: only the Goal record and its implementation report belong in
+/// synchronized state. Sitting beside the record put them inside the durable
+/// namespace, where they were published to every node until an exclusion caught
+/// them by filename — a rule the next sharded sidecar would slip past just as
+/// easily. `runtime/` is excluded structurally, by leading path component, so
+/// the category error is not expressible here.
+pub(crate) fn goal_logs_path(refine_dir: &Path, goal_id: &str) -> PathBuf {
     let goal_id = goal_id.to_uppercase();
-    refine_dir
-        .join("goals")
+    goal_logs_root(refine_dir)
         .join(&goal_id[..2])
         .join(&goal_id[2..])
         .join("logs.jsonl")
+}
+
+pub(crate) fn goal_logs_root(refine_dir: &Path) -> PathBuf {
+    refine_dir.join("runtime").join("goals")
 }
 
 #[cfg(test)]
@@ -296,7 +308,7 @@ mod tests {
         };
         let written = service.append_round_log("GOAL1", 1, entry).unwrap();
         assert_eq!(written.round_idx, Some(1));
-        assert!(refine_dir.join("goals/GO/AL1/logs.jsonl").exists());
+        assert!(refine_dir.join("runtime/goals/GO/AL1/logs.jsonl").exists());
 
         let (page, has_more, total) = service.page_round_logs("GOAL1", 1, 50, 0).unwrap();
         assert!(!has_more);
@@ -330,6 +342,29 @@ mod tests {
         );
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    // Sitting beside the Goal record put log sidecars inside the durable
+    // namespace, where every node published its agent logs until an exclusion
+    // caught them by filename. Living under runtime/ makes the exclusion
+    // structural, by leading path component, so the next sharded sidecar cannot
+    // reintroduce the problem.
+    #[test]
+    fn goal_log_sidecars_live_outside_the_durable_namespace() {
+        let refine_dir = PathBuf::from("/tmp/live-state");
+        let path = goal_logs_path(&refine_dir, "goal1");
+
+        let relative = path.strip_prefix(&refine_dir).unwrap();
+        assert_eq!(
+            relative,
+            Path::new("runtime/goals/GO/AL1/logs.jsonl"),
+            "log sidecars must be node-local runtime evidence"
+        );
+        assert_eq!(
+            relative.components().next().unwrap().as_os_str(),
+            "runtime",
+            "the leading component is what sync excludes on"
+        );
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

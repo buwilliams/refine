@@ -91,7 +91,7 @@ fn web_server_appends_and_reads_goal_round_logs() {
         })),
     });
     assert_eq!(append.status, 200);
-    assert!(refine_dir.join("goals/GO/AL1/logs.jsonl").exists());
+    assert!(refine_dir.join("runtime/goals/GO/AL1/logs.jsonl").exists());
 
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),

@@ -365,7 +365,7 @@ fn quality_evidence_persistence_failures_remain_nonterminal_and_recoverable() {
                 .unwrap();
             fixture.refine_dir.join(summary.goal.json_path)
         } else {
-            fixture.refine_dir.join("goals/GO/AL1/logs.jsonl")
+            fixture.refine_dir.join("runtime/goals/GO/AL1/logs.jsonl")
         };
         let backup = blocked_path.with_extension("backup");
         if failure == "summary" || blocked_path.exists() {

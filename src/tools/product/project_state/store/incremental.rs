@@ -90,7 +90,7 @@ impl FileProjectStateStore {
             delta.fingerprints.insert(rel_path, fingerprint);
         }
 
-        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
+        for path in Self::collect_json_files(&goal_logs_root(&self.refine_dir), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             let fingerprint = Self::metadata_fingerprint(&path)?;
             if !expected

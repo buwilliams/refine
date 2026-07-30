@@ -115,7 +115,7 @@ impl ProjectStateStore for FileProjectStateStore {
             let rel_path = self.relative_path(&activity_path)?;
             source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&activity_path)?);
         }
-        for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
+        for path in Self::collect_json_files(&goal_logs_root(&self.refine_dir), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
