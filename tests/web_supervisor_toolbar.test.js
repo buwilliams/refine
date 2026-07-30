@@ -83,6 +83,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   let toolbarResize = null;
   let toolbarBody = null;
   let toolbarAddMenu = null;
+  const terminalAction = new FakeElement();
   Object.defineProperty(toolbar, "innerHTML", {
     get() { return toolbar._innerHTML; },
     set(value) {
@@ -96,6 +97,8 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       toolbarAddMenu = toolbar._innerHTML.includes('data-testid="toolbar-add-menu"')
         ? new FakeElement()
         : null;
+      const action = toolbar._innerHTML.match(/data-terminal-action(?:="([^"]*)")?/);
+      terminalAction.dataset.terminalAction = action?.[1] || "";
       const height = toolbar._innerHTML.match(/data-testid="toolbar-body"[^>]*style="height:(\d+)px"/);
       if (toolbarBody && height) toolbarBody.clientHeight = Number(height[1]);
     },
@@ -131,8 +134,12 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
     if (selector === "#toolbar-dock-resize") return toolbarResize;
     if (selector === ".toolbar-dock-body") return toolbarBody;
     if (selector === ".toolbar-add-menu") return toolbarAddMenu;
+    if (selector === "[data-terminal-action]" && toolbar.innerHTML.includes("data-terminal-action")) {
+      return terminalAction;
+    }
     return null;
   };
+  const boundListeners = new WeakMap();
   const context = vm.createContext({
     // The real helpers live in dom-morph.js and need a browser DOM plus
     // Idiomorph. These stand in with the pre-morph semantics this fake DOM
@@ -145,8 +152,15 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
     releaseAfterMorph(el) {
       if (el) delete el.dataset.morphPreserve;
     },
-    bindOnce(el, event, handler) {
+    bindOnce(el, event, handler, key = event) {
       if (!el) return;
+      let bound = boundListeners.get(el);
+      if (!bound) {
+        bound = new Set();
+        boundListeners.set(el, bound);
+      }
+      if (bound.has(key)) return;
+      bound.add(key);
       el.addEventListener(event, handler);
     },
     AbortController,
@@ -194,6 +208,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       innerHeight: 800,
     },
     withButtonBusy: async (_button, _label, action) => action(),
+    __terminalAction: terminalAction,
   });
   const staticRoot = path.join(__dirname, "../src/surfaces/web/static/js");
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
@@ -232,6 +247,12 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         return activateToolbarTab(tabId, { toggleIfActive: true });
       },
       draw: drawToolbar,
+      show(tabId) {
+        ensureTestTab(tabId);
+        chatState.activeTabId = tabId;
+        chatState.open = true;
+        drawToolbar();
+      },
       openGoal(goalId) { return openAgentDock({ goalId }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       create(mode) { return createToolbarTab(mode); },
@@ -247,6 +268,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         ensureTestTab(tabId);
         chatState.activeTabId = tabId;
         return stopTerminalSession(chatState.tabs[tabId]);
+      },
+      clickTerminalAction() {
+        return globalThis.__terminalAction.listeners.get("click")?.();
       },
       close(tabId) { return closeChatTab(tabId); },
       clickCloseDescendant(tabId) {
@@ -911,6 +935,38 @@ test("Stop and tab reactivation use terminal lifecycle routes", async () => {
     "/api/terminal/session",
     "/api/terminal/agent-1/stop",
     "/api/terminal/session",
+  ]);
+});
+
+test("the morphed Start button dispatches Stop after an Agent connects", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath) => {
+    requests.push([method, requestPath]);
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "morphed-agent-session",
+        process_id: "morphed-agent-process",
+        cwd: "/repo",
+        profile: "agent",
+        provider: "codex",
+      };
+    }
+    return { ok: true };
+  });
+
+  browser.runtime.show("agent");
+  await browser.runtime.clickTerminalAction();
+  assert.equal(browser.runtime.terminal("agent").connected, true);
+  assert.match(browser.html(), /data-terminal-action="stop"/);
+
+  await browser.runtime.clickTerminalAction();
+
+  assert.equal(browser.runtime.terminal("agent").exited, true);
+  assert.match(browser.html(), />Restart</);
+  assert.deepEqual(requests, [
+    ["POST", "/api/terminal/session"],
+    ["POST", "/api/terminal/morphed-agent-session/stop"],
   ]);
 });
 

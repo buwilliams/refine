@@ -1214,9 +1214,19 @@ function bindTerminalPanel(root, boundTab) {
   bindOnce(output, "blur", () => output.classList.remove("focused"));
   ensureTerminalRenderer(output, liveTab());
   observeTerminalOutputSize(output, liveTab());
-  bindOnce(root.querySelector('[data-terminal-action="start"]'), "click", () => startTerminalSession(liveTab()));
-  bindOnce(root.querySelector('[data-terminal-action="reattach"]'), "click", () => reattachTerminalSession(liveTab()));
-  bindOnce(root.querySelector('[data-terminal-action="stop"]'), "click", () => stopTerminalSession(liveTab()));
+  const actionButton = root.querySelector("[data-terminal-action]");
+  bindOnce(
+    actionButton,
+    "click",
+    () => handleTerminalAction(actionButton.dataset.terminalAction, liveTab()),
+    "terminal-action",
+  );
+}
+
+function handleTerminalAction(action, tab) {
+  if (action === "start") return startTerminalSession(tab);
+  if (action === "reattach") return reattachTerminalSession(tab);
+  if (action === "stop") return stopTerminalSession(tab);
 }
 
 async function startTerminalSession(tab = currentToolbarTab()) {
