@@ -180,7 +180,9 @@ function clipboardRuntime() {
         type: "keydown",
         ...init,
         defaultPrevented: false,
+        propagationStopped: false,
         preventDefault() { this.defaultPrevented = true; },
+        stopPropagation() { this.propagationStopped = true; },
       };
     }
 
@@ -230,14 +232,21 @@ function clipboardRuntime() {
       },
       pasteEvent(tabId, text) {
         chatState.activeTabId = tabId;
+        const terminal = terminalStateFor(tabId);
         const event = clipboardTestEvent({
           type: "paste",
           clipboardData: {
             getData(type) { return type === "text/plain" ? text : ""; },
           },
         });
-        terminalStateFor(tabId).term.element.listeners.get("paste")(event);
-        return { defaultPrevented: event.defaultPrevented };
+        terminal.term.element.listeners.get("paste")(event);
+        // xterm owns a paste listener below the shared terminal element. Model
+        // its onData fallback when the capture listener lets the event through.
+        if (!event.propagationStopped) terminal.term.dataHandler(text);
+        return {
+          defaultPrevented: event.defaultPrevented,
+          propagationStopped: event.propagationStopped,
+        };
       },
       select(tabId, text) {
         terminalStateFor(tabId).term.selection = text;
@@ -354,7 +363,7 @@ test("Ctrl+V pastes single-line and multiline clipboard text exactly once withou
   assert.equal(inputs.some((request) => request.body.data.includes("\x16")), false);
 });
 
-test("native copy and paste events preserve exact text for context-menu shortcuts", async () => {
+test("native paste is sent exactly once instead of being reprocessed by xterm", async () => {
   const browser = clipboardRuntime();
   browser.runtime.add("worktree", "standalone", "Agent in Worktree");
   browser.runtime.select("worktree", "selected\r\ntext");
@@ -364,6 +373,7 @@ test("native copy and paste events preserve exact text for context-menu shortcut
   assert.equal(copy.copied["text/plain"], "selected\r\ntext");
   const paste = browser.runtime.pasteEvent("worktree", "one\r\ntwo\n");
   assert.equal(paste.defaultPrevented, true);
+  assert.equal(paste.propagationStopped, true);
   await settleInput();
 
   assert.deepEqual(inputRequests(browser).map((request) => request.body.data), ["one\r\ntwo\n"]);
