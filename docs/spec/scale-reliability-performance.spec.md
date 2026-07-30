@@ -593,7 +593,6 @@ Implemented, with tests, as of this revision:
 | D6 — Concurrency, disk headroom, and cadence derived from host capacity | Done |
 | D7 — Synchronization stops rehashing unmoved records | Done |
 | D8b — Goal logs relocated under `runtime/` | Done |
-
 | D4 — Scheduling reads an index bounded by work in flight | Done |
 
 Not implemented, and why:
