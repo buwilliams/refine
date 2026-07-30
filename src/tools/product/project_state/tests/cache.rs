@@ -156,3 +156,100 @@ fn file_store_rebuilds_malformed_projection_snapshot() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+// Staleness used to be a single boolean, so any change discarded the cached
+// projection and re-read every Goal and Feature record. A Goal write is the
+// most frequent event in a running fleet, which made the full-corpus path the
+// normal path and tied the cost of every mutation to total project size.
+#[test]
+fn goal_writes_patch_the_projection_without_a_full_rebuild() {
+    let temp_root = unique_temp_dir("projection-incremental");
+    let refine_dir = temp_root.join(".refine");
+    let cache_dir = temp_root.join("run").join("8080").join("cache");
+    for (shard, rest, id) in [("GO", "AL1", "GOAL1"), ("GO", "AL2", "GOAL2")] {
+        let goal_dir = refine_dir.join("goals").join(shard).join(rest);
+        fs::create_dir_all(&goal_dir).unwrap();
+        fs::write(
+            goal_dir.join("goal.json"),
+            format!(
+                r#"{{"id":"{id}","name":"{id} original","status":"todo","rounds":[]}}"#
+            ),
+        )
+        .unwrap();
+    }
+
+    let store = FileProjectStateStore::new(&refine_dir);
+    // Cold cache legitimately rebuilds once.
+    store.load_or_refresh_projection(&cache_dir).unwrap();
+    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+
+    let goal_path = refine_dir.join("goals").join("GO").join("AL1");
+    fs::write(
+        goal_path.join("goal.json"),
+        r#"{"id":"GOAL1","name":"GOAL1 renamed","status":"done","rounds":[]}"#,
+    )
+    .unwrap();
+
+    let patched = store.load_or_refresh_projection(&cache_dir).unwrap();
+
+    assert_eq!(
+        FileProjectStateStore::rebuild_count(&refine_dir),
+        0,
+        "a Goal write must not re-read the whole corpus"
+    );
+    assert_eq!(patched.goals["GOAL1"].goal.name, "GOAL1 renamed");
+    assert_eq!(patched.goals["GOAL1"].goal.status, GoalStatus::Done);
+    // The untouched Goal survives, and derived aggregates reflect both.
+    assert_eq!(patched.goals["GOAL2"].goal.name, "GOAL2 original");
+    assert_eq!(
+        patched.dashboard.all_node_status_counts.get(&GoalStatus::Done),
+        Some(&1)
+    );
+    assert_eq!(
+        patched.dashboard.all_node_status_counts.get(&GoalStatus::Todo),
+        Some(&1)
+    );
+
+    // The patched projection is what a later read observes, without rebuilding.
+    let reloaded = store.load_or_refresh_projection(&cache_dir).unwrap();
+    assert_eq!(FileProjectStateStore::rebuild_count(&refine_dir), 0);
+    assert_eq!(reloaded.goals["GOAL1"].goal.name, "GOAL1 renamed");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn removing_a_goal_record_drops_it_from_the_patched_projection() {
+    let temp_root = unique_temp_dir("projection-incremental-remove");
+    let refine_dir = temp_root.join(".refine");
+    let cache_dir = temp_root.join("run").join("8080").join("cache");
+    for (rest, id) in [("AL1", "GOAL1"), ("AL2", "GOAL2")] {
+        let goal_dir = refine_dir.join("goals").join("GO").join(rest);
+        fs::create_dir_all(&goal_dir).unwrap();
+        fs::write(
+            goal_dir.join("goal.json"),
+            format!(r#"{{"id":"{id}","name":"{id}","status":"todo","rounds":[]}}"#),
+        )
+        .unwrap();
+    }
+
+    let store = FileProjectStateStore::new(&refine_dir);
+    store.load_or_refresh_projection(&cache_dir).unwrap();
+    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+
+    fs::remove_dir_all(refine_dir.join("goals").join("GO").join("AL2")).unwrap();
+    let patched = store.load_or_refresh_projection(&cache_dir).unwrap();
+
+    assert_eq!(FileProjectStateStore::rebuild_count(&refine_dir), 0);
+    assert!(patched.goals.contains_key("GOAL1"));
+    assert!(
+        !patched.goals.contains_key("GOAL2"),
+        "a deleted record must leave the projection"
+    );
+    assert_eq!(
+        patched.dashboard.all_node_status_counts.get(&GoalStatus::Todo),
+        Some(&1)
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}

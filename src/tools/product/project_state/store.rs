@@ -61,6 +61,7 @@ mod core;
 mod features;
 mod goals;
 mod helpers;
+mod incremental;
 mod projection_store;
 
 use helpers::*;

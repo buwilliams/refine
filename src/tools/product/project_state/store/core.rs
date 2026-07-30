@@ -145,11 +145,24 @@ impl FileProjectStateStore {
         Ok(source_fingerprints)
     }
 
+    /// Returns a current projection, repairing the cached one where possible.
+    ///
+    /// Any change at all used to discard the cache and re-read every Goal and
+    /// Feature record. A Goal write is the most frequent event in a running
+    /// fleet, so the full-corpus path was the normal path and its cost scaled
+    /// with project size on every mutation. A delta names the sources that
+    /// actually moved, so only those are re-read and everything derived is
+    /// recomputed in memory. Full rebuilds are left to a cold or unreadable
+    /// cache.
     pub fn load_or_refresh_projection(&self, cache_dir: &Path) -> RefineResult<ProjectionSnapshot> {
-        if let Some(snapshot) = self.load_projection_snapshot(cache_dir)?
-            && self.source_fingerprints_match(&snapshot.source_fingerprints)?
-        {
-            return Ok(snapshot);
+        if let Some(snapshot) = self.load_projection_snapshot(cache_dir)? {
+            let delta = self.source_delta(&snapshot.source_fingerprints)?;
+            if delta.is_empty() {
+                return Ok(snapshot);
+            }
+            let patched = self.patch_projection(snapshot, delta)?;
+            self.persist_projection_snapshot(cache_dir, &patched)?;
+            return Ok(patched);
         }
         let snapshot = self.rebuild_projection()?;
         self.persist_projection_snapshot(cache_dir, &snapshot)?;
