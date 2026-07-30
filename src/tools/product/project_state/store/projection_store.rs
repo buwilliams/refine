@@ -36,8 +36,14 @@ impl ProjectStateStore for FileProjectStateStore {
         if value.get("version").and_then(Value::as_u64) != Some(PROJECTION_SNAPSHOT_VERSION) {
             return Ok(None);
         }
-        match serde_json::from_value(value) {
-            Ok(snapshot) => Ok(Some(snapshot)),
+        match serde_json::from_value::<ProjectionSnapshot>(value) {
+            // The source directory is not serialized, so a snapshot read back
+            // from cache has to be pointed at its records again before text
+            // search can consult them.
+            Ok(mut snapshot) => {
+                snapshot.refine_dir = Some(self.refine_dir.clone());
+                Ok(Some(snapshot))
+            }
             Err(_) => Ok(None),
         }
     }
@@ -127,6 +133,7 @@ impl ProjectStateStore for FileProjectStateStore {
         let changes = self.project_changes(&goals);
 
         Ok(ProjectionSnapshot {
+            refine_dir: Some(self.refine_dir.clone()),
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "unknown".to_string(),
             source_fingerprints,

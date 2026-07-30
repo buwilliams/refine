@@ -64,6 +64,65 @@ pub(super) fn matching_change_goal<'a>(
     })
 }
 
+/// How much searchable text a Goal keeps resident in the projection.
+///
+/// Notes and Round prompts have no upper bound, and a Goal accumulates both for
+/// as long as it is worked, so carrying all of them made this the largest
+/// per-Goal cost in the projection by a wide margin. The resident tier is a
+/// prefix that answers most queries outright; anything it cannot decide is
+/// resolved by reading the record, so nothing becomes unsearchable.
+pub(crate) const RESIDENT_SEARCH_TEXT_LIMIT: usize = 512;
+
+/// Everything about a Goal that a text query can match, in full.
+///
+/// Shared by the resident tier and the on-demand tier so the two cannot drift:
+/// a term the deep tier would match but the resident prefix truncated is the
+/// only difference between them.
+pub(crate) fn goal_searchable_parts(object: &serde_json::Map<String, Value>) -> Vec<String> {
+    let mut parts = vec![
+        text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
+        text(object.get("reporter")).unwrap_or_default(),
+        text(object.get("assignee")).unwrap_or_default(),
+    ];
+    for note in object
+        .get("notes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+    {
+        if let Some(body) = text(note.get("body")) {
+            parts.push(body);
+        }
+    }
+    for round in object
+        .get("rounds")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+    {
+        for key in ["reporter", "assignee", "prompt"] {
+            if let Some(value) = text(round.get(key)) {
+                parts.push(value);
+            }
+        }
+    }
+    parts
+}
+
+/// Truncate to the resident budget on a character boundary.
+pub(crate) fn resident_search_text(full: &str) -> String {
+    if full.len() <= RESIDENT_SEARCH_TEXT_LIMIT {
+        return full.to_string();
+    }
+    let mut end = RESIDENT_SEARCH_TEXT_LIMIT;
+    while end > 0 && !full.is_char_boundary(end) {
+        end -= 1;
+    }
+    full[..end].to_string()
+}
+
 pub(super) fn text(value: Option<&Value>) -> Option<String> {
     match value {
         Some(Value::String(value)) => Some(value.clone()),

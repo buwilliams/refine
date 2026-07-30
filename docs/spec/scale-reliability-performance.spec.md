@@ -594,14 +594,10 @@ Implemented, with tests, as of this revision:
 | D7 — Synchronization stops rehashing unmoved records | Done |
 | D8b — Goal logs relocated under `runtime/` | Done |
 | D4 — Scheduling reads an index bounded by work in flight | Done |
+| D4 — Two-tier search; resident text bounded, deep text on demand | Done |
 
 Not implemented, and why:
 
-- **Two-tier search (D4).** `searchable_text` is still carried in the
-  projection, and it is the largest per-Goal contributor since it concatenates
-  every note body and Round prompt. Moving it off the projection needs
-  `goal_matches` restructured into filter-then-read, which changes query
-  behavior and cost across the Goals, Activity, and import surfaces.
 - **Single-writer claim state and asynchronous mutations (D5).** Lock
   acquisition is now bounded and Git can no longer hang indefinitely, which
   removes the failure these were meant to address. The intent queue and the
@@ -611,10 +607,14 @@ Not implemented, and why:
 Scheduling no longer reads a projection of the whole project on any path:
 promotion, backlog promotion, claiming, starting a claim, and interrupted-Goal
 recovery all read the active index instead, and a regression test asserts a
-promotion pass builds no projection at all. What remains between here and the
-five-million-Goal target is the read surfaces — the Goals, Activity, and import
-views still page over a resident projection, and two-tier search is what moves
-them off it. Neither affects the scheduler.
+promotion pass builds no projection at all.
+
+Per-Goal projection cost is now bounded on every axis that previously grew
+without one — searchable text, round-log activity, and content hashing. What a
+projection still grows with is Goal count itself, at a bounded cost per Goal, so
+the read surfaces remain the last thing between here and five million. Sharding
+the projection by Goal-id prefix, so a page reads only the shards it needs, is
+the remaining step; the scheduler no longer depends on it.
 
 ## Open Questions
 

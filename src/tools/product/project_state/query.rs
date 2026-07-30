@@ -6,6 +6,7 @@ use crate::model::goal::{GoalIndexProjection, GoalPriority};
 use crate::model::workflow::GoalStatus;
 
 use super::helpers::*;
+use super::deep_search::{goal_matches_deep_text, resident_text_is_complete};
 use super::types::*;
 
 pub trait ProjectionQuery {
@@ -314,26 +315,56 @@ fn goal_matches(
     if !activity_matches(snapshot, projection, query) {
         return false;
     }
+    // Text matching runs last, after every filter that can be decided from the
+    // index alone. A scoped query has already narrowed the field by the time
+    // anything is read from disk.
     if let Some(q) = query.q.as_deref().filter(|value| !value.trim().is_empty()) {
         let q = q.to_lowercase();
-        if !projection.searchable_text.to_lowercase().contains(&q)
-            && !goal.id.to_lowercase().contains(&q)
-            && !goal.name.to_lowercase().contains(&q)
-            && !goal
-                .reporter
-                .as_deref()
-                .map(|reporter| reporter.to_lowercase().contains(&q))
-                .unwrap_or(false)
-            && !goal
-                .assignee
-                .as_deref()
-                .map(|assignee| assignee.to_lowercase().contains(&q))
-                .unwrap_or(false)
-        {
+        if !goal_matches_text(snapshot, projection, &q) {
             return false;
         }
     }
     true
+}
+
+/// Whether a Goal's text matches, consulting its record only when it must.
+///
+/// The projection keeps a prefix of a Goal's searchable text rather than every
+/// note body and Round prompt, so a miss against that prefix is only conclusive
+/// when the prefix is the whole text. Where it is not, the record is read. Most
+/// Goals never reach that: index fields answer the common queries, and a Goal
+/// with a short description has a complete prefix.
+fn goal_matches_text(
+    snapshot: &ProjectionSnapshot,
+    projection: &GoalSummaryProjection,
+    lowercased_query: &str,
+) -> bool {
+    let goal = &projection.goal;
+    if goal.id.to_lowercase().contains(lowercased_query)
+        || goal.name.to_lowercase().contains(lowercased_query)
+        || goal
+            .reporter
+            .as_deref()
+            .is_some_and(|reporter| reporter.to_lowercase().contains(lowercased_query))
+        || goal
+            .assignee
+            .as_deref()
+            .is_some_and(|assignee| assignee.to_lowercase().contains(lowercased_query))
+        || projection
+            .searchable_text
+            .to_lowercase()
+            .contains(lowercased_query)
+    {
+        return true;
+    }
+    if resident_text_is_complete(&projection.searchable_text) {
+        return false;
+    }
+    goal_matches_deep_text(
+        snapshot.refine_dir.as_deref(),
+        &goal.json_path,
+        lowercased_query,
+    )
 }
 
 fn activity_matches(

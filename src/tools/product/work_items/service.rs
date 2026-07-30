@@ -37,7 +37,7 @@ use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     ActiveGoalIndex, FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection,
-    ProjectStateStore, ProjectionSnapshot,
+    ProjectStateStore, ProjectionSnapshot, goal_text_matches,
 };
 use crate::workflow::WorkflowEngine;
 

@@ -219,6 +219,7 @@ impl FileProjectStateStore {
         // one is, and carries the same generation marker. Leaving the cached
         // value in place would report the projection as older than it is.
         snapshot.generated_at = "unknown".to_string();
+        snapshot.refine_dir = Some(self.refine_dir.clone());
         Ok(snapshot)
     }
 }

@@ -16,6 +16,7 @@ pub(super) fn derive_goal_name(prompt: &str) -> Option<String> {
 }
 
 pub(super) fn bulk_goal_matches_filter(
+    refine_dir: Option<&std::path::Path>,
     goal: &GoalSummaryProjection,
     filter: &BulkGoalFilter,
 ) -> bool {
@@ -83,13 +84,20 @@ pub(super) fn bulk_goal_matches_filter(
     }
     if let Some(query) = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let query = query.to_lowercase();
-        let haystack = goal.searchable_text.to_lowercase();
         let reporter = goal.goal.reporter.as_deref().unwrap_or("").to_lowercase();
         let assignee = goal.goal.assignee.as_deref().unwrap_or("").to_lowercase();
-        if !haystack.contains(&query)
-            && !goal.goal.id.to_lowercase().contains(&query)
+        // Matched against the same corpus the Goals view searches, so a bulk
+        // selection cannot quietly cover fewer Goals than the list it was made
+        // from.
+        if !goal.goal.id.to_lowercase().contains(&query)
             && !reporter.contains(&query)
             && !assignee.contains(&query)
+            && !goal_text_matches(
+                refine_dir,
+                &goal.goal.json_path,
+                &goal.searchable_text,
+                &query,
+            )
         {
             return false;
         }

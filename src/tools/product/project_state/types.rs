@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +14,14 @@ pub const PROJECTION_SNAPSHOT_FILE: &str = "projection-snapshot.json";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProjectionSnapshot {
+    /// Where the Goal records behind this projection live.
+    ///
+    /// Not serialized: it locates a source on this host rather than describing
+    /// project state, and a snapshot restored on another node would carry a
+    /// meaningless path. Text search consults it when the resident prefix
+    /// cannot settle a query.
+    #[serde(skip)]
+    pub refine_dir: Option<PathBuf>,
     pub version: u64,
     pub generated_at: Timestamp,
     pub source_fingerprints: BTreeMap<String, SourceFingerprint>,
@@ -27,6 +36,7 @@ pub struct ProjectionSnapshot {
 impl Default for ProjectionSnapshot {
     fn default() -> Self {
         Self {
+            refine_dir: None,
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "detached".to_string(),
             source_fingerprints: BTreeMap::new(),

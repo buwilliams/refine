@@ -68,6 +68,7 @@ fn projection_query_filters_sorts_and_pages_goals_and_features() {
     features.insert("feature-1".to_string(), feature);
 
     let snapshot = ProjectionSnapshot {
+        refine_dir: None,
         version: PROJECTION_SNAPSHOT_VERSION,
         generated_at: "now".to_string(),
         source_fingerprints: BTreeMap::new(),

@@ -28,30 +28,11 @@ impl FileProjectStateStore {
             .and_then(|round| round.get("prompt"))
             .and_then(Value::as_str)
             .map(|prompt| prompt.trim().to_string());
-        let notes = object
-            .get("notes")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let mut searchable_parts = vec![
-            text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
-            reporter.clone().unwrap_or_default(),
-            assignee.clone().unwrap_or_default(),
-        ];
-        for note in notes.iter().filter_map(Value::as_object) {
-            if let Some(body) = text(note.get("body")) {
-                searchable_parts.push(body);
-            }
-        }
-        for round in &valid_rounds {
-            if let Some(round) = round.as_object() {
-                for key in ["reporter", "assignee", "prompt"] {
-                    if let Some(value) = text(round.get(key)) {
-                        searchable_parts.push(value);
-                    }
-                }
-            }
-        }
+        // Only a prefix stays resident. Notes and Round prompts are unbounded
+        // and accumulate for as long as a Goal is worked, so carrying them in
+        // full made this the largest per-Goal cost in the projection. Queries
+        // the prefix cannot decide fall through to reading the record.
+        let searchable_text = resident_search_text(&goal_searchable_parts(object).join("\n"));
 
         Ok(Some(GoalSummaryProjection {
             goal: GoalIndexProjection {
@@ -78,7 +59,7 @@ impl FileProjectStateStore {
             },
             node_display_name: None,
             latest_round_prompt,
-            searchable_text: searchable_parts.join("\n"),
+            searchable_text,
             activity_ids: Vec::new(),
         }))
     }

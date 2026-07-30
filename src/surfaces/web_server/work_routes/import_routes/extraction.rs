@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::tools::product::project_state::goal_text_matches;
+
 impl InProcessWebServer {
     pub(crate) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "extract imported Goals");
@@ -256,13 +258,24 @@ impl InProcessWebServer {
                 continue;
             }
             if let Some(existing) = projection.goals.values().find(|goal| {
+                // The resident text is a prefix, so a Goal whose duplicate
+                // evidence sits past it is matched by consulting its record
+                // rather than treated as new. Importing a duplicate is worse
+                // than the read.
                 let haystack = normalized_dedup_text(&[
                     goal.goal.name.as_str(),
                     goal.searchable_text.as_str(),
                     goal.goal.id.as_str(),
                 ]);
                 needles.iter().any(|needle| {
-                    haystack == *needle || (!haystack.is_empty() && haystack.contains(needle))
+                    haystack == *needle
+                        || (!haystack.is_empty() && haystack.contains(needle))
+                        || goal_text_matches(
+                            projection.refine_dir.as_deref(),
+                            &goal.goal.json_path,
+                            &goal.searchable_text,
+                            needle,
+                        )
                 })
             }) {
                 matches.push(json!({

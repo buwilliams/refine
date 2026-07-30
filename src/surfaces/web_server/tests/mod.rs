@@ -214,6 +214,7 @@ fn server_with_projection() -> InProcessWebServer {
             lifecycle_evidence: None,
         },
         projection: ProjectionSnapshot {
+            refine_dir: None,
             version: PROJECTION_SNAPSHOT_VERSION,
             generated_at: "now".to_string(),
             source_fingerprints: BTreeMap::new(),
