@@ -169,3 +169,79 @@ fn file_process_supervisor_streams_registered_output_files() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+// A command that hangs while holding a lock stalls everything queued behind it
+// for as long as the daemon lives. Git runs under the repository lock, so an
+// unreachable remote or a wedged index used to be indistinguishable from work
+// that was merely slow, and neither ever returned.
+#[test]
+fn stall_timeout_stops_a_process_that_reports_no_progress() {
+    let temp_root = unique_temp_dir("process-stall-timeout");
+    let runtime_root = temp_root.join("run/8080");
+
+    let started = Instant::now();
+    let result = FileProcessSupervisor::new(&runtime_root).run_to_completion(ManagedProcessSpec {
+        owner: ProcessOwner::Maintenance,
+        command: shell_binary().to_string(),
+        // Silent and long-running: exactly the shape of a wedged command.
+        args: shell_args("sleep 30"),
+        cwd: None,
+        env: Vec::new(),
+        stdin: None,
+        limits: Some(ProcessResourceLimits {
+            stall_timeout_seconds: Some(1),
+            ..ProcessResourceLimits::default()
+        }),
+        authorization_command: None,
+        sensitive: false,
+        // Git runs isolated for exactly this reason: the stall stop has to reach
+        // descendants, not just the process Refine spawned.
+        metadata: [("isolated_process_group".to_string(), json!(true))]
+            .into_iter()
+            .collect(),
+    });
+
+    let error = result.expect_err("a silent process must not run to completion");
+    assert!(
+        matches!(error, RefineError::Degraded(_)),
+        "a stall says nothing about whether the work would have succeeded: {error:?}"
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(20),
+        "the process was not stopped near its stall budget"
+    );
+
+    let _ = fs::remove_dir_all(temp_root);
+}
+
+// Output is the process demonstrating it is still working, so a chatty command
+// must survive well past its stall budget. Otherwise the budget measures the
+// host rather than the work, which is the failure this replaced.
+#[test]
+fn stall_timeout_spares_a_slow_process_that_keeps_reporting_progress() {
+    let temp_root = unique_temp_dir("process-stall-progress");
+    let runtime_root = temp_root.join("run/8080");
+
+    let output = FileProcessSupervisor::new(&runtime_root)
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Maintenance,
+            command: shell_binary().to_string(),
+            args: shell_args("for i in 1 2 3 4 5 6; do echo progress; sleep 0.5; done"),
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: Some(ProcessResourceLimits {
+                stall_timeout_seconds: Some(1),
+                ..ProcessResourceLimits::default()
+            }),
+            authorization_command: None,
+            sensitive: false,
+            metadata: Default::default(),
+        })
+        .expect("a process still reporting progress must not be stopped");
+
+    assert!(output.process.exit_code == Some(0), "{:?}", output.process);
+    assert_eq!(output.stdout.matches("progress").count(), 6);
+
+    let _ = fs::remove_dir_all(temp_root);
+}

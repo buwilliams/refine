@@ -108,7 +108,16 @@ impl FileGitWorktreeService {
                     .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
                     .collect(),
                 stdin: stdin.map(str::to_string),
-                limits: None,
+                // Git runs while holding the repository lock, so a command that
+                // hangs — an unreachable remote, a wedged index — stalls every
+                // caller queued behind it indefinitely, including the workflow
+                // scheduler. A progress budget rather than a total one: fetching
+                // a large repository on a slow link is legitimately slow and
+                // reports progress throughout, while a wedged command is silent.
+                limits: Some(ProcessResourceLimits {
+                    stall_timeout_seconds: Some(GIT_STALL_TIMEOUT_SECONDS),
+                    ..ProcessResourceLimits::default()
+                }),
                 authorization_command: Some(format!("git {}", args.join(" "))),
                 sensitive: false,
                 metadata,

@@ -9,10 +9,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 pub use crate::model::goal::MergeResult;
-use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
+/// How long a Git command may go without output before it is stopped.
+///
+/// Generous, because this only has to catch a genuinely wedged command: Git
+/// reports progress throughout a slow fetch or checkout, so legitimate slowness
+/// on a constrained host keeps resetting the budget.
+const GIT_STALL_TIMEOUT_SECONDS: u64 = 300;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct GitStatus {

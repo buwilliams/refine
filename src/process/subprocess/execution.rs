@@ -103,6 +103,12 @@ impl FileProcessSupervisor {
         } else {
             None
         };
+        // Read before the limits move into the managed record.
+        let stall_timeout = spec
+            .limits
+            .as_ref()
+            .and_then(|limits| limits.stall_timeout_seconds)
+            .map(Duration::from_secs);
         let mut process = ManagedProcess {
             id: process_id,
             owner: spec.owner.clone(),
@@ -164,7 +170,33 @@ impl FileProcessSupervisor {
         let mut reader_done = 0usize;
         let mut reader_error = None;
         let mut status = None;
+        // Output is the process demonstrating it is still working, so it resets
+        // the budget. Without this a command that hangs holds every lock it took
+        // for as long as the daemon lives.
+        let mut last_progress = Instant::now();
+        let mut stalled = false;
         while reader_done < 2 || status.is_none() {
+            if let Some(stall_timeout) = stall_timeout
+                && status.is_none()
+                && last_progress.elapsed() >= stall_timeout
+            {
+                // Signal the whole group where the process leads one. Killing
+                // only the direct child leaves its descendants holding the
+                // inherited pipes, so reading would block until they finished
+                // on their own — which for a wedged command is never.
+                if let Some(pid) = process.pid {
+                    let _ = signal_os_process(pid, "kill", process_owns_group(&process));
+                }
+                let _ = child.kill();
+                stalled = true;
+                status = Some(child.wait().map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to reap stalled managed process {}: {error}",
+                        process.id
+                    ))
+                })?);
+                break;
+            }
             match rx.recv_timeout(Duration::from_millis(25)) {
                 Ok(ProcessOutputEvent::Chunk { stream, bytes }) => {
                     match stream {
@@ -187,6 +219,7 @@ impl FileProcessSupervisor {
                             stderr_bytes.extend_from_slice(&bytes);
                         }
                     }
+                    last_progress = Instant::now();
                     on_output(stream, &bytes);
                 }
                 Ok(ProcessOutputEvent::Done) => reader_done += 1,
@@ -238,6 +271,16 @@ impl FileProcessSupervisor {
         };
         process.exit_code = status.code();
         self.remove_process_artifacts(&process)?;
+        if stalled {
+            // Degraded rather than a failure of the command itself: nothing is
+            // known about whether the work would have succeeded, only that it
+            // stopped reporting progress while holding whatever it had taken.
+            return Err(RefineError::Degraded(format!(
+                "{} produced no output for {}s and was stopped",
+                spec.command,
+                stall_timeout.unwrap_or_default().as_secs()
+            )));
+        }
         if let Some(error) = reader_error {
             return Err(error);
         }

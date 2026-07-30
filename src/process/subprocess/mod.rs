@@ -72,6 +72,15 @@ pub struct ProcessResourceLimits {
     pub max_memory_bytes: Option<u64>,
     pub cpu_priority: Option<String>,
     pub kill_on_parent_exit: bool,
+    /// Abort the process after this long without observable progress.
+    ///
+    /// Opt-in, and deliberately a stall budget rather than a total one. Some
+    /// supervised work is legitimately slow or quiet for long stretches, so a
+    /// total deadline would kill healthy work on a slow host. Commands that
+    /// hold a lock while talking to a repository — where hanging forever
+    /// stalls everything waiting behind them — set this; agent runs do not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stall_timeout_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

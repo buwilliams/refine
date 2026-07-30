@@ -16,6 +16,7 @@ fn file_process_supervisor_tracks_running_processes_and_pause_state() {
                 max_memory_bytes: Some(512 * 1024 * 1024),
                 cpu_priority: Some("normal".to_string()),
                 kill_on_parent_exit: false,
+                stall_timeout_seconds: None,
             }),
             authorization_command: None,
             sensitive: false,
