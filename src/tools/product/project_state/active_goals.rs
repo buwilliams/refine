@@ -100,6 +100,18 @@ impl ActiveGoalIndex {
         Ok(index)
     }
 
+    /// Materialize the index if it is missing, without keeping it.
+    ///
+    /// Reconstruction reads every Goal record. Callers that hold a lock other
+    /// work waits on use this first, so the expensive path runs outside that
+    /// lock and the load inside it only reads the live set.
+    pub fn ensure_built(refine_dir: &Path) -> RefineResult<()> {
+        if Self::path(refine_dir).exists() {
+            return Ok(());
+        }
+        Self::rebuild(refine_dir)?.persist(refine_dir)
+    }
+
     fn load(refine_dir: &Path) -> RefineResult<Option<Self>> {
         let path = Self::path(refine_dir);
         let Ok(file) = File::open(&path) else {

@@ -16,6 +16,13 @@ use super::{
 
 impl WorkflowAutomation for WorkflowEngine {
     fn promote(&self) -> RefineResult<usize> {
+        // Reconstructing the index reads every Goal record, which must not
+        // happen while holding the lock that every other claim decision waits
+        // on. Doing it first means the load inside the lock is a read of the
+        // live set, whose size is bounded by work in flight.
+        if let Some(refine_dir) = self.refine_dir()? {
+            ActiveGoalIndex::ensure_built(&refine_dir)?;
+        }
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
