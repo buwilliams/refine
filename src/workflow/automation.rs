@@ -5,6 +5,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::process_control::FileProcessControlService;
+use crate::tools::product::project_state::ActiveGoalIndex;
 use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 
 use super::policy::ClaimEligibility;
@@ -29,52 +30,54 @@ impl WorkflowAutomation for WorkflowEngine {
                 .count());
         };
         self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?;
-        let snapshot = self.projection_snapshot(&refine_dir)?;
+        // Schedule from the active index rather than a projection of the whole
+        // project. Its size is bounded by work in flight, so scheduling cost and
+        // memory stop tracking how much work the project has ever contained.
+        let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let work_items = FileWorkItemService::new(&refine_dir);
+        // Quarantine is driven from the recorded failures rather than by asking
+        // every Goal whether it has one. The set of Goals that failed
+        // preparation is bounded by claims, and this loop reads a Goal record
+        // per entry.
         let mut quarantined_goal_ids = BTreeSet::new();
-        for projection in snapshot.goals.values() {
-            let Some(failure) = state.latest_preparation_failure(&projection.goal.id) else {
+        for goal_id in state.preparation_failure_goal_ids() {
+            let Some(failure) = state.latest_preparation_failure(&goal_id) else {
                 continue;
             };
             if failure.goal_revision.is_none()
                 || failure.goal_revision
-                    == Some(workflow_revision(
-                        &work_items.show_goal_detail(&projection.goal.id)?,
-                    ))
+                    == Some(workflow_revision(&work_items.show_goal_detail(&goal_id)?))
             {
-                quarantined_goal_ids.insert(projection.goal.id.clone());
+                quarantined_goal_ids.insert(goal_id);
             }
         }
-        let eligibility = ClaimEligibility::new(&snapshot, &quarantined_goal_ids);
-        let mut eligible = snapshot
-            .goals
-            .values()
-            .filter(|projection| {
+        let eligibility = ClaimEligibility::new(active.goals(), &quarantined_goal_ids);
+        let mut eligible = active
+            .goals()
+            .filter(|goal| {
                 matches!(
-                    projection.goal.status,
+                    goal.status,
                     GoalStatus::Todo | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
                 )
             })
-            .filter(|projection| eligibility.feature_eligible(&projection.goal.id))
-            .filter(|projection| eligibility.priority_eligible(&projection.goal))
+            .filter(|goal| eligibility.feature_eligible(&goal.id))
+            .filter(|goal| eligibility.priority_eligible(goal))
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
-            priority_rank(&b.goal.priority)
-                .cmp(&priority_rank(&a.goal.priority))
-                .then_with(|| {
-                    compare_feature_goal_order(a.goal.feature_order, b.goal.feature_order)
-                })
-                .then_with(|| a.goal.created.cmp(&b.goal.created))
-                .then_with(|| a.goal.id.cmp(&b.goal.id))
+            priority_rank(&b.priority)
+                .cmp(&priority_rank(&a.priority))
+                .then_with(|| compare_feature_goal_order(a.feature_order, b.feature_order))
+                .then_with(|| a.created.cmp(&b.created))
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         let mut promoted = 0;
         for goal in eligible {
-            if Self::active_claim(&state, &goal.goal.id).is_some() {
+            if Self::active_claim(&state, &goal.id).is_some() {
                 continue;
             }
-            if quarantined_goal_ids.contains(&goal.goal.id) {
+            if quarantined_goal_ids.contains(&goal.id) {
                 continue;
             }
             let metadata = match self.claim_metadata(Some(&goal), &policy) {
@@ -94,7 +97,7 @@ impl WorkflowAutomation for WorkflowEngine {
             let now = now_timestamp();
             state.claims.push(WorkflowClaim {
                 claim_id: new_claim_id(),
-                goal_id: goal.goal.id,
+                goal_id: goal.id,
                 node_id: metadata.node_id,
                 provider: metadata.provider,
                 target_app_id: metadata.target_app_id,
@@ -135,7 +138,8 @@ impl WorkflowAutomation for WorkflowEngine {
             let goal = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
                 RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
             })?;
-            let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
+            let eligibility =
+                ClaimEligibility::new(snapshot.goals.values().map(|p| &p.goal), &BTreeSet::new());
             if !eligibility.feature_eligible(&goal.goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} is blocked by Feature order"
@@ -150,7 +154,7 @@ impl WorkflowAutomation for WorkflowEngine {
         } else {
             None
         };
-        let metadata = self.claim_metadata(goal.as_ref(), &policy)?;
+        let metadata = self.claim_metadata(goal.as_ref().map(|goal| &goal.goal), &policy)?;
         if !Self::capacity_available(
             &state,
             &policy,
@@ -216,8 +220,9 @@ impl WorkflowAutomation for WorkflowEngine {
                     claim.goal_id
                 ))
             })?;
-            self.claim_metadata(Some(goal), &policy)?;
-            let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
+            self.claim_metadata(Some(&goal.goal), &policy)?;
+            let eligibility =
+                ClaimEligibility::new(snapshot.goals.values().map(|p| &p.goal), &BTreeSet::new());
             if !eligibility.feature_eligible(&goal.goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} is blocked by Feature order",

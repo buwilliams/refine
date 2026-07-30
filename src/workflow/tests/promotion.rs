@@ -319,13 +319,17 @@ fn claim_eligibility_stays_linear_on_a_large_single_feature_backlog() {
         ..ProjectionSnapshot::default()
     };
 
-    let started = Instant::now();
-    let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
-    let eligible = snapshot
+    let goals = snapshot
         .goals
         .values()
-        .filter(|projection| eligibility.feature_eligible(&projection.goal.id))
-        .filter(|projection| eligibility.priority_eligible(&projection.goal))
+        .map(|projection| projection.goal.clone())
+        .collect::<Vec<_>>();
+    let started = Instant::now();
+    let eligibility = ClaimEligibility::new(goals.iter(), &BTreeSet::new());
+    let eligible = goals
+        .iter()
+        .filter(|goal| eligibility.feature_eligible(&goal.id))
+        .filter(|goal| eligibility.priority_eligible(goal))
         .count();
     let elapsed = started.elapsed();
 

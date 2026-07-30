@@ -548,6 +548,14 @@ impl FileWorkItemService {
                 goal_path.display()
             ))
         })?;
+        // A deleted record cannot be re-projected, so the removal is recorded
+        // explicitly rather than derived from the file that no longer exists.
+        if let Err(error) = ActiveGoalIndex::forget_goal(&self.refine_dir, &current.goal.id) {
+            eprintln!(
+                "refine: active Goal index still lists deleted Goal {}: {error}",
+                current.goal.id
+            );
+        }
         if let Some(parent) = goal_path.parent() {
             let _ = fs::remove_dir(parent);
         }

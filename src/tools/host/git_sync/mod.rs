@@ -24,6 +24,7 @@ use crate::tools::host::project_layout::{
     git_common_dir, prepare_refine_dir, state_worktree_for_target_root,
 };
 use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::project_state::ActiveGoalIndex;
 
 const PUSH_RETRY_LIMIT: usize = 3;
 const PUSH_RETRY_DELAY: Duration = Duration::from_millis(100);

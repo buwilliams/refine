@@ -1,3 +1,4 @@
+mod active_goals;
 mod helpers;
 mod query;
 mod store;
@@ -5,6 +6,7 @@ mod store;
 mod tests;
 mod types;
 
+pub use active_goals::ActiveGoalIndex;
 pub use query::ProjectionQuery;
 pub use store::{FileProjectStateStore, ProjectStateStore};
 pub use types::*;

@@ -10,6 +10,8 @@ pub mod promotion;
 
 use chrono::Utc;
 use fs2::FileExt;
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -106,6 +108,21 @@ impl WorkflowAutomationState {
                     WorkflowClaimState::Claimed | WorkflowClaimState::Running
                 )
         })
+    }
+
+    /// Goals that have a recorded preparation failure to consider quarantining.
+    ///
+    /// Bounded by claims rather than by project size, so quarantine no longer
+    /// asks every Goal in the project whether it failed.
+    pub(crate) fn preparation_failure_goal_ids(&self) -> BTreeSet<String> {
+        self.claims
+            .iter()
+            .filter(|claim| {
+                claim.state == WorkflowClaimState::Failed
+                    && claim.failure_stage.as_deref() == Some("preparation")
+            })
+            .map(|claim| claim.goal_id.clone())
+            .collect()
     }
 
     pub(crate) fn latest_preparation_failure(&self, goal_id: &str) -> Option<&WorkflowClaim> {

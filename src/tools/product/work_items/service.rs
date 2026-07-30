@@ -36,8 +36,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
-    FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection, ProjectStateStore,
-    ProjectionSnapshot,
+    ActiveGoalIndex, FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection,
+    ProjectStateStore, ProjectionSnapshot,
 };
 use crate::workflow::WorkflowEngine;
 

@@ -181,6 +181,11 @@ impl FileProjectStateStore {
             })
     }
 
+    /// Every Goal record under a state directory, in a stable order.
+    pub(crate) fn collect_goal_record_paths(refine_dir: &Path) -> RefineResult<Vec<PathBuf>> {
+        Self::collect_json_files(&refine_dir.join("goals"), "goal.json")
+    }
+
     pub(super) fn collect_json_files(root: &Path, file_name: &str) -> RefineResult<Vec<PathBuf>> {
         let mut files = Vec::new();
         if !root.exists() {

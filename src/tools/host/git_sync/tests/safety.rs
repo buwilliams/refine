@@ -129,3 +129,37 @@ fn reusing_content_hashes_never_masks_a_change() {
 
     fs::remove_dir_all(root).unwrap();
 }
+
+// Local mutations keep the scheduler's view current as they write, but
+// synchronization copies records straight into the live store without going
+// through that path. Work another Node published would otherwise stay invisible
+// to scheduling until something unrelated forced a reconstruction.
+#[test]
+fn synchronized_goals_reach_the_scheduler_index() {
+    let fixture = SyncFixture::new("sync-active-index");
+    write_goal(&fixture.a, "GOALA");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    let b_refine = refine_dir_for_target_root(&fixture.b).unwrap();
+    let pulled = ActiveGoalIndex::load_or_rebuild(&b_refine).unwrap();
+    assert_eq!(
+        pulled.goals().map(|goal| goal.id.clone()).collect::<Vec<_>>(),
+        vec!["GOALA"],
+        "a Goal pulled from another node must be schedulable"
+    );
+
+    // And a Goal that reaches a terminal status elsewhere must leave this node's
+    // index when that status arrives.
+    let a_goal = refine_dir_for_target_root(&fixture.a)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    fs::write(&a_goal, "{\"id\":\"GOALA\",\"status\":\"done\"}\n").unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(
+        ActiveGoalIndex::load_or_rebuild(&b_refine).unwrap().is_empty(),
+        "a Goal completed on another node must leave the scheduler index"
+    );
+}

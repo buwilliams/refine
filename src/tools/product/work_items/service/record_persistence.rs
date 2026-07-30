@@ -52,8 +52,29 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
         let encoded = serde_json::to_vec_pretty(&next).map_err(|error| {
             RefineError::Serialization(format!("failed to encode workflow JSON: {error}"))
         })?;
-        replace_file_durably(path, &encoded)
+        replace_file_durably(path, &encoded)?;
+        // Follow the record with the scheduler's view of it. Write-through is
+        // what keeps that view affordable: the alternative is comparing every
+        // Goal file against the index to discover which moved, which costs a
+        // stat per Goal on every scheduling pass and is the scan the index
+        // exists to avoid. The record is already durable, so a failure here
+        // leaves a stale index rather than a lost mutation — recoverable by
+        // reconstruction, which is why it does not fail the write.
+        if is_goal_record(path) {
+            let refine_dir = workflow_record_root(path);
+            if let Err(error) = ActiveGoalIndex::record_goal(&refine_dir, path) {
+                eprintln!(
+                    "refine: active Goal index was not updated for {}: {error}",
+                    path.display()
+                );
+            }
+        }
+        Ok(())
     })
+}
+
+fn is_goal_record(path: &std::path::Path) -> bool {
+    path.file_name().and_then(|name| name.to_str()) == Some("goal.json")
 }
 
 pub(crate) fn workflow_revision(value: &Value) -> u64 {

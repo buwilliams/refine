@@ -268,6 +268,7 @@ pub(super) fn merge_state_into_live(
         let destination = live_root.join(&relative);
         if source.contains_key(&relative) {
             copy_state_file(&source_root.join(&relative), &destination)?;
+            record_synchronized_goal(live_root, &relative, &destination);
         } else if destination.exists() {
             fs::remove_file(&destination).map_err(|error| {
                 RefineError::Io(format!(
@@ -275,9 +276,67 @@ pub(super) fn merge_state_into_live(
                     destination.display()
                 ))
             })?;
+            forget_synchronized_goal(live_root, &relative);
         }
     }
     Ok(concurrent_change)
+}
+
+/// Keep the scheduler's view current for Goals arriving from another Node.
+///
+/// Local mutations update that view as they write, but synchronization copies
+/// records straight into the live store without going through the write path.
+/// Without this, work another Node published would be invisible to scheduling
+/// until something unrelated forced a reconstruction.
+fn record_synchronized_goal(
+    live_root: &std::path::Path,
+    relative: &std::path::Path,
+    destination: &std::path::Path,
+) {
+    if !is_goal_record(relative) {
+        return;
+    }
+    if let Err(error) = ActiveGoalIndex::record_goal(live_root, destination) {
+        eprintln!(
+            "refine: active Goal index was not updated for synchronized {}: {error}",
+            relative.display()
+        );
+    }
+}
+
+fn forget_synchronized_goal(live_root: &std::path::Path, relative: &std::path::Path) {
+    if !is_goal_record(relative) {
+        return;
+    }
+    // The record is already gone, so identity comes from its sharded path
+    // rather than from the file.
+    let Some(goal_id) = goal_id_from_record_path(relative) else {
+        return;
+    };
+    if let Err(error) = ActiveGoalIndex::forget_goal(live_root, &goal_id) {
+        eprintln!(
+            "refine: active Goal index still lists synchronized-away Goal {goal_id}: {error}"
+        );
+    }
+}
+
+fn is_goal_record(relative: &std::path::Path) -> bool {
+    relative.file_name().and_then(|name| name.to_str()) == Some("goal.json")
+}
+
+/// `goals/<shard>/<rest>/goal.json` identifies Goal `<shard><rest>`.
+fn goal_id_from_record_path(relative: &std::path::Path) -> Option<String> {
+    let mut components = relative
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    components.pop()?;
+    let rest = components.pop()?;
+    let shard = components.pop()?;
+    if components.last().map(String::as_str) != Some("goals") {
+        return None;
+    }
+    Some(format!("{shard}{rest}"))
 }
 
 pub(super) fn copy_state_file(

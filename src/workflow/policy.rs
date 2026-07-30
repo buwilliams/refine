@@ -16,7 +16,7 @@ use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
-    FileProjectStateStore, GoalSummaryProjection, ProjectionSnapshot,
+    FileProjectStateStore, ProjectionSnapshot,
 };
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::promotion::BacklogPromotionService;
@@ -470,16 +470,14 @@ impl WorkflowEngine {
 
     pub(super) fn claim_metadata(
         &self,
-        goal: Option<&GoalSummaryProjection>,
+        goal: Option<&GoalIndexProjection>,
         policy: &WorkflowPolicy,
     ) -> RefineResult<ClaimMetadata> {
         let node_id = goal
-            .and_then(|goal| goal.goal.node_id.clone())
+            .and_then(|goal| goal.node_id.clone())
             .unwrap_or_else(default_node_id);
         if node_id != policy.active_node_id {
-            let goal_id = goal
-                .map(|goal| goal.goal.id.as_str())
-                .unwrap_or("requested Goal");
+            let goal_id = goal.map(|goal| goal.id.as_str()).unwrap_or("requested Goal");
             return Err(RefineError::Conflict(format!(
                 "{goal_id} is owned by node {node_id}, not active node {}",
                 policy.active_node_id
@@ -518,7 +516,7 @@ fn occupies_feature_slot(status: &GoalStatus) -> bool {
     )
 }
 
-/// Claim eligibility for every Goal in one projection snapshot, decided up front.
+/// Claim eligibility for a set of Goals, decided up front.
 ///
 /// Both predicates used to be answered by rescanning the whole snapshot per
 /// candidate, and the priority scan called the Feature scan inside its own loop.
@@ -534,16 +532,18 @@ pub(super) struct ClaimEligibility {
 }
 
 impl ClaimEligibility {
-    pub(super) fn new(
-        snapshot: &ProjectionSnapshot,
+    /// Takes the Goals themselves rather than a projection, so the scheduler can
+    /// be fed the active index — bounded by work in flight — instead of a
+    /// snapshot of everything the project has ever contained.
+    pub(super) fn new<'a>(
+        goals: impl IntoIterator<Item = &'a GoalIndexProjection> + Clone,
         excluded_goal_ids: &BTreeSet<String>,
     ) -> Self {
         // Per (Node, Feature): the lowest order still holding the queue, and how
         // many ordered Goals currently occupy the in-flight slot.
         let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
         let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
-        for projection in snapshot.goals.values() {
-            let goal = &projection.goal;
+        for goal in goals.clone() {
             let Some(feature_id) = goal.feature_id.as_deref() else {
                 continue;
             };
@@ -565,17 +565,13 @@ impl ClaimEligibility {
             }
         }
 
-        let feature_eligible = snapshot
-            .goals
-            .values()
-            .filter(|projection| {
-                Self::feature_eligible_from(
-                    &projection.goal,
-                    &lowest_holding_order,
-                    &occupying_count,
-                )
+        let feature_eligible = goals
+            .clone()
+            .into_iter()
+            .filter(|goal| {
+                Self::feature_eligible_from(goal, &lowest_holding_order, &occupying_count)
             })
-            .map(|projection| projection.goal.id.clone())
+            .map(|goal| goal.id.clone())
             .collect::<BTreeSet<_>>();
 
         // A Goal is priority-eligible when nothing claimable on its Node
@@ -584,8 +580,7 @@ impl ClaimEligibility {
         // whether a strictly greater entry exists. That is what lets a
         // per-candidate scan collapse into a single maximum.
         let mut highest_claimable_todo_rank: BTreeMap<String, u8> = BTreeMap::new();
-        for projection in snapshot.goals.values() {
-            let goal = &projection.goal;
+        for goal in goals {
             if goal.status != GoalStatus::Todo
                 || excluded_goal_ids.contains(&goal.id)
                 || !feature_eligible.contains(&goal.id)
