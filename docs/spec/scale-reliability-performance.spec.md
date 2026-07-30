@@ -594,14 +594,10 @@ Implemented, with tests, as of this revision:
 | D7 — Synchronization stops rehashing unmoved records | Done |
 | D8b — Goal logs relocated under `runtime/` | Done |
 
+| D4 — Scheduling reads an index bounded by work in flight | Done |
+
 Not implemented, and why:
 
-- **Bounded scheduler working set (D4 hot set).** `patch_projection` takes the
-  whole projection by value, so any path that keeps it current holds all of it.
-  A maintained list of active Goals cannot bound memory while the full snapshot
-  is still required to maintain that list. Meeting the criterion genuinely
-  requires the sharded per-shard index described in D3, where records are loaded
-  a shard at a time. That is a storage redesign rather than an addition.
 - **Two-tier search (D4).** `searchable_text` is still carried in the
   projection, and it is the largest per-Goal contributor since it concatenates
   every note body and Round prompt. Moving it off the projection needs
@@ -613,8 +609,13 @@ Not implemented, and why:
   `202 Accepted` contract remain a scale change rather than a reliability one,
   and they touch every mutating surface in the web UI.
 
-The first two are what the 5M-Goal target depends on. Neither affects a project
-of the size that motivated this work.
+Scheduling no longer reads a projection of the whole project on any path:
+promotion, backlog promotion, claiming, starting a claim, and interrupted-Goal
+recovery all read the active index instead, and a regression test asserts a
+promotion pass builds no projection at all. What remains between here and the
+five-million-Goal target is the read surfaces — the Goals, Activity, and import
+views still page over a resident projection, and two-tier search is what moves
+them off it. Neither affects the scheduler.
 
 ## Open Questions
 

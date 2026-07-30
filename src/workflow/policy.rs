@@ -15,9 +15,7 @@ use crate::tools::host::host_resources::{HostResources, observed_agent_memory_by
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::{
-    FileProjectStateStore, ProjectionSnapshot,
-};
+use crate::tools::product::project_state::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::promotion::BacklogPromotionService;
 
@@ -137,24 +135,24 @@ impl WorkflowEngine {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
         };
-        let snapshot = self.projection_snapshot(&refine_dir)?;
+        // Every status this looks for is one the scheduler index holds, so the
+        // interrupted set is found without reading a projection of the whole
+        // project.
+        let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
-        let goal_ids = snapshot
-            .goals
-            .values()
-            .filter(|projection| {
+        let goal_ids = active
+            .goals()
+            .filter(|goal| {
                 matches!(
-                    projection.goal.status,
+                    goal.status,
                     GoalStatus::InProgress
                         | GoalStatus::ReadyMerge
                         | GoalStatus::Build
                         | GoalStatus::Qa
                 )
             })
-            .filter(|projection| {
-                projection.goal.node_id.as_deref().unwrap_or("default") == active_node_id
-            })
-            .map(|projection| projection.goal.id.clone())
+            .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == active_node_id)
+            .map(|goal| goal.id.clone())
             .collect::<Vec<_>>();
         if goal_ids.is_empty() {
             return Ok(0);
@@ -488,14 +486,6 @@ impl WorkflowEngine {
             provider: policy.provider.clone(),
             target_app_id: policy.target_app_id.clone(),
         })
-    }
-
-    pub(super) fn projection_snapshot(
-        &self,
-        refine_dir: &Path,
-    ) -> RefineResult<ProjectionSnapshot> {
-        FileProjectStateStore::with_runtime_root(refine_dir, &self.runtime_root)
-            .load_or_refresh_projection(&self.runtime_root.join("cache"))
     }
 
 }

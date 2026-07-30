@@ -229,7 +229,7 @@ impl FileWorkItemService {
                             })
                             .and_then(|goal| {
                                 self.transition_goal_status_from_projection(
-                                    goal,
+                                    &goal.goal,
                                     GoalStatus::Backlog,
                                 )
                             }),

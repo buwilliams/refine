@@ -341,3 +341,57 @@ fn claim_eligibility_stays_linear_on_a_large_single_feature_backlog() {
         "eligibility for {GOAL_COUNT} Goals took {elapsed:?}, which indicates super-linear cost"
     );
 }
+
+// Scheduling used to load a projection of the whole project, so its cost and
+// memory tracked everything the project had ever contained rather than what it
+// was currently doing. At five million Goals that does not fit however few are
+// active. The scheduler now reads an index bounded by work in flight, and this
+// pins that: a promotion pass must not build a projection at all.
+#[test]
+fn scheduling_never_builds_a_projection_of_the_whole_project() {
+    use crate::tools::product::project_state::{ActiveGoalIndex, FileProjectStateStore};
+
+    let temp_root = unique_temp_dir("automation-bounded");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let work_items = FileWorkItemService::new(&refine_dir);
+
+    // One claimable Goal behind a body of completed work, as a mature project
+    // looks.
+    work_items
+        .create_goal_summary("Live", Some("GOALLIVE"))
+        .unwrap();
+    work_items
+        .transition_goal_status("GOALLIVE", GoalStatus::Todo)
+        .unwrap();
+    for index in 0..40 {
+        let id = format!("GOALDONE{index:03}");
+        work_items.create_goal_summary("Finished", Some(&id)).unwrap();
+        work_items.cancel_goal_summary(&id).unwrap();
+    }
+
+    // Write-through keeps the index current, so the completed Goals never enter
+    // the scheduler's working set in the first place.
+    let index = ActiveGoalIndex::load_or_rebuild(&refine_dir).unwrap();
+    assert_eq!(
+        index.goals().map(|goal| goal.id.clone()).collect::<Vec<_>>(),
+        vec!["GOALLIVE"],
+        "completed Goals must not stay resident"
+    );
+
+    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    assert_eq!(automation.promote().unwrap(), 1);
+
+    assert_eq!(
+        FileProjectStateStore::rebuild_count(&refine_dir),
+        0,
+        "a promotion pass must not read a projection of every Goal"
+    );
+    let state = automation.load_state().unwrap();
+    assert_eq!(state.claims.len(), 1);
+    assert_eq!(state.claims[0].goal_id, "GOALLIVE");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}

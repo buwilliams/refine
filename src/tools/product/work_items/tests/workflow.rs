@@ -46,7 +46,7 @@ fn projected_status_transition_rejects_an_external_revision_change() {
     fs::write(&goal_path, serde_json::to_vec_pretty(&durable).unwrap()).unwrap();
 
     let error = service
-        .transition_goal_status_from_projection(&projected, GoalStatus::Todo)
+        .transition_goal_status_from_projection(&projected.goal, GoalStatus::Todo)
         .unwrap_err();
 
     assert!(matches!(error, RefineError::Conflict(_)));

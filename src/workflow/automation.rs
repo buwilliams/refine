@@ -134,18 +134,24 @@ impl WorkflowAutomation for WorkflowEngine {
             return Ok(existing.claim_id.clone());
         }
         let goal = if let Some(refine_dir) = self.refine_dir()? {
-            let snapshot = self.projection_snapshot(&refine_dir)?;
-            let goal = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
-                RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
-            })?;
-            let eligibility =
-                ClaimEligibility::new(snapshot.goals.values().map(|p| &p.goal), &BTreeSet::new());
-            if !eligibility.feature_eligible(&goal.goal.id) {
+            // Claiming decides against the same set scheduling does, so it reads
+            // the scheduler index rather than a projection of every Goal. A Goal
+            // absent from it is one no claim could succeed for.
+            let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
+            let goal = active
+                .goals()
+                .find(|goal| goal.id == goal_id)
+                .cloned()
+                .ok_or_else(|| {
+                    RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
+                })?;
+            let eligibility = ClaimEligibility::new(active.goals(), &BTreeSet::new());
+            if !eligibility.feature_eligible(&goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} is blocked by Feature order"
                 )));
             }
-            if !eligibility.priority_eligible(&goal.goal) {
+            if !eligibility.priority_eligible(&goal) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} is blocked by higher priority work"
                 )));
@@ -154,7 +160,7 @@ impl WorkflowAutomation for WorkflowEngine {
         } else {
             None
         };
-        let metadata = self.claim_metadata(goal.as_ref().map(|goal| &goal.goal), &policy)?;
+        let metadata = self.claim_metadata(goal.as_ref(), &policy)?;
         if !Self::capacity_available(
             &state,
             &policy,
@@ -213,23 +219,25 @@ impl WorkflowAutomation for WorkflowEngine {
             )));
         }
         if let Some(refine_dir) = self.refine_dir()? {
-            let snapshot = self.projection_snapshot(&refine_dir)?;
-            let goal = snapshot.goals.get(&claim.goal_id).ok_or_else(|| {
-                RefineError::NotFound(format!(
-                    "Goal {} was not found in target state",
-                    claim.goal_id
-                ))
-            })?;
-            self.claim_metadata(Some(&goal.goal), &policy)?;
-            let eligibility =
-                ClaimEligibility::new(snapshot.goals.values().map(|p| &p.goal), &BTreeSet::new());
-            if !eligibility.feature_eligible(&goal.goal.id) {
+            let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
+            let goal = active
+                .goals()
+                .find(|goal| goal.id == claim.goal_id)
+                .ok_or_else(|| {
+                    RefineError::NotFound(format!(
+                        "Goal {} was not found in target state",
+                        claim.goal_id
+                    ))
+                })?;
+            self.claim_metadata(Some(goal), &policy)?;
+            let eligibility = ClaimEligibility::new(active.goals(), &BTreeSet::new());
+            if !eligibility.feature_eligible(&goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} is blocked by Feature order",
                     claim.goal_id
                 )));
             }
-            if !eligibility.priority_eligible(&goal.goal) {
+            if !eligibility.priority_eligible(goal) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} is blocked by higher priority work",
                     claim.goal_id

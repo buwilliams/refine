@@ -71,8 +71,13 @@ impl FileWorkItemService {
     }
 
     pub(super) fn ensure_goal_owned(&self, goal: &GoalSummaryProjection) -> RefineResult<()> {
+        self.ensure_goal_index_owned(&goal.goal)
+    }
+
+    /// Ownership decided from index fields alone, so callers holding a Goal from
+    /// the scheduler index need not materialize a full summary for it.
+    pub(super) fn ensure_goal_index_owned(&self, goal: &GoalIndexProjection) -> RefineResult<()> {
         let owner = goal
-            .goal
             .node_id
             .as_deref()
             .filter(|node_id| !node_id.is_empty())
@@ -83,7 +88,7 @@ impl FileWorkItemService {
         } else {
             Err(RefineError::Conflict(format!(
                 "Goal {} is owned by node {owner}, not active node {active}",
-                goal.goal.id
+                goal.id
             )))
         }
     }

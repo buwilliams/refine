@@ -387,7 +387,7 @@ impl FileWorkItemService {
         let current = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
         })?;
-        self.transition_goal_status_from_projection(&current, target)?;
+        self.transition_goal_status_from_projection(&current.goal, target)?;
 
         let refreshed = self.projection_snapshot()?;
         refreshed.goals.get(goal_id).cloned().ok_or_else(|| {
@@ -399,13 +399,13 @@ impl FileWorkItemService {
     /// coherent snapshot without loading or refreshing another projection.
     pub(crate) fn transition_goal_status_from_projection(
         &self,
-        current: &GoalSummaryProjection,
+        current: &GoalIndexProjection,
         target: GoalStatus,
     ) -> RefineResult<()> {
-        self.ensure_goal_owned(current)?;
-        validate_manual_goal_transition(&current.goal.status, &target)?;
+        self.ensure_goal_index_owned(current)?;
+        validate_manual_goal_transition(&current.status, &target)?;
 
-        let goal_path = self.refine_dir.join(&current.goal.json_path);
+        let goal_path = self.refine_dir.join(&current.json_path);
         let bytes = fs::read(&goal_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Goal {}: {error}",
@@ -444,13 +444,13 @@ impl FileWorkItemService {
             })
             .map(str::to_string)
             .unwrap_or_else(|| "default".to_string());
-        if durable_status != current.goal.status
-            || durable_updated != current.goal.updated
-            || Some(durable_node_id.as_str()) != current.goal.node_id.as_deref()
+        if durable_status != current.status
+            || durable_updated != current.updated
+            || Some(durable_node_id.as_str()) != current.node_id.as_deref()
         {
             return Err(RefineError::Conflict(format!(
                 "Goal {} changed after the projection snapshot was read",
-                current.goal.id
+                current.id
             )));
         }
         object.insert(
