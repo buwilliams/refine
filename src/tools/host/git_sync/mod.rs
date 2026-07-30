@@ -9,7 +9,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, TryLockError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,14 @@ use crate::tools::product::nodes::FileNodeRegistryService;
 const PUSH_RETRY_LIMIT: usize = 3;
 const PUSH_RETRY_DELAY: Duration = Duration::from_millis(100);
 pub const REFINE_STATE_BRANCH: &str = "refine/state";
+/// How long to wait for the repository lock before reporting contention.
+///
+/// Longer than the Git stall budget on purpose: a legitimately slow operation
+/// that keeps reporting progress must be allowed to finish rather than have its
+/// waiters give up underneath it, while a wedged one is stopped by its own
+/// budget and releases the lock well inside this window.
+const REPOSITORY_LOCK_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(600);
+const REPOSITORY_LOCK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const REFINE_STATE_REF: &str = "refs/heads/refine/state";
 const DEFAULT_REMOTE: &str = "origin";
 const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";

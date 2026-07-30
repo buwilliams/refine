@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use fs2::FileExt;
 use uuid::Uuid;
@@ -10,6 +11,44 @@ use uuid::Uuid;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const WORKFLOW_COORDINATION_LOCK: &str = ".workflow-coordination.lock";
+/// How long to wait for the coordination lock before giving up.
+///
+/// Acquisition used to block forever, so one holder that wedged — a Git command
+/// with no deadline, a process killed between taking the lock and releasing it —
+/// stopped every other caller permanently, with no diagnostic distinguishing
+/// that from ordinary idleness. A caller that gives up reports a contended lock
+/// and can be retried by its own cadence; a caller that blocks forever cannot.
+const COORDINATION_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(60);
+const COORDINATION_ACQUIRE_POLL_INTERVAL: Duration = Duration::from_millis(25);
+
+/// Take an exclusive lock, giving up at `timeout`.
+///
+/// `fs2` offers only a blocking or an immediate attempt, so a bounded wait is
+/// polled. The interval is short enough that ordinary contention is
+/// indistinguishable from a blocking acquire.
+fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineResult<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match file.try_lock_exclusive() {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to acquire workflow coordination lock {}: {error}",
+                    path.display()
+                )));
+            }
+        }
+        if Instant::now() >= deadline {
+            return Err(RefineError::Degraded(format!(
+                "workflow coordination lock {} was held by another operation for {}s",
+                path.display(),
+                timeout.as_secs()
+            )));
+        }
+        std::thread::sleep(COORDINATION_ACQUIRE_POLL_INTERVAL);
+    }
+}
 
 thread_local! {
     static HELD_COORDINATION_LOCKS: RefCell<BTreeMap<PathBuf, usize>> =
@@ -59,12 +98,7 @@ pub fn acquire_workflow_coordination(root: &Path) -> RefineResult<WorkflowCoordi
                 path.display()
             ))
         })?;
-    file.lock_exclusive().map_err(|error| {
-        RefineError::Io(format!(
-            "failed to acquire workflow coordination lock {}: {error}",
-            path.display()
-        ))
-    })?;
+    lock_exclusive_before(&file, &path, COORDINATION_ACQUIRE_TIMEOUT)?;
     HELD_COORDINATION_LOCKS.with(|locks| {
         locks.borrow_mut().insert(root.clone(), 1);
     });
@@ -184,5 +218,63 @@ impl Drop for WorkflowCoordinationGuard {
                 self.path.display()
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Acquisition used to block forever, so one holder that wedged stopped every
+    // other caller permanently and was indistinguishable from an idle system.
+    #[test]
+    fn a_contended_lock_is_reported_rather_than_waited_on_forever() {
+        let root = unique_temp_dir("coordination-contended");
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join(WORKFLOW_COORDINATION_LOCK);
+        let holder = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        holder.lock_exclusive().unwrap();
+
+        let waiter = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        let started = Instant::now();
+        let error = lock_exclusive_before(&waiter, &path, Duration::from_millis(200))
+            .expect_err("a held lock must not be acquired");
+
+        assert!(
+            matches!(error, RefineError::Degraded(_)),
+            "contention is a degraded condition, not an I/O failure: {error:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "waiting did not respect the deadline"
+        );
+
+        FileExt::unlock(&holder).unwrap();
+        // Once released the lock is ordinary again, so contention never leaves
+        // the caller permanently poisoned.
+        lock_exclusive_before(&waiter, &path, Duration::from_secs(1)).unwrap();
+        FileExt::unlock(&waiter).unwrap();
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
     }
 }

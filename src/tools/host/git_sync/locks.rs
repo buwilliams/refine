@@ -56,17 +56,37 @@ pub(super) struct RepositoryFileLock {
 }
 
 impl RepositoryFileLock {
+    /// Take the repository lock, giving up at the deadline.
+    ///
+    /// Acquisition used to block forever, so a holder that wedged stopped every
+    /// other repository operation permanently and looked exactly like an idle
+    /// system. Giving up turns that into a reported contention that the caller's
+    /// own cadence retries.
     fn acquire(target_root: &std::path::Path) -> RefineResult<Self> {
         let Some(file) = repository_lock_file(target_root)? else {
             return Ok(Self { file: None });
         };
-        file.lock_exclusive().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to lock repository {}: {error}",
-                target_root.display()
-            ))
-        })?;
-        Ok(Self { file: Some(file) })
+        let deadline = Instant::now() + REPOSITORY_LOCK_ACQUIRE_TIMEOUT;
+        loop {
+            match file.try_lock_exclusive() {
+                Ok(()) => return Ok(Self { file: Some(file) }),
+                Err(error) if error.kind() == ErrorKind::WouldBlock => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to lock repository {}: {error}",
+                        target_root.display()
+                    )));
+                }
+            }
+            if Instant::now() >= deadline {
+                return Err(RefineError::Degraded(format!(
+                    "repository {} stayed locked by another operation for {}s",
+                    target_root.display(),
+                    REPOSITORY_LOCK_ACQUIRE_TIMEOUT.as_secs()
+                )));
+            }
+            std::thread::sleep(REPOSITORY_LOCK_POLL_INTERVAL);
+        }
     }
 
     pub(super) fn try_acquire(target_root: &std::path::Path) -> RefineResult<Option<Self>> {
