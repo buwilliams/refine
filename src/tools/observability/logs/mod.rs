@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -97,6 +98,58 @@ impl FileLogService {
 
     pub fn all_round_logs(&self, goal_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
         self.read_sidecar(goal_id)
+    }
+
+    /// The most recent `limit` entries, paired with their absolute position in
+    /// the sidecar.
+    ///
+    /// Reading a whole sidecar costs memory proportional to everything the Goal
+    /// has ever logged, and log volume tracks retries and failures rather than
+    /// Goal count. Streaming through a bounded window keeps the cost at `limit`
+    /// per Goal however large the file has grown. Positions are absolute because
+    /// activity identity is derived from them.
+    pub fn recent_round_logs(
+        &self,
+        goal_id: &str,
+        limit: usize,
+    ) -> RefineResult<Vec<(usize, RoundLogEntry)>> {
+        let path = goal_logs_path(&self.refine_dir, goal_id);
+        if !path.exists() || limit == 0 {
+            return Ok(Vec::new());
+        }
+        let file = fs::File::open(&path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to open Goal log sidecar {}: {error}",
+                path.display()
+            ))
+        })?;
+        let mut window: VecDeque<(usize, RoundLogEntry)> = VecDeque::with_capacity(limit);
+        let mut index = 0usize;
+        for line in BufReader::new(file).lines() {
+            let line = line.map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read Goal log sidecar {}: {error}",
+                    path.display()
+                ))
+            })?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let entry = parse_round_log_line(&line).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse Goal log sidecar {}: {error}",
+                    path.display()
+                ))
+            })?;
+            // The position advances over every parsed line, including the ones
+            // the window drops, so identity stays stable as the file grows.
+            if window.len() == limit {
+                window.pop_front();
+            }
+            window.push_back((index, entry));
+            index += 1;
+        }
+        Ok(window.into())
     }
 
     fn read_sidecar(&self, goal_id: &str) -> RefineResult<Vec<RoundLogEntry>> {

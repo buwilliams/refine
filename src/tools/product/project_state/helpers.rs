@@ -1,13 +1,10 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 
 use serde_json::Value;
 
 use crate::model::goal::GoalPriority;
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GoalStatus;
-use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 use super::types::*;
 
@@ -65,21 +62,6 @@ pub(super) fn matching_change_goal<'a>(
         subject.contains(&goal.goal.id)
             || branch.is_some_and(|branch| branch.contains(&goal.goal.id))
     })
-}
-
-pub(super) fn fingerprint_content_hash(path: &Path) -> RefineResult<String> {
-    let bytes = fs::read(path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to read {} for fingerprint: {error}",
-            path.display()
-        ))
-    })?;
-    let mut hash = 0xcbf29ce484222325u64;
-    for byte in bytes {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    Ok(format!("{hash:016x}"))
 }
 
 pub(super) fn text(value: Option<&Value>) -> Option<String> {

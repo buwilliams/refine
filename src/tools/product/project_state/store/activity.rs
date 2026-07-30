@@ -46,29 +46,53 @@ impl FileProjectStateStore {
         Ok(activity)
     }
 
+    /// Round-log activity for the projection, bounded per Goal and overall.
+    ///
+    /// This used to read every Goal's entire sidecar and hold one entry, with
+    /// its own searchable text, for every line ever logged — to serve consumers
+    /// that want a recent slice. Because log volume tracks retries and
+    /// failures rather than Goal count, that charged resident memory for
+    /// everything the fleet had ever gotten wrong.
+    ///
+    /// Both bounds are needed: the per-Goal window keeps one noisy Goal from
+    /// dominating, and the overall cap keeps total cost independent of Goal
+    /// count. Complete history stays available per Goal through
+    /// `FileLogService`, which is where a Goal's own view reads it from.
     pub(super) fn project_goal_round_activity(
         &self,
         goals: &BTreeMap<String, GoalSummaryProjection>,
     ) -> RefineResult<BTreeMap<String, ActivitySummaryProjection>> {
         let log_service = FileLogService::new(&self.refine_dir);
-        let mut activity = BTreeMap::new();
+        // Keyed by (datetime, id) so trimming keeps the newest across all Goals
+        // rather than whichever Goals happened to be walked last.
+        let mut newest: BTreeMap<(String, String), ActivitySummaryProjection> = BTreeMap::new();
         for goal_id in goals.keys() {
             if goal_id.len() < 2 {
                 continue;
             }
-            for (index, log) in log_service.all_round_logs(goal_id)?.into_iter().enumerate() {
+            for (index, log) in
+                log_service.recent_round_logs(goal_id, PROJECTED_ACTIVITY_PER_GOAL_LIMIT)?
+            {
                 let entry = round_log_activity_entry(goal_id, index, log);
                 let searchable_text = activity_searchable_text(&entry);
-                activity.insert(
-                    entry.id.clone(),
+                newest.insert(
+                    (entry.datetime.clone(), entry.id.clone()),
                     ActivitySummaryProjection {
                         entry,
                         searchable_text,
                     },
                 );
             }
+            // Trim as we go so peak cost stays at the cap plus one Goal's
+            // window, rather than everything collected before a final sort.
+            while newest.len() > PROJECTED_ACTIVITY_LIMIT {
+                newest.pop_first();
+            }
         }
-        Ok(activity)
+        Ok(newest
+            .into_values()
+            .map(|projection| (projection.entry.id.clone(), projection))
+            .collect())
     }
 
     pub(super) fn project_changes(

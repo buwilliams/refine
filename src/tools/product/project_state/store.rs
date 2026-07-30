@@ -25,6 +25,14 @@ use super::helpers::*;
 use super::types::*;
 
 static PROJECTION_SNAPSHOT_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+/// How many round-log entries one Goal may contribute to the projection.
+/// Bounds a single noisy Goal — a retry loop can append without limit.
+pub(crate) const PROJECTED_ACTIVITY_PER_GOAL_LIMIT: usize = 50;
+/// How many round-log entries the projection holds across all Goals. Keeps
+/// resident activity independent of both Goal count and failure volume; the
+/// consumers are a fifty-item dashboard list, a two-hundred-entry event feed,
+/// and a paged view that reads recent-first.
+const PROJECTED_ACTIVITY_LIMIT: usize = 5_000;
 #[cfg(test)]
 static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = OnceLock::new();
 

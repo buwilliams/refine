@@ -236,11 +236,13 @@ fn rebuild_projection_scans_python_style_goal_and_feature_records() {
             .source_fingerprints
             .contains_key("goals/01/GOAL1/goal.json")
     );
-    assert!(
-        snapshot.source_fingerprints["goals/01/GOAL1/goal.json"]
-            .content_hash
-            .is_some()
-    );
+    // Staleness is decided from metadata. Content hashing every source meant
+    // reading whole files, unboundedly so for log sidecars, to populate a field
+    // that only `git:HEAD` is ever compared on.
+    let goal_fingerprint = &snapshot.source_fingerprints["goals/01/GOAL1/goal.json"];
+    assert!(goal_fingerprint.size > 0);
+    assert!(goal_fingerprint.change_unix_ns.is_some());
+    assert!(goal_fingerprint.content_hash.is_none());
     assert_eq!(
         snapshot
             .dashboard

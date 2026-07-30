@@ -56,25 +56,13 @@ impl FileProjectStateStore {
         ))
     }
 
-    pub fn fingerprint(path: &Path) -> RefineResult<SourceFingerprint> {
-        let metadata = fs::metadata(path).map_err(|error| {
-            RefineError::Io(format!("failed to stat {}: {error}", path.display()))
-        })?;
-        let modified_unix_ms = metadata
-            .modified()
-            .ok()
-            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_millis() as i64);
-
-        Ok(SourceFingerprint {
-            path: path.display().to_string(),
-            size: metadata.len(),
-            modified_unix_ms,
-            change_unix_ns: metadata_change_unix_ns(&metadata),
-            content_hash: Some(fingerprint_content_hash(path)?),
-        })
-    }
-
+    /// Source fingerprints are metadata only.
+    ///
+    /// Every source previously carried a content hash that required reading the
+    /// whole file, and for Goal log sidecars that read was unbounded. None of it
+    /// was ever consulted: `source_fingerprints_match` compares content only for
+    /// `git:HEAD`, whose fingerprint is built from a branch ref rather than a
+    /// file. Size, mtime, and ctime already decide staleness for real files.
     pub(super) fn metadata_fingerprint(path: &Path) -> RefineResult<SourceFingerprint> {
         let metadata = fs::metadata(path).map_err(|error| {
             RefineError::Io(format!("failed to stat {}: {error}", path.display()))
@@ -136,20 +124,20 @@ impl FileProjectStateStore {
         let mut source_fingerprints = BTreeMap::new();
         for path in Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")? {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
         for path in Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")? {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
         for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
         let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&activity_path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&activity_path)?);
         }
         if let Some(fingerprint) = self.git_head_fingerprint() {
             source_fingerprints.insert(fingerprint.path.clone(), fingerprint);

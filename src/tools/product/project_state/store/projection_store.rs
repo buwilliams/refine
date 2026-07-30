@@ -93,7 +93,7 @@ impl ProjectStateStore for FileProjectStateStore {
 
         for path in goal_paths {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path.clone(), Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path.clone(), Self::metadata_fingerprint(&path)?);
             if let Some(projection) = self.project_goal(&path)? {
                 goals.insert(projection.goal.id.clone(), projection);
             }
@@ -101,7 +101,7 @@ impl ProjectStateStore for FileProjectStateStore {
 
         for path in feature_paths {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path.clone(), Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path.clone(), Self::metadata_fingerprint(&path)?);
             if let Some(feature) = self.project_feature(&path)? {
                 let mut feature_goals: Vec<GoalIndexProjection> = goals
                     .values()
@@ -131,11 +131,11 @@ impl ProjectStateStore for FileProjectStateStore {
         activity.extend(self.project_goal_round_activity(&goals)?);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&activity_path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&activity_path)?);
         }
         for path in Self::collect_json_files(&self.refine_dir.join("goals"), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
+            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
         if let Some(fingerprint) = self.git_head_fingerprint() {
             source_fingerprints.insert(fingerprint.path.clone(), fingerprint);
