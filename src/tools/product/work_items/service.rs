@@ -9,13 +9,12 @@ mod rounds_and_metadata;
 mod validation;
 mod workflow;
 use std::collections::BTreeSet;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
-use fs2::FileExt;
 use serde_json::{Map, Value};
 
 use crate::model::feature::{
@@ -29,8 +28,7 @@ use crate::model::workflow::{
     is_feature_protected_status, is_terminal_status, user_status_transition,
 };
 use crate::process::supervisor::coordination::{
-    WorkflowCoordinationLease, acquire_workflow_coordination, replace_file_durably,
-    with_workflow_coordination,
+    RecordLease, acquire_record_lock, record_lock_key, replace_file_durably, with_record_lock,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
@@ -50,8 +48,6 @@ use validation::*;
 
 pub(crate) use record_persistence::workflow_revision;
 
-const GOAL_MUTATION_LOCK_FILE: &str = ".goal-mutations.lock";
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GoalCancellationExpectation {
     pub status: GoalStatus,
@@ -60,9 +56,9 @@ pub(crate) struct GoalCancellationExpectation {
     pub node_id: String,
 }
 
+/// Serializes mutations of one Goal against other writers of that Goal.
 struct GoalMutationLock {
-    _coordination: WorkflowCoordinationLease,
-    file: File,
+    _record: RecordLease,
 }
 
 #[derive(Clone, Copy)]
@@ -75,12 +71,6 @@ enum BulkGoalStatusProtection {
 enum BulkGoalStatusMutation {
     Updated,
     Skipped(String),
-}
-
-impl Drop for GoalMutationLock {
-    fn drop(&mut self) {
-        let _ = FileExt::unlock(&self.file);
-    }
 }
 
 pub(crate) struct GoalCancellationTransaction {
@@ -294,7 +284,7 @@ impl FileWorkItemService {
         raw_target: &str,
         status_protection: BulkGoalStatusProtection,
     ) -> RefineResult<BulkGoalStatusMutation> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let goal_path = goal_json_path(&self.refine_dir, goal_id);
         let bytes = fs::read(&goal_path).map_err(|error| {
             RefineError::Io(format!(

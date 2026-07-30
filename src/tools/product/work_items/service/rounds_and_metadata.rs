@@ -245,7 +245,7 @@ impl FileWorkItemService {
             ));
         }
 
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
@@ -537,7 +537,7 @@ impl FileWorkItemService {
     }
 
     pub fn delete_goal_record(&self, goal_id: &str) -> RefineResult<()> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::Delete)?;

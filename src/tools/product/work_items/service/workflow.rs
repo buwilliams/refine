@@ -27,7 +27,7 @@ impl FileWorkItemService {
         target_commit: &str,
         failure_message: &str,
     ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         validate_automated_goal_transition(&current.goal.status, &GoalStatus::Todo)?;
@@ -137,7 +137,7 @@ impl FileWorkItemService {
         target_branch: &str,
         target_commit: &str,
     ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         if current.goal.status != GoalStatus::Todo {
@@ -310,7 +310,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
     ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         if matches!(
             current.goal.status,
@@ -382,7 +382,7 @@ impl FileWorkItemService {
         goal_id: &str,
         target: GoalStatus,
     ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let snapshot = self.projection_snapshot()?;
         let current = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Goal {goal_id} was not found in refine state"))
@@ -464,7 +464,7 @@ impl FileWorkItemService {
     }
 
     pub fn cancel_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock()?;
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         if current.goal.status == GoalStatus::Cancelled {
             return Ok(current);
@@ -484,7 +484,7 @@ impl FileWorkItemService {
         expected: &GoalCancellationExpectation,
         target_status: GoalStatus,
     ) -> RefineResult<GoalCancellationTransaction> {
-        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         if current.goal.status != expected.status
@@ -537,7 +537,7 @@ impl FileWorkItemService {
         restored: Option<&Value>,
         superseded: Option<&Value>,
     ) -> RefineResult<GoalCancellationTransaction> {
-        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let (goal_path, current_value) = self.read_goal_value_unchecked_locked(&current)?;

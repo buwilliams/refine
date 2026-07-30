@@ -1,8 +1,13 @@
 use super::*;
 
 pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> RefineResult<()> {
-    let coordination_root = workflow_record_root(path);
-    with_workflow_coordination(&coordination_root, || {
+    // Locked per record rather than per target application. What this window
+    // protects is one record's read-compare-write against another writer of the
+    // same record; a lock covering every record meant two unrelated Goals could
+    // not be written at once however much capacity the host had.
+    let record_root = workflow_record_root(path);
+    let record_key = record_lock_key(path);
+    with_record_lock(&record_root, &record_key, || {
         let expected_revision = workflow_revision(value);
         let current = match fs::read(path) {
             Ok(bytes) => Some(serde_json::from_slice::<Value>(&bytes).map_err(|error| {

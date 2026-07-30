@@ -21,36 +21,25 @@ impl FileWorkItemService {
         }
     }
 
-    pub(super) fn acquire_goal_mutation_lock(&self) -> RefineResult<GoalMutationLock> {
-        let coordination = acquire_workflow_coordination(&self.refine_dir)?;
+    /// Serialize a mutation of one Goal against other writers of that Goal.
+    ///
+    /// Keyed by the Goal's own identifier so that locking it and then writing
+    /// its record resolve to the same lock and nest re-entrantly. This replaces
+    /// a single lock covering the whole target application, under which two
+    /// unrelated Goals could not be mutated concurrently no matter how much
+    /// capacity the host had.
+    pub(super) fn acquire_goal_mutation_lock(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalMutationLock> {
         fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create Refine state directory {}: {error}",
                 self.refine_dir.display()
             ))
         })?;
-        let path = self.refine_dir.join(GOAL_MUTATION_LOCK_FILE);
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(&path)
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to open Goal mutation lock {}: {error}",
-                    path.display()
-                ))
-            })?;
-        file.lock_exclusive().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to lock Goal mutations {}: {error}",
-                path.display()
-            ))
-        })?;
         Ok(GoalMutationLock {
-            _coordination: coordination,
-            file,
+            _record: acquire_record_lock(&self.refine_dir, goal_id)?,
         })
     }
 
@@ -118,7 +107,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
     ) -> RefineResult<(GoalMutationLock, PathBuf, Value)> {
-        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let (goal_path, value) = self.read_goal_value_unchecked_locked(&current)?;
@@ -129,7 +118,7 @@ impl FileWorkItemService {
         &self,
         current: &GoalSummaryProjection,
     ) -> RefineResult<(GoalMutationLock, PathBuf, Value)> {
-        let goal_lock = self.acquire_goal_mutation_lock()?;
+        let goal_lock = self.acquire_goal_mutation_lock(&current.goal.id)?;
         let (goal_path, value) = self.read_goal_value_unchecked_locked(current)?;
         Ok((goal_lock, goal_path, value))
     }

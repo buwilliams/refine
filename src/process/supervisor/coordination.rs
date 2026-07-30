@@ -50,9 +50,148 @@ fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineR
     }
 }
 
+/// Where record locks live. Under `runtime/` because a lock describes this
+/// host's in-flight work, not project state, and must never synchronize.
+const RECORD_LOCK_DIR: &str = "runtime/record-locks";
+/// How many locks the record space is divided across.
+///
+/// One lock per record would mean an inode per Goal, which does not survive a
+/// project of millions; a single lock is what this replaces. Striping keeps the
+/// file count fixed while letting unrelated records proceed in parallel —
+/// collisions only cost the serialization that used to apply to everything.
+const RECORD_LOCK_STRIPES: u64 = 64;
+
 thread_local! {
     static HELD_COORDINATION_LOCKS: RefCell<BTreeMap<PathBuf, usize>> =
         const { RefCell::new(BTreeMap::new()) };
+    static HELD_RECORD_LOCKS: RefCell<BTreeMap<PathBuf, usize>> =
+        const { RefCell::new(BTreeMap::new()) };
+}
+
+/// The identity a record is locked under.
+///
+/// A Goal's own identifier, so that locking a Goal and then writing its record
+/// resolve to the same stripe and nest re-entrantly. Deriving one from the path
+/// and the other from the id would put a mutation behind two different locks
+/// and deadlock it against itself.
+pub fn record_lock_key(path: &Path) -> String {
+    let components = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    for (index, component) in components.iter().enumerate() {
+        if matches!(component.as_str(), "goals" | "features") {
+            let identity = components
+                .get(index + 1..components.len().saturating_sub(1))
+                .unwrap_or_default()
+                .concat();
+            if !identity.is_empty() {
+                return identity;
+            }
+        }
+    }
+    path.to_string_lossy().into_owned()
+}
+
+/// Serialize writers of one record without serializing writers of all records.
+///
+/// Every Goal mutation used to take a single lock covering the whole target
+/// application, so two unrelated Goals could not be written at the same time
+/// however much capacity the host had. What that lock actually has to protect
+/// is one record's read-compare-write against another writer of the *same*
+/// record; the durable revision check inside that window is what makes the
+/// write safe, and it only needs to be atomic per record.
+///
+/// Re-entrant, because a mutation locks a Goal and then writes its record, and
+/// `flock` on a second descriptor for the same file would otherwise block
+/// against the caller's own lock.
+pub fn acquire_record_lock(root: &Path, key: &str) -> RefineResult<RecordLease> {
+    let root = coordination_lock_root(root);
+    let mut stripe = 0xcbf29ce484222325u64;
+    for byte in key.as_bytes() {
+        stripe ^= u64::from(*byte);
+        stripe = stripe.wrapping_mul(0x100000001b3);
+    }
+    let directory = root.join(RECORD_LOCK_DIR);
+    let path = directory.join(format!("{}.lock", stripe % RECORD_LOCK_STRIPES));
+
+    let nested = HELD_RECORD_LOCKS.with(|locks| {
+        let mut locks = locks.borrow_mut();
+        let Some(depth) = locks.get_mut(&path) else {
+            return false;
+        };
+        *depth += 1;
+        true
+    });
+    if nested {
+        return Ok(RecordLease {
+            _depth: RecordLockDepth { path },
+            _guard: None,
+        });
+    }
+    fs::create_dir_all(&directory).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to create record lock directory {}: {error}",
+            directory.display()
+        ))
+    })?;
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to open record lock {}: {error}",
+                path.display()
+            ))
+        })?;
+    lock_exclusive_before(&file, &path, COORDINATION_ACQUIRE_TIMEOUT)?;
+    HELD_RECORD_LOCKS.with(|locks| {
+        locks.borrow_mut().insert(path.clone(), 1);
+    });
+    Ok(RecordLease {
+        _depth: RecordLockDepth { path: path.clone() },
+        _guard: Some(WorkflowCoordinationGuard { file, path }),
+    })
+}
+
+pub fn with_record_lock<T>(
+    root: &Path,
+    key: &str,
+    action: impl FnOnce() -> RefineResult<T>,
+) -> RefineResult<T> {
+    let _lease = acquire_record_lock(root, key)?;
+    action()
+}
+
+pub struct RecordLease {
+    _depth: RecordLockDepth,
+    _guard: Option<WorkflowCoordinationGuard>,
+}
+
+struct RecordLockDepth {
+    path: PathBuf,
+}
+
+impl Drop for RecordLockDepth {
+    fn drop(&mut self) {
+        HELD_RECORD_LOCKS.with(|locks| {
+            let mut locks = locks.borrow_mut();
+            let remove = match locks.get_mut(&self.path) {
+                Some(depth) if *depth > 1 => {
+                    *depth -= 1;
+                    false
+                }
+                Some(_) => true,
+                None => false,
+            };
+            if remove {
+                locks.remove(&self.path);
+            }
+        });
+    }
 }
 
 pub fn with_workflow_coordination<T>(

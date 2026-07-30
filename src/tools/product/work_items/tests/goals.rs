@@ -245,3 +245,126 @@ fn distribute_converge_moves_only_reviewable_goals_to_review_node() {
     assert_eq!(backlog_goal.goal.node_id.as_deref(), Some("worker"));
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+// Every Goal mutation used to take one lock covering the whole target
+// application, so two unrelated Goals could not be written at the same time
+// however much capacity the host had — a fleet running several agents
+// serialized all of their bookkeeping against each other. Locking is per record
+// now, and this is decisive: with a Goal's lock held, mutating other Goals still
+// proceeds, where under the old lock none of them could.
+#[test]
+fn holding_one_goal_does_not_block_mutating_others() {
+    use crate::process::supervisor::coordination::acquire_record_lock;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let temp_root = unique_temp_dir("goal-lock-independence");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service.create_goal_summary("Held", Some("GOALHELD")).unwrap();
+    let others = (0..8)
+        .map(|index| format!("GOALFREE{index:02}"))
+        .collect::<Vec<_>>();
+    for id in &others {
+        service.create_goal_summary("Free", Some(id)).unwrap();
+    }
+
+    // The lock is re-entrant per thread, so it has to be held from this one
+    // while another thread does the mutating.
+    let held = acquire_record_lock(&refine_dir, "GOALHELD").unwrap();
+
+    let (tx, rx) = mpsc::channel();
+    let worker_refine_dir = refine_dir.clone();
+    let worker_others = others.clone();
+    let worker = std::thread::spawn(move || {
+        let service = FileWorkItemService::new(&worker_refine_dir);
+        for id in worker_others {
+            let started = Instant::now();
+            let outcome = service.update_goal_metadata_summary(&id, Some("Renamed"), None, None, None);
+            let _ = tx.send((outcome.is_ok(), started.elapsed()));
+        }
+    });
+
+    // Comfortably shorter than the lock acquisition deadline, so a Goal that
+    // was actually blocked cannot be counted as free.
+    let budget = Duration::from_secs(5);
+    let mut proceeded = 0;
+    for _ in 0..others.len() {
+        match rx.recv_timeout(Duration::from_secs(30)) {
+            Ok((true, elapsed)) if elapsed < budget => proceeded += 1,
+            Ok(_) => {}
+            Err(_) => break,
+        }
+    }
+    drop(held);
+    worker.join().unwrap();
+
+    // Records are striped rather than given a lock each, so one of these may
+    // share a stripe with the held Goal. Under a single global lock none would
+    // have proceeded at all.
+    assert!(
+        proceeded >= others.len() - 1,
+        "only {proceeded} of {} unrelated Goals proceeded while one Goal was held",
+        others.len()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+// Narrowing the lock must not weaken what it protected. Writers of the same
+// Goal still serialize, so a read-modify-write cannot lose an update to a
+// concurrent one.
+#[test]
+fn concurrent_writers_of_one_goal_do_not_lose_updates() {
+    let temp_root = unique_temp_dir("goal-lock-same-record");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Contended", Some("GOALSAME"))
+        .unwrap();
+
+    const WRITERS: usize = 6;
+    const NOTES_EACH: usize = 4;
+    let workers = (0..WRITERS)
+        .map(|writer| {
+            let refine_dir = refine_dir.clone();
+            std::thread::spawn(move || {
+                let service = FileWorkItemService::new(&refine_dir);
+                for note in 0..NOTES_EACH {
+                    service
+                        .add_goal_note_summary(
+                            "GOALSAME",
+                            "tester",
+                            &format!("writer {writer} note {note}"),
+                        )
+                        .unwrap();
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    for worker in workers {
+        worker.join().unwrap();
+    }
+
+    // Every append survives: none was overwritten by a writer that had read the
+    // Goal before it landed.
+    let detail = service.show_goal_detail("GOALSAME").unwrap();
+    let notes = detail
+        .get("notes")
+        .and_then(|notes| notes.as_array())
+        .expect("notes array");
+    assert_eq!(notes.len(), WRITERS * NOTES_EACH);
+    for writer in 0..WRITERS {
+        for note in 0..NOTES_EACH {
+            let needle = format!("writer {writer} note {note}");
+            assert!(
+                notes.iter().any(|entry| {
+                    entry.get("body").and_then(|body| body.as_str()) == Some(needle.as_str())
+                }),
+                "lost update: {needle}"
+            );
+        }
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
