@@ -577,6 +577,45 @@ that is when the projection stops fingerprinting them anyway.
   target app with ~5M Goals and 2 parallel agents through repeated Governance and
   quality failures without state drift.
 
+## Implementation Status
+
+Implemented, with tests, as of this revision:
+
+| Item | State |
+| --- | --- |
+| D8a — Goal logs excluded from `refine/state`, published ones retired | Done |
+| D1 — Claim eligibility decided in one pass | Done |
+| D2 — Readiness by progress, direct and service-managed | Done |
+| D4 — Activity bounded; content hashing removed from fingerprinting | Done |
+| D4 — Per-claim projection caches collapsed to one shared cache | Done |
+| D3 — Source delta; Goal writes patch rather than rebuild | Done |
+| D5 — Git stall budget; coordination and repository lock deadlines | Done |
+| D6 — Concurrency, disk headroom, and cadence derived from host capacity | Done |
+| D7 — Synchronization stops rehashing unmoved records | Done |
+| D8b — Goal logs relocated under `runtime/` | Done |
+
+Not implemented, and why:
+
+- **Bounded scheduler working set (D4 hot set).** `patch_projection` takes the
+  whole projection by value, so any path that keeps it current holds all of it.
+  A maintained list of active Goals cannot bound memory while the full snapshot
+  is still required to maintain that list. Meeting the criterion genuinely
+  requires the sharded per-shard index described in D3, where records are loaded
+  a shard at a time. That is a storage redesign rather than an addition.
+- **Two-tier search (D4).** `searchable_text` is still carried in the
+  projection, and it is the largest per-Goal contributor since it concatenates
+  every note body and Round prompt. Moving it off the projection needs
+  `goal_matches` restructured into filter-then-read, which changes query
+  behavior and cost across the Goals, Activity, and import surfaces.
+- **Single-writer claim state and asynchronous mutations (D5).** Lock
+  acquisition is now bounded and Git can no longer hang indefinitely, which
+  removes the failure these were meant to address. The intent queue and the
+  `202 Accepted` contract remain a scale change rather than a reliability one,
+  and they touch every mutating surface in the web UI.
+
+The first two are what the 5M-Goal target depends on. Neither affects a project
+of the size that motivated this work.
+
 ## Open Questions
 
 - **Reclaiming already-synced log volume.** D8 stops future growth, but volume
