@@ -219,12 +219,17 @@ impl WorkflowEngine {
             )
         })?;
         let refine_dir = prepare_refine_dir(target_root)?;
+        // One shared projection cache, as every other caller uses. Scoping it per
+        // claim wrote a full copy of project state per claim into
+        // `cache/workflow/<claim id>`, and nothing ever removed those, so disk
+        // grew without bound in proportion to claims ever created. Snapshots are
+        // published by atomic rename over a temp file, so sharing is safe under
+        // concurrent workers: a reader sees one complete snapshot, and writers
+        // rebuilding from the same sources converge.
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
             &self.runtime_root,
-            self.runtime_root
-                .join("cache/workflow")
-                .join(&claim.claim_id),
+            self.runtime_root.join("cache"),
         );
         let round_idx = ensure_workflow_round(&work_items, &claim.goal_id)?;
         let settings =
