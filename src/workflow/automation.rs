@@ -7,6 +7,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 
+use super::policy::ClaimEligibility;
 use super::{
     AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation, WorkflowClaim, WorkflowClaimState,
     WorkflowEngine, new_claim_id, new_execution_id, now_timestamp, priority_rank,
@@ -44,6 +45,7 @@ impl WorkflowAutomation for WorkflowEngine {
                 quarantined_goal_ids.insert(projection.goal.id.clone());
             }
         }
+        let eligibility = ClaimEligibility::new(&snapshot, &quarantined_goal_ids);
         let mut eligible = snapshot
             .goals
             .values()
@@ -53,14 +55,8 @@ impl WorkflowAutomation for WorkflowEngine {
                     GoalStatus::Todo | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
                 )
             })
-            .filter(|projection| Self::feature_claim_eligible(&snapshot, projection))
-            .filter(|projection| {
-                Self::priority_claim_eligible_excluding(
-                    &snapshot,
-                    projection,
-                    &quarantined_goal_ids,
-                )
-            })
+            .filter(|projection| eligibility.feature_eligible(&projection.goal.id))
+            .filter(|projection| eligibility.priority_eligible(&projection.goal))
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
@@ -139,12 +135,13 @@ impl WorkflowAutomation for WorkflowEngine {
             let goal = snapshot.goals.get(goal_id).cloned().ok_or_else(|| {
                 RefineError::NotFound(format!("Goal {goal_id} was not found in target state"))
             })?;
-            if !Self::feature_claim_eligible(&snapshot, &goal) {
+            let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
+            if !eligibility.feature_eligible(&goal.goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} is blocked by Feature order"
                 )));
             }
-            if !Self::priority_claim_eligible(&snapshot, &goal) {
+            if !eligibility.priority_eligible(&goal.goal) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} is blocked by higher priority work"
                 )));
@@ -220,13 +217,14 @@ impl WorkflowAutomation for WorkflowEngine {
                 ))
             })?;
             self.claim_metadata(Some(goal), &policy)?;
-            if !Self::feature_claim_eligible(&snapshot, goal) {
+            let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
+            if !eligibility.feature_eligible(&goal.goal.id) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} is blocked by Feature order",
                     claim.goal_id
                 )));
             }
-            if !Self::priority_claim_eligible(&snapshot, goal) {
+            if !eligibility.priority_eligible(&goal.goal) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} is blocked by higher priority work",
                     claim.goal_id

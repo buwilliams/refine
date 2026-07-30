@@ -1,9 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::model::feature::is_ordered_feature_goal;
+use crate::model::goal::GoalIndexProjection;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
@@ -492,64 +492,143 @@ impl WorkflowEngine {
             .load_or_refresh_projection(&self.runtime_root.join("cache"))
     }
 
-    pub(super) fn feature_claim_eligible(
-        snapshot: &ProjectionSnapshot,
-        goal: &GoalSummaryProjection,
-    ) -> bool {
-        let Some(feature_id) = goal.goal.feature_id.as_deref() else {
-            return true;
-        };
-        let Some(feature_order) = goal.goal.feature_order else {
-            return true;
-        };
-        let node_id = goal.goal.node_id.as_deref().unwrap_or("default");
-        !snapshot.goals.values().any(|other| {
-            other.goal.feature_id.as_deref() == Some(feature_id)
-                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
-                && other
-                    .goal
-                    .feature_order
-                    .is_some_and(|order| order < feature_order)
-                && !matches!(
-                    other.goal.status,
-                    GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled
-                )
-        }) && !snapshot.goals.values().any(|other| {
-            other.goal.id != goal.goal.id
-                && other.goal.feature_id.as_deref() == Some(feature_id)
-                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
-                && is_ordered_feature_goal(goal.goal.feature_order)
-                && is_ordered_feature_goal(other.goal.feature_order)
-                && matches!(
-                    other.goal.status,
-                    GoalStatus::InProgress
-                        | GoalStatus::ReadyMerge
-                        | GoalStatus::Build
-                        | GoalStatus::Qa
-                )
-        })
-    }
+}
 
-    pub(super) fn priority_claim_eligible(
-        snapshot: &ProjectionSnapshot,
-        goal: &GoalSummaryProjection,
-    ) -> bool {
-        Self::priority_claim_eligible_excluding(snapshot, goal, &BTreeSet::new())
-    }
+/// A Goal past implementation no longer holds its Feature's ordering queue.
+fn releases_feature_order(status: &GoalStatus) -> bool {
+    matches!(
+        status,
+        GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled
+    )
+}
 
-    pub(super) fn priority_claim_eligible_excluding(
+/// Statuses that occupy a Feature's single in-flight slot.
+fn occupies_feature_slot(status: &GoalStatus) -> bool {
+    matches!(
+        status,
+        GoalStatus::InProgress | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+    )
+}
+
+/// Claim eligibility for every Goal in one projection snapshot, decided up front.
+///
+/// Both predicates used to be answered by rescanning the whole snapshot per
+/// candidate, and the priority scan called the Feature scan inside its own loop.
+/// That made promotion quadratic in Goal count at rest and cubic once a batch of
+/// Todo Goals shared a Feature and a priority band — the shape a real backlog
+/// takes. Neither predicate actually needs per-candidate scanning: Feature
+/// eligibility reduces to two aggregates per (Node, Feature), and priority
+/// eligibility to one maximum per Node. One pass answers every candidate in
+/// constant time.
+pub(super) struct ClaimEligibility {
+    feature_eligible: BTreeSet<String>,
+    highest_claimable_todo_rank: BTreeMap<String, u8>,
+}
+
+impl ClaimEligibility {
+    pub(super) fn new(
         snapshot: &ProjectionSnapshot,
-        goal: &GoalSummaryProjection,
         excluded_goal_ids: &BTreeSet<String>,
+    ) -> Self {
+        // Per (Node, Feature): the lowest order still holding the queue, and how
+        // many ordered Goals currently occupy the in-flight slot.
+        let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
+        let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+        for projection in snapshot.goals.values() {
+            let goal = &projection.goal;
+            let Some(feature_id) = goal.feature_id.as_deref() else {
+                continue;
+            };
+            // Only ordered Goals participate: the original scans reached these
+            // comparisons through `feature_order`, so an unordered Goal neither
+            // holds the queue nor occupies the slot.
+            let Some(order) = goal.feature_order else {
+                continue;
+            };
+            let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
+            if !releases_feature_order(&goal.status) {
+                lowest_holding_order
+                    .entry(key)
+                    .and_modify(|lowest| *lowest = (*lowest).min(order))
+                    .or_insert(order);
+            }
+            if occupies_feature_slot(&goal.status) {
+                *occupying_count.entry(key).or_default() += 1;
+            }
+        }
+
+        let feature_eligible = snapshot
+            .goals
+            .values()
+            .filter(|projection| {
+                Self::feature_eligible_from(
+                    &projection.goal,
+                    &lowest_holding_order,
+                    &occupying_count,
+                )
+            })
+            .map(|projection| projection.goal.id.clone())
+            .collect::<BTreeSet<_>>();
+
+        // A Goal is priority-eligible when nothing claimable on its Node
+        // outranks it. Whether the Goal itself contributes to this maximum does
+        // not matter: dropping one entry equal to its own rank cannot change
+        // whether a strictly greater entry exists. That is what lets a
+        // per-candidate scan collapse into a single maximum.
+        let mut highest_claimable_todo_rank: BTreeMap<String, u8> = BTreeMap::new();
+        for projection in snapshot.goals.values() {
+            let goal = &projection.goal;
+            if goal.status != GoalStatus::Todo
+                || excluded_goal_ids.contains(&goal.id)
+                || !feature_eligible.contains(&goal.id)
+            {
+                continue;
+            }
+            let rank = priority_rank(&goal.priority);
+            highest_claimable_todo_rank
+                .entry(goal.node_id.as_deref().unwrap_or("default").to_string())
+                .and_modify(|highest| *highest = (*highest).max(rank))
+                .or_insert(rank);
+        }
+
+        Self {
+            feature_eligible,
+            highest_claimable_todo_rank,
+        }
+    }
+
+    fn feature_eligible_from(
+        goal: &GoalIndexProjection,
+        lowest_holding_order: &BTreeMap<(&str, &str), i64>,
+        occupying_count: &BTreeMap<(&str, &str), usize>,
     ) -> bool {
-        let node_id = goal.goal.node_id.as_deref().unwrap_or("default");
-        !snapshot.goals.values().any(|other| {
-            other.goal.id != goal.goal.id
-                && !excluded_goal_ids.contains(&other.goal.id)
-                && other.goal.status == GoalStatus::Todo
-                && other.goal.node_id.as_deref().unwrap_or("default") == node_id
-                && priority_rank(&other.goal.priority) > priority_rank(&goal.goal.priority)
-                && Self::feature_claim_eligible(snapshot, other)
-        })
+        let Some(feature_id) = goal.feature_id.as_deref() else {
+            return true;
+        };
+        let Some(order) = goal.feature_order else {
+            return true;
+        };
+        let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
+        // Nothing earlier in the Feature may still be holding the queue.
+        if lowest_holding_order
+            .get(&key)
+            .is_some_and(|lowest| *lowest < order)
+        {
+            return false;
+        }
+        // The Feature admits one ordered Goal in flight at a time, and a Goal
+        // already holding that slot does not block itself.
+        let occupying = occupying_count.get(&key).copied().unwrap_or_default();
+        occupying.saturating_sub(usize::from(occupies_feature_slot(&goal.status))) == 0
+    }
+
+    pub(super) fn feature_eligible(&self, goal_id: &str) -> bool {
+        self.feature_eligible.contains(goal_id)
+    }
+
+    pub(super) fn priority_eligible(&self, goal: &GoalIndexProjection) -> bool {
+        self.highest_claimable_todo_rank
+            .get(goal.node_id.as_deref().unwrap_or("default"))
+            .is_none_or(|highest| *highest <= priority_rank(&goal.priority))
     }
 }

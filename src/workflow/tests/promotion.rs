@@ -262,3 +262,78 @@ fn file_automation_respects_feature_order_on_promote_claim_and_start() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+// Claim eligibility used to be answered by rescanning the whole snapshot per
+// candidate, with the priority scan calling the Feature scan inside its own
+// loop. That is quadratic at rest and cubic once Todo Goals share a Feature and
+// a priority band, which is the shape a real backlog takes: at a thousand Goals
+// a single promotion pass costs on the order of 1e9 predicate evaluations and
+// cannot finish inside its own one-second replenish interval.
+//
+// Ten thousand Goals is chosen so the complexity classes are unmistakable —
+// linear is microseconds, quadratic is 1e8 and takes seconds to minutes, cubic
+// never finishes. The bound is deliberately loose so machine speed cannot make
+// this flaky while still failing outright on any return to super-linear cost.
+#[test]
+fn claim_eligibility_stays_linear_on_a_large_single_feature_backlog() {
+    use crate::model::goal::GoalIndexProjection;
+    use crate::workflow::GoalPriority;
+    use crate::tools::product::project_state::{GoalSummaryProjection, ProjectionSnapshot};
+    use crate::workflow::policy::ClaimEligibility;
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::time::Instant;
+
+    const GOAL_COUNT: i64 = 10_000;
+
+    let mut goals = BTreeMap::new();
+    for index in 0..GOAL_COUNT {
+        let id = format!("GOAL{index:06}");
+        goals.insert(
+            id.clone(),
+            GoalSummaryProjection {
+                goal: GoalIndexProjection {
+                    id: id.clone(),
+                    name: format!("Goal {index}"),
+                    status: GoalStatus::Todo,
+                    priority: GoalPriority::Medium,
+                    reporter: None,
+                    assignee: None,
+                    round_count: 0,
+                    created: "2026-01-01T00:00:00Z".to_string(),
+                    updated: "2026-01-01T00:00:00Z".to_string(),
+                    branch_name: None,
+                    node_id: Some("default".to_string()),
+                    feature_id: Some("FEATURE1".to_string()),
+                    feature_order: Some(index),
+                    json_path: format!("goals/GO/{index:06}/goal.json"),
+                },
+                node_display_name: None,
+                latest_round_prompt: None,
+                searchable_text: String::new(),
+                activity_ids: Vec::new(),
+            },
+        );
+    }
+    let snapshot = ProjectionSnapshot {
+        goals,
+        ..ProjectionSnapshot::default()
+    };
+
+    let started = Instant::now();
+    let eligibility = ClaimEligibility::new(&snapshot, &BTreeSet::new());
+    let eligible = snapshot
+        .goals
+        .values()
+        .filter(|projection| eligibility.feature_eligible(&projection.goal.id))
+        .filter(|projection| eligibility.priority_eligible(&projection.goal))
+        .count();
+    let elapsed = started.elapsed();
+
+    // Only the lowest-ordered Goal clears the Feature queue; every later one is
+    // held behind it. Same answer the per-candidate scans gave.
+    assert_eq!(eligible, 1, "feature order must still serialize the queue");
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "eligibility for {GOAL_COUNT} Goals took {elapsed:?}, which indicates super-linear cost"
+    );
+}
