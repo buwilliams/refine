@@ -132,6 +132,26 @@ resolutions per call — one via `promote_backlog_to_todo_for_refine_dir`, one v
 (`ACTIVE_WORK_REPLENISH_INTERVAL`, `src/workflow/mod.rs:24`; `WORKFLOW_INTERVAL`,
 `src/process/runner.rs:37`), while holding the global lock.
 
+#### The projection materializes every log line ever written
+
+`rebuild_projection` calls `project_goal_round_activity`
+(`project_state/store/activity.rs:49`), which walks every Goal, reads its
+**entire** log file through `all_round_logs`, and materializes one
+`ActivitySummaryProjection` — each with its own `searchable_text` — **per log
+line**. The whole structure is held in memory and serialized into the snapshot
+on disk.
+
+Its consumer is `recent_activity_ids`, which takes 50 entries
+(`projection_store.rs`). The full-corpus materialization exists to produce a
+50-item dashboard list.
+
+This is the dominant memory cost, and it scales with **failure volume rather
+than Goal count**: every Governance rejection, quality failure, and retry
+appends log lines, and every one of them becomes a resident projection entry on
+the next rebuild. An environment with frequent Governance and quality failures
+therefore degrades far more sharply than its Goal count predicts — which is the
+observed deployment behavior that Goal count alone does not explain.
+
 #### Root cause of the root cause: index and detail are fused
 
 `GoalIndexProjection` (`src/model/goal/mod.rs:53`) is 14 scalar fields — roughly
@@ -329,7 +349,24 @@ Split the three concerns currently fused in `GoalSummaryProjection`:
 | --- | --- | --- |
 | Index | `GoalIndexProjection` only (~200 B) | Hot; always available |
 | Search | `searchable_text` | Two-tier; see below |
+| Activity | Round-log entries | Per Goal or per page, on demand |
 | Detail | Rounds, notes | By Goal ID, on demand; never in bulk |
+
+#### Activity is queried, not materialized
+
+Round-log activity leaves the eager projection entirely. Nothing needs every log
+line resident: the dashboard needs a recent slice, the Activity screen needs a
+page, and a Goal view needs one Goal's entries.
+
+- **Dashboard recency** comes from a bounded tail rather than a full-corpus sort.
+- **Activity paging** reads only the Goals on the requested page.
+- **Per-Goal activity** reads that Goal's sidecar.
+
+`GoalSummaryProjection::activity_ids` and `DashboardProjection::recent_activity_ids`
+stop being precomputed cross-references into a resident map. Because activity
+volume tracks failures rather than Goals, this is what decouples memory from how
+badly the fleet is doing — the current design charges the scheduler for every
+retry the system has ever performed.
 
 #### Search is two-tier
 
