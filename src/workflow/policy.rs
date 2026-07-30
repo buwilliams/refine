@@ -22,8 +22,8 @@ use crate::workflow::promotion::BacklogPromotionService;
 use super::{
     ClaimLoad, ClaimMetadata, WorkflowAutomation, WorkflowAutomationState, WorkflowClaim,
     WorkflowClaimState, WorkflowEngine, WorkflowPolicy, default_node_id, ensure_workflow_round,
-    json_object, now_timestamp, priority_rank, setting_cap_with_default_values, setting_string,
-    setting_usize,
+    json_object, now_timestamp, priority_rank, setting_cap_with_default_values,
+    setting_string, setting_usize,
 };
 
 impl WorkflowEngine {
@@ -59,6 +59,14 @@ impl WorkflowEngine {
             // two-core node and a thirty-two-core one, wasting the capable host
             // and overcommitting the constrained one. An explicit setting still
             // wins: the governor supplies the fallback, not an override.
+            //
+            // A stored value is honoured whatever it is, including one equal to
+            // the cap Refine used to seed. Reinterpreting that number as "unset"
+            // would let a capable host reach the governor without an operator
+            // touching anything, but at the cost of making it impossible to
+            // deliberately choose it — and the two cases are indistinguishable
+            // at read time. Nodes carrying the seeded value are handed back by
+            // clearing the setting, which the migration runbook covers.
             let governed_limit = HostResources::current(&self.runtime_root)
                 .recommended_agent_concurrency(observed_agent_memory_bytes(&self.runtime_root));
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", governed_limit);

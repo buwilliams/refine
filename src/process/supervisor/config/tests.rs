@@ -284,3 +284,56 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
+
+// Seeding a concurrency cap meant the scheduler never saw the key as unset, so
+// the host-capacity governor it falls back to could not be reached through any
+// supported configuration: a fixed 2 applied to a two-core node and a
+// thirty-two-core one alike.
+#[test]
+fn concurrency_caps_are_unset_until_an_operator_chooses_one() {
+    let temp_root = unique_temp_dir("settings-caps-unset");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileSettingsService::new(&refine_dir);
+
+    let defaults = service.load().unwrap();
+    for key in [
+        "parallel_run_cap",
+        "parallel_per_node_cap",
+        "parallel_per_provider_cap",
+        "parallel_per_target_app_cap",
+    ] {
+        assert!(
+            defaults.get(key).is_none(),
+            "{key} must be absent so the host decides"
+        );
+    }
+
+    // An explicit choice is still stored and still wins.
+    let updated = service
+        .update(&serde_json::json!({"parallel_run_cap": 4}))
+        .unwrap();
+    assert_eq!(updated["settings"]["parallel_run_cap"], "4");
+    assert_eq!(service.load().unwrap()["parallel_run_cap"], "4");
+
+    // And clearing it hands the decision back, which previously required
+    // hand-editing the node registry because the range rejects every value the
+    // scheduler reads as unset.
+    let cleared = service
+        .update(&serde_json::json!({"parallel_run_cap": ""}))
+        .unwrap();
+    assert_eq!(cleared["settings"]["parallel_run_cap"], "");
+    assert!(
+        service.load().unwrap()["parallel_run_cap"]
+            .as_str()
+            .is_none_or(str::is_empty)
+    );
+
+    // Out-of-range values are still rejected rather than silently accepted.
+    assert!(
+        service
+            .update(&serde_json::json!({"parallel_run_cap": 0}))
+            .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}

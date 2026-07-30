@@ -42,6 +42,11 @@ fn promoting_a_large_todo_queue_does_not_materialize_worktrees() {
     let target_root = temp_root.join("target");
     let refine_dir = test_refine_dir(&target_root);
     let runtime_root = temp_root.join("run/8080");
+    // Pinned: this asserts worktrees are not materialized, not what the host
+    // would choose, and an unset cap now varies with the machine.
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"parallel_run_cap": 2}))
+        .unwrap();
     let work_items = FileWorkItemService::new(&refine_dir);
     for index in 0..128 {
         let id = format!("GOAL{index:04}");
@@ -392,6 +397,78 @@ fn scheduling_never_builds_a_projection_of_the_whole_project() {
     let state = automation.load_state().unwrap();
     assert_eq!(state.claims.len(), 1);
     assert_eq!(state.claims[0].goal_id, "GOALLIVE");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+// The governor was wired as a fallback but the fallback was unreachable: a
+// seeded cap meant the key was never unset, so every node ran a fixed 2
+// regardless of its hardware — the exact behavior the governor exists to
+// remove. These pin the three configurations that have to behave differently.
+#[test]
+fn concurrency_follows_the_host_unless_an_operator_overrides_it() {
+    use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
+
+    let temp_root = unique_temp_dir("automation-governed-cap");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let engine = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    let settings = FileSettingsService::new(&refine_dir);
+
+    let expected = HostResources::current(&runtime_root)
+        .recommended_agent_concurrency(observed_agent_memory_bytes(&runtime_root));
+
+    // Unset: the host decides.
+    assert_eq!(engine.policy().unwrap().global_limit, expected);
+    assert!(expected >= 1, "scarcity slows work rather than stopping it");
+
+    // Explicitly chosen: the operator decides, even above what the host would
+    // pick, because a deliberate cap is not the governor's to overrule.
+    settings
+        .update(&json!({"parallel_run_cap": expected + 3}))
+        .unwrap();
+    assert_eq!(engine.policy().unwrap().global_limit, expected + 3);
+
+    // Cleared: the host decides again, without hand-editing the node registry.
+    settings.update(&json!({"parallel_run_cap": ""})).unwrap();
+    assert_eq!(engine.policy().unwrap().global_limit, expected);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+// An operator's cap is honoured whatever its value, including one equal to the
+// number Refine used to seed. Reinterpreting that as "unset" would hand a
+// capable host to the governor without anyone touching anything, but would also
+// make the value impossible to choose deliberately, and the two cases cannot be
+// told apart at read time. Clearing is the supported way to hand it back.
+#[test]
+fn a_stored_cap_is_honoured_even_when_it_equals_the_retired_default() {
+    use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
+
+    let temp_root = unique_temp_dir("automation-retired-cap");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let engine = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    let settings = FileSettingsService::new(&refine_dir);
+
+    let expected = HostResources::current(&runtime_root)
+        .recommended_agent_concurrency(observed_agent_memory_bytes(&runtime_root));
+
+    settings.update(&json!({"parallel_run_cap": 2})).unwrap();
+    assert_eq!(
+        engine.policy().unwrap().global_limit,
+        2,
+        "a stored cap must be honoured even when it matches the retired default"
+    );
+
+    settings.update(&json!({"parallel_run_cap": ""})).unwrap();
+    assert_eq!(
+        engine.policy().unwrap().global_limit,
+        expected,
+        "clearing hands the decision to the host"
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

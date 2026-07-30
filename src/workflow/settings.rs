@@ -1,5 +1,8 @@
 use crate::model::JsonObject;
 
+/// A positive stored value, or the fallback when the key is absent, empty, or
+/// non-positive. Absent and empty are how an operator hands a limit back to the
+/// host-capacity governor.
 pub(super) fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -> usize {
     settings
         .get(key)

@@ -1,12 +1,16 @@
 use super::*;
 
 pub(super) fn default_settings() -> JsonObject {
+    // The concurrency caps are deliberately absent.
+    //
+    // Seeding them meant `load` always produced a value, so the scheduler never
+    // saw the key as unset and the host-capacity governor it falls back to could
+    // not be reached through any supported configuration — a fixed 2 applied to
+    // a two-core node and a thirty-two-core one alike, which is exactly what the
+    // governor exists to stop. Absent means "let this host decide"; an explicit
+    // value still wins.
     let mut settings = JsonObject::new();
     for (key, value) in [
-        ("parallel_run_cap", "2"),
-        ("parallel_per_node_cap", "2"),
-        ("parallel_per_provider_cap", "2"),
-        ("parallel_per_target_app_cap", "2"),
         ("branch_name_pattern", "refine/{goal_id}"),
         ("agent_idle_timeout_seconds", "900"),
         ("agent_hard_cap_seconds", "7200"),
@@ -181,10 +185,19 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
         }
         "target_app_test_commands" => normalize_target_app_test_commands(value),
         "worktree_cleanup_generated_paths" => normalize_worktree_cleanup_generated_paths(value),
+        // Empty hands the decision back to the host-capacity governor. Without
+        // it the only way to unpin a cap was to hand-edit `nodes.json`, since
+        // the range rejects every value the scheduler treats as unset.
         "parallel_run_cap"
         | "parallel_per_node_cap"
         | "parallel_per_provider_cap"
-        | "parallel_per_target_app_cap" => normalize_range(key, value, 1, 100),
+        | "parallel_per_target_app_cap" => {
+            if as_string(value).trim().is_empty() {
+                Ok(String::new())
+            } else {
+                normalize_range(key, value, 1, 100)
+            }
+        }
         "target_app_tcp_check_port" => {
             let text = as_string(value);
             if text.trim().is_empty() {

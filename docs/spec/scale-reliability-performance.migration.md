@@ -140,6 +140,45 @@ something.
 rm -f "$LIVE_STATE/.goal-mutations.lock"
 ```
 
+## 6. Hand concurrency back to the host
+
+Refine used to seed `parallel_run_cap` into every node, so a node upgraded from
+an earlier build carries that value in its stored settings whether or not anyone
+chose it. A stored cap always wins over the host-capacity governor, so such a
+node keeps running at its seeded limit and the governor never engages.
+
+The seeded value and a deliberate one are indistinguishable once stored, so
+nothing clears it automatically — that would make the number impossible to
+choose on purpose. Clear it only where the limit was never a decision:
+
+Clear the field in web settings, or through the API the daemon serves:
+
+```bash
+curl -s -X PATCH http://127.0.0.1:<port>/api/settings \
+  -H 'content-type: application/json' \
+  -d '{"parallel_run_cap": ""}'
+```
+
+There is no CLI for writing settings — `refine node settings` only prints them.
+
+Do the same for `parallel_per_node_cap`, `parallel_per_provider_cap`, and
+`parallel_per_target_app_cap` if they were never chosen deliberately; cleared,
+they follow the global limit.
+
+Confirm it took effect by reading back the effective policy:
+
+```bash
+python3 -c "import json;print(json.load(open('$RUNTIME_ROOT/<port>/workflow-automation-state.json'))['policy'])"
+```
+
+Leave a cap in place where it was chosen for a reason — a node sharing hardware
+with something else, or one deliberately limited during an investigation. The
+governor is a default, not a correction.
+
+Expect the effective limit to move in either direction. On a capable host it
+rises well above the seeded value. On a constrained one it can fall below it,
+because the governor leaves a core for the daemon: a two-core node settles at 1.
+
 ## Do not create these by hand
 
 Two node-local files are built on demand. Creating or copying them produces
@@ -153,7 +192,7 @@ state that does not match this node.
 
 Neither is synchronized, and neither should be copied between nodes.
 
-## 6. Start the daemon and verify
+## 7. Start the daemon and verify
 
 ```bash
 ./r daemon start
