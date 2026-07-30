@@ -34,15 +34,82 @@ pub(super) fn remote_first_bootstrap_baseline(
         .collect()
 }
 
+/// Identity of a file as it was when its contents were last hashed.
+///
+/// Size alone is far too weak, and mtime can be preserved across a rewrite, so
+/// the inode change time is included: it advances on any content or metadata
+/// change and cannot be set backwards by a writer. A stale entry here would
+/// make synchronization believe a changed record was untouched, so the guard is
+/// deliberately stricter than a cache would otherwise need.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct HashedFileIdentity {
+    size: u64,
+    modified_unix_ns: Option<i128>,
+    change_unix_ns: Option<i64>,
+}
+
+static STATE_CONTENT_HASHES: OnceLock<Mutex<BTreeMap<PathBuf, (HashedFileIdentity, u64)>>> =
+    OnceLock::new();
+/// Entries retained before the memo is dropped wholesale. It is a pure cache, so
+/// discarding it costs only the next scan and keeps memory bounded on a project
+/// far larger than the working set.
+const STATE_CONTENT_HASH_CAPACITY: usize = 50_000;
+
+fn hashed_file_identity(metadata: &fs::Metadata) -> HashedFileIdentity {
+    #[cfg(unix)]
+    let change_unix_ns = {
+        use std::os::unix::fs::MetadataExt;
+        Some(metadata.ctime().saturating_mul(1_000_000_000) + i64::from(metadata.ctime_nsec() as i32))
+    };
+    #[cfg(not(unix))]
+    let change_unix_ns = None;
+    HashedFileIdentity {
+        size: metadata.len(),
+        modified_unix_ns: metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_nanos() as i128),
+        change_unix_ns,
+    }
+}
+
+/// Content hashes for every durable record under `root`.
+///
+/// Synchronization compares these across worktrees, where modification times
+/// are unrelated, so content is what identity has to be built from — metadata
+/// cannot stand in for it here as it does for projection staleness.
+///
+/// What can be avoided is re-reading files that have not moved. A full scan
+/// otherwise costs the whole project on every sync, and syncs are frequent, so
+/// a node paid to re-read its entire history each time one record changed.
+/// Files whose identity is unchanged reuse their previous hash, leaving the
+/// steady-state cost at one stat per record.
 pub(super) fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableStateMap> {
     if !root.exists() {
         return Ok(BTreeMap::new());
     }
     let mut files = Vec::new();
     collect_durable_state_files(root, root, &mut files)?;
+    let memo = STATE_CONTENT_HASHES.get_or_init(|| Mutex::new(BTreeMap::new()));
+    let mut memo = memo.lock().ok();
+    if let Some(memo) = memo.as_deref_mut()
+        && memo.len() > STATE_CONTENT_HASH_CAPACITY
+    {
+        memo.clear();
+    }
     let mut state = BTreeMap::new();
     for path in files {
         let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+        let identity = fs::metadata(&path).ok().as_ref().map(hashed_file_identity);
+        if let Some(identity) = identity
+            && let Some(memo) = memo.as_deref_mut()
+            && let Some((cached, hash)) = memo.get(&path)
+            && *cached == identity
+        {
+            state.insert(relative, *hash);
+            continue;
+        }
         let bytes = fs::read(&path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read Refine state {}: {error}",
@@ -51,7 +118,17 @@ pub(super) fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableS
         })?;
         let mut hasher = DefaultHasher::new();
         bytes.hash(&mut hasher);
-        state.insert(relative, hasher.finish());
+        let hash = hasher.finish();
+        // Re-stat after reading: a write that landed between the first stat and
+        // the read would otherwise be memoized under the earlier identity and
+        // never observed again.
+        if let Some(memo) = memo.as_deref_mut()
+            && let Some(settled) = fs::metadata(&path).ok().as_ref().map(hashed_file_identity)
+            && Some(settled) == identity
+        {
+            memo.insert(path.clone(), (settled, hash));
+        }
+        state.insert(relative, hash);
     }
     Ok(state)
 }

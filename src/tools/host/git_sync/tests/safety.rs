@@ -91,3 +91,41 @@ fn sync_retires_goal_logs_already_published_to_state() {
         "the live log sidecar must survive as node-local evidence"
     );
 }
+
+// Synchronization compares content hashes across worktrees, so a memo that
+// returned a stale hash would make a changed record look untouched and let one
+// node's edit be silently dropped. Skipping re-reads is only safe if every real
+// change still moves the hash.
+#[test]
+fn reusing_content_hashes_never_masks_a_change() {
+    let root = unique_temp_dir("state-hash-memo");
+    let record = root.join("goals/GO/AL1");
+    fs::create_dir_all(&record).unwrap();
+    let path = record.join("goal.json");
+    fs::write(&path, "{\"id\":\"GOAL1\",\"status\":\"todo\"}\n").unwrap();
+
+    let first = durable_state_map(&root).unwrap();
+    // A second scan with nothing touched must agree with the first; this is the
+    // path that reuses the cached hash.
+    let unchanged = durable_state_map(&root).unwrap();
+    assert_eq!(first, unchanged, "an untouched record changed identity");
+
+    // Same length, different content: the case a size check alone would miss.
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    fs::write(&path, "{\"id\":\"GOAL1\",\"status\":\"done\"}\n").unwrap();
+    let edited = durable_state_map(&root).unwrap();
+    assert_ne!(
+        first[&PathBuf::from("goals/GO/AL1/goal.json")],
+        edited[&PathBuf::from("goals/GO/AL1/goal.json")],
+        "an edited record must not reuse its previous hash"
+    );
+
+    // Restoring the original content restores the original hash: identity
+    // tracks content, not the number of times a file was written.
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    fs::write(&path, "{\"id\":\"GOAL1\",\"status\":\"todo\"}\n").unwrap();
+    let restored = durable_state_map(&root).unwrap();
+    assert_eq!(first, restored);
+
+    fs::remove_dir_all(root).unwrap();
+}
