@@ -1606,6 +1606,10 @@ function handleTerminalPaste(e, terminal = terminalStateFor()) {
   }
   if (!text) return false;
   e.preventDefault();
+  // This listener runs during capture above xterm's textarea. Once the shared
+  // terminal path accepts the paste, keep xterm from processing the same event
+  // through onData and appending the clipboard text to the input buffer again.
+  e.stopPropagation();
   queueTerminalInput(text, terminal);
   return true;
 }
