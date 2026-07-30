@@ -26,6 +26,32 @@ impl FileGitSyncService {
         self.try_sync_with(GitFetchScope::State)
     }
 
+    /// Remove state-worktree files that synchronized state no longer admits and
+    /// report the ones Git still tracks, so the deletion is recorded as a change.
+    ///
+    /// Records published under an exclusion rule that has since widened would
+    /// otherwise stay tracked forever: the copy that refreshes the state
+    /// worktree enumerates through that same exclusion, so it never observes
+    /// them to delete. Asking Git what it tracks is what lets a newly excluded
+    /// path be retired from the branch.
+    pub(super) fn retire_excluded_tracked_state(
+        &self,
+        state_root: &std::path::Path,
+        state_refine: &std::path::Path,
+    ) -> RefineResult<Vec<PathBuf>> {
+        let tracked_excluded = self
+            .git_at_stdout(state_root, &["ls-files", "--", ".refine"])?
+            .lines()
+            .filter_map(|path| path.strip_prefix(".refine/"))
+            .map(PathBuf::from)
+            .filter(|path| is_excluded_from_durable_state(path))
+            .collect::<BTreeSet<_>>();
+        Ok(remove_excluded_state_files(state_refine)?
+            .into_iter()
+            .filter(|path| tracked_excluded.contains(path))
+            .collect())
+    }
+
     pub(super) fn try_sync_with(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
         let lock = repository_git_lock(&self.target_root)?;
         let _guard = match lock.try_lock() {
@@ -144,17 +170,7 @@ impl FileGitSyncService {
             }
         }
 
-        let tracked_transient = self
-            .git_at_stdout(&state_root, &["ls-files", "--", ".refine"])?
-            .lines()
-            .filter_map(|path| path.strip_prefix(".refine/"))
-            .map(PathBuf::from)
-            .filter(|path| is_transient_refine_path(path))
-            .collect::<BTreeSet<_>>();
-        let removed_transient = remove_transient_state_files(&state_refine)?
-            .into_iter()
-            .filter(|path| tracked_transient.contains(path))
-            .collect::<Vec<_>>();
+        let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
         let remote_state = durable_state_map(&state_refine)?;
         let bootstrap_remote_state =
             stored_base.is_none() && remote_exists && bootstrap_only_state(&local);
@@ -180,7 +196,7 @@ impl FileGitSyncService {
         let updated = durable_state_map(&state_refine)?;
         let mut changed = state_change_status(&remote_state, &updated);
         changed.extend(
-            removed_transient
+            removed_excluded
                 .into_iter()
                 .map(|path| format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))),
         );
@@ -220,7 +236,8 @@ impl FileGitSyncService {
                 self.fetch_state_branch(&remote)?;
                 let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
                 self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
-                remove_transient_state_files(&state_refine)?;
+                let retry_removed_excluded =
+                    self.retire_excluded_tracked_state(&state_root, &state_refine)?;
                 let retry_remote_state = durable_state_map(&state_refine)?;
                 // A rejected push means both the remote and the live store may have advanced
                 // since the original reconciliation. Re-evaluate the original observed base
@@ -247,7 +264,13 @@ impl FileGitSyncService {
                     &retry_resolved_paths,
                 )?;
                 let retry_updated = durable_state_map(&state_refine)?;
-                let retry_changed = state_change_status(&retry_remote_state, &retry_updated);
+                let mut retry_changed = state_change_status(&retry_remote_state, &retry_updated);
+                // Both sides of that comparison are enumerated through the
+                // exclusion, so a retired path is invisible to it. Record the
+                // removals explicitly or the reset would silently restore them.
+                retry_changed.extend(retry_removed_excluded.into_iter().map(|path| {
+                    format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))
+                }));
                 committed = !retry_changed.is_empty();
                 if committed {
                     self.git_at_checked(&state_root, &["add", "-f", "-A", "--", ".refine"])?;

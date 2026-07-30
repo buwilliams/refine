@@ -18,7 +18,7 @@ pub(super) fn collect_durable_state_files(
         })?;
         let path = entry.path();
         let relative = path.strip_prefix(root).unwrap_or(&path);
-        if is_runtime_only_refine_path(relative) || is_transient_refine_path(relative) {
+        if is_excluded_from_durable_state(relative) {
             continue;
         }
         let file_type = entry.file_type().map_err(|error| {
@@ -36,16 +36,16 @@ pub(super) fn collect_durable_state_files(
     Ok(())
 }
 
-pub(super) fn remove_transient_state_files(root: &std::path::Path) -> RefineResult<Vec<PathBuf>> {
+pub(super) fn remove_excluded_state_files(root: &std::path::Path) -> RefineResult<Vec<PathBuf>> {
     if !root.exists() {
         return Ok(Vec::new());
     }
     let mut removed = Vec::new();
-    remove_transient_state_files_from(root, root, &mut removed)?;
+    remove_excluded_state_files_from(root, root, &mut removed)?;
     Ok(removed)
 }
 
-pub(super) fn remove_transient_state_files_from(
+pub(super) fn remove_excluded_state_files_from(
     root: &std::path::Path,
     current: &std::path::Path,
     removed: &mut Vec<PathBuf>,
@@ -63,19 +63,11 @@ pub(super) fn remove_transient_state_files_from(
         })?;
         let path = entry.path();
         let relative = path.strip_prefix(root).unwrap_or(&path);
-        if is_transient_refine_path(relative) {
-            match fs::remove_file(&path) {
-                Ok(()) => removed.push(relative.to_path_buf()),
-                Err(error) if error.kind() == ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(RefineError::Io(format!(
-                        "failed to remove transient Refine state {}: {error}",
-                        path.display()
-                    )));
-                }
-            }
-            continue;
-        }
+        // Resolve the entry type before applying the exclusion. Runtime-only
+        // rules match on a leading component, so a directory such as `runtime/`
+        // satisfies the predicate; attempting to unlink it as a file would fail
+        // the whole sync. Directories are descended into instead, which removes
+        // the excluded files they contain.
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(error) if error.kind() == ErrorKind::NotFound => continue,
@@ -87,7 +79,20 @@ pub(super) fn remove_transient_state_files_from(
             }
         };
         if file_type.is_dir() {
-            remove_transient_state_files_from(root, &path, removed)?;
+            remove_excluded_state_files_from(root, &path, removed)?;
+            continue;
+        }
+        if is_excluded_from_durable_state(relative) {
+            match fs::remove_file(&path) {
+                Ok(()) => removed.push(relative.to_path_buf()),
+                Err(error) if error.kind() == ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove excluded Refine state {}: {error}",
+                        path.display()
+                    )));
+                }
+            }
         }
     }
     Ok(())
@@ -103,12 +108,30 @@ pub(super) fn is_transient_refine_path(path: &std::path::Path) -> bool {
 }
 
 pub(super) fn is_runtime_only_refine_path(path: &std::path::Path) -> bool {
-    matches!(
+    if matches!(
         path.components()
             .next()
             .and_then(|component| component.as_os_str().to_str()),
         Some("run" | "runtime" | "logs" | "support-bundles" | "provider-bin")
     ) || path == std::path::Path::new("manage-app.log")
+    {
+        return true;
+    }
+    // Per-Goal log sidecars sit beside the Goal record at
+    // `goals/<shard>/<id>/logs.jsonl`, so the leading-component rule above never
+    // matched them and every node published its agent logs to `refine/state`.
+    // Logs are node-local evidence; only the Goal record and its implementation
+    // report belong in synchronized state.
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    file_name == "logs.jsonl" || file_name.ends_with(".logs.jsonl")
+}
+
+/// Paths that must never appear in synchronized durable state, whether because
+/// they are node-local runtime evidence or in-flight temporary files.
+pub(super) fn is_excluded_from_durable_state(path: &std::path::Path) -> bool {
+    is_runtime_only_refine_path(path) || is_transient_refine_path(path)
 }
 
 pub(super) fn append_output_detail(details: &mut Vec<String>, output: &GitCommandOutput) {
