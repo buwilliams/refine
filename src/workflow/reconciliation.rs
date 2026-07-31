@@ -1,27 +1,51 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
 use std::path::Path;
 
 use fs2::FileExt;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 
+use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_worktrees::FileGitWorktreeService;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::workflow::now_timestamp;
 
 const INTEGRATED_TARGET_RECONCILIATION_LOCK: &str = "refine-reconciliation.lock";
+const INTEGRATED_TARGET_TRANSACTION: &str = "refine-integrated-target-transaction.json";
+const INTEGRATED_TARGET_RECOVERIES: &str = "refine-integrated-target-recoveries.jsonl";
 
-/// A repository-wide lease for quality and settlement against the integrated target.
-///
-/// Already-merged reconciliation deliberately evaluates the shared target worktree and may
-/// revert its merge on failure. A separate lock from the short-lived repository Git lock lets
-/// the lease span supervised Quality while Git operations inside that critical section continue
-/// to use their normal coordination.
-pub(super) struct IntegratedTargetReconciliationLease {
-    file: File,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct IntegratedTargetTransaction {
+    goal_id: String,
+    round_idx: usize,
+    branch: String,
+    commit: String,
+    started_at: String,
 }
 
-impl IntegratedTargetReconciliationLease {
-    pub(super) fn acquire(target_root: &Path) -> RefineResult<Self> {
-        let path = FileGitWorktreeService::new(target_root)
-            .git_path(INTEGRATED_TARGET_RECONCILIATION_LOCK)?;
+/// A repository-wide lease for integration, build, Quality, and settlement against the shared
+/// target checkout.
+///
+/// A separate lock from the short-lived repository Git lock lets one Goal own the checkout across
+/// supervised operations while Git commands inside the lane retain normal coordination. The
+/// durable transaction marker proves ownership of residue after a process interruption: a later
+/// owner quarantines that residue before starting instead of failing an unrelated Goal.
+pub(super) struct IntegratedTargetWorkflowLease {
+    file: File,
+    target_root: std::path::PathBuf,
+    marker_path: std::path::PathBuf,
+    finished: bool,
+}
+
+impl IntegratedTargetWorkflowLease {
+    pub(super) fn acquire(
+        target_root: &Path,
+        goal_id: &str,
+        round_idx: usize,
+    ) -> RefineResult<Self> {
+        let git = FileGitWorktreeService::new(target_root);
+        let path = git.git_path(INTEGRATED_TARGET_RECONCILIATION_LOCK)?;
         let file = OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -40,12 +64,269 @@ impl IntegratedTargetReconciliationLease {
                 target_root.display()
             ))
         })?;
-        Ok(Self { file })
+        let marker_path = git.git_path(INTEGRATED_TARGET_TRANSACTION)?;
+        recover_interrupted_transaction(&git, &marker_path, goal_id, round_idx)?;
+        let status = git.inspect(target_root.to_str().unwrap_or(""))?;
+        if status.dirty_user_changes {
+            return Err(RefineError::Conflict(format!(
+                "integrated-target workflow lane found an unattributed dirty index or worktree at {}; user work was preserved",
+                target_root.display()
+            )));
+        }
+        let head = git.head_ref()?;
+        let transaction = IntegratedTargetTransaction {
+            goal_id: goal_id.to_string(),
+            round_idx,
+            branch: head.branch.unwrap_or_default(),
+            commit: head.commit.unwrap_or_default(),
+            started_at: now_timestamp(),
+        };
+        let encoded = serde_json::to_vec_pretty(&transaction).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode integrated-target transaction: {error}"
+            ))
+        })?;
+        write_json_atomically(&marker_path, &encoded, "integrated-target transaction")?;
+        Ok(Self {
+            file,
+            target_root: target_root.to_path_buf(),
+            marker_path,
+            finished: false,
+        })
+    }
+
+    pub(super) fn finish(&mut self) -> RefineResult<()> {
+        if self.finished {
+            return Ok(());
+        }
+        let git = FileGitWorktreeService::new(&self.target_root);
+        let status = git.inspect(self.target_root.to_str().unwrap_or(""))?;
+        if status.dirty_user_changes {
+            return Err(RefineError::Conflict(format!(
+                "integrated-target workflow left a dirty index or worktree at {}; residue remains attributed to the owning Goal for recovery",
+                self.target_root.display()
+            )));
+        }
+        remove_marker(&self.marker_path)?;
+        self.finished = true;
+        Ok(())
+    }
+
+    pub(super) fn finish_if_clean(&mut self) {
+        let _ = self.finish();
     }
 }
 
-impl Drop for IntegratedTargetReconciliationLease {
+impl Drop for IntegratedTargetWorkflowLease {
     fn drop(&mut self) {
         let _ = FileExt::unlock(&self.file);
+    }
+}
+
+fn recover_interrupted_transaction(
+    git: &FileGitWorktreeService,
+    marker_path: &Path,
+    next_goal_id: &str,
+    next_round_idx: usize,
+) -> RefineResult<()> {
+    let Some(bytes) = fs::read(marker_path)
+        .map(Some)
+        .or_else(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Ok(None)
+            } else {
+                Err(error)
+            }
+        })
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read integrated-target transaction {}: {error}",
+                marker_path.display()
+            ))
+        })?
+    else {
+        return Ok(());
+    };
+    let interrupted: IntegratedTargetTransaction =
+        serde_json::from_slice(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "invalid integrated-target transaction {}: {error}; checkout was preserved",
+                marker_path.display()
+            ))
+        })?;
+    let status = git.inspect("")?;
+    let stash_commit = if status.dirty_user_changes {
+        git.quarantine_worktree_changes(&format!(
+            "Refine quarantined interrupted integrated-target residue from Goal {} round {}",
+            interrupted.goal_id,
+            interrupted.round_idx + 1
+        ))?
+    } else {
+        None
+    };
+    let recoveries_path = git.git_path(INTEGRATED_TARGET_RECOVERIES)?;
+    if let Some(parent) = recoveries_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create integrated-target recovery directory {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let mut recoveries = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&recoveries_path)
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to open integrated-target recovery log {}: {error}",
+                recoveries_path.display()
+            ))
+        })?;
+    let event = json!({
+        "recovered_at": now_timestamp(),
+        "interrupted": interrupted,
+        "stash_commit": stash_commit,
+        "next_owner": {"goal_id": next_goal_id, "round_idx": next_round_idx}
+    });
+    serde_json::to_writer(&mut recoveries, &event).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode integrated-target recovery event: {error}"
+        ))
+    })?;
+    recoveries.write_all(b"\n").map_err(|error| {
+        RefineError::Io(format!(
+            "failed to append integrated-target recovery log {}: {error}",
+            recoveries_path.display()
+        ))
+    })?;
+    recoveries.sync_all().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to synchronize integrated-target recovery log {}: {error}",
+            recoveries_path.display()
+        ))
+    })?;
+    remove_marker(marker_path)
+}
+
+fn remove_marker(marker_path: &Path) -> RefineResult<()> {
+    match fs::remove_file(marker_path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(RefineError::Io(format!(
+            "failed to remove integrated-target transaction {}: {error}",
+            marker_path.display()
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use serde_json::Value;
+
+    use super::*;
+
+    fn repository(label: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "refine-integrated-target-{label}-{}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        for args in [
+            vec!["init", "-q", "-b", "main"],
+            vec!["config", "user.email", "refine-test@example.invalid"],
+            vec!["config", "user.name", "Refine Test"],
+        ] {
+            assert!(
+                Command::new("git")
+                    .arg("-C")
+                    .arg(&root)
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        fs::write(root.join("app.txt"), "base\n").unwrap();
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&root)
+                .args(["add", "app.txt"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&root)
+                .args(["commit", "-q", "-m", "base"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        root
+    }
+
+    #[test]
+    fn completed_integrated_target_lane_removes_its_transaction_marker() {
+        let root = repository("finish");
+        let marker = FileGitWorktreeService::new(&root)
+            .git_path(INTEGRATED_TARGET_TRANSACTION)
+            .unwrap();
+        let mut lane = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+        assert!(marker.exists());
+
+        lane.finish().unwrap();
+
+        assert!(!marker.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn next_lane_quarantines_residue_owned_by_an_interrupted_goal() {
+        let root = repository("recovery");
+        let git = FileGitWorktreeService::new(&root);
+        let recoveries = git.git_path(INTEGRATED_TARGET_RECOVERIES).unwrap();
+        {
+            let _interrupted = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+            fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
+            assert!(
+                Command::new("git")
+                    .arg("-C")
+                    .arg(&root)
+                    .args(["add", "app.txt"])
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        let status = git.inspect("").unwrap();
+        assert!(!status.dirty_user_changes);
+        let event: Value = serde_json::from_str(
+            fs::read_to_string(&recoveries)
+                .unwrap()
+                .lines()
+                .last()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(event["interrupted"]["goal_id"], "GOAL1");
+        assert_eq!(event["next_owner"]["goal_id"], "GOAL2");
+        assert!(event["stash_commit"].as_str().is_some());
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
     }
 }

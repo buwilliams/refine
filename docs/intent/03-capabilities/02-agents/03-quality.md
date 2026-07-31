@@ -22,7 +22,7 @@ Quality should sit between implementation and trust. Every committed Goal candid
 Current implementation details that matter to intent:
 
 - each configured plain-text test should receive exactly one pass or fail result;
-- the Quality agent should choose one non-interactive command for each test, and a pass without a correlated observed execution should fail;
+- the Quality agent should choose one non-interactive command for each test whose final status is `0` if and only if that test passes; expected-empty predicates must invert or compare tools such as `grep` so a successful no-match cannot surface as exit `1`, and a pass without a correlated observed execution should fail;
 - the provider and test commands should be correlated with one durable operation ID, and process registration should share the cancellation barrier so no work can launch after cancellation wins;
 - manual and workflow evaluation of the same Goal candidate should share one exclusive operation owner and identical Goal-round evidence;
 - manual evaluation should validate active Node ownership and reserve the same Node, provider, target-app, and global agent capacity used by workflow;

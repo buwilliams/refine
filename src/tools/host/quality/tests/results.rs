@@ -201,6 +201,60 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
 }
 
 #[test]
+fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
+    let temp_root = unique_temp_dir("quality-no-match-pass");
+    let candidate_root = temp_root.join("candidate");
+    let refine_dir = temp_root.join("state");
+    let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"No forbidden warning is emitted\",\"status\":\"passed\",\"evidence\":\"no match is the passing predicate\",\"command\":\"! grep -q forbidden candidate.txt\"}]}'\n",
+    )
+    .unwrap();
+    make_executable(&smoke_ai);
+    let candidate_commit = init_git_candidate(&candidate_root);
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
+    service
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["No forbidden warning is emitted".to_string()]),
+            ..QualitySettingsPatch::default()
+        })
+        .unwrap();
+
+    let result = service
+        .run_checks(QualityCheckRequest {
+            owner_id: "GOAL1".to_string(),
+            round_idx: 0,
+            node_id: "default".to_string(),
+            provider: "smoke-ai".to_string(),
+            cwd: candidate_root.display().to_string(),
+            source_candidate_commit: Some(candidate_commit.clone()),
+            evaluation_scope: "isolated_candidate".to_string(),
+            candidate_commit,
+            process_metadata: quality_operation_metadata(&runtime_root),
+        })
+        .unwrap();
+
+    assert!(result.ok, "{result:#?}");
+    assert_eq!(result.results[0].status, "passed");
+    assert_eq!(result.results[0].exit_code, Some(0));
+    assert!(
+        result.results[0]
+            .evidence
+            .contains("no match is the passing predicate")
+    );
+    restore_smoke_ai(previous);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn quality_detects_candidate_mutation_and_preserves_it() {
     let temp_root = unique_temp_dir("quality-candidate-mutation");
     let candidate_root = temp_root.join("candidate");

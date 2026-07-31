@@ -38,7 +38,7 @@ pub(super) fn run_workflow_worker(
                 }
             }
             if recovered_root.as_ref() != Some(&root) {
-                match workflow.fail_interrupted_goals(
+                match workflow.recover_interrupted_goals(
                     "workflow runner stopped before the Goal completed; restart the Goal when ready",
                 ) {
                     Ok(count) if count > 0 => {

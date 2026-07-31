@@ -934,7 +934,14 @@ Requirements:
   explicitly replaces them.
 - The agent proposes one command per exact test. A pass is accepted only when the
   same command ran as an observed supervised Quality process and exited
-  successfully; process ID, exit code, and output evidence are persisted.
+  successfully; the prompt requires exit `0` if and only if the test passes, so
+  expected-empty grep predicates must invert or compare the no-match result;
+  process ID, exit code, and output evidence are persisted.
+- Ready Merge, Build, and post-build Quality share one durable single-writer
+  integrated-target lane. Interrupted tracked residue is attributed and
+  quarantined from its clean-start transaction marker before a successor runs;
+  unattributed dirty work remains preserved. Ready Merge, Build, and QA statuses
+  remain resumable checkpoints across runner restart.
 - Evaluation requires the recorded candidate commit to equal worktree HEAD and a
   clean index and worktree before and after checks. Mismatches fail visibly and
   are never reset or cleaned.

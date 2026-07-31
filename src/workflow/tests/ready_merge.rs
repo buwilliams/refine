@@ -597,7 +597,7 @@ fn parallel_already_merged_reconciliations_serialize_shared_target_quality() {
                 .unwrap()
                 .iter()
                 .any(|log| log["message"].as_str()
-                    == Some("Acquired exclusive integrated-target reconciliation lease"))
+                    == Some("Acquired exclusive integrated-target workflow lane"))
         );
     }
     assert!(!collision.exists());
@@ -764,7 +764,7 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
     assert!(
         error
             .to_string()
-            .contains("dirty candidate index or worktree")
+            .contains("unattributed dirty index or worktree")
     );
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
@@ -780,7 +780,7 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
         detail["rounds"][0]["workflow_reconciliation"]["state"],
         "detected"
     );
-    assert_eq!(detail["rounds"][0]["quality_state"], "failed");
+    assert_eq!(detail["rounds"][0]["quality_state"], "unclassified");
     assert!(
         detail["rounds"][0]["logs"]
             .as_array()
@@ -788,7 +788,7 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
             .iter()
             .any(|log| log["message"]
                 .as_str()
-                .is_some_and(|message| message.contains("Goal status were preserved")))
+                .is_some_and(|message| message.contains("Goal status was preserved")))
     );
 
     fs::remove_file(target_root.join("operator.txt")).unwrap();
@@ -911,6 +911,200 @@ fn file_automation_resumes_supported_ready_merge_retry_without_rerunning_impleme
 
     fs::remove_dir_all(&worktree_path).ok();
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn parallel_post_build_goals_serialize_the_entire_integrated_target_lane() {
+    let temp_root = unique_temp_dir("parallel-post-build-lane");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&target_root).unwrap();
+    fs::create_dir_all(&runtime_root).unwrap();
+    fs::write(target_root.join("app.py"), "base\n").unwrap();
+    git(&target_root, &["init", "-q", "-b", "main"]).unwrap();
+    git(
+        &target_root,
+        &["config", "user.email", "refine-test@example.invalid"],
+    )
+    .unwrap();
+    git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+    git(&target_root, &["add", "app.py"]).unwrap();
+    git(&target_root, &["commit", "-q", "-m", "base"]).unwrap();
+    let base_commit = git_stdout(&target_root, &["rev-parse", "HEAD"])
+        .unwrap()
+        .trim()
+        .to_string();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    let mut worktrees = Vec::new();
+    for (goal_id, feature) in [("GOAL1", "one"), ("GOAL2", "two")] {
+        let branch = format!("refine/{goal_id}/round-1");
+        let worktree = target_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
+        fs::create_dir_all(worktree.parent().unwrap()).unwrap();
+        git(
+            &target_root,
+            &["worktree", "add", "-b", &branch, worktree.to_str().unwrap()],
+        )
+        .unwrap();
+        let feature_path = format!("feature-{feature}.txt");
+        fs::write(worktree.join(&feature_path), format!("{feature}\n")).unwrap();
+        git(&worktree, &["add", &feature_path]).unwrap();
+        git(&worktree, &["commit", "-q", "-m", feature]).unwrap();
+        let candidate = git_stdout(&worktree, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+
+        work_items
+            .create_goal_summary(feature, Some(goal_id))
+            .unwrap();
+        work_items
+            .append_goal_round_summary(goal_id, "Reporter", "Prompt")
+            .unwrap();
+        work_items
+            .update_latest_goal_round_implementation_report(goal_id, "Implementation completed")
+            .unwrap();
+        work_items
+            .transition_goal_status(goal_id, GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::InProgress)
+            .unwrap();
+        work_items
+            .update_goal_git_refs(goal_id, &branch, "main", &base_commit, Some(&candidate))
+            .unwrap();
+        work_items
+            .update_goal_round_evaluation_summary(
+                goal_id,
+                0,
+                &json!({
+                    "workflow_quality_timing": "post_build",
+                    "workflow_git_remote": "origin"
+                }),
+            )
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::ReadyMerge)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::Failed)
+            .unwrap();
+        work_items.retry_goal_merge_summary(goal_id).unwrap();
+        worktrees.push(worktree);
+    }
+
+    let collision = runtime_root.join("build-collision");
+    let active = runtime_root.join("build-active");
+    let build = runtime_root.join("exclusive-build");
+    fs::write(
+        &build,
+        format!(
+            "#!/bin/sh\nif mkdir '{}' 2>/dev/null; then\n  trap 'rmdir \"{}\" 2>/dev/null' EXIT\n  attempt=0\n  while [ ! -f '{}' ] && [ \"$attempt\" -lt 100 ]; do\n    sleep 0.01\n    attempt=$((attempt + 1))\n  done\n  exit 0\nfi\ntouch '{}'\nexit 1\n",
+            active.display(),
+            active.display(),
+            collision.display(),
+            collision.display()
+        ),
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&build).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&build, permissions).unwrap();
+    }
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({
+            "target_app_build_command": build.display().to_string(),
+            "parallel_run_cap": 2,
+            "parallel_per_node_cap": 2,
+            "parallel_per_provider_cap": 2,
+            "parallel_per_target_app_cap": 2
+        }))
+        .unwrap();
+
+    let result = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap();
+
+    assert_eq!(result.steps.len(), 2);
+    assert!(!collision.exists());
+    for goal_id in ["GOAL1", "GOAL2"] {
+        assert_eq!(
+            work_items.show_goal_summary(goal_id).unwrap().goal.status,
+            GoalStatus::Review
+        );
+        let detail = work_items.show_goal_detail(goal_id).unwrap();
+        assert_eq!(
+            detail["rounds"][0]["quality_details"]["evaluation_scope"],
+            "integrated_target"
+        );
+        assert!(
+            detail["rounds"][0]["logs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|log| log["message"] == "Acquired exclusive integrated-target workflow lane")
+        );
+    }
+    assert!(target_root.join("feature-one.txt").exists());
+    assert!(target_root.join("feature-two.txt").exists());
+
+    for worktree in worktrees {
+        fs::remove_dir_all(worktree).ok();
+    }
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn build_mutation_is_failed_and_attributed_before_review() {
+    let (temp_root, target_root, worktree_path, work_items, _) =
+        ready_merge_goal_with_advanced_target("build-mutation-attribution", true);
+    let runtime_root = reconciliation_runtime_root(&temp_root);
+    fs::create_dir_all(&runtime_root).unwrap();
+    let build = runtime_root.join("mutating-build");
+    fs::write(
+        &build,
+        "#!/bin/sh\nprintf 'build mutation\\n' >> app.py\ngit add app.py\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&build).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&build, permissions).unwrap();
+    }
+    FileSettingsService::new(test_refine_dir(&target_root))
+        .update(&json!({"target_app_build_command": build.display().to_string()}))
+        .unwrap();
+
+    let error = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .evaluate_workflow()
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("integrated-target after build found a dirty")
+    );
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Failed
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("app.py")).unwrap(),
+        "base\nbuild mutation\n"
+    );
+    let marker = crate::tools::host::git_worktrees::FileGitWorktreeService::new(&target_root)
+        .git_path("refine-integrated-target-transaction.json")
+        .unwrap();
+    assert!(marker.exists());
+
+    fs::remove_dir_all(worktree_path).ok();
+    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(runtime_root).unwrap();
 }
 
 #[test]

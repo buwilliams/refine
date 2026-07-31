@@ -22,8 +22,8 @@ use crate::workflow::promotion::BacklogPromotionService;
 use super::{
     ClaimLoad, ClaimMetadata, WorkflowAutomation, WorkflowAutomationState, WorkflowClaim,
     WorkflowClaimState, WorkflowEngine, WorkflowPolicy, default_node_id, ensure_workflow_round,
-    json_object, now_timestamp, priority_rank, setting_cap_with_default_values,
-    setting_string, setting_usize,
+    json_object, now_timestamp, priority_rank, setting_cap_with_default_values, setting_string,
+    setting_usize,
 };
 
 impl WorkflowEngine {
@@ -130,16 +130,16 @@ impl WorkflowEngine {
         FileProcessSupervisor::new(&self.runtime_root).set_workflow_paused(paused)
     }
 
-    pub fn fail_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
+    pub fn recover_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
         if let Some(target_root) = &self.target_root {
             return with_repository_git_lock(target_root, || {
-                self.fail_interrupted_goals_locked(detail)
+                self.recover_interrupted_goals_locked(detail)
             });
         }
-        self.fail_interrupted_goals_locked(detail)
+        self.recover_interrupted_goals_locked(detail)
     }
 
-    pub(super) fn fail_interrupted_goals_locked(&self, detail: &str) -> RefineResult<usize> {
+    pub(super) fn recover_interrupted_goals_locked(&self, detail: &str) -> RefineResult<usize> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
         };
@@ -148,7 +148,7 @@ impl WorkflowEngine {
         // project.
         let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
-        let goal_ids = active
+        let active_goals = active
             .goals()
             .filter(|goal| {
                 matches!(
@@ -160,9 +160,9 @@ impl WorkflowEngine {
                 )
             })
             .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == active_node_id)
-            .map(|goal| goal.id.clone())
+            .cloned()
             .collect::<Vec<_>>();
-        if goal_ids.is_empty() {
+        if active_goals.is_empty() {
             return Ok(0);
         }
 
@@ -174,26 +174,51 @@ impl WorkflowEngine {
         };
         let work_items = FileWorkItemService::new(&refine_dir);
         let logs = FileLogService::new(&refine_dir);
-        for goal_id in &goal_ids {
-            work_items.advance_automated_goal_status(goal_id, GoalStatus::Failed)?;
-            let round_idx = ensure_workflow_round(&work_items, goal_id)?;
+        for goal in &active_goals {
+            let checkpointed = matches!(
+                goal.status,
+                GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+            );
+            if !checkpointed {
+                // In-progress may be between arbitrary provider and Git effects, so it cannot be
+                // resumed without a durable stage boundary. Fail it with a causal event rather
+                // than silently guessing. Later stages are explicit idempotent checkpoints and
+                // remain eligible for the scheduler's normal automatic resume.
+                work_items.advance_automated_goal_status(&goal.id, GoalStatus::Failed)?;
+            }
+            let round_idx = ensure_workflow_round(&work_items, &goal.id)?;
             logs.append_round_log(
-                goal_id,
+                &goal.id,
                 round_idx,
                 LogEntry {
                     datetime: now_timestamp(),
-                    severity: "error".to_string(),
+                    severity: if checkpointed { "warning" } else { "error" }.to_string(),
                     category: "workflow".to_string(),
-                    message: format!("Workflow interrupted: {detail}"),
-                    details: Some(json_object(json!({"reason": detail}))),
+                    message: if checkpointed {
+                        format!(
+                            "Workflow interrupted at durable {} checkpoint; automatic resume retained: {detail}",
+                            goal.status.as_str()
+                        )
+                    } else {
+                        format!("Workflow interrupted during in-progress work: {detail}")
+                    },
+                    details: Some(json_object(json!({
+                        "reason": detail,
+                        "checkpoint": goal.status.as_str(),
+                        "automatic_resume": checkpointed
+                    }))),
                     actions: Vec::new(),
                     actor: Some("refine".to_string()),
-                    goal_id: Some(goal_id.clone()),
+                    goal_id: Some(goal.id.clone()),
                 },
             )?;
         }
+        let goal_ids = active_goals
+            .iter()
+            .map(|goal| goal.id.clone())
+            .collect::<Vec<_>>();
         self.interrupt_active_claims(&goal_ids)?;
-        Ok(goal_ids.len())
+        Ok(active_goals.len())
     }
 
     pub(super) fn signal_workflow_subprocesses(
@@ -483,7 +508,9 @@ impl WorkflowEngine {
             .and_then(|goal| goal.node_id.clone())
             .unwrap_or_else(default_node_id);
         if node_id != policy.active_node_id {
-            let goal_id = goal.map(|goal| goal.id.as_str()).unwrap_or("requested Goal");
+            let goal_id = goal
+                .map(|goal| goal.id.as_str())
+                .unwrap_or("requested Goal");
             return Err(RefineError::Conflict(format!(
                 "{goal_id} is owned by node {node_id}, not active node {}",
                 policy.active_node_id
@@ -495,7 +522,6 @@ impl WorkflowEngine {
             target_app_id: policy.target_app_id.clone(),
         })
     }
-
 }
 
 /// A Goal past implementation no longer holds its Feature's ordering queue.

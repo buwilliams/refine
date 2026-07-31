@@ -220,6 +220,14 @@ mod tests {
     }
 
     #[test]
+    fn quality_commands_must_encode_pass_semantics_in_their_exit_status() {
+        let loaded = PromptEngine::load(PromptTemplate::PostImplementationQuality);
+
+        assert!(loaded.contains("exit 0 iff the test passes"));
+        assert!(loaded.contains("never return grep's no-match exit 1 for a pass"));
+    }
+
+    #[test]
     fn agent_prompts_keep_only_task_specific_contracts() {
         let templates = [
             PromptTemplate::Chat,

@@ -713,7 +713,7 @@ fn file_automation_recovery_fails_interrupted_goals_for_restart() {
 
     assert_eq!(
         automation
-            .fail_interrupted_goals("runner terminated")
+            .recover_interrupted_goals("runner terminated")
             .unwrap(),
         1
     );
@@ -729,7 +729,12 @@ fn file_automation_recovery_fails_interrupted_goals_for_restart() {
         .all_round_logs("GOAL1")
         .unwrap();
     assert!(logs.iter().any(|entry| {
-        entry.entry.severity == "error" && entry.entry.message.contains("runner terminated")
+        entry.entry.severity == "error"
+            && entry
+                .entry
+                .message
+                .contains("interrupted during in-progress work")
+            && entry.entry.message.contains("runner terminated")
     }));
 
     work_items
@@ -739,6 +744,69 @@ fn file_automation_recovery_fails_interrupted_goals_for_restart() {
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
         GoalStatus::Todo
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn restart_retains_ready_merge_checkpoint_for_automatic_resume() {
+    let temp_root = unique_temp_dir("automation-checkpoint-recovery");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Checkpointed work", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    let claim_id = automation.claim("GOAL1").unwrap();
+    automation.start_claim(&claim_id).unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .unwrap();
+
+    assert_eq!(
+        automation
+            .recover_interrupted_goals("runner terminated")
+            .unwrap(),
+        1
+    );
+
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::ReadyMerge
+    );
+    assert_eq!(
+        automation.load_state().unwrap().claims[0].state,
+        WorkflowClaimState::Interrupted
+    );
+    assert_eq!(automation.promote().unwrap(), 1);
+    let resumed = automation.load_state().unwrap();
+    assert!(
+        resumed.claims.iter().any(|claim| {
+            claim.goal_id == "GOAL1" && claim.state == WorkflowClaimState::Claimed
+        })
+    );
+    let logs = FileLogService::new(&refine_dir)
+        .all_round_logs("GOAL1")
+        .unwrap();
+    assert!(logs.iter().any(|entry| {
+        entry.entry.severity == "warning"
+            && entry
+                .entry
+                .message
+                .contains("durable ready-merge checkpoint")
+            && entry.entry.message.contains("automatic resume retained")
+    }));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

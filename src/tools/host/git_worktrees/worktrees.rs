@@ -75,6 +75,35 @@ impl FileGitWorktreeService {
             .collect())
     }
 
+    /// Preserve tracked work left in a Refine-owned shared checkout, then return
+    /// the exact stash commit that quarantines it. Callers must establish ownership before using
+    /// this: the Git capability intentionally does not guess whether dirty work belongs to Refine.
+    pub fn quarantine_worktree_changes(&self, message: &str) -> RefineResult<Option<String>> {
+        if self.is_clean()? {
+            return Ok(None);
+        }
+        if message.trim().is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Git quarantine message is required".to_string(),
+            ));
+        }
+        let previous = self.resolve_commit("refs/stash").ok();
+        self.git_output(&["stash", "push", "-m", message])?;
+        let commit = self.resolve_commit("refs/stash")?;
+        if previous.as_deref() == Some(commit.as_str()) {
+            return Err(RefineError::Conflict(
+                "dirty integrated-target worktree had no tracked changes to quarantine; untracked work was preserved"
+                    .to_string(),
+            ));
+        }
+        self.audit(
+            "worktree_quarantine",
+            "ok",
+            json!({"message": message, "stash_commit": commit}),
+        )?;
+        Ok(Some(commit))
+    }
+
     pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
         let target = path.to_str().unwrap_or("");
         if target.trim().is_empty() {

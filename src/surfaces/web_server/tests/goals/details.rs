@@ -231,6 +231,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
     git(&temp_root, &["init", "-q"]).unwrap();
+    fs::write(temp_root.join(".git/info/exclude"), "smoke-ai\n").unwrap();
     git(
         &temp_root,
         &["config", "user.email", "refine-test@example.invalid"],

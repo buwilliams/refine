@@ -14,7 +14,6 @@ use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
-use crate::workflow::reconciliation::IntegratedTargetReconciliationLease;
 use crate::workflow::{
     GovernanceEvaluation, agent_worktree_cwd, goal_agent_prompt, implementation_branch_name,
     json_object, now_timestamp, parse_governance_provider_output,
@@ -539,17 +538,6 @@ impl WorkflowBehavior for WorkflowQa {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        let _reconciliation_lease = if ctx.reconciliation.is_some() {
-            let lease = IntegratedTargetReconciliationLease::acquire(ctx.target_root)?;
-            ctx.log(
-                "reconcile",
-                "Acquired exclusive integrated-target reconciliation lease",
-                None,
-            )?;
-            Some(lease)
-        } else {
-            None
-        };
         let quality = match run_workflow_quality(ctx) {
             Ok(result) => result,
             Err(error) if ctx.reconciliation.is_some() => {
@@ -831,6 +819,9 @@ impl WorkflowBehavior for WorkflowBuild {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        if let Err(error) = verify_integrated_target_checkout(ctx, "before build") {
+            return fail(ctx, "build", error);
+        }
         let target_app =
             FileTargetAppService::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
         let build = match target_app
@@ -848,6 +839,9 @@ impl WorkflowBehavior for WorkflowBuild {
             }
             Err(error) => return fail(ctx, "build", error),
         };
+        if let Err(error) = verify_integrated_target_checkout(ctx, "after build") {
+            return fail(ctx, "build", error);
+        }
         let skipped = build.last_operation.is_none();
         ctx.log(
             "build",
@@ -878,6 +872,42 @@ impl WorkflowBehavior for WorkflowBuild {
             },
         })
     }
+}
+
+fn verify_integrated_target_checkout(ctx: &WorkflowContext<'_>, phase: &str) -> RefineResult<()> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let expected_commit = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+        .and_then(|round| round.get("workflow_integration"))
+        .and_then(|integration| integration.get("target_commit"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|commit| !commit.is_empty())
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {} has no integrated target commit for {phase}",
+                ctx.goal_id
+            ))
+        })?;
+    let git = FileGitWorktreeService::new(ctx.target_root);
+    let head = git.head_ref()?;
+    if head.commit.as_deref() != Some(expected_commit) {
+        return Err(RefineError::Conflict(format!(
+            "integrated-target {phase} found HEAD {}, expected {expected_commit}; checkout was preserved",
+            head.commit.as_deref().unwrap_or("<unborn>")
+        )));
+    }
+    let status = git.inspect("")?;
+    if status.dirty_user_changes {
+        return Err(RefineError::Conflict(format!(
+            "integrated-target {phase} found a dirty index or worktree at {}; residue remains attributed to Goal {}",
+            ctx.target_root.display(),
+            ctx.goal_id
+        )));
+    }
+    Ok(())
 }
 
 impl WorkflowBehavior for WorkflowReview {

@@ -5,6 +5,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
+use crate::tools::host::quality::POST_BUILD;
 use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
@@ -12,6 +13,7 @@ use crate::workflow::behaviors::{
     WorkflowReview, WorkflowTodo,
 };
 use crate::workflow::context::WorkflowContext;
+use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
 use super::{
     ACTIVE_WORK_REPLENISH_INTERVAL, AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation,
@@ -338,7 +340,35 @@ impl WorkflowEngine {
         let done = WorkflowDone;
         let behaviors: [&dyn WorkflowBehavior; 6] =
             [&implementation, &ready_merge, &build, &qa, &review, &done];
+        let mut integrated_target_lane = None;
         loop {
+            if integrated_target_lane.is_none()
+                && workflow_status_uses_integrated_target(ctx, &current)?
+            {
+                let lane = match IntegratedTargetWorkflowLease::acquire(
+                    ctx.target_root,
+                    &ctx.goal_id,
+                    ctx.round_idx,
+                ) {
+                    Ok(lane) => lane,
+                    Err(error) => {
+                        ctx.log(
+                            "workflow",
+                            "Integrated-target workflow lane could not start; Goal status was preserved",
+                            Some(crate::workflow::json_object(serde_json::json!({
+                                "error": error.to_string()
+                            }))),
+                        )?;
+                        return Err(error);
+                    }
+                };
+                ctx.log(
+                    "workflow",
+                    "Acquired exclusive integrated-target workflow lane",
+                    None,
+                )?;
+                integrated_target_lane = Some(lane);
+            }
             let Some(behavior) = behaviors
                 .iter()
                 .copied()
@@ -349,14 +379,31 @@ impl WorkflowEngine {
                     current.as_str()
                 )));
             };
-            match behavior.advance(ctx)? {
+            let outcome = match behavior.advance(ctx) {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    if let Some(lane) = integrated_target_lane.as_mut() {
+                        lane.finish_if_clean();
+                    }
+                    return Err(error);
+                }
+            };
+            match outcome {
                 WorkflowAdvanceOutcome::Transition { to, .. } => {
                     current = to;
                 }
-                WorkflowAdvanceOutcome::Completed { .. } => return Ok(()),
+                WorkflowAdvanceOutcome::Completed { .. } => {
+                    if let Some(lane) = integrated_target_lane.as_mut() {
+                        lane.finish()?;
+                    }
+                    return Ok(());
+                }
                 WorkflowAdvanceOutcome::Noop { reason }
                 | WorkflowAdvanceOutcome::Blocked { reason }
                 | WorkflowAdvanceOutcome::Failed { reason } => {
+                    if let Some(lane) = integrated_target_lane.as_mut() {
+                        lane.finish_if_clean();
+                    }
                     return Err(RefineError::Conflict(reason));
                 }
             }
@@ -497,5 +544,17 @@ impl WorkflowEngine {
             }
         }
         Ok(())
+    }
+}
+
+fn workflow_status_uses_integrated_target(
+    ctx: &mut WorkflowContext<'_>,
+    status: &GoalStatus,
+) -> RefineResult<bool> {
+    match status {
+        GoalStatus::ReadyMerge | GoalStatus::Build => Ok(true),
+        GoalStatus::Qa if ctx.reconciliation.is_some() => Ok(true),
+        GoalStatus::Qa => Ok(ctx.quality_timing(GoalStatus::Qa)? == POST_BUILD),
+        _ => Ok(false),
     }
 }

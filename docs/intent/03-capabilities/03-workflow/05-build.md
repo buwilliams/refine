@@ -21,10 +21,11 @@ Build should not be hardcoded to one ecosystem. Different target apps may need d
 When a Goal is in build:
 
 - Refine first requires durable Ready Merge integration evidence.
+- Refine verifies the shared checkout is at the recorded integration commit and clean before and after build while the Goal owns the integrated-target workflow lane.
 - Refine uses target-app configuration to determine whether rebuild instructions or equivalent preparation guidance exists.
 - If build instructions exist, Refine asks the configured agent to perform the build work through the shared lifecycle capability.
 - Agent output, check context, output paths, status, and timing become evidence.
-- A successful build moves the Goal toward QA or review.
+- A successful build moves the Goal toward QA or review only if it did not mutate the tracked target checkout.
 - A failed build should preserve actionable output and route the Goal to failed, retry, or a new implementation round.
 - If no rebuild step applies, workflow records an explicit successful skip and continues according to the round's pinned Quality timing.
 

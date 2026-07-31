@@ -23,11 +23,14 @@ When a Goal is ready-merge:
 - Refine has a reviewable change, usually in a branch or worktree.
 - The Goal should point to changed files, commits or diff context, agent output, logs, and source evidence.
 - Refine integrates the exact candidate under the repository coordination boundary after any configured pre-merge Quality checks.
+- Ready Merge, rebuild, and post-build Quality hold one exclusive integrated-target workflow lane through review handoff. Concurrent Goals may implement in parallel but cannot interleave effects on the shared target checkout.
 - Successful merge and push evidence is durable before the Goal advances. A retry or restart proves existing integration instead of merging or pushing the candidate twice.
+- A durable lane marker attributes residue after interruption. The next owner quarantines tracked residue only when the marker proves the checkout was clean at handoff; unattributed user work remains preserved and blocks mutation.
 - Rebuild runs against the integrated target checkout when configured; otherwise Refine records an explicit skip.
 - Post-build Quality runs against the exact integrated target commit after rebuild, so review reflects the composed target app rather than only an isolated candidate.
 - Users and agents can inspect the change without losing the Goal's original intent.
 - Conflicts, stale candidates, ownership or revision races, and push failures preserve the candidate and evidence and use the failed/retry path rather than advancing.
+- Runner restart retains Ready Merge, Build, and QA checkpoints for automatic resume. Work interrupted before a durable checkpoint fails with an explicit causal event.
 
 ## Future Direction
 

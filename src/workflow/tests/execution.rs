@@ -387,6 +387,7 @@ fn file_automation_accepts_agent_precommitted_implementation_branch() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
     git(&temp_root, &["init", "-q"]).unwrap();
+    fs::write(temp_root.join(".git/info/exclude"), "smoke-ai\n").unwrap();
     git(
         &temp_root,
         &["config", "user.email", "refine-test@example.invalid"],
@@ -529,6 +530,7 @@ fn file_automation_treats_clean_noop_implementation_as_reviewable() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
     git(&temp_root, &["init", "-q"]).unwrap();
+    fs::write(temp_root.join(".git/info/exclude"), "smoke-ai\n").unwrap();
     git(
         &temp_root,
         &["config", "user.email", "refine-test@example.invalid"],
@@ -624,6 +626,7 @@ fn file_automation_reuses_existing_round_worktree_on_retry() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
     git(&temp_root, &["init", "-q"]).unwrap();
+    fs::write(temp_root.join(".git/info/exclude"), "smoke-ai\n").unwrap();
     git(
         &temp_root,
         &["config", "user.email", "refine-test@example.invalid"],
