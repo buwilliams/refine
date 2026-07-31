@@ -6,7 +6,8 @@ confirmation.
 
 ## Preconditions
 
-- The target app is a Git checkout with a clean base branch.
+- The Refine release repository is a Git checkout with a clean trusted target
+  branch (normally `main`).
 - The package version is a three-part semantic version.
 - Completed Goals and commits intended for the release have landed.
 - Publication credentials and the target branch's configured upstream remote
@@ -22,7 +23,9 @@ confirmation.
    whose prompt contains the trusted release plan.
 5. Follow the linked Goal's real workflow state and agent logs. Its worktree is
    managed by the normal Goal workflow under `.git/refine-worktrees`.
-6. Review and approve the Goal normally. Preparation never tags or publishes.
+6. Review and approve the Goal normally. Ready Merge integrates the exact
+   preparation candidate before Review; approval accepts that integration and
+   does not perform another merge. Preparation never tags or publishes.
 
 CLI equivalents:
 
@@ -40,22 +43,26 @@ cargo run --manifest-path xtask/Cargo.toml -- release-check
 
 ## Publish
 
-Return to **Refine (dev)** after the candidate is reviewed and merged. Choose
+Return to **Refine (dev)** after the candidate is integrated, reviewed, and
+approved. Choose
 **Publish release…** and explicitly confirm. Refine rejects publication unless:
 
-- the current branch is clean `main`;
-- local `main` and its configured upstream branch are synchronized;
-- the approved preparation commit is an ancestor of `main` (the normal
-  no-fast-forward merge commit may be `main` HEAD);
+- the current branch is the clean target branch recorded by the trusted
+  preparation (normally `main`);
+- that local branch and its configured upstream branch are synchronized;
+- the approved preparation commit is an ancestor of the synchronized target
+  branch (its normal no-fast-forward merge commit may be branch HEAD);
 - the package version and proposed semantic tag align;
 - any existing local tag, remote tag, or GitHub release resolves to the
-  expected synchronized `main` commit; and
+  expected synchronized target-branch commit; and
 - GitHub credentials work.
 
-Publication tags synchronized `main` HEAD, creates or validates the tag and
-GitHub release stage by stage, waits for relevant workflow runs to finish, and
-verifies the final remote tag and release URL. If no deployment or package
-workflows are configured, the operation records that explicitly.
+Publication tags synchronized target-branch HEAD, creates or validates the tag
+and GitHub release stage by stage, waits for relevant workflow runs to finish,
+and verifies the final remote tag and release URL. If no deployment or package
+workflows are configured, the operation records that explicitly. Deployment
+success and GitHub Release publication are separate evidence and must both be
+reported accurately.
 
 For CLI publication, retain the persisted preparation operation id returned by
 `release-prepare`, then run:

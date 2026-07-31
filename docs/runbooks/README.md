@@ -29,9 +29,15 @@ Runbooks:
   workers and bring reviewable work home.
 - [Migrate Gap state to Goals](migrate-gap-state.md) — preserve intent through
   the agent-operated schema migration.
-- [Migrate a Refine v2 project to v4](v2-to-v4-migration-runbook.md) — move
-  legacy durable state into the v4 layout and isolated state branch.
+- [Migrate a Refine v2 project to current v4](v2-to-v4-migration-runbook.md) —
+  preserve legacy durable state and node-local evidence in the current v4
+  layout and isolated state branch.
+- [Migrate a node to the scale and reliability layout](../spec/scale-reliability-performance.migration.md)
+  — relocate node-local logs, retire derived state, and restore host-governed
+  concurrency after upgrading an existing v4 node.
+
 Conventions: commands are shown as `refine …`; inside a source checkout use
-`./r …`, which is the same surface. All cluster/fleet commands accept
-`--dry-run` where they change external state — prefer a dry run first and
-show the user what would happen.
+`./r …`, which is the same surface. Use `--dry-run` only when a command's CLI
+entry documents it. Currently, use dry-run before `cluster distribute` and
+`cluster bootstrap`; do not invent a dry-run flag for transfer, enable/disable,
+maintenance, or removal commands.

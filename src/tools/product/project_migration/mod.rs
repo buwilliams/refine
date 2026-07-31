@@ -375,8 +375,14 @@ mod tests {
         assert!(!refine_dir.join("goals").exists());
         let runbook = Path::new(env!("CARGO_MANIFEST_DIR")).join(V2_TO_V4_RUNBOOK);
         let instructions = fs::read_to_string(runbook).unwrap();
-        assert!(instructions.contains("Migrate a Refine v2 Project to v4"));
+        assert!(instructions.contains("Migrate a Refine v2 Project to the Current v4 Release"));
         assert!(instructions.contains("<git_remote>/refine/state"));
+        assert!(instructions.contains("--path-format=absolute --git-common-dir"));
+        assert!(instructions.contains("runtime/goals/<shard>/<id>/logs.jsonl"));
+        assert!(instructions.contains("runtime/active-goals.jsonl"));
+        assert!(instructions.contains("parallel_run_cap"));
+        assert!(instructions.contains("scale-reliability-performance.migration.md"));
+        assert!(!instructions.contains("Refine `4.0.0`"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

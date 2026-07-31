@@ -143,6 +143,8 @@ fn write_command_markdown(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::Path;
 
     #[test]
     fn catalog_lists_cluster_commands_with_descriptions() {
@@ -217,5 +219,163 @@ mod tests {
             committed == generated,
             "docs/spec/cli-reference.md is out of date; regenerate with `cargo run --manifest-path xtask/Cargo.toml -- cli-reference`"
         );
+    }
+
+    #[test]
+    fn operational_runbooks_use_current_cli_and_layout_contracts() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let runbooks_dir = root.join("docs/runbooks");
+        let mut paths = fs::read_dir(&runbooks_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
+            .collect::<Vec<_>>();
+        paths.push(root.join("docs/spec/scale-reliability-performance.migration.md"));
+        paths.sort();
+
+        let cli = Cli::command();
+        let index = fs::read_to_string(root.join("docs/runbooks/README.md")).unwrap();
+        let mut all = String::new();
+        for path in paths {
+            let document = fs::read_to_string(&path).unwrap();
+            validate_documented_refine_commands(&cli, &path, &document);
+            validate_local_markdown_links(&path, &document);
+            if path.parent() == Some(runbooks_dir.as_path())
+                && path.file_name().and_then(|name| name.to_str()) != Some("README.md")
+            {
+                let file_name = path.file_name().unwrap().to_string_lossy();
+                assert!(
+                    index.contains(&format!("({file_name})")),
+                    "docs/runbooks/README.md does not list {file_name}"
+                );
+            }
+            all.push_str(&document);
+            all.push('\n');
+        }
+        assert!(
+            index.contains("(../spec/scale-reliability-performance.migration.md)"),
+            "the operational node-migration document must be discoverable from the runbook index"
+        );
+
+        for retired in [
+            "refine daemon ",
+            "./r daemon ",
+            "\nrefine status\n",
+            "\n./r status\n",
+        ] {
+            assert!(
+                !all.contains(retired),
+                "operational runbooks still contain retired CLI form {retired:?}"
+            );
+        }
+        assert!(
+            !all.contains("Refine `4.0.0`"),
+            "migration guidance must use the installed v4 version"
+        );
+        assert!(
+            !all.contains("$RUNTIME_ROOT\"/*/cache"),
+            "node migration cleanup must be scoped to one validated port runtime"
+        );
+        assert!(all.contains("--path-format=absolute --git-common-dir"));
+        assert!(all.contains("runtime/goals/<shard>/<id>/logs.jsonl"));
+    }
+
+    fn validate_documented_refine_commands(cli: &clap::Command, path: &Path, document: &str) {
+        for (line_index, line) in document.lines().enumerate() {
+            let line = line.trim();
+            let line_tokens = line.split_whitespace().collect::<Vec<_>>();
+            let Some(command_index) = line_tokens
+                .iter()
+                .position(|token| matches!(*token, "refine" | "./r"))
+            else {
+                continue;
+            };
+            let tokens = &line_tokens[command_index + 1..];
+            let Some(group_name) = tokens.first().copied() else {
+                continue;
+            };
+            if group_name.starts_with('-') {
+                continue;
+            }
+            let group_name = group_name.trim_matches(|character: char| {
+                !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_')
+            });
+            let group = cli.find_subcommand(group_name).unwrap_or_else(|| {
+                panic!(
+                    "{}:{} documents unknown Refine command group {group_name}",
+                    path.display(),
+                    line_index + 1
+                )
+            });
+            let mut documented_command = group;
+            let mut argument_start = 1;
+            if group.has_subcommands() {
+                let subcommand_name = tokens
+                    .get(1)
+                    .copied()
+                    .filter(|token| !token.starts_with('-'))
+                    .map(|token| {
+                        token.trim_matches(|character: char| {
+                            !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_')
+                        })
+                    })
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "{}:{} omits a subcommand after {group_name}",
+                            path.display(),
+                            line_index + 1
+                        )
+                    });
+                documented_command = group.find_subcommand(subcommand_name).unwrap_or_else(|| {
+                    panic!(
+                        "{}:{} documents unknown command refine {group_name} {subcommand_name}",
+                        path.display(),
+                        line_index + 1
+                    )
+                });
+                argument_start = 2;
+            }
+            for token in &tokens[argument_start..] {
+                let token = token.trim_matches(|character: char| {
+                    !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_' | '=')
+                });
+                let Some(flag) = token
+                    .strip_prefix("--")
+                    .map(|flag| flag.split('=').next().unwrap_or(flag))
+                else {
+                    continue;
+                };
+                assert!(
+                    documented_command
+                        .get_arguments()
+                        .any(|argument| argument.get_long() == Some(flag)),
+                    "{}:{} documents unknown flag --{flag} for refine {group_name}",
+                    path.display(),
+                    line_index + 1
+                );
+            }
+        }
+    }
+
+    fn validate_local_markdown_links(path: &Path, document: &str) {
+        for suffix in document.split("](").skip(1) {
+            let Some(destination) = suffix.split(')').next() else {
+                continue;
+            };
+            let destination = destination.split('#').next().unwrap_or(destination);
+            if destination.is_empty()
+                || destination.starts_with('#')
+                || destination.contains("://")
+                || destination.starts_with("mailto:")
+            {
+                continue;
+            }
+            let linked = path.parent().unwrap().join(destination);
+            assert!(
+                linked.exists(),
+                "{} links to missing local path {destination}",
+                path.display()
+            );
+        }
     }
 }

@@ -77,13 +77,13 @@ cd <refine-checkout>
 ```
 
 7. If the selected provider CLI is missing, install or authenticate it only after the user approves. Treat Refine installation and provider readiness separately.
-8. Use the matching provider auth command when the user approves auth now:
+8. Use Refine's provider adapter when the user approves authentication now,
+   then diagnose the same provider. This avoids baking provider-specific login
+   syntax into the installation contract:
 
 ```bash
-claude
-codex login
-gemini auth login
-copilot login
+./r agent auth --provider <provider>
+./r agent diagnose --provider <provider>
 ```
 
 Do not offer `smoke-ai` during installation. It is reserved for deterministic tests.
@@ -162,23 +162,27 @@ Distributed/node commands:
 
 ```bash
 ./r node list
-./r node settings
+./r node settings <node-id>
 ./r cluster list
 ./r cluster maintenance
 ./r cluster distribute [--to <node-id>] [--converge] [--dry-run]
 ```
 
 Refine publishes durable state automatically on the dedicated `refine/state`
-branch without touching application branches. Its live local projection and
-isolated branch worktree live under the target repository's `.git/` directory,
-so `<app>/.refine` never exists in the primary target-app worktree. The Target App **Git remote**
-setting controls both state and Goal-branch publication and defaults to
-`origin`. If that remote is unavailable, Refine still initializes and commits
-local state; it simply cannot publish it. Use `project sync` or the Node screen's
-**Sync state now** action when a state handoff must happen immediately;
-`cluster sync` invokes the same shared capability for the current node. Manual
-sync is queued in a supervised runner process, and the UI reports its progress
-and any terminal error without blocking the daemon.
+branch without touching application branches. Its live projection and isolated
+state worktree live under the target repository's Git common directory as
+`refine-live-state/` and `refine-state-worktree/`; do not assume that directory
+is `<app>/.git` when the app is a linked worktree. `<app>/.refine` never exists
+in the primary target-app worktree. Goal logs under
+`refine-live-state/runtime/goals/` are node-local and are not published. The
+Target App **Git remote** setting controls both state and Goal-branch
+publication and defaults to `origin`. If that remote is unavailable, Refine
+still initializes and commits local state; it simply cannot publish it. Use
+`project sync` or the Node screen's **Sync state now** action when a state
+handoff must happen immediately; `cluster sync` invokes the same shared
+capability for the current node. Manual sync is queued in a supervised runner
+process, and the UI reports its progress and any terminal error without
+blocking the daemon.
 
 Cloud worker creation is provider-operated rather than part of the Refine
 binary. Follow `docs/runbooks/provision.md` when a fleet needs another worker.

@@ -12,7 +12,11 @@ and the daemon before distributing work.
 
 ## Preconditions
 
-- A target project is attached and has the configured `git_remote` (default `origin`) where Refine can publish its dedicated `refine/state` branch and implementation branches.
+- A target project is attached and has the configured `git_remote` (default
+  `origin`) where Refine can publish its dedicated `refine/state` branch and
+  implementation branches. Run `refine project status` and
+  `refine project sync` before provisioning; do not infer publication from
+  local state alone.
 - The target repository is reachable from the worker, including credentials
   for a private repository.
 - The provider CLI is installed and authenticated on the control machine.
@@ -92,7 +96,9 @@ execution waits until an appropriate credential or subscription login exists.
 ```bash
 fly status --app "$APP_NAME"
 fly ssh console --app "$APP_NAME" --command "refine system status --port 8080"
+fly ssh console --app "$APP_NAME" --command "refine project status"
 fly ssh console --app "$APP_NAME" --command "refine node list"
+fly ssh console --app "$APP_NAME" --command "refine node show worker-1"
 fly ssh console --app "$APP_NAME" --command "refine agent detect"
 ```
 
@@ -106,14 +112,24 @@ refine cluster distribute
 
 ## Undo
 
-Move reviewable or open work away from the worker before destroying it:
+Pause new admission to the worker, then move both ordinary open work and Review
+work away before destroying it. Distribution cannot move an actively claimed
+Goal; wait for it to settle or stop it through the supported Goal/process
+lifecycle first.
 
 ```bash
+refine cluster disable-node "$NODE_ID"
 refine cluster distribute --to default --dry-run
 refine cluster distribute --to default
-refine cluster disable-node "$NODE_ID"
+refine cluster distribute --converge --to default --dry-run
+refine cluster distribute --converge --to default
+refine cluster show "$NODE_ID"
 fly apps destroy "$APP_NAME" --yes
 ```
+
+Do not destroy the machine until the final cluster readback shows no open or
+reviewable work owned by it. `disable-node` prevents new distribution but does
+not cancel or transfer an existing claim.
 
 ## Common failures
 

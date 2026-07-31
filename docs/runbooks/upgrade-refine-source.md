@@ -17,10 +17,10 @@ dirty or divergent checkout explicitly before retrying.
 
 ## UI Workflow
 
-When the attached target app is a Refine Git checkout, the refresh icon in the
-main navigation provides the same promotion action at a glance. It is disabled
-when the running source is current or any promotion precondition is blocked,
-and enabled when the fetched update is safe to promote.
+When the attached target app is a Refine Git checkout, the source-update control
+in the main navigation provides the same promotion action at a glance. It is
+disabled when the running source is current or any promotion precondition is
+blocked, and enabled when the fetched update is safe to promote.
 
 1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
    and find **Upgrade** for the detailed status.
@@ -54,7 +54,8 @@ Queue the same external handoff used by the UI:
 ```
 
 The command returns the durable operation id before the daemon stops. State is
-stored at `run/<port>/source-promotion.json`.
+stored at `<runtime-root>/<port>/source-promotion.json`; `run/<port>/...` is
+only the checkout-local default.
 
 ## Failure And Recovery
 
@@ -75,4 +76,6 @@ stored at `run/<port>/source-promotion.json`.
 ```
 
 Never claim success from a branch change alone; daemon health verification is
-part of the operation.
+part of the operation. Final evidence must include the healthy daemon, the live
+executable identity, and source status at the promoted commit; if rollback was
+required, report the restored commit and executable instead.

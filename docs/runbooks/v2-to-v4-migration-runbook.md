@@ -1,157 +1,239 @@
-# Migrate a Refine v2 Project to v4
+# Migrate a Refine v2 Project to the Current v4 Release
 
-This runbook is for an agent migrating a target application that was managed
-by Refine v2.x. It is a semantic migration: do not replace it with a
-deterministic field-renaming script. Refine v4 intentionally refuses to attach
-to incompatible state until an agent has preserved and verified its meaning.
+This runbook is for an agent migrating a target application managed by Refine
+v2.x directly to the installed Refine v4 release. It is a semantic migration:
+preserve the meaning of every durable record instead of treating the work as a
+field rename. Refine intentionally refuses to attach to incompatible state
+until an agent has resolved that meaning.
 
-Product version and project schema version are different. Refine v2.3 and
-Refine v4 can both report project schema version `2`, while their durable
-layouts differ. Inspect the files; do not infer compatibility from the number
-alone.
+Read this whole runbook before changing the project. The current node-local
+layout and cleanup rules come from
+[`scale-reliability-performance.migration.md`](../spec/scale-reliability-performance.migration.md).
+Its changes are incorporated here so a v2 project migrates directly to the
+current v4 layout rather than passing through an obsolete 4.0 layout.
+
+Product version and project schema version are different. Refine v2.3 and the
+current v4 release can both report project schema version `2` while using
+incompatible durable layouts. Inspect the files; do not infer compatibility
+from the schema number alone.
 
 ## Outcome
 
-- Durable project state is removed from the primary application worktree. The
-  local mutation projection lives at `<app>/.git/refine-live-state/`, while
-  `.refine/` is checked out only at
-  `<app>/.git/refine-state-worktree/.refine/` on `refine/state`.
-- Local process state is recreated in Refine's port-scoped runtime root and is
-  not copied into durable state.
-- The migrated `.refine` tree is published through the configured `git_remote`
+- The application branch no longer tracks or contains `<target-app>/.refine`.
+- The live project-state projection is
+  `<git-common-dir>/refine-live-state/`. The committed `.refine/` tree is checked
+  out at `<git-common-dir>/refine-state-worktree/` on `refine/state`.
+- `refine.json` records schema version `2` and the installed Refine version; the
+  migration never hard-codes an older v4 product version.
+- Durable Goals, Features, settings, governance, guidance, reporters, and other
+  supported project records are published through the configured `git_remote`
   (default `origin`) on `refine/state`.
-- The application branch receives only the reviewed removal of legacy tracked
-  `.refine`; other application files remain unchanged.
-- Every upgraded node can attach, synchronize, and show equivalent work and
-  configuration.
+- Goal log sidecars are preserved only as node-local evidence under
+  `runtime/goals/<shard>/<id>/logs.jsonl` in the live-state directory. They are
+  readable on the migration node but are not published to `refine/state`.
+- Process state, caches, scheduler indexes, locks, credentials, and other
+  derived or host-local artifacts are recreated rather than migrated.
+- Each additional v4 node can attach and synchronize the same durable project
+  records without changing the application branch.
 
 ## Stop conditions
 
 Stop and request project-owner judgment if any of these are true:
 
+- The installed v4 binary and exact version have not been identified.
 - A v2 or v4 daemon is still running against the project.
-- An agent, merge, rebase, or application deployment is in progress.
-- `<git_remote>/refine/state` already exists and does not represent this same
-  migration.
-- The application worktree has changes that cannot be attributed and safely
-  left untouched.
-- A legacy record, setting, ownership reference, or status has no clear v4
-  meaning.
-- Verification changes the application branch or any non-Refine source file.
+- An agent, merge, rebase, deployment, state sync, or application-branch change
+  is in progress.
+- The application worktree has changes that cannot be attributed and preserved.
+- `<git_remote>/refine/state` already exists and is not unquestionably state for
+  this same project and migration.
+- Both legacy `<target-app>/.refine` and an existing
+  `<git-common-dir>/refine-live-state` contain state that has not been
+  reconciled.
+- A legacy record, setting, ownership reference, credential reference, or
+  workflow status has no unambiguous current-v4 meaning.
+- Source and destination records disagree after translation.
+- Verification changes any non-Refine application file.
 
-Never force-push or rewrite application history. Back up legacy `.refine`
-before migration, then remove it from the application branch and commit that
-removal normally. Refine v4 refuses to operate while the application branch
-still tracks `.refine`.
+Never force-push or rewrite application or `refine/state` history. Preserve a
+byte-for-byte backup before changing legacy state. Remove tracked legacy
+`.refine` from the application branch with a normal reviewed commit only after
+the staged destination is internally consistent.
 
-## Preconditions and evidence
+## 1. Record the source and derive the current paths
 
-1. Install the v4 release by following `docs/runbooks/install.md`, but do not
-   start workflow automation for this project.
-2. Stop every old and new Refine node that can access the project. Record how
-   each node was stopped.
+1. Install the intended v4 release using [`install.md`](install.md), but do not
+   start workflow automation for this project. Record `refine --version` (or
+   `./r --version` inside a source checkout) and use that exact product version
+   in the migrated `refine.json`.
+2. Stop every Refine node that can access the project and verify each process is
+   actually down. For a current installation, use the supported system
+   lifecycle surface, for example `refine system stop --port <port>`.
 3. Record the application repository's current branch, exact HEAD, remotes,
-   worktree status, and whether `.refine` is tracked.
-4. Inspect `.refine/refine.toml`, `.refine/config.json`, `.refine/gaps/`,
-   `.refine/features/`, `.refine/nodes.json`, `.refine/nodes/`, and all other
-   JSON or JSONL evidence. Count records by type and record their ids.
-5. Record the configured `git_remote` (default `origin`) and check whether its
-   `refine/state` branch exists. If it does, fetch and inspect it before
-   changing local state; do not assume the local v2 tree wins.
-6. Make a byte-for-byte backup outside the application repository and outside
-   `.refine`. Include a manifest with file paths and checksums. Do not put the
-   backup under `.refine/backups`, because durable-state synchronization would
-   publish it.
+   worktree status, and tracked legacy state:
 
-## Layout translation
+   ```bash
+   TARGET_APP=/path/to/the/target/application
+   git -C "$TARGET_APP" branch --show-current
+   git -C "$TARGET_APP" rev-parse HEAD
+   git -C "$TARGET_APP" remote -v
+   git -C "$TARGET_APP" status --short
+   git -C "$TARGET_APP" ls-files -- .refine
+   ```
 
-Use this as a routing map, then inspect the current v4 models and services for
-the exact destination shape.
+4. Derive the shared Git directory. Do not assume it is
+   `<target-app>/.git`; linked worktrees use a different Git common directory.
 
-| Refine v2 state | Refine v4 destination | Agent responsibility |
+   ```bash
+   GIT_COMMON_DIR="$(git -C "$TARGET_APP" rev-parse --path-format=absolute --git-common-dir)"
+   LIVE_STATE="$GIT_COMMON_DIR/refine-live-state"
+   STATE_WORKTREE="$GIT_COMMON_DIR/refine-state-worktree"
+   printf '%s\n' "$GIT_COMMON_DIR" "$LIVE_STATE" "$STATE_WORKTREE"
+   ```
+
+5. Inspect `.refine/refine.toml`, `.refine/config.json`, `.refine/gaps/`,
+   `.refine/features/`, `.refine/nodes.json`, `.refine/nodes/`, and every other
+   JSON or JSONL record. Record counts and stable identifiers by record type.
+   Separately count Goal or Gap `logs.jsonl` sidecars.
+6. Record the configured `git_remote` (default `origin`). Fetch and inspect its
+   `refine/state` branch if one exists; do not assume the local v2 tree wins.
+7. Make a byte-for-byte backup outside the application repository and outside
+   every `.refine` or Git-owned Refine directory. Include a path and checksum
+   manifest. A backup beneath `.refine` can be published accidentally and is
+   not acceptable.
+
+## 2. Build a disposable destination
+
+Compose the destination from the external backup or another disposable copy.
+Do not edit the live v2 tree while translating it. The staged tree must contain
+the contents that will eventually become `LIVE_STATE`.
+
+Use this routing map, then validate each result against the current models and
+services in the installed release:
+
+| Refine v2 state | Current v4 destination | Required treatment |
 | --- | --- | --- |
-| `.refine/refine.toml` | installation/runtime configuration, not durable project state | Preserve its target-app and port intent in the installed v4 configuration; do not copy the TOML into the new schema. |
-| `.refine/config.json` | `.refine/refine.json` plus current governance and node settings | Create valid v4 project metadata with `schema_version: 2` and Refine `4.0.0`; translate settings into their current owners instead of copying obsolete keys blindly. |
-| `.refine/gaps/<shard>/<id>/gap.json` | `.refine/goals/<shard>/<id>/goal.json` | Preserve ids, order, ownership, status, priority, branch, timestamps, notes, and evidence. Follow `migrate-gap-state.md` for round prompt synthesis. |
-| Gap sibling logs and evidence | Goal sibling logs and evidence | Copy without rewriting content; repair only paths or references that changed from Gap to Goal. |
-| `.refine/features/**/feature.json` | `.refine/features/**/feature.json` | Preserve feature ids and ordering; update Gap-named membership fields or references to the corresponding Goal ids. |
-| `.refine/nodes.json` and `.refine/nodes/<id>/{application,runtime,target-app}.json` | `.refine/nodes.json` | Preserve node identity and metadata, merge supported per-node settings into each node's `settings` object, and retain unknown meaningful values for explicit review. Apply v4 defaults for new transport fields without inventing credentials. |
-| `.refine/nodes/<id>/reporters.json` | `.refine/reporters.json` | Merge reporters by stable identity/name, resolve collisions deliberately, and verify every Goal and Feature reporter reference. |
-| v2 project governance settings | `.refine/governance.json` | Preserve product, constitution, and rules semantically. Do not discard requirements that no longer have a one-to-one setting key. |
-| `.refine/guidance.json` | `.refine/guidance.json` | Normalize to the v4 guidance list while preserving enabled state and instructions. |
-| `target_app_rebuild_*` and `target_app_auto_rebuild*` settings | `target_app_build_*` and `target_app_auto_build*` | Use the current names while preserving commands, instructions, timeouts, and cadence. |
-| SQLite indexes, caches, PID/socket files, process logs, maintenance flags, and `.refine/run/` | v4 port-scoped runtime root | Do not migrate. These are local, derived, or stale process state and v4 recreates them. |
+| `.refine/refine.toml` | installed runtime and target-app configuration | Preserve target-app, port, and lifecycle intent through supported installation/runtime settings. Do not copy the TOML into durable project state. |
+| `.refine/config.json` | `refine.json`, current Node settings, and current project-owned settings | Create schema version `2`; set `refine.version` to the installed v4 version, not `4.0.0`; preserve timestamps where meaningful; translate only supported settings. |
+| `.refine/gaps/<shard>/<id>/gap.json` | `goals/<shard>/<id>/goal.json` | Preserve stable ids, order, ownership, valid status, priority, branch, timestamps, notes, and durable evidence. Use [`migrate-gap-state.md`](migrate-gap-state.md) for semantic Round prompt synthesis. |
+| Gap or Goal `logs.jsonl` | `runtime/goals/<shard>/<id>/logs.jsonl` | Preserve on the migration node as node-local evidence. Never place logs beside `goal.json` and never publish them on `refine/state`. |
+| Other Gap sibling files | current durable Goal fields or the external backup | Move content into a current field only when the current model consumes it. Keep unrecognized evidence in the migration backup rather than inventing a synchronized sidecar format. |
+| `.refine/features/**/feature.json` | `features/**/feature.json` | Preserve Feature identity, description, ownership, reporter, and ordering meaning. Update Gap references to Goal ids and verify every member. |
+| `.refine/nodes.json` and `.refine/nodes/<id>/{application,runtime,target-app}.json` | `nodes.json` | Preserve node identity and supported metadata. Merge supported node-specific settings into each node's `settings`; retain unknown meaningful values in the migration report for explicit judgment. Do not invent transport credentials. |
+| `.refine/nodes/<id>/reporters.json` | `reporters.json` | Merge reporters by stable identity or name, resolve collisions deliberately, and verify all Goal and Feature reporter references. |
+| v2 governance configuration | `governance.json` | Preserve product, constitution, and rules semantically. Do not discard requirements merely because a current key has a different shape. |
+| `.refine/guidance.json` | `guidance.json` | Normalize to the current guidance list while preserving enabled state and instructions. |
+| v2 Quality checks and timing | `quality/settings.json` | Preserve enforced checks and choose one project-wide `pre_merge` or `post_build` timing. If legacy Node timings diverge, stop for owner judgment. Do not leave `quality_timing` as an independent Node setting. |
+| `target_app_rebuild_*` and `target_app_auto_rebuild*` | `target_app_build_*` and `target_app_auto_build*` Node settings | Preserve commands, instructions, timeouts, and cadence under the current names. |
+| Explicit concurrency limits | `parallel_run_cap`, `parallel_per_node_cap`, `parallel_per_provider_cap`, and `parallel_per_target_app_cap` Node settings | Preserve only limits that were deliberate operator decisions. Omit inherited or seeded defaults so the host-capacity governor remains reachable. |
+| Other supported durable records | the path owned by the current service | Preserve chats, Todo lists, and similar product records only when their current service has a defined destination. Verify references rather than copying directories blindly. |
+| SQLite files, caches, PIDs, sockets, process logs, maintenance flags, `.refine/run/`, support bundles, provider binaries, and temporary or lock files | nowhere | Do not migrate. They are derived, transient, secret-bearing, or node-local and current v4 recreates what it needs. |
+
+For every legacy Round, synthesize one current `prompt` from `actual`, `target`,
+surrounding evidence, and project context. Do not concatenate fields
+mechanically. Preserve current durable Round evidence in the Round record when
+the model has a corresponding field.
 
 Do not migrate provider credentials, API keys, SSH private keys, environment
-secrets, or host authentication material into `.refine` or Git.
+secrets, host authentication, or copied runtime state into the staged tree.
 
-## Agent procedure
+Do not create these derived node-local paths by hand:
 
-1. Work from the external backup or another disposable copy while composing
-   the migration. Keep the live v2 tree unchanged until the destination passes
-   structural and semantic review.
-2. Create `refine.json`, the normalized node registry, and the current
-   governance, guidance, and reporter files.
-3. Migrate Features and Goals. For each legacy round, synthesize one `prompt`
-   from `actual`, `target`, surrounding evidence, and project context. Never
-   concatenate those fields mechanically.
-4. Preserve sidecar logs and cross-record references. Confirm that every Goal
-   owner exists, every Feature member exists, and every reporter reference can
-   be resolved.
-5. Remove runtime-only artifacts from the destination. Preserve them only in
-   the external backup when they are useful for audit evidence.
-6. Remove the legacy `.refine` tree from the application branch and commit that
-   removal after the migrated destination is internally consistent and safely
-   backed up. Verify that `git ls-files -- .refine` prints nothing.
-7. Place the migrated destination at `<app>/.refine` as a temporary untracked
-   handoff, then attach the application with v4. Refine atomically moves that
-   tree into the Git-owned live-state location; it refuses attachment if
-   `.refine` remains tracked. Verify that no physical `<app>/.refine` directory
-   remains, then run `refine project status`. If Refine
-   still reports a migration requirement, inspect and correct the state; do
-   not invoke deterministic migration code to bypass the check.
-8. Activate or confirm the intended node, then review settings through the
-   shared Refine surface. Correct unsupported or renamed values explicitly.
-9. Run `refine project sync`. This initializes or reconciles the isolated
-   `refine/state` branch without moving the application branch. If the
-   configured remote is absent, verify the local branch and commit, then
-   configure the remote before expecting publication.
-10. Inspect `<git_remote>/refine/state`, then bring up one v4 node. Add
-    remaining nodes one at a time, synchronizing and verifying each before
-    enabling work.
+- `runtime/active-goals.jsonl` — the scheduler reconstructs this index from Goal
+  records and then maintains it as Goals change.
+- `runtime/record-locks/` — per-record locks are created on demand.
+- port-scoped projection snapshots or `cache/workflow/` — current v4 rebuilds
+  projections and no longer uses per-claim project copies.
+- retired project-wide mutation locks such as `.goal-mutations.lock`.
 
-## Verification
+## 3. Validate before handoff
 
-- `refine project status` reports `compatible: true`, schema version `2`, and
-  no migration requirement.
-- The application branch contains the expected commit removing legacy
-  `.refine`; no other application source file changed.
-- `<app>/.refine` does not exist. The `.git/refine-live-state` directory and
-  `.git/refine-state-worktree` are present, and `.refine` exists only inside
-  the latter.
-- Source and destination counts match for Goals, Features, rounds, notes, and
-  evidence files. Any intentional count difference is explained in the
-  migration report.
-- Every Goal and Feature opens with correct ownership, reporter, ordering,
-  workflow status, and history.
-- Governance, guidance, quality behavior, provider choice, target-app
-  lifecycle instructions, and test commands retain their intended behavior.
-- `<git_remote>/refine/state` contains durable `.refine` files and excludes
-  runtime directories, caches, logs, credentials, and the external backup.
-- A second v4 node can synchronize the state and reports the same durable
-  records without an application-branch commit or checkout.
+Before touching the live tree:
+
+1. Parse every staged JSON and JSONL file.
+2. Confirm every Goal owner exists, every Feature member and order is valid,
+   every reporter reference resolves, and every status has current-v4 meaning.
+3. Compare source and destination counts for Goals, Features, rounds, notes,
+   durable evidence, and node-local Goal logs. Explain every intentional
+   difference in the migration report.
+4. Confirm there are no `logs.jsonl` files beneath staged `goals/`; they must be
+   beneath staged `runtime/goals/` with the same shard structure.
+5. Confirm the staged durable namespace contains no credentials, backup,
+   runtime cache, scheduler index, process registry, or lock file.
+6. Review effective settings against the current Settings surface. Record every
+   renamed, omitted, defaulted, or owner-resolved setting.
+
+If any check is ambiguous, stop. Do not use deterministic migration code or a
+schema-number edit to bypass semantic review.
+
+## 4. Hand the state to v4
+
+1. After the staged destination passes review, remove the legacy tracked
+   `.refine` tree from the application branch and commit that removal normally.
+   Verify `git -C "$TARGET_APP" ls-files -- .refine` prints nothing and no
+   unrelated application file changed.
+2. Verify `LIVE_STATE` does not already contain unreconciled state. Place the
+   staged destination temporarily at `<target-app>/.refine` as an untracked
+   handoff.
+3. Attach with the installed v4 binary:
+
+   ```bash
+   refine project attach "$TARGET_APP"
+   refine project status
+   ```
+
+   Refine atomically moves the temporary tree to `LIVE_STATE`. Attachment
+   refuses to proceed while the application branch still tracks `.refine` or
+   when both legacy and live-state trees exist. Verify the physical
+   `<target-app>/.refine` path is gone.
+4. Activate or confirm the intended node. Read settings through the shared
+   Refine surface and correct unsupported or renamed values explicitly. Leave
+   concurrency caps absent unless the recorded migration evidence proves they
+   were intentional.
+5. Run `refine project doctor`, then `refine project sync`. Sync initializes or
+   reconciles `STATE_WORKTREE` and `refine/state` without checking out or moving
+   the application branch. If the configured remote is absent, verify the local
+   state commit and configure the remote before expecting publication.
+6. Inspect `<git_remote>/refine/state`, then start one v4 node. Add other nodes
+   one at a time, synchronizing and verifying each before enabling workflow
+   automation.
+
+## 5. Verify the migration
+
+- `refine project status` reports `compatible: true`, schema version `2`, the
+  expected target root, and no migration requirement.
+- `refine.json` records the installed Refine version rather than an older
+  hard-coded v4 version.
+- The application branch contains only the reviewed legacy `.refine` removal
+  commit and expected pre-existing application changes.
+- `<target-app>/.refine` does not exist. `LIVE_STATE` and `STATE_WORKTREE` exist,
+  and the committed `.refine` tree exists only inside `STATE_WORKTREE`.
+- Durable Goal, Feature, Round, note, reporter, governance, guidance, Quality,
+  and other supported record counts match the reviewed translation.
+- On the migration node, a Goal with legacy history renders its logs from
+  `LIVE_STATE/runtime/goals/<shard>/<id>/logs.jsonl`; no Goal sibling
+  `logs.jsonl` remains.
+- `refine/state` contains durable `.refine` records and excludes `runtime/`,
+  `run/`, caches, logs, locks, credentials, provider binaries, support bundles,
+  and the external backup.
+- The scheduler creates `runtime/active-goals.jsonl` itself when it first needs
+  the index. It was not copied from v2 or built by the migration agent.
+- Effective concurrency uses the host-capacity governor wherever no explicit
+  operator cap was preserved.
+- A second v4 node synchronizes the same durable records. Node-local Goal logs
+  are not expected to appear on that node through `refine/state`.
 - A no-op `refine project sync` creates no additional commit or push.
 
-Write a migration report containing the backup location and checksum manifest,
-the before/after counts, settings that required judgment, commands run,
-verification evidence, and the resulting `refine/state` commit.
+Write a migration report containing the installed Refine version, derived Git
+and runtime roots, backup location and checksum manifest, before/after counts,
+settings judgments, node-local logs preserved, commands run, verification
+evidence, application removal commit, and resulting `refine/state` commit.
 
 ## Rollback
 
-Stop all v4 nodes. Preserve the failed `.git/refine-live-state` and
-`.git/refine-state-worktree` directories for diagnosis. Restore the external
-backup to `<app>/.refine` only if the project owner explicitly chooses to
-resume v2 operation, and restore or revert the corresponding
-application-branch removal commit normally. Do not delete or force-push
-`refine/state`; correct a v4 migration in a new attempt and publish a normal
-follow-up state commit.
+Stop all v4 nodes. Preserve the failed `LIVE_STATE`, `STATE_WORKTREE`, and
+node-local runtime roots for diagnosis. Restore the external backup to
+`<target-app>/.refine` only if the project owner explicitly chooses to resume v2
+operation, and revert the corresponding application-branch removal commit
+normally. Do not delete or force-push `refine/state`; correct a v4 migration in
+a new attempt and publish a normal follow-up state commit.

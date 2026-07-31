@@ -1,8 +1,9 @@
 # Runbook: Distribute and Converge Work
 
 Outcome: eligible Goals spread across healthy fleet nodes for parallel
-implementation, and reviewable results brought back to the node where your
-user reviews and merges.
+implementation, and reviewable results return to the node where the user makes
+the final acceptance decision. Ready Merge has already integrated a Goal's
+exact candidate before it reaches Review.
 
 ## Preconditions
 
@@ -38,18 +39,31 @@ refine cluster distribute --converge --to default
 refine goal list        # reviewable goals now owned by the review node
 ```
 
-Convergence is the same distribute operation pointed home. Review happens once,
-where the human judgment lives; approving a reviewed Goal asks Refine to
-integrate its isolated candidate.
+Convergence is the same distribute operation pointed home. It changes ownership
+only; it does not merge or replay the candidate. Review happens once, where the
+human judgment lives, and approval accepts the integration already recorded by
+Ready Merge.
 
 ## Verify
 
 - `refine next` no longer suggests distribution or convergence.
 - `refine cluster list` + `refine goal list` show the expected ownership.
-- The dry-run plan (`moves`, `skipped_details`) matches what happened.
+- The applied result matches the reviewed dry-run plan (`moves`,
+  `skipped_details`).
+- Each converged Review Goal still records the same candidate and Ready Merge
+  integration evidence; convergence did not perform another Git operation.
 
 ## Undo
 
-Distribution is ownership reassignment, so undoing is distributing again:
-`refine cluster distribute --to <node>` to pull work back to one node, or a
-targeted `refine cluster transfer <node-id> <goal-id>` for a single item.
+Distribution is ownership reassignment, so undoing is distributing again.
+Preview both ordinary open-work moves and Review convergence when both classes
+are present:
+
+```bash
+refine cluster distribute --to <node> --dry-run
+refine cluster distribute --converge --to <node> --dry-run
+```
+
+Apply only the required plan, or use
+`refine cluster transfer <node-id> <goal-or-feature-id>` for one item. Transfer
+has no dry-run flag, so inspect the item and destination first.

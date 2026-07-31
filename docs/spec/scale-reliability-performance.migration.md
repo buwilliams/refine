@@ -48,7 +48,8 @@ worktree:
 
 ```bash
 TARGET_APP=/path/to/the/target/application
-LIVE_STATE="$(git -C "$TARGET_APP" rev-parse --git-common-dir)/refine-live-state"
+GIT_COMMON_DIR="$(git -C "$TARGET_APP" rev-parse --path-format=absolute --git-common-dir)"
+LIVE_STATE="$GIT_COMMON_DIR/refine-live-state"
 ls "$LIVE_STATE/goals" >/dev/null || echo "STOP: live state not found"
 ```
 
@@ -65,8 +66,13 @@ Confirm by looking for port-numbered directories containing `daemon-status.json`
 
 ```bash
 RUNTIME_ROOT=/path/from/the/table
-ls "$RUNTIME_ROOT"/*/daemon-status.json
+PORT=8082
+PORT_RUNTIME="$RUNTIME_ROOT/$PORT"
+test -f "$PORT_RUNTIME/daemon-status.json" || echo "STOP: port runtime not found"
 ```
+
+Run this procedure once per port. Do not use a wildcard to delete state for
+other Refine installations that happen to share the runtime root.
 
 ## 1. Stop the daemon
 
@@ -74,17 +80,23 @@ Migration moves files the daemon writes. A running daemon will recreate them at
 the old paths and leave the node in a mixed state.
 
 ```bash
-./r daemon stop    # or the equivalent for this install
+REFINE_DAEMON_PORT="$PORT" ./r workflow pause
+./r system stop --port "$PORT" --runtime-root "$RUNTIME_ROOT"
+./r system status --port "$PORT" --runtime-root "$RUNTIME_ROOT"
 ```
 
-Confirm it is down before continuing. Do not proceed on the assumption that the
-stop command succeeded.
+Record whether workflow automation was already paused so it is resumed only if
+appropriate at the end. Confirm the status readback reports the daemon stopped
+before continuing; do not trust the stop command alone.
 
 ## 2. Move Goal log sidecars
 
 Logs moved from beside the Goal record to `runtime/` inside live state. The
 readers follow the new path, so logs left behind are not deleted — they become
 invisible, which is worse than either outcome. Move them to keep the history.
+
+Count the source files and make a recoverable copy outside `LIVE_STATE` before
+moving them. Record that backup path and its checksum in the migration report.
 
 ```bash
 cd "$LIVE_STATE"
@@ -114,8 +126,8 @@ usually the largest single reclaim in this migration — measure before deleting
 so you can report what it recovered.
 
 ```bash
-du -sh "$RUNTIME_ROOT"/*/cache/workflow 2>/dev/null
-rm -rf "$RUNTIME_ROOT"/*/cache/workflow
+du -sh "$PORT_RUNTIME/cache/workflow" 2>/dev/null
+rm -rf "$PORT_RUNTIME/cache/workflow"
 ```
 
 ## 4. Rebuild the projection snapshot
@@ -127,7 +139,7 @@ nothing consults any more. Deleting the snapshot forces one rebuild into the
 bounded form.
 
 ```bash
-rm -f "$RUNTIME_ROOT"/*/cache/projection-snapshot.json
+rm -f "$PORT_RUNTIME/cache/projection-snapshot.json"
 ```
 
 ## 5. Remove the retired mutation lock
@@ -140,7 +152,18 @@ something.
 rm -f "$LIVE_STATE/.goal-mutations.lock"
 ```
 
-## 6. Hand concurrency back to the host
+## 6. Start the upgraded daemon while workflow remains paused
+
+```bash
+./r system start --port "$PORT" --runtime-root "$RUNTIME_ROOT"
+./r system status --port "$PORT" --runtime-root "$RUNTIME_ROOT"
+REFINE_DAEMON_PORT="$PORT" ./r project status
+```
+
+Require a healthy status from the upgraded executable before using its API.
+Do not resume workflow yet.
+
+## 7. Hand concurrency back to the host
 
 Refine used to seed `parallel_run_cap` into every node, so a node upgraded from
 an earlier build carries that value in its stored settings whether or not anyone
@@ -151,24 +174,23 @@ The seeded value and a deliberate one are indistinguishable once stored, so
 nothing clears it automatically — that would make the number impossible to
 choose on purpose. Clear it only where the limit was never a decision:
 
-Clear the field in web settings, or through the API the daemon serves:
+With the upgraded daemon running and workflow still paused, clear every
+non-deliberate inherited cap in web settings or one request to the API the
+daemon serves. Omit any cap that was an intentional operator choice:
 
 ```bash
-curl -s -X PATCH http://127.0.0.1:<port>/api/settings \
+curl -s -X PATCH "http://127.0.0.1:$PORT/api/settings" \
   -H 'content-type: application/json' \
-  -d '{"parallel_run_cap": ""}'
+  -d '{"parallel_run_cap":"","parallel_per_node_cap":"","parallel_per_provider_cap":"","parallel_per_target_app_cap":""}'
 ```
 
-There is no CLI for writing settings — `refine node settings` only prints them.
-
-Do the same for `parallel_per_node_cap`, `parallel_per_provider_cap`, and
-`parallel_per_target_app_cap` if they were never chosen deliberately; cleared,
-they follow the global limit.
+There is no CLI for writing settings — `refine node settings <node-id>` only
+prints them.
 
 Confirm it took effect by reading back the effective policy:
 
 ```bash
-python3 -c "import json;print(json.load(open('$RUNTIME_ROOT/<port>/workflow-automation-state.json'))['policy'])"
+python3 -c "import json;print(json.load(open('$PORT_RUNTIME/workflow-automation-state.json'))['policy'])"
 ```
 
 Leave a cap in place where it was chosen for a reason — a node sharing hardware
@@ -192,21 +214,19 @@ state that does not match this node.
 
 Neither is synchronized, and neither should be copied between nodes.
 
-## 7. Start the daemon and verify
+## 8. Verify and restore the prior workflow admission state
 
-```bash
-./r daemon start
-./r status
-```
-
-Then confirm the four things this migration was for:
+Confirm the four things this migration was for:
 
 1. **Logs are readable.** Open a Goal that has history and confirm its round log
    still renders. An empty log on a Goal that had one means step 2 did not take
    effect for that shard.
-2. **Work schedules.** Confirm a Todo Goal is claimed. The scheduler now reads
-   `runtime/active-goals.jsonl`; if that file is absent after a promotion pass,
-   the node is not on the upgraded build.
+2. **Work schedules.** If workflow was running before the migration, resume it
+   with `REFINE_DAEMON_PORT="$PORT" ./r workflow resume`, then confirm a Todo
+   Goal is claimed. The scheduler now reads `runtime/active-goals.jsonl`; if
+   that file is absent after a promotion pass, the node is not on the upgraded
+   build. If workflow was already paused, leave it paused and report that
+   scheduling was not exercised.
 3. **Caches stay bounded.** After some work has run, confirm no
    `cache/workflow/` directory has reappeared.
 4. **Concurrency reflects the host.** If `parallel_run_cap` is unset, the limit
@@ -220,6 +240,10 @@ upgrade commits their deletion — on the order of dozens of files. This is
 expected, and it is the fix taking effect rather than data loss: the logs remain
 on the node under `runtime/`.
 
+Run `REFINE_DAEMON_PORT="$PORT" ./r project sync`, inspect the resulting
+`refine/state` commit, and verify it removes old Goal log paths without adding
+`runtime/`.
+
 History still carries the volume already committed. Reclaiming that requires
 rewriting `refine/state`, which is a separate decision, is not part of this
 migration, and must not be attempted without the project owner.
@@ -232,7 +256,7 @@ reconstruct it before investigating further:
 
 ```bash
 rm -f "$LIVE_STATE/runtime/active-goals.jsonl"
-rm -f "$RUNTIME_ROOT"/*/cache/projection-snapshot.json
+rm -f "$PORT_RUNTIME/cache/projection-snapshot.json"
 ```
 
 If that does not resolve it, report the exact symptom and the contents of
