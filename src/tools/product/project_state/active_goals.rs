@@ -196,9 +196,7 @@ impl ActiveGoalIndex {
     pub fn record_goal(refine_dir: &Path, goal_path: &Path) -> RefineResult<()> {
         let store = FileProjectStateStore::new(refine_dir);
         let record = match store.project_goal(goal_path)? {
-            Some(projection)
-                if Self::holds_scheduler_attention(&projection.goal.status) =>
-            {
+            Some(projection) if Self::holds_scheduler_attention(&projection.goal.status) => {
                 ActiveGoalRecord {
                     id: projection.goal.id.clone(),
                     goal: Some(Box::new(projection.goal)),
@@ -317,7 +315,10 @@ mod tests {
 
         let index = ActiveGoalIndex::load_or_rebuild(&refine_dir).unwrap();
 
-        let mut ids = index.goals().map(|goal| goal.id.clone()).collect::<Vec<_>>();
+        let mut ids = index
+            .goals()
+            .map(|goal| goal.id.clone())
+            .collect::<Vec<_>>();
         ids.sort();
         assert_eq!(
             ids,
@@ -377,7 +378,10 @@ mod tests {
         // And returning to it, so a reopened Goal is scheduled again.
         write_goal(&refine_dir, "GOALMOVING0", "todo");
         ActiveGoalIndex::record_goal(&refine_dir, &path).unwrap();
-        assert_eq!(ActiveGoalIndex::load_or_rebuild(&refine_dir).unwrap().len(), 1);
+        assert_eq!(
+            ActiveGoalIndex::load_or_rebuild(&refine_dir).unwrap().len(),
+            1
+        );
 
         // A deleted record cannot be re-projected, so removal is explicit.
         ActiveGoalIndex::forget_goal(&refine_dir, "GOALMOVING0").unwrap();

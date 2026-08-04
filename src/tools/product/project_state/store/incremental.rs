@@ -122,7 +122,9 @@ impl FileProjectStateStore {
             {
                 delta.git_head_changed = true;
             }
-            delta.fingerprints.insert(fingerprint.path.clone(), fingerprint);
+            delta
+                .fingerprints
+                .insert(fingerprint.path.clone(), fingerprint);
         }
 
         // Anything the snapshot knew about that is no longer observed was
@@ -169,7 +171,9 @@ impl FileProjectStateStore {
                 .goals
                 .retain(|_, projection| projection.goal.json_path != *rel_path);
             if let Some(projection) = self.project_goal(&self.refine_dir.join(rel_path))? {
-                snapshot.goals.insert(projection.goal.id.clone(), projection);
+                snapshot
+                    .goals
+                    .insert(projection.goal.id.clone(), projection);
             }
         }
 
@@ -201,7 +205,9 @@ impl FileProjectStateStore {
         // contain, so editing a Goal record cannot affect it. Rescanning only
         // when the Goal set or a sidecar actually moved keeps the ordinary
         // status write off the per-Goal sidecar scan.
-        if delta.activity_changed || !delta.goals_added.is_empty() || !delta.goals_removed.is_empty()
+        if delta.activity_changed
+            || !delta.goals_added.is_empty()
+            || !delta.goals_removed.is_empty()
         {
             let mut activity = self.project_activity()?;
             activity.extend(self.project_goal_round_activity(&snapshot.goals)?);

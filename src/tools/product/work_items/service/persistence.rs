@@ -411,7 +411,9 @@ impl FileWorkItemService {
             self.list_goal_summaries()?
                 .into_iter()
                 .filter(|goal| !excluded.contains(&goal.goal.id))
-                .filter(|goal| bulk_goal_matches_filter(Some(&self.refine_dir), goal, &selection.filter))
+                .filter(|goal| {
+                    bulk_goal_matches_filter(Some(&self.refine_dir), goal, &selection.filter)
+                })
                 .collect()
         };
         goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));

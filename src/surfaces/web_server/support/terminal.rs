@@ -248,18 +248,24 @@ fn local_terminal_session(session_id: &str) -> RefineResult<Option<Arc<TerminalS
 
 impl TerminalSession {
     fn launch_json(&self) -> Value {
-        let worktree = self
+        let details = self
             .process
             .details
             .as_deref()
-            .and_then(|details| serde_json::from_str::<Value>(details).ok())
+            .and_then(|details| serde_json::from_str::<Value>(details).ok());
+        let worktree = details
+            .as_ref()
             .and_then(|details| details.get("worktree").cloned());
+        let goal_id = details
+            .as_ref()
+            .and_then(|details| details.get("attached_goal_id").cloned());
         json!({
             "id": self.id,
             "process_id": self.process_id,
             "profile": self.profile,
             "provider": self.provider,
             "cwd": self.cwd.display().to_string(),
+            "goal_id": goal_id,
             "worktree": worktree,
         })
     }
@@ -540,12 +546,17 @@ impl TerminalSession {
     }
 
     fn status_json(&self) -> Value {
-        let worktree = self
+        let details = self
             .process
             .details
             .as_deref()
-            .and_then(|details| serde_json::from_str::<Value>(details).ok())
+            .and_then(|details| serde_json::from_str::<Value>(details).ok());
+        let worktree = details
+            .as_ref()
             .and_then(|details| details.get("worktree").cloned());
+        let goal_id = details
+            .as_ref()
+            .and_then(|details| details.get("attached_goal_id").cloned());
         let exited = self.exited.load(Ordering::Acquire);
         json!({
             "id": self.id,
@@ -553,6 +564,7 @@ impl TerminalSession {
             "profile": self.profile,
             "provider": self.provider,
             "cwd": self.cwd.display().to_string(),
+            "goal_id": goal_id,
             "worktree": worktree,
             "alive": !exited,
             "exited": exited,

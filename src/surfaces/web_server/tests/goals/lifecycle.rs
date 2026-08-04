@@ -136,6 +136,193 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
 }
 
 #[test]
+fn web_server_does_not_compete_with_an_in_progress_goal_agent_registration() {
+    let temp_root = unique_temp_dir("http-in-progress-goal-agent-registration");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    fs::create_dir_all(&app_root).unwrap();
+
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Workflow still owns this Goal", Some("GOAL-IN-PROGRESS"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary(
+            "GOAL-IN-PROGRESS",
+            "Workflow",
+            "Wait for the workflow Agent to register",
+        )
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-IN-PROGRESS", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-IN-PROGRESS", GoalStatus::InProgress)
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "goal", "goal_id": "GOAL-IN-PROGRESS"})),
+    });
+
+    assert_eq!(opened.status, 404, "{}", opened.body);
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .list()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        work_items
+            .show_goal_summary("GOAL-IN-PROGRESS")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::InProgress
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn web_server_opens_failed_goal_in_diagnostic_session_without_workflow_mutation() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let temp_root = unique_temp_dir("http-failed-goal-diagnostic-agent");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    let provider = temp_root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\ntrap 'exit 0' TERM INT\nprintf 'diagnostic-ready:%s\\n' \"$*\"\nwhile :; do sleep 1; done\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+    }
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Diagnose production failure", Some("GOAL-DIAGNOSTIC"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary(
+            "GOAL-DIAGNOSTIC",
+            "Production User",
+            "Investigate the failed request",
+        )
+        .unwrap();
+    work_items
+        .update_latest_goal_round_evaluation_summary(
+            "GOAL-DIAGNOSTIC",
+            &json!({
+                "failure_category": "provider",
+                "failure_message": "Agent authentication expired",
+                "failure_at": "2026-08-04T10:00:00Z"
+            }),
+        )
+        .unwrap();
+    work_items
+        .set_goal_status_unchecked("GOAL-DIAGNOSTIC", &GoalStatus::Failed)
+        .unwrap();
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({
+            "profile": "goal",
+            "goal_id": "GOAL-DIAGNOSTIC",
+            "cols": 100,
+            "rows": 30
+        })),
+    });
+    assert_eq!(opened.status, 200, "{}", opened.body);
+    assert_eq!(opened.body["profile"], "goal");
+    assert_eq!(opened.body["goal_id"], "GOAL-DIAGNOSTIC");
+    let session_id = opened.body["id"].as_str().unwrap().to_string();
+    let process_id = opened.body["process_id"].as_str().unwrap();
+    let process = FileProcessSupervisor::new(&runtime_root)
+        .inspect(process_id)
+        .unwrap()
+        .api_json();
+    assert_eq!(process["attached_goal_id"], "GOAL-DIAGNOSTIC");
+    assert!(process.get("goal_id").is_none());
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut transcript = String::new();
+    while Instant::now() < deadline {
+        transcript = crate::surfaces::web_server::support::terminal_events_since(
+            &runtime_root,
+            &session_id,
+            0,
+        )
+        .unwrap()
+        .iter()
+        .filter_map(|event| event.get("data").and_then(serde_json::Value::as_str))
+        .collect();
+        if transcript.contains("diagnostic-ready:") {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(
+        transcript.contains("Agent authentication expired"),
+        "{transcript}"
+    );
+    assert!(
+        transcript.contains("This is a diagnostic session"),
+        "{transcript}"
+    );
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/stop"),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["ok"], true);
+    assert_eq!(
+        work_items
+            .show_goal_summary("GOAL-DIAGNOSTIC")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Failed
+    );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
     let _env_guard = smoke_ai_env_lock()
         .lock()

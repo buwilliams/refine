@@ -512,6 +512,6 @@ function renderActivityList(entries) {
         ${e.actor ? ' · ' + htmlEscape(e.actor) : ''}
         ${e.goal_id ? ` · <a href="#/goals/${e.goal_id}">Goal ${e.goal_id.slice(0,8)}…</a>` : ''}
       </div>
-      ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ''}
+      ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(diagnosticDetailsText(e.details))}</pre></details>` : ''}
     </div>`).join("");
 }

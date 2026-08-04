@@ -261,7 +261,9 @@ fn holding_one_goal_does_not_block_mutating_others() {
     let temp_root = unique_temp_dir("goal-lock-independence");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
-    service.create_goal_summary("Held", Some("GOALHELD")).unwrap();
+    service
+        .create_goal_summary("Held", Some("GOALHELD"))
+        .unwrap();
     let others = (0..8)
         .map(|index| format!("GOALFREE{index:02}"))
         .collect::<Vec<_>>();
@@ -280,7 +282,8 @@ fn holding_one_goal_does_not_block_mutating_others() {
         let service = FileWorkItemService::new(&worker_refine_dir);
         for id in worker_others {
             let started = Instant::now();
-            let outcome = service.update_goal_metadata_summary(&id, Some("Renamed"), None, None, None);
+            let outcome =
+                service.update_goal_metadata_summary(&id, Some("Renamed"), None, None, None);
             let _ = tx.send((outcome.is_ok(), started.elapsed()));
         }
     });

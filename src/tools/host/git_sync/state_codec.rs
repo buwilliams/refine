@@ -59,7 +59,10 @@ fn hashed_file_identity(metadata: &fs::Metadata) -> HashedFileIdentity {
     #[cfg(unix)]
     let change_unix_ns = {
         use std::os::unix::fs::MetadataExt;
-        Some(metadata.ctime().saturating_mul(1_000_000_000) + i64::from(metadata.ctime_nsec() as i32))
+        Some(
+            metadata.ctime().saturating_mul(1_000_000_000)
+                + i64::from(metadata.ctime_nsec() as i32),
+        )
     };
     #[cfg(not(unix))]
     let change_unix_ns = None;

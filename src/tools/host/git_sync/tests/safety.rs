@@ -61,8 +61,14 @@ fn sync_retires_goal_logs_already_published_to_state() {
     fs::create_dir_all(tracked_log.parent().unwrap()).unwrap();
     fs::write(&tracked_log, "{\"message\":\"agent output\"}\n").unwrap();
     git(&state_worktree, &["add", "-f", "--", ".refine"]);
-    git(&state_worktree, &["commit", "-q", "-m", "publish goal logs"]);
-    git(&state_worktree, &["push", "-q", "origin", "HEAD:refine/state"]);
+    git(
+        &state_worktree,
+        &["commit", "-q", "-m", "publish goal logs"],
+    );
+    git(
+        &state_worktree,
+        &["push", "-q", "origin", "HEAD:refine/state"],
+    );
     assert!(
         git_stdout(&state_worktree, &["ls-files", "--", ".refine"]).contains("logs.jsonl"),
         "fixture did not publish a tracked log sidecar"
@@ -144,7 +150,10 @@ fn synchronized_goals_reach_the_scheduler_index() {
     let b_refine = refine_dir_for_target_root(&fixture.b).unwrap();
     let pulled = ActiveGoalIndex::load_or_rebuild(&b_refine).unwrap();
     assert_eq!(
-        pulled.goals().map(|goal| goal.id.clone()).collect::<Vec<_>>(),
+        pulled
+            .goals()
+            .map(|goal| goal.id.clone())
+            .collect::<Vec<_>>(),
         vec!["GOALA"],
         "a Goal pulled from another node must be schedulable"
     );
@@ -159,7 +168,9 @@ fn synchronized_goals_reach_the_scheduler_index() {
     fixture.service(&fixture.b).sync().unwrap();
 
     assert!(
-        ActiveGoalIndex::load_or_rebuild(&b_refine).unwrap().is_empty(),
+        ActiveGoalIndex::load_or_rebuild(&b_refine)
+            .unwrap()
+            .is_empty(),
         "a Goal completed on another node must leave the scheduler index"
     );
 }

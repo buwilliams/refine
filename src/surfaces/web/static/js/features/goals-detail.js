@@ -276,10 +276,13 @@ function drawGoalDetail(goal) {
                              goal.status === "failed");
   const hasPreservedDraft = hasPreservedRoundFormDraft(goal.id);
   const cancelEnabled = !["done", "cancelled"].includes(goal.status);
-  // The Goal Agent is the workflow-owned native CLI session. Open Agent
-  // attaches to that process while implementation is active; it never starts
-  // a second conversational agent for the same Goal.
-  const canOpenAgent = goal.status === "in-progress";
+  // During implementation this attaches to the workflow-owned Goal Agent.
+  // Outside implementation it opens a separate diagnostic session whose stop
+  // lifecycle cannot requeue, cancel, or otherwise mutate the Goal.
+  const canOpenAgent = !!goal.id;
+  const openAgentTitle = goal.status === "in-progress"
+    ? "Attach to the running Goal Agent"
+    : "Open a diagnostic Agent with this Goal's recorded context";
 
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
@@ -315,7 +318,7 @@ function drawGoalDetail(goal) {
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
-                  title="${canOpenAgent ? "Attach to the running Goal Agent" : "The Goal Agent is available while implementation is active"}">Open Agent</button>
+                  title="${htmlEscape(openAgentTitle)}">Open Agent</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
@@ -354,7 +357,7 @@ function drawGoalDetail(goal) {
           <span class="banner-msg" data-testid="goal-feature-blocking-banner-message">${htmlEscape(featureBlockingNotice.message)}</span>
         </div>` : ""}
 
-      ${latest ? renderFailureSummary(latest) : ""}
+      ${latest ? renderFailureSummary(goal, latest) : ""}
       ${latest ? renderGovernanceSummary(latest) : ""}
       ${latest ? renderQualitySummary(latest) : ""}
 
@@ -810,18 +813,53 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
 // A Goal can fail after every gate it reached passed — an integration that
 // found the branch tip moved, for one — so the reason gets its own card above
 // the gate summaries rather than being inferred from them.
-function renderFailureSummary(round) {
-  if (!round || !round.failure_message) {
+function goalFailureEvidence(goal, round) {
+  if (!round) return null;
+  const stateBoundary = latestStateBoundary(round);
+  // Failure transitions are normally logged immediately after their cause, so
+  // a strict post-transition boundary would discard the error users need.
+  // The latest error is already scoped to this round by the backend.
+  const errorLog = goal?.status === "failed"
+    ? round.latest_error_log || null
+    : currentRoundLog(round.latest_error_log, stateBoundary);
+  const workflowLog = currentRoundLog(round.latest_workflow_log, stateBoundary);
+  const fallbackLog = currentRoundLog(
+    round.latest_log?.severity && round.latest_log.severity !== "info"
+      ? round.latest_log
+      : null,
+    stateBoundary,
+  );
+  const log = errorLog || workflowLog || fallbackLog;
+  const message = round.failure_message || log?.message || "";
+  if (!message || (goal?.status !== "failed" && !round.failure_message)) return null;
+  return {
+    category: round.failure_category || log?.category || "workflow",
+    message,
+    at: round.failure_at || log?.datetime || "",
+    log_details: log?.details || null,
+  };
+}
+
+function renderFailureSummary(goal, round) {
+  const failure = goalFailureEvidence(goal, round);
+  if (!failure) {
     return "";
   }
+  const details = diagnosticDetailsText({
+    category: failure.category,
+    message: failure.message,
+    occurred_at: failure.at || null,
+    evidence: failure.log_details,
+  });
   return `
     <div class="card" style="margin:0 0 14px" data-testid="goal-failure-summary">
       <h3>Failure</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        ${round.failure_category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(round.failure_category)}</span>` : ""}
-        ${round.failure_at ? `<span class="muted small" data-testid="goal-failure-at">${fmtTime(round.failure_at)}</span>` : ""}
+        ${failure.category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(failure.category)}</span>` : ""}
+        ${failure.at ? `<span class="muted small" data-testid="goal-failure-at">${fmtTime(failure.at)}</span>` : ""}
       </div>
-      <p style="margin-bottom:6px" data-testid="goal-failure-message">${htmlEscape(round.failure_message)}</p>
+      <p style="margin-bottom:6px" data-testid="goal-failure-message">${htmlEscape(failure.message)}</p>
+      <details data-testid="goal-failure-details"><summary>Details</summary><pre>${htmlEscape(details)}</pre></details>
     </div>`;
 }
 
@@ -842,7 +880,7 @@ function renderGovernanceSummary(round) {
         <span class="status-pill ${reviewStateClass(states.meta)}" data-testid="goal-governance-meta">meta: ${htmlEscape(states.meta)}</span>
       </div>
       ${round.governance_message ? `<p style="margin-bottom:6px" data-testid="goal-governance-message">${htmlEscape(round.governance_message)}</p>` : ""}
-      ${round.governance_details ? `<details data-testid="goal-governance-details"><summary>Details</summary><pre>${htmlEscape(round.governance_details)}</pre></details>` : ""}
+      ${round.governance_details ? `<details data-testid="goal-governance-details"><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(round.governance_details))}</pre></details>` : ""}
       ${actions.length ? `
         <details style="margin-top:8px" data-testid="goal-governance-actions">
           <summary>Rule actions (${actions.length})</summary>
@@ -867,7 +905,7 @@ function renderQualitySummary(round) {
         ${round.quality_checked_at ? `<span class="muted small" data-testid="goal-quality-checked-at">${fmtTime(round.quality_checked_at)}</span>` : ""}
       </div>
       ${round.quality_message ? `<p style="margin-bottom:6px" data-testid="goal-quality-message">${htmlEscape(round.quality_message)}</p>` : ""}
-      ${round.quality_details ? `<details data-testid="goal-quality-details"><summary>Details</summary><pre>${htmlEscape(round.quality_details)}</pre></details>` : ""}
+      ${round.quality_details ? `<details data-testid="goal-quality-details"><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(round.quality_details))}</pre></details>` : ""}
     </div>`;
 }
 

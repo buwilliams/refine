@@ -5,8 +5,8 @@ use crate::model::feature::FeatureRollup;
 use crate::model::goal::{GoalIndexProjection, GoalPriority};
 use crate::model::workflow::GoalStatus;
 
-use super::helpers::*;
 use super::deep_search::{goal_matches_deep_text, resident_text_is_complete};
+use super::helpers::*;
 use super::types::*;
 
 pub trait ProjectionQuery {

@@ -171,9 +171,7 @@ fn goal_writes_patch_the_projection_without_a_full_rebuild() {
         fs::create_dir_all(&goal_dir).unwrap();
         fs::write(
             goal_dir.join("goal.json"),
-            format!(
-                r#"{{"id":"{id}","name":"{id} original","status":"todo","rounds":[]}}"#
-            ),
+            format!(r#"{{"id":"{id}","name":"{id} original","status":"todo","rounds":[]}}"#),
         )
         .unwrap();
     }
@@ -202,11 +200,17 @@ fn goal_writes_patch_the_projection_without_a_full_rebuild() {
     // The untouched Goal survives, and derived aggregates reflect both.
     assert_eq!(patched.goals["GOAL2"].goal.name, "GOAL2 original");
     assert_eq!(
-        patched.dashboard.all_node_status_counts.get(&GoalStatus::Done),
+        patched
+            .dashboard
+            .all_node_status_counts
+            .get(&GoalStatus::Done),
         Some(&1)
     );
     assert_eq!(
-        patched.dashboard.all_node_status_counts.get(&GoalStatus::Todo),
+        patched
+            .dashboard
+            .all_node_status_counts
+            .get(&GoalStatus::Todo),
         Some(&1)
     );
 
@@ -247,7 +251,10 @@ fn removing_a_goal_record_drops_it_from_the_patched_projection() {
         "a deleted record must leave the projection"
     );
     assert_eq!(
-        patched.dashboard.all_node_status_counts.get(&GoalStatus::Todo),
+        patched
+            .dashboard
+            .all_node_status_counts
+            .get(&GoalStatus::Todo),
         Some(&1)
     );
 

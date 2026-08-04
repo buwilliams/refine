@@ -313,6 +313,7 @@ function renderManagedProcessLabel(proc, rawLabel) {
 function renderAgentProcessRow(proc, anchorMs) {
   const kind = proc.kind || "agent";
   const interactive = kind === "interactive_session";
+  const attachedGoalId = proc.goal_id || proc.attached_goal_id || "";
   const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
   const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
     ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
@@ -322,16 +323,16 @@ function renderAgentProcessRow(proc, anchorMs) {
     : `<span class="muted small">-</span>`;
   const label = kind === "chat"
     ? `${htmlEscape(proc.mode === "goal" ? "Goal agent session" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
-    : proc.goal_id
-    ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
+    : attachedGoalId
+    ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
     : htmlEscape(proc.label || "Agent");
   const context = kind === "chat"
-    ? proc.goal_id
-      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
+    ? attachedGoalId
+      ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
       : "standalone"
     : interactive
-    ? proc.goal_id
-      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
+    ? attachedGoalId
+      ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
       : htmlEscape(proc.profile || proc.role || "interactive")
     : proc.round_idx != null
     ? String(Number(proc.round_idx) + 1)

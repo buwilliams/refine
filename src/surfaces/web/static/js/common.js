@@ -1407,6 +1407,20 @@ function htmlEscape(s) {
   }[c]));
 }
 
+// Audit and evaluation payloads are strings in older records and structured
+// JSON in current records. Avoid implicit object coercion, which otherwise
+// hides useful evidence behind "[object Object]".
+function diagnosticDetailsText(details) {
+  if (details == null) return "";
+  if (typeof details === "string") return details;
+  try {
+    const encoded = JSON.stringify(details, null, 2);
+    return encoded === undefined ? String(details) : encoded;
+  } catch (_) {
+    return String(details);
+  }
+}
+
 // ---- Minimal Markdown → HTML ------------------------------------------------
 //
 // Used to render chat transcripts. Inputs come from the selected agent CLI's

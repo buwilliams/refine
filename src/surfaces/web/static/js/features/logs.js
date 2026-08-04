@@ -271,7 +271,7 @@ function drawLogsList(data, f) {
                 <span class="logs-entry-meta-label">Message</span>
                 <div class="logs-message-body">
                   <div class="logs-message-text">${htmlEscape(e.message)}</div>
-                  ${e.details ? `<details data-testid="logs-details"><summary class="diff-show-details" data-testid="logs-show-details">Show details</summary><pre>${htmlEscape(logDetailsText(e.details))}</pre></details>` : ""}
+                  ${e.details ? `<details data-testid="logs-details"><summary class="diff-show-details" data-testid="logs-show-details">Show details</summary><pre>${htmlEscape(diagnosticDetailsText(e.details))}</pre></details>` : ""}
                 </div>
               </div>
             </td>
@@ -302,16 +302,6 @@ function syncLogsPeriodControls(period = "day") {
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-pressed", active ? "true" : "false");
   });
-}
-
-function logDetailsText(details) {
-  if (details == null) return "";
-  if (typeof details === "string") return details;
-  try {
-    return JSON.stringify(details, null, 2);
-  } catch (_) {
-    return String(details);
-  }
 }
 
 function logBucketLabel(datetime, period) {

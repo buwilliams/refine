@@ -12,8 +12,8 @@ pub use crate::model::goal::MergeResult;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
-use crate::tools::host::host_resources::HostResources;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::host_resources::HostResources;
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
 /// How long a Git command may go without output before it is stopped.

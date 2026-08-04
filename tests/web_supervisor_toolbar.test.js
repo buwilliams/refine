@@ -253,7 +253,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         chatState.open = true;
         drawToolbar();
       },
-      openGoal(goalId) { return openAgentDock({ goalId }); },
+      openGoal(goalId, goalStatus = null) { return openAgentDock({ goalId, goalStatus }); },
       openPlan(prompt = "") { return openPlanChatDock({ initialPrompt: prompt }); },
       create(mode) { return createToolbarTab(mode); },
       restore: loadChatStateFromStorage,
@@ -1267,6 +1267,48 @@ test("terminal output and exit events remain scoped to their tab", async () => {
   assert.equal(browser.runtime.terminal("agent").display, "agent outputexit 0");
   assert.equal(browser.runtime.terminal("terminal").connected, true);
   assert.equal(browser.runtime.terminal("agent").exited, true);
+});
+
+test("terminal output decodes transported ANSI escapes without changing ordinary text", async () => {
+  const browser = browserRuntime();
+  await browser.runtime.activate("agent");
+
+  browser.runtime.receive(
+    "agent",
+    "plain \\u001b text\\n\\u001b[31mred\\u001b[0m \\x1b]0;title",
+  );
+
+  assert.equal(
+    browser.runtime.terminal("agent").display,
+    "plain \\u001b text\\n\x1b[31mred\x1b[0m \x1b]0;title",
+  );
+});
+
+test("a failed Goal opens an independent diagnostic Agent and can restart it", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "diagnostic-session",
+        process_id: "interactive-diagnostic",
+        cwd: "/repo",
+        profile: "goal",
+        provider: "codex",
+        goal_id: body.goal_id,
+      };
+    }
+    return { ok: true };
+  });
+
+  await browser.runtime.openGoal("GOAL-FAILED", "failed");
+  assert.equal(requests[0].body.profile, "goal");
+  assert.equal(requests[0].body.goal_id, "GOAL-FAILED");
+
+  browser.runtime.markExited("GOAL-FAILED");
+  browser.runtime.draw();
+  assert.match(browser.html(), /data-testid="terminal-start">Restart<\/button>/);
 });
 
 test("Goal Agent opens on the latest transcript tail while earlier context loads in the background", async () => {

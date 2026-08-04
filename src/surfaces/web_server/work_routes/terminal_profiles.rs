@@ -9,6 +9,7 @@ use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::deployed_update::active_refine_paths;
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::product::work_items::FileWorkItemService;
 
 use super::InProcessWebServer;
 
@@ -49,19 +50,22 @@ pub(crate) fn terminal_profile_prompt(
             .goals
             .get(goal_id)
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} was not found")))?;
-        let context = serde_json::to_string_pretty(&json!({
-            "id": goal.goal.id,
-            "name": goal.goal.name,
-            "status": goal.goal.status,
-            "priority": goal.goal.priority,
-            "reporter": goal.goal.reporter,
-            "assignee": goal.goal.assignee,
-            "round_count": goal.goal.round_count,
-            "feature_id": goal.goal.feature_id,
-            "node_id": goal.goal.node_id,
-            "updated": goal.goal.updated,
-        }))
-        .map_err(|error| {
+        let context_value = match server.current_refine_dir()? {
+            Some(refine_dir) => FileWorkItemService::new(refine_dir).show_goal_detail(goal_id)?,
+            None => json!({
+                "id": goal.goal.id,
+                "name": goal.goal.name,
+                "status": goal.goal.status,
+                "priority": goal.goal.priority,
+                "reporter": goal.goal.reporter,
+                "assignee": goal.goal.assignee,
+                "round_count": goal.goal.round_count,
+                "feature_id": goal.goal.feature_id,
+                "node_id": goal.goal.node_id,
+                "updated": goal.goal.updated,
+            }),
+        };
+        let context = serde_json::to_string_pretty(&context_value).map_err(|error| {
             RefineError::Serialization(format!("failed to encode Goal context: {error}"))
         })?;
         sections.push(format!("Attached Refine Goal context:\n{context}"));
@@ -93,7 +97,7 @@ pub(crate) fn terminal_profile_prompt(
         );
     } else if profile == "goal" {
         sections.push(
-            "Use Refine's CLI and repository evidence to inspect and advance the attached Goal."
+            "This is a diagnostic session, not the Goal's workflow-owned implementation process. Inspect the attached Goal's recorded rounds, logs, failure, Governance, Quality, Git, and repository evidence before drawing conclusions. Do not change durable Goal state, submit a recovery round, or modify source unless the user explicitly asks you to do so."
                 .to_string(),
         );
     }

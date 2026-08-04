@@ -695,13 +695,7 @@ function normalizeGoalLogOrder(order) {
 }
 
 function goalLogDetailsText(details) {
-  if (details == null) return "";
-  if (typeof details === "string") return details;
-  try {
-    return JSON.stringify(details, null, 2);
-  } catch (_) {
-    return String(details);
-  }
+  return diagnosticDetailsText(details);
 }
 
 function goalLogSearchText(entry) {
@@ -1155,6 +1149,7 @@ function toolbarIcon(name) {
 function renderTerminalPanel(tab) {
   const terminal = terminalStateFor(chatState.activeTabId);
   const role = tab.mode === "terminal" ? "shell" : `${tab.label} agent`;
+  const diagnosticGoal = tab.mode === "goal" && tab.goalStatus && tab.goalStatus !== "in-progress";
   const status = terminal?.loading
     ? `Starting ${role}...`
     : terminal?.stopping
@@ -1181,9 +1176,9 @@ function renderTerminalPanel(tab) {
       ? `<button type="button" class="danger" data-terminal-action="stop" data-testid="terminal-stop">Stop</button>`
       : terminal?.sessionId && !terminal?.statusChecked
         ? `<button type="button" class="secondary" data-terminal-action="reattach">Reconnect</button>`
-      : tab.mode === "goal" && terminal?.exited
+      : tab.mode === "goal" && terminal?.exited && !diagnosticGoal
         ? `<button type="button" class="secondary" disabled>Session ended</button>`
-        : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${tab.mode === "goal" ? "Open" : terminal?.exited ? "Restart" : "Start"}</button>`;
+        : `<button type="button" class="primary" data-terminal-action="start" data-testid="terminal-start">${tab.mode === "goal" && !terminal?.exited ? "Open" : terminal?.exited ? "Restart" : "Start"}</button>`;
   const provider = tab.provider ? ` · ${htmlEscape(tab.provider)}` : "";
   const worktree = tab.worktree?.path
     ? `<span class="muted small" data-testid="terminal-worktree"> · Worktree: <code>${htmlEscape(tab.worktree.path)}</code></span>`
@@ -1742,6 +1737,7 @@ function flushTerminalInput(
 
 function terminalReceiveOutput(text, terminal = terminalStateFor()) {
   if (!terminal) return;
+  text = normalizeTerminalOutput(text);
   if (text) {
     terminal.display = `${terminal.display || ""}${text}`;
     if (terminal.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
@@ -1756,7 +1752,18 @@ function terminalReceiveOutput(text, terminal = terminalStateFor()) {
   // the viewport back down here or incoming agent output becomes unreadable.
 }
 
+// Some provider or proxy combinations double-encode ESC while transporting
+// terminal output. Decode only escape spellings that introduce a real ANSI
+// CSI/OSC sequence; ordinary backslashes and user-authored text are preserved.
+function normalizeTerminalOutput(text) {
+  return String(text || "").replace(
+    /(?:\\u001b|\\x1b|\\033|\\e)(?=[\[\]])/gi,
+    "\x1b",
+  );
+}
+
 function terminalPrependOutput(text, terminal = terminalStateFor()) {
+  text = normalizeTerminalOutput(text);
   if (!terminal || !text) return;
   terminal.display = `${text}${terminal.display || ""}`;
   if (terminal.display.length > TERMINAL_OUTPUT_MAX_CHARS) {

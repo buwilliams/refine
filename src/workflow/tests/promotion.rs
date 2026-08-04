@@ -282,8 +282,8 @@ fn file_automation_respects_feature_order_on_promote_claim_and_start() {
 #[test]
 fn claim_eligibility_stays_linear_on_a_large_single_feature_backlog() {
     use crate::model::goal::GoalIndexProjection;
-    use crate::workflow::GoalPriority;
     use crate::tools::product::project_state::{GoalSummaryProjection, ProjectionSnapshot};
+    use crate::workflow::GoalPriority;
     use crate::workflow::policy::ClaimEligibility;
     use std::collections::{BTreeMap, BTreeSet};
     use std::time::Instant;
@@ -372,7 +372,9 @@ fn scheduling_never_builds_a_projection_of_the_whole_project() {
         .unwrap();
     for index in 0..40 {
         let id = format!("GOALDONE{index:03}");
-        work_items.create_goal_summary("Finished", Some(&id)).unwrap();
+        work_items
+            .create_goal_summary("Finished", Some(&id))
+            .unwrap();
         work_items.cancel_goal_summary(&id).unwrap();
     }
 
@@ -380,7 +382,10 @@ fn scheduling_never_builds_a_projection_of_the_whole_project() {
     // the scheduler's working set in the first place.
     let index = ActiveGoalIndex::load_or_rebuild(&refine_dir).unwrap();
     assert_eq!(
-        index.goals().map(|goal| goal.id.clone()).collect::<Vec<_>>(),
+        index
+            .goals()
+            .map(|goal| goal.id.clone())
+            .collect::<Vec<_>>(),
         vec!["GOALLIVE"],
         "completed Goals must not stay resident"
     );

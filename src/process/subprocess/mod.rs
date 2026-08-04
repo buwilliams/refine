@@ -196,6 +196,7 @@ impl ManagedProcess {
         {
             for key in [
                 "goal_id",
+                "attached_goal_id",
                 "feature_id",
                 "session_id",
                 "claim_id",

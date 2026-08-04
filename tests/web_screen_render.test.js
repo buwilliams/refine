@@ -386,6 +386,42 @@ test("a toolbar Agent's morphed Start button dispatches Stop", { skip: SKIP }, a
   }
 });
 
+test("Agent terminal renders transported ANSI control sequences through xterm", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    const rendered = await app.page.evaluate(async () => {
+      chatState.tabs = {
+        agent: normalizeInteractiveTerminalTab({
+          goalId: null,
+          label: "Agent",
+          mode: "agent",
+          sessionId: null,
+        }),
+      };
+      chatState.activeTabId = "agent";
+      chatState.open = true;
+      chatState.bodyHeight = 420;
+      drawToolbar();
+      const terminal = terminalStateFor("agent");
+      terminalReceiveOutput("\\u001b[31mANSI-RED\\u001b[0m plain", terminal);
+      await new Promise((resolve) => terminal.term.write("", resolve));
+      const rows = document.querySelector(".terminal-output .xterm-rows");
+      return {
+        text: rows?.textContent || "",
+        html: rows?.innerHTML || "",
+      };
+    });
+
+    assert.match(rendered.text, /ANSI-RED plain/);
+    assert.doesNotMatch(rendered.text, /(?:\\u001b|\[31m|\[0m)/);
+    assert.match(rendered.html, /color:\s*#b91c1c|color:\s*rgb\(185,\s*28,\s*28\)/i);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
