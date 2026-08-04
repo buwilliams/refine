@@ -285,6 +285,35 @@ impl FileGitSyncService {
         ))
     }
 
+    /// Recover the content represented by a persisted baseline fingerprint.
+    ///
+    /// Older baseline files intentionally contain hashes rather than a second
+    /// copy of all durable state. A conflicting record's prior bytes are still
+    /// available in the append-only `refine/state` history, so inspect only that
+    /// record's revisions and select the exact hashed version. If history was
+    /// rewritten or the hash cannot be reproduced, the caller retains the
+    /// normal conflict instead of guessing.
+    pub(super) fn load_baseline_file(
+        &self,
+        state_root: &std::path::Path,
+        relative: &std::path::Path,
+        fingerprint: u64,
+    ) -> RefineResult<Option<Vec<u8>>> {
+        let git_path = format!(".refine/{}", relative.to_string_lossy().replace('\\', "/"));
+        let revisions = self.git_at_stdout(
+            state_root,
+            &["log", "--format=%H", "--all", "--", &git_path],
+        )?;
+        for revision in revisions.lines() {
+            let object = format!("{revision}:{git_path}");
+            let output = self.git_at(state_root, &["show", &object])?;
+            if output.success && state_content_fingerprint(&output.stdout) == fingerprint {
+                return Ok(Some(output.stdout));
+            }
+        }
+        Ok(None)
+    }
+
     pub(super) fn save_state_baseline(&self, baseline: &DurableStateMap) -> RefineResult<()> {
         let path = git_common_dir(&self.target_root)?.join(STATE_BASELINE_FILE);
         let stored = baseline

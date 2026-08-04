@@ -140,6 +140,129 @@ fn sync_reports_same_record_multi_node_conflicts() {
 }
 
 #[test]
+fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
+    let fixture = SyncFixture::new("disjoint-goal-fields");
+    write_goal(&fixture.a, "GOALA");
+    let goal_a = refine_dir_for_target_root(&fixture.a)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    fs::write(
+        &goal_a,
+        r#"{"id":"GOALA","node_id":"node-a","status":"review","updated":"2026-08-03T18:20:00Z"}
+"#,
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    fs::write(
+        &goal_a,
+        r#"{"id":"GOALA","node_id":"node-b","status":"review","updated":"2026-08-03T18:21:00Z"}
+"#,
+    )
+    .unwrap();
+    write_goal(&fixture.a, "REMOTE_ONLY");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let goal_b = refine_dir_for_target_root(&fixture.b)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    fs::write(
+        &goal_b,
+        r#"{"id":"GOALA","node_id":"node-b","status":"done","updated":"2026-08-03T18:22:00Z"}
+"#,
+    )
+    .unwrap();
+
+    let result = fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(
+        result.committed && result.pulled && result.pushed,
+        "{result:?}"
+    );
+    assert!(
+        result
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("Merged non-overlapping Goal changes")),
+        "{result:?}"
+    );
+    let merged: serde_json::Value = serde_json::from_slice(&fs::read(&goal_b).unwrap()).unwrap();
+    assert_eq!(merged["status"], "done");
+    assert_eq!(merged["node_id"], "node-b");
+    assert_eq!(merged["updated"], "2026-08-03T18:22:00Z");
+    assert!(
+        refine_dir_for_target_root(&fixture.b)
+            .unwrap()
+            .join("goals/REMOTE_ONLY/goal.json")
+            .exists()
+    );
+}
+
+#[test]
+fn goal_merge_does_not_use_timestamps_to_hide_competing_lifecycle_changes() {
+    let base = br#"{"id":"GOALA","status":"backlog","updated":"2026-08-03T18:20:00Z"}"#;
+    let local = br#"{"id":"GOALA","status":"done","updated":"2026-08-03T18:22:00Z"}"#;
+    let remote = br#"{"id":"GOALA","status":"todo","updated":"2026-08-03T18:21:00Z"}"#;
+
+    assert!(merge_goal_record(base, local, remote).is_none());
+}
+
+#[test]
+fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
+    let fixture = SyncFixture::new("mixed-goal-conflicts");
+    for id in ["GOALA", "GOALB"] {
+        write_goal(&fixture.a, id);
+        fs::write(
+            refine_dir_for_target_root(&fixture.a)
+                .unwrap()
+                .join(format!("goals/{id}/goal.json")),
+            format!(
+                "{{\"id\":\"{id}\",\"node_id\":\"node-a\",\"status\":\"backlog\",\"updated\":\"2026-08-03T18:20:00Z\"}}\n"
+            ),
+        )
+        .unwrap();
+    }
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+    fs::write(
+        refine_a.join("goals/GOALA/goal.json"),
+        "{\"id\":\"GOALA\",\"node_id\":\"node-b\",\"status\":\"backlog\",\"updated\":\"2026-08-03T18:21:00Z\"}\n",
+    )
+    .unwrap();
+    fs::write(
+        refine_a.join("goals/GOALB/goal.json"),
+        "{\"id\":\"GOALB\",\"node_id\":\"node-a\",\"status\":\"todo\",\"updated\":\"2026-08-03T18:21:00Z\"}\n",
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    for id in ["GOALA", "GOALB"] {
+        fs::write(
+            refine_b.join(format!("goals/{id}/goal.json")),
+            format!(
+                "{{\"id\":\"{id}\",\"node_id\":\"node-b\",\"status\":\"done\",\"updated\":\"2026-08-03T18:22:00Z\"}}\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    let error = fixture.service(&fixture.b).sync().unwrap_err();
+
+    assert!(error.to_string().contains("goals/GOALB/goal.json"));
+    assert_eq!(
+        git_stdout(
+            &state_worktree_for_target_root(&fixture.b).unwrap(),
+            &["status", "--short"]
+        ),
+        ""
+    );
+}
+
+#[test]
 fn state_commit_summary_counts_sharded_records() {
     assert_eq!(
         state_commit_summary(

@@ -10,6 +10,12 @@ pub(super) struct StateWorktreeSetup {
 
 pub(super) type DurableStateMap = BTreeMap<PathBuf, u64>;
 
+pub(super) fn state_content_fingerprint(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
+}
+
 pub(super) fn bootstrap_only_state(state: &DurableStateMap) -> bool {
     state.keys().all(|path| {
         matches!(
@@ -119,9 +125,7 @@ pub(super) fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableS
                 path.display()
             ))
         })?;
-        let mut hasher = DefaultHasher::new();
-        bytes.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = state_content_fingerprint(&bytes);
         // Re-stat after reading: a write that landed between the first stat and
         // the read would otherwise be memoized under the earlier identity and
         // never observed again.
@@ -142,6 +146,18 @@ pub(super) fn state_conflicts(
     remote: &DurableStateMap,
     resolved: &BTreeSet<PathBuf>,
 ) -> Vec<String> {
+    state_conflict_paths(base, local, remote, resolved)
+        .into_iter()
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect()
+}
+
+pub(super) fn state_conflict_paths(
+    base: &DurableStateMap,
+    local: &DurableStateMap,
+    remote: &DurableStateMap,
+    resolved: &BTreeSet<PathBuf>,
+) -> Vec<PathBuf> {
     let paths = base
         .keys()
         .chain(local.keys())
@@ -159,7 +175,6 @@ pub(super) fn state_conflicts(
             let remote_value = remote.get(path);
             local_value != base_value && remote_value != base_value && local_value != remote_value
         })
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
         .collect()
 }
 
@@ -323,8 +338,103 @@ fn forget_synchronized_goal(live_root: &std::path::Path, relative: &std::path::P
     }
 }
 
-fn is_goal_record(relative: &std::path::Path) -> bool {
+pub(super) fn is_goal_record(relative: &std::path::Path) -> bool {
     relative.file_name().and_then(|name| name.to_str()) == Some("goal.json")
+}
+
+/// Merge independently changed fields in one Goal record.
+///
+/// Goal persistence rewrites the complete JSON document even for a single
+/// field mutation. The file-level synchronization guard therefore sees an
+/// ownership transfer on one Node and a workflow transition on another as a
+/// conflict, despite the changes being compatible. This is a strict three-way
+/// merge: values changed differently on both sides still fail, arrays remain
+/// atomic, and only the bookkeeping `updated` timestamp has a defined
+/// concurrent resolution (the later valid RFC 3339 value).
+pub(super) fn merge_goal_record(base: &[u8], local: &[u8], remote: &[u8]) -> Option<Vec<u8>> {
+    let base = serde_json::from_slice::<serde_json::Value>(base).ok()?;
+    let local = serde_json::from_slice::<serde_json::Value>(local).ok()?;
+    let remote = serde_json::from_slice::<serde_json::Value>(remote).ok()?;
+    let base_id = base.get("id")?.as_str()?;
+    if base_id.is_empty()
+        || local.get("id").and_then(serde_json::Value::as_str) != Some(base_id)
+        || remote.get("id").and_then(serde_json::Value::as_str) != Some(base_id)
+    {
+        return None;
+    }
+    let merged = merge_json_value(&base, &local, &remote, None)?;
+    let mut encoded = serde_json::to_vec_pretty(&merged).ok()?;
+    encoded.push(b'\n');
+    Some(encoded)
+}
+
+fn merge_json_value(
+    base: &serde_json::Value,
+    local: &serde_json::Value,
+    remote: &serde_json::Value,
+    field: Option<&str>,
+) -> Option<serde_json::Value> {
+    if local == remote {
+        return Some(local.clone());
+    }
+    if local == base {
+        return Some(remote.clone());
+    }
+    if remote == base {
+        return Some(local.clone());
+    }
+    if field == Some("updated") {
+        return later_timestamp(local, remote);
+    }
+    let (base, local, remote) = (base.as_object()?, local.as_object()?, remote.as_object()?);
+    let keys = base
+        .keys()
+        .chain(local.keys())
+        .chain(remote.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut merged = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) =
+            merge_json_member(base.get(&key), local.get(&key), remote.get(&key), &key)?
+        {
+            merged.insert(key, value);
+        }
+    }
+    Some(serde_json::Value::Object(merged))
+}
+
+fn merge_json_member(
+    base: Option<&serde_json::Value>,
+    local: Option<&serde_json::Value>,
+    remote: Option<&serde_json::Value>,
+    field: &str,
+) -> Option<Option<serde_json::Value>> {
+    if local == remote {
+        return Some(local.cloned());
+    }
+    if local == base {
+        return Some(remote.cloned());
+    }
+    if remote == base {
+        return Some(local.cloned());
+    }
+    Some(Some(merge_json_value(base?, local?, remote?, Some(field))?))
+}
+
+fn later_timestamp(
+    local: &serde_json::Value,
+    remote: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let local_text = local.as_str()?;
+    let remote_text = remote.as_str()?;
+    let local_time = chrono::DateTime::parse_from_rfc3339(local_text).ok()?;
+    let remote_time = chrono::DateTime::parse_from_rfc3339(remote_text).ok()?;
+    Some(if local_time >= remote_time {
+        local.clone()
+    } else {
+        remote.clone()
+    })
 }
 
 /// `goals/<shard>/<rest>/goal.json` identifies Goal `<shard><rest>`.
@@ -374,6 +484,42 @@ pub(super) fn copy_state_file(
         let _ = fs::remove_file(&temp);
         RefineError::Io(format!(
             "failed to commit synchronized Refine state {}: {error}",
+            destination.display()
+        ))
+    })
+}
+
+pub(super) fn write_state_file_bytes(
+    destination: &std::path::Path,
+    bytes: &[u8],
+) -> RefineResult<()> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create Refine state directory {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let parent = destination
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let temp = parent.join(format!(
+        ".refine-sync-{}-{}",
+        std::process::id(),
+        STATE_COPY_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    if let Err(error) = fs::write(&temp, bytes) {
+        let _ = fs::remove_file(&temp);
+        return Err(RefineError::Io(format!(
+            "failed to write reconciled Refine state {}: {error}",
+            temp.display()
+        )));
+    }
+    fs::rename(&temp, destination).map_err(|error| {
+        let _ = fs::remove_file(&temp);
+        RefineError::Io(format!(
+            "failed to commit reconciled Refine state {}: {error}",
             destination.display()
         ))
     })

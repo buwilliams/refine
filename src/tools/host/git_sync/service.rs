@@ -183,7 +183,21 @@ impl FileGitSyncService {
         } else {
             stored_base.unwrap_or_default()
         };
-        let resolved_paths = BTreeSet::new();
+        let reconciled_goals = self.reconcile_non_overlapping_goal_changes(
+            &state_root,
+            &live_refine,
+            &state_refine,
+            &base,
+            &local,
+            &remote_state,
+        )?;
+        let resolved_paths = reconciled_goals.keys().cloned().collect::<BTreeSet<_>>();
+        if !resolved_paths.is_empty() {
+            details.push(format!(
+                "Merged non-overlapping Goal changes: {}",
+                display_state_paths(&resolved_paths)
+            ));
+        }
         let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         if !conflicts.is_empty() {
             return Err(RefineError::Conflict(format!(
@@ -191,6 +205,7 @@ impl FileGitSyncService {
                 conflicts.join(", ")
             )));
         }
+        write_reconciled_goal_changes(&state_refine, &reconciled_goals)?;
         apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 
         let updated = durable_state_map(&state_refine)?;
@@ -243,7 +258,24 @@ impl FileGitSyncService {
                 // since the original reconciliation. Re-evaluate the original observed base
                 // against both fresh sides before replaying any local delta.
                 let retry_local = durable_state_map(&live_refine)?;
-                let retry_resolved_paths = BTreeSet::new();
+                let retry_reconciled_goals = self.reconcile_non_overlapping_goal_changes(
+                    &state_root,
+                    &live_refine,
+                    &state_refine,
+                    &base,
+                    &retry_local,
+                    &retry_remote_state,
+                )?;
+                let retry_resolved_paths = retry_reconciled_goals
+                    .keys()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                if !retry_resolved_paths.is_empty() {
+                    details.push(format!(
+                        "Merged non-overlapping Goal changes during push retry: {}",
+                        display_state_paths(&retry_resolved_paths)
+                    ));
+                }
                 let retry_conflicts = state_conflicts(
                     &base,
                     &retry_local,
@@ -256,6 +288,7 @@ impl FileGitSyncService {
                         retry_conflicts.join(", ")
                     )));
                 }
+                write_reconciled_goal_changes(&state_refine, &retry_reconciled_goals)?;
                 apply_local_state_delta(
                     &live_refine,
                     &state_refine,
@@ -314,4 +347,70 @@ impl FileGitSyncService {
             deferred: concurrent_local_change,
         })
     }
+
+    fn reconcile_non_overlapping_goal_changes(
+        &self,
+        state_root: &std::path::Path,
+        live_refine: &std::path::Path,
+        state_refine: &std::path::Path,
+        base: &DurableStateMap,
+        local: &DurableStateMap,
+        remote: &DurableStateMap,
+    ) -> RefineResult<BTreeMap<PathBuf, Vec<u8>>> {
+        let unresolved = BTreeSet::new();
+        let mut reconciled = BTreeMap::new();
+        for relative in state_conflict_paths(base, local, remote, &unresolved) {
+            if !is_goal_record(&relative) {
+                continue;
+            }
+            let (Some(base_fingerprint), Some(_), Some(_)) = (
+                base.get(&relative),
+                local.get(&relative),
+                remote.get(&relative),
+            ) else {
+                continue;
+            };
+            let Some(base_bytes) =
+                self.load_baseline_file(state_root, &relative, *base_fingerprint)?
+            else {
+                continue;
+            };
+            let local_path = live_refine.join(&relative);
+            let remote_path = state_refine.join(&relative);
+            let local_bytes = read_reconciliation_file(&local_path)?;
+            let remote_bytes = read_reconciliation_file(&remote_path)?;
+            let Some(merged) = merge_goal_record(&base_bytes, &local_bytes, &remote_bytes) else {
+                continue;
+            };
+            reconciled.insert(relative, merged);
+        }
+        Ok(reconciled)
+    }
+}
+
+fn read_reconciliation_file(path: &std::path::Path) -> RefineResult<Vec<u8>> {
+    fs::read(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read conflicting Refine state {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn display_state_paths(paths: &BTreeSet<PathBuf>) -> String {
+    paths
+        .iter()
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn write_reconciled_goal_changes(
+    state_refine: &std::path::Path,
+    reconciled: &BTreeMap<PathBuf, Vec<u8>>,
+) -> RefineResult<()> {
+    for (relative, bytes) in reconciled {
+        write_state_file_bytes(&state_refine.join(relative), bytes)?;
+    }
+    Ok(())
 }
