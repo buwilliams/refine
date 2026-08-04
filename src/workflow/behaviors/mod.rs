@@ -9,7 +9,9 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::host::quality::{POST_BUILD, QualityCheckResult, QualityOperationRunner};
+use crate::tools::host::quality::{
+    POST_BUILD, QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,
+};
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
@@ -548,7 +550,14 @@ impl WorkflowBehavior for WorkflowQa {
                 );
                 return Err(error);
             }
-            Err(error) => return fail(ctx, "quality", error),
+            Err(error) => {
+                let category = if is_quality_harness_fault(&error) {
+                    "quality_harness"
+                } else {
+                    "quality"
+                };
+                return fail(ctx, category, error);
+            }
         };
         if let Some(integration) = ctx.reconciliation.clone() {
             if quality.ok {

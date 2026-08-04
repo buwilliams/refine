@@ -177,6 +177,7 @@ impl FileQualityService {
         let security = FileSecurityService::from_project_settings(&runtime_root, &self.refine_dir)?;
         security.authorize_host_command("quality", command)?;
         let (shell, args) = shell_program_args(command);
+        let observed_shell = shell.clone();
         let output = FileProcessSupervisor::with_allowed_commands(
             runtime_root,
             security.allowed_commands.iter().cloned(),
@@ -198,6 +199,7 @@ impl FileQualityService {
         })?;
         Ok(ObservedExecution {
             process_id: output.process.id,
+            shell: observed_shell,
             exit_code: output.process.exit_code,
             stdout: output.stdout,
             stderr: output.stderr,

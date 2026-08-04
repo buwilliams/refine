@@ -37,6 +37,7 @@ mod settings;
 mod settlement;
 
 use cancellation::*;
+pub(crate) use provider_output::is_quality_harness_fault;
 pub(crate) use provider_output::parse_quality_provider_output;
 use provider_output::*;
 pub use runner::QualityOperationRunner;

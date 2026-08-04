@@ -2,8 +2,11 @@ use super::os_backend::ServiceCommandOutput;
 use super::service_control::launchd_label;
 use super::*;
 use std::collections::VecDeque;
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, TcpListener};
 use std::path::Path;
 use std::sync::Mutex;
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -136,6 +139,75 @@ fn installed_systemd_service_owns_daemon_lifecycle_commands() {
             .is_none(),
         "an inactive registration must not intercept shutdown of the direct fallback runtime"
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn uninstall_deactivation_errors_are_visible_and_after_stop_cleanup_does_not_stop_twice() {
+    let temp_root = unique_temp_dir("installation-uninstall-deactivation");
+    let runtime_root = temp_root.join("run");
+    let linux = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+    linux.install(InstallTarget::LinuxCliWeb).unwrap();
+    let mut linux_backend = linux.load_backend().unwrap().unwrap();
+
+    let error = linux
+        .deactivate_os_backend_with(&mut linux_backend, false, &mut |_| {
+            Err("permission denied".to_string())
+        })
+        .unwrap_err();
+
+    assert!(error.to_string().contains("permission denied"));
+    assert!(linux_backend.activated);
+
+    let mac = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
+    mac.install(InstallTarget::MacOsAppBundle).unwrap();
+    let mut mac_backend = mac.load_backend().unwrap().unwrap();
+    let mut commands = Vec::new();
+    mac.deactivate_os_backend_with(&mut mac_backend, true, &mut |command| {
+        commands.push(command.display());
+        Ok(())
+    })
+    .unwrap();
+
+    assert_eq!(commands.len(), 1, "{commands:?}");
+    assert!(commands[0].contains("'launchctl' 'disable'"));
+    assert!(!commands[0].contains("bootout"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn installation_uninstall_refuses_to_remove_registration_while_daemon_is_reachable() {
+    let temp_root = unique_temp_dir("installation-uninstall-reachable");
+    let runtime_root = temp_root.join("run");
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let service = test_installation_service_for_port(&runtime_root, "1.0.0", port, &temp_root);
+    let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
+    let metadata = PathBuf::from(
+        installed
+            .backend
+            .as_ref()
+            .and_then(|backend| backend.service_metadata_path.as_ref())
+            .unwrap(),
+    );
+    let responder = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = [0_u8; 1024];
+        let _ = stream.read(&mut request);
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+            .unwrap();
+    });
+
+    let error = service.uninstall().unwrap_err();
+    responder.join().unwrap();
+
+    assert!(error.to_string().contains("daemon remains reachable"));
+    assert!(service.status().unwrap().installed);
+    assert!(service.backend_path().exists());
+    assert!(metadata.exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -212,6 +212,45 @@ pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec
     }
 }
 
+/// Remove service-manager enablement after the daemon has already been stopped
+/// and its non-reachability confirmed by the host lifecycle authority.
+///
+/// Repeating the full deactivation is not portable: launchd reports `bootout`
+/// of an already stopped service as an error. These commands remove persistent
+/// enablement without issuing a second stop.
+pub(super) fn deactivation_after_stop_commands(
+    backend: &InstallBackendRegistration,
+) -> Vec<ServiceCommand> {
+    match backend.target {
+        InstallTarget::LinuxCliWeb => vec![
+            ServiceCommand::new(
+                "systemctl",
+                vec![
+                    "--user".to_string(),
+                    "disable".to_string(),
+                    service_control::systemd_unit_name(backend),
+                ],
+            ),
+            ServiceCommand::new(
+                "systemctl",
+                vec!["--user".to_string(), "daemon-reload".to_string()],
+            ),
+        ],
+        InstallTarget::MacOsAppBundle => vec![ServiceCommand::new(
+            "launchctl",
+            vec![
+                "disable".to_string(),
+                format!(
+                    "{}/{}",
+                    launchctl_gui_domain(),
+                    service_control::launchd_label(backend)
+                ),
+            ],
+        )],
+        InstallTarget::WindowsInstaller => Vec::new(),
+    }
+}
+
 #[cfg(target_family = "unix")]
 pub(super) fn launchctl_gui_domain() -> String {
     format!("gui/{}", unsafe { libc_getuid() })

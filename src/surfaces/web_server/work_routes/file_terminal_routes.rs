@@ -1,13 +1,12 @@
 use super::{
-    ApiRequest, ApiResponse, ConfigService, GoalStatus, HostAgentProviderService,
-    InProcessWebServer, PathBuf, RefineError, TerminalLaunchSpec, Value,
-    cleanup_failed_terminal_worktree, create_terminal_standalone_worktree,
-    default_interactive_shell, error_response, files_read_response, files_search_response,
-    files_tree_response, find_goal_agent_session, json, query_param,
-    resume_terminal_standalone_worktree, runtime_root_unavailable, target_root_unavailable,
-    terminal_events_range, terminal_input_response, terminal_profile_prompt,
-    terminal_resize_response, terminal_session_start_response, terminal_status_response,
-    terminal_stop_response,
+    ApiRequest, ApiResponse, ConfigService, HostAgentProviderService, InProcessWebServer, PathBuf,
+    RefineError, TerminalLaunchSpec, Value, cleanup_failed_terminal_worktree,
+    create_terminal_standalone_worktree, default_interactive_shell, error_response,
+    files_read_response, files_search_response, files_tree_response, find_goal_agent_session, json,
+    query_param, resume_terminal_standalone_worktree, runtime_root_unavailable,
+    target_root_unavailable, terminal_events_range, terminal_input_response,
+    terminal_profile_prompt, terminal_resize_response, terminal_session_start_response,
+    terminal_status_response, terminal_stop_response,
 };
 
 impl InProcessWebServer {
@@ -119,23 +118,11 @@ impl InProcessWebServer {
                         ))),
                     };
                 }
-                Err(RefineError::NotFound(message)) => {
-                    let projection = match self.current_projection() {
-                        Ok(projection) => projection,
-                        Err(error) => return error_response(error),
-                    };
-                    let Some(goal) = projection.goals.get(goal_id) else {
-                        return error_response(RefineError::NotFound(format!(
-                            "Goal {goal_id} was not found"
-                        )));
-                    };
-                    // A running workflow can be between process registration
-                    // and terminal discovery. Never launch a competing
-                    // diagnostic Agent inside that ownership window.
-                    if goal.goal.status == GoalStatus::InProgress {
-                        return error_response(RefineError::NotFound(message));
-                    }
-                }
+                // No workflow-owned session is attachable. Continue into the
+                // context-only diagnostic profile regardless of the Goal's
+                // lifecycle label; its metadata deliberately carries
+                // `attached_goal_id`, never workflow ownership.
+                Err(RefineError::NotFound(_)) => {}
                 Err(error) => return error_response(error),
             }
         }

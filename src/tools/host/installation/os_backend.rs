@@ -148,21 +148,52 @@ impl FileInstallationService {
             .push("native service activated with the platform service manager".to_string());
     }
 
-    pub(super) fn deactivate_os_backend(&self, backend: &mut InstallBackendRegistration) {
-        let commands = deactivation_commands(backend);
+    pub(super) fn deactivate_os_backend(
+        &self,
+        backend: &mut InstallBackendRegistration,
+    ) -> RefineResult<()> {
+        self.deactivate_os_backend_with(backend, false, &mut |command| {
+            self.run_service_command(command)
+        })
+    }
+
+    pub(super) fn deactivate_os_backend_after_stop(
+        &self,
+        backend: &mut InstallBackendRegistration,
+    ) -> RefineResult<()> {
+        self.deactivate_os_backend_with(backend, true, &mut |command| {
+            self.run_service_command(command)
+        })
+    }
+
+    pub(super) fn deactivate_os_backend_with(
+        &self,
+        backend: &mut InstallBackendRegistration,
+        daemon_already_stopped: bool,
+        run: &mut impl FnMut(&ServiceCommand) -> Result<(), String>,
+    ) -> RefineResult<()> {
+        let commands = if daemon_already_stopped {
+            deactivation_after_stop_commands(backend)
+        } else {
+            deactivation_commands(backend)
+        };
         backend.deactivation_commands = commands.iter().map(ServiceCommand::display).collect();
         for command in commands {
-            if let Err(error) = self.run_service_command(&command) {
+            if let Err(error) = run(&command) {
                 backend.notes.push(format!(
                     "native service deactivation failed while running `{}`: {error}",
                     command.display()
                 ));
-                return;
+                return Err(RefineError::Degraded(format!(
+                    "failed to deactivate installed Refine service with `{}`: {error}",
+                    command.display()
+                )));
             }
         }
         if !backend.deactivation_commands.is_empty() {
             backend.activated = false;
         }
+        Ok(())
     }
 
     pub(super) fn service_metadata(

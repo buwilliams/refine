@@ -409,13 +409,21 @@ impl QualityOperationRunner {
                 Ok(QualityOperationResult { operation, result })
             }
             Err(error) => {
+                let harness_fault = is_quality_harness_fault(&error);
                 registry.append_log(
                     operation_id,
                     quality_operation_log(
                         &request.owner_id,
                         "error",
-                        "Quality checks failed",
-                        Some(json!({"error": error.to_string()})),
+                        if harness_fault {
+                            "Quality command harness fault"
+                        } else {
+                            "Quality checks failed"
+                        },
+                        Some(json!({
+                            "error": error.to_string(),
+                            "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }
+                        })),
                     ),
                 )?;
                 let current = registry.status(operation_id)?;
@@ -442,7 +450,11 @@ impl QualityOperationRunner {
                 registry.fail_with_error(
                     operation_id,
                     json!({
-                        "code": "quality_evaluation_failed",
+                        "code": if harness_fault {
+                            "quality_command_harness_fault"
+                        } else {
+                            "quality_evaluation_failed"
+                        },
                         "message": error.to_string()
                     }),
                 )?;

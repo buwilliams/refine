@@ -40,8 +40,17 @@ function goalsHash(parts) {
 
 async function renderGoalsList() {
   if (renderNoProjectIfDetached("Goals")) return;
-  renderBanners([]);
-  await ensureGoalsNodeOptions();
+  let reporterLoadError = null;
+  await Promise.all([
+    ensureGoalsNodeOptions(),
+    refreshReporters().catch((error) => {
+      reporterLoadError = error;
+    }),
+  ]);
+  renderBanners(reporterLoadError ? [{
+    severity: "error",
+    message: `Could not load Reporter and Assignee filters: ${reporterLoadError.message || reporterLoadError}`,
+  }] : []);
   const f = goalsFilterFromHash();
   // Preserve the filter shell's open/closed state across full re-renders
   // (Clear filters, bulk-op completion, etc.). First-ever render defaults

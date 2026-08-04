@@ -268,13 +268,37 @@ impl FileInstallationService {
         Ok(selected_port == LEGACY_DEFAULT_PORT && !has_any_explicit_port)
     }
 
-    pub(super) fn unregister_backend(&self) -> RefineResult<()> {
+    pub(crate) fn uninstall_after_daemon_stopped(&self) -> RefineResult<()> {
+        self.commit_uninstall(true)
+    }
+
+    pub(super) fn commit_uninstall(&self, daemon_already_stopped: bool) -> RefineResult<()> {
+        let mut state = self.load()?;
+        self.unregister_backend(daemon_already_stopped)?;
+        state.status.installed = false;
+        state.status.port = self.port;
+        state.status.stale = false;
+        state.status.partial = false;
+        state.status.conflicting = false;
+        state.status.backend = None;
+        state.updated_at = now_timestamp();
+        self.save(&state)
+    }
+
+    pub(super) fn unregister_backend(&self, daemon_already_stopped: bool) -> RefineResult<()> {
         let remove_legacy = self.legacy_registration_belongs_to_selected_port()?;
-        if let Some(backend) = self.load_backend()?
-            && let Some(path) = backend.service_metadata_path.clone()
-        {
-            let mut backend = backend;
-            self.deactivate_os_backend(&mut backend);
+        let mut backend = self.load_backend()?;
+        if let Some(backend) = backend.as_mut() {
+            if daemon_already_stopped {
+                self.deactivate_os_backend_after_stop(backend)?;
+            } else {
+                self.deactivate_os_backend(backend)?;
+            }
+        }
+        if !daemon_already_stopped {
+            self.confirm_uninstall_daemon_stopped(backend.as_ref())?;
+        }
+        if let Some(path) = backend.and_then(|backend| backend.service_metadata_path) {
             let path = PathBuf::from(path);
             if path.exists() {
                 fs::remove_file(&path).map_err(|error| {
@@ -305,6 +329,29 @@ impl FileInstallationService {
             })?;
         }
         Ok(())
+    }
+
+    fn confirm_uninstall_daemon_stopped(
+        &self,
+        backend: Option<&InstallBackendRegistration>,
+    ) -> RefineResult<()> {
+        let port = self
+            .port
+            .or_else(|| backend.and_then(|backend| backend.port))
+            .ok_or_else(|| {
+                RefineError::InvalidInput(
+                    "uninstall requires a port so daemon shutdown can be confirmed".to_string(),
+                )
+            })?;
+        match http_reachability_probe(port) {
+            DaemonReachability::Unreachable(_) => Ok(()),
+            DaemonReachability::Reachable => Err(RefineError::Degraded(format!(
+                "refusing to remove the Refine installation because the daemon remains reachable on 127.0.0.1:{port}"
+            ))),
+            DaemonReachability::Unknown(error) => Err(RefineError::Degraded(format!(
+                "refusing to remove the Refine installation because daemon shutdown on 127.0.0.1:{port} could not be confirmed: {error}"
+            ))),
+        }
     }
 }
 

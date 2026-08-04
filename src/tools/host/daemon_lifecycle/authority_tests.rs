@@ -204,7 +204,7 @@ fn shared_authority_uses_direct_fallback_for_an_uninstalled_reachable_port() {
 }
 
 #[test]
-fn registered_but_inactive_installation_stops_observed_direct_runtime() {
+fn uninstalling_registered_but_inactive_installation_stops_observed_direct_runtime() {
     let temp_root = unique_temp_dir("shared-daemon-lifecycle-inactive-registration");
     let runtime_root = temp_root.join("run");
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
@@ -267,19 +267,74 @@ fn registered_but_inactive_installation_stops_observed_direct_runtime() {
     let recovered = runtime.recover(port).unwrap();
     runtime.mark_ready(recovered).unwrap();
 
-    let stopped = authority.stop(port).unwrap();
+    uninstall_daemon_installation(&authority, &installation, port).unwrap();
+    let stopped = runtime.status(port).unwrap();
     assert_eq!(stopped.worker_state, "stopped");
     assert!(!stopped.daemon_healthy);
     let evidence = stopped.lifecycle_evidence.unwrap();
     assert_eq!(evidence.service_manager, "direct_process");
     assert_eq!(evidence.observed_reachable, Some(false));
     assert_ne!(supervisor.wait(&process.id).unwrap().state, "running");
+    assert!(!installation.status().unwrap().installed);
+    assert!(!installation.backend_path().exists());
     assert_eq!(
         installation
             .installed_service_manager_for(InstalledServiceAction::Stop)
             .unwrap(),
         None
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn failed_uninstall_shutdown_preserves_service_registration() {
+    struct FailingStop;
+
+    impl HostDaemonLifecycleService for FailingStop {
+        fn start(&self, _config: BackgroundDaemonConfig) -> RefineResult<DaemonStatus> {
+            unreachable!()
+        }
+
+        fn stop(&self, _port: u16) -> RefineResult<DaemonStatus> {
+            Err(RefineError::Degraded(
+                "daemon remained reachable after service stop".to_string(),
+            ))
+        }
+
+        fn restart(&self, _config: BackgroundDaemonConfig) -> RefineResult<DaemonStatus> {
+            unreachable!()
+        }
+    }
+
+    let temp_root = unique_temp_dir("failed-uninstall-preserves-registration");
+    let runtime_root = temp_root.join("run");
+    let authority = FileHostDaemonLifecycleService::with_path_inputs(
+        RuntimeRoot {
+            root: runtime_root.clone(),
+        },
+        "1.0.0",
+        test_path_inputs(&temp_root),
+    );
+    let installation = authority.installation(4557);
+    let installed = installation.install(InstallTarget::LinuxCliWeb).unwrap();
+    let metadata = PathBuf::from(
+        installed
+            .backend
+            .as_ref()
+            .and_then(|backend| backend.service_metadata_path.as_ref())
+            .unwrap(),
+    );
+
+    let error = uninstall_daemon_installation(&FailingStop, &installation, 4557).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "daemon remained reachable after service stop"
+    );
+    assert!(installation.status().unwrap().installed);
+    assert!(installation.backend_path().exists());
+    assert!(metadata.exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

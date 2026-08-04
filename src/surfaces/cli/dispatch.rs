@@ -68,6 +68,7 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
+    uninstall_daemon_installation,
 };
 use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,

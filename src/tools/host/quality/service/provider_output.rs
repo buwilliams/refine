@@ -9,6 +9,7 @@ pub(super) struct QualityTestDefinition {
 #[derive(Clone, Debug)]
 pub(super) struct ObservedExecution {
     pub(super) process_id: String,
+    pub(super) shell: String,
     pub(super) exit_code: Option<i32>,
     pub(super) stdout: String,
     pub(super) stderr: String,
@@ -31,6 +32,53 @@ impl ObservedExecution {
         }
         evidence
     }
+
+    pub(super) fn shell_parser_aborted(&self) -> bool {
+        if self.exit_code != Some(2) {
+            return false;
+        }
+        let stderr = self.stderr.to_ascii_lowercase();
+        let shell = self.shell.to_ascii_lowercase();
+        let shell_name = Path::new(&shell)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&shell);
+        let emitted_by_shell = stderr.lines().any(|line| {
+            let line = line.trim_start();
+            line.starts_with(&format!("{shell}:")) || line.starts_with(&format!("{shell_name}:"))
+        });
+        emitted_by_shell
+            && [
+                "syntax error",
+                "redirection unexpected",
+                "unexpected token",
+                "unexpected end of file",
+                "bad substitution",
+            ]
+            .iter()
+            .any(|marker| stderr.contains(marker))
+    }
+}
+
+const QUALITY_COMMAND_HARNESS_FAULT_PREFIX: &str = "Quality command harness fault:";
+
+pub(super) fn quality_command_harness_fault(
+    command: &str,
+    observed: &ObservedExecution,
+) -> RefineError {
+    RefineError::Degraded(format!(
+        "{QUALITY_COMMAND_HARNESS_FAULT_PREFIX} supervised shell {} could not parse {command:?}. {}",
+        observed.shell,
+        observed.evidence()
+    ))
+}
+
+pub(crate) fn is_quality_harness_fault(error: &RefineError) -> bool {
+    matches!(
+        error,
+        RefineError::Degraded(message)
+            if message.starts_with(QUALITY_COMMAND_HARNESS_FAULT_PREFIX)
+    )
 }
 
 pub(crate) fn parse_quality_provider_output(
@@ -290,17 +338,49 @@ pub(super) fn normalize_timing_lossy(value: &str) -> String {
 }
 
 pub(super) fn shell_program_args(command: &str) -> (String, Vec<String>) {
-    if cfg!(windows) {
+    #[cfg(windows)]
+    {
         (
             "cmd".to_string(),
             vec!["/C".to_string(), command.to_string()],
         )
-    } else {
+    }
+    #[cfg(not(windows))]
+    {
         (
-            "sh".to_string(),
-            vec!["-lc".to_string(), command.to_string()],
+            find_bash().unwrap_or_else(|| "sh".to_string()),
+            vec!["-c".to_string(), command.to_string()],
         )
     }
+}
+
+#[cfg(not(windows))]
+fn find_bash() -> Option<String> {
+    let path_candidates = std::env::var_os("PATH")
+        .map(|path| {
+            std::env::split_paths(&path)
+                .map(|directory| directory.join("bash"))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    path_candidates
+        .into_iter()
+        .chain([PathBuf::from("/bin/bash"), PathBuf::from("/usr/bin/bash")])
+        .find(|path| executable_file(path))
+        .map(|path| path.display().to_string())
+}
+
+#[cfg(unix)]
+fn executable_file(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(all(not(windows), not(unix)))]
+fn executable_file(path: &Path) -> bool {
+    path.is_file()
 }
 
 fn tail_text(value: &str, max_chars: usize) -> Option<String> {

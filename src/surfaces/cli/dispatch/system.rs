@@ -233,7 +233,15 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     version,
                 },
         } => {
-            FileInstallationService::for_port(runtime_root, version, port).uninstall()?;
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let lifecycle = FileHostDaemonLifecycleService::new(
+                RuntimeRoot {
+                    root: runtime_root.clone(),
+                },
+                env!("CARGO_PKG_VERSION"),
+            );
+            let installation = FileInstallationService::for_port(runtime_root, version, port);
+            uninstall_daemon_installation(&lifecycle, &installation, port)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"uninstalled": true})).unwrap()

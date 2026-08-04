@@ -63,6 +63,20 @@ pub fn execute_daemon_lifecycle(
     }
 }
 
+/// Stop and confirm the exact daemon before removing its installation.
+///
+/// The installation remains intact when shutdown fails, so an operator can
+/// inspect or retry the registered service instead of being left with a live,
+/// unmanaged daemon and a false uninstall success.
+pub fn uninstall_daemon_installation(
+    lifecycle: &impl HostDaemonLifecycleService,
+    installation: &FileInstallationService,
+    port: u16,
+) -> RefineResult<()> {
+    lifecycle.stop(port)?;
+    installation.uninstall_after_daemon_stopped()
+}
+
 #[derive(Clone, Debug)]
 pub struct FileHostDaemonLifecycleService {
     runtime_root: RuntimeRoot,

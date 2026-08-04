@@ -88,16 +88,7 @@ impl InstallationService for FileInstallationService {
     }
 
     fn uninstall(&self) -> RefineResult<()> {
-        let mut state = self.load()?;
-        state.status.installed = false;
-        state.status.port = self.port;
-        state.status.stale = false;
-        state.status.partial = false;
-        state.status.conflicting = false;
-        state.status.backend = None;
-        state.updated_at = now_timestamp();
-        self.unregister_backend()?;
-        self.save(&state)
+        self.commit_uninstall(false)
     }
 
     fn status(&self) -> RefineResult<InstallStatus> {

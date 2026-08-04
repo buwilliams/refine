@@ -291,6 +291,32 @@ test("features list renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("Goals cold-load hydrates Reporter and Assignee filters before rendering", { skip: SKIP }, async () => {
+  const requests = [];
+  const app = await openApp({
+    onRequest(pathname) {
+      requests.push(pathname);
+    },
+  });
+  try {
+    await assertScreenRenders(app, {
+      route: "#/goals",
+      marker: '[data-testid="goals-table"]',
+    });
+    assert.ok(requests.includes("/api/reporters"));
+    assert.deepEqual(
+      await app.page.locator('[data-testid="goals-reporter-filter"] option').allTextContents(),
+      ["all reporters", "Reporter"],
+    );
+    assert.deepEqual(
+      await app.page.locator('[data-testid="goals-assignee-filter"] option').allTextContents(),
+      ["all assignees", "Reporter"],
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("feature detail renders from the routed URL", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

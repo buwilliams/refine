@@ -81,6 +81,10 @@ impl QualityService for FileQualityService {
             metadata.insert("quality_command".to_string(), json!(&result.command));
             self.ensure_operation_active(&request, "the next test command")?;
             let observed = self.run_observed_command(&result.command, &candidate_root, metadata)?;
+            if observed.shell_parser_aborted() {
+                verify_candidate(&candidate_root, &request.candidate_commit, "after")?;
+                return Err(quality_command_harness_fault(&result.command, &observed));
+            }
             let observed_ok = observed.exit_code == Some(0);
             result.process_id = Some(observed.process_id.clone());
             result.exit_code = observed.exit_code;

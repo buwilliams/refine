@@ -42,17 +42,19 @@ impl QualityOperationRunner {
         operation_id: &str,
     ) -> RefineResult<()> {
         let message = error.to_string();
+        let harness_fault = is_quality_harness_fault(error);
         let details = json!({
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit,
-            "error": message
+            "error": message,
+            "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }
         });
         FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
             .update_goal_round_evaluation_summary(
                 &request.owner_id,
                 request.round_idx,
                 &json!({
-                    "quality_state": "failed",
+                    "quality_state": if harness_fault { "harness_fault" } else { "failed" },
                     "quality_message": message,
                     "quality_details": details,
                     "quality_checked_at": now_timestamp()

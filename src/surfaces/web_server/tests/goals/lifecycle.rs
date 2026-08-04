@@ -136,12 +136,32 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
 }
 
 #[test]
-fn web_server_does_not_compete_with_an_in_progress_goal_agent_registration() {
+fn web_server_opens_an_in_progress_goal_diagnostic_when_no_goal_agent_is_running() {
+    let _env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let temp_root = unique_temp_dir("http-in-progress-goal-agent-registration");
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8082");
+    let provider = temp_root.join("smoke-ai");
     fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\ntrap 'exit 0' TERM INT\nprintf 'diagnostic-ready:%s\\n' \"$*\"\nwhile :; do sleep 1; done\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&provider).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&provider, permissions).unwrap();
+    }
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
 
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
@@ -160,6 +180,9 @@ fn web_server_does_not_compete_with_an_in_progress_goal_agent_registration() {
     work_items
         .advance_automated_goal_status("GOAL-IN-PROGRESS", GoalStatus::InProgress)
         .unwrap();
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
 
     let mut server = server_with_projection();
     server.target_root = Some(app_root);
@@ -170,13 +193,15 @@ fn web_server_does_not_compete_with_an_in_progress_goal_agent_registration() {
         body: Some(json!({"profile": "goal", "goal_id": "GOAL-IN-PROGRESS"})),
     });
 
-    assert_eq!(opened.status, 404, "{}", opened.body);
-    assert!(
-        FileProcessSupervisor::new(&runtime_root)
-            .list()
-            .unwrap()
-            .is_empty()
-    );
+    assert_eq!(opened.status, 200, "{}", opened.body);
+    let session_id = opened.body["id"].as_str().unwrap().to_string();
+    let process_id = opened.body["process_id"].as_str().unwrap();
+    let process = FileProcessSupervisor::new(&runtime_root)
+        .inspect(process_id)
+        .unwrap()
+        .api_json();
+    assert_eq!(process["attached_goal_id"], "GOAL-IN-PROGRESS");
+    assert!(process.get("goal_id").is_none());
     assert_eq!(
         work_items
             .show_goal_summary("GOAL-IN-PROGRESS")
@@ -185,6 +210,20 @@ fn web_server_does_not_compete_with_an_in_progress_goal_agent_registration() {
             .status,
         GoalStatus::InProgress
     );
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/stop"),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
 
     remove_temp_dir(&temp_root);
 }

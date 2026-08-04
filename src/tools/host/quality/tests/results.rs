@@ -200,6 +200,96 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn quality_runs_supervised_commands_with_bash_process_substitution() {
+    let temp_root = unique_temp_dir("quality-bash-process-substitution");
+    let candidate_root = temp_root.join("candidate");
+    let refine_dir = temp_root.join("state");
+    let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Bash syntax works\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"test -r <(printf ok)\"}]}'\n",
+    )
+    .unwrap();
+    make_executable(&smoke_ai);
+    let candidate_commit = init_git_candidate(&candidate_root);
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
+    service
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["Bash syntax works".to_string()]),
+            ..QualitySettingsPatch::default()
+        })
+        .unwrap();
+
+    let result = service
+        .run_checks(QualityCheckRequest {
+            owner_id: "GOAL1".to_string(),
+            round_idx: 0,
+            node_id: "default".to_string(),
+            provider: "smoke-ai".to_string(),
+            cwd: candidate_root.display().to_string(),
+            source_candidate_commit: Some(candidate_commit.clone()),
+            evaluation_scope: "isolated_candidate".to_string(),
+            candidate_commit,
+            process_metadata: quality_operation_metadata(&runtime_root),
+        })
+        .unwrap();
+
+    assert!(result.ok, "{result:#?}");
+    assert_eq!(result.results[0].exit_code, Some(0));
+    restore_smoke_ai(previous);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn quality_records_shell_parser_aborts_as_harness_faults() {
+    let fixture = goal_quality_fixture(
+        "quality-shell-parser-harness-fault",
+        "printf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf ok < <(\"}]}'",
+    );
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
+    let runner = fixture.runner();
+    let (operation, request) = runner
+        .register_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap();
+
+    let error = runner.run_registered(&operation.id, request).unwrap_err();
+
+    assert!(error.to_string().contains("Quality command harness fault"));
+    let detail = FileWorkItemService::new(&fixture.refine_dir)
+        .show_goal_detail("GOAL1")
+        .unwrap();
+    assert_eq!(detail["rounds"][0]["quality_state"], "harness_fault");
+    assert_eq!(
+        detail["rounds"][0]["quality_details"]["error_kind"],
+        "harness_fault"
+    );
+    let settled = FileOperationRegistry::new(&fixture.runtime_root)
+        .status(&operation.id)
+        .unwrap();
+    assert_eq!(settled.state, OperationState::Failed);
+    assert_eq!(
+        settled.error.as_ref().unwrap()["code"],
+        "quality_command_harness_fault"
+    );
+
+    restore_smoke_ai(previous);
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
 #[test]
 fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
     let temp_root = unique_temp_dir("quality-no-match-pass");

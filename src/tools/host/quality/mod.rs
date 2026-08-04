@@ -3,6 +3,7 @@ mod service;
 mod tests;
 mod types;
 
+pub(crate) use service::is_quality_harness_fault;
 #[cfg(test)]
 pub(crate) use service::parse_quality_provider_output;
 pub use service::{
