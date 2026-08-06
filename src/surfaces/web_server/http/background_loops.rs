@@ -26,10 +26,15 @@ impl LocalHttpDaemon {
                         .ensure_background_worker(WORKTREE_CLEANUP_RUNNER)
                         .err()
                         .map(|error| format!("worktree cleanup runner: {error}"));
-                    let development_request_error = workers
-                        .ensure_background_worker(DEVELOPMENT_REQUEST_RUNNER)
-                        .err()
-                        .map(|error| format!("development request runner: {error}"));
+                    let development_request_error =
+                        match load_self_development_email_config(runtime_root) {
+                            Ok(Some(_)) => workers
+                                .ensure_background_worker(DEVELOPMENT_REQUEST_RUNNER)
+                                .err()
+                                .map(|error| format!("development request runner: {error}")),
+                            Ok(None) => None,
+                            Err(error) => Some(format!("self-development email contract: {error}")),
+                        };
                     let failures = [workflow_error, cleanup_error, development_request_error]
                         .into_iter()
                         .flatten()

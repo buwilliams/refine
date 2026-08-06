@@ -8,6 +8,17 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
     let service = FileSettingsService::new(&refine_dir);
 
     assert_eq!(service.load().unwrap()["agent_cli"], "claude");
+    assert!(
+        !service
+            .load()
+            .unwrap()
+            .contains_key("development_request_email_enabled")
+    );
+    assert!(
+        service
+            .update(&serde_json::json!({"development_request_email_enabled": true}))
+            .is_err()
+    );
     let updated = service
         .update(&serde_json::json!({
             "agent_cli": "smoke-ai",
@@ -25,6 +36,40 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
         .unwrap();
     assert_eq!(generic["settings"]["agent_cli"], "/opt/refine/custom-agent");
 
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_settings_service_removes_retired_global_email_settings() {
+    let temp_root = unique_temp_dir("settings-retired-email");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(
+        refine_dir.join("nodes.json"),
+        serde_json::to_vec_pretty(&json!({
+            "nodes": [{
+                "id": "default",
+                "display_name": "Default",
+                "created_at": "2026-08-06T00:00:00Z",
+                "updated_at": "2026-08-06T00:00:00Z",
+                "settings": {
+                    "agent_cli": "codex",
+                    "development_request_email_enabled": "1",
+                    "development_request_allowed_senders": "private@example.com"
+                }
+            }]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let settings = FileSettingsService::new(&refine_dir).load().unwrap();
+    assert_eq!(settings["agent_cli"], "codex");
+    assert!(!settings.contains_key("development_request_email_enabled"));
+    let stored = fs::read_to_string(refine_dir.join("nodes.json")).unwrap();
+    assert!(!stored.contains("development_request_email_enabled"));
+    assert!(!stored.contains("development_request_allowed_senders"));
+    assert!(!stored.contains("private@example.com"));
     fs::remove_dir_all(temp_root).unwrap();
 }
 

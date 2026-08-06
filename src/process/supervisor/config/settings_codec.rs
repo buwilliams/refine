@@ -57,16 +57,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("target_app_process_check_command", ""),
         ("target_app_auto_build", "never"),
         ("target_app_auto_build_hour_utc", "3"),
-        ("development_request_email_enabled", "0"),
-        ("development_request_address", "goal@getrefine.dev"),
-        ("development_request_mailbox", "Development Requests"),
-        (
-            "development_request_allowed_senders",
-            "bwilliams@nevo.com, ejacobson@nevo.com, ethan.jacobson@insurity.com, buddy.williams@insurity.com, buddywilliams@gmail.com",
-        ),
-        ("development_request_poll_seconds", "60"),
-        ("development_request_auto_approve_after_seconds", "0"),
-        ("development_request_agent_cli", ""),
     ] {
         settings.insert(key.to_string(), Value::String(value.to_string()));
     }
@@ -126,13 +116,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "target_app_process_check_command",
         "target_app_auto_build",
         "target_app_auto_build_hour_utc",
-        "development_request_email_enabled",
-        "development_request_address",
-        "development_request_mailbox",
-        "development_request_allowed_senders",
-        "development_request_poll_seconds",
-        "development_request_auto_approve_after_seconds",
-        "development_request_agent_cli",
     ]
     .into_iter()
     .collect()
@@ -147,6 +130,19 @@ pub(super) fn legacy_setting_key(key: &str) -> Option<&'static str> {
         "target_app_auto_rebuild_hour_utc" => Some("target_app_auto_build_hour_utc"),
         _ => None,
     }
+}
+
+pub(super) fn is_retired_development_request_setting(key: &str) -> bool {
+    matches!(
+        key,
+        "development_request_email_enabled"
+            | "development_request_address"
+            | "development_request_mailbox"
+            | "development_request_allowed_senders"
+            | "development_request_poll_seconds"
+            | "development_request_auto_approve_after_seconds"
+            | "development_request_agent_cli"
+    )
 }
 
 pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
@@ -175,9 +171,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                 ))
             }
         }
-        "quality_enabled" | "development_request_email_enabled" => {
-            Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string())
-        }
+        "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
         "quality_timing" => {
             let value = as_string(value);
             if matches!(value.trim(), "post_build" | "post_rebuild") {
@@ -236,8 +230,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                     | "worktree_cleanup_after_seconds"
                     | "state_sync_debounce_seconds"
                     | "project_update_pulse_interval_seconds"
-                    | "development_request_poll_seconds"
-                    | "development_request_auto_approve_after_seconds"
             ) =>
         {
             normalize_integer(key, value)

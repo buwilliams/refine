@@ -50,6 +50,8 @@ use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::tools::host::quality::QualityOperationRunner;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
+#[cfg(not(test))]
+use crate::tools::product::development_requests::load_self_development_email_config;
 use crate::tools::product::project_state::ProjectionQuery;
 #[cfg(test)]
 use crate::workflow::WorkflowEngine;

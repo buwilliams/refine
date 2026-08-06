@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::model::JsonObject;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -29,63 +28,132 @@ const TOKEN_SCOPE: &str = "email";
 const TOKEN_NAME: &str = "fastmail_jmap_token";
 const PROCESSED_KEYWORD: &str = "refine-processed";
 const REQUEST_SCHEMA_VERSION: u64 = 1;
+const CONFIG_SCHEMA_VERSION: u64 = 1;
+const DEFAULT_POLL_SECONDS: u64 = 60;
+pub const SELF_DEVELOPMENT_EMAIL_CONFIG_FILE: &str = "self-development-email.json";
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DevelopmentRequestSettings {
-    pub enabled: bool,
+fn default_poll_seconds() -> u64 {
+    DEFAULT_POLL_SECONDS
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SelfDevelopmentEmailConfig {
+    pub schema_version: u64,
+    pub target_root: PathBuf,
     pub address: String,
     pub mailbox: String,
     pub allowed_senders: BTreeSet<String>,
-    pub poll_interval: Duration,
+    #[serde(default = "default_poll_seconds")]
+    pub poll_seconds: u64,
+    #[serde(default)]
+    pub auto_approve_after_seconds: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_cli: Option<String>,
+}
+
+pub fn self_development_email_config_path(runtime_root: &Path) -> PathBuf {
+    runtime_root.join(SELF_DEVELOPMENT_EMAIL_CONFIG_FILE)
+}
+
+pub fn load_self_development_email_config(
+    runtime_root: &Path,
+) -> RefineResult<Option<SelfDevelopmentEmailConfig>> {
+    let path = self_development_email_config_path(runtime_root);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(&path)
+        .map_err(|error| RefineError::Io(format!("failed to read {}: {error}", path.display())))?;
+    let mut config =
+        serde_json::from_slice::<SelfDevelopmentEmailConfig>(&bytes).map_err(|error| {
+            RefineError::Serialization(format!("failed to parse {}: {error}", path.display()))
+        })?;
+    if config.schema_version != CONFIG_SCHEMA_VERSION {
+        return Err(RefineError::InvalidInput(format!(
+            "{} schema_version must be {CONFIG_SCHEMA_VERSION}",
+            path.display()
+        )));
+    }
+    if !config.target_root.is_absolute() {
+        return Err(RefineError::InvalidInput(format!(
+            "{} target_root must be an absolute path",
+            path.display()
+        )));
+    }
+    config.target_root = config.target_root.canonicalize().map_err(|error| {
+        RefineError::InvalidInput(format!(
+            "{} target_root {} cannot be resolved: {error}",
+            path.display(),
+            config.target_root.display()
+        ))
+    })?;
+    config.address = config.address.trim().to_ascii_lowercase();
+    if config.address.is_empty() || !config.address.contains('@') {
+        return Err(RefineError::InvalidInput(format!(
+            "{} address must be a valid non-empty email address",
+            path.display()
+        )));
+    }
+    config.mailbox = config.mailbox.trim().to_string();
+    if config.mailbox.is_empty() {
+        return Err(RefineError::InvalidInput(format!(
+            "{} mailbox must not be empty",
+            path.display()
+        )));
+    }
+    config.allowed_senders = config
+        .allowed_senders
+        .iter()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+        .collect();
+    if config.allowed_senders.is_empty() {
+        return Err(RefineError::InvalidInput(format!(
+            "{} allowed_senders must contain at least one address",
+            path.display()
+        )));
+    }
+    config.poll_seconds = config.poll_seconds.max(1);
+    config.agent_cli = config
+        .agent_cli
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    Ok(Some(config))
+}
+
+pub fn self_development_email_target_is_active(
+    config: &SelfDevelopmentEmailConfig,
+    active_target_root: &Path,
+) -> RefineResult<bool> {
+    let active_target_root = active_target_root.canonicalize().map_err(|error| {
+        RefineError::InvalidInput(format!(
+            "active target_root {} cannot be resolved: {error}",
+            active_target_root.display()
+        ))
+    })?;
+    Ok(active_target_root == config.target_root)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DevelopmentRequestSettings {
+    pub address: String,
+    pub mailbox: String,
+    pub allowed_senders: BTreeSet<String>,
     pub auto_approve_after: Duration,
     pub provider: String,
 }
 
 impl DevelopmentRequestSettings {
-    pub fn from_project_settings(settings: &JsonObject) -> Self {
-        let text = |key: &str, fallback: &str| {
-            settings
-                .get(key)
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or(fallback)
-                .to_string()
-        };
-        let seconds = |key: &str, fallback: u64| {
-            settings
-                .get(key)
-                .and_then(Value::as_str)
-                .and_then(|value| value.trim().parse::<u64>().ok())
-                .unwrap_or(fallback)
-        };
-        let provider = text("development_request_agent_cli", "");
+    pub fn from_local_config(config: &SelfDevelopmentEmailConfig, fallback_provider: &str) -> Self {
         Self {
-            enabled: settings
-                .get("development_request_email_enabled")
-                .and_then(Value::as_str)
-                .is_some_and(|value| value == "1"),
-            address: text("development_request_address", "goal@getrefine.dev")
-                .to_ascii_lowercase(),
-            mailbox: text("development_request_mailbox", "Development Requests"),
-            allowed_senders: parse_allowed_senders(
-                settings
-                    .get("development_request_allowed_senders")
-                    .and_then(Value::as_str)
-                    .unwrap_or(
-                        "bwilliams@nevo.com, ejacobson@nevo.com, ethan.jacobson@insurity.com, buddy.williams@insurity.com, buddywilliams@gmail.com",
-                    ),
-            ),
-            poll_interval: Duration::from_secs(seconds("development_request_poll_seconds", 60).max(1)),
-            auto_approve_after: Duration::from_secs(seconds(
-                "development_request_auto_approve_after_seconds",
-                0,
-            )),
-            provider: if provider.is_empty() {
-                text("agent_cli", "claude")
-            } else {
-                provider
-            },
+            address: config.address.clone(),
+            mailbox: config.mailbox.clone(),
+            allowed_senders: config.allowed_senders.clone(),
+            auto_approve_after: Duration::from_secs(config.auto_approve_after_seconds),
+            provider: config
+                .agent_cli
+                .clone()
+                .unwrap_or_else(|| fallback_provider.to_string()),
         }
     }
 }
@@ -478,12 +546,10 @@ impl FileDevelopmentRequestService {
     }
 
     pub fn process_once(&self, settings: &DevelopmentRequestSettings) -> RefineResult<()> {
-        if !settings.enabled {
-            return Ok(());
-        }
         if settings.allowed_senders.is_empty() {
             return Err(RefineError::InvalidInput(
-                "development_request_allowed_senders must contain at least one address".to_string(),
+                "self-development email allowed_senders must contain at least one address"
+                    .to_string(),
             ));
         }
         let token = NativeSecretStore::new(&self.runtime_root)
@@ -507,7 +573,7 @@ impl FileDevelopmentRequestService {
                 fastmail.mark_processed(&email_id)?;
                 continue;
             }
-            let record = self.record_from_email(&email_id, parsed);
+            let record = self.record_from_email(&email_id, parsed, &settings.address);
             let path = self.record_path(&record.id);
             if !path.exists() {
                 self.write_record(&record)?;
@@ -518,9 +584,17 @@ impl FileDevelopmentRequestService {
         Ok(())
     }
 
-    fn record_from_email(&self, email_id: &str, parsed: ParsedEmail) -> DevelopmentRequestRecord {
+    fn record_from_email(
+        &self,
+        email_id: &str,
+        parsed: ParsedEmail,
+        address: &str,
+    ) -> DevelopmentRequestRecord {
         let id = request_id(email_id);
         let now = Utc::now().to_rfc3339();
+        let message_id_domain = address
+            .split_once('@')
+            .map_or(address, |(_, domain)| domain);
         DevelopmentRequestRecord {
             schema_version: REQUEST_SCHEMA_VERSION,
             id: id.clone(),
@@ -535,7 +609,7 @@ impl FileDevelopmentRequestService {
             goal_id: None,
             goal_name: None,
             review_seen_at: None,
-            notification_message_id: format!("refine-{id}@getrefine.dev"),
+            notification_message_id: format!("refine-{id}@{message_id_domain}"),
             notified_at: None,
             last_error: None,
             attempts: 0,
@@ -705,7 +779,9 @@ impl FileDevelopmentRequestService {
     }
 
     fn records_dir(&self) -> PathBuf {
-        self.refine_dir.join("development-requests")
+        self.runtime_root
+            .join("self-development-email")
+            .join("requests")
     }
 
     fn record_path(&self, request_id: &str) -> PathBuf {
@@ -771,15 +847,6 @@ fn ensure_set_succeeded(result: &Value, action: &str) -> RefineResult<()> {
         )));
     }
     Ok(())
-}
-
-fn parse_allowed_senders(value: &str) -> BTreeSet<String> {
-    value
-        .split([',', '\n'])
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_ascii_lowercase)
-        .collect()
 }
 
 fn parse_email(raw: &[u8]) -> RefineResult<ParsedEmail> {
@@ -849,15 +916,110 @@ fn parse_review_decision(output: &str) -> RefineResult<ReviewDecision> {
 mod tests {
     use super::*;
 
+    fn write_config(runtime_root: &Path, target_root: &Path, allowed_senders: &[&str]) {
+        fs::create_dir_all(runtime_root).unwrap();
+        fs::write(
+            self_development_email_config_path(runtime_root),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": 1,
+                "target_root": target_root,
+                "address": " Goal@GetRefine.dev ",
+                "mailbox": " Development Requests ",
+                "allowed_senders": allowed_senders,
+                "poll_seconds": 0,
+                "auto_approve_after_seconds": 5
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
     #[test]
-    fn sender_allowlist_is_case_insensitive_and_deduplicated() {
+    fn absent_local_contract_disables_email_intake() {
+        let runtime_root = std::env::temp_dir().join(format!(
+            "refine-development-request-config-{}",
+            uuid::Uuid::new_v4()
+        ));
         assert_eq!(
-            parse_allowed_senders(" Buddy@example.com,\nBUDDY@example.com\nteam@example.com "),
+            load_self_development_email_config(&runtime_root).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn local_contract_is_normalized_reread_and_bound_to_one_target() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-development-request-config-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let runtime_root = root.join("run/8082");
+        let target_root = root.join("refine-next");
+        let other_target = root.join("production-app");
+        fs::create_dir_all(&target_root).unwrap();
+        fs::create_dir_all(&other_target).unwrap();
+        write_config(
+            &runtime_root,
+            &target_root,
+            &[" Buddy@Example.com ", "BUDDY@example.com"],
+        );
+
+        let config = load_self_development_email_config(&runtime_root)
+            .unwrap()
+            .unwrap();
+        assert_eq!(config.target_root, target_root.canonicalize().unwrap());
+        assert_eq!(config.address, "goal@getrefine.dev");
+        assert_eq!(config.mailbox, "Development Requests");
+        assert_eq!(config.poll_seconds, 1);
+        assert_eq!(
+            config.allowed_senders,
+            BTreeSet::from(["buddy@example.com".to_string()])
+        );
+        assert!(self_development_email_target_is_active(&config, &target_root).unwrap());
+        assert!(!self_development_email_target_is_active(&config, &other_target).unwrap());
+
+        write_config(
+            &runtime_root,
+            &target_root,
+            &["second@example.com", "THIRD@example.com"],
+        );
+        let updated = load_self_development_email_config(&runtime_root)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            updated.allowed_senders,
             BTreeSet::from([
-                "buddy@example.com".to_string(),
-                "team@example.com".to_string()
+                "second@example.com".to_string(),
+                "third@example.com".to_string()
             ])
         );
+        let settings = DevelopmentRequestSettings::from_local_config(&updated, "codex");
+        assert_eq!(settings.provider, "codex");
+        assert_eq!(settings.auto_approve_after, Duration::from_secs(5));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn local_contract_rejects_a_relative_target() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-development-request-config-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let runtime_root = root.join("run/8082");
+        fs::create_dir_all(&runtime_root).unwrap();
+        fs::write(
+            self_development_email_config_path(&runtime_root),
+            serde_json::to_vec_pretty(&json!({
+                "schema_version": 1,
+                "target_root": "../refine-next",
+                "address": "goal@getrefine.dev",
+                "mailbox": "Development Requests",
+                "allowed_senders": ["buddy@example.com"]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(load_self_development_email_config(&runtime_root).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -910,6 +1072,7 @@ mod tests {
                 subject: "Request".to_string(),
                 source_text: "Please implement this.".to_string(),
             },
+            "goal@getrefine.dev",
         );
         service.write_record(&record).unwrap();
         assert_eq!(
@@ -918,6 +1081,13 @@ mod tests {
                 .unwrap(),
             record
         );
+        assert!(
+            service
+                .record_path(&record.id)
+                .starts_with(root.join("run/8082/self-development-email/requests"))
+        );
+        assert!(!root.join("refine-live-state/development-requests").exists());
+        assert!(record.notification_message_id.ends_with("@getrefine.dev"));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -947,28 +1117,6 @@ mod tests {
             ReviewDecision::Ignore {
                 reason: Some("noise".to_string())
             }
-        );
-    }
-
-    #[test]
-    fn settings_default_to_goal_address_and_inherit_agent_cli() {
-        let settings = JsonObject::from_iter([
-            (
-                "development_request_email_enabled".to_string(),
-                Value::String("1".to_string()),
-            ),
-            ("agent_cli".to_string(), Value::String("codex".to_string())),
-        ]);
-        let parsed = DevelopmentRequestSettings::from_project_settings(&settings);
-        assert!(parsed.enabled);
-        assert_eq!(parsed.address, "goal@getrefine.dev");
-        assert_eq!(parsed.provider, "codex");
-        assert!(parsed.allowed_senders.contains("bwilliams@nevo.com"));
-        assert!(parsed.allowed_senders.contains("buddywilliams@gmail.com"));
-        assert!(
-            parsed
-                .allowed_senders
-                .contains("buddy.williams@insurity.com")
         );
     }
 }

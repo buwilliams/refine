@@ -228,7 +228,9 @@ impl ConfigService for FileSettingsService {
                     Value::String(normalize_setting(new_key, &value)?),
                 );
                 migrated = true;
-            } else if key == RETIRED_SUPERVISOR_STALL_KEY {
+            } else if key == RETIRED_SUPERVISOR_STALL_KEY
+                || is_retired_development_request_setting(&key)
+            {
                 migrated = true;
             }
         }
