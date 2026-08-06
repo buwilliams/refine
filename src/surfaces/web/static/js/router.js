@@ -59,6 +59,14 @@ function parseHash() {
 
 function navigate() {
   const r = parseHash();
+  const destinationHash = location.hash || "#/";
+  if (
+    r.route !== "goals_new" &&
+    typeof guardNewGoalNavigation === "function" &&
+    guardNewGoalNavigation({ destinationHash, continueNavigation: navigate })
+  ) {
+    return;
+  }
   if (r.route === "chat_redirect") {
     // Legacy `#/chat[?goal=...]` deep links now open the dock and bounce to
     // the dashboard so the URL no longer points at a removed screen.

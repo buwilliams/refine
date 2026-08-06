@@ -9,6 +9,21 @@ async function renderGoalNew() {
 }
 
 let _newGoalModalOpen = false;
+let _newGoalModalDismiss = null;
+let _newGoalModalReturnHash = null;
+
+function guardNewGoalNavigation({ destinationHash, continueNavigation }) {
+  if (!_newGoalModalOpen || !_newGoalModalDismiss) return false;
+  const returnHash = _newGoalModalReturnHash || "#/";
+  _newGoalModalDismiss({ navigateAway: false }).then((discarded) => {
+    if (discarded) {
+      if ((location.hash || "#/") === destinationHash) continueNavigation();
+    } else if ((location.hash || "#/") !== returnHash) {
+      history.replaceState(null, "", returnHash);
+    }
+  });
+  return true;
+}
 
 function openNewGoalModal(options = {}) {
   if (_newGoalModalOpen) return;
@@ -18,6 +33,7 @@ function openNewGoalModal(options = {}) {
     return;
   }
   _newGoalModalOpen = true;
+  _newGoalModalReturnHash = location.hash || "#/";
 
   const root = document.createElement("div");
   root.className = "modal-backdrop";
@@ -57,14 +73,25 @@ function openNewGoalModal(options = {}) {
   `;
   document.body.appendChild(root);
 
+  const form = root.querySelector("#new-goal-form");
+  const promptField = form.querySelector("textarea[name='prompt']");
+  const priorityField = form.querySelector("select[name='priority']");
+  const initialFormState = {
+    prompt: promptField.value.trim(),
+    priority: priorityField.value,
+  };
   let closed = false;
+  let discardConfirmation = null;
   let duplicateDecision = "";
   let duplicateDecisionKey = "";
   function close(navigateAway) {
     if (closed) return;
     closed = true;
     _newGoalModalOpen = false;
+    _newGoalModalDismiss = null;
+    _newGoalModalReturnHash = null;
     document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("beforeunload", onBeforeUnload);
     root.remove();
     // If the modal was opened via the #/goals/new route, send the user back
     // to the goals list when they dismiss it (so the URL no longer points at
@@ -73,10 +100,54 @@ function openNewGoalModal(options = {}) {
       location.hash = "#/goals";
     }
   }
+  function isDirty() {
+    return promptField.value.trim() !== initialFormState.prompt
+      || priorityField.value !== initialFormState.priority;
+  }
+  function requestClose({ navigateAway, restoreFocusTo = document.activeElement }) {
+    if (closed) return Promise.resolve(true);
+    if (!isDirty()) {
+      close(navigateAway);
+      return Promise.resolve(true);
+    }
+    if (discardConfirmation) return discardConfirmation;
+    const priorFocus = root.contains(restoreFocusTo) ? restoreFocusTo : promptField;
+    discardConfirmation = modalConfirm(
+      "Your unsaved Goal text will be discarded.",
+      {
+        title: "Discard unsaved Goal?",
+        okLabel: "Discard Goal",
+        cancelLabel: "Keep editing",
+        danger: true,
+        focusCancel: true,
+      },
+    ).then((discarded) => {
+      if (discarded) {
+        close(navigateAway);
+        return true;
+      }
+      if (!closed) {
+        const focus = priorFocus?.isConnected ? priorFocus : promptField;
+        focus?.focus();
+      }
+      return false;
+    }).finally(() => {
+      discardConfirmation = null;
+    });
+    return discardConfirmation;
+  }
+  _newGoalModalDismiss = requestClose;
+
+  function onBeforeUnload(e) {
+    if (!isDirty()) return;
+    e.preventDefault();
+    e.returnValue = "";
+  }
   function onKey(e) {
+    if (discardConfirmation) return;
     if (e.key === "Escape") {
       e.preventDefault();
-      close(true);
+      requestClose({ navigateAway: true });
     } else if (e.key === "Enter") {
       // Allow Enter inside textareas to insert newlines.
       if (e.target && e.target.tagName === "TEXTAREA") return;
@@ -85,13 +156,15 @@ function openNewGoalModal(options = {}) {
     }
   }
   document.addEventListener("keydown", onKey, true);
+  window.addEventListener("beforeunload", onBeforeUnload);
   root.addEventListener("click", (e) => {
-    if (e.target === root) close(true);
+    if (e.target === root) requestClose({ navigateAway: true });
   });
-  root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  root.querySelector("[data-cancel]").addEventListener("click", (e) => {
+    requestClose({ navigateAway: true, restoreFocusTo: e.currentTarget });
+  });
   root.querySelector("[data-ok]").addEventListener("click", submit);
 
-  const form = root.querySelector("#new-goal-form");
   form.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
   $$("#new-goal-form textarea[name='prompt']", root).forEach((field) => {
     field.addEventListener("input", () => {
@@ -139,14 +212,20 @@ function openNewGoalModal(options = {}) {
         return;
       }
       toast("Goal created", "info");
-      if (typeof options.onSaved === "function") {
-        await options.onSaved(r);
-      }
       // Stay on whatever screen the modal was layered over — Dashboard,
       // Goals list, etc. `close(true)` only re-routes if we came in via
       // the `#/goals/new` deep link; otherwise the underlying hash is
       // preserved so the user doesn't lose their place.
+      // Creation is already durable. Close before any optional refresh callback
+      // so a callback failure cannot leave a retryable-looking duplicate draft.
       close(true);
+      if (typeof options.onSaved === "function") {
+        try {
+          await options.onSaved(r);
+        } catch (err) {
+          toast(`Goal created, but refresh failed: ${err.message}`, "error");
+        }
+      }
     } catch (err) {
       if (err.code === "duplicate_goal" && err.error?.duplicate?.match) {
         duplicateDecision = "";
@@ -178,8 +257,7 @@ function openNewGoalModal(options = {}) {
     }
   }
 
-  const firstField = root.querySelector("textarea[name='prompt']");
-  if (firstField) firstField.focus();
+  promptField.focus();
 }
 
 function drawNewGoalDuplicatePrompt(root, match, {
