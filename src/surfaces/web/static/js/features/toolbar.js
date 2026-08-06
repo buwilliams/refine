@@ -1571,6 +1571,26 @@ function handleTerminalNewlineKeydown(e, terminal = terminalStateFor()) {
   return true;
 }
 
+function handleAgentTerminalSuspendKeydown(
+  e,
+  tab = currentToolbarTab(),
+  terminal = terminalStateFor(),
+) {
+  if (!terminal?.sessionId || terminal.exited || tab?.mode === "terminal") return false;
+  if (!toolbarTabUsesTerminal(tab) || (e.type && e.type !== "keydown")) return false;
+  if (
+    String(e.key || "").toLowerCase() !== "z"
+    || !e.ctrlKey
+    || e.altKey
+    || e.metaKey
+  ) return false;
+  // Agent sessions have no useful foreground shell to resume a stopped TUI.
+  // Consume the VSUSP keystroke before xterm can emit SUB (0x1a) to the PTY;
+  // ordinary Terminal tabs keep standard shell job-control behavior.
+  e.preventDefault();
+  return true;
+}
+
 function terminalSelection(terminal) {
   if (!terminal?.term?.hasSelection?.()) return "";
   return terminal.term.getSelection?.() || "";
@@ -1872,7 +1892,8 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   term.onData((data) => queueTerminalInput(data, terminal));
   term.attachCustomKeyEventHandler?.(
     (event) => !handleTerminalClipboardKeydown(event, terminal)
-      && !handleTerminalNewlineKeydown(event, terminal),
+      && !handleTerminalNewlineKeydown(event, terminal)
+      && !handleAgentTerminalSuspendKeydown(event, tab, terminal),
   );
   term.element?.addEventListener?.(
     "copy",
