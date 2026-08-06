@@ -448,6 +448,7 @@ impl FileWorkItemService {
         object.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("notes".to_string(), Value::Array(Vec::new()));
         object.insert("rounds".to_string(), Value::Array(rounds));
+        self.ensure_goal_reporter_registered(reporter)?;
         write_json_atomically(&goal_path, &Value::Object(object))?;
 
         let json_path = goal_path

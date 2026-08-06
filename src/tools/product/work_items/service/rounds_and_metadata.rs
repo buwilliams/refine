@@ -51,6 +51,7 @@ impl FileWorkItemService {
                     Value::String(reporter.to_string())
                 },
             );
+            self.ensure_goal_reporter_registered(reporter)?;
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&goal_path, &value)?;
@@ -267,6 +268,7 @@ impl FileWorkItemService {
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
+        self.ensure_goal_reporter_registered(reporter)?;
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)
     }
@@ -300,10 +302,9 @@ impl FileWorkItemService {
             ))
         })?;
         if let Some(reporter) = reporter {
-            latest.insert(
-                "reporter".to_string(),
-                Value::String(Self::validate_goal_reporter(reporter)?.to_string()),
-            );
+            let reporter = Self::validate_goal_reporter(reporter)?;
+            latest.insert("reporter".to_string(), Value::String(reporter.to_string()));
+            self.ensure_goal_reporter_registered(reporter)?;
         }
         if let Some(assignee) = assignee {
             let assignee = Self::validate_goal_assignee(assignee)?;

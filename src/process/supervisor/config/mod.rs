@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 use crate::model::JsonObject;
 use crate::model::node::{Node, NodeDisplayNameAuthority};
 use crate::process::subprocess::write_json_atomically;
+use crate::process::supervisor::coordination::with_record_lock;
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;

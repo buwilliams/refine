@@ -27,6 +27,7 @@ use crate::model::workflow::{
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
     is_feature_protected_status, is_terminal_status, user_status_transition,
 };
+use crate::process::supervisor::config::FileReporterService;
 use crate::process::supervisor::coordination::{
     RecordLease, acquire_record_lock, record_lock_key, replace_file_durably, with_record_lock,
 };

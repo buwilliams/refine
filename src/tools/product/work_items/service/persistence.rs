@@ -1,6 +1,16 @@
 use super::*;
 
 impl FileWorkItemService {
+    pub(super) fn ensure_goal_reporter_registered(&self, reporter: &str) -> RefineResult<()> {
+        let reporter = reporter.trim();
+        if reporter.is_empty() {
+            return Ok(());
+        }
+        FileReporterService::new(&self.refine_dir)
+            .create(reporter)
+            .map(|_| ())
+    }
+
     pub(super) fn projection_snapshot(
         &self,
     ) -> RefineResult<crate::tools::product::project_state::ProjectionSnapshot> {
@@ -242,6 +252,7 @@ impl FileWorkItemService {
             },
         );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
+        self.ensure_goal_reporter_registered(reporter)?;
         write_json_atomically(&goal_path, &value)
     }
 
