@@ -11,51 +11,54 @@ impl FileWorkItemService {
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::EditMetadata)?;
+        let reporter = reporter.map(Self::validate_goal_reporter).transpose()?;
 
-        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        if let Some(name) = name {
-            let name = name.trim();
-            if name.is_empty() {
-                return Err(RefineError::InvalidInput(
-                    "Goal name cannot be empty".to_string(),
-                ));
+        let mutate = || {
+            let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
+            let object = value.as_object_mut().ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "Goal {} is not a JSON object",
+                    goal_path.display()
+                ))
+            })?;
+            if let Some(name) = name {
+                let name = name.trim();
+                if name.is_empty() {
+                    return Err(RefineError::InvalidInput(
+                        "Goal name cannot be empty".to_string(),
+                    ));
+                }
+                object.insert("name".to_string(), Value::String(name.to_string()));
             }
-            object.insert("name".to_string(), Value::String(name.to_string()));
-        }
-        if let Some(priority) = priority {
-            let Some(priority) = GoalPriority::parse_wire(priority) else {
-                return Err(RefineError::InvalidInput(
-                    "priority must be one of low, medium, or high".to_string(),
-                ));
-            };
-            object.insert(
-                "priority".to_string(),
-                Value::String(priority.as_str().to_string()),
-            );
-        }
+            if let Some(priority) = priority {
+                let Some(priority) = GoalPriority::parse_wire(priority) else {
+                    return Err(RefineError::InvalidInput(
+                        "priority must be one of low, medium, or high".to_string(),
+                    ));
+                };
+                object.insert(
+                    "priority".to_string(),
+                    Value::String(priority.as_str().to_string()),
+                );
+            }
+            if let Some(reporter) = reporter {
+                object.insert(
+                    "reporter".to_string(),
+                    if reporter.is_empty() {
+                        Value::Null
+                    } else {
+                        Value::String(reporter.to_string())
+                    },
+                );
+            }
+            object.insert("updated".to_string(), Value::String(now_timestamp()));
+            write_json_atomically(&goal_path, &value)
+        };
         if let Some(reporter) = reporter {
-            let reporter = reporter.trim();
-            if !reporter.is_empty() && !valid_reporter_name(reporter) {
-                return Err(RefineError::InvalidInput(
-                    "invalid reporter name".to_string(),
-                ));
-            }
-            object.insert(
-                "reporter".to_string(),
-                if reporter.is_empty() {
-                    Value::Null
-                } else {
-                    Value::String(reporter.to_string())
-                },
-            );
-            self.ensure_goal_reporter_registered(reporter)?;
+            self.with_goal_reporter_registered(reporter, mutate)?;
+        } else {
+            mutate()?;
         }
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&goal_path, &value)?;
-        drop(_goal_lock);
         if let Some(assignee) = assignee {
             self.set_latest_round_assignee(goal_id, assignee)?;
         }
@@ -246,30 +249,34 @@ impl FileWorkItemService {
             ));
         }
 
-        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
-        let current = self.show_goal_summary(goal_id)?;
-        self.ensure_goal_owned(&current)?;
-        validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        let round = new_round_value(reporter, assignee, prompt);
-        match object.get_mut("rounds") {
-            Some(Value::Array(rounds)) => rounds.push(round),
-            _ => {
-                object.insert("rounds".to_string(), Value::Array(vec![round]));
+        self.with_goal_reporter_registered(reporter, || {
+            let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
+            let current = self.show_goal_summary(goal_id)?;
+            self.ensure_goal_owned(&current)?;
+            validate_goal_operation(&current.goal.status, &GoalOperation::SubmitNewRound)?;
+            let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
+            let object = value.as_object_mut().ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "Goal {} is not a JSON object",
+                    goal_path.display()
+                ))
+            })?;
+            let round = new_round_value(reporter, assignee, prompt);
+            match object.get_mut("rounds") {
+                Some(Value::Array(rounds)) => rounds.push(round),
+                _ => {
+                    object.insert("rounds".to_string(), Value::Array(vec![round]));
+                }
             }
-        }
-        if current.goal.status == GoalStatus::Review {
-            object.insert(
-                "status".to_string(),
-                Value::String(GoalStatus::Todo.as_str().to_string()),
-            );
-        }
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
-        self.ensure_goal_reporter_registered(reporter)?;
-        write_json_atomically(&goal_path, &value)?;
+            if current.goal.status == GoalStatus::Review {
+                object.insert(
+                    "status".to_string(),
+                    Value::String(GoalStatus::Todo.as_str().to_string()),
+                );
+            }
+            object.insert("updated".to_string(), Value::String(now_timestamp()));
+            write_json_atomically(&goal_path, &value)
+        })?;
         self.show_goal_summary(goal_id)
     }
 
@@ -280,53 +287,61 @@ impl FileWorkItemService {
         assignee: Option<&str>,
         prompt: Option<&str>,
     ) -> RefineResult<GoalSummaryProjection> {
-        let current = self.show_goal_summary(goal_id)?;
-        validate_goal_operation(&current.goal.status, &GoalOperation::EditLatestRound)?;
-
-        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        let rounds = object
-            .get_mut("rounds")
-            .and_then(Value::as_array_mut)
-            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = rounds
-            .iter_mut()
-            .rev()
-            .find(|round| round.is_object())
-            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
-        let latest = latest.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!(
-                "latest round for Goal {goal_id} is not a JSON object"
-            ))
-        })?;
+        let reporter = reporter.map(Self::validate_goal_reporter).transpose()?;
+        let assignee = assignee.map(Self::validate_goal_assignee).transpose()?;
+        let mutate = || {
+            let current = self.show_goal_summary(goal_id)?;
+            validate_goal_operation(&current.goal.status, &GoalOperation::EditLatestRound)?;
+            let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
+            let object = value.as_object_mut().ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "Goal {} is not a JSON object",
+                    goal_path.display()
+                ))
+            })?;
+            let rounds = object
+                .get_mut("rounds")
+                .and_then(Value::as_array_mut)
+                .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+            let latest = rounds
+                .iter_mut()
+                .rev()
+                .find(|round| round.is_object())
+                .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+            let latest = latest.as_object_mut().ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "latest round for Goal {goal_id} is not a JSON object"
+                ))
+            })?;
+            if let Some(reporter) = reporter {
+                latest.insert("reporter".to_string(), Value::String(reporter.to_string()));
+            }
+            if let Some(assignee) = assignee {
+                latest.insert(
+                    "assignee".to_string(),
+                    if assignee.is_empty() {
+                        Value::Null
+                    } else {
+                        Value::String(assignee.to_string())
+                    },
+                );
+            }
+            if let Some(prompt) = prompt {
+                latest.insert(
+                    "prompt".to_string(),
+                    Value::String(prompt.trim().to_string()),
+                );
+            }
+            let now = now_timestamp();
+            latest.insert("updated".to_string(), Value::String(now.clone()));
+            object.insert("updated".to_string(), Value::String(now));
+            write_json_atomically(&goal_path, &value)
+        };
         if let Some(reporter) = reporter {
-            let reporter = Self::validate_goal_reporter(reporter)?;
-            latest.insert("reporter".to_string(), Value::String(reporter.to_string()));
-            self.ensure_goal_reporter_registered(reporter)?;
+            self.with_goal_reporter_registered(reporter, mutate)?;
+        } else {
+            mutate()?;
         }
-        if let Some(assignee) = assignee {
-            let assignee = Self::validate_goal_assignee(assignee)?;
-            latest.insert(
-                "assignee".to_string(),
-                if assignee.is_empty() {
-                    Value::Null
-                } else {
-                    Value::String(assignee.to_string())
-                },
-            );
-        }
-        if let Some(prompt) = prompt {
-            latest.insert(
-                "prompt".to_string(),
-                Value::String(prompt.trim().to_string()),
-            );
-        }
-        let now = now_timestamp();
-        latest.insert("updated".to_string(), Value::String(now.clone()));
-        object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)
     }
 

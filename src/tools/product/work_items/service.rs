@@ -205,6 +205,8 @@ pub struct FileWorkItemService {
     pub active_node_id_override: Option<String>,
     #[cfg(test)]
     after_bulk_goal_selection_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+    #[cfg(test)]
+    after_reporter_registration_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl std::fmt::Debug for FileWorkItemService {
@@ -228,6 +230,8 @@ impl FileWorkItemService {
             active_node_id_override: None,
             #[cfg(test)]
             after_bulk_goal_selection_hook: None,
+            #[cfg(test)]
+            after_reporter_registration_hook: None,
         }
     }
 
@@ -242,6 +246,8 @@ impl FileWorkItemService {
             active_node_id_override: Some(node_id.into()),
             #[cfg(test)]
             after_bulk_goal_selection_hook: None,
+            #[cfg(test)]
+            after_reporter_registration_hook: None,
         }
     }
 
@@ -267,6 +273,8 @@ impl FileWorkItemService {
             active_node_id_override: None,
             #[cfg(test)]
             after_bulk_goal_selection_hook: None,
+            #[cfg(test)]
+            after_reporter_registration_hook: None,
         }
     }
 
@@ -276,6 +284,15 @@ impl FileWorkItemService {
         hook: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         self.after_bulk_goal_selection_hook = Some(std::sync::Arc::new(hook));
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_after_reporter_registration_hook(
+        mut self,
+        hook: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        self.after_reporter_registration_hook = Some(std::sync::Arc::new(hook));
         self
     }
 

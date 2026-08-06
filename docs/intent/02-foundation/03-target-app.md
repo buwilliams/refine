@@ -38,8 +38,11 @@ The current implementation details that matter to intent are:
 - Reporter-scoped todo lists are durable target-app records, so the same Reporter
   can open them from any Node synchronized with that app;
 - a valid Reporter introduced by Goal creation, metadata editing, or Round authoring is
-  registered durably before the Goal mutation is written, keeping Goal references manageable
-  through the shared Reporter capability regardless of which surface or agent supplied them;
+  registered under the same coordination boundary as the durable Goal write, keeping Goal
+  references manageable through the shared Reporter capability regardless of which surface or
+  agent supplied them; Reporter rename and merge retain both possibly referenced names plus a
+  durable recovery record until their record-locked cascade completes, while explicit removal
+  changes only the dropdown and leaves historical strings intact;
 - projections and caches exist for speed but should be rebuildable from durable state;
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.

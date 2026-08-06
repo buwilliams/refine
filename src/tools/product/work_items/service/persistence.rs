@@ -1,14 +1,18 @@
 use super::*;
 
 impl FileWorkItemService {
-    pub(super) fn ensure_goal_reporter_registered(&self, reporter: &str) -> RefineResult<()> {
-        let reporter = reporter.trim();
-        if reporter.is_empty() {
-            return Ok(());
-        }
-        FileReporterService::new(&self.refine_dir)
-            .create(reporter)
-            .map(|_| ())
+    pub(super) fn with_goal_reporter_registered<T>(
+        &self,
+        reporter: &str,
+        action: impl FnOnce() -> RefineResult<T>,
+    ) -> RefineResult<T> {
+        FileReporterService::new(&self.refine_dir).with_registered(reporter, || {
+            #[cfg(test)]
+            if let Some(hook) = &self.after_reporter_registration_hook {
+                hook();
+            }
+            action()
+        })
     }
 
     pub(super) fn projection_snapshot(
@@ -239,21 +243,25 @@ impl FileWorkItemService {
         reporter: &str,
     ) -> RefineResult<()> {
         let reporter = Self::validate_goal_reporter(reporter)?;
-        let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        object.insert(
-            "reporter".to_string(),
-            if reporter.is_empty() {
-                Value::Null
-            } else {
-                Value::String(reporter.to_string())
-            },
-        );
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
-        self.ensure_goal_reporter_registered(reporter)?;
-        write_json_atomically(&goal_path, &value)
+        self.with_goal_reporter_registered(reporter, || {
+            let (_goal_lock, goal_path, mut value) = self.read_goal_value(goal_id)?;
+            let object = value.as_object_mut().ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "Goal {} is not a JSON object",
+                    goal_path.display()
+                ))
+            })?;
+            object.insert(
+                "reporter".to_string(),
+                if reporter.is_empty() {
+                    Value::Null
+                } else {
+                    Value::String(reporter.to_string())
+                },
+            );
+            object.insert("updated".to_string(), Value::String(now_timestamp()));
+            write_json_atomically(&goal_path, &value)
+        })
     }
 
     pub(super) fn set_goal_node_unchecked(&self, goal_id: &str, node_id: &str) -> RefineResult<()> {
