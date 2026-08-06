@@ -190,33 +190,47 @@
 .goals-table {
   --work-item-name-width: 20%;
   --work-item-select-width: 4%;
+  --goals-node-width: 220px;
+  width: calc(958px + var(--goals-node-width));
+  min-width: 100%;
+}
+.goals-table.goals-table-with-selection {
+  width: calc(1002px + var(--goals-node-width));
+}
+.goals-table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.resizing-column .goals-table-scroll {
+  cursor: ew-resize;
+  user-select: none;
 }
 .goals-col-name {
-  width: var(--work-item-name-width);
+  width: 240px;
 }
 .goals-col-status {
-  width: 12%;
+  width: 120px;
 }
 .goals-col-priority {
-  width: 8%;
+  width: 96px;
 }
 .goals-col-reporter {
-  width: 10%;
+  width: 120px;
 }
 .goals-col-assignee {
-  width: 10%;
+  width: 120px;
 }
 .goals-col-feature {
-  width: 14%;
+  width: 150px;
 }
 .goals-col-node {
-  width: 8%;
+  width: var(--goals-node-width);
 }
 .goals-col-updated {
-  width: 8%;
+  width: 112px;
 }
 .goals-col-select {
-  width: var(--work-item-select-width);
+  width: 44px;
 }
 .features-col-select {
   width: var(--work-item-select-width);
@@ -237,8 +251,48 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.goals-table th[data-sort-key="node"] {
+  white-space: nowrap;
+}
+.table-column-resize-handle {
+  cursor: ew-resize;
+  display: inline-block;
+  height: 24px;
+  margin: -6px 0 -6px 6px;
+  position: relative;
+  vertical-align: middle;
+  width: 12px;
+}
+.table-column-resize-handle::after {
+  background: var(--color-border);
+  border-radius: 2px;
+  bottom: 2px;
+  content: "";
+  left: 5px;
+  position: absolute;
+  top: 2px;
+  width: 2px;
+}
+.table-column-resize-handle:hover::after,
+.table-column-resize-handle:focus-visible::after,
+.resizing-column .table-column-resize-handle::after {
+  background: var(--accent);
+  width: 3px;
+}
+.table-column-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 @media (max-width: 760px) {
+  .goals-table,
+  .goals-table.goals-table-with-selection {
+    min-width: 0;
+    width: 100%;
+  }
+  .goals-table-scroll {
+    overflow-x: visible;
+  }
   .mobile-card-table .goals-node-value {
     overflow: visible;
     overflow-wrap: anywhere;
