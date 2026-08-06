@@ -25,7 +25,7 @@ const WORKFLOW_AUTOMATION_STATE_LOCK_FILE: &str = ".workflow-automation-state.lo
 const AUTOMATION_CONCURRENCY_LIMIT_REACHED: &str = "automation concurrency limit reached";
 const ACTIVE_WORK_REPLENISH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowClaimState {
     Claimed,
@@ -59,9 +59,27 @@ pub struct WorkflowClaim {
     pub failure_message: Option<String>,
     #[serde(default)]
     pub decision_version: u64,
+    /// Number of semantically equivalent terminal attempts represented by this
+    /// record after claim-history compaction.
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub occurrences: u32,
     pub state: WorkflowClaimState,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct WorkflowGoalClaimSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_claim: Option<WorkflowClaim>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_preparation_failure: Option<WorkflowClaim>,
+    #[serde(default)]
+    pub consecutive_execution_failures: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_not_before: Option<String>,
+    #[serde(default)]
+    pub execution_quarantined: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -95,19 +113,30 @@ pub struct WorkflowAutomationState {
     pub version: u64,
     #[serde(default)]
     pub policy: WorkflowPolicy,
+    #[serde(default)]
+    pub claim_history_version: u32,
+    /// Compact per-Goal authority and retry projection. This remains bounded by
+    /// Goals rather than attempts and lets hot paths avoid historical scans.
+    #[serde(default)]
+    pub claim_summaries: BTreeMap<String, WorkflowGoalClaimSummary>,
     pub claims: Vec<WorkflowClaim>,
     pub updated_at: Option<String>,
 }
 
 impl WorkflowAutomationState {
     pub(crate) fn active_claim(&self, goal_id: &str) -> Option<&WorkflowClaim> {
-        self.claims.iter().find(|claim| {
-            claim.goal_id == goal_id
-                && matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-        })
+        self.claim_summaries
+            .get(goal_id)
+            .and_then(|summary| summary.latest_claim.as_ref())
+            .filter(|claim| claim.is_active())
+            .or_else(|| {
+                // Compatibility for callers that deserialize legacy state
+                // directly rather than through WorkflowEngine::load_state.
+                self.claims
+                    .iter()
+                    .rev()
+                    .find(|claim| claim.goal_id == goal_id && claim.is_active())
+            })
     }
 
     /// Goals that have a recorded preparation failure to consider quarantining.
@@ -115,25 +144,32 @@ impl WorkflowAutomationState {
     /// Bounded by claims rather than by project size, so quarantine no longer
     /// asks every Goal in the project whether it failed.
     pub(crate) fn preparation_failure_goal_ids(&self) -> BTreeSet<String> {
-        self.claims
+        self.claim_summaries
             .iter()
-            .filter(|claim| {
-                claim.state == WorkflowClaimState::Failed
-                    && claim.failure_stage.as_deref() == Some("preparation")
+            .filter(|(_, summary)| {
+                summary.latest_claim.as_ref().is_some_and(|claim| {
+                    claim.state == WorkflowClaimState::Failed
+                        && claim.failure_stage.as_deref() == Some("preparation")
+                })
             })
-            .map(|claim| claim.goal_id.clone())
+            .map(|(goal_id, _)| goal_id.clone())
             .collect()
     }
 
     pub(crate) fn latest_preparation_failure(&self, goal_id: &str) -> Option<&WorkflowClaim> {
-        let latest = self
-            .claims
-            .iter()
-            .rev()
-            .find(|claim| claim.goal_id == goal_id)?;
+        let latest = self.claim_summaries.get(goal_id)?.latest_claim.as_ref()?;
         (latest.state == WorkflowClaimState::Failed
             && latest.failure_stage.as_deref() == Some("preparation"))
         .then_some(latest)
+    }
+}
+
+impl WorkflowClaim {
+    pub(crate) fn is_active(&self) -> bool {
+        matches!(
+            self.state,
+            WorkflowClaimState::Claimed | WorkflowClaimState::Running
+        )
     }
 }
 
@@ -280,7 +316,16 @@ fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
+fn one() -> u32 {
+    1
+}
+
+fn is_one(value: &u32) -> bool {
+    *value == 1
+}
+
 mod automation;
+mod claim_history;
 mod execution;
 mod execution_context;
 mod goal_agent_context;

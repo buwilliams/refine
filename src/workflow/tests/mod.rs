@@ -1,5 +1,6 @@
 mod cancellation;
 mod capacity;
+mod claim_history;
 mod execution;
 mod governance;
 mod promotion;

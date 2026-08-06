@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use chrono::Utc;
+
 use crate::model::feature::compare_feature_goal_order;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
@@ -26,15 +28,19 @@ impl WorkflowAutomation for WorkflowEngine {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
+        let claim_history_needs_persistence = state.claim_history_needs_persistence();
         let policy = self.policy()?;
         state.policy = policy.clone();
         self.ensure_automation_running(&state)?;
         let Some(refine_dir) = self.refine_dir()? else {
-            return Ok(state
-                .claims
-                .iter()
+            let claimed = state
+                .active_claims()
                 .filter(|claim| claim.state == WorkflowClaimState::Claimed)
-                .count());
+                .count();
+            if claim_history_needs_persistence {
+                self.save_state(&mut state)?;
+            }
+            return Ok(claimed);
         };
         self.promote_backlog_to_todo_for_refine_dir(&refine_dir)?;
         // Schedule from the active index rather than a projection of the whole
@@ -84,6 +90,9 @@ impl WorkflowAutomation for WorkflowEngine {
             if Self::active_claim(&state, &goal.id).is_some() {
                 continue;
             }
+            if !state.claim_retry_allowed(&goal.id, Utc::now()) {
+                continue;
+            }
             if quarantined_goal_ids.contains(&goal.id) {
                 continue;
             }
@@ -114,13 +123,14 @@ impl WorkflowAutomation for WorkflowEngine {
                 failure_stage: None,
                 failure_message: None,
                 decision_version: 1,
+                occurrences: 1,
                 state: WorkflowClaimState::Claimed,
                 created_at: now.clone(),
                 updated_at: now,
             });
             promoted += 1;
         }
-        if promoted > 0 {
+        if promoted > 0 || claim_history_needs_persistence {
             self.save_state(&mut state)?;
         }
         Ok(promoted)
@@ -139,6 +149,17 @@ impl WorkflowAutomation for WorkflowEngine {
         self.ensure_automation_running(&state)?;
         if let Some(existing) = Self::active_claim(&state, goal_id) {
             return Ok(existing.claim_id.clone());
+        }
+        if !state.claim_retry_allowed(goal_id, Utc::now()) {
+            let summary = state.claim_summaries.get(goal_id);
+            let reason = if summary.is_some_and(|summary| summary.execution_quarantined) {
+                "is quarantined after repeated execution failures"
+            } else {
+                "is waiting for execution retry backoff"
+            };
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} {reason}; use explicit workflow retry after inspecting its evidence"
+            )));
         }
         let goal = if let Some(refine_dir) = self.refine_dir()? {
             // Claiming decides against the same set scheduling does, so it reads
@@ -192,6 +213,7 @@ impl WorkflowAutomation for WorkflowEngine {
             failure_stage: None,
             failure_message: None,
             decision_version: 1,
+            occurrences: 1,
             state: WorkflowClaimState::Claimed,
             created_at: now.clone(),
             updated_at: now,

@@ -10,6 +10,7 @@ use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
+use super::claim_history::CLAIM_HISTORY_VERSION;
 use super::{
     WORKFLOW_AUTOMATION_STATE_FILE, WORKFLOW_AUTOMATION_STATE_LOCK_FILE, WorkflowAutomationState,
     WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowStateMutationLock, now_timestamp,
@@ -164,21 +165,18 @@ impl WorkflowEngine {
         };
         let state = self.load_state()?;
         let work_items = FileWorkItemService::new(refine_dir);
-        let mut seen = std::collections::BTreeSet::new();
         let mut failures = Vec::new();
-        for claim in state.claims.iter().rev() {
-            if !seen.insert(claim.goal_id.clone()) {
+        for (goal_id, summary) in &state.claim_summaries {
+            let Some(claim) = summary.latest_claim.as_ref().filter(|claim| {
+                claim.state == WorkflowClaimState::Failed
+                    && claim.failure_stage.as_deref() == Some("preparation")
+            }) else {
                 continue;
-            }
-            if claim.state != WorkflowClaimState::Failed
-                || claim.failure_stage.as_deref() != Some("preparation")
-            {
-                continue;
-            }
+            };
             let still_current = match claim.goal_revision {
                 None => true,
                 Some(failed_revision) => work_items
-                    .show_goal_detail(&claim.goal_id)
+                    .show_goal_detail(goal_id)
                     .map(|detail| workflow_revision(&detail) == failed_revision)
                     .unwrap_or(true),
             };
@@ -186,7 +184,6 @@ impl WorkflowEngine {
                 failures.push(claim.clone());
             }
         }
-        failures.reverse();
         Ok(failures)
     }
 
@@ -231,6 +228,8 @@ impl WorkflowEngine {
         state.policy = self.policy()?;
         state.updated_at = Some(now_timestamp());
         state.version = state.version.saturating_add(1);
+        state.normalize_claim_history();
+        state.claim_history_version = CLAIM_HISTORY_VERSION;
         write_state(&self.state_path(), state)
     }
 }

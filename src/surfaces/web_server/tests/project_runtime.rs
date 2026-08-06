@@ -50,6 +50,7 @@ fn dashboard_surfaces_quarantined_claim_preparation_failures() {
         failure_stage: Some("preparation".to_string()),
         failure_message: Some("round reconciliation is already reverted".to_string()),
         decision_version: 2,
+        occurrences: 1,
         state: crate::workflow::WorkflowClaimState::Failed,
         created_at: "2026-07-29T00:00:00Z".to_string(),
         updated_at: "2026-07-29T00:00:01Z".to_string(),

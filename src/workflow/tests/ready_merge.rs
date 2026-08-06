@@ -1266,6 +1266,7 @@ fn ready_merge_fence_rejects_cancellation_replacement_and_unequal_claims() {
         failure_stage: None,
         failure_message: None,
         decision_version: 1,
+        occurrences: 1,
         state: WorkflowClaimState::Running,
         created_at: now_timestamp(),
         updated_at: now_timestamp(),

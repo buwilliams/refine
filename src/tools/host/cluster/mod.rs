@@ -11,9 +11,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::{
-    WORKFLOW_AUTOMATION_STATE_FILE, WorkflowAutomationState, WorkflowClaimState,
-};
+use crate::workflow::WorkflowEngine;
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 
@@ -315,23 +313,12 @@ impl FileClusterService {
         let Some(runtime_root) = &self.runtime_root else {
             return BTreeSet::new();
         };
-        let path = runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE);
-        let Ok(bytes) = fs::read(&path) else {
-            return BTreeSet::new();
-        };
-        let Ok(state) = serde_json::from_slice::<WorkflowAutomationState>(&bytes) else {
+        let Ok(state) = WorkflowEngine::new(runtime_root).load_state() else {
             return BTreeSet::new();
         };
         state
-            .claims
-            .into_iter()
-            .filter(|claim| {
-                matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-            })
-            .map(|claim| claim.goal_id)
+            .active_claim_goal_ids()
+            .map(ToString::to_string)
             .collect()
     }
 

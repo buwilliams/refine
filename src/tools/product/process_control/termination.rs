@@ -88,9 +88,7 @@ impl FileProcessControlService {
         }
         let state = WorkflowEngine::new(&self.runtime_root).load_state()?;
         let claim = state
-            .claims
-            .iter()
-            .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
+            .claim_by_execution(execution_id)
             .cloned()
             .ok_or_else(|| {
                 RefineError::NotFound(format!("claim for execution {execution_id} was not found"))

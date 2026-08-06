@@ -37,6 +37,14 @@ Current implementation details that matter to intent:
 - `WorkflowEngine` owns workflow-state advancement.
 - Workflow policy tracks limits by global, node, provider, and target app scope.
 - Claims record which Goal is being worked, by which provider and node, for which target app.
+- Workflow claim state keeps a compact per-Goal authority and retry summary. Every active claim is
+  retained, while terminal attempt records are semantically deduplicated and hard-capped at the
+  newest 256 entries. The latest preparation-stage failure remains in the per-Goal summary even
+  after its full claim record ages out, so compaction cannot silently release that quarantine.
+- Execution-stage failures use exponential retry admission starting at five seconds with a
+  five-minute cap, and quarantine a Goal after five consecutive failures. An explicit workflow retry
+  remains the operator-owned recovery path; ordinary scheduling and daemon resume do not recreate
+  a retry storm.
 - Pause controls can stop agents, target-app work, or all automation.
 - Goal state rules distinguish manual transitions from automated transitions.
 - Bulk status correction can place non-automated Goals in review or done, while Goals in actively
