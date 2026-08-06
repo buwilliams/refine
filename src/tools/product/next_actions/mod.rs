@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+#[cfg(test)]
 use std::fs;
 use std::path::PathBuf;
 
@@ -6,9 +7,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::{
-    WORKFLOW_AUTOMATION_STATE_FILE, WorkflowAutomationState, WorkflowClaimState,
-};
+use crate::workflow::WorkflowEngine;
 
 /// The `refine next` oracle: reads durable state and recommends the next
 /// operations, each with the exact command to run. No scheduler and no side
@@ -176,22 +175,9 @@ impl FileNextActionsService {
         let Some(runtime_root) = &self.runtime_root else {
             return 0;
         };
-        let Ok(bytes) = fs::read(runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)) else {
-            return 0;
-        };
-        serde_json::from_slice::<WorkflowAutomationState>(&bytes)
-            .map(|state| {
-                state
-                    .claims
-                    .iter()
-                    .filter(|claim| {
-                        matches!(
-                            claim.state,
-                            WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                        )
-                    })
-                    .count()
-            })
+        WorkflowEngine::new(runtime_root)
+            .load_state()
+            .map(|state| state.active_claim_count())
             .unwrap_or(0)
     }
 }

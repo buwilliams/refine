@@ -328,6 +328,8 @@ fn cleanup_preserves_a_worktree_owned_by_an_active_workflow_claim() {
     let state = WorkflowAutomationState {
         version: 1,
         policy: WorkflowPolicy::default(),
+        claim_history_version: 0,
+        claim_summaries: Default::default(),
         claims: vec![WorkflowClaim {
             claim_id: "claim-1".to_string(),
             goal_id: "CLAIMED".to_string(),
@@ -340,6 +342,7 @@ fn cleanup_preserves_a_worktree_owned_by_an_active_workflow_claim() {
             failure_stage: None,
             failure_message: None,
             decision_version: 1,
+            occurrences: 1,
             state: WorkflowClaimState::Claimed,
             created_at: "2026-01-01T00:00:00Z".to_string(),
             updated_at: "2026-01-01T00:00:00Z".to_string(),

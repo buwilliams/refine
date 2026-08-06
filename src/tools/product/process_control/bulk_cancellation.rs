@@ -41,15 +41,7 @@ impl FileProcessControlService {
         let expectation = preflight_goal_state(&refine_dir, goal_id)?;
         let state = WorkflowEngine::new(&self.runtime_root).load_state()?;
         let active_claims = state
-            .claims
-            .iter()
-            .filter(|claim| {
-                claim.goal_id == goal_id
-                    && matches!(
-                        claim.state,
-                        WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                    )
-            })
+            .active_claims_for_goal(goal_id)
             .cloned()
             .collect::<Vec<_>>();
         if active_claims.len() > 1 {

@@ -314,10 +314,10 @@ impl WorkflowEngine {
             .collect::<BTreeSet<_>>();
         let candidates = self
             .load_state()?
-            .claims
-            .into_iter()
+            .active_claims()
             .filter(|claim| claim.state == WorkflowClaimState::Running)
             .filter(|claim| !held.contains(&format!("workflow:{}", claim.claim_id)))
+            .cloned()
             .collect::<Vec<_>>();
         if candidates.is_empty() {
             return Ok(0);
@@ -389,28 +389,8 @@ impl WorkflowEngine {
         state: &WorkflowAutomationState,
         policy: &WorkflowPolicy,
     ) -> ClaimLoad {
-        Self::claim_load_excluding(state, policy, None)
-    }
-
-    pub(super) fn claim_load_excluding(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-        excluded_index: Option<usize>,
-    ) -> ClaimLoad {
         let mut load = ClaimLoad::default();
-        for claim in state
-            .claims
-            .iter()
-            .enumerate()
-            .filter(|(index, claim)| {
-                Some(*index) != excluded_index
-                    && matches!(
-                        claim.state,
-                        WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                    )
-            })
-            .map(|(_, claim)| claim)
-        {
+        for claim in state.active_claims() {
             load.global += 1;
             *load.by_node.entry(claim.node_id.clone()).or_default() += 1;
             *load.by_provider.entry(claim.provider.clone()).or_default() += 1;
@@ -464,8 +444,7 @@ impl WorkflowEngine {
     ) -> ClaimLoad {
         let mut load = ClaimLoad::default();
         for claim in state
-            .claims
-            .iter()
+            .active_claims()
             .filter(|claim| claim.state == WorkflowClaimState::Running)
         {
             Self::record_claim_load(&mut load, claim);
@@ -481,8 +460,7 @@ impl WorkflowEngine {
         let mut load = Self::running_claim_load(state, policy);
         let mut claim_ids = Vec::new();
         for claim in state
-            .claims
-            .iter()
+            .active_claims()
             .filter(|claim| claim.state == WorkflowClaimState::Claimed)
         {
             if Self::capacity_available_for_load(

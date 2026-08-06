@@ -312,14 +312,8 @@ fn preflight_goal_for_process(
         .map(str::trim)
         .filter(|value| !value.is_empty());
     let claim = match recorded_claim_id {
-        Some(claim_id) => state
-            .claims
-            .iter()
-            .find(|claim| claim.claim_id == claim_id),
-        None => state
-            .claims
-            .iter()
-            .find(|claim| claim.execution_id.as_deref() == Some(execution_id.as_str())),
+        Some(claim_id) => state.claim_by_id(claim_id),
+        None => state.claim_by_execution(&execution_id),
     }
     .ok_or_else(|| {
         RefineError::Conflict(format!(
@@ -369,13 +363,7 @@ fn ensure_goal_has_no_active_workflow_claim_in_state(
     process_id: &str,
     phase: WorkflowOwnershipPhase,
 ) -> RefineResult<()> {
-    if state.claims.iter().any(|claim| {
-        claim.goal_id == goal_id
-            && matches!(
-                claim.state,
-                WorkflowClaimState::Claimed | WorkflowClaimState::Running
-            )
-    }) {
+    if state.active_claim(goal_id).is_some() {
         let outcome = match phase {
             WorkflowOwnershipPhase::BeforeTermination => {
                 "termination was not requested and the Goal remains non-cancelled"
@@ -407,13 +395,9 @@ fn validate_workflow_goal_ownership_in_state(
     ownership: &WorkflowGoalOwnership,
     phase: WorkflowOwnershipPhase,
 ) -> RefineResult<()> {
-    let claim = state
-        .claims
-        .iter()
-        .find(|claim| claim.claim_id == ownership.claim_id)
-        .ok_or_else(|| {
-            stale_workflow_ownership(goal_id, ownership, "claim is no longer present", phase)
-        })?;
+    let claim = state.claim_by_id(&ownership.claim_id).ok_or_else(|| {
+        stale_workflow_ownership(goal_id, ownership, "claim is no longer present", phase)
+    })?;
     if claim.goal_id != goal_id || claim.execution_id != ownership.execution_id {
         return Err(stale_workflow_ownership(
             goal_id,
@@ -422,14 +406,9 @@ fn validate_workflow_goal_ownership_in_state(
             phase,
         ));
     }
-    let competing_active_claim = state.claims.iter().any(|candidate| {
-        candidate.goal_id == goal_id
-            && candidate.claim_id != ownership.claim_id
-            && matches!(
-                candidate.state,
-                WorkflowClaimState::Claimed | WorkflowClaimState::Running
-            )
-    });
+    let competing_active_claim = state
+        .active_claims_for_goal(goal_id)
+        .any(|candidate| candidate.claim_id != ownership.claim_id);
     if competing_active_claim {
         return Err(stale_workflow_ownership(
             goal_id,

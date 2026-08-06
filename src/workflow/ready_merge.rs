@@ -17,14 +17,10 @@ impl WorkflowEngine {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
-        if let Some(other) = state.claims.iter().find(|claim| {
-            claim.goal_id == goal_id
-                && claim.claim_id != claim_id
-                && matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-        }) {
+        if let Some(other) = state
+            .active_claims_for_goal(goal_id)
+            .find(|claim| claim.claim_id != claim_id)
+        {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} has unequal concurrent claims {claim_id} at revision {goal_revision} and {} at revision {}",
                 other.claim_id,
@@ -73,14 +69,10 @@ impl WorkflowEngine {
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
         let state = self.load_state()?;
-        if let Some(other) = state.claims.iter().find(|claim| {
-            claim.goal_id == fence.goal_id
-                && claim.claim_id != fence.claim_id
-                && matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-        }) {
+        if let Some(other) = state
+            .active_claims_for_goal(&fence.goal_id)
+            .find(|claim| claim.claim_id != fence.claim_id)
+        {
             return Err(RefineError::Conflict(format!(
                 "Goal {} has unequal concurrent claims {} at revision {} and {} at revision {}",
                 fence.goal_id,

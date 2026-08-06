@@ -15,6 +15,7 @@ use crate::workflow::behaviors::{
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
+use super::claim_history::bounded_failure_message;
 use super::{
     ACTIVE_WORK_REPLENISH_INTERVAL, AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation,
     WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
@@ -180,10 +181,10 @@ impl WorkflowEngine {
                                 }
                             }
                             Err(error) => {
-                                let _ = self.mark_claim_state(
+                                let _ = self.mark_claim_execution_failed(
                                     &claim_id,
-                                    Some(&execution_id),
-                                    WorkflowClaimState::Failed,
+                                    &execution_id,
+                                    &error,
                                 );
                                 errors.push((order, error));
                             }
@@ -412,9 +413,8 @@ impl WorkflowEngine {
 
     pub(super) fn claim_by_id(&self, claim_id: &str) -> RefineResult<WorkflowClaim> {
         self.load_state()?
-            .claims
-            .into_iter()
-            .find(|claim| claim.claim_id == claim_id)
+            .claim_by_id(claim_id)
+            .cloned()
             .ok_or_else(|| RefineError::NotFound(format!("claim {claim_id} was not found")))
     }
 
@@ -464,6 +464,41 @@ impl WorkflowEngine {
         Ok(())
     }
 
+    fn mark_claim_execution_failed(
+        &self,
+        claim_id: &str,
+        expected_execution_id: &str,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
+        let _state_lock = self.acquire_state_mutation_lock()?;
+        let mut state = self.load_state()?;
+        let Some(claim) = state
+            .claims
+            .iter_mut()
+            .find(|claim| claim.claim_id == claim_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "claim {claim_id} was not found"
+            )));
+        };
+        if claim.state != WorkflowClaimState::Running
+            || claim.execution_id.as_deref() != Some(expected_execution_id)
+        {
+            return Err(RefineError::Conflict(format!(
+                "execution {expected_execution_id} no longer owns claim {claim_id}"
+            )));
+        }
+        claim.failure_stage = Some("execution".to_string());
+        claim.failure_message = Some(bounded_failure_message(&error.to_string()));
+        claim.decision_version = claim.decision_version.saturating_add(1);
+        claim.state = WorkflowClaimState::Failed;
+        claim.updated_at = now_timestamp();
+        self.save_state(&mut state)?;
+        self.release_claim_capacity(claim_id)?;
+        Ok(())
+    }
+
     fn mark_claim_preparation_failed(
         &self,
         claim_id: &str,
@@ -506,7 +541,7 @@ impl WorkflowEngine {
         }
         claim.goal_revision = goal_revision;
         claim.failure_stage = Some("preparation".to_string());
-        claim.failure_message = Some(error.to_string());
+        claim.failure_message = Some(bounded_failure_message(&error.to_string()));
         claim.decision_version = claim.decision_version.saturating_add(1);
         claim.state = WorkflowClaimState::Failed;
         claim.updated_at = now_timestamp();
