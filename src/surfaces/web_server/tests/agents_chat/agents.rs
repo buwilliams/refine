@@ -291,7 +291,7 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 }
 
 #[test]
-fn general_agent_prompt_has_checkout_local_cli_guidance_without_supervision() {
+fn general_agent_prompt_routes_repository_changes_through_refine_workflow() {
     let prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
         &server_with_projection(),
         "agent",
@@ -302,10 +302,43 @@ fn general_agent_prompt_has_checkout_local_cli_guidance_without_supervision() {
     .unwrap();
 
     assert!(prompt.contains("general-purpose native Agent"));
+    assert!(prompt.contains("Treat Refine as the execution path for repository changes"));
+    assert!(prompt.contains("inspect source, runtime state, logs, Git history"));
+    assert!(prompt.contains("answer conversational questions"));
+    assert!(prompt.contains("do not modify the repository ad hoc in this session"));
+    assert!(prompt.contains("Autonomously translate the desired outcome"));
+    assert!(prompt.contains("complete Refine Goal"));
+    assert!(prompt.contains("actionable Round"));
+    assert!(prompt.contains("make the Goal eligible for workflow execution"));
+    assert!(prompt.contains("do not require the user to recite lifecycle commands"));
+    assert!(prompt.contains("preserve that attempt"));
+    assert!(prompt.contains("append a new Round"));
+    assert!(prompt.contains("return the Goal to an eligible workflow state"));
+    assert!(prompt.contains("Honor Refine's confirmation and audit boundaries"));
+    assert!(prompt.contains("never directly edit durable Goal state"));
+    assert!(prompt.contains("conceal failures"));
+    assert!(prompt.contains("approve or merge on the user's behalf"));
+    assert!(prompt.contains("destructively discard retained work"));
+    assert!(prompt.contains("begin ongoing supervision unless the user requests it"));
     assert!(prompt.contains("Active Refine executable:"));
     assert!(prompt.contains("Resolved Refine source checkout:"));
     assert!(prompt.contains("checkout-local `./r`"));
     assert!(!prompt.contains("monitor the targeted app"));
+
+    for profile in ["plan", "goal", "standalone"] {
+        let other_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+            &server_with_projection(),
+            profile,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            !other_prompt.contains("Treat Refine as the execution path for repository changes"),
+            "{profile} must retain its existing profile contract"
+        );
+    }
 }
 
 #[test]
