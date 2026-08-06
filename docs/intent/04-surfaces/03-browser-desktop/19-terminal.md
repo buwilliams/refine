@@ -25,6 +25,8 @@ Current implementation details that matter to intent:
   surface: copying an active selection does not interrupt the PTY, while
   control-C without a selection retains normal terminal semantics;
 - control-Enter inserts an editable line break in native agent TUI prompts;
+- control-Z is consumed by Agent terminal profiles so it cannot suspend the
+  attached agent TUI, while ordinary shell terminals retain job control;
 - clipboard text, including multiline text, uses xterm's terminal-native paste
   semantics before reaching the managed input route, preserving bracketed-paste
   framing and line endings as the attached PTY application expects; clipboard

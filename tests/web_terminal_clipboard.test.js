@@ -359,6 +359,57 @@ test("Ctrl+Enter inserts a TUI newline without submitting ordinary Enter", async
   );
 });
 
+test("Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable", async () => {
+  const browser = clipboardRuntime();
+  const profiles = [
+    ["agent", "agent", "Agent"],
+    ["worktree", "standalone", "Agent in Worktree"],
+    ["goal", "goal", "Goal Agent"],
+    ["plan", "plan", "Planing Agent"],
+  ];
+
+  for (const [tabId, mode, label] of profiles) {
+    browser.runtime.add(tabId, mode, label);
+    const suspended = browser.runtime.key(tabId, { key: "z", ctrlKey: true });
+    assert.deepEqual({ ...suspended }, {
+      acceptedByTerminal: false,
+      defaultPrevented: true,
+    });
+    const continued = browser.runtime.key(tabId, { key: "x" });
+    assert.deepEqual({ ...continued }, {
+      acceptedByTerminal: true,
+      defaultPrevented: false,
+    });
+  }
+  await settleInput();
+
+  assert.deepEqual(
+    inputRequests(browser).map(({ path: requestPath, body }) => [requestPath, body.data]),
+    profiles.map(([tabId]) => [`/api/terminal/session-${tabId}/input`, "x"]),
+  );
+  assert.equal(
+    inputRequests(browser).some(({ body }) => body.data.includes("\x1a")),
+    false,
+  );
+});
+
+test("Ctrl+Z retains shell Terminal job-control semantics", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("shell", "terminal", "Terminal");
+
+  const result = browser.runtime.key("shell", { key: "z", ctrlKey: true });
+  assert.deepEqual({ ...result }, {
+    acceptedByTerminal: true,
+    defaultPrevented: false,
+  });
+  await settleInput();
+
+  assert.deepEqual(
+    inputRequests(browser).map(({ body }) => body.data),
+    ["\x1a"],
+  );
+});
+
 test("Ctrl+C without a selection keeps terminal SIGINT semantics", async () => {
   const browser = clipboardRuntime();
   browser.runtime.add("shell", "terminal", "Terminal");
