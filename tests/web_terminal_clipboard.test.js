@@ -46,6 +46,7 @@ class FakeTerminal {
     this.selection = "";
     this.customKeyHandler = null;
     this.dataHandler = null;
+    this.pasteCalls = [];
   }
   attachCustomKeyEventHandler(handler) { this.customKeyHandler = handler; }
   dispose() {}
@@ -54,6 +55,11 @@ class FakeTerminal {
   hasSelection() { return this.selection.length > 0; }
   onData(handler) { this.dataHandler = handler; }
   open(output) { output.replaceChildren(this.element); }
+  paste(text) {
+    this.pasteCalls.push(text);
+    const normalized = text.replace(/\r?\n/g, "\r");
+    this.dataHandler(`\x1b[200~${normalized}\x1b[201~`);
+  }
   resize() {}
   write() {}
 }
@@ -248,6 +254,9 @@ function clipboardRuntime() {
           propagationStopped: event.propagationStopped,
         };
       },
+      pastedText(tabId) {
+        return [...terminalStateFor(tabId).term.pasteCalls];
+      },
       select(tabId, text) {
         terminalStateFor(tabId).term.selection = text;
       },
@@ -322,7 +331,31 @@ test("every terminal profile installs the shared copy and paste behavior", async
   assert.deepEqual(browser.writes, profiles.map(([, mode]) => `selected-${mode}`));
   assert.deepEqual(
     inputRequests(browser).map(({ path: requestPath, body }) => [requestPath, body.data]),
-    profiles.map(([tabId, mode]) => [`/api/terminal/session-${tabId}/input`, `pasted-${mode}`]),
+    profiles.map(([tabId, mode]) => [
+      `/api/terminal/session-${tabId}/input`,
+      `\x1b[200~pasted-${mode}\x1b[201~`,
+    ]),
+  );
+});
+
+test("Ctrl+Enter inserts a TUI newline without submitting ordinary Enter", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("agent-a", "agent", "Agent");
+
+  const result = browser.runtime.key("agent-a", {
+    key: "Enter",
+    code: "Enter",
+    ctrlKey: true,
+  });
+  assert.deepEqual({ ...result }, {
+    acceptedByTerminal: false,
+    defaultPrevented: true,
+  });
+  await settleInput();
+
+  assert.deepEqual(
+    inputRequests(browser).map(({ path: requestPath, body }) => [requestPath, body.data]),
+    [["/api/terminal/session-agent-a/input", "\n"]],
   );
 });
 
@@ -344,7 +377,7 @@ test("Ctrl+C without a selection keeps terminal SIGINT semantics", async () => {
   assert.deepEqual(browser.writes, []);
 });
 
-test("Ctrl+V pastes single-line and multiline clipboard text exactly once without raw control-V", async () => {
+test("Ctrl+V uses terminal-native framing for single-line and multiline text", async () => {
   const browser = clipboardRuntime();
   browser.runtime.add("agent-a", "agent", "Agent");
   const values = ["single line", "first\r\nsecond\nthird\tend"];
@@ -359,7 +392,11 @@ test("Ctrl+V pastes single-line and multiline clipboard text exactly once withou
 
   const inputs = inputRequests(browser);
   assert.equal(inputs.length, 2);
-  assert.deepEqual(inputs.map((request) => request.body.data), values);
+  assert.deepEqual(Array.from(browser.runtime.pastedText("agent-a")), values);
+  assert.deepEqual(inputs.map((request) => request.body.data), [
+    "\x1b[200~single line\x1b[201~",
+    "\x1b[200~first\rsecond\rthird\tend\x1b[201~",
+  ]);
   assert.equal(inputs.some((request) => request.body.data.includes("\x16")), false);
 });
 
@@ -376,7 +413,10 @@ test("native paste is sent exactly once instead of being reprocessed by xterm", 
   assert.equal(paste.propagationStopped, true);
   await settleInput();
 
-  assert.deepEqual(inputRequests(browser).map((request) => request.body.data), ["one\r\ntwo\n"]);
+  assert.deepEqual(Array.from(browser.runtime.pastedText("worktree")), ["one\r\ntwo\n"]);
+  assert.deepEqual(inputRequests(browser).map((request) => request.body.data), [
+    "\x1b[200~one\rtwo\r\x1b[201~",
+  ]);
 });
 
 test("clipboard failures are visible and unavailable APIs do not claim browser handling", async () => {

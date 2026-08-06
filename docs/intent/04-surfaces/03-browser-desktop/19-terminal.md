@@ -24,8 +24,11 @@ Current implementation details that matter to intent:
 - browser copy and paste shortcuts are scoped to the focused shared terminal
   surface: copying an active selection does not interrupt the PTY, while
   control-C without a selection retains normal terminal semantics;
-- clipboard text, including multiline text, is sent unchanged through the
-  managed terminal input route, and clipboard access failures remain visible;
+- control-Enter inserts an editable line break in native agent TUI prompts;
+- clipboard text, including multiline text, uses xterm's terminal-native paste
+  semantics before reaching the managed input route, preserving bracketed-paste
+  framing and line endings as the attached PTY application expects; clipboard
+  access failures remain visible;
 - output is retained up to a bounded size in the UI;
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.
