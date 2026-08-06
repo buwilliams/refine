@@ -41,7 +41,6 @@ pub struct SelfDevelopmentEmailConfig {
     pub schema_version: u64,
     pub target_root: PathBuf,
     pub address: String,
-    pub mailbox: String,
     pub allowed_senders: BTreeSet<String>,
     #[serde(default = "default_poll_seconds")]
     pub poll_seconds: u64,
@@ -94,13 +93,6 @@ pub fn load_self_development_email_config(
             path.display()
         )));
     }
-    config.mailbox = config.mailbox.trim().to_string();
-    if config.mailbox.is_empty() {
-        return Err(RefineError::InvalidInput(format!(
-            "{} mailbox must not be empty",
-            path.display()
-        )));
-    }
     config.allowed_senders = config
         .allowed_senders
         .iter()
@@ -137,7 +129,6 @@ pub fn self_development_email_target_is_active(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DevelopmentRequestSettings {
     pub address: String,
-    pub mailbox: String,
     pub allowed_senders: BTreeSet<String>,
     pub auto_approve_after: Duration,
     pub provider: String,
@@ -147,7 +138,6 @@ impl DevelopmentRequestSettings {
     pub fn from_local_config(config: &SelfDevelopmentEmailConfig, fallback_provider: &str) -> Self {
         Self {
             address: config.address.clone(),
-            mailbox: config.mailbox.clone(),
             allowed_senders: config.allowed_senders.clone(),
             auto_approve_after: Duration::from_secs(config.auto_approve_after_seconds),
             provider: config
@@ -302,27 +292,6 @@ impl FastmailClient {
             .ok_or_else(|| RefineError::Serialization(format!("Fastmail response omitted {name}")))
     }
 
-    fn mailbox_id(&self, name: &str) -> RefineResult<String> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Mailbox/get", {"accountId": self.account_id}, "mailboxes"])],
-        )?;
-        Self::method_result(&response, "Mailbox/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|mailboxes| {
-                mailboxes
-                    .iter()
-                    .find(|mailbox| mailbox.get("name").and_then(Value::as_str) == Some(name))
-            })
-            .and_then(|mailbox| mailbox.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| {
-                RefineError::NotFound(format!("Fastmail mailbox {name:?} was not found"))
-            })
-    }
-
     fn mailbox_id_by_role(&self, role: &str) -> RefineResult<String> {
         let response = self.call(
             &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
@@ -342,12 +311,12 @@ impl FastmailClient {
             .ok_or_else(|| RefineError::NotFound(format!("Fastmail {role} mailbox was not found")))
     }
 
-    fn pending_email_ids(&self, mailbox_id: &str) -> RefineResult<Vec<String>> {
+    fn pending_email_ids(&self, address: &str) -> RefineResult<Vec<String>> {
         let response = self.call(
             &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
             vec![json!(["Email/query", {
                 "accountId": self.account_id,
-                "filter": {"inMailbox": mailbox_id, "notKeyword": PROCESSED_KEYWORD},
+                "filter": pending_email_filter(address),
                 "sort": [{"property": "receivedAt", "isAscending": true}],
                 "limit": 25
             }, "pending"])],
@@ -565,8 +534,7 @@ impl FileDevelopmentRequestService {
         fastmail: &FastmailClient,
         settings: &DevelopmentRequestSettings,
     ) -> RefineResult<()> {
-        let mailbox_id = fastmail.mailbox_id(&settings.mailbox)?;
-        for email_id in fastmail.pending_email_ids(&mailbox_id)? {
+        for email_id in fastmail.pending_email_ids(&settings.address)? {
             let raw = fastmail.raw_email(&email_id)?;
             let parsed = parse_email(&raw)?;
             if !settings.allowed_senders.contains(&parsed.sender) {
@@ -849,6 +817,10 @@ fn ensure_set_succeeded(result: &Value, action: &str) -> RefineResult<()> {
     Ok(())
 }
 
+fn pending_email_filter(address: &str) -> Value {
+    json!({"to": address, "notKeyword": PROCESSED_KEYWORD})
+}
+
 fn parse_email(raw: &[u8]) -> RefineResult<ParsedEmail> {
     let message = MessageParser::default()
         .parse(raw)
@@ -924,7 +896,6 @@ mod tests {
                 "schema_version": 1,
                 "target_root": target_root,
                 "address": " Goal@GetRefine.dev ",
-                "mailbox": " Development Requests ",
                 "allowed_senders": allowed_senders,
                 "poll_seconds": 0,
                 "auto_approve_after_seconds": 5
@@ -968,7 +939,6 @@ mod tests {
             .unwrap();
         assert_eq!(config.target_root, target_root.canonicalize().unwrap());
         assert_eq!(config.address, "goal@getrefine.dev");
-        assert_eq!(config.mailbox, "Development Requests");
         assert_eq!(config.poll_seconds, 1);
         assert_eq!(
             config.allowed_senders,
@@ -1012,7 +982,6 @@ mod tests {
                 "schema_version": 1,
                 "target_root": "../refine-next",
                 "address": "goal@getrefine.dev",
-                "mailbox": "Development Requests",
                 "allowed_senders": ["buddy@example.com"]
             }))
             .unwrap(),
@@ -1102,6 +1071,14 @@ mod tests {
             true
         );
         assert!(patch["update"].get("email_id").is_none());
+    }
+
+    #[test]
+    fn pending_query_selects_the_recipient_address_without_a_mailbox() {
+        let filter = pending_email_filter("goal@getrefine.dev");
+        assert_eq!(filter["to"], "goal@getrefine.dev");
+        assert_eq!(filter["notKeyword"], PROCESSED_KEYWORD);
+        assert!(filter.get("inMailbox").is_none());
     }
 
     #[test]

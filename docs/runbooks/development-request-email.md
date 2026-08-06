@@ -2,7 +2,7 @@
 
 Use this runbook only for a local Refine installation that develops Refine
 itself. The example connects `~/projects/refine/run/8082` to the Fastmail
-mailbox `goal@getrefine.dev` and pins intake to `~/projects/refine-next`.
+address `goal@getrefine.dev` and pins intake to `~/projects/refine-next`.
 Fastmail is the durable queue: mail continues to arrive while Refine is stopped,
 and the daemon processes it after restart.
 
@@ -21,18 +21,16 @@ Fastmail, or create an email-request ledger.
 Do not enable Cloudflare Email Routing for this domain after its MX records
 point to Fastmail. Keep the existing website records in Cloudflare unchanged.
 
-## Finish the Fastmail mailbox setup
+## Finish the Fastmail address setup
 
-1. In Fastmail, create a mailbox named `Development Requests`.
-2. Confirm `goal@getrefine.dev` is an address or alias on the account and is
+1. Confirm `goal@getrefine.dev` is an address or alias on the account and is
    available as a sending identity.
-3. Add a Fastmail rule whose condition matches mail addressed to
-   `goal@getrefine.dev` and whose action moves it to `Development Requests`.
-4. Under **Settings -> Privacy & Security -> Manage API tokens**, create a token
+2. Under **Settings -> Privacy & Security -> Manage API tokens**, create a token
    for Refine with mail read/write and submission access. Copy it once.
 
-The folder rule is important: Refine intentionally polls only this dedicated
-mailbox, not the account-wide inbox.
+No dedicated mailbox or Fastmail filing rule is required. Refine queries mail
+addressed to `goal@getrefine.dev` wherever Fastmail filed it, then accepts only
+senders present in the host-local allowlist.
 
 ## Store the token locally
 
@@ -60,7 +58,6 @@ repository, and must not be committed or synchronized:
   "schema_version": 1,
   "target_root": "/home/buddy/projects/refine-next",
   "address": "goal@getrefine.dev",
-  "mailbox": "Development Requests",
   "allowed_senders": [
     "person@example.com"
   ],
@@ -87,7 +84,8 @@ validates the complete file each polling cycle.
 
 For each accepted Fastmail message, Refine:
 
-1. checks the local sender allowlist;
+1. queries mail addressed to the configured recipient and checks the local
+   sender allowlist;
 2. persists a retry record before marking the Fastmail message processed;
 3. supplies the plain body and `.txt` attachments to one review agent, ignoring
    images and every other attachment type;
@@ -116,9 +114,9 @@ review, Goal creation, approval, and replies; Fastmail continues queuing mail.
    and confirm no Goal appears until Refine is started again.
 
 If intake fails, inspect the request record's `last_error` and the daemon's
-`refine development requests:` log line. Common causes are a missing token,
-wrong mailbox name, a sender absent from the allowlist, or an API token without
-mail/submission access.
+`refine development requests:` log line. Common causes are a missing token, a
+sender absent from the allowlist, or an API token without mail/submission
+access.
 
 ## Disable or rotate
 
