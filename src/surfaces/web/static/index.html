@@ -17,14 +17,14 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#/" data-route="dashboard" aria-label="Refine dashboard">
+    <a class="brand" href="#/" data-route="dashboard" data-node-scope-destination="dashboard" aria-label="Refine dashboard">
       <img class="brand-logo" src="/static/images/refine_logo_transparent.png" alt="refine">
       <div class="brand-node" id="active-node-label">-</div>
     </a>
     <nav class="nav" data-testid="primary-nav">
-      <a href="#/" data-route="dashboard" data-testid="nav-dashboard">Dashboard</a>
+      <a href="#/" data-route="dashboard" data-node-scope-destination="dashboard" data-testid="nav-dashboard">Dashboard</a>
       <a href="#/features" data-route="features" data-testid="nav-features">Features</a>
-      <a href="#/goals" data-route="goals" data-testid="nav-goals">Goals</a>
+      <a href="#/goals" data-route="goals" data-node-scope-destination="goals" data-testid="nav-goals">Goals</a>
       <a href="#/changes" data-route="changes" data-testid="nav-changes">Changes</a>
       <a href="#/logs" data-route="logs" data-testid="nav-logs">Logs</a>
     </nav>
@@ -158,6 +158,7 @@
   </template>
 
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/node-scope-navigation.js"></script>
   <script src="/static/vendor/idiomorph/idiomorph.min.js"></script>
   <script src="/static/js/dom-morph.js"></script>
   <script src="/static/vendor/xterm/xterm.js"></script>

@@ -19,6 +19,8 @@ Nav should keep the system grounded. If the user is attached to the wrong app, u
 
 The current browser shell uses Dashboard, Features, Goals, Changes, and Logs as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
 
+Dashboard and Goals navigation carries their shared current/all Node scope in the URL. The URL remains the filter source of truth so reload, sharing, and browser history preserve that scope; a specific named-Node Goals filter is not projected onto Dashboard.
+
 Nav should not hide important operating state in deep settings pages. Active app, node, target-app status, and agent status are part of the user's working context.
 
 ## Future Direction

@@ -203,6 +203,7 @@ async function renderGoalsList() {
     }));
   bindOnce($("#goals-clear"), "click", () => {
     history.replaceState(null, "", "#/goals");
+    syncNodeScopeNavigation(location.hash);
     renderGoalsList();
   });
   // The bulk-action buttons read the current filter from the hash at click
@@ -294,6 +295,7 @@ function updateGoalsFilter(patch) {
     dir: "dir" in patch ? patch.dir : current.dir,
   };
   history.replaceState(null, "", goalsHash(next));
+  syncNodeScopeNavigation(location.hash);
   refreshGoalsTable();
 }
 

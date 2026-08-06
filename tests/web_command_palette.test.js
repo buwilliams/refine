@@ -9,6 +9,7 @@ function commandRuntime() {
   const window = {};
   const context = vm.createContext({
     SETTINGS_SURFACES: {},
+    URLSearchParams,
 
     SYSTEM_TAB_ID: "system",
     TERMINAL_TAB_ID: "terminal",
@@ -22,11 +23,16 @@ function commandRuntime() {
       currentRoute: "dashboard",
       lastReporter: "",
       project: { attached: true },
+      underlayHash: "#/",
     },
     toast: () => {},
     window,
   });
   const staticRoot = path.join(__dirname, "../src/surfaces/web/static/js");
+  vm.runInContext(
+    fs.readFileSync(path.join(staticRoot, "node-scope-navigation.js"), "utf8"),
+    context,
+  );
   vm.runInContext(
     fs.readFileSync(path.join(staticRoot, "command-registry.js"), "utf8"),
     context,
@@ -49,6 +55,7 @@ function commandRuntime() {
     commands: context.commandPaletteTest,
     location: context.location,
     openedToolbarTabs,
+    state: context.state,
   };
 }
 
@@ -87,4 +94,26 @@ test("palette includes the existing New Feature flow", async () => {
   assert.equal(browser.commands.ids("new feature")[0], "feature.new");
   await browser.commands.run("feature.new");
   assert.equal(browser.location.hash, "#/features/new");
+});
+
+test("Dashboard and Goals palette navigation carries shared node scope", async () => {
+  const browser = commandRuntime();
+
+  browser.location.hash = "#/";
+  await browser.commands.run("nav.goals");
+  assert.equal(browser.location.hash, "#/goals?node=current");
+  await browser.commands.run("nav.dashboard");
+  assert.equal(browser.location.hash, "#/");
+
+  browser.location.hash = "#/goals?node=all";
+  await browser.commands.run("nav.dashboard");
+  assert.equal(browser.location.hash, "#/?node=all");
+  await browser.commands.run("nav.goals");
+  assert.equal(browser.location.hash, "#/goals?node=all");
+
+  browser.state.currentRoute = "goals_detail";
+  browser.state.underlayHash = "#/goals?status=review&node=current";
+  browser.location.hash = "#/goals/GOAL1";
+  await browser.commands.run("nav.dashboard");
+  assert.equal(browser.location.hash, "#/");
 });

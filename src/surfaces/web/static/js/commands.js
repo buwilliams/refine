@@ -199,7 +199,10 @@ function openRefineIssueRequestModal() {
 }
 
 function navigateCommand(hash) {
-  location.hash = hash;
+  const sourceHash = state.currentRoute === "goals_detail"
+    ? state.underlayHash
+    : location.hash;
+  location.hash = nodeScopeNavigationHash(hash, sourceHash);
 }
 
 function registerNavigationCommand(id, title, hash, keywords = []) {
@@ -362,6 +365,7 @@ registerCommand({
       return;
     }
     history.replaceState(null, "", "#/goals");
+    syncNodeScopeNavigation(location.hash);
     renderGoalsList();
   },
 });
