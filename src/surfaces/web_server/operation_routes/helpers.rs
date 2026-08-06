@@ -26,13 +26,9 @@ pub(in crate::surfaces::web_server) fn workflow_execution_json(
     execution_id: &str,
 ) -> RefineResult<Value> {
     let state = automation.load_state()?;
-    let claim = state
-        .claims
-        .iter()
-        .find(|claim| claim.execution_id.as_deref() == Some(execution_id))
-        .ok_or_else(|| {
-            RefineError::NotFound(format!("Workflow execution {execution_id} was not found"))
-        })?;
+    let claim = state.claim_by_execution(execution_id).ok_or_else(|| {
+        RefineError::NotFound(format!("Workflow execution {execution_id} was not found"))
+    })?;
     Ok(json!({
         "id": execution_id,
         "claim_id": claim.claim_id,

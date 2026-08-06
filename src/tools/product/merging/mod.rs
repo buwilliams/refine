@@ -184,9 +184,8 @@ impl FileMergerService {
                     .ok()
                     .and_then(|state| {
                         state
-                            .claims
-                            .into_iter()
-                            .find(|claim| claim.claim_id == claim_id)
+                            .claim_by_id(claim_id)
+                            .cloned()
                             .map(|claim| claim.state)
                     });
                 let cancelled = operation_state
@@ -320,7 +319,7 @@ impl FileMergerService {
         let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
         let workflow =
             WorkflowEngine::with_target_root(&self.runtime_root, &target_root).load_state()?;
-        let owns_reconciliation = workflow.claims.iter().any(|claim| {
+        let owns_reconciliation = workflow.claim_by_id(claim_id).is_some_and(|claim| {
             claim.claim_id == claim_id
                 && claim.execution_id.as_deref() == Some(execution_id)
                 && claim.goal_id == goal_id

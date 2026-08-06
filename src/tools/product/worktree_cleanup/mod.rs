@@ -17,7 +17,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitLinkedWorktree};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::{WorkflowClaimState, WorkflowEngine};
+use crate::workflow::WorkflowEngine;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorktreeCleanupOptions {
@@ -281,15 +281,8 @@ impl FileWorktreeCleanupService {
     fn active_goal_ids(&self) -> RefineResult<BTreeSet<String>> {
         let mut goal_ids = WorkflowEngine::new(&self.runtime_root)
             .load_state()?
-            .claims
-            .into_iter()
-            .filter(|claim| {
-                matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-            })
-            .map(|claim| claim.goal_id)
+            .active_claim_goal_ids()
+            .map(ToString::to_string)
             .collect::<BTreeSet<_>>();
         for operation in FileOperationRegistry::new(&self.runtime_root).recover()? {
             if matches!(
