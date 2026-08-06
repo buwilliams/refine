@@ -108,10 +108,24 @@ class BrowserElement {
     return child;
   }
 
+  prepend(child) {
+    child.parentElement = this;
+    this.children.unshift(child);
+  }
+
   remove() {
     if (!this.parentElement) return;
     this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
     this.parentElement = null;
+  }
+
+  contains(element) {
+    let current = element;
+    while (current) {
+      if (current === this) return true;
+      current = current.parentElement;
+    }
+    return false;
   }
 
   get isConnected() {
@@ -175,10 +189,26 @@ class BrowserDocument {
   constructor() {
     this.activeElement = null;
     this.body = new BrowserElement("body", this);
+    this.listeners = new Map();
   }
 
   createElement(tagName) { return new BrowserElement(tagName, this); }
   querySelector(selector) { return this.body.querySelector(selector); }
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(listener);
+  }
+  removeEventListener(type, listener) {
+    const listeners = this.listeners.get(type) || [];
+    this.listeners.set(type, listeners.filter((candidate) => candidate !== listener));
+  }
+  dispatchEvent(event) {
+    if (!(event instanceof BrowserEvent)) event = new BrowserEvent(event.type || event, event);
+    if (!event.target) event.target = this;
+    event.currentTarget = this;
+    for (const listener of [...(this.listeners.get(event.type) || [])]) listener.call(this, event);
+    return !event.defaultPrevented;
+  }
 }
 
 function createBrowserDom(markup) {
