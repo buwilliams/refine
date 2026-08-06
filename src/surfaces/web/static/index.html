@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>refine</title>
   <link rel="icon" href="/static/images/favicon.svg" type="image/svg+xml">
+  <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/common.css">
@@ -14,6 +15,7 @@
   <link rel="stylesheet" href="/static/css/toolbar.css">
   <link rel="stylesheet" href="/static/css/toolbar-todo.css">
   <link rel="stylesheet" href="/static/vendor/xterm/xterm.css">
+  <link rel="stylesheet" href="/static/css/theme.css">
 </head>
 <body>
   <header class="topbar">
@@ -100,6 +102,19 @@
             <span class="nav-control-copy">
               <span>Update Refine</span>
               <span class="nav-control-status nav-source-update-status">Checking for updates</span>
+            </span>
+          </button>
+          <button class="nav-menu-item nav-control-item nav-management-item nav-theme-toggle" id="btn-theme-toggle"
+                  data-testid="nav-theme-toggle"
+                  type="button"
+                  aria-label="Use dark mode"
+                  aria-pressed="false">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"></path>
+            </svg>
+            <span class="nav-control-copy">
+              <span>Dark mode</span>
+              <span class="nav-control-status nav-theme-status">Off</span>
             </span>
           </button>
           <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide" data-testid="nav-guide-open">

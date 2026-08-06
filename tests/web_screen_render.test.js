@@ -255,6 +255,52 @@ async function assertScreenRenders(app, { route, marker, forbiddenText }) {
   );
 }
 
+test("Controls switches to dark mode and restores the stored theme on reload", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await app.page.emulateMedia({ colorScheme: "light" });
+    await app.page.goto(`${app.origin}/#/`);
+    await app.page.waitForSelector('[data-testid="context-menu-toggle"]');
+    await app.page.evaluate(() => localStorage.removeItem("refine_color_theme"));
+    await app.page.reload();
+    await app.page.locator('[data-testid="context-menu-toggle"]').click();
+    await app.page.locator('[data-testid="nav-theme-toggle"]').click();
+
+    const dark = await app.page.evaluate(() => {
+      const toggle = document.getElementById("btn-theme-toggle");
+      const bodyStyle = getComputedStyle(document.body);
+      return {
+        theme: document.documentElement.dataset.theme,
+        stored: localStorage.getItem("refine_color_theme"),
+        pressed: toggle.getAttribute("aria-pressed"),
+        label: toggle.getAttribute("aria-label"),
+        status: toggle.querySelector(".nav-theme-status").textContent,
+        background: bodyStyle.backgroundColor,
+        color: bodyStyle.color,
+      };
+    });
+    assert.deepEqual(dark, {
+      theme: "dark",
+      stored: "dark",
+      pressed: "true",
+      label: "Use light mode",
+      status: "On",
+      background: "rgb(11, 17, 32)",
+      color: "rgb(229, 231, 235)",
+    });
+
+    await app.page.reload();
+    assert.equal(
+      await app.page.getAttribute("html", "data-theme"),
+      "dark",
+      "reload should apply the stored theme before app initialization",
+    );
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("goal detail renders from the routed URL", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
