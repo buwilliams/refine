@@ -1,4 +1,139 @@
 use super::*;
+use crate::process::supervisor::errors::RefineError;
+
+fn failed_quality_result(
+    results: Vec<QualityTestResult>,
+    diagnostics: Vec<String>,
+) -> QualityCheckResult {
+    QualityCheckResult {
+        owner_id: "GOAL1".to_string(),
+        ok: false,
+        summary: String::new(),
+        results,
+        diagnostics,
+        candidate_commit: "candidate".to_string(),
+    }
+}
+
+fn failed_test(
+    test: &str,
+    evidence: &str,
+    command: &str,
+    process_id: Option<&str>,
+    exit_code: Option<i32>,
+) -> QualityTestResult {
+    QualityTestResult {
+        test: test.to_string(),
+        status: "failed".to_string(),
+        evidence: evidence.to_string(),
+        command: command.to_string(),
+        process_id: process_id.map(str::to_string),
+        exit_code,
+    }
+}
+
+#[test]
+fn quality_failure_summary_names_one_failed_test_and_observed_cause() {
+    let result = failed_quality_result(
+        vec![failed_test(
+            "Dashboard loads",
+            "Observed supervised process quality-1 exited 1. stderr: assertion failed",
+            "cargo test dashboard",
+            Some("quality-1"),
+            Some(1),
+        )],
+        vec!["complete diagnostic retained in Details".to_string()],
+    );
+
+    assert_eq!(
+        quality_failure_summary(&result),
+        "Quality failed: “Dashboard loads” — supervised command exited with code 1."
+    );
+}
+
+#[test]
+fn quality_failure_summary_selects_high_signal_failure_and_counts_the_rest() {
+    let result = failed_quality_result(
+        vec![
+            failed_test("First check", "agent reported failure", "", None, None),
+            failed_test(
+                "Compile check",
+                "compiler output",
+                "cargo check",
+                Some("quality-2"),
+                Some(101),
+            ),
+            failed_test("Third check", "missing evidence", "", None, None),
+        ],
+        Vec::new(),
+    );
+
+    assert_eq!(
+        quality_failure_summary(&result),
+        "Quality failed: “Compile check” — supervised command exited with code 101. 2 additional tests failed."
+    );
+}
+
+#[test]
+fn quality_failure_summary_has_clear_fallback_without_structured_evidence() {
+    let result = failed_quality_result(Vec::new(), Vec::new());
+
+    assert_eq!(
+        quality_failure_summary(&result),
+        "Quality failed: no valid structured failure evidence was recorded; inspect Details and supervised logs."
+    );
+}
+
+#[test]
+fn quality_failure_summary_explains_rejected_pass_without_supervised_evidence() {
+    let result = failed_quality_result(
+        vec![failed_test(
+            "Release artifact is valid",
+            "Pass claim rejected because no supervised command execution was requested.",
+            "",
+            None,
+            None,
+        )],
+        Vec::new(),
+    );
+
+    assert_eq!(
+        quality_failure_summary(&result),
+        "Quality failed: “Release artifact is valid” — Pass claim rejected because no supervised command execution was requested."
+    );
+}
+
+#[test]
+fn quality_failure_summary_bounds_normalizes_and_redacts_diagnostics() {
+    let result = failed_quality_result(
+        Vec::new(),
+        vec![format!(
+            "Multiline diagnostic\n\twith token=do-not-repeat and {}",
+            "x".repeat(600)
+        )],
+    );
+
+    let summary = quality_failure_summary(&result);
+    assert!(summary.starts_with("Quality failed: Multiline diagnostic with token=[redacted] and "));
+    assert!(!summary.contains('\n'));
+    assert!(!summary.contains("do-not-repeat"));
+    assert!(summary.ends_with('…'));
+    assert!(summary.chars().count() <= 400);
+}
+
+#[test]
+fn quality_error_summary_preserves_bounded_harness_fault_cause() {
+    let error = RefineError::Degraded(
+        "Quality command harness fault: supervised shell could not parse the command\nsyntax error"
+            .to_string(),
+    );
+
+    let summary = quality_error_summary(&error);
+    assert!(summary.contains("Quality command harness fault"));
+    assert!(summary.contains("syntax error"));
+    assert!(!summary.contains('\n'));
+    assert!(summary.chars().count() <= 400);
+}
 
 #[test]
 fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {

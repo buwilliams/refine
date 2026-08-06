@@ -11,6 +11,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::{
     POST_BUILD, QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,
+    quality_error_summary,
 };
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
@@ -556,7 +557,11 @@ impl WorkflowBehavior for WorkflowQa {
                 } else {
                     "quality"
                 };
-                return fail(ctx, category, error);
+                return fail(
+                    ctx,
+                    category,
+                    RefineError::Conflict(quality_error_summary(&error)),
+                );
             }
         };
         if let Some(integration) = ctx.reconciliation.clone() {
@@ -597,10 +602,10 @@ impl WorkflowBehavior for WorkflowQa {
                 ctx.refine_dir(),
                 ctx.target_root,
             );
-            let reconciliation_failure = RefineError::Conflict(
-                "quality checks failed; the already-merged candidate was reverted and evidence was preserved"
-                    .to_string(),
-            );
+            let reconciliation_failure = RefineError::Conflict(format!(
+                "{} The already-merged candidate was reverted and complete evidence was preserved.",
+                quality.summary
+            ));
             let goal_id = ctx.goal_id.clone();
             let round_idx = ctx.round_idx;
             let claim_id = ctx.claim_id.clone();
@@ -690,13 +695,7 @@ impl WorkflowBehavior for WorkflowQa {
             return Err(reconciliation_failure);
         }
         if !quality.ok {
-            return fail(
-                ctx,
-                "quality",
-                RefineError::Conflict(
-                    "quality checks failed; evidence was preserved for recovery".to_string(),
-                ),
-            );
+            return fail(ctx, "quality", RefineError::Conflict(quality.summary));
         }
         let next = if ctx.quality_timing(GoalStatus::Qa)? == POST_BUILD {
             GoalStatus::Review

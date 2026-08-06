@@ -341,16 +341,17 @@ impl QualityOperationRunner {
         let service = FileQualityService::with_runtime_root(&self.refine_dir, &self.runtime_root);
         match service.run_checks(request.clone()) {
             Ok(result) => {
+                let operation_message = if result.ok {
+                    "Quality checks passed"
+                } else {
+                    result.summary.as_str()
+                };
                 registry.append_log(
                     operation_id,
                     quality_operation_log(
                         &request.owner_id,
                         if result.ok { "info" } else { "error" },
-                        if result.ok {
-                            "Quality checks passed"
-                        } else {
-                            "Quality checks failed"
-                        },
+                        operation_message,
                         Some(json!({
                             "summary": &result.summary,
                             "candidate_commit": &result.candidate_commit,
@@ -410,16 +411,13 @@ impl QualityOperationRunner {
             }
             Err(error) => {
                 let harness_fault = is_quality_harness_fault(&error);
+                let summary = quality_error_summary(&error);
                 registry.append_log(
                     operation_id,
                     quality_operation_log(
                         &request.owner_id,
                         "error",
-                        if harness_fault {
-                            "Quality command harness fault"
-                        } else {
-                            "Quality checks failed"
-                        },
+                        &summary,
                         Some(json!({
                             "error": error.to_string(),
                             "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }

@@ -813,7 +813,12 @@ fn file_automation_fails_goal_and_preserves_candidate_on_qa_failure() {
 
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
-    assert!(error.to_string().contains("quality checks failed"));
+    assert!(
+        error
+            .to_string()
+            .contains("The candidate has no fail-qa marker")
+    );
+    assert!(error.to_string().contains("exited with code 1"));
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
         GoalStatus::Failed
@@ -831,17 +836,23 @@ fn file_automation_fails_goal_and_preserves_candidate_on_qa_failure() {
         detail["rounds"][0]["quality_details"]["results"][0]["test"],
         "The candidate has no fail-qa marker."
     );
+    assert_eq!(
+        detail["rounds"][0]["quality_message"],
+        "Quality failed: “The candidate has no fail-qa marker.” — supervised command exited with code 1."
+    );
+    assert!(
+        detail["rounds"][0]["quality_details"]["diagnostics"]
+            .as_array()
+            .is_some_and(|diagnostics| !diagnostics.is_empty()),
+        "complete diagnostics must remain in Quality Details"
+    );
     // A failed Goal has to carry its own reason. Reading `failed` with the
     // gates it reached recorded as passed otherwise explains nothing, and
     // the operator has no reason to go opening operations files.
     assert_eq!(detail["rounds"][0]["failure_category"], "quality");
-    assert!(
-        detail["rounds"][0]["failure_message"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("quality checks failed"),
-        "the Goal must record why it failed, got {:?}",
-        detail["rounds"][0]["failure_message"]
+    assert_eq!(
+        detail["rounds"][0]["failure_message"], detail["rounds"][0]["quality_message"],
+        "Failure and Quality projections must share the actionable explanation"
     );
     assert!(
         !detail["rounds"][0]["failure_at"]
