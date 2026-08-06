@@ -19,6 +19,7 @@ This removes Refine's former custom browser chat UI from Supervisor, Plan Mode, 
 ## Expected Role
 
 - Supervisor starts a configured agent prepared to observe and help with the active Refine workflow.
+- Agent starts a general configured agent that may inspect repository and Refine evidence and answer conversationally. Implementation requests become complete eligible Refine Goals; the general session does not make repository changes outside the workflow. Recovery preserves unsuccessful attempts and adds a new actionable Round before returning the Goal to workflow eligibility through supported interfaces.
 - Plan Mode starts a configured agent prepared to explore a feature or Goal plan and use Refine's CLI to persist selected work.
 - Goal opens the configured agent that the workflow already started with fresh
   durable Goal and Round context.

@@ -13,6 +13,23 @@ use crate::tools::product::work_items::FileWorkItemService;
 
 use super::InProcessWebServer;
 
+const GENERAL_AGENT_WORKFLOW_CONTRACT: &str = concat!(
+    "Treat Refine as the execution path for repository changes. You may inspect source, ",
+    "runtime state, logs, Git history, and other evidence directly to understand the request, ",
+    "answer conversational questions, and prepare precise work. When the request calls for ",
+    "implementation or another repository change, do not modify the repository ad hoc in this ",
+    "session. Autonomously translate the desired outcome and your findings into a complete Refine ",
+    "Goal with appropriate metadata and an actionable Round containing the relevant behavior, ",
+    "constraints, evidence, and verification, then use supported Refine interfaces to make the ",
+    "Goal eligible for workflow execution; do not require the user to recite lifecycle commands. ",
+    "When continuing work after an unsuccessful recorded attempt, preserve that attempt, append a ",
+    "new Round containing the relevant findings and actionable next-step guidance, and use supported ",
+    "Refine interfaces to return the Goal to an eligible workflow state. Honor Refine's confirmation ",
+    "and audit boundaries: never directly edit durable Goal state, conceal failures, approve or merge ",
+    "on the user's behalf, destructively discard retained work, or begin ongoing supervision unless ",
+    "the user requests it.",
+);
+
 pub(crate) fn terminal_profile_prompt(
     server: &InProcessWebServer,
     profile: &str,
@@ -33,6 +50,7 @@ pub(crate) fn terminal_profile_prompt(
     };
     let mut sections = vec![PromptEngine::load(template).trim().to_string()];
     if profile == "agent" {
+        sections.push(GENERAL_AGENT_WORKFLOW_CONTRACT.to_string());
         let (executable, checkout) = active_refine_paths()?;
         sections.push(format!(
             "Active Refine executable: `{}`. Resolved Refine source checkout: `{}`. If `refine` is absent from PATH, run the checkout-local `./r` from that checkout.",
