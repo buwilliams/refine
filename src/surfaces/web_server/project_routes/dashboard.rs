@@ -27,7 +27,7 @@ impl InProcessWebServer {
             Ok(value) => value,
             Err(error) => return error_response(error),
         };
-        let (active_node_id, active_node_display_name) = match current_refine_dir {
+        let active_node_identity = match current_refine_dir {
             Some(refine_dir) => {
                 let service = self.node_registry_service(refine_dir);
                 match dashboard_active_node(&service) {
@@ -35,8 +35,13 @@ impl InProcessWebServer {
                     Err(error) => return error_response(error),
                 }
             }
-            None => ("default".to_string(), "Default".to_string()),
+            None => crate::tools::product::nodes::ActiveNodeIdentity {
+                id: "default".to_string(),
+                display_name: "Default".to_string(),
+                diagnostics: Vec::new(),
+            },
         };
+        let active_node_id = active_node_identity.id.clone();
         let dashboard = projection.dashboard_summary(DashboardProjectionQuery {
             node: Some(node_filter.to_string()),
             current_node_id: Some(active_node_id.clone()),
@@ -82,7 +87,8 @@ impl InProcessWebServer {
                 "node_filter": dashboard.node_filter,
                 "quality_timing": self.quality_timing_setting(),
                 "active_node_id": dashboard.current_node_id,
-                "active_node_display_name": active_node_display_name,
+                "active_node_display_name": active_node_identity.display_name,
+                "active_node_diagnostics": active_node_identity.diagnostics,
                 "needs_attention": dashboard_attention_items(
                     &dashboard.attention_indicators,
                     &preparation_failures,

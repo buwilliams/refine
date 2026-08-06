@@ -349,6 +349,7 @@ pub(in crate::surfaces::web_server) fn project_status_value(
         "apps": apps,
         "active_node_id": status.active_node_id,
         "active_node": status.active_node,
+        "active_node_diagnostics": status.active_node_diagnostics,
         "nodes": [{
             "id": status.active_node_id.clone().unwrap_or_else(|| "default".to_string()),
             "display_name": status.active_node.clone().unwrap_or_else(|| "Default".to_string()),

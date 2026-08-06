@@ -441,3 +441,105 @@ fn web_server_manages_nodes_and_transfers_goal_ownership() {
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn stale_default_label_never_relabels_default_owned_goal_projections() {
+    let temp_root = unique_temp_dir("http-stale-default-node-label");
+    let target_root = temp_root.join("app");
+    let refine_dir = target_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    let mut server = server_with_projection();
+    server.target_root = Some(target_root);
+    server.runtime_root = Some(runtime_root);
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "GOALDEFAULT", "name": "Default-owned Goal"})),
+    });
+    assert_eq!(created.status, 201);
+    fs::write(
+        refine_dir.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        serde_json::json!({
+            "nodes": [{
+                "id": "default",
+                "display_name": "BO2LNXNEVO04 (QA)",
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z"
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let nodes = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/nodes".to_string(),
+        body: None,
+    });
+    assert_eq!(nodes.status, 200);
+    assert_eq!(nodes.body["active_node_id"], "default");
+    assert_eq!(nodes.body["active_node"], "Default");
+    assert_eq!(nodes.body["nodes"][0]["display_name"], "Default");
+    assert_eq!(
+        nodes.body["nodes"][0]["registry_display_name"],
+        "BO2LNXNEVO04 (QA)"
+    );
+    assert_eq!(
+        nodes.body["diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    let project_status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/status".to_string(),
+        body: None,
+    });
+    assert_eq!(project_status.status, 200);
+    assert_eq!(project_status.body["active_node_id"], "default");
+    assert_eq!(project_status.body["active_node"], "Default");
+    assert_eq!(
+        project_status.body["active_node_diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    let list = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/goals?node=all".to_string(),
+        body: None,
+    });
+    assert_eq!(list.status, 200);
+    assert_eq!(list.body["goals"][0]["node_id"], "default");
+    assert_eq!(list.body["goals"][0]["node_display_name"], "Default");
+    assert_eq!(
+        list.body["goals"][0]["node_identity_diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    let detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/goals/GOALDEFAULT".to_string(),
+        body: None,
+    });
+    assert_eq!(detail.status, 200);
+    assert_eq!(detail.body["goal"]["node_id"], "default");
+    assert_eq!(detail.body["goal"]["node_display_name"], "Default");
+    assert_eq!(
+        detail.body["goal"]["node_identity_diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    let dashboard = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+    assert_eq!(dashboard.status, 200);
+    assert_eq!(dashboard.body["active_node_id"], "default");
+    assert_eq!(dashboard.body["active_node_display_name"], "Default");
+    assert_eq!(
+        dashboard.body["active_node_diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    remove_temp_dir(&temp_root);
+}

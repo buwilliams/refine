@@ -74,12 +74,12 @@ fn quality_operation_preserves_provider_failure_and_settles_terminally() {
 #[test]
 fn manual_quality_rejects_foreign_node_before_registering_an_operation() {
     let fixture = goal_quality_fixture("quality-manual-node-owner", "exit 99");
-    fs::create_dir_all(&fixture.runtime_root).unwrap();
-    fs::write(
-        fixture.runtime_root.join("active-node.json"),
-        serde_json::to_vec_pretty(&json!({"active_node_id": "node-b"})).unwrap(),
-    )
-    .unwrap();
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+        &fixture.refine_dir,
+        &fixture.runtime_root,
+    );
+    nodes.create("node-b").unwrap();
+    nodes.activate("node-b").unwrap();
 
     let error = fixture
         .runner()

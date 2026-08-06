@@ -3,10 +3,20 @@
 function renderSettingsNodesTab({
   nodes, nodeCounts, activeNodeId,
 }) {
+  const identityDiagnostics = nodes.flatMap((node) =>
+    (node.identity_diagnostics || []).map((diagnostic) => ({ node, diagnostic })));
   return `
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Nodes", "node-manage")}</h3>
       <p class="scope-label muted small">Project-wide</p>
+      ${identityDiagnostics.map(({ node, diagnostic }) => `
+        <div class="banner warn" data-testid="node-identity-diagnostic" data-node-id="${htmlEscape(node.id)}">
+          <div class="banner-msg">
+            <strong>Node identity needs confirmation.</strong>
+            ${htmlEscape(diagnostic.message || "")}
+            <div class="small">${htmlEscape(diagnostic.recovery_action || "")}</div>
+          </div>
+        </div>`).join("")}
       <table class="table" data-testid="node-settings-table">
         <thead><tr><th>Name</th><th>ID</th><th>Goals</th><th>Host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
         <tbody>
@@ -35,12 +45,12 @@ function renderSettingsNodesTab({
                     <div class="nav-menu-panel node-action-panel">
                       <button class="nav-menu-item" type="button"
                               data-node-rename="${htmlEscape(inst.id)}"
-                              data-name="${htmlEscape(inst.display_name || inst.id)}"
+                              data-name="${htmlEscape(inst.registry_display_name || inst.display_name || inst.id)}"
                               data-testid="node-rename">Rename</button>
                       <button class="nav-menu-item" type="button"
                               data-node-remote-configure="${htmlEscape(inst.id)}"
                               data-testid="node-remote-configure"
-                              data-name="${htmlEscape(inst.display_name || inst.id)}"
+                              data-name="${htmlEscape(inst.registry_display_name || inst.display_name || inst.id)}"
                               data-ssh-host="${htmlEscape(inst.ssh_host || "")}"
                               data-ssh-user="${htmlEscape(inst.ssh_user || "")}"
                               data-ssh-identity-path="${htmlEscape(inst.ssh_identity_path || "")}"

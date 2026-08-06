@@ -508,10 +508,10 @@ fn project_status_for(
         Some(root) => FileProjectMigrationService::new(root).status()?,
         None => detached_schema_status(),
     };
-    let (active_node_id, active_node) = if attached {
-        active_node_status(active_refine_dir.as_deref(), active_node_root)
+    let (active_node_id, active_node, active_node_diagnostics) = if attached {
+        active_node_status(active_refine_dir.as_deref(), active_node_root)?
     } else {
-        (None, None)
+        (None, None, Vec::new())
     };
     Ok(ProjectStatus {
         attached,
@@ -528,6 +528,7 @@ fn project_status_for(
         apps: registry,
         active_node_id,
         active_node,
+        active_node_diagnostics,
         message: if attached {
             None
         } else {
@@ -539,36 +540,28 @@ fn project_status_for(
 fn active_node_status(
     active_refine_dir: Option<&Path>,
     active_node_root: Option<&Path>,
-) -> (Option<String>, Option<String>) {
+) -> RefineResult<(
+    Option<String>,
+    Option<String>,
+    Vec<crate::model::node::NodeIdentityDiagnostic>,
+)> {
     let Some(refine_dir) = active_refine_dir else {
-        return (Some("default".to_string()), Some("Default".to_string()));
+        return Ok((
+            Some("default".to_string()),
+            Some("Default".to_string()),
+            Vec::new(),
+        ));
     };
     let service = match active_node_root {
         Some(root) => FileNodeRegistryService::with_active_root(refine_dir, root),
         None => FileNodeRegistryService::new(refine_dir),
     };
-    let active_node_id = service
-        .active_node_id()
-        .unwrap_or_else(|_| "default".to_string());
-    let active_node = service
-        .list_response()
-        .ok()
-        .and_then(|value| {
-            value
-                .get("nodes")
-                .and_then(|nodes| nodes.as_array())
-                .and_then(|nodes| {
-                    nodes.iter().find(|node| {
-                        node.get("id").and_then(|value| value.as_str())
-                            == Some(active_node_id.as_str())
-                    })
-                })
-                .and_then(|node| node.get("display_name"))
-                .and_then(|value| value.as_str())
-                .map(str::to_string)
-        })
-        .unwrap_or_else(|| "Default".to_string());
-    (Some(active_node_id), Some(active_node))
+    let identity = service.active_identity()?;
+    Ok((
+        Some(identity.id),
+        Some(identity.display_name),
+        identity.diagnostics,
+    ))
 }
 
 fn detached_schema_status() -> ProjectSchemaStatus {

@@ -170,6 +170,54 @@ fn file_cluster_service_migrates_legacy_cluster_json_to_nodes() {
 }
 
 #[test]
+fn cluster_node_api_uses_the_shared_identity_contract() {
+    let temp_root = unique_temp_dir("cluster-default-identity");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(
+        refine_dir.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        serde_json::json!({
+            "nodes": [{
+                "id": "default",
+                "display_name": "QA Host",
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z"
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let service = FileClusterService::new(&refine_dir);
+
+    let ambiguous = service.list_response().unwrap();
+    assert_eq!(ambiguous["nodes"][0]["display_name"], "Default");
+    assert_eq!(ambiguous["nodes"][0]["registry_display_name"], "QA Host");
+    assert_eq!(
+        ambiguous["nodes"][0]["identity_diagnostics"][0]["code"],
+        "ambiguous_legacy_default_display_name"
+    );
+
+    let confirmed = service
+        .upsert_node(
+            "default",
+            NodeRemoteUpdate {
+                display_name: Some("Review Node".to_string()),
+                ..NodeRemoteUpdate::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(confirmed["nodes"][0]["display_name"], "Review Node");
+    assert!(
+        confirmed["nodes"][0]["identity_diagnostics"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_cluster_service_authorizes_remote_run_commands() {
     let temp_root = unique_temp_dir("cluster-security");
     let refine_dir = temp_root.join(".refine");

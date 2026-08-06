@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
-use crate::model::node::Node;
+use crate::model::node::{Node, NodeDisplayNameAuthority};
 use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
@@ -57,6 +57,7 @@ fn settings_node(id: &str, now: &str) -> Node {
         } else {
             id.to_string()
         },
+        display_name_authority: Some(NodeDisplayNameAuthority::System),
         created_at: now.to_string(),
         updated_at: now.to_string(),
         settings: JsonObject::new(),

@@ -6,6 +6,9 @@ use crate::model::{JsonObject, Timestamp};
 pub struct Node {
     pub id: String,
     pub display_name: String,
+    /// Provenance for the human label. Legacy records omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name_authority: Option<NodeDisplayNameAuthority>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     #[serde(default, skip_serializing_if = "JsonObject::is_empty")]
@@ -30,6 +33,20 @@ pub struct Node {
     pub health: Option<NodeHealth>,
     #[serde(default)]
     pub archived: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeDisplayNameAuthority {
+    System,
+    User,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct NodeIdentityDiagnostic {
+    pub code: String,
+    pub message: String,
+    pub recovery_action: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

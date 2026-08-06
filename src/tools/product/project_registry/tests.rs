@@ -153,6 +153,71 @@ fn file_project_registry_normalizes_refine_dir_inputs_before_persisting() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn project_status_uses_authoritative_identity_across_attach_switch_and_restart() {
+    let temp_root = unique_temp_dir("project-registry-node-identity");
+    let runtime_root = temp_root.join("run/8082");
+    let app_a = temp_root.join("app-a");
+    let app_b = temp_root.join("app-b");
+    fs::create_dir_all(&app_a).unwrap();
+    fs::create_dir_all(&app_b).unwrap();
+    git_init(&app_a);
+    git_init(&app_b);
+    let service = FileProjectRegistryService::new(&runtime_root, None);
+    service.attach(app_a.to_str().unwrap()).unwrap();
+    service
+        .register_path(Some("app-b"), app_b.to_str().unwrap(), false)
+        .unwrap();
+    let refine_a = refine_dir_for_target_root(&app_a).unwrap();
+    let refine_b = refine_dir_for_target_root(&app_b).unwrap();
+    let nodes_a = FileNodeRegistryService::with_active_root(&refine_a, &runtime_root);
+    nodes_a.create("ethan").unwrap();
+    nodes_a.rename("ethan", "Ethan's Node").unwrap();
+    nodes_a.activate("ethan").unwrap();
+
+    let active_a = service.status().unwrap();
+    assert_eq!(active_a.active_node_id.as_deref(), Some("ethan"));
+    assert_eq!(active_a.active_node.as_deref(), Some("Ethan's Node"));
+    assert!(active_a.active_node_diagnostics.is_empty());
+
+    fs::create_dir_all(&refine_b).unwrap();
+    FileProjectMigrationService::new(&refine_b)
+        .initialize_current_schema()
+        .unwrap();
+    fs::write(
+        refine_b.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        serde_json::json!({
+            "nodes": [{
+                "id": "default",
+                "display_name": "BO2LNXNEVO04 (QA)",
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z"
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let switched = service.switch_with_migration("app-b").unwrap();
+    assert_eq!(switched.active_node_id.as_deref(), Some("default"));
+    assert_eq!(switched.active_node.as_deref(), Some("Default"));
+    let codes = switched
+        .active_node_diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code.as_str())
+        .collect::<Vec<_>>();
+    assert!(codes.contains(&"active_node_selection_project_mismatch"));
+    assert!(codes.contains(&"ambiguous_legacy_default_display_name"));
+
+    let restarted = FileProjectRegistryService::new(&runtime_root, None)
+        .status()
+        .unwrap();
+    assert_eq!(restarted.active_node_id.as_deref(), Some("default"));
+    assert_eq!(restarted.active_node.as_deref(), Some("Default"));
+    assert_eq!(restarted.active_node_diagnostics.len(), 2);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

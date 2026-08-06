@@ -88,18 +88,12 @@ impl FileWorkItemService {
         Ok(())
     }
 
-    pub(super) fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
+    pub(super) fn node_identity(
+        &self,
+        node_id: Option<&str>,
+    ) -> Option<crate::tools::product::nodes::NodeIdentity> {
         let node_id = node_id.unwrap_or("default");
-        self.node_registry_service()
-            .show(node_id)
-            .ok()
-            .and_then(|value| {
-                value
-                    .get("node")
-                    .and_then(|node| node.get("display_name"))
-                    .and_then(Value::as_str)
-                    .map(str::to_string)
-            })
+        self.node_registry_service().node_identity(node_id).ok()
     }
 
     pub(super) fn attach_round_logs(

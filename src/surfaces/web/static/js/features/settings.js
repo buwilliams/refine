@@ -318,7 +318,8 @@ function settingsActiveNodeLabel(project = state.project) {
   const active = project?.active_node
     || nodes.find((i) => i.id === activeId)
     || null;
-  return active?.display_name || active?.name || activeId || "Default";
+  return (typeof active === "string" ? active : (active?.display_name || active?.name))
+    || activeId || "Default";
 }
 
 function createSettingsAutosave(save, options = {}) {
