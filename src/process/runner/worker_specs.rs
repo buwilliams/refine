@@ -62,6 +62,7 @@ pub(super) fn managed_worker_kind(process: &ManagedProcess) -> Option<&str> {
             WORKFLOW_RUNNER => Some(WORKFLOW_RUNNER),
             WORKTREE_CLEANUP_RUNNER => Some(WORKTREE_CLEANUP_RUNNER),
             GIT_SYNC_RUNNER => Some(GIT_SYNC_RUNNER),
+            DEVELOPMENT_REQUEST_RUNNER => Some(DEVELOPMENT_REQUEST_RUNNER),
             PROJECT_SYNC_RUNNER => Some(PROJECT_SYNC_RUNNER),
             _ => None,
         })

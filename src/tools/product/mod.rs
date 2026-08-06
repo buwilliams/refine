@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod development_requests;
 pub mod goal_exports;
 pub mod imports;
 pub mod merging;

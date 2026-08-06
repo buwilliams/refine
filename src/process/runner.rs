@@ -33,6 +33,7 @@ pub const WORKTREE_CLEANUP_RUNNER: &str = "worktree-cleanup";
 pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
 pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
+pub const DEVELOPMENT_REQUEST_RUNNER: &str = "development-requests";
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 const WORKTREE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
@@ -41,6 +42,7 @@ const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
 const DEFAULT_GIT_SYNC_DEBOUNCE: Duration = Duration::from_secs(5);
 const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
+const DEVELOPMENT_REQUEST_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug)]
 pub struct FileRunnerWorkerService {
@@ -59,6 +61,7 @@ struct JiraExportOperationRequest {
     retry_identity: Option<String>,
 }
 
+mod development_requests;
 mod dispatch;
 mod git_sync;
 mod jira_export;
@@ -70,6 +73,7 @@ mod worktree_cleanup;
 
 pub use dispatch::run_worker;
 
+use development_requests::*;
 use git_sync::*;
 use jira_export::*;
 use project_sync::*;

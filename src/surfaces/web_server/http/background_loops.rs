@@ -26,11 +26,15 @@ impl LocalHttpDaemon {
                         .ensure_background_worker(WORKTREE_CLEANUP_RUNNER)
                         .err()
                         .map(|error| format!("worktree cleanup runner: {error}"));
-                    let error = match (workflow_error, cleanup_error) {
-                        (Some(workflow), Some(cleanup)) => Some(format!("{workflow}; {cleanup}")),
-                        (Some(error), None) | (None, Some(error)) => Some(error),
-                        (None, None) => None,
-                    };
+                    let development_request_error = workers
+                        .ensure_background_worker(DEVELOPMENT_REQUEST_RUNNER)
+                        .err()
+                        .map(|error| format!("development request runner: {error}"));
+                    let failures = [workflow_error, cleanup_error, development_request_error]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    let error = (!failures.is_empty()).then(|| failures.join("; "));
                     if let Some(error) = error {
                         // A stall otherwise looks exactly like an idle queue.
                         // Report it only when it changes: this loop runs every second.

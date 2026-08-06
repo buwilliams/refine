@@ -1,0 +1,40 @@
+use super::*;
+
+use crate::tools::product::development_requests::{
+    DevelopmentRequestSettings, FileDevelopmentRequestService,
+};
+
+pub(super) fn run_development_request_worker(
+    runtime_root: &Path,
+    project_registry_root: Option<&Path>,
+) -> RefineResult<()> {
+    let mut next_poll = Instant::now();
+    let mut interval = Duration::from_secs(60);
+    loop {
+        if Instant::now() >= next_poll {
+            match current_target_root(runtime_root, project_registry_root) {
+                Ok(Some(target_root)) => {
+                    let result = (|| {
+                        let refine_dir = refine_dir_for_target_root(&target_root)?;
+                        let values =
+                            FileSettingsService::with_active_root(&refine_dir, runtime_root)
+                                .load()?;
+                        let settings = DevelopmentRequestSettings::from_project_settings(&values);
+                        interval = settings.poll_interval;
+                        FileDevelopmentRequestService::new(runtime_root, refine_dir, &target_root)
+                            .process_once(&settings)
+                    })();
+                    if let Err(error) = result {
+                        eprintln!("refine development requests: {error}");
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    eprintln!("refine development requests: failed to resolve active app: {error}")
+                }
+            }
+            next_poll = Instant::now() + interval;
+        }
+        thread::sleep(DEVELOPMENT_REQUEST_POLL_INTERVAL);
+    }
+}

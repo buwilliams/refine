@@ -19,6 +19,9 @@ Runbooks:
 
 - [Install Refine](install.md) — install or update Refine, configure an agent
   provider, start the daemon, and verify the result.
+- [Operate development-request email intake](development-request-email.md) —
+  connect the Fastmail `goal@getrefine.dev` mailbox to the active project,
+  verify queued intake, automatic approval, and threaded resolution replies.
 - [Upgrade Refine source](upgrade-refine-source.md) — safely build,
   fast-forward, and restart a running Refine source checkout from the UI or CLI.
 - [Prepare and publish a release](semantic-release.md) — preview a semantic

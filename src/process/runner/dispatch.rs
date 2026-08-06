@@ -14,6 +14,9 @@ pub fn run_worker(
             run_worktree_cleanup_worker(&runtime_root, project_registry_root.as_deref())
         }
         GIT_SYNC_RUNNER => run_git_sync_worker(&runtime_root, project_registry_root.as_deref()),
+        DEVELOPMENT_REQUEST_RUNNER => {
+            run_development_request_worker(&runtime_root, project_registry_root.as_deref())
+        }
         PROJECT_SYNC_RUNNER => {
             let target_root = target_root.ok_or_else(|| {
                 RefineError::InvalidInput("project-sync worker requires --target-root".to_string())

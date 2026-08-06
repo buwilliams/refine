@@ -26,6 +26,7 @@ pub enum PromptTemplate {
     TargetAppCommandStart,
     TargetAppCommandStop,
     TargetAppCommandBuild,
+    DevelopmentRequestReview,
 }
 
 impl PromptTemplate {
@@ -54,6 +55,7 @@ impl PromptTemplate {
             Self::TargetAppCommandStart => "target-app-command-start.md",
             Self::TargetAppCommandStop => "target-app-command-stop.md",
             Self::TargetAppCommandBuild => "target-app-command-build.md",
+            Self::DevelopmentRequestReview => "development-request-review.md",
         }
     }
 
@@ -84,6 +86,7 @@ impl PromptTemplate {
             Self::TargetAppCommandStart => include_str!("target-app-command-start.md"),
             Self::TargetAppCommandStop => include_str!("target-app-command-stop.md"),
             Self::TargetAppCommandBuild => include_str!("target-app-command-build.md"),
+            Self::DevelopmentRequestReview => include_str!("development-request-review.md"),
         }
     }
 }
@@ -252,6 +255,7 @@ mod tests {
             PromptTemplate::TargetAppCommandStart,
             PromptTemplate::TargetAppCommandStop,
             PromptTemplate::TargetAppCommandBuild,
+            PromptTemplate::DevelopmentRequestReview,
         ];
         let mut total_words = 0;
         for template in templates {

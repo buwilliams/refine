@@ -165,6 +165,17 @@ fn runner_specs_create_real_runner_processes() {
         WORKTREE_CLEANUP_RUNNER
     );
     assert!(validate_worker_kind(WORKTREE_CLEANUP_RUNNER, false).is_ok());
+    let development_request_spec = background_worker_spec(
+        Path::new("/opt/refine"),
+        Path::new("/tmp/run/8082"),
+        Some(Path::new("/tmp/run")),
+        DEVELOPMENT_REQUEST_RUNNER,
+    );
+    assert_eq!(
+        development_request_spec.metadata["worker_kind"],
+        DEVELOPMENT_REQUEST_RUNNER
+    );
+    assert!(validate_worker_kind(DEVELOPMENT_REQUEST_RUNNER, false).is_ok());
 
     let spec = project_sync_worker_spec(
         Path::new("/opt/refine"),
