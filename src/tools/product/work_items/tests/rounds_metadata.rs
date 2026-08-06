@@ -5,6 +5,9 @@ fn file_work_item_service_edits_notes_and_deletes_goal_json() {
     let temp_root = unique_temp_dir("work-item-edit-note-delete");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
+    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+        .create("Existing")
+        .unwrap();
     service
         .create_goal_summary("Original", Some("GOAL1"))
         .unwrap();
@@ -21,6 +24,16 @@ fn file_work_item_service_edits_notes_and_deletes_goal_json() {
     assert_eq!(edited.goal.name, "Renamed");
     assert_eq!(edited.goal.priority, GoalPriority::High);
     assert_eq!(edited.goal.reporter.as_deref(), Some("Reporter"));
+    let reporters = crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+        .list()
+        .unwrap();
+    let reporter_names = reporters["reporters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|reporter| reporter["name"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(reporter_names, vec!["Existing", "Reporter"]);
 
     service
         .add_goal_note_summary("GOAL1", "Reviewer", "Needs a note")

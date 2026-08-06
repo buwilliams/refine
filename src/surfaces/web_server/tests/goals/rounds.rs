@@ -6,6 +6,9 @@ fn web_server_appends_and_edits_latest_round() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+        .create("Existing")
+        .unwrap();
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/goals".to_string(),
@@ -48,7 +51,13 @@ fn web_server_appends_and_edits_latest_round() {
         body: None,
     });
     assert_eq!(reporters.status, 200);
-    assert_eq!(reporters.body["reporters"][0]["name"], "Reviewer");
+    let reporter_names = reporters.body["reporters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|reporter| reporter["name"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(reporter_names, vec!["Existing", "Reporter", "Reviewer"]);
     assert!(refine_dir.join("reporters.json").exists());
 
     remove_temp_dir(&temp_root);

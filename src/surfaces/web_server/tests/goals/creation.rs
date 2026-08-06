@@ -6,6 +6,9 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+        .create("Existing")
+        .unwrap();
 
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -40,6 +43,19 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
         "Pressing pause should freeze the board and show a paused state."
     );
     assert_eq!(detail.body["goal"]["rounds"][0]["assignee"], "Bob");
+
+    let reporters = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/reporters".to_string(),
+        body: None,
+    });
+    let reporter_names = reporters.body["reporters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|reporter| reporter["name"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(reporter_names, vec!["Alice", "Existing"]);
 
     remove_temp_dir(&temp_root);
 }
@@ -187,6 +203,11 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
         )
         .unwrap();
     }
+    // These fixtures bypass Goal authoring, so establish the durable invariant
+    // that real Goal creation would have established before timing a warmed write.
+    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+        .create("Performance")
+        .unwrap();
 
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());

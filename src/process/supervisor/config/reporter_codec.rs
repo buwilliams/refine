@@ -86,24 +86,43 @@ pub(super) fn collect_reporter_name(value: Option<&Value>, names: &mut BTreeSet<
     }
 }
 
+pub(super) enum ReporterCascadeStage<'a> {
+    BeforeRecord(&'a Path),
+    RecordLocked(&'a Path),
+    AfterRecord(&'a Path),
+}
+
 pub(super) fn rewrite_reporter_references(
     refine_dir: &Path,
     old: &str,
     new: &str,
+    mut observe: impl FnMut(ReporterCascadeStage<'_>),
 ) -> RefineResult<()> {
     if old.trim().is_empty() || old == new {
         return Ok(());
     }
-    rewrite_reporter_references_in_tree(&refine_dir.join("goals"), "goal.json", old, new)?;
-    rewrite_reporter_references_in_tree(&refine_dir.join("features"), "feature.json", old, new)?;
+    let mut paths = Vec::new();
+    collect_reporter_reference_paths(&refine_dir.join("goals"), "goal.json", &mut paths)?;
+    collect_reporter_reference_paths(&refine_dir.join("features"), "feature.json", &mut paths)?;
+    paths.sort();
+    for path in paths {
+        observe(ReporterCascadeStage::BeforeRecord(&path));
+        let record_key = record_lock_key(&path);
+        with_record_lock(refine_dir, &record_key, || {
+            observe(ReporterCascadeStage::RecordLocked(&path));
+            if rewrite_reporter_references_in_record(refine_dir, &path, old, new)? {
+                observe(ReporterCascadeStage::AfterRecord(&path));
+            }
+            Ok(())
+        })?;
+    }
     FileTodoService::new(refine_dir).reassign_reporter(old, new)
 }
 
-pub(super) fn rewrite_reporter_references_in_tree(
+fn collect_reporter_reference_paths(
     path: &Path,
     file_name: &str,
-    old: &str,
-    new: &str,
+    paths: &mut Vec<PathBuf>,
 ) -> RefineResult<()> {
     if !path.exists() {
         return Ok(());
@@ -122,18 +141,53 @@ pub(super) fn rewrite_reporter_references_in_tree(
         })?;
         let path = entry.path();
         if path.is_dir() {
-            rewrite_reporter_references_in_tree(&path, file_name, old, new)?;
+            collect_reporter_reference_paths(&path, file_name, paths)?;
             continue;
         }
         if path.file_name().and_then(|value| value.to_str()) != Some(file_name) {
             continue;
         }
-        let mut value = read_json_or_default(path.clone(), json!({}))?;
-        if rewrite_reporter_reference_value(&mut value, old, new) {
-            write_json(path, &value)?;
-        }
+        paths.push(path);
     }
     Ok(())
+}
+
+fn rewrite_reporter_references_in_record(
+    refine_dir: &Path,
+    path: &Path,
+    old: &str,
+    new: &str,
+) -> RefineResult<bool> {
+    let mut value = read_json_or_default(path.to_path_buf(), json!({}))?;
+    if !rewrite_reporter_reference_value(&mut value, old, new) {
+        return Ok(false);
+    }
+    let revision = value
+        .get("workflow_revision")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        .saturating_add(1);
+    value
+        .as_object_mut()
+        .ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "workflow record {} is not a JSON object",
+                path.display()
+            ))
+        })?
+        .insert("workflow_revision".to_string(), Value::from(revision));
+    let encoded = serde_json::to_vec_pretty(&value)
+        .map_err(|error| RefineError::Serialization(format!("failed to encode JSON: {error}")))?;
+    replace_file_durably(path, &encoded)?;
+    if path.file_name().and_then(|name| name.to_str()) == Some("goal.json")
+        && let Err(error) = ActiveGoalIndex::record_goal(refine_dir, path)
+    {
+        eprintln!(
+            "refine: active Goal index was not updated for {}: {error}",
+            path.display()
+        );
+    }
+    Ok(true)
 }
 
 pub(super) fn rewrite_reporter_reference_value(value: &mut Value, old: &str, new: &str) -> bool {
