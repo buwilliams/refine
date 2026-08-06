@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-    ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessPauseState,
+    ProcessResourceLimits, ProcessSupervisor,
 };
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -34,6 +34,12 @@ pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
 pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
 pub const DEVELOPMENT_REQUEST_RUNNER: &str = "development-requests";
+pub const AUTOMATION_RUNNERS: [&str; 4] = [
+    WORKFLOW_RUNNER,
+    DEVELOPMENT_REQUEST_RUNNER,
+    GIT_SYNC_RUNNER,
+    WORKTREE_CLEANUP_RUNNER,
+];
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 const WORKTREE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
@@ -98,6 +104,11 @@ impl FileRunnerWorkerService {
     pub fn ensure_background_worker(&self, worker_kind: &str) -> RefineResult<ManagedProcess> {
         validate_worker_kind(worker_kind, false)?;
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        if supervisor.pause_state()?.workflow_paused {
+            return Err(RefineError::Conflict(format!(
+                "automation is paused; {worker_kind} runner was not launched"
+            )));
+        }
         let recovered = supervisor.recover_owner(ProcessOwner::Runner)?;
         if let Some(process) = recovered.iter().into_iter().find(|process| {
             adoptable_worker(process, worker_kind, self.project_registry_root.as_deref())
@@ -120,6 +131,20 @@ impl FileRunnerWorkerService {
             self.project_registry_root.as_deref(),
             worker_kind,
         ))
+    }
+
+    pub fn automation_paused(&self) -> RefineResult<bool> {
+        Ok(FileProcessSupervisor::new(&self.runtime_root)
+            .pause_state()?
+            .workflow_paused)
+    }
+
+    pub fn set_automation_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
+        // Runner loops observe this record and exit at their next safe boundary.
+        // Do not SIGTERM the workflow runner: its in-flight Goal Agents use
+        // parent-death supervision and must retain the established drain-or-
+        // explicit-Stop contract.
+        FileProcessSupervisor::new(&self.runtime_root).set_workflow_paused(paused)
     }
 
     pub fn queue_project_sync(&self, target_root: &Path) -> RefineResult<OperationHandle> {
@@ -271,6 +296,10 @@ impl FileRunnerWorkerService {
             }
         }
     }
+}
+
+pub(super) fn automation_is_paused(runtime_root: &Path) -> RefineResult<bool> {
+    FileRunnerWorkerService::new(runtime_root).automation_paused()
 }
 
 #[cfg(test)]

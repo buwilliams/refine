@@ -12,6 +12,9 @@ pub(super) fn run_development_request_worker(
     let mut next_poll = Instant::now();
     let mut interval = Duration::from_secs(60);
     loop {
+        if automation_is_paused(runtime_root)? {
+            return Ok(());
+        }
         if Instant::now() >= next_poll {
             let config = match load_self_development_email_config(runtime_root) {
                 Ok(Some(config)) => config,

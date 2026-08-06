@@ -160,7 +160,10 @@ fn diagnostics_cache_keeps_process_health_live_after_startup_warming() {
     assert_eq!(live.body["processes"]["runner_reachable"], true);
     assert_eq!(live.body["processes"]["process_count"], 2);
     assert_eq!(live.body["processes"]["running_process_count"], 2);
-    assert_eq!(live.body["processes"]["background_processes_stopped"], true);
+    assert_eq!(
+        live.body["processes"]["background_processes_stopped"],
+        false
+    );
     assert_eq!(live.body["processes"]["agents_paused"], true);
     assert_eq!(live.body["processes"]["paused"], true);
     assert_eq!(live.body["processes"]["workflow_paused"], true);

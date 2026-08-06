@@ -7,6 +7,9 @@ pub(super) fn run_workflow_worker(
     let mut recovered_root = None;
     let mut retired_supervisor_root = None;
     loop {
+        if automation_is_paused(runtime_root)? {
+            return Ok(());
+        }
         // Every step here is retried on the next interval rather than propagated.
         // A transient failure — the app detaching, a registry read losing a race,
         // a lock held for a moment — must not end the tick loop: nothing restarts

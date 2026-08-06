@@ -16,6 +16,10 @@ impl LocalHttpDaemon {
                     if let Some(project_registry_root) = &project_registry_root {
                         workers = workers.with_project_registry_root(project_registry_root);
                     }
+                    if workers.automation_paused().unwrap_or(true) {
+                        sleep_until_stopped(&thread_stop, interval);
+                        continue;
+                    }
                     // Supervise these independently: cleanup must keep running
                     // even if workflow execution itself cannot be launched.
                     let workflow_error = workers
@@ -74,6 +78,10 @@ impl LocalHttpDaemon {
                     let mut workers = FileRunnerWorkerService::new(runtime_root);
                     if let Some(project_registry_root) = &project_registry_root {
                         workers = workers.with_project_registry_root(project_registry_root);
+                    }
+                    if workers.automation_paused().unwrap_or(true) {
+                        sleep_until_stopped(&thread_stop, Duration::from_secs(1));
+                        continue;
                     }
                     let _ = workers.ensure_background_worker(GIT_SYNC_RUNNER);
                 }

@@ -87,13 +87,25 @@ pub fn process_summary_value_with_chat_sessions(
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
     let runner_reachable = required_runner_workers_reachable(&process_values);
+    let automation_runner_count = process_values
+        .iter()
+        .filter(|process| is_live_automation_runner(process))
+        .count();
+    let live_agent_count = process_values
+        .iter()
+        .filter(|process| is_live_agent_process(process))
+        .count();
     Ok(json!({
         "runner_reachable": runner_reachable,
         "paused": pause_state.workflow_paused,
         "workflow_paused": pause_state.workflow_paused,
-        // Wire-compatible aliases. Both are derived from the single workflow gate.
-        "background_processes_stopped": pause_state.workflow_paused,
-        "agents_paused": pause_state.workflow_paused,
+        // Compatibility fields now describe observed quiescence. The requested
+        // control state remains independently available as workflow_paused.
+        "background_processes_stopped": automation_runner_count == 0,
+        "agents_paused": pause_state.workflow_paused && live_agent_count == 0,
+        "automation_worker_count": automation_runner_count,
+        "automation_workers_running": automation_runner_count > 0,
+        "os_liveness_observed": true,
         "processes": process_values,
         "runner_work": runner_work_summary(runtime_root, pause_state.workflow_paused),
         "backend": {
@@ -147,12 +159,23 @@ pub fn process_status_value(summary: &Value) -> Value {
         .flatten()
         .filter(|process| is_current_process_api_value(process))
         .collect::<Vec<_>>();
-    let process_count = current_processes.len();
-    let agent_count = current_processes
+    let os_liveness_observed = summary
+        .get("os_liveness_observed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let os_processes = current_processes
+        .iter()
+        .copied()
+        .filter(|process| {
+            !os_liveness_observed || process.get("pid").and_then(Value::as_u64).is_some()
+        })
+        .collect::<Vec<_>>();
+    let process_count = os_processes.len();
+    let agent_count = os_processes
         .iter()
         .filter(|process| process.get("kind").and_then(Value::as_str) == Some("agent"))
         .count();
-    let running_count = current_processes
+    let running_count = os_processes
         .iter()
         .filter(|process| process.get("status").and_then(Value::as_str) == Some("running"))
         .count();
@@ -322,6 +345,24 @@ fn required_runner_workers_reachable(processes: &[Value]) -> bool {
                 && process.get("status").and_then(Value::as_str) == Some("running")
         })
     })
+}
+
+fn is_live_automation_runner(process: &Value) -> bool {
+    process.get("kind").and_then(Value::as_str) == Some("runner")
+        && process.get("status").and_then(Value::as_str) == Some("running")
+        && process.get("pid").and_then(Value::as_u64).is_some()
+        && process
+            .get("worker_kind")
+            .and_then(Value::as_str)
+            .is_some_and(|kind| crate::process::runner::AUTOMATION_RUNNERS.contains(&kind))
+}
+
+fn is_live_agent_process(process: &Value) -> bool {
+    matches!(
+        process.get("kind").and_then(Value::as_str),
+        Some("agent" | "chat" | "interactive_session")
+    ) && process.get("status").and_then(Value::as_str) == Some("running")
+        && process.get("pid").and_then(Value::as_u64).is_some()
 }
 
 fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {

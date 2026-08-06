@@ -57,6 +57,84 @@ fn file_process_supervisor_tracks_running_processes_and_pause_state() {
 }
 
 #[test]
+fn workflow_pause_uses_one_port_control_record_across_runtime_roots() {
+    let temp_root = unique_temp_dir("durable-process-control");
+    let control_path = temp_root.join("control/8082/process-control.json");
+    let old_runtime_root = temp_root.join("old/run/8082");
+    let legacy_supervisor = FileProcessSupervisor::new(&old_runtime_root);
+    let before_migration =
+        FileProcessSupervisor::new(&old_runtime_root).with_pause_state_path(&control_path);
+    let after_migration = FileProcessSupervisor::new(temp_root.join("new/run/8082"))
+        .with_pause_state_path(&control_path);
+    assert_eq!(
+        crate::process::subprocess::pause::durable_process_control_path_in(
+            &temp_root.join("old/run/8082"),
+            &temp_root,
+        ),
+        crate::process::subprocess::pause::durable_process_control_path_in(
+            &temp_root.join("new/run/8082"),
+            &temp_root,
+        )
+    );
+
+    legacy_supervisor.set_workflow_paused(true).unwrap();
+    assert!(before_migration.pause_state().unwrap().workflow_paused);
+    assert!(
+        control_path.exists(),
+        "legacy pause must migrate canonically"
+    );
+    assert!(after_migration.pause_state().unwrap().workflow_paused);
+    after_migration.set_workflow_paused(false).unwrap();
+    assert!(!before_migration.pause_state().unwrap().workflow_paused);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn recovery_reconstructs_a_live_process_record_from_identity_evidence() {
+    let temp_root = unique_temp_dir("orphan-process-record");
+    let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));
+    let process = supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command: shell_binary().to_string(),
+            args: long_running_shell_args(),
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::from_value(json!({
+                "kind": "runner",
+                "worker_kind": "workflow"
+            }))
+            .unwrap(),
+        })
+        .unwrap();
+    fs::remove_file(
+        supervisor
+            .processes_dir()
+            .join(format!("{}.json", process.id)),
+    )
+    .unwrap();
+
+    let recovered = supervisor.recover().unwrap();
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0].id, process.id);
+    assert_eq!(recovered[0].api_json()["worker_kind"], "workflow");
+    assert!(
+        supervisor
+            .processes_dir()
+            .join(format!("{}.json", process.id))
+            .exists()
+    );
+
+    supervisor.signal(&process.id, "terminate").unwrap();
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_process_supervisor_archives_launched_process_exit_and_output() {
     let temp_root = unique_temp_dir("process-reaper");
     let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));

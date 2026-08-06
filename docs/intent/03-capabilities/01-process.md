@@ -68,7 +68,17 @@ Current implementation details that matter to intent:
   copy; only a capacity-admitted running claim may durably transition its Goal
   to in-progress and then materialize that Goal round's implementation worktree.
   A large todo queue therefore consumes workflow state, not one worktree per Goal.
-- pause state can stop background processes or pause agents.
+- workflow pause is a durable, port-scoped control-plane state at
+  `app-support/control/<port>/process-control.json`, independent of the selected
+  runtime directory. A legacy runtime-local record is migrated on first read.
+  The control prevents supervision from launching or
+  respawning the workflow, development-request, git-sync, and worktree-cleanup
+  runners and makes already-running instances exit without further automation.
+  The daemon and its API remain available, and in-flight Goal agents retain
+  their claims while they drain or are explicitly stopped. Process status keeps
+  this requested pause state separate from OS-validated worker liveness and
+  reconstructs missing live registry records from retained process identity
+  evidence.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
   capability, including Workflow claim settlement, rather than splitting
   process and Workflow semantics. A user Stop retains ownership evidence,

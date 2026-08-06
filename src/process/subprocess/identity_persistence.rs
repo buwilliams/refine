@@ -1,5 +1,88 @@
 use super::*;
 
+impl FileProcessSupervisor {
+    pub(super) fn recover_orphaned_process_records(
+        &self,
+        known_ids: &BTreeSet<String>,
+    ) -> RefineResult<Vec<ManagedProcess>> {
+        let dir = self.process_identities_dir();
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut recovered = Vec::new();
+        for entry in fs::read_dir(&dir).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read process identity registry {}: {error}",
+                dir.display()
+            ))
+        })? {
+            let entry = entry.map_err(|error| {
+                RefineError::Io(format!("failed to inspect process identity entry: {error}"))
+            })?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                continue;
+            }
+            let bytes = match fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to read process identity {}: {error}",
+                        path.display()
+                    )));
+                }
+            };
+            let identity = match serde_json::from_slice::<ManagedProcessIdentity>(&bytes) {
+                Ok(identity) => identity,
+                Err(_) => continue,
+            };
+            if known_ids.contains(&identity.process_id) {
+                continue;
+            }
+            let process = identity.process.as_deref().cloned().unwrap_or_else(|| {
+                ManagedProcess {
+                    id: identity.process_id.clone(),
+                    owner: identity.owner.clone(),
+                    pid: identity.pid,
+                    state: "running".to_string(),
+                    label: Some(format!("recovered {} process", identity.owner.as_kind())),
+                    details: Some(
+                        "process registry record was reconstructed from OS-validated identity evidence"
+                            .to_string(),
+                    ),
+                    stdout_path: None,
+                    stderr_path: None,
+                    stdin_path: None,
+                    limits: None,
+                    started_at: identity.registered_at.clone(),
+                    exit_code: None,
+                }
+            });
+            if self
+                .ensure_identity_matches_process(&process, &identity)
+                .is_err()
+            {
+                continue;
+            }
+            match self.owned_process_state(&process, &identity)? {
+                OwnedProcessState::Alive => {
+                    self.write_process(&process)?;
+                    recovered.push(process);
+                }
+                OwnedProcessState::Exited => {
+                    remove_file_if_present(&path, "stale process identity")?;
+                }
+                OwnedProcessState::IdentityMismatch(_) => {
+                    // Retain conflicting evidence for explicit recovery, but do not
+                    // claim that an unrelated process belongs to Refine.
+                }
+            }
+        }
+        Ok(recovered)
+    }
+}
+
 pub(super) fn now_millis_string() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

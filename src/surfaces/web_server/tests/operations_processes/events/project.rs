@@ -688,7 +688,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(summary.status, 200);
     assert_eq!(summary.body["agent_count"], 3);
-    assert_eq!(summary.body["process_count"], 8);
+    assert_eq!(summary.body["process_count"], 6);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = server.current_runtime_projection().unwrap();
     assert!(
@@ -798,7 +798,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(paused.body["paused"], true);
     assert_eq!(paused.body["workflow_paused"], true);
     assert_eq!(paused.body["background_processes_stopped"], true);
-    assert_eq!(paused.body["agents_paused"], true);
+    assert_eq!(paused.body["agents_paused"], false);
     let paused_supervisor = paused.body["processes"]
         .as_array()
         .unwrap()
@@ -821,6 +821,12 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         supervisor.inspect(&launched_agent.id).unwrap().state,
         "running"
     );
+    let dashboard_while_paused = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+    assert_eq!(dashboard_while_paused.status, 200);
     assert!(
         paused.body["runner_work"]
             .as_array()
@@ -837,7 +843,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(resumed.status, 200);
     assert_eq!(resumed.body["paused"], false);
     assert_eq!(resumed.body["workflow_paused"], false);
-    assert_eq!(resumed.body["background_processes_stopped"], false);
+    assert_eq!(resumed.body["background_processes_stopped"], true);
     assert_eq!(resumed.body["agents_paused"], false);
     assert!(runtime_root.join("process-control.json").exists());
     let cached = server.current_runtime_projection().unwrap();

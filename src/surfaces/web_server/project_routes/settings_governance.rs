@@ -14,24 +14,10 @@ impl InProcessWebServer {
         let mut body = request.body.unwrap_or_else(|| json!({}));
         if let Some(paused) = body.get("paused").map(runtime_bool_setting)
             && let Some(runtime_root) = &self.runtime_root
+            && let Err(error) = crate::process::runner::FileRunnerWorkerService::new(runtime_root)
+                .set_automation_paused(paused)
         {
-            match self.current_target_root() {
-                Ok(Some(target_root)) => {
-                    if let Err(error) = WorkflowEngine::with_target_root(runtime_root, target_root)
-                        .set_workflow_paused(paused)
-                    {
-                        return error_response(error);
-                    }
-                }
-                Ok(None) => {
-                    if let Err(error) =
-                        FileProcessSupervisor::new(runtime_root).set_workflow_paused(paused)
-                    {
-                        return error_response(error);
-                    }
-                }
-                Err(error) => return error_response(error),
-            }
+            return error_response(error);
         }
         if let Some(body) = body.as_object_mut() {
             body.remove("paused");

@@ -28,16 +28,9 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("control workflow automation");
         };
-        let target_root = match self.current_target_root() {
-            Ok(root) => root,
-            Err(error) => return error_response(error),
-        };
-        let result = if let Some(target_root) = target_root {
-            WorkflowEngine::with_target_root(runtime_root, target_root).set_workflow_paused(paused)
-        } else {
-            FileProcessSupervisor::new(runtime_root).set_workflow_paused(paused)
-        };
-        match result {
+        match crate::process::runner::FileRunnerWorkerService::new(runtime_root)
+            .set_automation_paused(paused)
+        {
             Ok(_) => self.handle_processes("/processes"),
             Err(error) => error_response(error),
         }

@@ -67,6 +67,30 @@ fn settled_worker_records_are_not_adopted_as_a_running_workflow_runner() {
 }
 
 #[test]
+fn paused_automation_refuses_every_autonomous_runner_entrypoint() {
+    let runtime_root = std::env::temp_dir().join(format!(
+        "refine-paused-runner-entrypoints-{}",
+        uuid::Uuid::new_v4()
+    ));
+    FileProcessSupervisor::new(&runtime_root)
+        .set_workflow_paused(true)
+        .unwrap();
+
+    for worker_kind in AUTOMATION_RUNNERS {
+        assert!(
+            run_worker(worker_kind, runtime_root.clone(), None, None, None).is_ok(),
+            "{worker_kind} must exit without performing work while paused"
+        );
+        let error = FileRunnerWorkerService::new(&runtime_root)
+            .ensure_background_worker(worker_kind)
+            .unwrap_err();
+        assert!(error.to_string().contains("automation is paused"));
+    }
+
+    std::fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn an_unremovable_settled_record_cannot_stop_supervision_from_seeing_the_registry() {
     // A settled record whose artifacts refuse to be removed used to fail the
     // entire process listing. Every consumer reads through that listing, so

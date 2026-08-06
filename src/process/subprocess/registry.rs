@@ -6,6 +6,7 @@ impl FileProcessSupervisor {
             runtime_root: runtime_root.into(),
             allowed_commands: BTreeSet::new(),
             reaper_owned: Arc::new(Mutex::new(BTreeSet::new())),
+            pause_state_path_override: None,
         }
     }
 
@@ -20,7 +21,14 @@ impl FileProcessSupervisor {
                 .map(|command| command.into())
                 .collect(),
             reaper_owned: Arc::new(Mutex::new(BTreeSet::new())),
+            pause_state_path_override: None,
         }
+    }
+
+    #[cfg(test)]
+    pub fn with_pause_state_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.pause_state_path_override = Some(path.into());
+        self
     }
 
     pub fn processes_dir(&self) -> PathBuf {
@@ -93,10 +101,6 @@ impl FileProcessSupervisor {
             .join(format!("{process_id}.json"))
     }
 
-    pub fn pause_state_path(&self) -> PathBuf {
-        self.runtime_root.join("process-control.json")
-    }
-
     pub fn list(&self) -> RefineResult<Vec<ManagedProcess>> {
         let dir = self.processes_dir();
         if !dir.exists() {
@@ -156,57 +160,12 @@ impl FileProcessSupervisor {
 
     pub fn recover_owner(&self, owner: ProcessOwner) -> RefineResult<Vec<ManagedProcess>> {
         let mut recovered = Vec::new();
-        for mut process in self.list()? {
-            if process.owner == owner
-                && process.state == "running"
-                && !self.recover_running_process(&mut process)?
-            {
-                continue;
+        for process in self.recover()? {
+            if process.owner == owner {
+                recovered.push(process);
             }
-            recovered.push(process);
         }
         Ok(recovered)
-    }
-
-    pub fn pause_state(&self) -> RefineResult<ProcessPauseState> {
-        let path = self.pause_state_path();
-        if !path.exists() {
-            return Ok(ProcessPauseState::default());
-        }
-        let bytes = fs::read(&path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read process control {}: {error}",
-                path.display()
-            ))
-        })?;
-        serde_json::from_slice(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse process control {}: {error}",
-                path.display()
-            ))
-        })
-    }
-
-    pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
-        let state = ProcessPauseState {
-            workflow_paused: paused,
-        };
-        self.write_pause_state(&state)?;
-        Ok(state)
-    }
-
-    pub(super) fn write_pause_state(&self, state: &ProcessPauseState) -> RefineResult<()> {
-        fs::create_dir_all(&self.runtime_root).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create runtime root {}: {error}",
-                self.runtime_root.display()
-            ))
-        })?;
-        let encoded = serde_json::to_vec_pretty(state).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode process control: {error}"))
-        })?;
-        let path = self.pause_state_path();
-        write_json_atomically(&path, &encoded, "process control")
     }
 
     pub(super) fn write_process(&self, process: &ManagedProcess) -> RefineResult<()> {
@@ -253,6 +212,7 @@ impl FileProcessSupervisor {
             pid: process.pid,
             os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
             registered_at: now_millis_string(),
+            process: Some(Box::new(process.clone())),
         };
         self.write_process_identity(&identity)?;
         Ok(identity)

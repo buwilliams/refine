@@ -139,6 +139,8 @@ struct ManagedProcessIdentity {
     pid: Option<u32>,
     os_identity: Option<String>,
     registered_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    process: Option<Box<ManagedProcess>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -298,6 +300,7 @@ pub struct FileProcessSupervisor {
     pub runtime_root: PathBuf,
     pub allowed_commands: BTreeSet<String>,
     reaper_owned: Arc<Mutex<BTreeSet<String>>>,
+    pause_state_path_override: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -316,6 +319,7 @@ impl FileProcessSupervisor {}
 mod command_spec;
 mod identity_persistence;
 mod os_signals;
+mod pause;
 mod test_hooks;
 mod workflow_registration;
 

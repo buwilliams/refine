@@ -1,12 +1,12 @@
 use serde_json::{Value, json};
 
-use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::ConfigService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::quality::{
     FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
+use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
 
 use super::support::*;
@@ -33,16 +33,9 @@ impl InProcessWebServer {
 
     pub(super) fn runtime_settings_value(&self) -> Option<Value> {
         let runtime_root = self.runtime_root.as_ref()?;
-        let pause_state = FileProcessSupervisor::new(runtime_root)
-            .pause_state()
-            .ok()?;
-        Some(json!({
-            "paused": pause_state.workflow_paused,
-            "workflow_paused": pause_state.workflow_paused,
-            "agents_paused": pause_state.workflow_paused,
-            "background_processes_stopped": pause_state.workflow_paused,
-            "runtime_root": runtime_root.display().to_string()
-        }))
+        let mut summary = FileProcessStatusService::new(runtime_root).summary().ok()?;
+        summary["runtime_root"] = json!(runtime_root.display().to_string());
+        Some(summary)
     }
 
     pub(super) fn target_app_service(&self) -> RefineResult<FileTargetAppService> {

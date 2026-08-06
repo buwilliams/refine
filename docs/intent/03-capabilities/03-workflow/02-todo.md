@@ -22,6 +22,8 @@ When a Goal is in todo:
 
 - Refine treats the Goal as eligible for active work.
 - Workflow checks pause state, policy, node capacity, provider availability, target-app context, and Feature ordering.
+- The port-scoped pause survives daemon restarts and runtime-root changes; no
+  workflow or repository automation resumes until an explicit resume.
 - If the Goal can proceed, a node claims it so ownership is explicit.
 - The assigned agent or process receives the Goal context, guidance, governance, and target-app information it needs.
 - The Goal moves to in-progress when the active attempt begins.

@@ -353,6 +353,12 @@ impl ProcessSupervisor for FileProcessSupervisor {
             }
             recovered.push(process);
         }
+        let known_ids = recovered
+            .iter()
+            .map(|process| process.id.clone())
+            .collect::<BTreeSet<_>>();
+        recovered.extend(self.recover_orphaned_process_records(&known_ids)?);
+        recovered.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(recovered)
     }
 }
