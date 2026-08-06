@@ -126,3 +126,40 @@ test("a failed Goal falls back to current error evidence when legacy failure fie
   assert.match(html, /&quot;provider&quot;: &quot;codex&quot;/);
   assert.doesNotMatch(html, /\[object Object\]/);
 });
+
+test("Failure and Quality cards render the actionable summary safely and retain full Details", () => {
+  const runtime = goalDetailRuntime();
+  const summary = "Quality failed: “UI <script> & keyboard” — supervised command exited with code 7.";
+  const round = {
+    failure_category: "quality",
+    failure_message: summary,
+    failure_at: "2026-08-06T12:00:00Z",
+    quality_state: "failed",
+    quality_message: summary,
+    quality_details: {
+      operation_id: "quality-1",
+      results: [{
+        test: "UI <script> & keyboard",
+        status: "failed",
+        command: "node --test 'special & chars'",
+        exit_code: 7,
+        evidence: "first line\nsecond <line>",
+      }],
+      diagnostics: ["complete & authoritative <diagnostic>"],
+    },
+  };
+
+  const failure = runtime.failure({ status: "failed" }, round);
+  const quality = runtime.quality(round);
+
+  assert.match(failure, /goal-failure-message/);
+  assert.match(failure, /UI &lt;script&gt; &amp; keyboard/);
+  assert.doesNotMatch(failure, /<script>/);
+  assert.match(quality, /goal-quality-message/);
+  assert.match(quality, /supervised command exited with code 7/);
+  assert.match(quality, /&quot;results&quot;:/);
+  assert.match(quality, /&quot;command&quot;: &quot;node --test &#39;special &amp; chars&#39;&quot;/);
+  assert.match(quality, /&quot;diagnostics&quot;:/);
+  assert.match(quality, /complete &amp; authoritative &lt;diagnostic&gt;/);
+  assert.doesNotMatch(quality, /\[object Object\]/);
+});

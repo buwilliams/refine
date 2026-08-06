@@ -29,6 +29,9 @@ Current implementation details that matter to intent:
 - each operation should retain its originating target-app and Refine-state identity so restart recovery cannot write evidence into a subsequently selected app;
 - evaluation should pin the recorded isolated candidate commit for `pre_merge`, or the recorded integrated target commit for `post_build`, and require matching HEAD plus a clean index and checkout before and after checks, preserving any detected user changes;
 - workflow should use quality evidence before moving work toward merge or done;
+- failed Quality evidence should project one bounded, deterministic human-readable summary from
+  supervised structured results and diagnostics, naming the failed test and observed cause when
+  available while retaining the complete structured evidence for inspection;
 - failures should be visible in logs, System, Goal evidence, or review surfaces;
 - quality settings should be shared project context, not hidden UI state;
 - an empty Quality test list should be an explicit successful no-op, not a reason to skip durable Quality evidence.

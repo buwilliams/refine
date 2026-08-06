@@ -24,6 +24,8 @@ When a Goal is failed:
 
 - Refine stops treating the current attempt as successful.
 - Failure evidence is preserved: process output, provider output, quality failures, governance findings, logs, changed files, and error messages.
+- The visible failure summary should state the concrete authoritative cause when structured gate
+  evidence provides one, while complete evidence remains available for audit and recovery.
 - Active claims should be closed or made recoverable.
 - Users or agents can inspect the failure and choose a recovery path: retry, submit a new round, split the work, reassign it, cancel it, or leave it failed.
 - If the Goal blocks ordered Feature work, that blockage should be visible.

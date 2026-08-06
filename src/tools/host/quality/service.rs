@@ -15,7 +15,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
-use crate::process::supervisor::security::FileSecurityService;
+use crate::process::supervisor::security::{FileSecurityService, SecurityService};
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -35,12 +35,14 @@ mod provider_output;
 mod runner;
 mod settings;
 mod settlement;
+mod summary;
 
 use cancellation::*;
 pub(crate) use provider_output::is_quality_harness_fault;
 pub(crate) use provider_output::parse_quality_provider_output;
 use provider_output::*;
 pub use runner::QualityOperationRunner;
+pub(crate) use summary::{quality_error_summary, quality_failure_summary};
 
 pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 2;
 

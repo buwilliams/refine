@@ -41,12 +41,12 @@ impl QualityOperationRunner {
         error: &RefineError,
         operation_id: &str,
     ) -> RefineResult<()> {
-        let message = error.to_string();
+        let message = quality_error_summary(error);
         let harness_fault = is_quality_harness_fault(error);
         let details = json!({
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit,
-            "error": message,
+            "error": error.to_string(),
             "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }
         });
         FileWorkItemService::for_node(&self.refine_dir, &request.node_id)

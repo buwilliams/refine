@@ -98,19 +98,22 @@ impl QualityService for FileQualityService {
         }
         verify_candidate(&candidate_root, &request.candidate_commit, "after")?;
         let ok = results.iter().all(|result| result.status == "passed");
-        Ok(QualityCheckResult {
+        let mut result = QualityCheckResult {
             owner_id: request.owner_id,
             ok,
             summary: if ok {
                 "All Quality tests passed with observed supervised evidence.".to_string()
             } else {
-                "One or more Quality tests failed or lacked observed supervised evidence."
-                    .to_string()
+                String::new()
             },
             results,
             diagnostics,
             candidate_commit: request.candidate_commit,
-        })
+        };
+        if !result.ok {
+            result.summary = quality_failure_summary(&result);
+        }
+        Ok(result)
     }
 
     fn screenshots(&self, _owner_id: &str) -> RefineResult<Vec<String>> {
