@@ -87,6 +87,8 @@ fn web_server_route_groups_cover_static_web_surface() {
 fn static_main_nav_consolidates_context_and_controls() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let theme = fs::read_to_string(static_root.join("js/theme.js")).unwrap();
+    let theme_css = fs::read_to_string(static_root.join("css/theme.css")).unwrap();
     let target_app = fs::read_to_string(static_root.join("js/target-app.js")).unwrap();
     let releases =
         fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
@@ -121,6 +123,7 @@ fn static_main_nav_consolidates_context_and_controls() {
         r#"id="btn-source-update""#,
         r#"id="btn-command-palette""#,
         r#"id="btn-refine-issue""#,
+        r#"id="btn-theme-toggle""#,
     ] {
         assert!(
             menu.contains(control_id),
@@ -136,6 +139,22 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(menu.contains(r#"class="nav-control-status target-app-state""#));
     assert!(menu.contains(r#"class="nav-control-status agent-status-label""#));
     assert!(menu.contains(r#"class="nav-control-status nav-source-update-status""#));
+    assert!(menu.contains(r#"class="nav-control-status nav-theme-status""#));
+    assert!(menu.contains(r#"aria-pressed="false""#));
+    assert!(theme.contains(r#"const STORAGE_KEY = "refine_color_theme""#));
+    assert!(theme.contains(r#"new CustomEvent("refine-theme-change""#));
+    assert!(theme_css.contains(r#"html[data-theme="dark"]"#));
+    assert!(theme_css.contains("color-scheme: dark"));
+    let theme_script = index
+        .find(r#"<script src="/static/js/theme.js"></script>"#)
+        .expect("theme bootstrap should be loaded");
+    let base_styles = index
+        .find(r#"<link rel="stylesheet" href="/static/css/base.css">"#)
+        .expect("base stylesheet should be loaded");
+    assert!(
+        theme_script < base_styles,
+        "theme bootstrap should run before styles paint"
+    );
     let management_start = menu
         .find(r#">Management</div>"#)
         .expect("management section should exist");

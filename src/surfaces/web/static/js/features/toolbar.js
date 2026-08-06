@@ -1833,6 +1833,64 @@ function terminalPrependOutput(text, terminal = terminalStateFor()) {
   terminal.term.write(replay, () => terminal.term?.scrollToBottom?.());
 }
 
+function terminalColorTheme() {
+  if (document.documentElement?.dataset?.theme === "dark") {
+    return {
+      background: "#0f172a",
+      foreground: "#e5e7eb",
+      cursor: "#f8fafc",
+      selectionBackground: "#334155",
+      black: "#111827",
+      red: "#f87171",
+      green: "#4ade80",
+      yellow: "#fbbf24",
+      blue: "#60a5fa",
+      magenta: "#c084fc",
+      cyan: "#22d3ee",
+      white: "#e5e7eb",
+      brightBlack: "#94a3b8",
+      brightRed: "#fca5a5",
+      brightGreen: "#86efac",
+      brightYellow: "#fde68a",
+      brightBlue: "#93c5fd",
+      brightMagenta: "#d8b4fe",
+      brightCyan: "#67e8f9",
+      brightWhite: "#ffffff",
+    };
+  }
+  return {
+    background: "#fbfbf7",
+    foreground: "#111827",
+    cursor: "#111827",
+    selectionBackground: "#dbeafe",
+    black: "#111827",
+    red: "#b91c1c",
+    green: "#047857",
+    yellow: "#a16207",
+    blue: "#1d4ed8",
+    magenta: "#7e22ce",
+    cyan: "#0e7490",
+    white: "#f8fafc",
+    brightBlack: "#64748b",
+    brightRed: "#dc2626",
+    brightGreen: "#059669",
+    brightYellow: "#ca8a04",
+    brightBlue: "#2563eb",
+    brightMagenta: "#9333ea",
+    brightCyan: "#0891b2",
+    brightWhite: "#ffffff",
+  };
+}
+
+function refreshTerminalColorThemes() {
+  const theme = terminalColorTheme();
+  for (const terminal of terminalStates.values()) {
+    if (terminal.term?.options) terminal.term.options.theme = theme;
+  }
+}
+
+window.addEventListener("refine-theme-change", refreshTerminalColorThemes);
+
 function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   if (!output || !window.Terminal) return;
   const terminal = terminalStateFor(
@@ -1860,28 +1918,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
     fontSize: TERMINAL_FONT_SIZE,
     lineHeight: TERMINAL_LINE_HEIGHT,
     scrollback: 2000,
-    theme: {
-      background: "#fbfbf7",
-      foreground: "#111827",
-      cursor: "#111827",
-      selectionBackground: "#dbeafe",
-      black: "#111827",
-      red: "#b91c1c",
-      green: "#047857",
-      yellow: "#a16207",
-      blue: "#1d4ed8",
-      magenta: "#7e22ce",
-      cyan: "#0e7490",
-      white: "#f8fafc",
-      brightBlack: "#64748b",
-      brightRed: "#dc2626",
-      brightGreen: "#059669",
-      brightYellow: "#ca8a04",
-      brightBlue: "#2563eb",
-      brightMagenta: "#9333ea",
-      brightCyan: "#0891b2",
-      brightWhite: "#ffffff",
-    },
+    theme: terminalColorTheme(),
   });
   // The output host survives toolbar morphs, but each tab owns its own xterm.
   // Detach the inactive renderer before opening a new one so the preserved host

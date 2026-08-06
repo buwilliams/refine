@@ -11,7 +11,7 @@
 
 Navigation exists to make Refine's operating context immediately visible and to move users to the main work surfaces without ceremony.
 
-The topbar is not just a list of pages. It shows the active node, active app context, reporter context, target-app status, agent status, command palette access, Guide access, management links, and primary create actions.
+The topbar is not just a list of pages. It shows the active node, active app context, reporter context, target-app status, agent status, command palette access, Guide access, management links, appearance preference, and primary create actions.
 
 ## Expected Role
 
@@ -21,7 +21,7 @@ The current browser shell uses Dashboard, Features, Goals, Changes, and Logs as 
 
 Dashboard and Goals navigation carries their shared current/all Node scope in the URL. The URL remains the filter source of truth so reload, sharing, and browser history preserve that scope; a specific named-Node Goals filter is not projected onto Dashboard.
 
-Nav should not hide important operating state in deep settings pages. Active app, node, target-app status, and agent status are part of the user's working context.
+Nav should not hide important operating state or shell preferences in deep settings pages. Active app, node, target-app status, agent status, and the browser-local light/dark appearance toggle are part of the user's working context.
 
 ## Future Direction
 
