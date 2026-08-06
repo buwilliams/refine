@@ -6,11 +6,15 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
-use crate::model::node::{ActiveNodeSelection, Node, NodeRegistry};
+use crate::model::node::{Node, NodeDisplayNameAuthority, NodeRegistry};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const NODE_REGISTRY_FILE: &str = "nodes.json";
 pub const ACTIVE_NODE_FILE: &str = "active-node.json";
+
+mod identity;
+use identity::identity_for_node;
+pub use identity::{ActiveNodeIdentity, NodeIdentity};
 
 #[derive(Clone, Debug)]
 pub struct FileNodeRegistryService {
@@ -54,16 +58,19 @@ impl FileNodeRegistryService {
     }
 
     pub fn active_node_id(&self) -> RefineResult<String> {
-        self.load_active_node_id()
+        self.active_identity().map(|identity| identity.id)
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
-        let active_node_id = self.load_active_node_id()?;
-        let nodes = node_values_with_active(&registry.nodes, &active_node_id);
+        let active_identity = self.active_identity_for_nodes(&registry.nodes)?;
+        let active_node_id = &active_identity.id;
+        let nodes = node_values_with_active(&registry.nodes, active_node_id);
         Ok(json!({
             "nodes": nodes,
-            "active_node_id": active_node_id
+            "active_node_id": active_node_id,
+            "active_node": active_identity.display_name,
+            "diagnostics": active_identity.diagnostics
         }))
     }
 
@@ -72,30 +79,26 @@ impl FileNodeRegistryService {
         counts: BTreeMap<String, BTreeMap<String, usize>>,
     ) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
-        let active_node_id = self.load_active_node_id()?;
-        let nodes = node_values_with_active(&registry.nodes, &active_node_id);
-        let active_node = nodes
-            .iter()
-            .find(|node| node_id_value(node) == active_node_id)
-            .and_then(|node| node.get("display_name"))
-            .and_then(|value| value.as_str())
-            .unwrap_or("Default");
+        let active_identity = self.active_identity_for_nodes(&registry.nodes)?;
+        let active_node_id = &active_identity.id;
+        let nodes = node_values_with_active(&registry.nodes, active_node_id);
         Ok(json!({
             "active_node_id": active_node_id,
-            "active_node": active_node,
+            "active_node": active_identity.display_name,
             "nodes": nodes,
-            "counts": counts
+            "counts": counts,
+            "diagnostics": active_identity.diagnostics
         }))
     }
 
     pub fn show(&self, id: &str) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
-        let active_node_id = self.load_active_node_id()?;
+        let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
         let Some(node) = registry.nodes.iter().find(|node| node.id == id) else {
             return Err(RefineError::NotFound(format!("node {id} was not found")));
         };
         Ok(json!({
-            "node": node,
+            "node": node_value(node, node.id == active_node_id),
             "active": node.id == active_node_id
         }))
     }
@@ -110,6 +113,7 @@ impl FileNodeRegistryService {
         registry.nodes.push(Node {
             id: id.clone(),
             display_name: id.clone(),
+            display_name_authority: Some(NodeDisplayNameAuthority::System),
             created_at: now.clone(),
             updated_at: now,
             settings: JsonObject::new(),
@@ -141,6 +145,7 @@ impl FileNodeRegistryService {
         let node = Node {
             id,
             display_name: display_name.to_string(),
+            display_name_authority: Some(NodeDisplayNameAuthority::User),
             created_at: now.clone(),
             updated_at: now,
             settings: JsonObject::new(),
@@ -173,7 +178,7 @@ impl FileNodeRegistryService {
 
     pub fn archive(&self, id: &str) -> RefineResult<serde_json::Value> {
         let mut registry = self.load_registry()?;
-        let active_node_id = self.load_active_node_id()?;
+        let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
         if id == active_node_id {
             return Err(RefineError::Conflict(
                 "active node cannot be archived".to_string(),
@@ -190,7 +195,7 @@ impl FileNodeRegistryService {
 
     pub fn update(&self, id: &str, update: NodeUpdate) -> RefineResult<Node> {
         let mut registry = self.load_registry()?;
-        let active_node_id = self.load_active_node_id()?;
+        let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
         let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
             return Err(RefineError::NotFound(format!("node {id} was not found")));
         };
@@ -202,6 +207,7 @@ impl FileNodeRegistryService {
                 ));
             }
             node.display_name = display_name.to_string();
+            node.display_name_authority = Some(NodeDisplayNameAuthority::User);
         }
         if let Some(archived) = update.archived {
             if archived && id == active_node_id {
@@ -229,6 +235,7 @@ impl FileNodeRegistryService {
             return Err(RefineError::NotFound(format!("node {id} was not found")));
         };
         node.display_name = name.to_string();
+        node.display_name_authority = Some(NodeDisplayNameAuthority::User);
         node.updated_at = now_timestamp();
         self.save_registry(&registry)?;
         self.show(id)
@@ -285,33 +292,6 @@ impl FileNodeRegistryService {
         write_json(&self.registry_path(), registry)
     }
 
-    fn load_active_node_id(&self) -> RefineResult<String> {
-        let path = self.active_path();
-        if !path.exists() {
-            return Ok("default".to_string());
-        }
-        let bytes = fs::read(&path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read active node {}: {error}",
-                path.display()
-            ))
-        })?;
-        let value = serde_json::from_slice::<Value>(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse active node {}: {error}",
-                path.display()
-            ))
-        })?;
-        if let Ok(selection) = serde_json::from_value::<ActiveNodeSelection>(value.clone()) {
-            return Ok(selection.active_node_id);
-        }
-        Ok(value
-            .get("active_node_id")
-            .and_then(|value| value.as_str())
-            .unwrap_or("default")
-            .to_string())
-    }
-
     fn save_active_node_id(&self, id: &str) -> RefineResult<()> {
         write_json(
             &self.active_path(),
@@ -338,6 +318,7 @@ fn default_node(id: &str, display_name: &str) -> Node {
     Node {
         id: id.to_string(),
         display_name: display_name.to_string(),
+        display_name_authority: Some(NodeDisplayNameAuthority::System),
         created_at: now.clone(),
         updated_at: now,
         settings: JsonObject::new(),
@@ -362,9 +343,13 @@ fn node_values_with_active(nodes: &[Node], active_node_id: &str) -> Vec<Value> {
 }
 
 fn node_value(node: &Node, active: bool) -> Value {
+    let identity = identity_for_node(node);
     json!({
         "id": node.id,
-        "display_name": node.display_name,
+        "display_name": identity.display_name,
+        "registry_display_name": identity.registry_display_name,
+        "display_name_authority": node.display_name_authority,
+        "identity_diagnostics": identity.diagnostics,
         "enabled": node.enabled,
         "ssh_host": node.ssh_host,
         "ssh_user": node.ssh_user,
@@ -415,12 +400,6 @@ fn slug_id(value: &str, fallback: &str) -> String {
     } else {
         slug
     }
-}
-
-fn node_id_value(node: &Value) -> &str {
-    node.get("id")
-        .and_then(|value| value.as_str())
-        .unwrap_or("")
 }
 
 fn clean_node_id(id: &str) -> RefineResult<String> {

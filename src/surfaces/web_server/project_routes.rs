@@ -123,23 +123,10 @@ pub(super) fn dashboard_attention_items(
     items
 }
 
-fn dashboard_active_node(service: &FileNodeRegistryService) -> RefineResult<(String, String)> {
-    let active_node_id = service.active_node_id()?;
-    if active_node_id == "default" {
-        return Ok((active_node_id, "Default".to_string()));
-    }
-    let active_node_display_name = service
-        .show(&active_node_id)
-        .ok()
-        .and_then(|value| {
-            value
-                .get("node")
-                .and_then(|node| node.get("display_name"))
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .unwrap_or_else(|| active_node_id.clone());
-    Ok((active_node_id, active_node_display_name))
+fn dashboard_active_node(
+    service: &FileNodeRegistryService,
+) -> RefineResult<crate::tools::product::nodes::ActiveNodeIdentity> {
+    service.active_identity()
 }
 
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {

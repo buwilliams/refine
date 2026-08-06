@@ -5,17 +5,12 @@ fn a_nested_projection_cache_still_resolves_the_real_active_node() {
     let temp_root = unique_temp_dir("work-item-nested-cache-active-node");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8082");
-    fs::create_dir_all(&runtime_root).unwrap();
-    fs::write(
-        runtime_root.join("active-node.json"),
-        json!({
-            "active_node_id": "bo2lnxnevo03-buddy",
-            "refine_dir": refine_dir.display().to_string(),
-            "updated_at": "2026-07-25T00:00:00Z"
-        })
-        .to_string(),
-    )
-    .unwrap();
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+        &refine_dir,
+        &runtime_root,
+    );
+    nodes.create("bo2lnxnevo03-buddy").unwrap();
+    nodes.activate("bo2lnxnevo03-buddy").unwrap();
 
     // A goal owned by that Node, as automation would have created it.
     let owned = FileWorkItemService::for_node(&refine_dir, "bo2lnxnevo03-buddy")

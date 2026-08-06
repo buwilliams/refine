@@ -142,6 +142,57 @@ fn project_registry_commands_use_shared_file_project_registry_service() {
 }
 
 #[test]
+fn in_process_project_status_suppresses_ambiguous_legacy_default_label() {
+    let temp_root = unique_temp_dir("cli-project-status-node-identity");
+    let runtime_root = temp_root.join("run/8082");
+    let app_root = temp_root.join("app");
+    fs::create_dir_all(&app_root).unwrap();
+    git_init(&app_root);
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(
+        refine_dir.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        serde_json::json!({
+            "nodes": [{
+                "id": "default",
+                "display_name": "BO2LNXNEVO04 (QA)",
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z"
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let service = crate::tools::product::project_registry::FileProjectRegistryService::new(
+        &runtime_root,
+        Some(app_root.clone()),
+    );
+    let status = service.status().unwrap();
+    assert_eq!(status.active_node_id.as_deref(), Some("default"));
+    assert_eq!(status.active_node.as_deref(), Some("Default"));
+    assert_eq!(
+        status.active_node_diagnostics[0].code,
+        "ambiguous_legacy_default_display_name"
+    );
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "status",
+            "--runtime-root",
+            runtime_root.to_str().unwrap(),
+            "--target-root",
+            app_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn project_clone_uses_shared_file_project_registry_service() {
     let temp_root = unique_temp_dir("cli-project-clone");
     let runtime_root = temp_root.join("run");

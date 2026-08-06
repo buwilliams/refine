@@ -89,11 +89,35 @@ impl FileWorkItemService {
                 .map(Value::String)
                 .unwrap_or(Value::Null),
         );
-        if let Some(display_name) = current
-            .node_display_name
-            .or_else(|| self.node_display_name(current.goal.node_id.as_deref()))
-        {
-            object.insert("node_display_name".to_string(), Value::String(display_name));
+        if let Some(identity) = self.node_identity(current.goal.node_id.as_deref()) {
+            object.insert(
+                "node_display_name".to_string(),
+                Value::String(identity.display_name),
+            );
+            if !identity.diagnostics.is_empty() {
+                object.insert(
+                    "node_identity_diagnostics".to_string(),
+                    serde_json::to_value(identity.diagnostics).map_err(|error| {
+                        RefineError::Serialization(format!(
+                            "failed to encode node identity diagnostics: {error}"
+                        ))
+                    })?,
+                );
+            }
+        } else {
+            object.insert(
+                "node_display_name".to_string(),
+                Value::String(current.goal.node_id.clone().map_or_else(
+                    || "Default".to_string(),
+                    |node_id| {
+                        if node_id == "default" {
+                            "Default".to_string()
+                        } else {
+                            node_id
+                        }
+                    },
+                )),
+            );
         }
         if let Some(feature_id) = current.goal.feature_id.as_deref() {
             let mut feature_goals = snapshot

@@ -15,6 +15,55 @@ pub(crate) fn project_status_is_attached_to_test_app(fixture: &IntegrationFixtur
     assert_eq!(payload["schema"]["compatible"], true, "{payload:#}");
 }
 
+pub(crate) fn daemon_backed_project_status_suppresses_ambiguous_default_label(
+    fixture: &IntegrationFixture,
+) {
+    let refine_dir =
+        refine::tools::host::project_layout::refine_dir_for_target_root(&fixture.app_root).unwrap();
+    let path = refine_dir.join(refine::tools::product::nodes::NODE_REGISTRY_FILE);
+    let original = fs::read(&path).ok();
+    let mut registry = original
+        .as_deref()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(bytes).ok())
+        .unwrap_or_else(|| {
+            json!({
+                "nodes": [{
+                    "id": "default",
+                    "display_name": "Default",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z"
+                }]
+            })
+        });
+    let default = registry["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|node| node["id"] == "default")
+        .unwrap();
+    default["display_name"] = json!("BO2LNXNEVO04 (QA)");
+    default
+        .as_object_mut()
+        .unwrap()
+        .remove("display_name_authority");
+    fs::write(&path, serde_json::to_vec_pretty(&registry).unwrap()).unwrap();
+
+    let output = fixture.run_refine(&["project", "status"]);
+    fixture.assert_success("project status with stale default label", &output);
+    let payload = fixture.json_stdout(&output);
+    assert_eq!(payload["active_node_id"], "default", "{payload:#}");
+    assert_eq!(payload["active_node"], "Default", "{payload:#}");
+    assert_eq!(
+        payload["active_node_diagnostics"][0]["code"], "ambiguous_legacy_default_display_name",
+        "{payload:#}"
+    );
+
+    match original {
+        Some(bytes) => fs::write(path, bytes).unwrap(),
+        None => fs::remove_file(path).unwrap(),
+    }
+}
+
 pub(crate) fn project_doctor_runs(fixture: &IntegrationFixture) {
     let initial = fixture.run_refine(&["project", "doctor"]);
     fixture.assert_success("initial project doctor", &initial);

@@ -21,6 +21,10 @@ Refine needs this concept because agentic software work will not stay single-thr
 
 A node is the durable owner of active work. It may represent the local daemon, a runner worker, a machine, or a future distributed actor. The local daemon remains the responsive control plane while supervised runner processes execute agent and Git work. Agents may perform the work, but Refine should be able to say which node owns the Goal right now. That ownership is what lets many agents operate in parallel without collapsing into duplicated effort or hidden conflict.
 
+Node identity has two deliberately different parts. The durable node id is the authoritative ownership key stored on Goals, Features, workflow claims, processes, and synchronized state. A display name is only a human label for that same id; it must never be interpreted as ownership of another machine or environment. The active node selection is runtime-local and project-scoped, while the node registry is shared project state. Attach, switch, synchronization, and daemon restart must resolve the local selection against the currently attached registry rather than combining unrelated values from those two scopes.
+
+The id `default` is the reserved single-node compatibility identity. Its canonical label is `Default`. New explicit renames record display-name authority and remain valid, including an intentional rename of `default`; non-default node ids and their legitimate labels remain distinct. A legacy non-canonical label on `default` without authority metadata is ambiguous because older shared state could have copied a host-specific or environment-specific name onto the compatibility entry. Refine must keep the raw registry value inspectable, render the canonical label instead, and report a diagnostic with an operator action: rename `default` to `Default` to discard the stale label, or explicitly rename it to the intended label to confirm it. Refine must not silently rewrite ambiguous shared state.
+
 ## Expected Role
 
 Node should define how Refine thinks about parallel work:
@@ -31,6 +35,7 @@ Node should define how Refine thinks about parallel work:
 - Node ownership identifies which local or distributed actor is responsible for current progress.
 - Workflow claims prevent multiple nodes or agents from silently working the same Goal.
 - Nodes identify local or distributed actors that can own work, run processes, or report state.
+- Project status, node APIs, Goal list/detail projections, dashboard labels, CLI output, and browser surfaces resolve node labels through the same identity contract.
 - Cluster concepts let multiple Refine instances coordinate without making the product depend on one UI.
 - Git worktrees and branches isolate concurrent changes so parallel work remains reviewable.
 - Logs, quality results, process records, and diffs provide evidence for handoff and recovery.

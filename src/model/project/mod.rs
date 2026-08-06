@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::model::node::NodeIdentityDiagnostic;
 use crate::model::{JsonObject, Timestamp};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -30,6 +31,8 @@ pub struct ProjectStatus {
     pub apps: AppRegistry,
     pub active_node_id: Option<String>,
     pub active_node: Option<String>,
+    #[serde(default)]
+    pub active_node_diagnostics: Vec<NodeIdentityDiagnostic>,
     pub message: Option<String>,
 }
 

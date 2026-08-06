@@ -85,15 +85,15 @@ impl FileClusterService {
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
         let cluster = self.registry()?;
-        Ok(cluster_response(cluster))
+        self.identity_safe_cluster_response(cluster)
     }
 
     pub fn show(&self, id: &str) -> RefineResult<serde_json::Value> {
-        let cluster = self.registry()?;
-        let Some(node) = cluster.nodes.iter().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!("node {id} was not found")));
-        };
-        Ok(serde_json::json!({"node": node}))
+        // Preserve the legacy cluster migration side effect before projecting the
+        // node through the shared identity contract.
+        self.registry()?;
+        let shown = self.nodes().show(id)?;
+        Ok(serde_json::json!({"node": shown["node"]}))
     }
 
     pub fn add_node(&self, id: &str) -> RefineResult<serde_json::Value> {
@@ -112,7 +112,7 @@ impl FileClusterService {
         }
         registry.nodes.push(default_node(id));
         self.save_nodes(&registry)?;
-        Ok(cluster_response(self.cluster_from_registry(registry)))
+        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
     }
 
     pub fn upsert_node(
@@ -133,6 +133,7 @@ impl FileClusterService {
             .unwrap_or_else(|| default_node(id));
         if let Some(display_name) = update.display_name {
             node.display_name = display_name.trim().to_string();
+            node.display_name_authority = Some(crate::model::node::NodeDisplayNameAuthority::User);
         }
         if let Some(ssh_host) = update.ssh_host {
             let ssh_host = ssh_host.trim();
@@ -179,7 +180,7 @@ impl FileClusterService {
             registry.nodes.push(node);
         }
         self.save_nodes(&registry)?;
-        Ok(cluster_response(self.cluster_from_registry(registry)))
+        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
     }
 
     pub fn bootstrap_node_response(
@@ -230,7 +231,7 @@ impl FileClusterService {
             "node_id": node_id,
             "dry_run": dry_run,
             "result": result,
-            "cluster": cluster_response(cluster)
+            "cluster": self.identity_safe_cluster_response(cluster)?
         }))
     }
 
@@ -246,7 +247,7 @@ impl FileClusterService {
         node.enabled = enabled;
         node.updated_at = now_timestamp();
         self.save_nodes(&registry)?;
-        Ok(cluster_response(self.cluster_from_registry(registry)))
+        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
     }
 
     pub fn remove_node(&self, id: &str) -> RefineResult<serde_json::Value> {
@@ -348,6 +349,40 @@ impl FileClusterService {
 
     fn save_nodes(&self, registry: &NodeRegistry) -> RefineResult<()> {
         self.nodes().save_registry(registry)
+    }
+
+    fn identity_safe_cluster_response(&self, cluster: Cluster) -> RefineResult<serde_json::Value> {
+        let identities = self.nodes().node_identities()?;
+        let mut value = cluster_response(cluster);
+        if let Some(nodes) = value
+            .get_mut("nodes")
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for node in nodes {
+                let Some(id) = node.get("id").and_then(serde_json::Value::as_str) else {
+                    continue;
+                };
+                let Some(identity) = identities.get(id) else {
+                    continue;
+                };
+                let Some(object) = node.as_object_mut() else {
+                    continue;
+                };
+                object.insert(
+                    "display_name".to_string(),
+                    serde_json::json!(identity.display_name),
+                );
+                object.insert(
+                    "registry_display_name".to_string(),
+                    serde_json::json!(identity.registry_display_name),
+                );
+                object.insert(
+                    "identity_diagnostics".to_string(),
+                    serde_json::json!(identity.diagnostics),
+                );
+            }
+        }
+        Ok(value)
     }
 
     fn load_node_registry_with_legacy_cluster(&self) -> RefineResult<NodeRegistry> {

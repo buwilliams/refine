@@ -124,21 +124,37 @@ impl InProcessWebServer {
                 .facets
         });
         let result = projection.list_goals(query);
-        let node_names = self.node_display_names_for_routes();
+        let node_identities = self.node_identities_for_routes();
         let goals = result
             .goals
             .into_iter()
             .map(|goal| {
-                let node_display_name = goal
-                    .node_id
-                    .as_deref()
-                    .and_then(|node_id| node_names.get(node_id))
-                    .cloned();
+                let node_id = goal.node_id.as_deref().unwrap_or("default");
+                let fallback_display_name = if node_id == "default" {
+                    "Default"
+                } else {
+                    node_id
+                };
+                let node_identity = node_identities.get(node_id).cloned();
                 let mut value = json!(goal);
-                if let Some(display_name) = node_display_name
+                if let Some(identity) = node_identity
                     && let Some(object) = value.as_object_mut()
                 {
-                    object.insert("node_display_name".to_string(), json!(display_name));
+                    object.insert(
+                        "node_display_name".to_string(),
+                        json!(identity.display_name),
+                    );
+                    if !identity.diagnostics.is_empty() {
+                        object.insert(
+                            "node_identity_diagnostics".to_string(),
+                            json!(identity.diagnostics),
+                        );
+                    }
+                } else if let Some(object) = value.as_object_mut() {
+                    object.insert(
+                        "node_display_name".to_string(),
+                        json!(fallback_display_name),
+                    );
                 }
                 value
             })

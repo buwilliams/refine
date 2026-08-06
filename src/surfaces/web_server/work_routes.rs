@@ -53,28 +53,18 @@ impl InProcessWebServer {
             .unwrap_or_else(|| "default".to_string())
     }
 
-    fn node_display_names_for_routes(&self) -> BTreeMap<String, String> {
+    fn node_identities_for_routes(
+        &self,
+    ) -> BTreeMap<String, crate::tools::product::nodes::NodeIdentity> {
         self.current_refine_dir()
             .ok()
             .flatten()
-            .and_then(|refine_dir| self.node_registry_service(refine_dir).list_response().ok())
-            .and_then(|value| {
-                value
-                    .get("nodes")
-                    .and_then(|nodes| nodes.as_array())
-                    .cloned()
+            .and_then(|refine_dir| {
+                self.node_registry_service(refine_dir)
+                    .node_identities()
+                    .ok()
             })
-            .into_iter()
-            .flatten()
-            .filter_map(|node| {
-                let id = node.get("id").and_then(|value| value.as_str())?;
-                let display_name = node
-                    .get("display_name")
-                    .and_then(|value| value.as_str())
-                    .unwrap_or(id);
-                Some((id.to_string(), display_name.to_string()))
-            })
-            .collect()
+            .unwrap_or_default()
     }
 }
 
