@@ -8,6 +8,18 @@ const GOALS_DEFAULT_DIR = {
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
 const GOALS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const GOALS_DEFAULT_LIMIT = 50;
+const GOALS_NODE_COLUMN = Object.freeze({
+  key: "goals-node",
+  label: "Node",
+  testId: "goals-node-resize",
+  storageKey: "refine_goals_node_column_width",
+  tableSelector: ".goals-table",
+  cssProperty: "--goals-node-width",
+  defaultWidth: 220,
+  minWidth: 144,
+  maxWidth: 480,
+  step: 24,
+});
 
 // The page most recently drawn. Row, checkbox, and sort handlers are bound once
 // and outlive the render that bound them, so they read this rather than closing
@@ -461,6 +473,7 @@ function drawGoalsTable(goals, state) {
     { key: "node", label: "Node", sortable: true },
     { key: "updated",  label: "Updated",  sortable: true },
   ];
+  const nodeColumnWidth = readTableColumnWidth(GOALS_NODE_COLUMN);
   const sortHeads = columns.map((c) => {
     if (!c.sortable) {
       return `<th>${c.label}</th>`;
@@ -469,10 +482,14 @@ function drawGoalsTable(goals, state) {
     const arrow = isActive
       ? (state.dir === "asc" ? "↑" : "↓")
       : `<span class="sort-arrow-placeholder">↕</span>`;
+    const resizeHandle = c.key === "node"
+      ? renderTableColumnResizeHandle(GOALS_NODE_COLUMN, nodeColumnWidth)
+      : "";
     return `<th class="sortable ${isActive ? "active" : ""}"
                 data-sort-key="${c.key}"
                 data-testid="goals-sort-${c.key}">
-              ${c.label} <span class="sort-arrow">${arrow}</span>
+              <span class="goals-column-heading">${c.label} <span class="sort-arrow">${arrow}</span></span>
+              ${resizeHandle}
             </th>`;
   }).join("");
   const selectionHead = showSelection
@@ -483,8 +500,9 @@ function drawGoalsTable(goals, state) {
        </th>`
     : "";
   renderInto(root, `
-    <div class="table-scroll">
-      <table class="table work-items-table goals-table mobile-card-table">
+    <div class="table-scroll goals-table-scroll">
+      <table class="table work-items-table goals-table mobile-card-table${showSelection ? " goals-table-with-selection" : ""}"
+             style="--goals-node-width: ${nodeColumnWidth}px">
         <colgroup>
           ${showSelection ? '<col class="goals-col-select">' : ""}
           <col class="work-item-name-col goals-col-name">
@@ -527,6 +545,7 @@ function drawGoalsTable(goals, state) {
     ${renderPaginationControls("goals", state.page, goals.length, "goal")}
 		  `, () => {
     bindPaginationControls(root, "goals", (page) => updateGoalsFilter({ page }));
+    bindTableColumnResize(root, GOALS_NODE_COLUMN);
     // Row click navigates to goal detail — but a click on the checkbox (or
     // its surrounding td) should toggle selection, not navigate.
     $$(".table tbody tr", root).forEach((row) => {
@@ -568,7 +587,9 @@ function drawGoalsTable(goals, state) {
       });
     }
     $$(".table th.sortable", root).forEach((th) => {
-      bindOnce(th, "click", () => {
+      bindOnce(th, "click", (event) => {
+        if (root.dataset.columnResizeSuppressSort === "1") return;
+        if (event.target.closest(".table-column-resize-handle")) return;
         const key = th.dataset.sortKey;
         let nextDir;
         if (key === _goalsPage.sort) {

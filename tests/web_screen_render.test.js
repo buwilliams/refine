@@ -737,9 +737,10 @@ test("every converted screen boots and paints", { skip: SKIP }, async () => {
   }
 });
 
-test("Goals truncate long Node names without overflowing Updated", { skip: SKIP }, async () => {
+test("Goals Node column has a readable default without overflowing Updated", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
+    await app.page.setViewportSize({ width: 1280, height: 800 });
     await assertScreenRenders(app, {
       route: "#/goals",
       marker: ".goals-node-value",
@@ -748,20 +749,146 @@ test("Goals truncate long Node names without overflowing Updated", { skip: SKIP 
       const nodeRect = node.getBoundingClientRect();
       const updatedRect = node.closest("tr").querySelector('[data-label="Updated"]')
         .getBoundingClientRect();
+      const cellRect = node.closest("td").getBoundingClientRect();
       return {
         fullName: node.title,
+        nodeColumnWidth: Math.round(cellRect.width),
         textOverflow: getComputedStyle(node).textOverflow,
         whiteSpace: getComputedStyle(node).whiteSpace,
         isTruncated: node.scrollWidth > node.clientWidth,
         staysBeforeUpdated: nodeRect.right <= updatedRect.left,
       };
     });
-    assert.deepEqual(layout, {
-      fullName: GOAL.node_display_name,
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      isTruncated: true,
+    assert.equal(layout.fullName, GOAL.node_display_name);
+    assert.ok(layout.nodeColumnWidth >= 220, `Node column was only ${layout.nodeColumnWidth}px`);
+    assert.equal(layout.textOverflow, "ellipsis");
+    assert.equal(layout.whiteSpace, "nowrap");
+    assert.equal(layout.isTruncated, true);
+    assert.equal(layout.staysBeforeUpdated, true);
+    assert.equal(
+      await app.page.locator('[data-testid="goals-node-resize"]').getAttribute("aria-valuenow"),
+      "220",
+    );
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("Goals Node column widens accessibly, stays bounded, and survives rerenders", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await app.page.setViewportSize({ width: 1280, height: 800 });
+    await assertScreenRenders(app, {
+      route: "#/goals",
+      marker: '[data-testid="goals-node-resize"]',
+    });
+    const handle = app.page.locator('[data-testid="goals-node-resize"]');
+
+    const box = await handle.boundingBox();
+    assert.ok(box, "Node resize handle has no pointer target");
+    const hitTarget = await app.page.evaluate(({ x, y }) => {
+      const element = document.elementFromPoint(x, y);
+      return `${element?.tagName || "none"}.${element?.className || ""}`;
+    }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+    assert.match(hitTarget, /table-column-resize-handle/);
+    await app.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await app.page.mouse.down();
+    await app.page.mouse.move(box.x + box.width / 2 + 96, box.y + box.height / 2);
+    await app.page.mouse.up();
+    assert.equal(await handle.getAttribute("aria-valuenow"), "316");
+
+    await handle.focus();
+    await handle.press("End");
+    assert.equal(await handle.getAttribute("aria-valuenow"), "480");
+    await handle.press("ArrowRight");
+    assert.equal(await handle.getAttribute("aria-valuenow"), "480");
+    assert.equal(new URL(app.page.url()).hash, "#/goals");
+
+    const widened = await app.page.locator(".goals-node-value").evaluate((node) => {
+      const nodeRect = node.getBoundingClientRect();
+      const updatedRect = node.closest("tr").querySelector('[data-label="Updated"]')
+        .getBoundingClientRect();
+      const scroll = node.closest(".goals-table-scroll");
+      return {
+        isTruncated: node.scrollWidth > node.clientWidth,
+        staysBeforeUpdated: nodeRect.right <= updatedRect.left,
+        scrollsHorizontally: scroll.scrollWidth > scroll.clientWidth,
+      };
+    });
+    assert.deepEqual(widened, {
+      isTruncated: false,
       staysBeforeUpdated: true,
+      scrollsHorizontally: true,
+    });
+
+    await handle.press("Home");
+    assert.equal(await handle.getAttribute("aria-valuenow"), "144");
+    await handle.press("ArrowLeft");
+    assert.equal(await handle.getAttribute("aria-valuenow"), "144");
+    await handle.press("End");
+
+    // Expanding selection and changing page both redraw the table. The width and
+    // selection controls must survive alongside the existing list behavior.
+    await app.page.locator('[data-testid="goals-filter-summary"]').click();
+    assert.equal(
+      await app.page.locator('[data-testid="goals-node-resize"]').getAttribute("aria-valuenow"),
+      "480",
+    );
+    await app.page.waitForSelector('[data-testid="goals-row-select"]');
+    assert.equal(await app.page.locator('[data-testid="goals-row-select"]').count(), 1);
+    await app.page.evaluate(() => updateGoalsFilter({ page: 2 }));
+    await app.page.waitForFunction(() => (
+      location.hash.includes("page=2")
+      &&
+      document.querySelector('[data-testid="goals-node-resize"]')?.getAttribute("aria-valuenow") === "480"
+    ));
+
+    await app.page.locator('[data-testid="goals-sort-node"] .goals-column-heading').click();
+    await app.page.waitForFunction(() => location.hash.includes("sort=node"));
+    assert.equal(
+      await app.page.locator('[data-testid="goals-node-resize"]').getAttribute("aria-valuenow"),
+      "480",
+    );
+
+    // sessionStorage also carries the preference across a same-tab refresh.
+    await app.page.reload();
+    await app.page.waitForSelector('[data-testid="goals-node-resize"]');
+    assert.equal(
+      await app.page.locator('[data-testid="goals-node-resize"]').getAttribute("aria-valuenow"),
+      "480",
+    );
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("Goals mobile cards ignore desktop Node width and show the complete label", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await app.page.setViewportSize({ width: 700, height: 800 });
+    await assertScreenRenders(app, {
+      route: "#/goals",
+      marker: ".goals-node-value",
+    });
+    const mobile = await app.page.locator(".goals-node-value").evaluate((node) => {
+      const table = node.closest("table");
+      const scroll = node.closest(".goals-table-scroll");
+      return {
+        text: node.textContent,
+        overflow: getComputedStyle(node).overflow,
+        textOverflow: getComputedStyle(node).textOverflow,
+        whiteSpace: getComputedStyle(node).whiteSpace,
+        tableFitsViewport: table.getBoundingClientRect().width <= scroll.getBoundingClientRect().width,
+      };
+    });
+    assert.deepEqual(mobile, {
+      text: GOAL.node_display_name,
+      overflow: "visible",
+      textOverflow: "clip",
+      whiteSpace: "normal",
+      tableFitsViewport: true,
     });
     assert.deepEqual(app.pageErrors, []);
   } finally {
