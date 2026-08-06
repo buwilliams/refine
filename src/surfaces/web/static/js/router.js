@@ -103,6 +103,7 @@ function navigate() {
     } catch { /* keep prior state.underlayHash */ }
     state.currentRoute = "goals_detail";
     state.currentGoal = r.id;
+    syncNodeScopeNavigation(state.underlayHash);
     highlightNav("goals");
     openGoalDetailModal(r.id);
     return;
@@ -130,6 +131,7 @@ function navigate() {
   // since we're already moving to a different one).
   if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
   if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
+  syncNodeScopeNavigation(destinationHash);
 
   if (
     prevRoute === r.route &&

@@ -317,6 +317,64 @@ test("Goals cold-load hydrates Reporter and Assignee filters before rendering", 
   }
 });
 
+test("primary Dashboard and Goals navigation preserves current and all node scope", { skip: SKIP }, async () => {
+  const app = await openApp();
+  const hash = () => new URL(app.page.url()).hash;
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+
+    // Keyboard activation follows the real primary Goals link and makes the
+    // Dashboard's default current scope explicit in the Goals URL.
+    await app.page.locator('[data-testid="nav-goals"]').focus();
+    await app.page.locator('[data-testid="nav-goals"]').press("Enter");
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(hash(), "#/goals?node=current");
+    assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "current");
+
+    await app.page.locator('[data-testid="nav-dashboard"]').click();
+    await app.page.waitForSelector("#dash");
+    assert.equal(hash(), "#/");
+    await app.page.locator('[data-testid="nav-goals"]').click();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(hash(), "#/goals?node=current");
+
+    await app.page.goBack();
+    await app.page.waitForSelector("#dash");
+    assert.equal(hash(), "#/");
+    await app.page.goForward();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(hash(), "#/goals?node=current");
+    await app.page.reload();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "current");
+
+    await app.page.locator('[data-testid="nav-dashboard"]').click();
+    await app.page.waitForSelector("#dash");
+    await app.page.locator('[data-testid="dashboard-scope-all"]').click();
+    await app.page.waitForFunction(() => location.hash === "#/?node=all");
+    assert.equal(hash(), "#/?node=all");
+
+    await app.page.locator('[data-testid="nav-goals"]').click();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(hash(), "#/goals?node=all");
+    assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "all");
+
+    // The brand is another ordinary Dashboard entry point and must carry All.
+    await app.page.locator(".brand").click();
+    await app.page.waitForSelector("#dash");
+    assert.equal(hash(), "#/?node=all");
+    await app.page.locator('[data-testid="nav-goals"]').click();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(hash(), "#/goals?node=all");
+    await app.page.reload();
+    await app.page.waitForSelector('[data-testid="goals-table"]');
+    assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "all");
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("feature detail renders from the routed URL", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

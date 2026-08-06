@@ -9,12 +9,11 @@ let dashboardRetryTimer = null;
 const DASHBOARD_REFRESH_TIMEOUT_MS = 6000;
 const DASHBOARD_PANEL_STORAGE_PREFIX = "refine_dashboard_panel_open:";
 function dashboardScopeFromHash() {
-  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
-  return hashQs.get("node") === "all" ? "all" : "current";
+  return sharedNodeScopeFromHash(location.hash) || "current";
 }
 
 function dashboardHash(scope) {
-  return scope === "all" ? "#/?node=all" : "#/";
+  return nodeScopeSurfaceHash("dashboard", scope);
 }
 
 function dashboardScopeParam(d = null) {
