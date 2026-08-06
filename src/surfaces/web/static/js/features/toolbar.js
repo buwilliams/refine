@@ -1554,6 +1554,23 @@ function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
   return true;
 }
 
+function handleTerminalNewlineKeydown(e, terminal = terminalStateFor()) {
+  if (!terminal?.sessionId || terminal.exited) return false;
+  if (e.type && e.type !== "keydown") return false;
+  if (
+    e.key !== "Enter"
+    || !e.ctrlKey
+    || e.altKey
+    || e.metaKey
+  ) return false;
+  e.preventDefault();
+  // Browser key events can distinguish Ctrl+Enter even when xterm's legacy
+  // keyboard encoding cannot. Both supported agent TUIs treat Ctrl+J (LF) as
+  // an editor newline, so forward that semantic input instead of plain Enter.
+  queueTerminalInput("\n", terminal);
+  return true;
+}
+
 function terminalSelection(terminal) {
   if (!terminal?.term?.hasSelection?.()) return "";
   return terminal.term.getSelection?.() || "";
@@ -1600,12 +1617,33 @@ function handleTerminalPaste(e, terminal = terminalStateFor()) {
     return false;
   }
   if (!text) return false;
+  if (!pasteTerminalText(text, terminal)) return false;
   e.preventDefault();
   // This listener runs during capture above xterm's textarea. Once the shared
   // terminal path accepts the paste, keep xterm from processing the same event
-  // through onData and appending the clipboard text to the input buffer again.
+  // a second time after Terminal.paste has emitted its terminal-native input.
   e.stopPropagation();
-  queueTerminalInput(text, terminal);
+  return true;
+}
+
+function pasteTerminalText(
+  text,
+  terminal = terminalStateFor(),
+  sessionId = terminal?.sessionId,
+) {
+  if (
+    typeof text !== "string"
+    || !text
+    || !terminal
+    || terminal.exited
+    || !sessionId
+    || terminal.sessionId !== sessionId
+    || typeof terminal.term?.paste !== "function"
+  ) return false;
+  // Let xterm normalize line endings and honor the PTY application's
+  // bracketed-paste mode. Agent TUIs use that framing to preserve multiline
+  // content as one editable prompt rather than submitting embedded lines.
+  terminal.term.paste(text);
   return true;
 }
 
@@ -1653,7 +1691,7 @@ function readTerminalClipboard(terminal) {
           && terminal.sessionId === sessionId
           && !terminal.exited
         ) {
-          queueTerminalInput(text, terminal, sessionId);
+          pasteTerminalText(text, terminal, sessionId);
         }
       })
       .catch((error) => showTerminalClipboardError("paste", error, terminal));
@@ -1833,7 +1871,8 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   if (terminal.display) term.write(terminal.display);
   term.onData((data) => queueTerminalInput(data, terminal));
   term.attachCustomKeyEventHandler?.(
-    (event) => !handleTerminalClipboardKeydown(event, terminal),
+    (event) => !handleTerminalClipboardKeydown(event, terminal)
+      && !handleTerminalNewlineKeydown(event, terminal),
   );
   term.element?.addEventListener?.(
     "copy",
