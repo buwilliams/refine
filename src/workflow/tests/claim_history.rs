@@ -364,8 +364,11 @@ fn still_eligible_retry_delay_is_available_to_shared_status_surfaces() {
     fs::create_dir_all(&runtime_root).unwrap();
     super::super::write_state(&runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE), &state).unwrap();
 
+    let projection = crate::tools::product::project_state::FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
     let delays = WorkflowEngine::with_target_root(&runtime_root, &target_root)
-        .retry_delays_needing_attention()
+        .retry_delays_needing_attention(&projection)
         .unwrap();
 
     assert_eq!(delays.len(), 1);

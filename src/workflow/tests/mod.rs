@@ -19,6 +19,7 @@ use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::process_control::FileProcessControlService;
+use crate::tools::product::project_state::ProjectStateStore;
 use crate::tools::product::work_items::{BulkGoalSelection, FileWorkItemService};
 use crate::workflow::capacity::AgentCapacityService;
 use serde_json::{Value, json};

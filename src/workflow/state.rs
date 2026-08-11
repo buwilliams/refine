@@ -8,7 +8,8 @@ use fs2::FileExt;
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
+use crate::tools::product::project_state::ProjectionSnapshot;
+use crate::tools::product::work_items::workflow_revision_for_goal_projection;
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 use super::claim_history::CLAIM_HISTORY_VERSION;
@@ -160,12 +161,19 @@ impl WorkflowEngine {
         read_state(&self.state_path())
     }
 
-    pub fn preparation_failures_needing_attention(&self) -> RefineResult<Vec<WorkflowClaim>> {
+    /// Project preparation failures against the caller's request-scoped project authority.
+    ///
+    /// Dashboard already resolves an indexed/cached projection. Reusing it here prevents one
+    /// whole-project rebuild per historical failure while direct Goal reads keep revision checks
+    /// authoritative.
+    pub fn preparation_failures_needing_attention(
+        &self,
+        projection: &ProjectionSnapshot,
+    ) -> RefineResult<Vec<WorkflowClaim>> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(Vec::new());
         };
         let state = self.load_state()?;
-        let work_items = FileWorkItemService::new(refine_dir);
         let mut failures = Vec::new();
         for (goal_id, summary) in &state.claim_summaries {
             let Some(claim) = summary.latest_claim.as_ref().filter(|claim| {
@@ -176,10 +184,11 @@ impl WorkflowEngine {
             };
             let still_current = match claim.goal_revision {
                 None => true,
-                Some(failed_revision) => work_items
-                    .show_goal_detail(goal_id)
-                    .map(|detail| workflow_revision(&detail) == failed_revision)
-                    .unwrap_or(true),
+                Some(failed_revision) => projection.goals.get(goal_id).is_none_or(|goal| {
+                    workflow_revision_for_goal_projection(&refine_dir, &goal.goal)
+                        .map(|revision| revision == failed_revision)
+                        .unwrap_or(true)
+                }),
             };
             if still_current {
                 failures.push(claim.clone());
@@ -188,12 +197,14 @@ impl WorkflowEngine {
         Ok(failures)
     }
 
-    pub fn retry_delays_needing_attention(&self) -> RefineResult<Vec<WorkflowRetryDelay>> {
+    pub fn retry_delays_needing_attention(
+        &self,
+        projection: &ProjectionSnapshot,
+    ) -> RefineResult<Vec<WorkflowRetryDelay>> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(Vec::new());
         };
         let state = self.load_state()?;
-        let work_items = FileWorkItemService::new(refine_dir);
         let now = Utc::now();
         let mut delays = Vec::new();
         for (goal_id, summary) in &state.claim_summaries {
@@ -204,7 +215,7 @@ impl WorkflowEngine {
             else {
                 continue;
             };
-            let Ok(goal) = work_items.show_goal_summary(goal_id) else {
+            let Some(goal) = projection.goals.get(goal_id) else {
                 continue;
             };
             if !matches!(
@@ -216,9 +227,11 @@ impl WorkflowEngine {
             ) {
                 continue;
             }
-            let detail = work_items.show_goal_detail(goal_id)?;
             let round_idx = goal.goal.round_count.checked_sub(1);
-            let goal_revision = Some(workflow_revision(&detail));
+            let goal_revision = Some(workflow_revision_for_goal_projection(
+                &refine_dir,
+                &goal.goal,
+            )?);
             let Some(retry_not_before) =
                 state.claim_retry_not_before(goal_id, round_idx, goal_revision, now)
             else {

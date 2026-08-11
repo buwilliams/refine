@@ -59,7 +59,7 @@ impl InProcessWebServer {
         let preparation_failures = match (&self.runtime_root, &current_target_root) {
             (Some(runtime_root), Some(target_root)) => {
                 match WorkflowEngine::with_target_root(runtime_root, target_root)
-                    .preparation_failures_needing_attention()
+                    .preparation_failures_needing_attention(&projection)
                 {
                     Ok(failures) => failures
                         .into_iter()
@@ -73,7 +73,7 @@ impl InProcessWebServer {
         let retry_delays = match (&self.runtime_root, &current_target_root) {
             (Some(runtime_root), Some(target_root)) => {
                 match WorkflowEngine::with_target_root(runtime_root, target_root)
-                    .retry_delays_needing_attention()
+                    .retry_delays_needing_attention(&projection)
                 {
                     Ok(delays) => delays
                         .into_iter()

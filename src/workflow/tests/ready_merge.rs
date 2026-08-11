@@ -335,8 +335,15 @@ fn candidate_mismatch_preparation_failure_settles_and_requeue_creates_a_fresh_cl
             message.contains("candidate changed from integrated commit")
         })
     );
+    let projection = crate::tools::product::project_state::FileProjectStateStore::new(
+        test_refine_dir(&target_root),
+    )
+    .rebuild_projection()
+    .unwrap();
     assert_eq!(
-        automation.preparation_failures_needing_attention().unwrap(),
+        automation
+            .preparation_failures_needing_attention(&projection)
+            .unwrap(),
         vec![failed.clone()]
     );
     assert_eq!(
@@ -387,9 +394,14 @@ fn candidate_mismatch_preparation_failure_settles_and_requeue_creates_a_fresh_cl
             .count(),
         2
     );
+    let projection = crate::tools::product::project_state::FileProjectStateStore::new(
+        test_refine_dir(&target_root),
+    )
+    .rebuild_projection()
+    .unwrap();
     assert!(
         automation
-            .preparation_failures_needing_attention()
+            .preparation_failures_needing_attention(&projection)
             .unwrap()
             .is_empty()
     );
@@ -776,7 +788,14 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
         GoalStatus::Qa
     );
-    let retry_delays = automation.retry_delays_needing_attention().unwrap();
+    let projection = crate::tools::product::project_state::FileProjectStateStore::new(
+        test_refine_dir(&target_root),
+    )
+    .rebuild_projection()
+    .unwrap();
+    let retry_delays = automation
+        .retry_delays_needing_attention(&projection)
+        .unwrap();
     assert_eq!(retry_delays.len(), 1);
     assert_eq!(retry_delays[0].goal_id, "GOAL1");
     assert_eq!(automation.promote().unwrap(), 0);

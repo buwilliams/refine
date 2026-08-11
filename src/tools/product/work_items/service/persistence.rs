@@ -5,20 +5,7 @@ impl FileWorkItemService {
         &self,
         goal: &GoalIndexProjection,
     ) -> RefineResult<u64> {
-        let goal_path = self.refine_dir.join(&goal.json_path);
-        let bytes = fs::read(&goal_path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read Goal {}: {error}",
-                goal_path.display()
-            ))
-        })?;
-        let value = serde_json::from_slice::<Value>(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse Goal {}: {error}",
-                goal_path.display()
-            ))
-        })?;
-        Ok(workflow_revision(&value))
+        workflow_revision_for_goal_projection(&self.refine_dir, goal)
     }
 
     pub(super) fn with_goal_reporter_registered<T>(

@@ -1,5 +1,6 @@
 mod activity_exports;
 mod agents_chat;
+mod dashboard_retry;
 mod features;
 mod files_terminal;
 mod git_changes;
