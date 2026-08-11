@@ -30,6 +30,7 @@ const PROCESSED_KEYWORD: &str = "refine-processed";
 const REQUEST_SCHEMA_VERSION: u64 = 1;
 const CONFIG_SCHEMA_VERSION: u64 = 1;
 const DEFAULT_POLL_SECONDS: u64 = 60;
+const DEVELOPMENT_REQUEST_GOAL_PRIORITY: &str = "low";
 pub const SELF_DEVELOPMENT_EMAIL_CONFIG_FILE: &str = "self-development-email.json";
 
 fn default_poll_seconds() -> u64 {
@@ -182,14 +183,8 @@ pub struct DevelopmentRequestRecord {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(tag = "decision", rename_all = "snake_case")]
 enum ReviewDecision {
-    CreateGoal {
-        name: String,
-        prompt: String,
-        priority: String,
-    },
-    Ignore {
-        reason: Option<String>,
-    },
+    CreateGoal { name: String, prompt: String },
+    Ignore { reason: Option<String> },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -643,16 +638,7 @@ impl FileDevelopmentRequestService {
                 record.status = DevelopmentRequestStatus::Ignored;
                 record.last_error = reason;
             }
-            ReviewDecision::CreateGoal {
-                name,
-                prompt,
-                priority,
-            } => {
-                if !matches!(priority.as_str(), "low" | "medium" | "high") {
-                    return Err(RefineError::InvalidInput(
-                        "development request reviewer returned an invalid priority".to_string(),
-                    ));
-                }
+            ReviewDecision::CreateGoal { name, prompt } => {
                 let work_items = FileWorkItemService::with_projection_cache(
                     &self.refine_dir,
                     &self.runtime_root,
@@ -668,18 +654,11 @@ impl FileDevelopmentRequestService {
                     record.updated_at = Utc::now().to_rfc3339();
                     return self.write_record(record);
                 }
-                let result = work_items.author_goal(GoalAuthoringRequest {
-                    id: Some(record.id.clone()),
-                    name: Some(name.clone()),
+                let result = work_items.author_goal(development_request_goal_authoring_request(
+                    record,
+                    name.clone(),
                     prompt,
-                    reporter: record.sender.clone(),
-                    assignee: None,
-                    priority,
-                    feature_id: None,
-                    placement: FeatureGoalPlacement::Unordered,
-                    duplicate_decision: "original".to_string(),
-                    ..GoalAuthoringRequest::default()
-                })?;
+                ))?;
                 let goal = result.goal.ok_or_else(|| {
                     RefineError::Conflict("development request did not produce a Goal".to_string())
                 })?;
@@ -867,6 +846,25 @@ fn parse_email(raw: &[u8]) -> RefineResult<ParsedEmail> {
 fn request_id(provider_email_id: &str) -> String {
     let digest = Sha256::digest(provider_email_id.as_bytes());
     format!("DR{:X}", digest)[..26].to_string()
+}
+
+fn development_request_goal_authoring_request(
+    record: &DevelopmentRequestRecord,
+    name: String,
+    prompt: String,
+) -> GoalAuthoringRequest {
+    GoalAuthoringRequest {
+        id: Some(record.id.clone()),
+        name: Some(name),
+        prompt,
+        reporter: record.sender.clone(),
+        assignee: None,
+        priority: DEVELOPMENT_REQUEST_GOAL_PRIORITY.to_string(),
+        feature_id: None,
+        placement: FeatureGoalPlacement::Unordered,
+        duplicate_decision: "original".to_string(),
+        ..GoalAuthoringRequest::default()
+    }
 }
 
 fn parse_review_decision(output: &str) -> RefineResult<ReviewDecision> {
@@ -1082,12 +1080,29 @@ mod tests {
     }
 
     #[test]
-    fn reviewer_accepts_plain_and_fenced_json() {
+    fn reviewer_priority_cannot_raise_an_email_goal_priority() {
         let plain = r#"{"decision":"create_goal","name":"N","prompt":"P","priority":"high"}"#;
-        assert!(matches!(
-            parse_review_decision(plain).unwrap(),
-            ReviewDecision::CreateGoal { .. }
-        ));
+        let ReviewDecision::CreateGoal { name, prompt } = parse_review_decision(plain).unwrap()
+        else {
+            panic!("expected a Goal decision");
+        };
+        let service = FileDevelopmentRequestService::new("runtime", "state", "target");
+        let record = service.record_from_email(
+            "provider-id",
+            ParsedEmail {
+                message_id: None,
+                sender: "buddy@example.com".to_string(),
+                subject: "Request".to_string(),
+                source_text: "Please implement this.".to_string(),
+            },
+            "goal@getrefine.dev",
+        );
+        let request = development_request_goal_authoring_request(&record, name, prompt);
+        assert_eq!(request.priority, "low");
+    }
+
+    #[test]
+    fn reviewer_accepts_fenced_json() {
         let fenced = "```json\n{\"decision\":\"ignore\",\"reason\":\"noise\"}\n```";
         assert_eq!(
             parse_review_decision(fenced).unwrap(),

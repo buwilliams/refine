@@ -89,7 +89,7 @@ For each accepted Fastmail message, Refine:
 2. persists a retry record before marking the Fastmail message processed;
 3. supplies the plain body and `.txt` attachments to one review agent, ignoring
    images and every other attachment type;
-4. creates at most one deterministic Goal in Backlog;
+4. creates at most one deterministic, low-priority Goal in Backlog;
 5. lets the normal backlog and workflow automation run;
 6. approves the Goal from Review only after verified Ready Merge evidence; and
 7. sends a threaded resolution reply from `goal@getrefine.dev` after Done.
