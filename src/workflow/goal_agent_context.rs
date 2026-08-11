@@ -12,6 +12,7 @@ pub(super) fn round_agent_context(round: &Value, round_idx: usize) -> Value {
             "guidance_decision",
             "implementation_report",
             "implementation_reported_at",
+            "implementation_plan",
             "rule_state",
             "meta_rule_state",
             "product_state",

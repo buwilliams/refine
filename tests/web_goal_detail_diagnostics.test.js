@@ -67,6 +67,7 @@ function goalDetailRuntime() {
       failure: (goal, round) => renderFailureSummary(goal, round),
       governance: (round) => renderGovernanceSummary(round),
       quality: (round) => renderQualitySummary(round),
+      implementationPlan: (round, history = {}) => renderImplementationPlan(round, 0, history),
     };
   `, context);
   return context.goalDetailDiagnosticsTest;
@@ -162,4 +163,45 @@ test("Failure and Quality cards render the actionable summary safely and retain 
   assert.match(quality, /&quot;diagnostics&quot;:/);
   assert.match(quality, /complete &amp; authoritative &lt;diagnostic&gt;/);
   assert.doesNotMatch(quality, /\[object Object\]/);
+});
+
+test("Implementation Plan renders final checklist, immutable history, outcomes, and failures safely", () => {
+  const runtime = goalDetailRuntime();
+  const html = runtime.implementationPlan({
+    implementation_plan: {
+      phase: "implement",
+      state: "failed",
+      phase_started_at: "2026-08-11T09:20:00Z",
+      updated_at: "2026-08-11T10:00:00Z",
+      active_process: { operation_id: "op-implement", process_id: "goal-agent-1" },
+      proposal: {
+        completed_at: "2026-08-11T09:00:00Z",
+        result: { summary: "Original <proposal>", checklist: [{ id: "P1", description: "Old & risky" }] },
+      },
+      criticism: {
+        completed_at: "2026-08-11T09:10:00Z",
+        result: { summary: "Material gaps", findings: [{ id: "C1", description: "Missing <recovery>", recommendation: "Add & test it" }] },
+      },
+      final_plan: {
+        result: { summary: "Final safe plan", checklist: [{ id: "P1", description: "Implement safely", affected_behavior: ["API & UI"], verification: ["node --test <focused>"] }] },
+      },
+      implementation: {
+        execution: {
+          checklist: [{ id: "P1", outcome: "deviated", evidence: "Changed <API> only" }],
+          verification: ["cargo test --lib: passed"],
+        },
+      },
+      failure: { phase: "implement", message: "Provider <failed> & retained evidence" },
+    },
+  }, { "0:proposal": true });
+
+  assert.match(html, /goal-implementation-plan-phase">failed/);
+  assert.match(html, /Active operation op-implement · process goal-agent-1/);
+  assert.match(html, /goal-implementation-plan-checklist/);
+  assert.match(html, /goal-implementation-checklist-outcome">deviated/);
+  assert.match(html, /Original &lt;proposal&gt;/);
+  assert.match(html, /data-plan-history="proposal"[^>]* open/);
+  assert.match(html, /Missing &lt;recovery&gt;/);
+  assert.match(html, /Provider &lt;failed&gt; &amp; retained evidence/);
+  assert.doesNotMatch(html, /<API>|<recovery>|<failed>/);
 });

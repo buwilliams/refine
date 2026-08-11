@@ -54,6 +54,15 @@ fn jira_export_contains_reports_quality_notes_and_exact_commits() {
                 "updated": "2026-01-02T00:00:00Z",
                 "implementation_report": "Added export. cargo test passed.",
                 "implementation_reported_at": "2026-01-02T00:00:00Z",
+                "implementation_plan": {
+                    "schema_version": 1,
+                    "state": "completed",
+                    "phase": "implement",
+                    "final_plan": {"result": {
+                        "summary": "Export the shared planning evidence",
+                        "checklist": [{"id": "P1", "description": "Expose evidence"}]
+                    }}
+                },
                 "quality_state": "passed",
                 "quality_message": "All checks passed",
                 "quality_details": {"command": "cargo test", "exit_code": 0},
@@ -78,6 +87,16 @@ fn jira_export_contains_reports_quality_notes_and_exact_commits() {
     );
     assert!(export.csv.contains("Export audit, evidence"));
     assert!(export.csv.contains("Added export. cargo test passed."));
+    assert!(
+        export
+            .csv
+            .contains("Implementation planning state: completed")
+    );
+    assert!(
+        export
+            .csv
+            .contains("Final implementation plan: Export the shared planning evidence")
+    );
     assert!(export.csv.contains("GOAL1 implement evidence export"));
     assert!(export.csv.contains("\"\"quotes\"\""));
     assert!(export.csv.ends_with("\r\n"));

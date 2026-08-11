@@ -41,6 +41,11 @@ Current implementation details that matter to intent:
 - workflow Goal Agents run as PTY-backed managed processes with shared transcript,
   input, resize, attention, and lifecycle state, so CLI and browser attachments
   observe the same process.
+- execution-time plan, criticize, revise, and implement phases each have a
+  distinct managed-process and operation identity under the same workflow
+  execution. Process metadata names the active implementation phase so shared
+  attachment, cancellation, pause, logs, failure, and settlement operate on the
+  current process rather than launching a duplicate.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - one shared host daemon-lifecycle capability selects port-scoped systemd or
   launchd control versus supervised direct-process fallback from the selected

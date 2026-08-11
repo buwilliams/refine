@@ -16,6 +16,20 @@ It should make the work understandable to both humans and agents: what should be
 
 ## Expected Role
 
+Each Round shows one read-only Implementation Plan card sourced from the
+authoritative Goal detail. The active phase and final checklist are primary;
+the original proposal and independent criticism remain expandable history.
+Phase timestamps, failures, verification, and per-item implementation outcomes
+make discrepancies inspectable without turning the browser into a planning
+state machine. Expanded Round and planning-history sections remain open across
+SSE-driven redraws.
+
+The browser never orchestrates or polls implementation planning. Existing Goal
+SSE and reconnect reconciliation deliver the same Round object observed by CLI,
+API, MCP, and exports, and Open Agent attaches to the active workflow phase.
+Between phase-process registrations it reports that Workflow is between phases
+and never launches a diagnostic substitute for an in-progress planned Goal.
+
 The Goal UI should expose identity, status, priority, reporter, assignee, Feature membership, node ownership, notes, rounds, implementation reports, logs, governance, quality, chat, and workflow actions.
 
 Current implementation details that matter to intent:

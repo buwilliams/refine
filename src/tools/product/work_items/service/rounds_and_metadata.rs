@@ -478,6 +478,7 @@ impl FileWorkItemService {
         })?;
         for key in [
             "agent_context",
+            "implementation_plan",
             "guidance_decision",
             "rule_state",
             "meta_rule_state",

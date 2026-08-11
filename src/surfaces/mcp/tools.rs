@@ -190,7 +190,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
         },
         McpTool {
             name: "refine_show_goal",
-            description: "Show a single Goal by id, including its current workflow state.",
+            description: "Show authoritative Goal detail by id, including Round implementation plans, evidence, and current workflow state.",
             input_schema: goal_id_schema,
             binding: ToolBinding::Api {
                 method: "GET",

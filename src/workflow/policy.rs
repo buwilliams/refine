@@ -3,7 +3,9 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::model::goal::GoalIndexProjection;
+use crate::model::goal::{
+    GoalIndexProjection, ImplementationPlan, ImplementationPlanState, ImplementationPlanningFailure,
+};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
@@ -184,6 +186,9 @@ impl WorkflowEngine {
                 // resumed without a durable stage boundary. Fail it with a causal event rather
                 // than silently guessing. Later stages are explicit idempotent checkpoints and
                 // remain eligible for the scheduler's normal automatic resume.
+                if goal.status == GoalStatus::InProgress {
+                    self.fail_interrupted_implementation_plan(&work_items, goal, detail)?;
+                }
                 work_items.advance_automated_goal_status(&goal.id, GoalStatus::Failed)?;
             }
             let round_idx = ensure_workflow_round(&work_items, &goal.id)?;
@@ -219,6 +224,70 @@ impl WorkflowEngine {
             .collect::<Vec<_>>();
         self.interrupt_active_claims(&goal_ids)?;
         Ok(active_goals.len())
+    }
+
+    fn fail_interrupted_implementation_plan(
+        &self,
+        work_items: &FileWorkItemService,
+        goal: &GoalIndexProjection,
+        detail: &str,
+    ) -> RefineResult<()> {
+        let Some(round_idx) = goal.round_count.checked_sub(1) else {
+            return Ok(());
+        };
+        let goal_detail = work_items.show_goal_detail(&goal.id)?;
+        let Some(raw) = goal_detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(round_idx))
+            .and_then(|round| round.get("implementation_plan"))
+            .filter(|value| !value.is_null())
+        else {
+            return Ok(());
+        };
+        let previous: ImplementationPlan = serde_json::from_value(raw.clone()).map_err(|error| {
+            RefineError::Serialization(format!(
+                "Goal {} has invalid implementation planning evidence during interruption settlement: {error}",
+                goal.id
+            ))
+        })?;
+        if previous.state != ImplementationPlanState::InProgress {
+            return Ok(());
+        }
+        if previous.binding.goal_id != goal.id || previous.binding.round_idx != round_idx {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} interruption settlement found a stale implementation planning binding",
+                goal.id
+            )));
+        }
+        let mut failed = previous.clone();
+        failed.state = ImplementationPlanState::Failed;
+        failed.updated_at = now_timestamp();
+        failed.failure = Some(ImplementationPlanningFailure {
+            phase: previous.phase.clone(),
+            category: "interrupted".to_string(),
+            message: detail.to_string(),
+            failed_at: failed.updated_at.clone(),
+            operation_id: previous
+                .active_process
+                .as_ref()
+                .map(|process| process.operation_id.clone()),
+            process_id: previous
+                .active_process
+                .as_ref()
+                .and_then(|process| process.process_id.clone()),
+            git_before: None,
+            git_after: None,
+            process: previous.active_process.clone(),
+        });
+        failed.active_process = None;
+        work_items.replace_goal_round_implementation_plan(
+            &goal.id,
+            round_idx,
+            Some(&previous),
+            &failed,
+        )?;
+        Ok(())
     }
 
     pub(super) fn signal_workflow_subprocesses(

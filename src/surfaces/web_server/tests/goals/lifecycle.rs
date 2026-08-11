@@ -229,6 +229,66 @@ fn web_server_opens_an_in_progress_goal_diagnostic_when_no_goal_agent_is_running
 }
 
 #[test]
+fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_agent() {
+    let temp_root = unique_temp_dir("http-goal-between-planning-phases");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    fs::create_dir_all(&app_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Between planning phases", Some("GOAL-BETWEEN-PHASES"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL-BETWEEN-PHASES", "Workflow", "Implement")
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::InProgress)
+        .unwrap();
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL-BETWEEN-PHASES",
+            0,
+            &json!({
+                "implementation_plan": {
+                    "state": "in_progress",
+                    "phase": "criticize",
+                    "active_process": null
+                }
+            }),
+        )
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "goal", "goal_id": "GOAL-BETWEEN-PHASES"})),
+    });
+
+    assert_eq!(opened.status, 409, "{}", opened.body);
+    assert!(
+        opened
+            .body
+            .to_string()
+            .contains("between supervised implementation-planning phase processes")
+    );
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .list()
+            .unwrap()
+            .is_empty()
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_opens_failed_goal_in_diagnostic_session_without_workflow_mutation() {
     let _env_guard = smoke_ai_env_lock()
         .lock()

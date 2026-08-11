@@ -35,6 +35,18 @@ Every mutation that can change workflow meaning across processes crosses the sam
 
 Evidence required to justify a workflow decision is durable before the state that relies on it. Logs, process outcomes, Git observations, reviews, and governance results remain evidence linked to the relevant identities; none independently becomes a workflow verdict.
 
+Execution-time implementation planning follows the same rule at sub-state
+boundaries. The Round owns a typed, versioned proposal, criticism, final plan,
+and implementation-discrepancy history. Workflow persists each artifact before
+launching its consumer and compare-and-swaps every update against the complete
+prior planning value plus Goal/Round, claim/execution, pinned-context digest,
+branch, and base fences. A stale phase cannot overwrite newer judgment.
+
+Those durable artifacts order a live attempt; they are not automatic-resume
+checkpoints. Interruption settles the in-progress attempt as failed. A supported
+follow-up Round begins a new planning pipeline with new claim and execution
+identities while the interrupted Round remains immutable evidence.
+
 Once Refine acknowledges a decision, both the decision and enough identity to repair its incomplete consequences are durable. After interruption, recovery preserves that decision and reconciles authorities or derived views without silently choosing a different outcome or repeating consequential work as a new decision.
 
 Agents remain responsible for interpreting intent, weighing evidence, and making implementation, quality, review, and recovery judgments. Refine is responsible for deterministic integrity around those judgments: authority, identity, conflicts, durable acknowledgement, and evidence linkage.

@@ -4,6 +4,10 @@ use crate::model::log::RoundLogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
+mod implementation_plan;
+
+pub use implementation_plan::*;
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GoalPriority {
@@ -88,6 +92,9 @@ pub struct GoalRound {
     /// Versioned context pinned before this round's implementation agent starts.
     #[serde(default)]
     pub agent_context: Option<serde_json::Value>,
+    /// Workflow-owned, versioned evidence for this round's implementation planning pipeline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implementation_plan: Option<ImplementationPlan>,
     /// Structured guidance selection for current rounds; legacy strings remain readable.
     pub guidance_decision: Option<serde_json::Value>,
     #[serde(default)]
@@ -195,6 +202,7 @@ mod tests {
         });
         let legacy_round: GoalRound = serde_json::from_value(legacy).unwrap();
         assert_eq!(legacy_round.workflow_quality_timing, None);
+        assert_eq!(legacy_round.implementation_plan, None);
         assert_eq!(legacy_round.workflow_git_remote, None);
         assert_eq!(legacy_round.workflow_integration, None);
         assert_eq!(legacy_round.workflow_recovery, None);

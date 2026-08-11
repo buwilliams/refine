@@ -331,6 +331,7 @@ mod execution_context;
 mod goal_agent_context;
 mod goal_agent_spec;
 mod governance;
+mod implementation_planning;
 mod policy;
 mod ready_merge;
 mod reconciliation;
@@ -349,6 +350,13 @@ use goal_agent_spec::goal_agent_prompt;
 use governance::GOVERNANCE_VERDICT_UNPARSABLE;
 use governance::{
     GovernanceEvaluation, parse_governance_provider_output, post_implementation_governance_prompt,
+};
+#[cfg(test)]
+use implementation_planning::persist_plan;
+use implementation_planning::{
+    active_implementation_operation_id, complete_implementation_planning,
+    fail_implementation_phase, governed_implementation_prompt, record_current_process_settlement,
+    run_governed_implementation_planning,
 };
 use settings::{setting_cap_with_default_values, setting_string, setting_usize};
 use state_persistence::{read_state, write_state};

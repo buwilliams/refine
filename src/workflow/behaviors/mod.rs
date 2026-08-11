@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use crate::model::workflow::GoalStatus;
-use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
+use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::agent_providers::{
@@ -18,10 +18,11 @@ use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
-    GovernanceEvaluation, agent_worktree_cwd, goal_agent_prompt, implementation_branch_name,
-    json_object, now_timestamp, parse_governance_provider_output,
-    post_implementation_governance_prompt, round_agent_context, selected_agent_context,
-    setting_string,
+    GovernanceEvaluation, active_implementation_operation_id, agent_worktree_cwd,
+    complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,
+    implementation_branch_name, json_object, now_timestamp, parse_governance_provider_output,
+    post_implementation_governance_prompt, record_current_process_settlement, round_agent_context,
+    run_governed_implementation_planning, selected_agent_context, setting_string,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -360,10 +361,6 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(context) => context,
             Err(error) => return fail(ctx, "agent_context", error),
         };
-        let prompt = match goal_agent_prompt(&ctx.goal_id, &agent_context) {
-            Ok(prompt) => prompt,
-            Err(error) => return fail(ctx, "agent", error),
-        };
         let agent_cwd = match agent_worktree_cwd(
             &worktree_path,
             setting_string(&ctx.settings, "agent_subpath", "").as_str(),
@@ -371,13 +368,38 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(cwd) => cwd,
             Err(error) => return fail(ctx, "agent", error),
         };
+        let final_plan = match run_governed_implementation_planning(
+            ctx,
+            &goal,
+            &agent_context,
+            &agent_cwd,
+            &branch,
+        ) {
+            Ok(plan) => plan,
+            Err(error) => return fail(ctx, "implementation_planning", error),
+        };
+        let prompt = match governed_implementation_prompt(&ctx.goal_id, &agent_context, &final_plan)
+        {
+            Ok(prompt) => prompt,
+            Err(error) => return fail(ctx, "implementation_planning", error),
+        };
         let mut process_metadata =
             ctx.workflow_process_metadata("in-progress", "WorkflowImplementation");
+        process_metadata.insert("implementation_phase".to_string(), json!("implement"));
+        let implementation_operation_id = match active_implementation_operation_id(ctx) {
+            Ok(operation_id) => operation_id,
+            Err(error) => return fail(ctx, "implementation_planning", error),
+        };
+        process_metadata.insert(
+            "operation_id".to_string(),
+            json!(implementation_operation_id),
+        );
         process_metadata.insert(
             "worktree".to_string(),
             json!({"path": worktree_path, "branch": branch}),
         );
-        let agent_result = match run_goal_agent(
+        let implementation_started_at = now_timestamp();
+        let agent_result = match run_goal_agent_with_settlement(
             GoalAgentLaunch {
                 runtime_root: ctx.runtime_root.to_path_buf(),
                 cwd: agent_cwd.clone(),
@@ -397,11 +419,25 @@ impl WorkflowBehavior for WorkflowImplementation {
                     }))),
                 );
             },
+            |settlement| record_current_process_settlement(ctx, settlement),
         ) {
             Ok(result) => result,
-            Err(error) => return fail(ctx, "agent", error),
+            Err(error) => {
+                let failure = fail_implementation_phase(ctx, "provider", &error);
+                return fail(ctx, "agent", failure);
+            }
         };
         let provider_output = agent_result.output;
+        if let Err(error) = complete_implementation_planning(
+            ctx,
+            implementation_started_at,
+            agent_result.process_id.clone(),
+            agent_result.session_id.clone(),
+            provider_output.clone(),
+            agent_result.implementation_evidence.clone(),
+        ) {
+            return fail(ctx, "implementation_planning", error);
+        }
         if let Err(error) = ctx
             .work_items
             .update_latest_goal_round_implementation_report(&ctx.goal_id, &provider_output)

@@ -3,6 +3,8 @@ mod capacity;
 mod claim_history;
 mod execution;
 mod governance;
+mod implementation_planning;
+mod implementation_planning_failures;
 mod promotion;
 mod ready_merge;
 

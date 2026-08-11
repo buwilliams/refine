@@ -1,5 +1,12 @@
 use super::*;
 
+use sha2::{Digest, Sha256};
+
+use crate::model::goal::{
+    IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanBinding,
+    ImplementationPlanPhase, ImplementationPlanState,
+};
+
 #[test]
 fn file_work_item_service_edits_notes_and_deletes_goal_json() {
     let temp_root = unique_temp_dir("work-item-edit-note-delete");
@@ -114,6 +121,144 @@ fn file_work_item_service_records_latest_round_implementation_report() {
         service
             .update_latest_goal_round_implementation_report("GOAL1", "   ")
             .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn implementation_plan_round_trips_and_rejects_stale_or_rebound_updates() {
+    let temp_root = unique_temp_dir("work-item-implementation-plan");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Planned Goal", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Implement it")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .unwrap();
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base123", None)
+        .unwrap();
+    let context = json!({
+        "version": 1,
+        "goal": {"id": "GOAL1"},
+        "previous_rounds": [],
+        "current_round": {"round": 1, "prompt": "Implement it"}
+    });
+    service
+        .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"agent_context": context}))
+        .unwrap();
+    let context_digest = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&context).unwrap())
+    );
+    let initial = ImplementationPlan {
+        schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
+        state: ImplementationPlanState::InProgress,
+        phase: ImplementationPlanPhase::Plan,
+        binding: ImplementationPlanBinding {
+            goal_id: "GOAL1".to_string(),
+            round_idx: 0,
+            context_version: 1,
+            context_digest,
+            claim_id: "claim-1".to_string(),
+            execution_id: "execution-1".to_string(),
+            implementation_branch: "refine/GOAL1/round-1".to_string(),
+            target_branch: "main".to_string(),
+            base_commit: "base123".to_string(),
+        },
+        started_at: "2026-08-11T10:00:00Z".to_string(),
+        phase_started_at: "2026-08-11T10:00:00Z".to_string(),
+        updated_at: "2026-08-11T10:00:00Z".to_string(),
+        active_process: None,
+        completed_at: None,
+        proposal: None,
+        criticism: None,
+        final_plan: None,
+        implementation: None,
+        failure: None,
+    };
+    service
+        .replace_goal_round_implementation_plan("GOAL1", 0, None, &initial)
+        .unwrap();
+    assert_eq!(
+        service.show_goal_detail("GOAL1").unwrap()["rounds"][0]["implementation_plan"]["phase"],
+        "plan"
+    );
+
+    let mut criticized = initial.clone();
+    criticized.phase = ImplementationPlanPhase::Criticize;
+    criticized.updated_at = "2026-08-11T10:01:00Z".to_string();
+    service
+        .replace_goal_round_implementation_plan("GOAL1", 0, Some(&initial), &criticized)
+        .unwrap();
+    let mut stale = initial.clone();
+    stale.phase = ImplementationPlanPhase::Revise;
+    assert!(
+        service
+            .replace_goal_round_implementation_plan("GOAL1", 0, Some(&initial), &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("authority changed")
+    );
+
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/rebound", "main", "base123", None)
+        .unwrap();
+    assert!(
+        service
+            .replace_goal_round_implementation_plan("GOAL1", 0, Some(&criticized), &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("branch_name changed")
+    );
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base456", None)
+        .unwrap();
+    assert!(
+        service
+            .replace_goal_round_implementation_plan("GOAL1", 0, Some(&criticized), &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("base_commit changed")
+    );
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base123", None)
+        .unwrap();
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "release", "base123", None)
+        .unwrap();
+    assert!(
+        service
+            .replace_goal_round_implementation_plan("GOAL1", 0, Some(&criticized), &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("target_branch changed")
+    );
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base123", None)
+        .unwrap();
+
+    service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"agent_context": {"version": 2, "goal": {"id": "GOAL1"}}}),
+        )
+        .unwrap();
+    assert!(
+        service
+            .replace_goal_round_implementation_plan("GOAL1", 0, Some(&criticized), &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("context changed")
     );
 
     fs::remove_dir_all(temp_root).unwrap();

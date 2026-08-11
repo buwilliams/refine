@@ -260,6 +260,10 @@ function drawGoalDetail(goal) {
   document.querySelectorAll("details.round[data-round-idx]").forEach((el) => {
     prevRoundOpen[el.dataset.roundIdx] = el.open;
   });
+  const prevPlanHistoryOpen = {};
+  document.querySelectorAll("details[data-plan-history][data-round-idx]").forEach((el) => {
+    prevPlanHistoryOpen[`${el.dataset.roundIdx}:${el.dataset.planHistory}`] = el.open;
+  });
   const rounds = goal.rounds || [];
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(goal, latest);
@@ -367,6 +371,7 @@ function drawGoalDetail(goal) {
           rnd, idx,
           idx === rounds.length - 1,
           prevRoundOpen,
+          prevPlanHistoryOpen,
         )).join("")}
 
       ${(isLatestEditable || hasPreservedDraft) ? `
@@ -765,7 +770,53 @@ function restoreRoundFormDraftFocus(goalId) {
   }
 }
 
-function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
+function renderImplementationChecklist(items, implementation) {
+  const results = new Map((implementation?.execution?.checklist || []).map((item) => [item.id, item]));
+  if (!items?.length) return `<p class="muted small">No checklist has been recorded.</p>`;
+  return `<ol class="implementation-plan-checklist" data-testid="goal-implementation-plan-checklist">
+    ${items.map((item) => {
+      const result = results.get(item.id);
+      return `<li data-checklist-id="${htmlEscape(item.id)}">
+        <div><code>${htmlEscape(item.id)}</code> ${htmlEscape(item.description || "")}
+          ${result ? `<span class="status-pill ${result.outcome === "completed" ? "done" : "failed"}" data-testid="goal-implementation-checklist-outcome">${htmlEscape(result.outcome)}</span>` : ""}
+        </div>
+        ${item.affected_behavior?.length ? `<div class="muted small">Affected: ${item.affected_behavior.map(htmlEscape).join(", ")}</div>` : ""}
+        ${item.governance_rationale ? `<div class="muted small">Governance: ${htmlEscape(item.governance_rationale)}</div>` : ""}
+        ${item.verification?.length ? `<div class="muted small">Intended evidence: ${item.verification.map(htmlEscape).join("; ")}</div>` : ""}
+        ${result?.evidence ? `<div class="small" data-testid="goal-implementation-checklist-evidence">${htmlEscape(result.evidence)}</div>` : ""}
+      </li>`;
+    }).join("")}
+  </ol>`;
+}
+
+function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
+  const plan = rnd?.implementation_plan;
+  if (!plan) return "";
+  const finalPlan = plan.final_plan?.result;
+  const proposal = plan.proposal?.result;
+  const criticism = plan.criticism?.result;
+  const historyOpen = (kind) => prevPlanHistoryOpen[`${idx}:${kind}`] ? " open" : "";
+  const phase = plan.phase || "unknown";
+  const planState = plan.state || "in_progress";
+  const phaseLabel = planState === "in_progress" ? phase : planState;
+  return `<section class="card implementation-plan" data-testid="goal-implementation-plan" aria-labelledby="implementation-plan-title-${idx}" style="margin-top:12px">
+    <div class="row" style="align-items:center;gap:8px">
+      <h4 id="implementation-plan-title-${idx}" style="margin:0">Implementation Plan</h4>
+      <span class="status-pill ${planState === "completed" ? "done" : planState === "failed" ? "failed" : "in-progress"}" data-testid="goal-implementation-plan-phase">${htmlEscape(phaseLabel)}</span>
+      <span class="muted small">phase ${htmlEscape(phase)}</span>
+      <span class="spacer"></span>
+      <span class="muted small">phase started ${fmtTime(plan.phase_started_at || plan.started_at)} · updated ${fmtTime(plan.updated_at)}</span>
+    </div>
+    ${plan.active_process ? `<div class="muted small" data-testid="goal-implementation-plan-active-process">Active operation ${htmlEscape(plan.active_process.operation_id || "unknown")}${plan.active_process.process_id ? ` · process ${htmlEscape(plan.active_process.process_id)}` : " · awaiting process registration"}</div>` : ""}
+    ${finalPlan ? `<p data-testid="goal-implementation-plan-summary">${htmlEscape(finalPlan.summary || "")}</p>${renderImplementationChecklist(finalPlan.checklist, plan.implementation)}` : `<p class="muted">The final plan is not available yet.</p>`}
+    ${plan.implementation?.execution?.verification?.length ? `<div class="small" data-testid="goal-implementation-verification"><strong>Verification:</strong> ${plan.implementation.execution.verification.map(htmlEscape).join("; ")}</div>` : ""}
+    ${plan.failure ? `<div class="banner error" role="alert" data-testid="goal-implementation-plan-failure"><span class="banner-msg">${htmlEscape(plan.failure.phase)} failed ${plan.failure.failed_at ? `at ${fmtTime(plan.failure.failed_at)}` : ""}: ${htmlEscape(plan.failure.message)}</span></div>` : ""}
+    ${proposal ? `<details data-plan-history="proposal" data-round-idx="${idx}" data-testid="goal-implementation-plan-proposal"${historyOpen("proposal")}><summary>Original proposal · ${fmtTime(plan.proposal.completed_at)}</summary><p>${htmlEscape(proposal.summary || "")}</p>${renderImplementationChecklist(proposal.checklist)}</details>` : ""}
+    ${criticism ? `<details data-plan-history="criticism" data-round-idx="${idx}" data-testid="goal-implementation-plan-criticism"${historyOpen("criticism")}><summary>Independent criticism · ${fmtTime(plan.criticism.completed_at)}</summary><p>${htmlEscape(criticism.summary || "")}</p><ul>${(criticism.findings || []).map((finding) => `<li><code>${htmlEscape(finding.id)}</code> ${htmlEscape(finding.description || "")}<div class="muted small">${htmlEscape(finding.recommendation || "")}</div></li>`).join("")}</ul></details>` : ""}
+  </section>`;
+}
+
+function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen = {}) {
   // Preserve the user's open/closed choice across re-renders. New rounds
   // (no prior entry in the snapshot) default to "open on latest" — the
   // historical behavior.
@@ -793,6 +844,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
         <dl class="pair">
           <dt>prompt</dt><dd data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "").replace(/\n/g, "<br>")}</dd>
         </dl>
+        ${renderImplementationPlan(rnd, idx, prevPlanHistoryOpen)}
         ${rnd.implementation_report ? `
           <div class="card implementation-report" data-testid="goal-implementation-report" style="margin-top:12px">
             <div class="row" style="align-items:center;gap:8px">

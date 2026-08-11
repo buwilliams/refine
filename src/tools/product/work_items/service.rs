@@ -2,6 +2,7 @@ mod bulk_operations;
 mod features;
 mod goal_authoring;
 mod goal_filters;
+mod implementation_planning;
 mod persistence;
 mod record_persistence;
 mod round_helpers;

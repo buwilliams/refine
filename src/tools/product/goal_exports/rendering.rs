@@ -155,6 +155,7 @@ pub(super) fn jira_description(goal: &Value, commits: &[GitChange]) -> String {
                 128,
             );
             push_quality_summary(&mut outcomes, round);
+            push_implementation_plan_summary(&mut outcomes, round);
             push_bounded_optional_line(
                 &mut outcomes,
                 "Governance checked at",

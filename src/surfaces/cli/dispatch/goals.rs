@@ -42,10 +42,10 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
-                .show_goal_summary(&id)?;
+                .show_goal_detail(&id)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
+                serde_json::to_string_pretty(&json!({"goal": goal})).unwrap()
             );
             Ok(())
         }

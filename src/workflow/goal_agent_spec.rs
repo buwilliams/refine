@@ -24,6 +24,7 @@ const GOAL_WHAT_FIELDS: &[(&str, &str)] = &[
 const ROUND_METADATA_FIELDS: &[(&str, &str)] =
     &[("reporter", "Reporter"), ("assignee", "Assignee")];
 const ROUND_EVIDENCE_FIELDS: &[(&str, &str)] = &[
+    ("implementation_plan", "Implementation Plan Evidence"),
     ("implementation_report", "Implementation Report"),
     ("guidance_decision", "Guidance Decision"),
     ("rule_state", "Rule State"),
