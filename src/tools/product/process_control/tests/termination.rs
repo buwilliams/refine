@@ -78,6 +78,167 @@ fn current_workflow_execution_can_stop_and_requeue_its_goal() {
 }
 
 #[test]
+fn interactive_stop_fails_a_planned_attempt_instead_of_requeueing_its_round() {
+    let temp_root = unique_temp_dir("process-control-planned-stop");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let goal_id = "GOAL-PLANNED-STOP";
+    let claim_id = "claim-planned-stop";
+    let execution_id = "exec-planned-stop";
+    create_in_progress_goal_with_rounds(&refine_dir, goal_id, 1);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = launch_workflow_agent(&supervisor, goal_id, claim_id, execution_id, 0);
+    reserve_workflow_capacity(&runtime_root, claim_id);
+    let original_plan = seed_in_progress_implementation_plan(
+        &refine_dir,
+        goal_id,
+        claim_id,
+        execution_id,
+        &process.id,
+    );
+
+    let result = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+        .stop(&process.id, "terminate")
+        .unwrap();
+
+    assert_eq!(result["termination"]["confirmed_exit"], true);
+    assert_eq!(result["goal"]["status"], "failed");
+    assert_eq!(result["goal_requeued"], false);
+    assert_eq!(result["goal_disposition"], "fail_attempt");
+    let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
+    assert_eq!(state.claims[0].state, WorkflowClaimState::Cancelled);
+    assert!(
+        AgentCapacityService::new(&runtime_root)
+            .snapshot()
+            .unwrap()
+            .leases
+            .is_empty()
+    );
+    let service = FileWorkItemService::new(&refine_dir);
+    let detail = service.show_goal_detail(goal_id).unwrap();
+    let failed_plan = &detail["rounds"][0]["implementation_plan"];
+    assert_eq!(failed_plan["state"], "failed");
+    assert_eq!(failed_plan["failure"]["category"], "interrupted");
+    assert_eq!(failed_plan["failure"]["process_id"], process.id);
+    assert_eq!(failed_plan["binding"]["claim_id"], claim_id);
+    assert_eq!(failed_plan["binding"]["execution_id"], execution_id);
+    assert_eq!(failed_plan["proposal"], json!(original_plan.proposal));
+
+    service
+        .append_goal_round_summary(goal_id, "Recovery", "Start a fresh planned attempt")
+        .unwrap();
+    service
+        .transition_goal_status(goal_id, GoalStatus::Todo)
+        .unwrap();
+    let recovered = service.show_goal_detail(goal_id).unwrap();
+    assert_eq!(recovered["rounds"].as_array().unwrap().len(), 2);
+    assert!(recovered["rounds"][1]["implementation_plan"].is_null());
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn interrupted_planned_stop_replays_the_failed_attempt_disposition() {
+    let temp_root = unique_temp_dir("process-control-planned-stop-replay");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let goal_id = "GOAL-PLANNED-STOP-REPLAY";
+    let claim_id = "claim-planned-stop-replay";
+    let execution_id = "exec-planned-stop-replay";
+    create_in_progress_goal_with_rounds(&refine_dir, goal_id, 1);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = launch_workflow_agent(&supervisor, goal_id, claim_id, execution_id, 0);
+    reserve_workflow_capacity(&runtime_root, claim_id);
+    seed_in_progress_implementation_plan(&refine_dir, goal_id, claim_id, execution_id, &process.id);
+
+    let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+            .with_settlement_interruption(CancellationSettlementFailureStage::CapacityRelease)
+            .stop(&process.id, "terminate")
+            .unwrap();
+    }));
+    assert!(interrupted.is_err());
+
+    let replayed = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+        .stop(&process.id, "terminate")
+        .unwrap();
+
+    assert_eq!(replayed["goal"]["status"], "failed");
+    assert_eq!(replayed["goal_disposition"], "fail_attempt");
+    assert_eq!(replayed["goal_requeued"], false);
+    let journal: Value = serde_json::from_slice(
+        &fs::read(
+            runtime_root
+                .join("process-stop-outcomes")
+                .join(format!("workflow-cancellation-{goal_id}-{claim_id}.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(journal["schema_version"], 7);
+    assert_eq!(journal["state"], "committed");
+    assert_eq!(journal["goal_disposition"], "fail_attempt");
+    assert_eq!(journal["goal_requeued"], false);
+    let detail = FileWorkItemService::new(&refine_dir)
+        .show_goal_detail(goal_id)
+        .unwrap();
+    assert_eq!(
+        detail["rounds"][0]["implementation_plan"]["state"],
+        "failed"
+    );
+    assert_eq!(
+        detail["rounds"][0]["implementation_plan"]["failure"]["category"],
+        "interrupted"
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn explicit_cancellation_fails_active_planning_evidence_and_remains_terminal() {
+    let temp_root = unique_temp_dir("process-control-planned-cancel");
+    let runtime_root = temp_root.join("run/8080");
+    let refine_dir = temp_root.join(".refine");
+    let goal_id = "GOAL-PLANNED-CANCEL";
+    let claim_id = "claim-planned-cancel";
+    let execution_id = "exec-planned-cancel";
+    create_in_progress_goal_with_rounds(&refine_dir, goal_id, 1);
+    let supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
+    let process = launch_workflow_agent(&supervisor, goal_id, claim_id, execution_id, 0);
+    reserve_workflow_capacity(&runtime_root, claim_id);
+    seed_in_progress_implementation_plan(&refine_dir, goal_id, claim_id, execution_id, &process.id);
+
+    let result = FileProcessControlService::with_refine_dir(&runtime_root, &refine_dir)
+        .cancel_workflow_execution(execution_id)
+        .unwrap();
+
+    assert_eq!(result["cancelled"], true);
+    assert_eq!(result["goal"]["status"], "cancelled");
+    assert_eq!(result["goal_disposition"], "cancel");
+    let detail = FileWorkItemService::new(&refine_dir)
+        .show_goal_detail(goal_id)
+        .unwrap();
+    assert_eq!(
+        detail["rounds"][0]["implementation_plan"]["state"],
+        "failed"
+    );
+    assert_eq!(
+        detail["rounds"][0]["implementation_plan"]["failure"]["category"],
+        "cancelled"
+    );
+    assert_eq!(
+        WorkflowEngine::new(&runtime_root)
+            .load_state()
+            .unwrap()
+            .claims[0]
+            .state,
+        WorkflowClaimState::Cancelled
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn target_bound_cancellation_before_worker_registration_fails_closed() {
     let temp_root = unique_temp_dir("process-control-before-registration");
     let runtime_root = temp_root.join("run/8080");

@@ -102,9 +102,11 @@ Current implementation details that matter to intent:
   and remote target tips. Both deletions use exact-SHA compare-and-delete
   fences, so an advanced branch is retained. Termination intent is an
   explicit authoritative input to the shared capability: interactive user Stop
-  requeues, while explicit Goal or workflow cancellation remains terminal
-  cancelled. Process discovery and claim presence are settlement evidence, never
-  a source for guessing that intent. Explicit cancellation has monotonic
+  ordinarily requeues, while Stop of a workflow Round carrying governed
+  implementation-planning evidence fails that attempt so only a fresh Round can
+  receive a new claim and execution identity. Explicit Goal or workflow
+  cancellation remains terminal cancelled. Process discovery and claim presence
+  are settlement evidence, never a source for guessing that intent. Explicit cancellation has monotonic
   precedence: when durable Goal state is already cancelled, or becomes cancelled
   after Stop preflight, Stop may finish process, operation, claim, and capacity
   settlement but cannot return the Goal to todo. Journals, process receipts,

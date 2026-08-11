@@ -5,6 +5,29 @@ use crate::model::goal::ImplementationPlan;
 use super::*;
 
 impl FileWorkItemService {
+    pub(crate) fn goal_round_implementation_plan(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+    ) -> RefineResult<Option<ImplementationPlan>> {
+        let detail = self.show_goal_detail(goal_id)?;
+        detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(round_idx))
+            .and_then(|round| round.get("implementation_plan"))
+            .filter(|value| !value.is_null())
+            .map(|value| {
+                serde_json::from_value(value.clone()).map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "Goal {goal_id} round {} has invalid implementation planning evidence: {error}",
+                        round_idx + 1
+                    ))
+                })
+            })
+            .transpose()
+    }
+
     /// Atomically replaces planning evidence only while its complete workflow/Git/context
     /// binding is still current. Planning orchestration owns the phase machine; this method
     /// owns the durable Goal-record compare-and-swap boundary.
@@ -24,8 +47,40 @@ impl FileWorkItemService {
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        self.replace_goal_round_implementation_plan_in_value(
+            goal_id, round_idx, expected, plan, &mut value,
+        )?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        let now = now_timestamp();
+        let round = object
+            .get_mut("rounds")
+            .and_then(Value::as_array_mut)
+            .and_then(|rounds| rounds.get_mut(round_idx))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| {
+                RefineError::Serialization(format!(
+                    "round {} for Goal {goal_id} is not a JSON object",
+                    round_idx + 1
+                ))
+            })?;
+        round.insert("updated".to_string(), Value::String(now.clone()));
+        object.insert("updated".to_string(), Value::String(now));
+        write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
+    }
+
+    pub(super) fn replace_goal_round_implementation_plan_in_value(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        expected: Option<&ImplementationPlan>,
+        plan: &ImplementationPlan,
+        value: &mut Value,
+    ) -> RefineResult<()> {
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
         })?;
         if object.get("status").and_then(Value::as_str) != Some("in-progress") {
             return Err(RefineError::Conflict(format!(
@@ -125,10 +180,6 @@ impl FileWorkItemService {
                 ))
             })?,
         );
-        let now = now_timestamp();
-        round.insert("updated".to_string(), Value::String(now.clone()));
-        object.insert("updated".to_string(), Value::String(now));
-        write_json_atomically(&goal_path, &value)?;
-        self.show_goal_summary(goal_id)
+        Ok(())
     }
 }

@@ -1039,6 +1039,42 @@ test("Goal Stop reports when explicit cancellation supersedes requeue", async ()
   ]);
 });
 
+test("Goal Stop reports that a governed planned attempt needs a fresh Round", async () => {
+  const browser = browserRuntime();
+  browser.runtime.setApi(async (_method, requestPath, body) => {
+    if (requestPath === "/api/terminal/session") {
+      return {
+        id: "goal-planned-session",
+        process_id: "goal-planned-process",
+        cwd: "/repo/worktree",
+        profile: body.profile,
+        provider: "codex",
+      };
+    }
+    if (requestPath.endsWith("/stop")) {
+      return {
+        stopped: true,
+        requested_termination_intent: "interactive_stop",
+        termination_intent: "interactive_stop",
+        goal_disposition: "fail_attempt",
+        worktree_retention: { retained: true },
+        goal: { id: "GOAL-PLANNED", status: "failed" },
+        termination: { confirmed_exit: true },
+      };
+    }
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  await browser.runtime.openGoal("GOAL-PLANNED");
+  await browser.runtime.stop("GOAL-PLANNED");
+
+  assert.equal(browser.runtime.terminal("GOAL-PLANNED").exited, true);
+  assert.deepEqual(Array.from(browser.runtime.toasts().at(-1)), [
+    "Agent stopped. The current planned attempt failed; start a fresh follow-up Round to retry. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+    "info",
+  ]);
+});
+
 test("terminal exit releases Stop UI before workflow cancellation finishes settling", async () => {
   const browser = browserRuntime();
   const requests = [];

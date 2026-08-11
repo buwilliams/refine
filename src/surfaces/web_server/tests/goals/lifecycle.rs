@@ -1,4 +1,10 @@
 use super::*;
+use sha2::{Digest, Sha256};
+
+use crate::model::goal::{
+    IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanBinding,
+    ImplementationPlanPhase, ImplementationPlanState,
+};
 
 #[test]
 fn web_server_transitions_goal_and_refine_dir() {
@@ -249,16 +255,61 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
         .advance_automated_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::InProgress)
         .unwrap();
     work_items
+        .update_goal_git_refs(
+            "GOAL-BETWEEN-PHASES",
+            "refine/GOAL-BETWEEN-PHASES/round-1",
+            "main",
+            "base123",
+            None,
+        )
+        .unwrap();
+    let context = json!({
+        "version": 1,
+        "goal": {"id": "GOAL-BETWEEN-PHASES"},
+        "current_round": {"round": 1, "prompt": "Implement"},
+        "previous_rounds": []
+    });
+    work_items
         .update_goal_round_evaluation_summary(
             "GOAL-BETWEEN-PHASES",
             0,
-            &json!({
-                "implementation_plan": {
-                    "state": "in_progress",
-                    "phase": "criticize",
-                    "active_process": null
-                }
-            }),
+            &json!({"agent_context": context.clone()}),
+        )
+        .unwrap();
+    work_items
+        .replace_goal_round_implementation_plan(
+            "GOAL-BETWEEN-PHASES",
+            0,
+            None,
+            &ImplementationPlan {
+                schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
+                state: ImplementationPlanState::InProgress,
+                phase: ImplementationPlanPhase::Criticize,
+                binding: ImplementationPlanBinding {
+                    goal_id: "GOAL-BETWEEN-PHASES".to_string(),
+                    round_idx: 0,
+                    context_version: 1,
+                    context_digest: format!(
+                        "{:x}",
+                        Sha256::digest(serde_json::to_vec(&context).unwrap())
+                    ),
+                    claim_id: "claim-between-phases".to_string(),
+                    execution_id: "exec-between-phases".to_string(),
+                    implementation_branch: "refine/GOAL-BETWEEN-PHASES/round-1".to_string(),
+                    target_branch: "main".to_string(),
+                    base_commit: "base123".to_string(),
+                },
+                started_at: "2026-08-11T10:00:00Z".to_string(),
+                phase_started_at: "2026-08-11T10:01:00Z".to_string(),
+                updated_at: "2026-08-11T10:01:00Z".to_string(),
+                active_process: None,
+                completed_at: None,
+                proposal: None,
+                criticism: None,
+                final_plan: None,
+                implementation: None,
+                failure: None,
+            },
         )
         .unwrap();
 

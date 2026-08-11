@@ -83,6 +83,21 @@ fn file_work_item_service_appends_and_edits_latest_round() {
     assert!(written.contains("\"prompt\": \"New prompt\""));
     assert!(written.contains("\"rule_state\": \"unclassified\""));
 
+    let error = service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"implementation_plan": {"state": "completed"}}),
+        )
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("Workflow-owned evidence"),
+        "{error}"
+    );
+    assert!(
+        service.show_goal_detail("GOAL1").unwrap()["rounds"][0]["implementation_plan"].is_null()
+    );
+
     fs::remove_dir_all(temp_root).unwrap();
 }
 

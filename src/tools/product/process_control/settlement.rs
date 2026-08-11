@@ -1,3 +1,4 @@
+use super::planning_settlement::planning_stop_settlement;
 use super::*;
 
 use serde::{Deserialize, Serialize};
@@ -67,7 +68,6 @@ impl FileProcessControlService {
         let current = work_items.show_goal_summary(goal_id)?;
         let termination_intent =
             requested_intent.authoritative_for_goal_status(&current.goal.status);
-        let disposition = termination_intent.disposition();
         let authoritative_expectation = if termination_intent != requested_intent {
             let current_node_id = current
                 .goal
@@ -82,20 +82,23 @@ impl FileProcessControlService {
                     "Goal {goal_id} ownership changed before terminal cancellation precedence could be applied; the Goal was not requeued"
                 )));
             }
+            let implementation_plan = current
+                .goal
+                .round_count
+                .checked_sub(1)
+                .map(|round_idx| work_items.goal_round_implementation_plan(goal_id, round_idx))
+                .transpose()?
+                .flatten();
             GoalCancellationExpectation {
                 status: current.goal.status,
                 round_count: current.goal.round_count,
                 updated: current.goal.updated,
                 node_id: current_node_id,
+                implementation_plan,
             }
         } else {
             expectation.clone()
         };
-        let mut goal_transaction = work_items.prepare_goal_cancellation_if_current(
-            goal_id,
-            &authoritative_expectation,
-            disposition.goal_status(),
-        )?;
         let state = workflow.load_state()?;
         let original_state = state.clone();
         let mut claim_ids = Vec::new();
@@ -123,6 +126,26 @@ impl FileProcessControlService {
                 claim_ids.push(ownership.claim_id.clone());
             }
         }
+        let (disposition, planning_replacement) = planning_stop_settlement(
+            goal_id,
+            &authoritative_expectation,
+            ownership,
+            termination_intent,
+        )?;
+        let mut goal_transaction = work_items.prepare_goal_cancellation_if_current(
+            goal_id,
+            &authoritative_expectation,
+            disposition.goal_status(),
+            planning_replacement.as_ref().map(|failed| {
+                (
+                    authoritative_expectation
+                        .implementation_plan
+                        .as_ref()
+                        .expect("planning replacement requires prior evidence"),
+                    failed,
+                )
+            }),
+        )?;
         #[cfg(test)]
         if let Some(hook) = &self.settlement_hook {
             hook();
@@ -146,7 +169,7 @@ impl FileProcessControlService {
         let worktree_retention = WorkflowWorktreeRetention::from_targets(worktrees);
         let receipt_path = self.cancellation_settlement_receipt_path(goal_id, &claim_ids);
         let mut journal = CancellationSettlementJournal {
-            schema_version: 6,
+            schema_version: 7,
             state: "prepared".to_string(),
             goal_id: goal_id.to_string(),
             claim_ids: claim_ids.clone(),
@@ -351,6 +374,7 @@ impl FileProcessControlService {
         let journal_intent = journal.termination_intent.unwrap_or_else(|| {
             TerminationIntent::from_legacy_disposition(journal.goal_disposition)
         });
+        let journal_disposition = journal.goal_disposition;
         let recorded_requested_intent = journal
             .requested_termination_intent
             .unwrap_or(journal_intent);
@@ -379,6 +403,14 @@ impl FileProcessControlService {
                 .with_authoritative_precedence(requested_intent)
                 .authoritative_for_goal_status(&durable_goal.goal.status)
         };
+        let authoritative_disposition =
+            if authoritative_intent == TerminationIntent::ExplicitCancellation {
+                GoalStopDisposition::Cancel
+            } else if journal_disposition == GoalStopDisposition::FailAttempt {
+                GoalStopDisposition::FailAttempt
+            } else {
+                GoalStopDisposition::Requeue
+            };
         let replay_goal_before = journal
             .replay_goal_before
             .as_ref()
@@ -389,10 +421,12 @@ impl FileProcessControlService {
             .as_ref()
             .unwrap_or(&journal.goal_after)
             .clone();
-        let replay_goal_after = if authoritative_intent != journal_intent {
+        let replay_goal_after = if authoritative_intent != journal_intent
+            || authoritative_disposition != journal_disposition
+        {
             goal_value_with_status(
                 prior_replay_goal_after.clone(),
-                authoritative_intent.expected_goal_status(),
+                authoritative_disposition.goal_status(),
             )?
         } else {
             prior_replay_goal_after.clone()
@@ -406,13 +440,14 @@ impl FileProcessControlService {
         )?;
         let exact_replay_before = goal_transaction.original_value();
         let exact_replay_after = goal_transaction.settled_value();
-        let schema_upgrade_required = journal.schema_version < 6;
-        journal.schema_version = 6;
-        journal.goal_disposition = authoritative_intent.disposition();
+        let schema_upgrade_required = journal.schema_version < 7;
+        journal.schema_version = 7;
+        journal.goal_disposition = authoritative_disposition;
         journal.termination_intent = Some(authoritative_intent);
         journal.requested_termination_intent = Some(recorded_requested_intent);
         if schema_upgrade_required
             || authoritative_intent != journal_intent
+            || authoritative_disposition != journal_disposition
             || journal.replay_goal_before.as_ref() != Some(&exact_replay_before)
             || journal.replay_goal_after.as_ref() != Some(&exact_replay_after)
         {
@@ -547,6 +582,7 @@ impl FileProcessControlService {
             "settled_after_claim_cancellation": true,
             "requested_termination_intent": requested_intent,
             "termination_intent": authoritative_intent,
+            "goal_disposition": authoritative_disposition,
             "intent_superseded": requested_intent != authoritative_intent
         });
         if let Some(object) = result.as_object_mut() {
@@ -703,7 +739,7 @@ impl FileProcessControlService {
             })?;
             if !matches!(
                 value.get("schema_version").and_then(Value::as_u64),
-                Some(2..=6)
+                Some(2..=7)
             ) {
                 continue;
             }

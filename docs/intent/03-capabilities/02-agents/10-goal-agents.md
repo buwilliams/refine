@@ -34,14 +34,14 @@ When a Goal enters implementation, Refine:
   distinct supervised processes against that snapshot and implementation
   worktree. Opening the Goal resolves the currently active phase process; it
   does not create a diagnostic or implementation duplicate.
-- treats an explicit process Stop as interruption rather than Goal cancellation:
-  after confirmed exit it releases the exact claim, returns the Goal to todo
-  under its pinned Node owner, and retains every implementation worktree and
-  branch with durable recovery evidence. This successful retention is visible
-  through shared Process results; cleanup is a separate explicit
-  human-controlled operation. A prior or racing explicit Goal cancellation
-  remains terminal: Stop can settle remaining execution resources but never
-  resurrects the Goal as todo.
+- treats an explicit process Stop as interruption rather than Goal cancellation.
+  For a Round with implementation-planning evidence, confirmed Stop fails that
+  attempt, cancels its exact claim, and requires a fresh follow-up Round instead
+  of requeueing the plan under a cancelled identity. It retains every
+  implementation worktree and branch with durable recovery evidence; cleanup is
+  a separate explicit human-controlled operation. A prior or racing explicit
+  Goal cancellation remains terminal: Stop can settle remaining execution
+  resources but never weakens cancellation or resurrects the Goal as todo.
 
 The completion and needs-input signals are control state, not a replacement transcript protocol. Durable product truth remains in Goal records, Git changes, logs, governance, quality evidence, and workflow state.
 

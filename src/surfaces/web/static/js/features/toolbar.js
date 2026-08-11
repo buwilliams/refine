@@ -1320,7 +1320,9 @@ async function stopTerminalSession(tab = currentToolbarTab()) {
 function retainedGoalStopMessage(stopped) {
   const goalOutcome = stopped?.goal?.status === "cancelled"
     ? "Explicit Goal cancellation remains terminal."
-    : "Goal returned to todo.";
+    : stopped?.goal?.status === "failed"
+      ? "The current planned attempt failed; start a fresh follow-up Round to retry."
+      : "Goal returned to todo.";
   return `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`;
 }
 

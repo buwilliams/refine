@@ -115,6 +115,7 @@ test("agent Stop delegates to the shared process-control API route", () => {
     .split('$$("[data-cancel-agent]")')[0];
   assert.doesNotMatch(stopHandler, /\/api\/goals\//);
   assert.match(stopHandler, /stopped\?\.worktree_retention\?\.retained/);
+  assert.match(stopHandler, /fresh follow-up Round/);
   assert.match(stopHandler, /stopped\?\.goal\?\.status === "cancelled"/);
   assert.match(stopHandler, /Explicit Goal cancellation remains terminal/);
   assert.match(stopHandler, /toast\(/);

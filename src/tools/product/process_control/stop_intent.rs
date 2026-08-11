@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub(super) enum GoalStopDisposition {
     Cancel,
+    FailAttempt,
     Requeue,
 }
 
@@ -13,7 +14,17 @@ impl GoalStopDisposition {
     pub(super) fn goal_status(self) -> GoalStatus {
         match self {
             Self::Cancel => GoalStatus::Cancelled,
+            Self::FailAttempt => GoalStatus::Failed,
             Self::Requeue => GoalStatus::Todo,
+        }
+    }
+
+    pub(super) fn for_goal_status(status: &GoalStatus) -> Option<Self> {
+        match status {
+            GoalStatus::Cancelled => Some(Self::Cancel),
+            GoalStatus::Failed => Some(Self::FailAttempt),
+            GoalStatus::Todo => Some(Self::Requeue),
+            _ => None,
         }
     }
 }
@@ -49,7 +60,9 @@ impl TerminationIntent {
     pub(super) fn from_legacy_disposition(disposition: GoalStopDisposition) -> Self {
         match disposition {
             GoalStopDisposition::Cancel => Self::ExplicitCancellation,
-            GoalStopDisposition::Requeue => Self::InteractiveStop,
+            GoalStopDisposition::FailAttempt | GoalStopDisposition::Requeue => {
+                Self::InteractiveStop
+            }
         }
     }
 

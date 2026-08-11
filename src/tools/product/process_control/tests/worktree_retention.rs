@@ -193,7 +193,7 @@ fn assert_stop_retains_worktree(suffix: &str, contents: WorktreeContents) {
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(settlement_receipt["schema_version"], 6, "{suffix}");
+    assert_eq!(settlement_receipt["schema_version"], 7, "{suffix}");
     assert_eq!(settlement_receipt["state"], "committed", "{suffix}");
     assert_eq!(settlement_receipt["goal_requeued"], true, "{suffix}");
     assert_eq!(settlement_receipt["claim_cancelled"], true, "{suffix}");
@@ -297,7 +297,7 @@ fn legacy_multi_target_cleanup_journal_replays_as_retention_without_removal() {
     assert_branch_exists(&target_root, second_branch);
 
     let upgraded: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
-    assert_eq!(upgraded["schema_version"], 6);
+    assert_eq!(upgraded["schema_version"], 7);
     assert_eq!(upgraded["state"], "committed");
     assert_eq!(upgraded["worktrees_retained"], true);
     assert!(upgraded.get("worktree_cleanup").is_none());

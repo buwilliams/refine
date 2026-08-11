@@ -7,6 +7,7 @@ use chrono::Utc;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+use crate::model::goal::{ImplementationPlanState, ImplementationPlanningFailure};
 use crate::model::workflow::GoalStatus;
 #[cfg(test)]
 use crate::process::subprocess::ProcessCleanupStage;
@@ -33,6 +34,7 @@ use crate::workflow::{WorkflowAutomationState, WorkflowClaimState, WorkflowEngin
 const DEFAULT_AGENT_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
 
 mod bulk_cancellation;
+mod planning_settlement;
 
 #[derive(Clone, Debug)]
 struct WorkflowGoalOwnership {
@@ -245,12 +247,20 @@ fn preflight_goal_state(
     refine_dir: &Path,
     goal_id: &str,
 ) -> RefineResult<GoalCancellationExpectation> {
-    let goal = FileWorkItemService::new(refine_dir).show_goal_summary(goal_id)?;
+    let work_items = FileWorkItemService::new(refine_dir);
+    let goal = work_items.show_goal_summary(goal_id)?;
     if goal.goal.status == GoalStatus::Done {
         return Err(RefineError::InvalidInput(format!(
             "done Goal {goal_id} cannot be settled by process control; its linked process was left running"
         )));
     }
+    let implementation_plan = goal
+        .goal
+        .round_count
+        .checked_sub(1)
+        .map(|round_idx| work_items.goal_round_implementation_plan(goal_id, round_idx))
+        .transpose()?
+        .flatten();
     Ok(GoalCancellationExpectation {
         status: goal.goal.status,
         round_count: goal.goal.round_count,
@@ -260,6 +270,7 @@ fn preflight_goal_state(
             .node_id
             .filter(|node_id| !node_id.is_empty())
             .unwrap_or_else(|| "default".to_string()),
+        implementation_plan,
     })
 }
 

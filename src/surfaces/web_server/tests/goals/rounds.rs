@@ -160,6 +160,21 @@ fn web_server_appends_and_reads_goal_round_logs() {
         detail.body["goal"]["rounds"][0]["quality_message"],
         "Quality check failed."
     );
+    let planning_write = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/goals/GOAL1/rounds/latest/evaluation".to_string(),
+        body: Some(json!({
+            "implementation_plan": {"state": "completed", "phase": "implement"}
+        })),
+    });
+    assert_eq!(planning_write.status, 400, "{}", planning_write.body);
+    assert!(
+        planning_write.body["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("Workflow-owned evidence")),
+        "{}",
+        planning_write.body
+    );
 
     remove_temp_dir(&temp_root);
 }

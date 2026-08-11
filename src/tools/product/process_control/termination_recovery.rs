@@ -65,7 +65,10 @@ impl FileProcessControlService {
                 let authoritative_intent = retained_intent.with_authoritative_precedence(
                     requested_intent.authoritative_for_goal_status(&goal.goal.status),
                 );
-                if goal.goal.status == authoritative_intent.expected_goal_status() {
+                if goal.goal.status == authoritative_intent.expected_goal_status()
+                    || (authoritative_intent == TerminationIntent::InteractiveStop
+                        && goal.goal.status == GoalStatus::Failed)
+                {
                     let result = self.workflow_termination_result(
                         json!({
                             "recovered_process_id": process_id,
@@ -111,7 +114,10 @@ impl FileProcessControlService {
         let work_items = FileWorkItemService::new(refine_dir);
         let current = work_items.show_goal_summary(&claim.goal_id)?;
         let authoritative_intent = intent.authoritative_for_goal_status(&current.goal.status);
-        if current.goal.status == authoritative_intent.expected_goal_status() {
+        if current.goal.status == authoritative_intent.expected_goal_status()
+            || (authoritative_intent == TerminationIntent::InteractiveStop
+                && current.goal.status == GoalStatus::Failed)
+        {
             return self.workflow_termination_result(
                 json!({
                     "execution_id": execution_id,
@@ -194,6 +200,14 @@ impl FileProcessControlService {
             .and_then(|goal| goal.get("status"))
             .and_then(Value::as_str)
             .map(str::to_string);
+        let goal_disposition = match goal_status.as_deref() {
+            Some(status) if status == GoalStatus::Cancelled.as_str() => GoalStopDisposition::Cancel,
+            Some(status) if status == GoalStatus::Failed.as_str() => {
+                GoalStopDisposition::FailAttempt
+            }
+            Some(status) if status == GoalStatus::Todo.as_str() => GoalStopDisposition::Requeue,
+            _ => termination_intent.disposition(),
+        };
         let object = result.as_object_mut().ok_or_else(|| {
             RefineError::Serialization("workflow termination result must be an object".to_string())
         })?;
@@ -202,6 +216,7 @@ impl FileProcessControlService {
             json!(requested_intent),
         );
         object.insert("termination_intent".to_string(), json!(termination_intent));
+        object.insert("goal_disposition".to_string(), json!(goal_disposition));
         object.insert(
             "intent_superseded".to_string(),
             json!(requested_intent != termination_intent),
@@ -222,7 +237,7 @@ impl FileProcessControlService {
                 }
             }
             TerminationIntent::InteractiveStop => {
-                let expected = termination_intent.expected_goal_status();
+                let expected = goal_disposition.goal_status();
                 if goal_status.is_some() && goal_status.as_deref() != Some(expected.as_str()) {
                     return Err(RefineError::Conflict(format!(
                         "interactive Stop resolved authoritative Goal status {} but observed {}",
