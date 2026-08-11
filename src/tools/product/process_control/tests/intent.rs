@@ -253,7 +253,7 @@ fn interrupted_interactive_settlement_replay_is_superseded_by_explicit_cancellat
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(journal.schema_version, 6);
+    assert_eq!(journal.schema_version, 7);
     assert_eq!(
         journal.requested_termination_intent,
         Some(TerminationIntent::InteractiveStop)

@@ -11,6 +11,7 @@
 - **Pinned Context Contract**: before launch, the current Round records the exact governance, workflow summary, enabled guidance candidates, Goal fields, previous Rounds, and current request used by the agent.
 - **One Shared Specification**: every workflow-owned Goal Agent receives that pinned object through the same flat Markdown specification, independent of provider or attachment surface.
 - **Same-Turn Guidance**: the implementing agent selects applicable guidance while implementing and returns that selection with its completion signal; Refine does not spend a separate provider turn classifying guidance.
+- **Governed Implementation Planning**: three fresh Goal-scoped agent processes propose, independently criticize, and revise a plan before the fresh implementation agent starts; Workflow owns their order and evidence while agents own judgment.
 
 ## Purpose
 
@@ -29,14 +30,18 @@ When a Goal enters implementation, Refine:
 - lets the browser Open Agent action and `refine agent open <goal-id>` attach to that same session;
 - continues automated workflow when the agent completes;
 - keeps the session and workflow claim alive when the agent explicitly reports that user input is required.
-- treats an explicit process Stop as interruption rather than Goal cancellation:
-  after confirmed exit it releases the exact claim, returns the Goal to todo
-  under its pinned Node owner, and retains every implementation worktree and
-  branch with durable recovery evidence. This successful retention is visible
-  through shared Process results; cleanup is a separate explicit
-  human-controlled operation. A prior or racing explicit Goal cancellation
-  remains terminal: Stop can settle remaining execution resources but never
-  resurrects the Goal as todo.
+- pins context once, then launches plan, criticize, revise, and implement as
+  distinct supervised processes against that snapshot and implementation
+  worktree. Opening the Goal resolves the currently active phase process; it
+  does not create a diagnostic or implementation duplicate.
+- treats an explicit process Stop as interruption rather than Goal cancellation.
+  For a Round with implementation-planning evidence, confirmed Stop fails that
+  attempt, cancels its exact claim, and requires a fresh follow-up Round instead
+  of requeueing the plan under a cancelled identity. It retains every
+  implementation worktree and branch with durable recovery evidence; cleanup is
+  a separate explicit human-controlled operation. A prior or racing explicit
+  Goal cancellation remains terminal: Stop can settle remaining execution
+  resources but never weakens cancellation or resurrects the Goal as todo.
 
 The completion and needs-input signals are control state, not a replacement transcript protocol. Durable product truth remains in Goal records, Git changes, logs, governance, quality evidence, and workflow state.
 
@@ -65,6 +70,23 @@ Post-implementation governance consumes the same pinned governance snapshot, so
 a mid-turn settings edit cannot make implementation and evaluation reason from
 different rules. Refine records applied and skipped guidance candidates as
 structured Round evidence.
+
+Planning-phase processes are observational. Refine records exact Git state
+before and after each judgment. Any difference is retained with the transcript,
+process, operation, and failure evidence and blocks implementation without a
+reset or cleanup. A shared read-only execution boundary may be used only when it
+preserves the managed session's writable completion channel; exact Git mutation
+detection remains the provider-independent backstop.
+Completed proposal, criticism, and final-plan artifacts are immutable evidence.
+Later phases consume them, and implementation records
+per-checklist completion, deviation, rejection, or blockage separately.
+
+Planning phases do not resume after a runner, daemon, or provider-process
+interruption. Shared Process and Workflow settlement fails the attempt and
+retains available output, identities, logs, branch, and worktree evidence. A
+supported follow-up Round starts again at Plan with a new claim, execution, and
+per-Round planning record; it never reuses the interrupted execution identity or
+overwrites the earlier Round's evidence.
 
 The CLI opens a general Agent by default. `--profile plan|standalone` opens the
 role-specific sessions, while `--profile goal` takes a Goal id and attaches to

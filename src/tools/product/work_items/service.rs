@@ -2,6 +2,7 @@ mod bulk_operations;
 mod features;
 mod goal_authoring;
 mod goal_filters;
+mod implementation_planning;
 mod persistence;
 mod record_persistence;
 mod round_helpers;
@@ -21,7 +22,7 @@ use crate::model::feature::{
     Feature, FeatureDetail, compare_feature_goal_order, failed_goal_feature_blocking_notice,
     is_ordered_feature_goal,
 };
-use crate::model::goal::{Goal, GoalIndexProjection, GoalPriority};
+use crate::model::goal::{Goal, GoalIndexProjection, GoalPriority, ImplementationPlan};
 use crate::model::workflow::{
     FeatureOperation, GoalOperation, GoalStatus, feature_operation_allowed, goal_operation_allowed,
     is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
@@ -55,6 +56,7 @@ pub(crate) struct GoalCancellationExpectation {
     pub round_count: usize,
     pub updated: String,
     pub node_id: String,
+    pub implementation_plan: Option<ImplementationPlan>,
 }
 
 /// Serializes mutations of one Goal against other writers of that Goal.

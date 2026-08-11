@@ -483,6 +483,7 @@ impl FileWorkItemService {
         goal_id: &str,
         expected: &GoalCancellationExpectation,
         target_status: GoalStatus,
+        implementation_plan_replacement: Option<(&ImplementationPlan, &ImplementationPlan)>,
     ) -> RefineResult<GoalCancellationTransaction> {
         let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
@@ -508,15 +509,67 @@ impl FileWorkItemService {
             )));
         }
         let (goal_path, original) = self.read_goal_value_unchecked_locked(&current)?;
+        let observed_plan = expected
+            .round_count
+            .checked_sub(1)
+            .and_then(|round_idx| {
+                original
+                    .get("rounds")
+                    .and_then(Value::as_array)
+                    .and_then(|rounds| rounds.get(round_idx))
+                    .and_then(|round| round.get("implementation_plan"))
+                    .filter(|value| !value.is_null())
+            })
+            .map(|value| {
+                serde_json::from_value::<ImplementationPlan>(value.clone()).map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "Goal {goal_id} has invalid implementation planning evidence during process settlement: {error}"
+                    ))
+                })
+            })
+            .transpose()?;
+        if observed_plan != expected.implementation_plan {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} implementation planning authority changed before process settlement"
+            )));
+        }
         let mut settled = original.clone();
+        if let Some((previous, failed)) = implementation_plan_replacement {
+            let round_idx = expected.round_count.checked_sub(1).ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} has no round for implementation planning settlement"
+                ))
+            })?;
+            self.replace_goal_round_implementation_plan_in_value(
+                goal_id,
+                round_idx,
+                Some(previous),
+                failed,
+                &mut settled,
+            )?;
+        }
         let object = settled.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
+        let now = now_timestamp();
+        if implementation_plan_replacement.is_some() {
+            let round = object
+                .get_mut("rounds")
+                .and_then(Value::as_array_mut)
+                .and_then(|rounds| rounds.last_mut())
+                .and_then(Value::as_object_mut)
+                .ok_or_else(|| {
+                    RefineError::Serialization(format!(
+                        "latest round for Goal {goal_id} is not a JSON object"
+                    ))
+                })?;
+            round.insert("updated".to_string(), Value::String(now.clone()));
+        }
         object.insert(
             "status".to_string(),
             Value::String(target_status.as_str().to_string()),
         );
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        object.insert("updated".to_string(), Value::String(now));
         set_workflow_revision(&mut settled, workflow_revision(&original).saturating_add(1))?;
         Ok(GoalCancellationTransaction {
             service: self.clone(),

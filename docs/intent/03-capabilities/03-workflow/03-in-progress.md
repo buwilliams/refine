@@ -37,6 +37,23 @@ When a Goal is in-progress:
   workflow-owned PTY retains its artifact lease through terminal handoff so
   early exec or command-channel cleanup cannot replace the real provider
   failure.
+- Before repository implementation, Workflow advances one durable planning
+  pipeline through plan, criticize, revise, and implement. Every phase is
+  fenced to the exact Goal, Round, claim/execution, context digest,
+  implementation and target branches, and base commit. Each completed artifact
+  is written before the next process launches; stale observations conflict.
+- Plan, criticism, and revision use fresh managed native agents with repository
+  access. Their worktree must have identical Git observations before and after.
+  A mutation is preserved as failure evidence and implementation does not start.
+- The implementation prompt includes the final checklist while keeping the
+  final Round request authoritative. Completion evidence reports every stable
+  checklist ID; discrepancies do not rewrite the accepted plan.
+- An interruption, cancellation, or terminated phase process fails the current
+  in-progress attempt through shared Process and Workflow settlement. Refine
+  does not resume a phase, reuse its execution identity, or treat Git
+  observations as restart checkpoints. Recovery is a fresh follow-up Round with
+  a new Plan -> Criticize -> Revise -> Implement pipeline; prior process output,
+  logs, branch, worktree, and Round evidence remain inspectable.
 - Guidance selection happens inside the implementation turn and is returned in
   the completion signal. It never requires a separate provider invocation.
 - Post-implementation governance evaluates against the pinned governance

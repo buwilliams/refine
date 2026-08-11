@@ -8,17 +8,31 @@ pub fn run_goal_agent<F>(launch: GoalAgentLaunch, on_attention: F) -> RefineResu
 where
     F: FnMut(GoalAgentAttention),
 {
-    run_goal_agent_session(launch, on_attention, |_, _| Ok(()))
+    run_goal_agent_with_settlement(launch, on_attention, |_| Ok(()))
+}
+
+pub fn run_goal_agent_with_settlement<F, O>(
+    launch: GoalAgentLaunch,
+    on_attention: F,
+    mut on_settlement: O,
+) -> RefineResult<GoalAgentResult>
+where
+    F: FnMut(GoalAgentAttention),
+    O: FnMut(&GoalAgentSettlement) -> RefineResult<()>,
+{
+    run_goal_agent_session(launch, on_attention, |_, _, settlement| {
+        on_settlement(settlement)
+    })
 }
 
 pub(super) fn run_goal_agent_session<F, O>(
     launch: GoalAgentLaunch,
     mut on_attention: F,
-    mut on_process_exit: O,
+    mut on_process_settlement: O,
 ) -> RefineResult<GoalAgentResult>
 where
     F: FnMut(GoalAgentAttention),
-    O: FnMut(&FileProcessSupervisor, &ManagedProcess) -> RefineResult<()>,
+    O: FnMut(&FileProcessSupervisor, &ManagedProcess, &GoalAgentSettlement) -> RefineResult<()>,
 {
     let cwd = launch.cwd.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
@@ -327,6 +341,8 @@ where
     let mut completed_by_signal = false;
     let mut completion_report = None;
     let mut guidance_applied = None;
+    let mut implementation_evidence = None;
+    let mut planning_result = None;
     let status_result = (|| -> RefineResult<_> {
         loop {
             for command in read_commands_since(&command_path, &mut command_offset)? {
@@ -365,6 +381,8 @@ where
                         completion_report = (!signal.message.trim().is_empty())
                             .then(|| signal.message.trim().to_string());
                         guidance_applied = signal.guidance_applied;
+                        implementation_evidence = signal.implementation_evidence;
+                        planning_result = signal.planning_result;
                         metadata.insert("attention_state".to_string(), json!("completed"));
                         metadata.remove("attention_message");
                         process.details = Some(encode_metadata(&metadata)?);
@@ -415,17 +433,6 @@ where
             return Err(error);
         }
     };
-    if let Err(error) = on_process_exit(&supervisor, &process) {
-        let _ = reader_thread.join();
-        process.state = "failed".to_string();
-        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
-        let process_id = process.id.clone();
-        let _ = supervisor.register(process);
-        let _ = supervisor.cleanup(&process_id);
-        cleanup_session_artifacts(&command_path, &signal_path);
-        return Err(error);
-    }
-
     let reader_result = reader_thread
         .join()
         .map_err(|_| RefineError::Io("Goal Agent output reader panicked".to_string()))
@@ -454,9 +461,9 @@ where
             )));
         }
     };
-    // Give attached SSE readers one final polling interval to consume the fully
-    // flushed transcript before process cleanup removes transient channels.
-    thread::sleep(Duration::from_millis(120));
+    let result_output = completion_report
+        .clone()
+        .unwrap_or_else(|| strip_terminal_control(&output).trim().to_string());
     process.state = if status.success() || completed_by_signal {
         "exited".to_string()
     } else {
@@ -464,10 +471,29 @@ where
     };
     process.exit_code = i32::try_from(status.exit_code()).ok();
     let process_id = process.id.clone();
-    let _ = supervisor.register(process);
+    supervisor.register(process.clone())?;
+    let settlement = GoalAgentSettlement {
+        output: result_output.clone(),
+        process_id: process_id.clone(),
+        session_id: session_id.clone(),
+        state: process.state.clone(),
+        exit_code: process.exit_code,
+        guidance_applied: guidance_applied.clone(),
+        implementation_evidence: implementation_evidence.clone(),
+        planning_result: planning_result.clone(),
+    };
+    if let Err(error) = on_process_settlement(&supervisor, &process, &settlement) {
+        cleanup_session_artifacts(&command_path, &signal_path);
+        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
+        let _ = supervisor.cleanup(&process_id);
+        return Err(error);
+    }
+    // Give attached SSE readers one final polling interval to consume the fully
+    // flushed transcript after durable workflow evidence has consumed it.
+    thread::sleep(Duration::from_millis(120));
     cleanup_session_artifacts(&command_path, &signal_path);
-    let _ = supervisor.finish_artifact_handoff(artifact_handoff);
-    let _ = supervisor.cleanup(&process_id);
+    supervisor.finish_artifact_handoff(artifact_handoff)?;
+    supervisor.cleanup(&process_id)?;
 
     if !status.success() && !completed_by_signal {
         // Name the cause when the CLI could not authenticate. Otherwise a total
@@ -482,10 +508,11 @@ where
         )));
     }
     Ok(GoalAgentResult {
-        output: completion_report
-            .unwrap_or_else(|| strip_terminal_control(&output).trim().to_string()),
+        output: result_output,
         session_id,
         process_id,
         guidance_applied,
+        implementation_evidence,
+        planning_result,
     })
 }

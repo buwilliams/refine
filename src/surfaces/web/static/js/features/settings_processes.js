@@ -925,7 +925,7 @@ function bindSettingsProcessesTab(s) {
       const goalId = b.dataset.stopAgentGoal;
       const ok = await modalConfirm(
         goalId
-          ? "Stop this agent process? After the exact process exits, Refine will return its Goal to todo and retain every workflow worktree and branch. Cleanup is a separate explicit operation."
+          ? "Stop this agent process? After the exact process exits, Refine will settle its Goal from the authoritative workflow evidence and retain every workflow worktree and branch. Cleanup is a separate explicit operation."
           : "Stop this agent process?",
         { title: "Stop agent", okLabel: "Stop agent", danger: true,
           cancelLabel: "Keep running" },
@@ -939,7 +939,9 @@ function bindSettingsProcessesTab(s) {
           if (stopped?.worktree_retention?.retained) {
             const goalOutcome = stopped?.goal?.status === "cancelled"
               ? "Explicit Goal cancellation remains terminal."
-              : "Goal returned to todo.";
+              : stopped?.goal?.status === "failed"
+                ? "The current planned attempt failed; start a fresh follow-up Round to retry."
+                : "Goal returned to todo.";
             toast(
               `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`,
               "info",

@@ -1,4 +1,10 @@
 use super::*;
+use sha2::{Digest, Sha256};
+
+use crate::model::goal::{
+    IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanBinding,
+    ImplementationPlanPhase, ImplementationPlanState,
+};
 
 #[test]
 fn web_server_transitions_goal_and_refine_dir() {
@@ -224,6 +230,111 @@ fn web_server_opens_an_in_progress_goal_diagnostic_when_no_goal_agent_is_running
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_agent() {
+    let temp_root = unique_temp_dir("http-goal-between-planning-phases");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    fs::create_dir_all(&app_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Between planning phases", Some("GOAL-BETWEEN-PHASES"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL-BETWEEN-PHASES", "Workflow", "Implement")
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::InProgress)
+        .unwrap();
+    work_items
+        .update_goal_git_refs(
+            "GOAL-BETWEEN-PHASES",
+            "refine/GOAL-BETWEEN-PHASES/round-1",
+            "main",
+            "base123",
+            None,
+        )
+        .unwrap();
+    let context = json!({
+        "version": 1,
+        "goal": {"id": "GOAL-BETWEEN-PHASES"},
+        "current_round": {"round": 1, "prompt": "Implement"},
+        "previous_rounds": []
+    });
+    work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL-BETWEEN-PHASES",
+            0,
+            &json!({"agent_context": context.clone()}),
+        )
+        .unwrap();
+    work_items
+        .replace_goal_round_implementation_plan(
+            "GOAL-BETWEEN-PHASES",
+            0,
+            None,
+            &ImplementationPlan {
+                schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
+                state: ImplementationPlanState::InProgress,
+                phase: ImplementationPlanPhase::Criticize,
+                binding: ImplementationPlanBinding {
+                    goal_id: "GOAL-BETWEEN-PHASES".to_string(),
+                    round_idx: 0,
+                    context_version: 1,
+                    context_digest: format!(
+                        "{:x}",
+                        Sha256::digest(serde_json::to_vec(&context).unwrap())
+                    ),
+                    claim_id: "claim-between-phases".to_string(),
+                    execution_id: "exec-between-phases".to_string(),
+                    implementation_branch: "refine/GOAL-BETWEEN-PHASES/round-1".to_string(),
+                    target_branch: "main".to_string(),
+                    base_commit: "base123".to_string(),
+                },
+                started_at: "2026-08-11T10:00:00Z".to_string(),
+                phase_started_at: "2026-08-11T10:01:00Z".to_string(),
+                updated_at: "2026-08-11T10:01:00Z".to_string(),
+                active_process: None,
+                completed_at: None,
+                proposal: None,
+                criticism: None,
+                final_plan: None,
+                implementation: None,
+                failure: None,
+            },
+        )
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let opened = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"profile": "goal", "goal_id": "GOAL-BETWEEN-PHASES"})),
+    });
+
+    assert_eq!(opened.status, 409, "{}", opened.body);
+    assert!(
+        opened
+            .body
+            .to_string()
+            .contains("between supervised implementation-planning phase processes")
+    );
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .list()
+            .unwrap()
+            .is_empty()
+    );
 
     remove_temp_dir(&temp_root);
 }

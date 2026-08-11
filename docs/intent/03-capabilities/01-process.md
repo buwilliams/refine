@@ -41,6 +41,11 @@ Current implementation details that matter to intent:
 - workflow Goal Agents run as PTY-backed managed processes with shared transcript,
   input, resize, attention, and lifecycle state, so CLI and browser attachments
   observe the same process.
+- execution-time plan, criticize, revise, and implement phases each have a
+  distinct managed-process and operation identity under the same workflow
+  execution. Process metadata names the active implementation phase so shared
+  attachment, cancellation, pause, logs, failure, and settlement operate on the
+  current process rather than launching a duplicate.
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - one shared host daemon-lifecycle capability selects port-scoped systemd or
   launchd control versus supervised direct-process fallback from the selected
@@ -97,9 +102,11 @@ Current implementation details that matter to intent:
   and remote target tips. Both deletions use exact-SHA compare-and-delete
   fences, so an advanced branch is retained. Termination intent is an
   explicit authoritative input to the shared capability: interactive user Stop
-  requeues, while explicit Goal or workflow cancellation remains terminal
-  cancelled. Process discovery and claim presence are settlement evidence, never
-  a source for guessing that intent. Explicit cancellation has monotonic
+  ordinarily requeues, while Stop of a workflow Round carrying governed
+  implementation-planning evidence fails that attempt so only a fresh Round can
+  receive a new claim and execution identity. Explicit Goal or workflow
+  cancellation remains terminal cancelled. Process discovery and claim presence
+  are settlement evidence, never a source for guessing that intent. Explicit cancellation has monotonic
   precedence: when durable Goal state is already cancelled, or becomes cancelled
   after Stop preflight, Stop may finish process, operation, claim, and capacity
   settlement but cannot return the Goal to todo. Journals, process receipts,

@@ -13,8 +13,13 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 use super::*;
+use crate::model::goal::{
+    IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanBinding,
+    ImplementationPlanPhase, ImplementationPlanState, PlanningProcessEvidence,
+};
 use crate::process::subprocess::{ManagedProcessSpec, managed_pid_is_alive};
 use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use crate::workflow::{WorkflowAutomation, WorkflowClaim, WorkflowPolicy};
@@ -197,6 +202,81 @@ fn create_in_progress_goal_with_rounds_for_node(
     service
         .advance_automated_goal_status(goal_id, GoalStatus::InProgress)
         .unwrap();
+}
+
+fn seed_in_progress_implementation_plan(
+    refine_dir: &Path,
+    goal_id: &str,
+    claim_id: &str,
+    execution_id: &str,
+    process_id: &str,
+) -> ImplementationPlan {
+    let service = FileWorkItemService::new(refine_dir);
+    let round_idx = service
+        .show_goal_summary(goal_id)
+        .unwrap()
+        .goal
+        .round_count
+        .checked_sub(1)
+        .unwrap();
+    let branch = format!("refine/{goal_id}/round-{}", round_idx + 1);
+    service
+        .update_goal_git_refs(goal_id, &branch, "main", "base123", None)
+        .unwrap();
+    let context = json!({
+        "version": 1,
+        "goal": {"id": goal_id},
+        "current_round": {"round": round_idx + 1, "prompt": "Implement"},
+        "previous_rounds": []
+    });
+    service
+        .update_goal_round_evaluation_summary(
+            goal_id,
+            round_idx,
+            &json!({"agent_context": context}),
+        )
+        .unwrap();
+    let plan = ImplementationPlan {
+        schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
+        state: ImplementationPlanState::InProgress,
+        phase: ImplementationPlanPhase::Plan,
+        binding: ImplementationPlanBinding {
+            goal_id: goal_id.to_string(),
+            round_idx,
+            context_version: 1,
+            context_digest: format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(&context).unwrap())
+            ),
+            claim_id: claim_id.to_string(),
+            execution_id: execution_id.to_string(),
+            implementation_branch: branch,
+            target_branch: "main".to_string(),
+            base_commit: "base123".to_string(),
+        },
+        started_at: "2026-08-11T10:00:00Z".to_string(),
+        phase_started_at: "2026-08-11T10:00:00Z".to_string(),
+        updated_at: "2026-08-11T10:00:00Z".to_string(),
+        active_process: Some(PlanningProcessEvidence {
+            operation_id: "operation-plan".to_string(),
+            process_id: Some(process_id.to_string()),
+            provider: "smoke-ai".to_string(),
+            state: Some("running".to_string()),
+            exit_code: None,
+            output: None,
+            structured_output: None,
+        }),
+        completed_at: None,
+        proposal: None,
+        criticism: None,
+        final_plan: None,
+        implementation: None,
+        failure: None,
+    };
+    service
+        .replace_goal_round_implementation_plan(goal_id, round_idx, None, &plan)
+        .unwrap();
+    plan
 }
 
 fn write_workflow_state(runtime_root: &Path, claims: Value) {

@@ -111,6 +111,56 @@ pub(super) fn push_quality_summary(lines: &mut Vec<String>, round: &Value) {
     }
 }
 
+pub(super) fn push_implementation_plan_summary(lines: &mut Vec<String>, round: &Value) {
+    let Some(plan) = round.get("implementation_plan").and_then(Value::as_object) else {
+        return;
+    };
+    if let Some(phase) = plan.get("phase").and_then(compact_scalar) {
+        push_unique_line(lines, format!("Implementation planning phase: {phase}"));
+    }
+    if let Some(state) = plan.get("state").and_then(compact_scalar) {
+        push_unique_line(lines, format!("Implementation planning state: {state}"));
+    }
+    if let Some(summary) = plan
+        .get("final_plan")
+        .and_then(|value| value.get("result"))
+        .and_then(|value| value.get("summary"))
+        .and_then(compact_scalar)
+    {
+        push_unique_line(
+            lines,
+            format!(
+                "Final implementation plan: {}",
+                truncate_with_marker(&summary, 768, "Final implementation plan")
+            ),
+        );
+    }
+    if let Some(checklist) = plan
+        .get("final_plan")
+        .and_then(|value| value.get("result"))
+        .and_then(|value| value.get("checklist"))
+        .and_then(Value::as_array)
+    {
+        push_unique_line(
+            lines,
+            format!("Implementation plan checklist items: {}", checklist.len()),
+        );
+    }
+    if let Some(failure) = plan
+        .get("failure")
+        .and_then(|value| value.get("message"))
+        .and_then(compact_scalar)
+    {
+        push_unique_line(
+            lines,
+            format!(
+                "Implementation planning failure: {}",
+                truncate_with_marker(&failure, 768, "Implementation planning failure")
+            ),
+        );
+    }
+}
+
 pub(super) fn push_governance_summary(lines: &mut Vec<String>, round: &Value) {
     let states = [
         ("rule_state", "rule"),

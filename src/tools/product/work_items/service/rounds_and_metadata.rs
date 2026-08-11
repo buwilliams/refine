@@ -458,6 +458,12 @@ impl FileWorkItemService {
         let fields = evaluation.as_object().ok_or_else(|| {
             RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
         })?;
+        if fields.contains_key("implementation_plan") {
+            return Err(RefineError::InvalidInput(
+                "implementation_plan is Workflow-owned evidence and can only be changed through its fenced planning authority"
+                    .to_string(),
+            ));
+        }
 
         let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {

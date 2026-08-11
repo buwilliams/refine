@@ -48,11 +48,16 @@ impl FileProcessControlService {
         let requested_intent = requested_intent
             .map(|intent| json!(intent))
             .or(retained_requested_intent);
-        let authoritative_disposition = termination_intent
-            .clone()
-            .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
-            .map(|intent| json!(intent.disposition()))
-            .or(disposition);
+        let authoritative_disposition = goal_status
+            .and_then(GoalStopDisposition::for_goal_status)
+            .map(|disposition| json!(disposition))
+            .or(disposition)
+            .or_else(|| {
+                termination_intent
+                    .clone()
+                    .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
+                    .map(|intent| json!(intent.disposition()))
+            });
         let worktree = retained
             .as_ref()
             .and_then(|receipt| receipt.get("worktree").cloned());
@@ -166,11 +171,6 @@ impl FileProcessControlService {
             .and_then(|journal| journal.requested_termination_intent)
             .map(|intent| json!(intent))
             .or(retained_requested_intent);
-        let authoritative_disposition = settlement_intent
-            .clone()
-            .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
-            .map(|intent| json!(intent.disposition()))
-            .or(retained_disposition.clone());
         let durable_goal_status =
             self.refine_dir
                 .as_deref()
@@ -181,6 +181,22 @@ impl FileProcessControlService {
                         .ok()
                         .map(|goal| goal.goal.status)
                 });
+        let authoritative_disposition = durable_goal_status
+            .as_ref()
+            .and_then(GoalStopDisposition::for_goal_status)
+            .map(|disposition| json!(disposition))
+            .or_else(|| {
+                settlement
+                    .as_ref()
+                    .map(|journal| json!(journal.goal_disposition))
+            })
+            .or(retained_disposition.clone())
+            .or_else(|| {
+                settlement_intent
+                    .clone()
+                    .and_then(|value| serde_json::from_value::<TerminationIntent>(value).ok())
+                    .map(|intent| json!(intent.disposition()))
+            });
         let goal_cancelled = durable_goal_status
             .as_ref()
             .map(|status| *status == GoalStatus::Cancelled)

@@ -1,6 +1,25 @@
 use super::*;
 
+use crate::model::goal::PlanningGitObservation;
+
 impl FileGitWorktreeService {
+    /// Exact, non-mutating Git evidence used to prove planning phases were observational.
+    pub fn implementation_planning_observation(&self) -> RefineResult<PlanningGitObservation> {
+        let head_commit = stdout(self.git_output(&["rev-parse", "HEAD"])?)?
+            .trim()
+            .to_string();
+        let branch = stdout(self.git_output(&["branch", "--show-current"])?)?
+            .trim()
+            .to_string();
+        let status =
+            stdout(self.git_output(&["status", "--porcelain=v1", "--untracked-files=all"])?)?;
+        Ok(PlanningGitObservation {
+            head_commit,
+            branch: (!branch.is_empty()).then_some(branch),
+            status_porcelain: status.lines().map(ToString::to_string).collect(),
+        })
+    }
+
     pub fn list_refine_owned_branches(&self) -> RefineResult<Vec<String>> {
         let output = stdout(self.git_output(&[
             "for-each-ref",

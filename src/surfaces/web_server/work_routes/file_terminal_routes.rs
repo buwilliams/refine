@@ -8,6 +8,7 @@ use super::{
     terminal_profile_prompt, terminal_resize_response, terminal_session_start_response,
     terminal_status_response, terminal_stop_response,
 };
+use crate::tools::product::work_items::FileWorkItemService;
 
 impl InProcessWebServer {
     pub(crate) fn handle_files_tree(&self, raw_path: &str) -> ApiResponse {
@@ -118,11 +119,34 @@ impl InProcessWebServer {
                         ))),
                     };
                 }
-                // No workflow-owned session is attachable. Continue into the
-                // context-only diagnostic profile regardless of the Goal's
-                // lifecycle label; its metadata deliberately carries
-                // `attached_goal_id`, never workflow ownership.
-                Err(RefineError::NotFound(_)) => {}
+                Err(RefineError::NotFound(message)) => {
+                    let planning_between_processes = self
+                        .current_refine_dir()
+                        .ok()
+                        .flatten()
+                        .and_then(|refine_dir| {
+                            FileWorkItemService::new(refine_dir)
+                                .show_goal_detail(goal_id)
+                                .ok()
+                        })
+                        .is_some_and(|goal| {
+                            goal.get("status").and_then(Value::as_str) == Some("in-progress")
+                                && goal
+                                    .get("rounds")
+                                    .and_then(Value::as_array)
+                                    .and_then(|rounds| rounds.last())
+                                    .and_then(|round| round.get("implementation_plan"))
+                                    .is_some_and(|plan| {
+                                        plan.get("state").and_then(Value::as_str)
+                                            == Some("in_progress")
+                                    })
+                        });
+                    if planning_between_processes {
+                        return error_response(RefineError::Conflict(format!(
+                            "{message}; the workflow is between supervised implementation-planning phase processes, so Refine did not create a duplicate agent"
+                        )));
+                    }
+                }
                 Err(error) => return error_response(error),
             }
         }

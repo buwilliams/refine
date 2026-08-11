@@ -293,8 +293,10 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
             metadata,
         },
         |_| {},
-        |supervisor, process| {
+        |supervisor, process, settlement| {
             assert!(!FileProcessSupervisor::process_is_alive(process)?);
+            assert_eq!(settlement.process_id, process.id);
+            assert!(settlement.output.contains("transcript survives recovery"));
             let stdout_path = Path::new(process.stdout_path.as_deref().unwrap());
             assert!(stdout_path.is_file());
 
