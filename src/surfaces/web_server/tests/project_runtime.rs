@@ -73,6 +73,88 @@ fn dashboard_surfaces_quarantined_claim_preparation_failures() {
 }
 
 #[test]
+fn project_status_uses_the_port_scoped_node_that_owns_new_goals() {
+    let temp_root = unique_temp_dir("http-project-port-active-node");
+    let app_root = temp_root.join("app");
+    let app_registry_root = temp_root.join("run");
+    let port_runtime_root = app_registry_root.join("8082");
+    fs::create_dir_all(&app_root).unwrap();
+    git(&app_root, &["init", "-q"]).unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root.clone());
+    server.app_registry_root = Some(app_registry_root.clone());
+    server.runtime_root = Some(port_runtime_root.clone());
+
+    let initial_status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/status".to_string(),
+        body: None,
+    });
+    assert_eq!(initial_status.status, 200, "{:#}", initial_status.body);
+    assert!(app_registry_root.join("apps.json").exists());
+    assert!(!port_runtime_root.join("apps.json").exists());
+
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
+    let base_nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+        &refine_dir,
+        &app_registry_root,
+    );
+    base_nodes.create("stale-base").unwrap();
+    base_nodes.rename("stale-base", "Stale Base Node").unwrap();
+    base_nodes.activate("stale-base").unwrap();
+
+    let created_node = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes".to_string(),
+        body: Some(json!({"id": "port-owner"})),
+    });
+    assert_eq!(created_node.status, 200, "{:#}", created_node.body);
+    let renamed_node = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/nodes/port-owner".to_string(),
+        body: Some(json!({"display_name": "Port Owner"})),
+    });
+    assert_eq!(renamed_node.status, 200, "{:#}", renamed_node.body);
+    let activated = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/activate".to_string(),
+        body: Some(json!({"node_id": "port-owner"})),
+    });
+    assert_eq!(activated.status, 200, "{:#}", activated.body);
+    assert_eq!(activated.body["active_node_id"], "port-owner");
+    assert_eq!(activated.body["active_node"], "Port Owner");
+    assert_eq!(base_nodes.active_node_id().unwrap(), "stale-base");
+
+    let project_status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/status".to_string(),
+        body: None,
+    });
+    assert_eq!(project_status.status, 200, "{:#}", project_status.body);
+    assert_eq!(
+        project_status.body["active_node_id"],
+        activated.body["active_node_id"]
+    );
+    assert_eq!(
+        project_status.body["active_node"],
+        activated.body["active_node"]
+    );
+    assert_ne!(project_status.body["active_node_id"], "stale-base");
+    assert_ne!(project_status.body["active_node"], "Stale Base Node");
+
+    let created_goal = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals".to_string(),
+        body: Some(json!({"id": "PORTGOAL", "name": "Port-owned Goal"})),
+    });
+    assert_eq!(created_goal.status, 201, "{:#}", created_goal.body);
+    assert_eq!(created_goal.body["goal"]["node_id"], "port-owner");
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_reports_project_registry_and_updates_settings() {
     let temp_root = unique_temp_dir("http-project-settings");
     let app_root = temp_root.join("app");

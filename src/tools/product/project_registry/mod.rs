@@ -39,16 +39,27 @@ pub trait ProjectRegistryService {
 
 #[derive(Clone, Debug)]
 pub struct FileProjectRegistryService {
+    /// Durable app attachment registry root. This may be shared by multiple
+    /// daemon ports.
     pub runtime_root: PathBuf,
+    /// Runtime-local root that owns the active Node selection.
+    pub active_node_root: PathBuf,
     pub current_target_root: Option<PathBuf>,
 }
 
 impl FileProjectRegistryService {
     pub fn new(runtime_root: impl Into<PathBuf>, current_target_root: Option<PathBuf>) -> Self {
+        let runtime_root = runtime_root.into();
         Self {
-            runtime_root: runtime_root.into(),
+            active_node_root: runtime_root.clone(),
+            runtime_root,
             current_target_root,
         }
+    }
+
+    pub fn with_active_node_root(mut self, active_node_root: impl Into<PathBuf>) -> Self {
+        self.active_node_root = active_node_root.into();
+        self
     }
 
     pub fn path(&self) -> PathBuf {
@@ -133,7 +144,7 @@ impl FileProjectRegistryService {
             self.migrate_schema_if_safe(Path::new(current))?;
         }
         let attached = current.is_some();
-        project_status_for(registry, current, attached, Some(&self.runtime_root))
+        project_status_for(registry, current, attached, Some(&self.active_node_root))
     }
 
     pub fn register_path(
@@ -249,7 +260,12 @@ impl FileProjectRegistryService {
             true,
         );
         self.save(&registry)?;
-        project_status_for(registry, Some(display_path), true, Some(&self.runtime_root))
+        project_status_for(
+            registry,
+            Some(display_path),
+            true,
+            Some(&self.active_node_root),
+        )
     }
 
     pub fn create_local_project_at(
@@ -309,7 +325,7 @@ impl FileProjectRegistryService {
             app.last_used_at = Some(now_timestamp());
         }
         self.save(&registry)?;
-        project_status_for(registry, Some(path), true, Some(&self.runtime_root))
+        project_status_for(registry, Some(path), true, Some(&self.active_node_root))
     }
 
     pub fn migrate_current(&self) -> RefineResult<ProjectMigrationReport> {
@@ -445,7 +461,7 @@ impl ProjectRegistryService for FileProjectRegistryService {
         let mut registry = self.load()?;
         registry.active_app = None;
         self.save(&registry)?;
-        project_status_for(registry, None, false, Some(&self.runtime_root))
+        project_status_for(registry, None, false, Some(&self.active_node_root))
     }
 
     fn clone_app(
@@ -487,10 +503,10 @@ impl ProjectRegistryService for FileProjectRegistryService {
                 registry,
                 Some(app_path.display().to_string()),
                 true,
-                Some(&self.runtime_root),
+                Some(&self.active_node_root),
             );
         }
-        project_status_for(registry, None, false, Some(&self.runtime_root))
+        project_status_for(registry, None, false, Some(&self.active_node_root))
     }
 }
 

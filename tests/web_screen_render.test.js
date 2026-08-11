@@ -323,6 +323,63 @@ test("goal detail renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("project status active node drives the browser title and navigation label", { skip: SKIP }, async () => {
+  const activeGoal = {
+    ...GOAL,
+    node_id: "port-owner",
+    node_display_name: "Port Owner",
+  };
+  const fixture = (pathname, request) => {
+    if (pathname.startsWith("/api/project/status")) {
+      return {
+        attached: true,
+        target_root: "/tmp/app",
+        registry_enabled: true,
+        apps: [],
+        nodes: [{ id: "port-owner", display_name: "Port Owner" }],
+        active_node_id: "port-owner",
+        active_node: "Port Owner",
+      };
+    }
+    if (pathname.startsWith("/api/nodes")) {
+      return {
+        nodes: [{ id: "port-owner", display_name: "Port Owner" }],
+        active_node_id: "port-owner",
+        active_node: "Port Owner",
+      };
+    }
+    if (pathname.startsWith("/api/goals/")) return { goal: activeGoal };
+    if (pathname.startsWith("/api/goals")) {
+      return {
+        goals: [activeGoal],
+        facets: { status_counts: {} },
+        page: { page: 1, total: 1 },
+      };
+    }
+    return apiFixture(pathname, request);
+  };
+  const app = await openApp({ fixture });
+  try {
+    await assertScreenRenders(app, {
+      route: "#/goals?node=current",
+      marker: '[data-testid="goals-table"]',
+    });
+    await app.page.waitForFunction(() => document.title === "Port Owner - refine");
+    assert.equal(await app.page.title(), "Port Owner - refine");
+    assert.equal(
+      await app.page.locator("#active-node-label").textContent(),
+      "Port Owner",
+    );
+    assert.equal(
+      await app.page.locator(".goals-node-cell").textContent(),
+      "Port Owner",
+    );
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("features list renders from the routed URL", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

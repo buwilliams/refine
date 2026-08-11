@@ -85,8 +85,13 @@ impl InProcessWebServer {
     }
 
     pub(super) fn project_registry_service(&self) -> Option<FileProjectRegistryService> {
-        self.app_registry_runtime_root().map(|runtime_root| {
-            FileProjectRegistryService::new(runtime_root, self.target_root.clone())
+        self.app_registry_runtime_root().map(|registry_root| {
+            let active_node_root = self
+                .runtime_root
+                .clone()
+                .unwrap_or_else(|| registry_root.clone());
+            FileProjectRegistryService::new(registry_root, self.target_root.clone())
+                .with_active_node_root(active_node_root)
         })
     }
 
