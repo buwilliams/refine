@@ -614,6 +614,8 @@ select {
   text-align: left;
   padding: 12px;
   border-bottom: 1px solid var(--color-border-subtle);
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 .table th {
   color: var(--color-text-muted);

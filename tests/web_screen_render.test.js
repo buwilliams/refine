@@ -337,6 +337,55 @@ test("features list renders from the routed URL", { skip: SKIP }, async () => {
   }
 });
 
+test("shared table columns wrap long unbroken content within their cells", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    const layout = await app.page.evaluate(() => {
+      const fixture = document.createElement("div");
+      fixture.style.width = "260px";
+      fixture.innerHTML = `
+        <table class="table" data-testid="table-overflow-fixture">
+          <thead><tr>
+            <th>UnbrokenHeaderThatMustStayInsideItsColumn</th>
+            <th>Other</th>
+          </tr></thead>
+          <tbody><tr>
+            <td>averylongassigneeemailaddress@example-with-a-long-domain.invalid</td>
+            <td><code>unbroken-code-value-that-also-must-wrap</code></td>
+          </tr></tbody>
+        </table>`;
+      document.body.appendChild(fixture);
+
+      const table = fixture.querySelector("table");
+      const cells = [...fixture.querySelectorAll("th, td")];
+      return {
+        tableFitsContainer: table.getBoundingClientRect().right
+          <= fixture.getBoundingClientRect().right + 0.5,
+        cells: cells.map((cell) => {
+          const range = document.createRange();
+          range.selectNodeContents(cell);
+          const cellRect = cell.getBoundingClientRect();
+          const contentRect = range.getBoundingClientRect();
+          return {
+            overflowWrap: getComputedStyle(cell).overflowWrap,
+            contentFits: contentRect.left >= cellRect.left - 0.5
+              && contentRect.right <= cellRect.right + 0.5,
+          };
+        }),
+      };
+    });
+
+    assert.equal(layout.tableFitsContainer, true);
+    assert.ok(layout.cells.length > 0);
+    assert.ok(layout.cells.every((cell) => cell.overflowWrap === "anywhere"));
+    assert.ok(layout.cells.every((cell) => cell.contentFits));
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Goals cold-load hydrates Reporter and Assignee filters before rendering", { skip: SKIP }, async () => {
   const requests = [];
   const app = await openApp({
