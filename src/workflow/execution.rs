@@ -6,7 +6,7 @@ use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::quality::POST_BUILD;
-use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
+use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
     WorkflowBuild, WorkflowDone, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge,
@@ -235,6 +235,8 @@ impl WorkflowEngine {
             self.runtime_root.join("cache"),
         );
         let round_idx = ensure_workflow_round(&work_items, &claim.goal_id)?;
+        self.bind_started_claim_identity(claim_id, execution_id, &work_items, round_idx)?;
+        let claim = self.claim_by_id(claim_id)?;
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let mut ctx = WorkflowContext::new(
@@ -470,6 +472,7 @@ impl WorkflowEngine {
         expected_execution_id: &str,
         error: &RefineError,
     ) -> RefineResult<()> {
+        let identity = self.current_goal_identity(&self.claim_by_id(claim_id)?.goal_id);
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
         let mut state = self.load_state()?;
@@ -491,6 +494,10 @@ impl WorkflowEngine {
         }
         claim.failure_stage = Some("execution".to_string());
         claim.failure_message = Some(bounded_failure_message(&error.to_string()));
+        if let Some((round_idx, goal_revision)) = identity {
+            claim.round_idx = round_idx;
+            claim.goal_revision = goal_revision;
+        }
         claim.decision_version = claim.decision_version.saturating_add(1);
         claim.state = WorkflowClaimState::Failed;
         claim.updated_at = now_timestamp();
@@ -507,18 +514,9 @@ impl WorkflowEngine {
     ) -> RefineResult<()> {
         let goal_id = self.claim_by_id(claim_id)?.goal_id;
         // Preparation can fail because the target or Goal record itself cannot
-        // be read. Terminalize the claim even then; an unavailable revision is
-        // conservatively quarantined until an operator explicitly retries it.
-        let goal_revision = self
-            .target_root
-            .as_ref()
-            .and_then(|target_root| prepare_refine_dir(target_root).ok())
-            .and_then(|refine_dir| {
-                FileWorkItemService::new(refine_dir)
-                    .show_goal_detail(&goal_id)
-                    .ok()
-            })
-            .map(|detail| workflow_revision(&detail));
+        // be read. The claim evidence remains authoritative even if the best-
+        // effort Goal settlement cannot make the failure visible there.
+        let identity = self.settle_goal_failure(&goal_id, "preparation", error);
 
         let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
         let _state_lock = self.acquire_state_mutation_lock()?;
@@ -539,7 +537,10 @@ impl WorkflowEngine {
                 "execution {expected_execution_id} no longer owns claim {claim_id}"
             )));
         }
-        claim.goal_revision = goal_revision;
+        if let Some((round_idx, goal_revision)) = identity {
+            claim.round_idx = round_idx;
+            claim.goal_revision = goal_revision;
+        }
         claim.failure_stage = Some("preparation".to_string());
         claim.failure_message = Some(bounded_failure_message(&error.to_string()));
         claim.decision_version = claim.decision_version.saturating_add(1);

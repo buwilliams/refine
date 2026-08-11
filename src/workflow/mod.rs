@@ -10,8 +10,6 @@ pub mod promotion;
 
 use chrono::Utc;
 use fs2::FileExt;
-use std::collections::BTreeSet;
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -78,8 +76,16 @@ pub struct WorkflowGoalClaimSummary {
     pub consecutive_execution_failures: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_not_before: Option<String>,
-    #[serde(default)]
-    pub execution_quarantined: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct WorkflowRetryDelay {
+    pub goal_id: String,
+    pub node_id: String,
+    pub claim_id: String,
+    pub retry_not_before: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_message: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -137,30 +143,6 @@ impl WorkflowAutomationState {
                     .rev()
                     .find(|claim| claim.goal_id == goal_id && claim.is_active())
             })
-    }
-
-    /// Goals that have a recorded preparation failure to consider quarantining.
-    ///
-    /// Bounded by claims rather than by project size, so quarantine no longer
-    /// asks every Goal in the project whether it failed.
-    pub(crate) fn preparation_failure_goal_ids(&self) -> BTreeSet<String> {
-        self.claim_summaries
-            .iter()
-            .filter(|(_, summary)| {
-                summary.latest_claim.as_ref().is_some_and(|claim| {
-                    claim.state == WorkflowClaimState::Failed
-                        && claim.failure_stage.as_deref() == Some("preparation")
-                })
-            })
-            .map(|(goal_id, _)| goal_id.clone())
-            .collect()
-    }
-
-    pub(crate) fn latest_preparation_failure(&self, goal_id: &str) -> Option<&WorkflowClaim> {
-        let latest = self.claim_summaries.get(goal_id)?.latest_claim.as_ref()?;
-        (latest.state == WorkflowClaimState::Failed
-            && latest.failure_stage.as_deref() == Some("preparation"))
-        .then_some(latest)
     }
 }
 
@@ -328,6 +310,7 @@ mod automation;
 mod claim_history;
 mod execution;
 mod execution_context;
+mod failure_settlement;
 mod goal_agent_context;
 mod goal_agent_spec;
 mod governance;

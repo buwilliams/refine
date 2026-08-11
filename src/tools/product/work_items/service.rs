@@ -48,7 +48,7 @@ use record_persistence::*;
 use round_helpers::*;
 use validation::*;
 
-pub(crate) use record_persistence::workflow_revision;
+pub(crate) use record_persistence::{workflow_revision, workflow_revision_for_goal_projection};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GoalCancellationExpectation {
@@ -172,6 +172,7 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
         (from, to),
         (GoalStatus::Todo, GoalStatus::InProgress)
             | (GoalStatus::Todo, GoalStatus::Qa)
+            | (GoalStatus::Todo, GoalStatus::Failed)
             | (GoalStatus::InProgress, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
             | (GoalStatus::Qa, GoalStatus::ReadyMerge)

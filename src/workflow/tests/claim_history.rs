@@ -1,8 +1,7 @@
-use chrono::{TimeDelta, TimeZone, Utc};
+use crate::tools::product::work_items::workflow_revision;
+use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 
-use super::super::claim_history::{
-    EXECUTION_FAILURE_QUARANTINE_THRESHOLD, MAX_TERMINAL_CLAIM_HISTORY,
-};
+use super::super::claim_history::MAX_TERMINAL_CLAIM_HISTORY;
 use super::*;
 
 fn claim(
@@ -114,15 +113,11 @@ fn equivalent_terminal_attempts_deduplicate_without_losing_failure_count() {
     assert_eq!(state.claims.len(), 1);
     assert_eq!(state.claims[0].occurrences, 40);
     let summary = &state.claim_summaries["REPEATED"];
-    assert_eq!(
-        summary.consecutive_execution_failures,
-        EXECUTION_FAILURE_QUARANTINE_THRESHOLD
-    );
-    assert!(summary.execution_quarantined);
+    assert_eq!(summary.consecutive_execution_failures, 40);
 }
 
 #[test]
-fn preparation_failure_quarantine_survives_terminal_compaction() {
+fn preparation_failure_evidence_survives_terminal_compaction() {
     let mut state = WorkflowAutomationState::default();
     state.claims.push(claim(
         0,
@@ -148,40 +143,59 @@ fn preparation_failure_quarantine_survives_terminal_compaction() {
             .claims
             .iter()
             .all(|claim| claim.goal_id != "PREPARATION"),
-        "the old full record should demonstrate that the summary, not accidental retention, preserves quarantine"
+        "the old full record should demonstrate that the summary, not accidental retention, preserves evidence"
     );
     assert_eq!(
-        state
-            .latest_preparation_failure("PREPARATION")
+        state.claim_summaries["PREPARATION"]
+            .latest_preparation_failure
+            .as_ref()
             .map(|claim| claim.failure_message.as_deref()),
         Some(Some("target state unavailable"))
     );
-    assert!(state.preparation_failure_goal_ids().contains("PREPARATION"));
 }
 
 #[test]
-fn execution_failures_back_off_then_quarantine_at_the_hard_attempt_bound() {
+fn execution_failures_keep_bounded_backoff_without_permanent_admission_latch() {
     let started = Utc.with_ymd_and_hms(2026, 8, 6, 12, 0, 0).unwrap();
     let mut state = WorkflowAutomationState::default();
-    for attempt in 0..EXECUTION_FAILURE_QUARANTINE_THRESHOLD {
+    for attempt in 0..8 {
         state.claims.push(claim(
-            attempt as usize,
+            attempt,
             "RETRY",
             WorkflowClaimState::Failed,
             Some("execution"),
             Some(format!("failure {attempt}")),
         ));
         state.normalize_claim_history();
-        assert!(!state.claim_retry_allowed("RETRY", started + TimeDelta::seconds(attempt as i64)));
     }
 
     let summary = &state.claim_summaries["RETRY"];
+    assert_eq!(summary.consecutive_execution_failures, 8);
+    let failed_at = started + TimeDelta::seconds(7);
     assert_eq!(
-        summary.consecutive_execution_failures,
-        EXECUTION_FAILURE_QUARANTINE_THRESHOLD
+        state.claim_retry_not_before(
+            "RETRY",
+            Some(0),
+            Some(1),
+            failed_at + TimeDelta::seconds(299)
+        ),
+        summary.retry_not_before.as_deref()
     );
-    assert!(summary.execution_quarantined);
-    assert!(!state.claim_retry_allowed("RETRY", started + TimeDelta::days(365)));
+    assert_eq!(
+        state.claim_retry_not_before(
+            "RETRY",
+            Some(0),
+            Some(1),
+            failed_at + TimeDelta::seconds(300)
+        ),
+        None,
+        "even a long failure history is admitted after the five-minute cap"
+    );
+    assert_eq!(
+        state.claim_retry_not_before("RETRY", Some(1), Some(2), failed_at),
+        None,
+        "a fresh Goal identity bypasses stale attempt backoff"
+    );
 }
 
 #[test]
@@ -244,62 +258,204 @@ fn legacy_state_without_summary_or_occurrences_migrates_on_read() {
     let loaded = WorkflowEngine::new(&temp_root).load_state().unwrap();
 
     assert_eq!(loaded.claims[0].occurrences, 1);
-    assert!(loaded.latest_preparation_failure("LEGACY").is_some());
+    assert!(
+        loaded.claim_summaries["LEGACY"]
+            .latest_preparation_failure
+            .is_some()
+    );
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn resuming_with_many_todo_goals_does_not_reclaim_quarantined_failures() {
-    let temp_root = unique_temp_dir("quarantined-resume");
+fn fresh_round_after_more_than_five_failures_gets_new_claim_and_execution_identity() {
+    let temp_root = unique_temp_dir("fresh-round-after-long-failure-history");
     let target_root = temp_root.join("target");
     let refine_dir = test_refine_dir(&target_root);
     let runtime_root = temp_root.join("run/8080");
     let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Recover with a fresh Round", Some("RECOVER"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("RECOVER", "Reporter", "Initial attempt")
+        .unwrap();
+    work_items
+        .transition_goal_status("RECOVER", GoalStatus::Todo)
+        .unwrap();
+    work_items.fail_automated_goal_if_active("RECOVER").unwrap();
+    let failed_detail = work_items.show_goal_detail("RECOVER").unwrap();
+    let failed_revision = workflow_revision(&failed_detail);
+    let failed_at = Utc::now();
     let mut state = WorkflowAutomationState::default();
+    for attempt in 0..7 {
+        let mut failure = claim(
+            attempt,
+            "RECOVER",
+            WorkflowClaimState::Failed,
+            Some("execution"),
+            Some(format!("historic failure {attempt}")),
+        );
+        failure.goal_revision = Some(failed_revision);
+        failure.updated_at = failed_at.to_rfc3339();
+        state.claims.push(failure);
+    }
+    fs::create_dir_all(&runtime_root).unwrap();
+    super::super::write_state(&runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE), &state).unwrap();
 
-    for goal_index in 0..32 {
-        let goal_id = format!("QUARANTINED-{goal_index:03}");
-        work_items
-            .create_goal_summary("Repeated execution failure", Some(&goal_id))
-            .unwrap();
-        work_items
-            .transition_goal_status(&goal_id, GoalStatus::Todo)
-            .unwrap();
-        for attempt in 0..EXECUTION_FAILURE_QUARANTINE_THRESHOLD {
-            let index = goal_index * 100 + attempt as usize;
-            state.claims.push(claim(
-                index,
-                &goal_id,
-                WorkflowClaimState::Failed,
-                Some("execution"),
-                Some("repeatable provider failure".to_string()),
-            ));
-        }
+    let revised = work_items
+        .append_goal_round_summary("RECOVER", "Reporter", "Fresh recovery")
+        .unwrap();
+    assert_eq!(revised.goal.status, GoalStatus::Todo);
+    assert_eq!(revised.goal.round_count, 2);
+
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    assert_eq!(automation.promote().unwrap(), 1);
+    let promoted = automation.load_state().unwrap();
+    let fresh_claim = promoted.active_claim("RECOVER").unwrap();
+    assert_eq!(
+        promoted.claim_summaries["RECOVER"].consecutive_execution_failures,
+        0
+    );
+    assert!(
+        promoted.claim_summaries["RECOVER"]
+            .retry_not_before
+            .is_none()
+    );
+    assert!(!fresh_claim.claim_id.starts_with("claim-"));
+    assert_eq!(fresh_claim.round_idx, Some(1));
+    assert_ne!(fresh_claim.goal_revision, Some(failed_revision));
+    let fresh_claim_id = fresh_claim.claim_id.clone();
+    let execution_id = automation.start_claim(&fresh_claim_id).unwrap();
+    assert!((0..7).all(|attempt| execution_id != format!("exec-{attempt}")));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn still_eligible_retry_delay_is_available_to_shared_status_surfaces() {
+    let temp_root = unique_temp_dir("shared-retry-delay-status");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Temporarily delayed", Some("DELAYED"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("DELAYED", "Reporter", "Retry safely")
+        .unwrap();
+    let goal = work_items
+        .transition_goal_status("DELAYED", GoalStatus::Todo)
+        .unwrap();
+    let revision = workflow_revision(&work_items.show_goal_detail("DELAYED").unwrap());
+    let mut failure = claim(
+        0,
+        "DELAYED",
+        WorkflowClaimState::Failed,
+        Some("execution"),
+        Some("provider temporarily unavailable".to_string()),
+    );
+    failure.round_idx = goal.goal.round_count.checked_sub(1);
+    failure.goal_revision = Some(revision);
+    failure.updated_at = Utc::now().to_rfc3339();
+    let expected_claim_id = failure.claim_id.clone();
+    let mut state = WorkflowAutomationState::default();
+    state.claims.push(failure);
+    fs::create_dir_all(&runtime_root).unwrap();
+    super::super::write_state(&runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE), &state).unwrap();
+
+    let projection = crate::tools::product::project_state::FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    let delays = WorkflowEngine::with_target_root(&runtime_root, &target_root)
+        .retry_delays_needing_attention(&projection)
+        .unwrap();
+
+    assert_eq!(delays.len(), 1);
+    assert_eq!(delays[0].goal_id, "DELAYED");
+    assert_eq!(delays[0].claim_id, expected_claim_id);
+    assert_eq!(
+        delays[0].failure_message.as_deref(),
+        Some("provider temporarily unavailable")
+    );
+    assert!(DateTime::parse_from_rfc3339(&delays[0].retry_not_before).is_ok());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn legacy_quarantine_migrates_on_restart_without_losing_failure_evidence() {
+    let temp_root = unique_temp_dir("legacy-quarantine-restart");
+    let target_root = temp_root.join("target");
+    let refine_dir = test_refine_dir(&target_root);
+    let runtime_root = temp_root.join("run/8080");
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Repeated execution failure", Some("RECOVER"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("RECOVER", "Reporter", "Try again")
+        .unwrap();
+    work_items
+        .transition_goal_status("RECOVER", GoalStatus::Todo)
+        .unwrap();
+    let detail = work_items.show_goal_detail("RECOVER").unwrap();
+    let revision = workflow_revision(&detail);
+    let mut failures = Vec::new();
+    for attempt in 0..7 {
+        let mut failure = claim(
+            attempt,
+            "RECOVER",
+            WorkflowClaimState::Failed,
+            Some("execution"),
+            Some("repeatable provider failure".to_string()),
+        );
+        failure.goal_revision = Some(revision);
+        failures.push(failure);
     }
     fs::create_dir_all(&runtime_root).unwrap();
     fs::write(
         runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
-        serde_json::to_vec_pretty(&state).unwrap(),
+        serde_json::to_vec_pretty(&json!({
+            "version": 3,
+            "policy": WorkflowPolicy::default(),
+            "claim_history_version": 1,
+            "claim_summaries": {
+                "RECOVER": {
+                    "latest_claim": failures.last().unwrap(),
+                    "consecutive_execution_failures": 5,
+                    "retry_not_before": "2026-08-06T12:05:06Z",
+                    "execution_quarantined": true
+                }
+            },
+            "claims": failures,
+            "updated_at": "2026-08-06T12:00:06Z"
+        }))
+        .unwrap(),
     )
     .unwrap();
 
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(automation.promote().unwrap(), 0);
+    assert_eq!(automation.promote().unwrap(), 1);
     let resumed = automation.load_state().unwrap();
-    assert_eq!(resumed.active_claim_count(), 0);
-    assert_eq!(resumed.claim_summaries.len(), 32);
-    assert!(
-        resumed
-            .claim_summaries
-            .values()
-            .all(|summary| summary.execution_quarantined)
+    assert_eq!(resumed.active_claim_count(), 1);
+    assert_eq!(
+        resumed.claim_summaries["RECOVER"].consecutive_execution_failures, 5,
+        "migration preserves the legacy capped count without reconstructing lost detail"
     );
+    assert_eq!(resumed.claims[0].occurrences, 7);
     let persisted: Value = serde_json::from_slice(
         &fs::read(runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE)).unwrap(),
     )
     .unwrap();
-    assert_eq!(persisted["claim_history_version"], 1);
-    assert_eq!(persisted["claims"].as_array().unwrap().len(), 32);
+    assert_eq!(persisted["claim_history_version"], 2);
+    assert!(
+        persisted
+            .to_string()
+            .find("execution_quarantined")
+            .is_none()
+    );
+    assert_eq!(persisted["claims"].as_array().unwrap().len(), 2);
 
     fs::remove_dir_all(temp_root).unwrap();
 }

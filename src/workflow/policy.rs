@@ -23,9 +23,8 @@ use crate::workflow::promotion::BacklogPromotionService;
 
 use super::{
     ClaimLoad, ClaimMetadata, WorkflowAutomation, WorkflowAutomationState, WorkflowClaim,
-    WorkflowClaimState, WorkflowEngine, WorkflowPolicy, default_node_id, ensure_workflow_round,
-    json_object, now_timestamp, priority_rank, setting_cap_with_default_values, setting_string,
-    setting_usize,
+    WorkflowClaimState, WorkflowEngine, WorkflowPolicy, default_node_id, json_object,
+    now_timestamp, priority_rank, setting_cap_with_default_values, setting_string, setting_usize,
 };
 
 impl WorkflowEngine {
@@ -191,7 +190,21 @@ impl WorkflowEngine {
                 }
                 work_items.advance_automated_goal_status(&goal.id, GoalStatus::Failed)?;
             }
-            let round_idx = ensure_workflow_round(&work_items, &goal.id)?;
+            let round_idx = match goal.round_count.checked_sub(1) {
+                Some(round_idx) => round_idx,
+                None => work_items
+                    .append_workflow_recovery_round_summary(
+                        &goal.id,
+                        "Refine",
+                        "Implement and verify this Goal.",
+                    )?
+                    .goal
+                    .round_count
+                    .checked_sub(1)
+                    .ok_or_else(|| {
+                        RefineError::InvalidInput(format!("Goal {} has no rounds", goal.id))
+                    })?,
+            };
             logs.append_round_log(
                 &goal.id,
                 round_idx,

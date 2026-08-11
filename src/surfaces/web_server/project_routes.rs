@@ -78,6 +78,7 @@ fn configured_provider_from_settings(
 pub(super) fn dashboard_attention_items(
     indicators: &[String],
     preparation_failures: &[crate::workflow::WorkflowClaim],
+    retry_delays: &[crate::workflow::WorkflowRetryDelay],
     runner_reachable: bool,
 ) -> Vec<Value> {
     let mut items = indicators
@@ -106,11 +107,28 @@ pub(super) fn dashboard_attention_items(
                 claim.goal_id, reason
             ),
             "filter": {
-                "status": "todo"
+                "status": "failed"
             },
             "goal_id": claim.goal_id,
             "claim_id": claim.claim_id,
             "reason": reason
+        })
+    }));
+    items.extend(retry_delays.iter().map(|delay| {
+        json!({
+            "kind": "filter",
+            "severity": "warn",
+            "message": format!(
+                "Goal {} will be eligible for workflow retry at {}",
+                delay.goal_id, delay.retry_not_before
+            ),
+            "filter": {
+                "status": "todo"
+            },
+            "goal_id": delay.goal_id,
+            "claim_id": delay.claim_id,
+            "retry_not_before": delay.retry_not_before,
+            "reason": delay.failure_message
         })
     }));
     if !runner_reachable {
