@@ -2,6 +2,7 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
+use chrono::Utc;
 use fs2::FileExt;
 
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
@@ -13,8 +14,8 @@ use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use super::claim_history::CLAIM_HISTORY_VERSION;
 use super::{
     WORKFLOW_AUTOMATION_STATE_FILE, WORKFLOW_AUTOMATION_STATE_LOCK_FILE, WorkflowAutomationState,
-    WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowStateMutationLock, now_timestamp,
-    read_state, write_state,
+    WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowRetryDelay,
+    WorkflowStateMutationLock, now_timestamp, read_state, write_state,
 };
 
 impl WorkflowEngine {
@@ -185,6 +186,53 @@ impl WorkflowEngine {
             }
         }
         Ok(failures)
+    }
+
+    pub fn retry_delays_needing_attention(&self) -> RefineResult<Vec<WorkflowRetryDelay>> {
+        let Some(refine_dir) = self.refine_dir()? else {
+            return Ok(Vec::new());
+        };
+        let state = self.load_state()?;
+        let work_items = FileWorkItemService::new(refine_dir);
+        let now = Utc::now();
+        let mut delays = Vec::new();
+        for (goal_id, summary) in &state.claim_summaries {
+            let Some(claim) = summary
+                .latest_claim
+                .as_ref()
+                .filter(|claim| claim.state == WorkflowClaimState::Failed)
+            else {
+                continue;
+            };
+            let Ok(goal) = work_items.show_goal_summary(goal_id) else {
+                continue;
+            };
+            if !matches!(
+                goal.goal.status,
+                crate::model::workflow::GoalStatus::Todo
+                    | crate::model::workflow::GoalStatus::ReadyMerge
+                    | crate::model::workflow::GoalStatus::Build
+                    | crate::model::workflow::GoalStatus::Qa
+            ) {
+                continue;
+            }
+            let detail = work_items.show_goal_detail(goal_id)?;
+            let round_idx = goal.goal.round_count.checked_sub(1);
+            let goal_revision = Some(workflow_revision(&detail));
+            let Some(retry_not_before) =
+                state.claim_retry_not_before(goal_id, round_idx, goal_revision, now)
+            else {
+                continue;
+            };
+            delays.push(WorkflowRetryDelay {
+                goal_id: goal_id.clone(),
+                node_id: claim.node_id.clone(),
+                claim_id: claim.claim_id.clone(),
+                retry_not_before: retry_not_before.to_string(),
+                failure_message: claim.failure_message.clone(),
+            });
+        }
+        Ok(delays)
     }
 
     pub(crate) fn acquire_state_mutation_lock(&self) -> RefineResult<WorkflowStateMutationLock> {

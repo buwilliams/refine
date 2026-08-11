@@ -236,6 +236,26 @@ impl FileWorkItemService {
         assignee: Option<&str>,
         prompt: &str,
     ) -> RefineResult<GoalSummaryProjection> {
+        self.append_goal_round_summary_with_requeue(goal_id, reporter, assignee, prompt, true)
+    }
+
+    pub(crate) fn append_workflow_recovery_round_summary(
+        &self,
+        goal_id: &str,
+        reporter: &str,
+        prompt: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        self.append_goal_round_summary_with_requeue(goal_id, reporter, None, prompt, false)
+    }
+
+    fn append_goal_round_summary_with_requeue(
+        &self,
+        goal_id: &str,
+        reporter: &str,
+        assignee: Option<&str>,
+        prompt: &str,
+        requeue_failed: bool,
+    ) -> RefineResult<GoalSummaryProjection> {
         let reporter = Self::validate_goal_reporter(reporter)?;
         let assignee = assignee
             .map(Self::validate_goal_assignee)
@@ -268,7 +288,9 @@ impl FileWorkItemService {
                     object.insert("rounds".to_string(), Value::Array(vec![round]));
                 }
             }
-            if current.goal.status == GoalStatus::Review {
+            if current.goal.status == GoalStatus::Review
+                || requeue_failed && current.goal.status == GoalStatus::Failed
+            {
                 object.insert(
                     "status".to_string(),
                     Value::String(GoalStatus::Todo.as_str().to_string()),

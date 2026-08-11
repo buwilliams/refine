@@ -39,12 +39,16 @@ Current implementation details that matter to intent:
 - Claims record which Goal is being worked, by which provider and node, for which target app.
 - Workflow claim state keeps a compact per-Goal authority and retry summary. Every active claim is
   retained, while terminal attempt records are semantically deduplicated and hard-capped at the
-  newest 256 entries. The latest preparation-stage failure remains in the per-Goal summary even
-  after its full claim record ages out, so compaction cannot silently release that quarantine.
-- Execution-stage failures use exponential retry admission starting at five seconds with a
-  five-minute cap, and quarantine a Goal after five consecutive failures. An explicit workflow retry
-  remains the operator-owned recovery path; ordinary scheduling and daemon resume do not recreate
-  a retry storm.
+  newest 256 entries. The latest preparation-stage failure remains in the per-Goal summary after its
+  full claim record ages out, so its evidence stays inspectable.
+- Preparation and non-retryable workflow failures settle the Goal visibly to failed when its record
+  remains available. A failure that preserves a retryable checkpoint keeps that stage and uses an
+  exponential admission delay starting at five seconds with a five-minute cap; shared status
+  surfaces report the exact retry time instead of presenting inert work. Historical failures never
+  permanently exclude a Goal. A user-submitted fresh Round or explicit failed-to-todo requeue
+  changes the Goal revision and receives a fresh claim and execution identity rather than reusing
+  the failed attempt. Persisted legacy quarantine fields are discarded during claim-state
+  normalization without discarding prior claims or failure evidence.
 - Pause controls can stop agents, target-app work, or all automation.
 - Goal state rules distinguish manual transitions from automated transitions.
 - Bulk status correction can place non-automated Goals in review or done, while Goals in actively

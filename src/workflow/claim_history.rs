@@ -5,8 +5,7 @@ use chrono::{DateTime, Duration, Utc};
 use super::{WorkflowAutomationState, WorkflowClaim, WorkflowClaimState, WorkflowGoalClaimSummary};
 
 pub(super) const MAX_TERMINAL_CLAIM_HISTORY: usize = 256;
-pub(super) const EXECUTION_FAILURE_QUARANTINE_THRESHOLD: u32 = 5;
-pub(super) const CLAIM_HISTORY_VERSION: u32 = 1;
+pub(super) const CLAIM_HISTORY_VERSION: u32 = 2;
 const EXECUTION_RETRY_BASE_SECONDS: i64 = 5;
 const EXECUTION_RETRY_MAX_SECONDS: i64 = 300;
 const MAX_FAILURE_MESSAGE_CHARS: usize = 1_024;
@@ -124,19 +123,26 @@ impl WorkflowAutomationState {
         self.claim_summaries = summaries;
     }
 
-    pub(crate) fn claim_retry_allowed(&self, goal_id: &str, now: DateTime<Utc>) -> bool {
-        let Some(summary) = self.claim_summaries.get(goal_id) else {
-            return true;
-        };
-        if summary.execution_quarantined {
-            return false;
+    pub(crate) fn claim_retry_not_before(
+        &self,
+        goal_id: &str,
+        round_idx: Option<usize>,
+        goal_revision: Option<u64>,
+        now: DateTime<Utc>,
+    ) -> Option<&str> {
+        let summary = self.claim_summaries.get(goal_id)?;
+        let not_before = summary.retry_not_before.as_deref()?;
+        let failed_claim = summary
+            .latest_claim
+            .as_ref()
+            .filter(|claim| claim.state == WorkflowClaimState::Failed)?;
+        if claim_identity_changed(failed_claim, round_idx, goal_revision) {
+            return None;
         }
-        let Some(not_before) = summary.retry_not_before.as_deref() else {
-            return true;
-        };
         DateTime::parse_from_rfc3339(not_before)
-            .map(|not_before| now >= not_before.with_timezone(&Utc))
-            .unwrap_or(false)
+            .ok()
+            .filter(|not_before| now < not_before.with_timezone(&Utc))
+            .map(|_| not_before)
     }
 
     pub(crate) fn claim_history_needs_persistence(&self) -> bool {
@@ -191,28 +197,42 @@ fn apply_latest_transition(summary: &mut WorkflowGoalClaimSummary, claim: &Workf
         WorkflowClaimState::Failed if claim.failure_stage.as_deref() == Some("execution") => {
             summary.consecutive_execution_failures = summary
                 .consecutive_execution_failures
-                .saturating_add(claim.occurrences.max(1))
-                .min(EXECUTION_FAILURE_QUARANTINE_THRESHOLD);
-            summary.execution_quarantined =
-                summary.consecutive_execution_failures >= EXECUTION_FAILURE_QUARANTINE_THRESHOLD;
+                .saturating_add(claim.occurrences.max(1));
             summary.retry_not_before = Some(execution_retry_not_before(
                 &claim.updated_at,
                 summary.consecutive_execution_failures,
             ));
         }
+        WorkflowClaimState::Failed if claim.failure_stage.as_deref() == Some("preparation") => {
+            summary.retry_not_before = Some(execution_retry_not_before(&claim.updated_at, 1));
+        }
+        WorkflowClaimState::Claimed
+            if summary.latest_claim.as_ref().is_some_and(|latest| {
+                claim_identity_changed(latest, claim.round_idx, claim.goal_revision)
+            }) =>
+        {
+            summary.consecutive_execution_failures = 0;
+            summary.retry_not_before = None;
+        }
         WorkflowClaimState::Completed => {
             summary.consecutive_execution_failures = 0;
-            summary.execution_quarantined = false;
             summary.retry_not_before = None;
         }
         WorkflowClaimState::Cancelled | WorkflowClaimState::Interrupted => {
             summary.consecutive_execution_failures = 0;
-            summary.execution_quarantined = false;
             summary.retry_not_before = None;
         }
         _ => {}
     }
     summary.latest_claim = Some(claim.clone());
+}
+
+fn claim_identity_changed(
+    claim: &WorkflowClaim,
+    round_idx: Option<usize>,
+    goal_revision: Option<u64>,
+) -> bool {
+    claim.round_idx != round_idx || claim.goal_revision != goal_revision
 }
 
 fn execution_retry_not_before(updated_at: &str, failure_count: u32) -> String {

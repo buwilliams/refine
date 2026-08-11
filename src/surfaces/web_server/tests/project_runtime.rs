@@ -37,7 +37,7 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
 }
 
 #[test]
-fn dashboard_surfaces_quarantined_claim_preparation_failures() {
+fn dashboard_surfaces_settled_claim_preparation_failures() {
     let claim = crate::workflow::WorkflowClaim {
         claim_id: "claim-poisoned".to_string(),
         goal_id: "GOAL-POISONED".to_string(),
@@ -56,19 +56,55 @@ fn dashboard_surfaces_quarantined_claim_preparation_failures() {
         updated_at: "2026-07-29T00:00:01Z".to_string(),
     };
 
-    let attention =
-        crate::surfaces::web_server::project_routes::dashboard_attention_items(&[], &[claim], true);
+    let attention = crate::surfaces::web_server::project_routes::dashboard_attention_items(
+        &[],
+        &[claim],
+        &[],
+        true,
+    );
     assert_eq!(attention.len(), 1);
     assert_eq!(attention[0]["kind"], "filter");
     assert_eq!(attention[0]["severity"], "error");
     assert_eq!(attention[0]["goal_id"], "GOAL-POISONED");
     assert_eq!(attention[0]["claim_id"], "claim-poisoned");
-    assert_eq!(attention[0]["filter"], json!({"status": "todo"}));
+    assert_eq!(attention[0]["filter"], json!({"status": "failed"}));
     assert!(
         attention[0]["message"]
             .as_str()
             .unwrap()
             .contains("round reconciliation is already reverted")
+    );
+}
+
+#[test]
+fn dashboard_surfaces_temporary_workflow_retry_delay_with_exact_time() {
+    let retry_not_before = "2026-08-11T15:04:05Z";
+    let delay = crate::workflow::WorkflowRetryDelay {
+        goal_id: "GOAL-DELAYED".to_string(),
+        node_id: "default".to_string(),
+        claim_id: "claim-delayed".to_string(),
+        retry_not_before: retry_not_before.to_string(),
+        failure_message: Some("provider temporarily unavailable".to_string()),
+    };
+
+    let attention = crate::surfaces::web_server::project_routes::dashboard_attention_items(
+        &[],
+        &[],
+        &[delay],
+        true,
+    );
+
+    assert_eq!(attention.len(), 1);
+    assert_eq!(attention[0]["severity"], "warn");
+    assert_eq!(attention[0]["goal_id"], "GOAL-DELAYED");
+    assert_eq!(attention[0]["claim_id"], "claim-delayed");
+    assert_eq!(attention[0]["retry_not_before"], retry_not_before);
+    assert_eq!(attention[0]["filter"], json!({"status": "todo"}));
+    assert!(
+        attention[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains(retry_not_before)
     );
 }
 

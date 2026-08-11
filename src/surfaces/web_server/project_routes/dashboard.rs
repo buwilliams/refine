@@ -70,6 +70,20 @@ impl InProcessWebServer {
             }
             _ => Vec::new(),
         };
+        let retry_delays = match (&self.runtime_root, &current_target_root) {
+            (Some(runtime_root), Some(target_root)) => {
+                match WorkflowEngine::with_target_root(runtime_root, target_root)
+                    .retry_delays_needing_attention()
+                {
+                    Ok(delays) => delays
+                        .into_iter()
+                        .filter(|delay| node_filter == "all" || delay.node_id == active_node_id)
+                        .collect::<Vec<_>>(),
+                    Err(error) => return error_response(error),
+                }
+            }
+            _ => Vec::new(),
+        };
         ApiResponse::json(
             200,
             json!({
@@ -92,6 +106,7 @@ impl InProcessWebServer {
                 "needs_attention": dashboard_attention_items(
                     &dashboard.attention_indicators,
                     &preparation_failures,
+                    &retry_delays,
                     runner_reachable
                 ),
                 "attached": attached

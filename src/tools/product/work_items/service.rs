@@ -172,6 +172,7 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
         (from, to),
         (GoalStatus::Todo, GoalStatus::InProgress)
             | (GoalStatus::Todo, GoalStatus::Qa)
+            | (GoalStatus::Todo, GoalStatus::Failed)
             | (GoalStatus::InProgress, GoalStatus::Qa)
             | (GoalStatus::InProgress, GoalStatus::ReadyMerge)
             | (GoalStatus::Qa, GoalStatus::ReadyMerge)

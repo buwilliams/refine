@@ -275,7 +275,7 @@ fn absent_terminal_reconciliation_queues_a_fresh_round_without_a_retryable_confl
 }
 
 #[test]
-fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_next_goal() {
+fn candidate_mismatch_preparation_failure_settles_and_requeue_creates_a_fresh_claim() {
     let (temp_root, target_root, worktree_path, work_items, _, _) =
         failed_goal_with_integrated_candidate("candidate-mismatch-preparation-quarantine");
     let runtime_root = reconciliation_runtime_root(&temp_root);
@@ -339,9 +339,13 @@ fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_ne
         automation.preparation_failures_needing_attention().unwrap(),
         vec![failed.clone()]
     );
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Failed
+    );
 
-    // The deterministic failure is quarantined at this exact Goal revision.
-    // The next pass can admit its sibling instead of reclaiming GOAL1 forever.
+    // The deterministic failure is visibly settled. The next pass can admit
+    // its sibling instead of presenting GOAL1 as inert todo work.
     assert_eq!(automation.promote().unwrap(), 1);
     let state = automation.load_state().unwrap();
     assert_eq!(
@@ -358,8 +362,8 @@ fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_ne
         })
     );
 
-    // A durable Goal mutation changes its revision and makes an automated retry
-    // eligible again once the sibling no longer occupies the only slot.
+    // An explicit failed -> todo requeue changes the workflow revision and
+    // creates a fresh claim once the sibling no longer occupies the only slot.
     let sibling_claim = state
         .claims
         .iter()
@@ -371,11 +375,7 @@ fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_ne
         .mark_claim_state(&sibling_claim, None, WorkflowClaimState::Cancelled)
         .unwrap();
     work_items
-        .update_goal_round_evaluation_summary(
-            "GOAL1",
-            0,
-            &json!({"operator_recovery_evidence": "fresh"}),
-        )
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     assert_eq!(automation.promote().unwrap(), 1);
     let state = automation.load_state().unwrap();
@@ -393,6 +393,13 @@ fn candidate_mismatch_preparation_failure_is_quarantined_without_starving_the_ne
             .unwrap()
             .is_empty()
     );
+    let retry = state
+        .claims
+        .iter()
+        .find(|claim| claim.goal_id == "GOAL1" && claim.state == WorkflowClaimState::Claimed)
+        .unwrap();
+    assert_ne!(retry.claim_id, failed.claim_id);
+    assert_ne!(retry.goal_revision, failed.goal_revision);
 
     fs::remove_dir_all(&worktree_path).ok();
     fs::remove_dir_all(temp_root).unwrap();
@@ -757,9 +764,8 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
     let runtime_root = reconciliation_runtime_root(&temp_root);
     fs::write(target_root.join("operator.txt"), "preserve me\n").unwrap();
 
-    let error = WorkflowEngine::with_target_root(&runtime_root, &target_root)
-        .evaluate_workflow()
-        .unwrap_err();
+    let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    let error = automation.evaluate_workflow().unwrap_err();
 
     assert!(
         error
@@ -770,6 +776,10 @@ fn dirty_target_blocks_already_merged_reconciliation_without_false_failure_or_re
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
         GoalStatus::Qa
     );
+    let retry_delays = automation.retry_delays_needing_attention().unwrap();
+    assert_eq!(retry_delays.len(), 1);
+    assert_eq!(retry_delays[0].goal_id, "GOAL1");
+    assert_eq!(automation.promote().unwrap(), 0);
     assert!(target_root.join("feature.txt").exists());
     assert_eq!(
         fs::read_to_string(target_root.join("operator.txt")).unwrap(),

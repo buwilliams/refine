@@ -8,7 +8,7 @@ use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::process_control::FileProcessControlService;
 use crate::tools::product::project_state::ActiveGoalIndex;
-use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
+use crate::tools::product::work_items::FileWorkItemService;
 
 use super::policy::ClaimEligibility;
 use super::{
@@ -48,23 +48,7 @@ impl WorkflowAutomation for WorkflowEngine {
         // memory stop tracking how much work the project has ever contained.
         let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let work_items = FileWorkItemService::new(&refine_dir);
-        // Quarantine is driven from the recorded failures rather than by asking
-        // every Goal whether it has one. The set of Goals that failed
-        // preparation is bounded by claims, and this loop reads a Goal record
-        // per entry.
-        let mut quarantined_goal_ids = BTreeSet::new();
-        for goal_id in state.preparation_failure_goal_ids() {
-            let Some(failure) = state.latest_preparation_failure(&goal_id) else {
-                continue;
-            };
-            if failure.goal_revision.is_none()
-                || failure.goal_revision
-                    == Some(workflow_revision(&work_items.show_goal_detail(&goal_id)?))
-            {
-                quarantined_goal_ids.insert(goal_id);
-            }
-        }
-        let eligibility = ClaimEligibility::new(active.goals(), &quarantined_goal_ids);
+        let eligibility = ClaimEligibility::new(active.goals(), &BTreeSet::new());
         let mut eligible = active
             .goals()
             .filter(|goal| {
@@ -90,12 +74,6 @@ impl WorkflowAutomation for WorkflowEngine {
             if Self::active_claim(&state, &goal.id).is_some() {
                 continue;
             }
-            if !state.claim_retry_allowed(&goal.id, Utc::now()) {
-                continue;
-            }
-            if quarantined_goal_ids.contains(&goal.id) {
-                continue;
-            }
             let metadata = match self.claim_metadata(Some(&goal), &policy) {
                 Ok(metadata) => metadata,
                 Err(RefineError::Conflict(_)) => continue,
@@ -110,6 +88,13 @@ impl WorkflowAutomation for WorkflowEngine {
             ) {
                 break;
             }
+            let (round_idx, goal_revision) = claim_identity(&work_items, &goal)?;
+            if state
+                .claim_retry_not_before(&goal.id, round_idx, goal_revision, Utc::now())
+                .is_some()
+            {
+                continue;
+            }
             let now = now_timestamp();
             state.claims.push(WorkflowClaim {
                 claim_id: new_claim_id(),
@@ -118,8 +103,8 @@ impl WorkflowAutomation for WorkflowEngine {
                 provider: metadata.provider,
                 target_app_id: metadata.target_app_id,
                 execution_id: None,
-                round_idx: None,
-                goal_revision: None,
+                round_idx,
+                goal_revision,
                 failure_stage: None,
                 failure_message: None,
                 decision_version: 1,
@@ -150,18 +135,7 @@ impl WorkflowAutomation for WorkflowEngine {
         if let Some(existing) = Self::active_claim(&state, goal_id) {
             return Ok(existing.claim_id.clone());
         }
-        if !state.claim_retry_allowed(goal_id, Utc::now()) {
-            let summary = state.claim_summaries.get(goal_id);
-            let reason = if summary.is_some_and(|summary| summary.execution_quarantined) {
-                "is quarantined after repeated execution failures"
-            } else {
-                "is waiting for execution retry backoff"
-            };
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} {reason}; use explicit workflow retry after inspecting its evidence"
-            )));
-        }
-        let goal = if let Some(refine_dir) = self.refine_dir()? {
+        let (goal, round_idx, goal_revision) = if let Some(refine_dir) = self.refine_dir()? {
             // Claiming decides against the same set scheduling does, so it reads
             // the scheduler index rather than a projection of every Goal. A Goal
             // absent from it is one no claim could succeed for.
@@ -184,10 +158,19 @@ impl WorkflowAutomation for WorkflowEngine {
                     "Goal {goal_id} is blocked by higher priority work"
                 )));
             }
-            Some(goal)
+            let (round_idx, goal_revision) =
+                claim_identity(&FileWorkItemService::new(&refine_dir), &goal)?;
+            (Some(goal), round_idx, goal_revision)
         } else {
-            None
+            (None, None, None)
         };
+        if let Some(not_before) =
+            state.claim_retry_not_before(goal_id, round_idx, goal_revision, Utc::now())
+        {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} is waiting for execution retry backoff until {not_before}"
+            )));
+        }
         let metadata = self.claim_metadata(goal.as_ref(), &policy)?;
         if !Self::capacity_available(
             &state,
@@ -208,8 +191,8 @@ impl WorkflowAutomation for WorkflowEngine {
             provider: metadata.provider,
             target_app_id: metadata.target_app_id,
             execution_id: None,
-            round_idx: None,
-            goal_revision: None,
+            round_idx,
+            goal_revision,
             failure_stage: None,
             failure_message: None,
             decision_version: 1,
@@ -362,4 +345,12 @@ impl WorkflowAutomation for WorkflowEngine {
         }
         Ok(retried_execution_id)
     }
+}
+
+fn claim_identity(
+    work_items: &FileWorkItemService,
+    goal: &crate::model::goal::GoalIndexProjection,
+) -> RefineResult<(Option<usize>, Option<u64>)> {
+    let revision = work_items.workflow_revision_for_goal_projection(goal)?;
+    Ok((goal.round_count.checked_sub(1), Some(revision)))
 }
