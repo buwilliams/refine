@@ -11,7 +11,6 @@ use serde_json::json;
 fn main() {
     let result = match std::env::args().nth(1).as_deref() {
         Some("api-contract") => print_api_contract(),
-        Some("cli-reference") => write_cli_reference(),
         Some("check-static-assets") => check_static_assets(),
         Some("runtime-layout") => print_runtime_layout(),
         Some("release-plan") => release_plan(),
@@ -324,16 +323,6 @@ fn print_api_contract() -> Result<(), String> {
     Ok(())
 }
 
-fn write_cli_reference() -> Result<(), String> {
-    let repo_root = repo_root()?;
-    let path = repo_root.join("docs/spec/cli-reference.md");
-    let markdown = refine::surfaces::cli::command_reference_markdown();
-    fs::write(&path, &markdown)
-        .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
-    println!("wrote {} ({} bytes)", path.display(), markdown.len());
-    Ok(())
-}
-
 fn print_runtime_layout() -> Result<(), String> {
     let layout = RuntimePathLayout::current_user(DEFAULT_APP_ID);
     println!(
@@ -377,7 +366,7 @@ fn repo_root() -> Result<PathBuf, String> {
     let mut current =
         std::env::current_dir().map_err(|error| format!("failed to inspect cwd: {error}"))?;
     loop {
-        if current.join("docs/spec/rust-spec.md").is_file() {
+        if current.join("docs/intent/README.md").is_file() {
             return Ok(current);
         }
         if !current.pop() {

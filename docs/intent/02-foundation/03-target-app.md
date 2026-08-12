@@ -44,6 +44,9 @@ The current implementation details that matter to intent are:
   durable recovery record until their record-locked cascade completes, while explicit removal
   changes only the dropdown and leaves historical strings intact;
 - projections and caches exist for speed but should be rebuildable from durable state;
+- Goal log sidecars are node-local evidence under the live state's `runtime/`
+  namespace. They must remain readable on the node that observed them without
+  being published as durable `refine/state` project history;
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.
 

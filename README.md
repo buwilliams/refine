@@ -13,9 +13,6 @@ refine coordinates your agent fleet for software delivery. It is not another age
 
 The full design intent of Refine is documented at [Intent](docs/intent/README.md). You can learn the most by reading these documents.
 
-For the domain model the current code actually implements, see the
-[Refine Ontology](docs/ontology/refine-ontology.md).
-
 ## Install with your agent
 
 Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:

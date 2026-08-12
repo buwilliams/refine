@@ -28,6 +28,9 @@ Current implementation details that matter to intent:
 - Goals can belong to Features with an order, letting Refine advance ordered work without forcing every Goal into a sequence.
 - Active work is owned by a node so distributed or multi-instance operation can be reasoned about explicitly.
 - Projections exist so the system can stay fast without replacing flat files as the source of truth.
+- Scheduler indexes should scale with active work rather than total project
+  history. Read projections should keep a bounded per-record working set and
+  load deep searchable text only when a query needs it.
 - A Goal Round may carry a versioned `implementation_plan`. It binds proposal,
   independent criticism, final checklist, phase/process/Git evidence, failures,
   and implementation discrepancies to the exact Round, pinned context digest,

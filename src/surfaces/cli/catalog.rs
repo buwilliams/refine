@@ -1,11 +1,9 @@
 //! Machine-readable CLI catalog.
 //!
 //! `refine commands` emits the full command tree — names, descriptions, and
-//! arguments — as JSON so an agent can load the entire operational vocabulary
-//! in one call instead of exploring `--help` per subcommand. The same tree
-//! renders `docs/spec/cli-reference.md` (via `cargo run -p refine-xtask --
-//! cli-reference`), and a drift test keeps the committed doc in sync, so the
-//! reference can never rot away from the binary.
+//! arguments — as JSON so an agent can load the entire current operational
+//! vocabulary in one call instead of relying on a committed reference snapshot
+//! or exploring `--help` per subcommand.
 
 use clap::CommandFactory;
 use serde_json::{Value, json};
@@ -73,71 +71,6 @@ fn about_text(command: &clap::Command) -> String {
         .or_else(|| command.get_about())
         .map(|about| about.to_string())
         .unwrap_or_default()
-}
-
-/// Renders the same tree as human-readable markdown for
-/// `docs/spec/cli-reference.md`. Generated — do not edit the file by hand.
-pub fn command_reference_markdown() -> String {
-    let command = Cli::command();
-    let mut output = String::new();
-    output.push_str("# CLI Reference\n\n");
-    output.push_str(
-        "Generated from the clap command tree by `cargo run --manifest-path xtask/Cargo.toml -- cli-reference`.\n\
-         Do not edit by hand — a unit test fails when this file drifts from the binary.\n\n\
-         Agents: `refine commands` emits this same tree as JSON; `refine next` recommends\n\
-         which of these commands to run from current state.\n",
-    );
-    for subcommand in command
-        .get_subcommands()
-        .filter(|subcommand| subcommand.get_name() != "help")
-    {
-        write_command_markdown(&mut output, subcommand, "refine", 2);
-    }
-    output
-}
-
-fn write_command_markdown(
-    output: &mut String,
-    command: &clap::Command,
-    prefix: &str,
-    depth: usize,
-) {
-    let path = format!("{prefix} {}", command.get_name());
-    let heading = "#".repeat(depth.min(4));
-    output.push_str(&format!("\n{heading} `{path}`\n\n"));
-    let about = about_text(command);
-    if !about.is_empty() {
-        output.push_str(&format!("{about}\n"));
-    }
-    let arguments: Vec<&clap::Arg> = command
-        .get_arguments()
-        .filter(|argument| !argument.is_hide_set() && argument.get_id() != "help")
-        .collect();
-    if !arguments.is_empty() {
-        output.push('\n');
-        for argument in arguments {
-            let name = match argument.get_long() {
-                Some(long) => format!("--{long}"),
-                None => format!("<{}>", argument.get_id().as_str().to_uppercase()),
-            };
-            let required = if argument.is_required_set() {
-                " (required)"
-            } else {
-                ""
-            };
-            let help = argument
-                .get_help()
-                .map(|help| help.to_string())
-                .unwrap_or_default();
-            output.push_str(&format!("- `{name}`{required} — {help}\n"));
-        }
-    }
-    for subcommand in command
-        .get_subcommands()
-        .filter(|subcommand| subcommand.get_name() != "help")
-    {
-        write_command_markdown(output, subcommand, &path, depth + 1);
-    }
 }
 
 #[cfg(test)]
@@ -210,18 +143,6 @@ mod tests {
     }
 
     #[test]
-    fn committed_cli_reference_matches_generated_output() {
-        let path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/spec/cli-reference.md");
-        let committed = std::fs::read_to_string(&path).unwrap_or_default();
-        let generated = command_reference_markdown();
-        assert!(
-            committed == generated,
-            "docs/spec/cli-reference.md is out of date; regenerate with `cargo run --manifest-path xtask/Cargo.toml -- cli-reference`"
-        );
-    }
-
-    #[test]
     fn operational_runbooks_use_current_cli_and_layout_contracts() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let runbooks_dir = root.join("docs/runbooks");
@@ -230,7 +151,6 @@ mod tests {
             .map(|entry| entry.unwrap().path())
             .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
             .collect::<Vec<_>>();
-        paths.push(root.join("docs/spec/scale-reliability-performance.migration.md"));
         paths.sort();
 
         let cli = Cli::command();
@@ -252,11 +172,6 @@ mod tests {
             all.push_str(&document);
             all.push('\n');
         }
-        assert!(
-            index.contains("(../spec/scale-reliability-performance.migration.md)"),
-            "the operational node-migration document must be discoverable from the runbook index"
-        );
-
         for retired in [
             "refine daemon ",
             "./r daemon ",

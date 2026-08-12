@@ -35,7 +35,7 @@ Runbooks:
 - [Migrate a Refine v2 project to current v4](v2-to-v4-migration-runbook.md) —
   preserve legacy durable state and node-local evidence in the current v4
   layout and isolated state branch.
-- [Migrate a node to the scale and reliability layout](../spec/scale-reliability-performance.migration.md)
+- [Migrate a node to the scale and reliability layout](scale-reliability-migration.md)
   — relocate node-local logs, retire derived state, and restore host-governed
   concurrency after upgrading an existing v4 node.
 

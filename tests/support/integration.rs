@@ -356,7 +356,7 @@ impl Drop for IntegrationFixture {
 fn repo_root() -> PathBuf {
     let mut current = std::env::current_dir().expect("failed to inspect cwd");
     loop {
-        if current.join("docs/spec/rust-integration-spec.md").is_file() {
+        if current.join("docs/intent/README.md").is_file() {
             return current;
         }
         assert!(current.pop(), "failed to locate repository root");

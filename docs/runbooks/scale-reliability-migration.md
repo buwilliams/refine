@@ -1,7 +1,9 @@
-# Migrate a Node to the Scale and Reliability Changes
+# Migrate a Node to the Current Scale and Reliability Layout
 
-This runbook is for an agent upgrading an existing Refine node to the build
-described by [scale-reliability-performance.spec.md](scale-reliability-performance.spec.md).
+This runbook is for an agent upgrading an existing Refine node to the current
+node-local scale and reliability layout. The durable product contracts behind
+the procedure live in [Target App](../intent/02-foundation/03-target-app.md) and
+[Process](../intent/03-capabilities/01-process.md).
 
 The changes are deliberately not backwards compatible. Two on-disk locations
 moved and two are now obsolete. Nothing here rewrites durable project state:

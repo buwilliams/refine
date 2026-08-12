@@ -73,6 +73,10 @@ Current implementation details that matter to intent:
   copy; only a capacity-admitted running claim may durably transition its Goal
   to in-progress and then materialize that Goal round's implementation worktree.
   A large todo queue therefore consumes workflow state, not one worktree per Goal.
+- admission and cadence adapt to observed host CPU, memory, and disk headroom
+  unless an operator deliberately sets a cap. Slow operations remain healthy
+  while they make observable progress; silence and hard elapsed limits are
+  distinct failure signals.
 - pause state can stop background processes or pause agents.
 - stopping any managed, interactive, chat, or synthetic agent uses one shared
   capability, including Workflow claim settlement, rather than splitting

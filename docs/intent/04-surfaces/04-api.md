@@ -20,6 +20,12 @@ The API should expose system capability groups that match Refine's product desig
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
+Browser mutations must present an `Origin` or `Referer` whose authority matches
+the request `Host`. CLI and other non-browser clients may omit those headers.
+The local daemon does not add a separate authorization-token boundary, so
+binding it beyond loopback intentionally grants control to clients that can
+reach the port.
+
 Daemon lifecycle routes use the shared host authority. Start may return its
 observed result directly. Stop and restart first persist and return a
 port-scoped operation receipt, then a restart-safe helper performs service

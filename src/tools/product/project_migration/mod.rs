@@ -381,7 +381,7 @@ mod tests {
         assert!(instructions.contains("runtime/goals/<shard>/<id>/logs.jsonl"));
         assert!(instructions.contains("runtime/active-goals.jsonl"));
         assert!(instructions.contains("parallel_run_cap"));
-        assert!(instructions.contains("scale-reliability-performance.migration.md"));
+        assert!(instructions.contains("scale-reliability-migration.md"));
         assert!(!instructions.contains("Refine `4.0.0`"));
 
         fs::remove_dir_all(temp_root).unwrap();

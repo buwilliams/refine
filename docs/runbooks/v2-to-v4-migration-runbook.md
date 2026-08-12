@@ -8,7 +8,7 @@ until an agent has resolved that meaning.
 
 Read this whole runbook before changing the project. The current node-local
 layout and cleanup rules come from
-[`scale-reliability-performance.migration.md`](../spec/scale-reliability-performance.migration.md).
+[`scale-reliability-migration.md`](scale-reliability-migration.md).
 Its changes are incorporated here so a v2 project migrates directly to the
 current v4 layout rather than passing through an obsolete 4.0 layout.
 
