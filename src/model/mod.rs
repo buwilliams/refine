@@ -1,5 +1,5 @@
-pub mod cluster;
 pub mod feature;
+pub mod fleet;
 pub mod goal;
 pub mod log;
 pub mod node;

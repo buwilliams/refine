@@ -113,7 +113,7 @@ impl FileNextActionsService {
                 &format!(
                     "Node {node_id} last reported failed health; inspect before sending work to it."
                 ),
-                &format!("refine cluster show {node_id}"),
+                &format!("refine fleet show {node_id}"),
             );
         }
         if !stranded_review.is_empty() {
@@ -124,7 +124,7 @@ impl FileNextActionsService {
                     "{} reviewable goal(s) sit on other nodes; converge them to this node for review.",
                     stranded_review.len()
                 ),
-                &format!("refine cluster distribute --converge --to {active_node_id}"),
+                &format!("refine fleet distribute --converge --to {active_node_id}"),
             );
         }
         let open_total: usize = open_by_node.values().sum();
@@ -135,7 +135,7 @@ impl FileNextActionsService {
                 &format!(
                     "{open_total} open goal(s) all sit on one node while {healthy_node_count} nodes are available."
                 ),
-                "refine cluster distribute --dry-run",
+                "refine fleet distribute --dry-run",
             );
         }
         if let Some(review_count) = status_counts.get("review")
@@ -194,7 +194,7 @@ fn suggest(suggestions: &mut Vec<serde_json::Value>, id: &str, reason: &str, com
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tools::host::cluster::{FileClusterService, NodeRemoteUpdate};
+    use crate::tools::host::fleet::{FileFleetService, NodeRemoteUpdate};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -221,8 +221,8 @@ mod tests {
     fn next_suggests_distribution_and_convergence() {
         let temp_root = unique_temp_dir("guidance-fleet");
         let refine_dir = temp_root.join(".refine");
-        let cluster = FileClusterService::new(&refine_dir);
-        cluster
+        let fleet = FileFleetService::new(&refine_dir);
+        fleet
             .upsert_node("fly-worker-1", NodeRemoteUpdate::default())
             .unwrap();
         let work = FileWorkItemService::new(&refine_dir);
@@ -254,7 +254,7 @@ mod tests {
             .iter()
             .map(|suggestion| suggestion["command"].as_str().unwrap())
             .collect();
-        assert!(commands.contains(&"refine cluster distribute --converge --to default"));
+        assert!(commands.contains(&"refine fleet distribute --converge --to default"));
         fs::remove_dir_all(temp_root).unwrap();
     }
 

@@ -5,7 +5,7 @@
 - **Node As Owner**: active work is owned by a node so responsibility is explicit.
 - **Decentralized Scale Primitive**: nodes are what let Refine move from one agent on one machine to many agents across many machines.
 - **One Agent To Many Agents**: Refine should start simply with one local agent and scale toward many agents working in parallel.
-- **Local First, Multi-Node Ready**: the system should work well on one machine without blocking future clusters of machines.
+- **Local First, Multi-Node Ready**: the system should work well on one machine without blocking future fleets of machines.
 - **Explicit Work Ownership**: every active Goal should be owned by a node clearly enough to prevent accidental overlap.
 - **Ordered When It Matters**: parallel work should respect Feature ordering, dependencies, and review boundaries.
 - **Coordination Without Centralization By Default**: scale should come from durable state, claims, nodes, and Git-backed evidence before requiring hosted infrastructure.
@@ -15,7 +15,7 @@
 
 The Node concept explains how Refine grows from a single local assistant into a system that can coordinate many agents across many machines. Node is the foundation for decentralized scale: work can be parallelized only when the system can say which node owns each active Goal, which node is running a process, and which node is reporting state.
 
-The starting point should be easy: one user, one target app, one local daemon, one agent working one Goal. The future direction is larger: multiple agents, cluster nodes, runner workers, ordered Features, parallel Goal execution, review gates, quality checks, and merge handoffs.
+The starting point should be easy: one user, one target app, one local daemon, one agent working one Goal. The future direction is larger: multiple agents, fleet nodes, runner workers, ordered Features, parallel Goal execution, review gates, quality checks, and merge handoffs.
 
 Refine needs this concept because agentic software work will not stay single-threaded. Stronger agents will be able to decompose, implement, review, test, and merge work concurrently. Without explicit ownership and ordering, parallelism becomes confusion. With the right foundation, parallelism becomes faster software composition.
 
@@ -36,7 +36,7 @@ Node should define how Refine thinks about parallel work:
 - Workflow claims prevent multiple nodes or agents from silently working the same Goal.
 - Nodes identify local or distributed actors that can own work, run processes, or report state.
 - Project status, node APIs, Goal list/detail projections, dashboard labels, CLI output, and browser surfaces resolve node labels through the same identity contract.
-- Cluster concepts let multiple Refine instances coordinate without making the product depend on one UI.
+- Fleet concepts let multiple Refine instances coordinate without making the product depend on one UI.
 - Git worktrees and branches isolate concurrent changes so parallel work remains reviewable.
 - Logs, quality results, process records, and diffs provide evidence for handoff and recovery.
 

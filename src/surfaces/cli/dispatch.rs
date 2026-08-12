@@ -1,8 +1,8 @@
 mod agents;
-mod cluster;
 mod daemon_transport;
 mod discovery;
 mod features;
+mod fleet;
 mod goals;
 mod logs;
 mod nodes;
@@ -17,9 +17,9 @@ use system::{port_status_with_processes, selected_process_ports, stop_system_pro
 #[cfg(not(test))]
 use agents::dispatch_agent_daemon;
 #[cfg(not(test))]
-use cluster::dispatch_cluster_daemon;
-#[cfg(not(test))]
 use features::dispatch_feature_daemon;
+#[cfg(not(test))]
+use fleet::dispatch_fleet_daemon;
 #[cfg(not(test))]
 use goals::dispatch_goal_daemon;
 #[cfg(not(test))]
@@ -65,14 +65,16 @@ use crate::surfaces::web_server::{
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
     uninstall_daemon_installation,
 };
 use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout,
-    resolve_update_provider, run_deployed_update,
+    resolve_agent_provider, run_deployed_update,
+};
+use crate::tools::host::fleet::{
+    FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
 };
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
@@ -123,7 +125,25 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Todo { action } => return dispatch_todo(action),
         Commands::Workflow { action } => return dispatch_workflow_daemon(action),
         Commands::Node { action } => return dispatch_node_daemon(action),
-        Commands::Cluster { action } => return dispatch_cluster_daemon(action),
+        Commands::Fleet {
+            action: FleetAction::Request(words),
+        } => return fleet::dispatch_request(words),
+        Commands::Fleet {
+            action:
+                FleetAction::Manage {
+                    request,
+                    provider,
+                    runtime_root,
+                },
+        } => return fleet::dispatch_manage(request, provider, runtime_root),
+        Commands::Fleet {
+            action:
+                FleetAction::Distribute {
+                    instructions: Some(instructions),
+                    ..
+                },
+        } => return fleet::dispatch_distribute_instructions(instructions),
+        Commands::Fleet { action } => return dispatch_fleet_daemon(action),
         Commands::Log { action } => return dispatch_log_daemon(action),
         Commands::Agent { action } => return dispatch_agent_daemon(action),
         Commands::System {
@@ -140,7 +160,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         command @ Commands::Website { .. } => website::dispatch_command(command),
         command @ Commands::System { .. } => system::dispatch_command(command),
         command @ Commands::Node { .. } => nodes::dispatch_command(command),
-        command @ Commands::Cluster { .. } => cluster::dispatch_command(command),
+        command @ Commands::Fleet { .. } => fleet::dispatch_command(command),
         command @ Commands::Next { .. } => discovery::dispatch_command(command),
         command @ Commands::Commands => discovery::dispatch_command(command),
         command @ Commands::Log { .. } => logs::dispatch_command(command),
@@ -551,20 +571,21 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | NodeAction::Transfer { target_root, .. } => target_root.as_ref(),
             NodeAction::Init { .. } => None,
         },
-        Commands::Cluster { action } => match action {
-            ClusterAction::List { target_root }
-            | ClusterAction::Show { target_root, .. }
-            | ClusterAction::AddNode { target_root, .. }
-            | ClusterAction::EditNode { target_root, .. }
-            | ClusterAction::EnableNode { target_root, .. }
-            | ClusterAction::DisableNode { target_root, .. }
-            | ClusterAction::RemoveNode { target_root, .. }
-            | ClusterAction::Bootstrap { target_root, .. }
-            | ClusterAction::Distribute { target_root, .. }
-            | ClusterAction::Sync { target_root }
-            | ClusterAction::Run { target_root, .. }
-            | ClusterAction::Transfer { target_root, .. }
-            | ClusterAction::Maintenance { target_root } => target_root.as_ref(),
+        Commands::Fleet { action } => match action {
+            FleetAction::List { target_root }
+            | FleetAction::Show { target_root, .. }
+            | FleetAction::AddNode { target_root, .. }
+            | FleetAction::EditNode { target_root, .. }
+            | FleetAction::EnableNode { target_root, .. }
+            | FleetAction::DisableNode { target_root, .. }
+            | FleetAction::RemoveNode { target_root, .. }
+            | FleetAction::Bootstrap { target_root, .. }
+            | FleetAction::Distribute { target_root, .. }
+            | FleetAction::Sync { target_root }
+            | FleetAction::Run { target_root, .. }
+            | FleetAction::Transfer { target_root, .. }
+            | FleetAction::Maintenance { target_root } => target_root.as_ref(),
+            FleetAction::Manage { .. } | FleetAction::Request(_) => None,
         },
         Commands::Log { action } => match action {
             LogAction::List { target_root, .. }

@@ -80,14 +80,14 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn catalog_lists_cluster_commands_with_descriptions() {
+    fn catalog_lists_fleet_commands_with_descriptions() {
         let catalog = commands_catalog();
         let commands = catalog["commands"].as_array().unwrap();
-        let cluster = commands
+        let fleet = commands
             .iter()
-            .find(|command| command["name"] == "cluster")
-            .expect("cluster command present");
-        let names: Vec<&str> = cluster["subcommands"]
+            .find(|command| command["name"] == "fleet")
+            .expect("fleet command present");
+        let names: Vec<&str> = fleet["subcommands"]
             .as_array()
             .unwrap()
             .iter()
@@ -175,6 +175,8 @@ mod tests {
         for retired in [
             "refine daemon ",
             "./r daemon ",
+            "refine cluster ",
+            "./r cluster ",
             "\nrefine status\n",
             "\n./r status\n",
         ] {

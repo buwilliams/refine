@@ -1,15 +1,15 @@
 use super::*;
 
 #[test]
-fn web_server_manages_cluster_operations_over_nodes() {
-    let temp_root = unique_temp_dir("http-cluster-registry");
+fn web_server_manages_fleet_operations_over_nodes() {
+    let temp_root = unique_temp_dir("http-fleet-registry");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/cluster/nodes".to_string(),
+        path: "/api/fleet/nodes".to_string(),
         body: Some(json!({
             "id": "node-1",
             "display_name": "Node One",
@@ -37,7 +37,7 @@ fn web_server_manages_cluster_operations_over_nodes() {
 
     let disabled = server.handle(ApiRequest {
         method: "PATCH".to_string(),
-        path: "/api/cluster/nodes/node-1".to_string(),
+        path: "/api/fleet/nodes/node-1".to_string(),
         body: Some(json!({"enabled": false, "ssh_port": 2222})),
     });
     assert_eq!(disabled.status, 200);
@@ -52,7 +52,7 @@ fn web_server_manages_cluster_operations_over_nodes() {
 
     let bootstrap = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/cluster/nodes/node-1/bootstrap".to_string(),
+        path: "/api/fleet/nodes/node-1/bootstrap".to_string(),
         body: Some(json!({"dry_run": true})),
     });
     assert_eq!(bootstrap.status, 200);
@@ -77,7 +77,7 @@ fn web_server_manages_cluster_operations_over_nodes() {
             .contains("'deploy@example.com'")
     );
     assert_eq!(
-        bootstrap.body["cluster"]["nodes"]
+        bootstrap.body["fleet"]["nodes"]
             .as_array()
             .unwrap()
             .iter()
@@ -90,7 +90,7 @@ fn web_server_manages_cluster_operations_over_nodes() {
 }
 
 #[test]
-fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
+fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
     let temp_root = unique_temp_dir("http-status-surfaces");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -407,14 +407,14 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(nodes.status, 200);
     assert_eq!(nodes.body["nodes"][0]["id"], "default");
 
-    let cluster = server.handle(ApiRequest {
+    let fleet = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: "/api/cluster".to_string(),
+        path: "/api/fleet".to_string(),
         body: None,
     });
-    assert_eq!(cluster.status, 200);
-    assert_eq!(cluster.body["enabled"], true);
-    assert_eq!(cluster.body["nodes"][0]["id"], "default");
+    assert_eq!(fleet.status, 200);
+    assert_eq!(fleet.body["enabled"], true);
+    assert_eq!(fleet.body["nodes"][0]["id"], "default");
 
     remove_temp_dir(&temp_root);
 }

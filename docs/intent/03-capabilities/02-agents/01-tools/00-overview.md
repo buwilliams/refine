@@ -22,7 +22,7 @@ The tools capability should make Refine useful without requiring users to adopt 
 
 Current implementation details that matter to intent:
 
-- host tools cover agent providers, clusters, deployed updates, Git worktrees, installation, quality, and target apps.
+- host tools cover agent providers, fleets, deployed updates, Git worktrees, installation, quality, and target apps.
 - product tools cover chat, imports, merging, nodes, project migration, project registry, project state, and work items.
 - observability tools cover activity, diagnostics, logs, metrics, processes, and support bundles.
 - the work item service centralizes Goal and Feature behavior so surfaces share the same rules.

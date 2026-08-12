@@ -45,8 +45,8 @@ path = "tests/cli_surface.rs"
 test = false
 
 [[test]]
-name = "cluster_ssh_cli"
-path = "tests/cluster_ssh_cli.rs"
+name = "fleet_ssh_cli"
+path = "tests/fleet_ssh_cli.rs"
 test = false
 
 [[test]]

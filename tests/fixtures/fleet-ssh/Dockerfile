@@ -5,11 +5,11 @@ RUN apk add --no-cache git openssh-server \
     && echo 'refine:refine' | chpasswd \
     && mkdir -p /run/sshd /ssh /home/refine/.ssh
 
-COPY entrypoint.sh /usr/local/bin/refine-cluster-ssh-entrypoint
+COPY entrypoint.sh /usr/local/bin/refine-fleet-ssh-entrypoint
 COPY sshd_config /etc/ssh/sshd_config
 
-RUN chmod 0755 /usr/local/bin/refine-cluster-ssh-entrypoint
+RUN chmod 0755 /usr/local/bin/refine-fleet-ssh-entrypoint
 
 EXPOSE 22
 
-ENTRYPOINT ["/usr/local/bin/refine-cluster-ssh-entrypoint"]
+ENTRYPOINT ["/usr/local/bin/refine-fleet-ssh-entrypoint"]

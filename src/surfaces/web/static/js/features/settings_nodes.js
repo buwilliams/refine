@@ -162,7 +162,7 @@ function bindSettingsNodesTab() {
     if (!payload) return;
     await withButtonBusy(b, "Saving...", async () => {
       try {
-        await api("PATCH", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.nodeRemoteConfigure), {
+        await api("PATCH", "/api/fleet/nodes/" + encodeURIComponent(b.dataset.nodeRemoteConfigure), {
           ...payload,
           display_name: payload.display_name || b.dataset.nodeRemoteConfigure,
         });
@@ -175,7 +175,7 @@ function bindSettingsNodesTab() {
     const enabled = b.dataset.enabled !== "1";
     await withButtonBusy(b, enabled ? "Enabling..." : "Disabling...", async () => {
       try {
-        await api("PATCH", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.nodeRemoteToggle), {
+        await api("PATCH", "/api/fleet/nodes/" + encodeURIComponent(b.dataset.nodeRemoteToggle), {
           enabled,
         });
         await refreshSettingsTab("application", { force: true });
@@ -191,7 +191,7 @@ function bindSettingsNodesTab() {
     if (!ok) return;
     await withButtonBusy(b, "Bootstrapping...", async () => {
       try {
-        const result = await api("POST", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.nodeRemoteBootstrap) + "/bootstrap", {});
+        const result = await api("POST", "/api/fleet/nodes/" + encodeURIComponent(b.dataset.nodeRemoteBootstrap) + "/bootstrap", {});
         toast(result.ok ? "Node bootstrapped" : "Node bootstrap failed", result.ok ? "info" : "error");
         await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }

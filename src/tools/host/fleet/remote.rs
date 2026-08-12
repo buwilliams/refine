@@ -10,14 +10,14 @@ pub(super) fn node_health_allows_distribution(node: &Node) -> bool {
         .unwrap_or(true)
 }
 
-pub fn validate_remote_node_enabled(cluster: &Cluster, node_id: &str) -> RefineResult<()> {
+pub fn validate_remote_node_enabled(fleet: &Fleet, node_id: &str) -> RefineResult<()> {
     if !valid_node_id(node_id) {
         return Err(RefineError::InvalidInput(format!(
             "invalid node id {node_id}"
         )));
     }
 
-    let Some(node) = cluster.nodes.iter().find(|node| node.id == node_id) else {
+    let Some(node) = fleet.nodes.iter().find(|node| node.id == node_id) else {
         return Err(RefineError::NotFound(format!(
             "node {node_id} was not found"
         )));
@@ -30,16 +30,16 @@ pub fn validate_remote_node_enabled(cluster: &Cluster, node_id: &str) -> RefineR
     }
 }
 
-pub fn bootstrap_remote_node(request: ClusterBootstrapRequest) -> RefineResult<RemoteRunResult> {
+pub fn bootstrap_remote_node(request: FleetBootstrapRequest) -> RefineResult<RemoteRunResult> {
     bootstrap_remote_node_with_runtime(
         request,
-        PathBuf::from("run/cluster-processes"),
+        PathBuf::from("run/fleet-processes"),
         Vec::<String>::new(),
     )
 }
 
 pub(super) fn bootstrap_remote_node_with_runtime(
-    request: ClusterBootstrapRequest,
+    request: FleetBootstrapRequest,
     runtime_root: impl Into<PathBuf>,
     allowed_commands: impl IntoIterator<Item = impl Into<String>>,
 ) -> RefineResult<RemoteRunResult> {
@@ -65,7 +65,7 @@ pub(super) fn bootstrap_remote_node_with_runtime(
         &request.target_app_path,
         request.refine_port,
     );
-    let known_hosts_path = runtime_root.join("cluster-known_hosts");
+    let known_hosts_path = runtime_root.join("fleet-known_hosts");
     let command = ssh_display_command(
         request.ssh_port,
         &request.ssh_user,
@@ -333,13 +333,13 @@ pub(super) fn port_or_default(value: u64, default: u16) -> u16 {
     u16::try_from(value).unwrap_or(default)
 }
 
-pub(super) fn cluster_response(cluster: Cluster) -> serde_json::Value {
+pub(super) fn fleet_response(fleet: Fleet) -> serde_json::Value {
     serde_json::json!({
-        "nodes": cluster.nodes,
+        "nodes": fleet.nodes,
         "maintenance": null,
-        "enabled": !cluster.nodes.is_empty(),
-        "updated_at": cluster.updated_at,
-        "message": if cluster.nodes.is_empty() {
+        "enabled": !fleet.nodes.is_empty(),
+        "updated_at": fleet.updated_at,
+        "message": if fleet.nodes.is_empty() {
             "No nodes configured."
         } else {
             "Nodes configured."

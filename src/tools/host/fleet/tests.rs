@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn bootstrap_remote_node_builds_dry_run_ssh_command() {
-    let result = bootstrap_remote_node(ClusterBootstrapRequest {
+    let result = bootstrap_remote_node(FleetBootstrapRequest {
         node_id: "node-1".to_string(),
         ssh_host: "example.com".to_string(),
         ssh_user: "deploy".to_string(),
@@ -31,7 +31,7 @@ fn bootstrap_remote_node_builds_dry_run_ssh_command() {
     assert!(
         result
             .command
-            .contains("-o 'UserKnownHostsFile=run/cluster-processes/cluster-known_hosts'")
+            .contains("-o 'UserKnownHostsFile=run/fleet-processes/fleet-known_hosts'")
     );
     assert!(result.command.contains("-i '~/.ssh/refine_ed25519'"));
     assert!(result.command.contains("'deploy@example.com'"));
@@ -41,7 +41,7 @@ fn bootstrap_remote_node_builds_dry_run_ssh_command() {
 
 #[test]
 fn bootstrap_remote_node_rejects_user_at_host() {
-    let error = bootstrap_remote_node(ClusterBootstrapRequest {
+    let error = bootstrap_remote_node(FleetBootstrapRequest {
         node_id: "node-1".to_string(),
         ssh_host: "user@example.com".to_string(),
         ssh_user: String::new(),
@@ -58,7 +58,7 @@ fn bootstrap_remote_node_rejects_user_at_host() {
 
 #[test]
 fn ssh_preflight_reports_missing_identity_file() {
-    let temp_root = unique_temp_dir("cluster-ssh-preflight");
+    let temp_root = unique_temp_dir("fleet-ssh-preflight");
     let missing_identity = temp_root.join("missing_ed25519");
 
     let error = validate_ssh_prerequisites(missing_identity.to_str().unwrap()).unwrap_err();
@@ -69,7 +69,7 @@ fn ssh_preflight_reports_missing_identity_file() {
 
 #[test]
 fn ssh_command_uses_existing_identity_file() {
-    let temp_root = unique_temp_dir("cluster-ssh-command");
+    let temp_root = unique_temp_dir("fleet-ssh-command");
     fs::create_dir_all(&temp_root).unwrap();
     let identity = temp_root.join("id_ed25519");
     fs::write(&identity, "").unwrap();
@@ -94,10 +94,10 @@ fn ssh_command_uses_existing_identity_file() {
 }
 
 #[test]
-fn file_cluster_service_manages_node_lifecycle() {
-    let temp_root = unique_temp_dir("cluster");
+fn file_fleet_service_manages_node_lifecycle() {
+    let temp_root = unique_temp_dir("fleet");
     let refine_dir = temp_root.join(".refine");
-    let service = FileClusterService::new(&refine_dir);
+    let service = FileFleetService::new(&refine_dir);
 
     assert_eq!(service.list_response().unwrap()["enabled"], true);
     service.add_node("node-1").unwrap();
@@ -121,8 +121,8 @@ fn file_cluster_service_manages_node_lifecycle() {
 }
 
 #[test]
-fn file_cluster_service_migrates_legacy_cluster_json_to_nodes() {
-    let temp_root = unique_temp_dir("cluster-legacy-migration");
+fn file_fleet_service_migrates_legacy_fleet_json_to_nodes() {
+    let temp_root = unique_temp_dir("fleet-legacy-migration");
     let refine_dir = temp_root.join(".refine");
     fs::create_dir_all(&refine_dir).unwrap();
     fs::write(
@@ -149,7 +149,7 @@ fn file_cluster_service_migrates_legacy_cluster_json_to_nodes() {
     )
     .unwrap();
 
-    let service = FileClusterService::new(&refine_dir);
+    let service = FileFleetService::new(&refine_dir);
     let response = service.list_response().unwrap();
     let migrated_node = response["nodes"]
         .as_array()
@@ -170,8 +170,8 @@ fn file_cluster_service_migrates_legacy_cluster_json_to_nodes() {
 }
 
 #[test]
-fn cluster_node_api_uses_the_shared_identity_contract() {
-    let temp_root = unique_temp_dir("cluster-default-identity");
+fn fleet_node_api_uses_the_shared_identity_contract() {
+    let temp_root = unique_temp_dir("fleet-default-identity");
     let refine_dir = temp_root.join(".refine");
     fs::create_dir_all(&refine_dir).unwrap();
     fs::write(
@@ -187,7 +187,7 @@ fn cluster_node_api_uses_the_shared_identity_contract() {
         .to_string(),
     )
     .unwrap();
-    let service = FileClusterService::new(&refine_dir);
+    let service = FileFleetService::new(&refine_dir);
 
     let ambiguous = service.list_response().unwrap();
     assert_eq!(ambiguous["nodes"][0]["display_name"], "Default");
@@ -218,14 +218,14 @@ fn cluster_node_api_uses_the_shared_identity_contract() {
 }
 
 #[test]
-fn file_cluster_service_authorizes_remote_run_commands() {
-    let temp_root = unique_temp_dir("cluster-security");
+fn file_fleet_service_authorizes_remote_run_commands() {
+    let temp_root = unique_temp_dir("fleet-security");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     FileSettingsService::new(&refine_dir)
         .update(&serde_json::json!({"allowed_commands": "printf"}))
         .unwrap();
-    let service = FileClusterService::with_runtime_root(&refine_dir, &runtime_root);
+    let service = FileFleetService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .upsert_node(
             "node-1",
@@ -250,9 +250,9 @@ fn file_cluster_service_authorizes_remote_run_commands() {
 
 #[test]
 fn distribute_targets_only_enabled_healthy_nodes() {
-    let temp_root = unique_temp_dir("cluster-distribute");
+    let temp_root = unique_temp_dir("fleet-distribute");
     let refine_dir = temp_root.join(".refine");
-    let service = FileClusterService::new(&refine_dir);
+    let service = FileFleetService::new(&refine_dir);
     service.add_node("worker-up").unwrap();
     service.add_node("worker-down").unwrap();
     service.add_node("worker-broken").unwrap();
@@ -265,7 +265,7 @@ fn distribute_targets_only_enabled_healthy_nodes() {
             .iter_mut()
             .find(|node| node.id == "worker-broken")
             .unwrap();
-        broken.health = Some(ClusterHealth {
+        broken.health = Some(FleetHealth {
             status: "failed".to_string(),
             checked_at: now_timestamp(),
             details: None,

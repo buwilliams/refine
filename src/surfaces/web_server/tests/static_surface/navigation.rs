@@ -13,7 +13,7 @@ fn web_server_route_groups_cover_static_web_surface() {
         "/cache",
         "/changes",
         "/chat",
-        "/cluster",
+        "/fleet",
         "/dashboard",
         "/diagnostics",
         "/events",

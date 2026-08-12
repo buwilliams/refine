@@ -140,7 +140,7 @@ pub(super) fn screen_critical_http_request(method: &str, path: &str, cache_mode:
             | "/guidance"
             | "/reporters"
             | "/todos"
-            | "/cluster"
+            | "/fleet"
             | "/quality"
             | "/upgrade"
             | "/target-app/status"

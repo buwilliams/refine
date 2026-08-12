@@ -8,7 +8,7 @@ mod goals;
 mod http_transport;
 mod imports;
 mod imports_parity;
-mod nodes_cluster;
+mod nodes_fleet;
 mod operations_processes;
 mod project_runtime;
 mod quality_guidance;

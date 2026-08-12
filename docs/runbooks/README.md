@@ -26,8 +26,9 @@ Runbooks:
   fast-forward, and restart a running Refine source checkout from the UI or CLI.
 - [Prepare and publish a release](semantic-release.md) — preview a semantic
   increment, prepare and review the candidate, then explicitly publish it.
-- [Provision a fleet worker](provision.md) — create and verify a worker using
-  provider tools while Refine owns node identity and work.
+- [Manage the fleet](manage-fleet.md) — inspect the fleet, add and bootstrap
+  workers on any infrastructure, move work, and retire nodes; Refine owns node
+  identity and work while the agent owns the machines.
 - [Distribute and converge work](distribute-and-converge.md) — move Goals to
   workers and bring reviewable work home.
 - [Migrate Gap state to Goals](migrate-gap-state.md) — preserve intent through
@@ -41,6 +42,6 @@ Runbooks:
 
 Conventions: commands are shown as `refine …`; inside a source checkout use
 `./r …`, which is the same surface. Use `--dry-run` only when a command's CLI
-entry documents it. Currently, use dry-run before `cluster distribute` and
-`cluster bootstrap`; do not invent a dry-run flag for transfer, enable/disable,
+entry documents it. Currently, use dry-run before `fleet distribute` and
+`fleet bootstrap`; do not invent a dry-run flag for transfer, enable/disable,
 maintenance, or removal commands.

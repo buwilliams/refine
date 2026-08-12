@@ -112,7 +112,7 @@ pub fn default_update_provider() -> String {
 /// Pick the provider that performs a delegated update: an explicit `--provider`
 /// wins, then the active target app's configured provider, then the first
 /// installed provider CLI in alphabetical order.
-pub fn resolve_update_provider(
+pub fn resolve_agent_provider(
     runtime_root: &Path,
     explicit: Option<String>,
 ) -> RefineResult<String> {

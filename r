@@ -34,14 +34,14 @@ Usage: ./r test [SUITE]
 
 Suites:
   unit                 Run in-crate Rust unit tests only. This is the default.
-  integration          Run opt-in CLI, daemon, Docker, and cluster suites.
+  integration          Run opt-in CLI, daemon, Docker, and fleet suites.
   full                 Run all test suites and repository checks.
 
 Focused xtask suites:
   rust
   smoke-ai
   cli
-  cluster-ssh
+  fleet-ssh
   full-workflow
   multi-instance-sync
 EOF
@@ -85,8 +85,8 @@ run_test_command() {
     cli)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cli
       ;;
-    cluster-ssh)
-      exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cluster-ssh
+    fleet-ssh)
+      exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-fleet-ssh
       ;;
     full-workflow)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-full-workflow
@@ -152,10 +152,10 @@ print_test_dry_run() {
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cli\n' "$ROOT"
       ;;
-    cluster-ssh)
+    fleet-ssh)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
-      printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cluster-ssh\n' "$ROOT"
+      printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-fleet-ssh\n' "$ROOT"
       ;;
     full-workflow)
       printf 'mode=test\n'

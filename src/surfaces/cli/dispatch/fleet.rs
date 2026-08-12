@@ -2,44 +2,62 @@ use super::*;
 
 pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
     match command {
-        Commands::Cluster {
+        Commands::Fleet {
+            action: FleetAction::Request(words),
+        } => dispatch_request(words),
+        Commands::Fleet {
             action:
-                ClusterAction::List {
+                FleetAction::Manage {
+                    request,
+                    provider,
+                    runtime_root,
+                },
+        } => dispatch_manage(request, provider, runtime_root),
+        Commands::Fleet {
+            action:
+                FleetAction::Distribute {
+                    instructions: Some(instructions),
+                    ..
+                },
+        } => dispatch_distribute_instructions(instructions),
+        Commands::Fleet {
+            action:
+                FleetAction::List {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
-                .list_response()?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            let fleet =
+                FileFleetService::new(refine_dir_for_target_root(&target_root)?).list_response()?;
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Show {
+                FleetAction::Show {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
             let node =
-                FileClusterService::new(refine_dir_for_target_root(&target_root)?).show(&id)?;
+                FileFleetService::new(refine_dir_for_target_root(&target_root)?).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::AddNode {
+                FleetAction::AddNode {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster =
-                FileClusterService::new(refine_dir_for_target_root(&target_root)?).add_node(&id)?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            let fleet =
+                FileFleetService::new(refine_dir_for_target_root(&target_root)?).add_node(&id)?;
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::EditNode {
+                FleetAction::EditNode {
                     id,
                     display_name,
                     ssh_host,
@@ -53,7 +71,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let fleet = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .upsert_node(
                     &id,
                     NodeRemoteUpdate {
@@ -68,75 +86,76 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                         enabled,
                     },
                 )?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::EnableNode {
+                FleetAction::EnableNode {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let fleet = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .set_enabled(&id, true)?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::DisableNode {
+                FleetAction::DisableNode {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let fleet = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .set_enabled(&id, false)?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::RemoveNode {
+                FleetAction::RemoveNode {
                     id,
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let fleet = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .remove_node(&id)?;
-            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
+            println!("{}", serde_json::to_string_pretty(&fleet).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Bootstrap {
+                FleetAction::Bootstrap {
                     id,
                     dry_run,
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .bootstrap_node_response(&id, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Distribute {
+                FleetAction::Distribute {
+                    instructions: None,
                     to,
                     converge,
                     dry_run,
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .distribute_response(to.as_deref(), converge, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Sync {
+                FleetAction::Sync {
                     target_root: Some(target_root),
                 },
         } => {
@@ -145,59 +164,130 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Run {
+                FleetAction::Run {
                     id,
                     command,
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let result = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .run_remote(&id, &command)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Transfer {
+                FleetAction::Transfer {
                     id,
                     item_id,
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileClusterService::new(refine_dir_for_target_root(&target_root)?);
+            let service = FileFleetService::new(refine_dir_for_target_root(&target_root)?);
             service.transfer(&item_id, &id)?;
             let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
                 .transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::Cluster {
+        Commands::Fleet {
             action:
-                ClusterAction::Maintenance {
+                FleetAction::Maintenance {
                     target_root: Some(target_root),
                 },
         } => {
-            let maintenance = FileClusterService::new(refine_dir_for_target_root(&target_root)?)
+            let maintenance = FileFleetService::new(refine_dir_for_target_root(&target_root)?)
                 .maintenance_response()?;
             println!("{}", serde_json::to_string_pretty(&maintenance).unwrap());
             Ok(())
         }
-        Commands::Cluster { action } => dispatch_cluster_daemon(action),
+        Commands::Fleet { action } => dispatch_fleet_daemon(action),
         _ => unreachable!("command family was routed incorrectly"),
     }
 }
 
-pub(super) fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
+/// `refine fleet "<request>"`: free text in place of a subcommand delegates to
+/// the same agent session as `fleet manage`. A single word is almost always a
+/// mistyped subcommand, so it is rejected instead of spawning an agent.
+pub(super) fn dispatch_request(words: Vec<String>) -> RefineResult<()> {
+    let request = words.join(" ");
+    let request = request.trim();
+    if request.is_empty() || !request.contains(char::is_whitespace) {
+        return Err(RefineError::InvalidInput(format!(
+            "unknown fleet command {request:?}; to delegate a request to an agent, quote a plain-language sentence: refine fleet \"<request>\""
+        )));
+    }
+    dispatch_manage(request.to_string(), None, PathBuf::from("run"))
+}
+
+/// `refine fleet distribute "<instructions>"`: agent-directed distribution.
+/// The agent reassigns Goals to nodes per the instructions and syncs state —
+/// no machines are created and no SSH is involved.
+pub(super) fn dispatch_distribute_instructions(instructions: String) -> RefineResult<()> {
+    dispatch_manage(
+        format!(
+            "Distribute work across the existing fleet nodes as instructed; reassign Goals to \
+             nodes and sync state, without creating machines or connecting over SSH. \
+             Instructions: {instructions}"
+        ),
+        None,
+        PathBuf::from("run"),
+    )
+}
+
+/// Open an interactive session with the resolved agent provider, seeded with
+/// the manage-fleet runbook and the user's request. The provider owns the
+/// conversation; Refine owns the working directory and the runbook contract.
+pub(super) fn dispatch_manage(
+    request: String,
+    provider: Option<String>,
+    runtime_root: PathBuf,
+) -> RefineResult<()> {
+    let runtime_root = absolute_cli_path(runtime_root)?;
+    let checkout = discover_refine_checkout()?;
+    if !checkout.join(FLEET_RUNBOOK_PATH).is_file() {
+        return Err(RefineError::NotFound(format!(
+            "fleet runbook not found: {}",
+            checkout.join(FLEET_RUNBOOK_PATH).display()
+        )));
+    }
+    let provider = resolve_agent_provider(&runtime_root, provider)?;
+    let prompt = fleet_manage_prompt(&checkout, &request);
+    let launch = HostAgentProviderService::new().interactive_command(&provider, &prompt)?;
+    launch.validate_prompt_artifact()?;
+    eprintln!(
+        "refine: opening {} to manage the fleet (guided by {FLEET_RUNBOOK_PATH})",
+        launch.display_name
+    );
+    let mut command = std::process::Command::new(&launch.binary);
+    command.args(&launch.args).current_dir(&checkout);
+    launch.launch_environment.apply_to_command(&mut command);
+    let status = command.status().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to launch {} for fleet manage: {error}",
+            launch.binary
+        ))
+    })?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(RefineError::Degraded(format!(
+            "fleet manage agent session exited with {status}"
+        )))
+    }
+}
+
+pub(super) fn dispatch_fleet_daemon(action: FleetAction) -> RefineResult<()> {
     let response = match action {
-        ClusterAction::List { target_root: None } => daemon_json("GET", "/cluster", None)?,
-        ClusterAction::Show {
+        FleetAction::List { target_root: None } => daemon_json("GET", "/fleet", None)?,
+        FleetAction::Show {
             id,
             target_root: None,
         } => {
-            let cluster = daemon_json("GET", "/cluster", None)?;
-            let node = cluster
+            let fleet = daemon_json("GET", "/fleet", None)?;
+            let node = fleet
                 .get("nodes")
                 .and_then(|value| value.as_array())
                 .and_then(|nodes| {
@@ -209,11 +299,11 @@ pub(super) fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()>
                 .ok_or_else(|| RefineError::NotFound(format!("node {id} was not found")))?;
             json!({ "node": node })
         }
-        ClusterAction::AddNode {
+        FleetAction::AddNode {
             id,
             target_root: None,
-        } => daemon_json("POST", "/cluster/nodes", Some(json!({ "id": id })))?,
-        ClusterAction::EditNode {
+        } => daemon_json("POST", "/fleet/nodes", Some(json!({ "id": id })))?,
+        FleetAction::EditNode {
             id,
             display_name,
             ssh_host,
@@ -227,7 +317,7 @@ pub(super) fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()>
             target_root: None,
         } => daemon_json(
             "PATCH",
-            &format!("/cluster/nodes/{}", path_segment(&id)),
+            &format!("/fleet/nodes/{}", path_segment(&id)),
             Some(remote_node_edit_body(
                 display_name,
                 ssh_host,
@@ -240,82 +330,83 @@ pub(super) fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()>
                 enabled,
             )),
         )?,
-        ClusterAction::EnableNode {
+        FleetAction::EnableNode {
             id,
             target_root: None,
         } => daemon_json(
             "PATCH",
-            &format!("/cluster/nodes/{}", path_segment(&id)),
+            &format!("/fleet/nodes/{}", path_segment(&id)),
             Some(json!({ "enabled": true })),
         )?,
-        ClusterAction::DisableNode {
+        FleetAction::DisableNode {
             id,
             target_root: None,
         } => daemon_json(
             "PATCH",
-            &format!("/cluster/nodes/{}", path_segment(&id)),
+            &format!("/fleet/nodes/{}", path_segment(&id)),
             Some(json!({ "enabled": false })),
         )?,
-        ClusterAction::RemoveNode {
+        FleetAction::RemoveNode {
             id,
             target_root: None,
         } => daemon_json(
             "DELETE",
-            &format!("/cluster/nodes/{}", path_segment(&id)),
+            &format!("/fleet/nodes/{}", path_segment(&id)),
             None,
         )?,
-        ClusterAction::Bootstrap {
+        FleetAction::Bootstrap {
             id,
             dry_run,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/cluster/nodes/{}/bootstrap", path_segment(&id)),
+            &format!("/fleet/nodes/{}/bootstrap", path_segment(&id)),
             Some(json!({ "dry_run": dry_run })),
         )?,
-        ClusterAction::Run {
+        FleetAction::Run {
             id,
             command,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/cluster/nodes/{}/run", path_segment(&id)),
+            &format!("/fleet/nodes/{}/run", path_segment(&id)),
             Some(json!({ "command": command })),
         )?,
-        ClusterAction::Distribute {
+        FleetAction::Distribute {
+            instructions: None,
             to,
             converge,
             dry_run,
             target_root: None,
         } => daemon_json(
             "POST",
-            "/cluster/distribute",
+            "/fleet/distribute",
             Some(json!({ "to": to, "converge": converge, "dry_run": dry_run })),
         )?,
-        ClusterAction::Transfer {
+        FleetAction::Transfer {
             id,
             item_id,
             target_root: None,
         } => daemon_json(
             "POST",
-            &format!("/cluster/nodes/{}/transfer", path_segment(&id)),
+            &format!("/fleet/nodes/{}/transfer", path_segment(&id)),
             Some(json!({ "item_id": item_id })),
         )?,
-        ClusterAction::Maintenance { target_root: None } => {
-            let cluster = daemon_json("GET", "/cluster", None)?;
+        FleetAction::Maintenance { target_root: None } => {
+            let fleet = daemon_json("GET", "/fleet", None)?;
             json!({
                 "ok": true,
                 "maintenance": {
                     "active": true,
-                    "updated_at": cluster.get("updated_at").cloned().unwrap_or(serde_json::Value::Null)
+                    "updated_at": fleet.get("updated_at").cloned().unwrap_or(serde_json::Value::Null)
                 },
-                "cluster": cluster
+                "fleet": fleet
             })
         }
-        ClusterAction::Sync { target_root: None } => daemon_json("POST", "/project/sync", None)?,
+        FleetAction::Sync { target_root: None } => daemon_json("POST", "/project/sync", None)?,
         other => {
             return Err(RefineError::NotImplemented(format!(
-                "Cluster command is not available through the daemon API yet: {other:?}"
+                "Fleet command is not available through the daemon API yet: {other:?}"
             )));
         }
     };

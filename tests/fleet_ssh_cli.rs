@@ -11,9 +11,9 @@ use support::integration::IntegrationFixture;
 
 #[test]
 #[ignore = "requires docker compose and OpenSSH client tools"]
-fn cluster_cli_runs_commands_over_real_ssh_container() {
+fn fleet_cli_runs_commands_over_real_ssh_container() {
     let ssh = DockerSshFixture::start();
-    let fixture = IntegrationFixture::start("cluster-ssh");
+    let fixture = IntegrationFixture::start("fleet-ssh");
 
     let settings = fixture.api_json(
         "PATCH",
@@ -25,13 +25,13 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "printf\nsh\nmkdir"
     );
 
-    let add = fixture.run_refine(&["cluster", "add-node", "docker-ssh"]);
-    fixture.assert_success("cluster add-node docker-ssh", &add);
+    let add = fixture.run_refine(&["fleet", "add-node", "docker-ssh"]);
+    fixture.assert_success("fleet add-node docker-ssh", &add);
 
     let ssh_port = ssh.port.to_string();
     let identity = ssh.identity.display().to_string();
     let edit = fixture.run_refine(&[
-        "cluster",
+        "fleet",
         "edit-node",
         "docker-ssh",
         "--display-name",
@@ -51,17 +51,17 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "--refine-port",
         "18081",
     ]);
-    fixture.assert_success("cluster edit-node docker-ssh", &edit);
+    fixture.assert_success("fleet edit-node docker-ssh", &edit);
 
-    let show = fixture.run_refine(&["cluster", "show", "docker-ssh"]);
-    fixture.assert_success("cluster show docker-ssh", &show);
+    let show = fixture.run_refine(&["fleet", "show", "docker-ssh"]);
+    fixture.assert_success("fleet show docker-ssh", &show);
     let node = fixture.json_stdout(&show);
     assert_eq!(node["node"]["ssh_host"], "127.0.0.1");
     assert_eq!(node["node"]["ssh_user"], "refine");
     assert_eq!(node["node"]["ssh_port"], ssh.port);
 
-    let dry_bootstrap = fixture.run_refine(&["cluster", "bootstrap", "docker-ssh", "--dry-run"]);
-    fixture.assert_success("cluster bootstrap docker-ssh dry-run", &dry_bootstrap);
+    let dry_bootstrap = fixture.run_refine(&["fleet", "bootstrap", "docker-ssh", "--dry-run"]);
+    fixture.assert_success("fleet bootstrap docker-ssh dry-run", &dry_bootstrap);
     let dry_bootstrap_payload = fixture.json_stdout(&dry_bootstrap);
     assert_eq!(
         dry_bootstrap_payload["ok"], true,
@@ -79,31 +79,31 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "{dry_bootstrap_payload:#}"
     );
     assert_eq!(
-        node_in_cluster_payload(&dry_bootstrap_payload, "docker-ssh")["health"]["status"],
+        node_in_fleet_payload(&dry_bootstrap_payload, "docker-ssh")["health"]["status"],
         "ready",
         "{dry_bootstrap_payload:#}"
     );
 
     fixture.assert_success(
-        "cluster disable-node docker-ssh",
-        &fixture.run_refine(&["cluster", "disable-node", "docker-ssh"]),
+        "fleet disable-node docker-ssh",
+        &fixture.run_refine(&["fleet", "disable-node", "docker-ssh"]),
     );
-    let disabled_run = fixture.run_refine(&["cluster", "run", "docker-ssh", "printf disabled"]);
+    let disabled_run = fixture.run_refine(&["fleet", "run", "docker-ssh", "printf disabled"]);
     assert!(
         !disabled_run.status.success(),
-        "cluster run unexpectedly succeeded for disabled node"
+        "fleet run unexpectedly succeeded for disabled node"
     );
     assert!(
         String::from_utf8_lossy(&disabled_run.stderr).contains("disabled"),
         "stderr:\n{}",
         String::from_utf8_lossy(&disabled_run.stderr)
     );
-    let disabled_goal = fixture.create_goal("disabled cluster transfer goal");
+    let disabled_goal = fixture.create_goal("disabled fleet transfer goal");
     let disabled_transfer =
-        fixture.run_refine(&["cluster", "transfer", "docker-ssh", &disabled_goal]);
+        fixture.run_refine(&["fleet", "transfer", "docker-ssh", &disabled_goal]);
     assert!(
         !disabled_transfer.status.success(),
-        "cluster transfer unexpectedly succeeded for disabled node"
+        "fleet transfer unexpectedly succeeded for disabled node"
     );
     assert!(
         String::from_utf8_lossy(&disabled_transfer.stderr).contains("disabled"),
@@ -111,17 +111,17 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         String::from_utf8_lossy(&disabled_transfer.stderr)
     );
     fixture.assert_success(
-        "cluster enable-node docker-ssh",
-        &fixture.run_refine(&["cluster", "enable-node", "docker-ssh"]),
+        "fleet enable-node docker-ssh",
+        &fixture.run_refine(&["fleet", "enable-node", "docker-ssh"]),
     );
 
-    let run = fixture.run_refine(&["cluster", "run", "docker-ssh", "printf cluster-ssh-ok"]);
-    fixture.assert_success("cluster run docker-ssh", &run);
+    let run = fixture.run_refine(&["fleet", "run", "docker-ssh", "printf fleet-ssh-ok"]);
+    fixture.assert_success("fleet run docker-ssh", &run);
     let run_payload = fixture.json_stdout(&run);
     assert_eq!(run_payload["ok"], true, "{run_payload:#}");
     assert_eq!(run_payload["result"]["ok"], true, "{run_payload:#}");
     assert_eq!(run_payload["result"]["exit_code"], 0, "{run_payload:#}");
-    assert_eq!(run_payload["result"]["stdout"], "cluster-ssh-ok");
+    assert_eq!(run_payload["result"]["stdout"], "fleet-ssh-ok");
     assert_eq!(run_payload["result"]["stderr"], "");
     assert!(
         run_payload["result"]["command"]
@@ -134,9 +134,9 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         fixture
             .runtime_root
             .join(fixture.port.to_string())
-            .join("cluster-known_hosts")
+            .join("fleet-known_hosts")
             .is_file(),
-        "cluster SSH should use runtime-scoped known_hosts"
+        "fleet SSH should use runtime-scoped known_hosts"
     );
 
     let denied_settings = fixture.api_json(
@@ -145,10 +145,10 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         json!({"allowed_commands": "printf"}),
     );
     assert_eq!(denied_settings["settings"]["allowed_commands"], "printf");
-    let denied = fixture.run_refine(&["cluster", "run", "docker-ssh", "sh -c 'printf denied'"]);
+    let denied = fixture.run_refine(&["fleet", "run", "docker-ssh", "sh -c 'printf denied'"]);
     assert!(
         !denied.status.success(),
-        "unauthorized cluster run unexpectedly succeeded"
+        "unauthorized fleet run unexpectedly succeeded"
     );
     assert!(
         String::from_utf8_lossy(&denied.stderr).contains("not authorized"),
@@ -165,10 +165,10 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "printf\nsh\nmkdir"
     );
 
-    let empty_command = fixture.run_refine(&["cluster", "run", "docker-ssh", "   "]);
+    let empty_command = fixture.run_refine(&["fleet", "run", "docker-ssh", "   "]);
     assert!(
         !empty_command.status.success(),
-        "empty cluster run unexpectedly succeeded"
+        "empty fleet run unexpectedly succeeded"
     );
     assert!(
         String::from_utf8_lossy(&empty_command.stderr).contains("command is required"),
@@ -177,12 +177,12 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
     );
 
     let failing = fixture.run_refine(&[
-        "cluster",
+        "fleet",
         "run",
         "docker-ssh",
         "sh -c 'printf fail-out; printf fail-err >&2; exit 7'",
     ]);
-    fixture.assert_success("cluster run docker-ssh nonzero remote", &failing);
+    fixture.assert_success("fleet run docker-ssh nonzero remote", &failing);
     let failing_payload = fixture.json_stdout(&failing);
     assert_eq!(failing_payload["ok"], false, "{failing_payload:#}");
     assert_eq!(
@@ -197,8 +197,8 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
     assert_eq!(failing_payload["result"]["stderr"], "fail-err");
 
     ssh.prepare_bootstrap_checkout();
-    let bootstrap = fixture.run_refine(&["cluster", "bootstrap", "docker-ssh"]);
-    fixture.assert_success("cluster bootstrap docker-ssh", &bootstrap);
+    let bootstrap = fixture.run_refine(&["fleet", "bootstrap", "docker-ssh"]);
+    fixture.assert_success("fleet bootstrap docker-ssh", &bootstrap);
     let bootstrap_payload = fixture.json_stdout(&bootstrap);
     assert_eq!(bootstrap_payload["ok"], true, "{bootstrap_payload:#}");
     assert_eq!(bootstrap_payload["dry_run"], false, "{bootstrap_payload:#}");
@@ -214,14 +214,14 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "{bootstrap_payload:#}"
     );
     assert_eq!(
-        node_in_cluster_payload(&bootstrap_payload, "docker-ssh")["health"]["status"],
+        node_in_fleet_payload(&bootstrap_payload, "docker-ssh")["health"]["status"],
         "ready",
         "{bootstrap_payload:#}"
     );
 
-    let remove = fixture.run_refine(&["cluster", "remove-node", "docker-ssh"]);
-    fixture.assert_success("cluster remove-node docker-ssh", &remove);
-    let removed_show = fixture.run_refine(&["cluster", "show", "docker-ssh"]);
+    let remove = fixture.run_refine(&["fleet", "remove-node", "docker-ssh"]);
+    fixture.assert_success("fleet remove-node docker-ssh", &remove);
+    let removed_show = fixture.run_refine(&["fleet", "show", "docker-ssh"]);
     assert!(
         !removed_show.status.success(),
         "removed node was still visible"
@@ -239,22 +239,22 @@ impl DockerSshFixture {
     fn start() -> Self {
         let repo_root = repo_root();
         let root = repo_root
-            .join("target/refine-integration/cluster-ssh")
+            .join("target/refine-integration/fleet-ssh")
             .join(unique_suffix());
         let key_dir = root.join("keys");
-        fs::create_dir_all(&key_dir).expect("failed to create cluster ssh key dir");
+        fs::create_dir_all(&key_dir).expect("failed to create fleet ssh key dir");
 
         let identity = key_dir.join("id_ed25519");
         run_command(
             Command::new("ssh-keygen")
                 .args(["-q", "-t", "ed25519", "-N", "", "-f"])
                 .arg(&identity),
-            "generate SSH keypair for cluster fixture",
+            "generate SSH keypair for fleet fixture",
         );
 
         let port = free_loopback_port();
-        let project = format!("refine-cluster-ssh-{}", unique_suffix());
-        let compose_file = repo_root.join("tests/fixtures/cluster-ssh/compose.yml");
+        let project = format!("refine-fleet-ssh-{}", unique_suffix());
+        let compose_file = repo_root.join("tests/fixtures/fleet-ssh/compose.yml");
         let authorized_keys = identity.with_extension("pub");
         let fixture = Self {
             root,
@@ -266,12 +266,12 @@ impl DockerSshFixture {
         run_command(
             compose_command(&compose_file, &fixture.project)
                 .args(["up", "-d", "--build", "--wait"])
-                .env("REFINE_CLUSTER_SSH_PORT", fixture.port.to_string())
+                .env("REFINE_FLEET_SSH_PORT", fixture.port.to_string())
                 .env(
-                    "REFINE_CLUSTER_SSH_AUTHORIZED_KEYS",
+                    "REFINE_FLEET_SSH_AUTHORIZED_KEYS",
                     authorized_keys.display().to_string(),
                 ),
-            "start cluster SSH docker compose fixture",
+            "start fleet SSH docker compose fixture",
         );
         fixture
     }
@@ -292,7 +292,7 @@ impl DockerSshFixture {
                      git commit -m init >/dev/null; \
                      git push -u origin master >/dev/null",
             ),
-            "prepare remote checkout for cluster bootstrap",
+            "prepare remote checkout for fleet bootstrap",
         );
     }
 
@@ -320,7 +320,7 @@ impl DockerSshFixture {
 
 impl Drop for DockerSshFixture {
     fn drop(&mut self) {
-        let compose_file = repo_root().join("tests/fixtures/cluster-ssh/compose.yml");
+        let compose_file = repo_root().join("tests/fixtures/fleet-ssh/compose.yml");
         let _ = compose_command(&compose_file, &self.project)
             .args(["down", "--volumes", "--remove-orphans"])
             .output();
@@ -364,11 +364,11 @@ fn repo_root() -> PathBuf {
     }
 }
 
-fn node_in_cluster_payload<'a>(
+fn node_in_fleet_payload<'a>(
     payload: &'a serde_json::Value,
     node_id: &str,
 ) -> &'a serde_json::Value {
-    payload["cluster"]["nodes"]
+    payload["fleet"]["nodes"]
         .as_array()
         .unwrap()
         .iter()

@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::model::cluster::{
-    Cluster, ClusterHealth, RemoteRunResult, valid_node_id, valid_ssh_host, valid_ssh_user,
+use crate::model::fleet::{
+    Fleet, FleetHealth, RemoteRunResult, valid_node_id, valid_ssh_host, valid_ssh_user,
 };
 use crate::model::node::{Node, NodeRegistry};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
@@ -13,10 +13,26 @@ use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::WorkflowEngine;
 
-pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
+// The legacy registry keeps its pre-rename on-disk name so existing synced
+// state still migrates into the node registry.
+pub const LEGACY_CLUSTER_REGISTRY_FILE: &str = "cluster.json";
+
+pub const FLEET_RUNBOOK_PATH: &str = "docs/runbooks/manage-fleet.md";
+
+/// Seed prompt for a fleet-management agent session: the runbook carries the
+/// questions to ask and the CLI contract; the request carries the user's goal.
+pub fn fleet_manage_prompt(checkout_path: &Path, request: &str) -> String {
+    format!(
+        "Manage this Refine fleet. Read {runbook} in the Refine checkout at {checkout} and \
+         follow it: ask the user the questions the runbook calls for before acting, then carry \
+         the request out with the documented commands. User request: {request}",
+        runbook = FLEET_RUNBOOK_PATH,
+        checkout = checkout_path.display(),
+    )
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ClusterBootstrapRequest {
+pub struct FleetBootstrapRequest {
     pub node_id: String,
     pub ssh_host: String,
     pub ssh_user: String,
@@ -28,16 +44,16 @@ pub struct ClusterBootstrapRequest {
     pub dry_run: bool,
 }
 
-pub trait ClusterService {
-    fn registry(&self) -> RefineResult<Cluster>;
+pub trait FleetService {
+    fn registry(&self) -> RefineResult<Fleet>;
     fn transfer(&self, goal_or_feature_id: &str, node_id: &str) -> RefineResult<()>;
     fn sync(&self) -> RefineResult<()>;
     fn run_remote(&self, node_id: &str, command: &str) -> RefineResult<RemoteRunResult>;
-    fn maintenance(&self, active: bool, reason: Option<String>) -> RefineResult<Cluster>;
+    fn maintenance(&self, active: bool, reason: Option<String>) -> RefineResult<Fleet>;
 }
 
 #[derive(Clone, Debug)]
-pub struct FileClusterService {
+pub struct FileFleetService {
     pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
@@ -55,7 +71,7 @@ pub struct NodeRemoteUpdate {
     pub enabled: Option<bool>,
 }
 
-impl FileClusterService {
+impl FileFleetService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
@@ -74,7 +90,7 @@ impl FileClusterService {
     }
 
     pub fn path(&self) -> PathBuf {
-        self.refine_dir.join(CLUSTER_REGISTRY_FILE)
+        self.refine_dir.join(LEGACY_CLUSTER_REGISTRY_FILE)
     }
 
     fn nodes(&self) -> FileNodeRegistryService {
@@ -82,12 +98,12 @@ impl FileClusterService {
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
-        let cluster = self.registry()?;
-        self.identity_safe_cluster_response(cluster)
+        let fleet = self.registry()?;
+        self.identity_safe_fleet_response(fleet)
     }
 
     pub fn show(&self, id: &str) -> RefineResult<serde_json::Value> {
-        // Preserve the legacy cluster migration side effect before projecting the
+        // Preserve the legacy fleet migration side effect before projecting the
         // node through the shared identity contract.
         self.registry()?;
         let shown = self.nodes().show(id)?;
@@ -100,7 +116,7 @@ impl FileClusterService {
                 "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
             ));
         }
-        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let mut registry = self.load_node_registry_with_legacy_fleet()?;
         if registry
             .nodes
             .iter()
@@ -110,7 +126,7 @@ impl FileClusterService {
         }
         registry.nodes.push(default_node(id));
         self.save_nodes(&registry)?;
-        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
+        self.identity_safe_fleet_response(self.fleet_from_registry(registry))
     }
 
     pub fn upsert_node(
@@ -124,7 +140,7 @@ impl FileClusterService {
                 "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
             ));
         }
-        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let existing_index = registry.nodes.iter().position(|node| node.id == id);
         let mut node = existing_index
             .and_then(|index| registry.nodes.get(index).cloned())
@@ -178,7 +194,7 @@ impl FileClusterService {
             registry.nodes.push(node);
         }
         self.save_nodes(&registry)?;
-        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
+        self.identity_safe_fleet_response(self.fleet_from_registry(registry))
     }
 
     pub fn bootstrap_node_response(
@@ -186,7 +202,7 @@ impl FileClusterService {
         node_id: &str,
         dry_run: bool,
     ) -> RefineResult<serde_json::Value> {
-        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let Some(index) = registry
             .nodes
             .iter()
@@ -197,7 +213,7 @@ impl FileClusterService {
             )));
         };
         let node = registry.nodes[index].clone();
-        let request = ClusterBootstrapRequest {
+        let request = FleetBootstrapRequest {
             node_id: node_id.to_string(),
             ssh_host: node.ssh_host,
             ssh_user: node.ssh_user,
@@ -216,25 +232,25 @@ impl FileClusterService {
         )?;
         let mut details = serde_json::Map::new();
         details.insert("bootstrap".to_string(), serde_json::json!(result.clone()));
-        registry.nodes[index].health = Some(ClusterHealth {
+        registry.nodes[index].health = Some(FleetHealth {
             status: if result.ok { "ready" } else { "failed" }.to_string(),
             checked_at: now_timestamp(),
             details: Some(details),
         });
         registry.nodes[index].updated_at = now_timestamp();
         self.save_nodes(&registry)?;
-        let cluster = self.cluster_from_registry(registry);
+        let fleet = self.fleet_from_registry(registry);
         Ok(serde_json::json!({
             "ok": result.ok,
             "node_id": node_id,
             "dry_run": dry_run,
             "result": result,
-            "cluster": self.identity_safe_cluster_response(cluster)?
+            "fleet": self.identity_safe_fleet_response(fleet)?
         }))
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
-        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let Some(node) = registry
             .nodes
             .iter_mut()
@@ -245,7 +261,7 @@ impl FileClusterService {
         node.enabled = enabled;
         node.updated_at = now_timestamp();
         self.save_nodes(&registry)?;
-        self.identity_safe_cluster_response(self.cluster_from_registry(registry))
+        self.identity_safe_fleet_response(self.fleet_from_registry(registry))
     }
 
     pub fn remove_node(&self, id: &str) -> RefineResult<serde_json::Value> {
@@ -279,7 +295,7 @@ impl FileClusterService {
         converge: bool,
         dry_run: bool,
     ) -> RefineResult<serde_json::Value> {
-        let cluster = self.registry()?;
+        let fleet = self.registry()?;
         if converge && to.is_none() {
             return Err(RefineError::InvalidInput(
                 "converge requires a target review node (--to)".to_string(),
@@ -287,10 +303,10 @@ impl FileClusterService {
         }
         let targets: Vec<String> = match to {
             Some(node_id) => {
-                validate_remote_node_enabled(&cluster, node_id)?;
+                validate_remote_node_enabled(&fleet, node_id)?;
                 vec![node_id.to_string()]
             }
-            None => cluster
+            None => fleet
                 .nodes
                 .iter()
                 .filter(|node| node.enabled && node_health_allows_distribution(node))
@@ -323,14 +339,14 @@ impl FileClusterService {
     }
 
     pub fn maintenance_response(&self) -> RefineResult<serde_json::Value> {
-        let cluster = self.maintenance(true, None)?;
+        let fleet = self.maintenance(true, None)?;
         Ok(serde_json::json!({
             "ok": true,
             "maintenance": {
                 "active": true,
-                "updated_at": cluster.updated_at
+                "updated_at": fleet.updated_at
             },
-            "cluster": cluster
+            "fleet": fleet
         }))
     }
 
@@ -338,9 +354,9 @@ impl FileClusterService {
         self.nodes().save_registry(registry)
     }
 
-    fn identity_safe_cluster_response(&self, cluster: Cluster) -> RefineResult<serde_json::Value> {
+    fn identity_safe_fleet_response(&self, fleet: Fleet) -> RefineResult<serde_json::Value> {
         let identities = self.nodes().node_identities()?;
-        let mut value = cluster_response(cluster);
+        let mut value = fleet_response(fleet);
         if let Some(nodes) = value
             .get_mut("nodes")
             .and_then(serde_json::Value::as_array_mut)
@@ -372,9 +388,9 @@ impl FileClusterService {
         Ok(value)
     }
 
-    fn load_node_registry_with_legacy_cluster(&self) -> RefineResult<NodeRegistry> {
+    fn load_node_registry_with_legacy_fleet(&self) -> RefineResult<NodeRegistry> {
         let mut registry = self.nodes().load_registry()?;
-        let Some(legacy) = self.load_legacy_cluster()? else {
+        let Some(legacy) = self.load_legacy_fleet()? else {
             return Ok(registry);
         };
 
@@ -397,35 +413,35 @@ impl FileClusterService {
         Ok(registry)
     }
 
-    fn load_legacy_cluster(&self) -> RefineResult<Option<Cluster>> {
+    fn load_legacy_fleet(&self) -> RefineResult<Option<Fleet>> {
         let path = self.path();
         if !path.exists() {
             return Ok(None);
         }
         let bytes = fs::read(&path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to read legacy cluster registry {}: {error}",
+                "failed to read legacy fleet registry {}: {error}",
                 path.display()
             ))
         })?;
-        serde_json::from_slice::<Cluster>(&bytes)
+        serde_json::from_slice::<Fleet>(&bytes)
             .map(Some)
             .map_err(|error| {
                 RefineError::Serialization(format!(
-                    "failed to parse legacy cluster registry {}: {error}",
+                    "failed to parse legacy fleet registry {}: {error}",
                     path.display()
                 ))
             })
     }
 
-    fn cluster_from_registry(&self, registry: NodeRegistry) -> Cluster {
+    fn fleet_from_registry(&self, registry: NodeRegistry) -> Fleet {
         let updated_at = registry
             .nodes
             .iter()
             .map(|node| node.updated_at.clone())
             .max()
             .unwrap_or_else(now_timestamp);
-        Cluster {
+        Fleet {
             nodes: registry
                 .nodes
                 .into_iter()
@@ -436,10 +452,10 @@ impl FileClusterService {
     }
 }
 
-impl ClusterService for FileClusterService {
-    fn registry(&self) -> RefineResult<Cluster> {
-        let registry = self.load_node_registry_with_legacy_cluster()?;
-        Ok(self.cluster_from_registry(registry))
+impl FleetService for FileFleetService {
+    fn registry(&self) -> RefineResult<Fleet> {
+        let registry = self.load_node_registry_with_legacy_fleet()?;
+        Ok(self.fleet_from_registry(registry))
     }
 
     fn transfer(&self, _goal_or_feature_id: &str, node_id: &str) -> RefineResult<()> {
@@ -451,9 +467,9 @@ impl ClusterService for FileClusterService {
     }
 
     fn run_remote(&self, node_id: &str, command: &str) -> RefineResult<RemoteRunResult> {
-        let cluster = self.registry()?;
-        validate_remote_node_enabled(&cluster, node_id)?;
-        let Some(node) = cluster.nodes.iter().find(|node| node.id == node_id) else {
+        let fleet = self.registry()?;
+        validate_remote_node_enabled(&fleet, node_id)?;
+        let Some(node) = fleet.nodes.iter().find(|node| node.id == node_id) else {
             return Err(RefineError::NotFound(format!(
                 "node {node_id} was not found"
             )));
@@ -468,8 +484,8 @@ impl ClusterService for FileClusterService {
             return Err(RefineError::InvalidInput("command is required".to_string()));
         }
         let security = self.security()?;
-        security.authorize_host_command("cluster", &remote_command)?;
-        let known_hosts_path = security.runtime_root.join("cluster-known_hosts");
+        security.authorize_host_command("fleet", &remote_command)?;
+        let known_hosts_path = security.runtime_root.join("fleet-known_hosts");
         let command = ssh_display_command(
             node.ssh_port,
             &node.ssh_user,
@@ -513,12 +529,12 @@ impl ClusterService for FileClusterService {
         })
     }
 
-    fn maintenance(&self, _active: bool, _reason: Option<String>) -> RefineResult<Cluster> {
+    fn maintenance(&self, _active: bool, _reason: Option<String>) -> RefineResult<Fleet> {
         self.registry()
     }
 }
 
-impl FileClusterService {
+impl FileFleetService {
     fn security(&self) -> RefineResult<FileSecurityService> {
         let runtime_root = self
             .runtime_root

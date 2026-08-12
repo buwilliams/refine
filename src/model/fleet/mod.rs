@@ -4,13 +4,13 @@ use crate::model::Timestamp;
 use crate::model::node::{Node, NodeHealth};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Cluster {
-    pub nodes: Vec<ClusterNode>,
+pub struct Fleet {
+    pub nodes: Vec<FleetNode>,
     pub updated_at: Timestamp,
 }
 
-pub type ClusterNode = Node;
-pub type ClusterHealth = NodeHealth;
+pub type FleetNode = Node;
+pub type FleetHealth = NodeHealth;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RemoteRunResult {
@@ -50,7 +50,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn node_id_validation_matches_cluster_operation_spec() {
+    fn node_id_validation_matches_fleet_operation_spec() {
         assert!(valid_node_id("node-1"));
         assert!(valid_node_id("1_node"));
         assert!(!valid_node_id(""));

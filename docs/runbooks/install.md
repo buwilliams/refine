@@ -200,9 +200,9 @@ Distributed/node commands:
 ```bash
 ./r node list
 ./r node settings <node-id>
-./r cluster list
-./r cluster maintenance
-./r cluster distribute [--to <node-id>] [--converge] [--dry-run]
+./r fleet list
+./r fleet maintenance
+./r fleet distribute [--to <node-id>] [--converge] [--dry-run]
 ```
 
 Refine publishes durable state automatically on the dedicated `refine/state`
@@ -216,13 +216,14 @@ Target App **Git remote** setting controls both state and Goal-branch
 publication and defaults to `origin`. If that remote is unavailable, Refine
 still initializes and commits local state; it simply cannot publish it. Use
 `project sync` or the Node screen's **Sync state now** action when a state
-handoff must happen immediately; `cluster sync` invokes the same shared
+handoff must happen immediately; `fleet sync` invokes the same shared
 capability for the current node. Manual sync is queued in a supervised runner
 process, and the UI reports its progress and any terminal error without
 blocking the daemon.
 
-Cloud worker creation is provider-operated rather than part of the Refine
-binary. Follow `docs/runbooks/provision.md` when a fleet needs another worker.
+Worker machine creation is agent-operated rather than part of the Refine
+binary. Follow `docs/runbooks/manage-fleet.md` when a fleet needs another
+worker.
 
 ## Operating Refine after install
 
@@ -235,8 +236,8 @@ reading source code:
   to do next.
 - `./r commands` — machine-readable JSON catalog of every CLI command with
   descriptions. Load once instead of exploring `--help` per subcommand.
-- `docs/runbooks/` — task-oriented guides (provision a fleet worker,
-  distribute and converge work) with preconditions, user questions,
-  verification, and undo steps.
+- `docs/runbooks/` — task-oriented guides (manage the fleet, distribute and
+  converge work) with preconditions, user questions, verification, and undo
+  steps.
 
 When a command fails, report the exact command, exit code, stdout/stderr summary, and any relevant log path. Prefer CLI evidence over guessing from browser state.

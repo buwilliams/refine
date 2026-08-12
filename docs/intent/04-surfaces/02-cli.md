@@ -20,7 +20,8 @@ The CLI should be the most stable surface for automation and system control. Bro
 
 Current implementation details that matter to intent:
 
-- command groups include project, goal, feature, Todo, workflow, node, cluster, log, agent, and system.
+- command groups include project, goal, feature, Todo, workflow, node, fleet, log, agent, and system.
+- `fleet manage "<request>"` opens an agent session seeded with the manage-fleet runbook so fleet changes are conversational; `fleet "<request>"` and `fleet distribute "<instructions>"` reach the same session. The other fleet commands remain the deterministic primitives the agent acts through.
 - `refine commands` emits the current command tree as machine-readable JSON,
   while `refine next` recommends commands from current state. These live
   surfaces are authoritative instead of a committed generated command snapshot.

@@ -7,7 +7,7 @@ exact candidate before it reaches Review.
 
 ## Preconditions
 
-- More than one enabled node (`refine cluster list`), each healthy (`health`
+- More than one enabled node (`refine fleet list`), each healthy (`health`
   absent or `ready`).
 - Goals exist in `backlog` or `todo`. Goals with active claims stay where they
   are; Goals inside a Feature move only when the Feature is transferred, so
@@ -17,9 +17,9 @@ exact candidate before it reaches Review.
 
 ```bash
 refine next                              # will suggest distribution when it applies
-refine cluster distribute --dry-run      # show the plan: who gets what, what's skipped
-refine cluster distribute                # spread across enabled healthy nodes
-refine cluster distribute --to worker-1  # or: fill one specific node
+refine fleet distribute --dry-run      # show the plan: who gets what, what's skipped
+refine fleet distribute                # spread across enabled healthy nodes
+refine fleet distribute --to worker-1  # or: fill one specific node
 ```
 
 Distribution reassigns node ownership of unclaimed work — that is the entire
@@ -34,8 +34,8 @@ When workers finish, their Goals sit in `review` status owned by the worker
 node. Bring them home to the review node (usually where your user is):
 
 ```bash
-refine cluster distribute --converge --to default --dry-run
-refine cluster distribute --converge --to default
+refine fleet distribute --converge --to default --dry-run
+refine fleet distribute --converge --to default
 refine goal list        # reviewable goals now owned by the review node
 ```
 
@@ -47,7 +47,7 @@ Ready Merge.
 ## Verify
 
 - `refine next` no longer suggests distribution or convergence.
-- `refine cluster list` + `refine goal list` show the expected ownership.
+- `refine fleet list` + `refine goal list` show the expected ownership.
 - The applied result matches the reviewed dry-run plan (`moves`,
   `skipped_details`).
 - Each converged Review Goal still records the same candidate and Ready Merge
@@ -60,10 +60,10 @@ Preview both ordinary open-work moves and Review convergence when both classes
 are present:
 
 ```bash
-refine cluster distribute --to <node> --dry-run
-refine cluster distribute --converge --to <node> --dry-run
+refine fleet distribute --to <node> --dry-run
+refine fleet distribute --converge --to <node> --dry-run
 ```
 
 Apply only the required plan, or use
-`refine cluster transfer <node-id> <goal-or-feature-id>` for one item. Transfer
+`refine fleet transfer <node-id> <goal-or-feature-id>` for one item. Transfer
 has no dry-run flag, so inspect the item and destination first.

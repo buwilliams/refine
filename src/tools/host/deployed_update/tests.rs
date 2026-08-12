@@ -256,17 +256,17 @@ fn deployed_update_reports_restart_failures_after_binary_replacement() {
 }
 
 #[test]
-fn resolve_update_provider_prefers_explicit_provider() {
+fn resolve_agent_provider_prefers_explicit_provider() {
     let runtime_root = std::env::temp_dir().join(format!(
         "refine-update-provider-explicit-{}",
         uuid::Uuid::new_v4()
     ));
-    let provider = resolve_update_provider(&runtime_root, Some("codex".to_string())).unwrap();
+    let provider = resolve_agent_provider(&runtime_root, Some("codex".to_string())).unwrap();
     assert_eq!(provider, "codex");
 }
 
 #[test]
-fn resolve_update_provider_uses_target_app_configured_provider() {
+fn resolve_agent_provider_uses_target_app_configured_provider() {
     let root = std::env::temp_dir().join(format!(
         "refine-update-provider-target-{}",
         uuid::Uuid::new_v4()
@@ -285,7 +285,7 @@ fn resolve_update_provider_uses_target_app_configured_provider() {
         .update(&serde_json::json!({"agent_cli": "gemini"}))
         .unwrap();
 
-    let provider = resolve_update_provider(&runtime_root, None).unwrap();
+    let provider = resolve_agent_provider(&runtime_root, None).unwrap();
     assert_eq!(provider, "gemini");
 
     fs::remove_dir_all(root).unwrap();

@@ -335,7 +335,7 @@ impl FileProjectRegistryService {
             return Ok(());
         }
         if schema.migration_required {
-            if schema.safe_auto && !schema.requires_cluster_quiescence {
+            if schema.safe_auto && !schema.requires_fleet_quiescence {
                 service.migrate()?;
                 return Ok(());
             }
@@ -356,7 +356,7 @@ impl FileProjectRegistryService {
         let service =
             FileProjectMigrationService::with_runtime_root(&refine_dir, self.runtime_root.clone());
         let schema = service.status()?;
-        if schema.migration_required && schema.safe_auto && !schema.requires_cluster_quiescence {
+        if schema.migration_required && schema.safe_auto && !schema.requires_fleet_quiescence {
             service.migrate()?;
             return Ok(true);
         }
@@ -575,7 +575,7 @@ fn detached_schema_status() -> ProjectSchemaStatus {
         migration_id: None,
         migration_description: None,
         safe_auto: true,
-        requires_cluster_quiescence: false,
+        requires_fleet_quiescence: false,
         operator_instructions: None,
     }
 }

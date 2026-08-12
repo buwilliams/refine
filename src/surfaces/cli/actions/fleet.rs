@@ -1,14 +1,33 @@
 use super::*;
 
 #[derive(Debug, Subcommand)]
-pub enum ClusterAction {
-    /// List the cluster: every fleet node with its enablement, connection, and health details.
+pub enum FleetAction {
+    /// Anything that is not a fleet subcommand is treated as a plain-language
+    /// request: `refine fleet "<request>"` opens the same runbook-guided
+    /// agent session as `fleet manage`.
+    #[command(external_subcommand)]
+    Request(Vec<String>),
+    /// Open an agent session that manages the fleet with runbook guidance:
+    /// describe what you want, answer its questions, and it acts.
+    Manage {
+        /// What the fleet should do or look like, in plain language.
+        request: String,
+        /// Agent provider that runs the session. Defaults to the target
+        /// app's configured provider, then the first installed provider CLI
+        /// in alphabetical order.
+        #[arg(long)]
+        provider: Option<String>,
+        /// Runtime directory where Refine keeps daemon state.
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+    },
+    /// List the fleet: every fleet node with its enablement, connection, and health details.
     List {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Show one fleet node's full cluster record.
+    /// Show one fleet node's full fleet record.
     Show {
         /// Node id.
         id: String,
@@ -16,7 +35,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Register a new node in the cluster so it can be configured and receive distributed work.
+    /// Register a new node in the fleet so it can be configured and receive distributed work.
     AddNode {
         /// Node id to add.
         id: String,
@@ -24,7 +43,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Edit a cluster node's connection settings: SSH details, paths, and ports.
+    /// Edit a fleet node's connection settings: SSH details, paths, and ports.
     EditNode {
         /// Node id to edit.
         id: String,
@@ -75,7 +94,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Remove a node from the cluster registry.
+    /// Remove a node from the fleet registry.
     RemoveNode {
         /// Node id to remove.
         id: String,
@@ -97,8 +116,14 @@ pub enum ClusterAction {
     },
     /// Reassign eligible unclaimed Goal ownership across the fleet.
     /// Spreads across enabled healthy nodes by default, fills one node with --to,
-    /// or converges reviewable Goals home with --converge --to <node>.
+    /// converges reviewable Goals home with --converge --to <node>, or delegates
+    /// to an agent when given plain-language instructions.
     Distribute {
+        /// Plain-language distribution instructions. When given, an agent
+        /// session guided by the manage-fleet runbook plans and applies the
+        /// Goal assignments instead of the built-in spread.
+        #[arg(value_name = "INSTRUCTIONS", conflicts_with_all = ["to", "converge", "dry_run"])]
+        instructions: Option<String>,
         /// Send all moves to this node instead of spreading across the fleet.
         #[arg(long)]
         to: Option<String>,
@@ -128,7 +153,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Transfer ownership of a Goal or Feature (by item id) to the given node, updating cluster records.
+    /// Transfer ownership of a Goal or Feature (by item id) to the given node, updating fleet records.
     Transfer {
         /// Destination node id.
         id: String,
@@ -138,7 +163,7 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Put the cluster into maintenance mode and report the updated cluster state.
+    /// Put the fleet into maintenance mode and report the updated fleet state.
     Maintenance {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

@@ -243,7 +243,7 @@ function screenDataCacheablePath(path) {
     "/api/governance",
     "/api/guidance",
     "/api/reporters",
-    "/api/cluster",
+    "/api/fleet",
     "/api/quality",
     "/api/performance",
     "/api/upgrade",
@@ -833,7 +833,7 @@ function manualMigrationText(source) {
 
 function isManualMigrationError(err) {
   const text = `${err?.details || ""}\n${err?.message || ""}`;
-  return /refine (?:project migrate|migrate run)|manual cluster migration/i.test(text);
+  return /refine (?:project migrate|migrate run)|manual fleet migration/i.test(text);
 }
 
 async function ensureProjectAttached() {

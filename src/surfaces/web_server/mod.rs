@@ -106,7 +106,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "node registry, activation, ownership transfer",
     },
     ApiRouteGroup {
-        prefix: "/cluster",
+        prefix: "/fleet",
         capability: "node registry and remote operations",
     },
     ApiRouteGroup {

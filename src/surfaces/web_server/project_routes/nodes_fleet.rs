@@ -138,7 +138,7 @@ impl InProcessWebServer {
         )
     }
 
-    pub(crate) fn handle_cluster(&self) -> ApiResponse {
+    pub(crate) fn handle_fleet(&self) -> ApiResponse {
         let refine_dir = match self.current_refine_dir() {
             Ok(Some(path)) => path,
             Ok(None) => {
@@ -154,7 +154,7 @@ impl InProcessWebServer {
             }
             Err(error) => return error_response(error),
         };
-        match FileClusterService::new(refine_dir).list_response() {
+        match FileFleetService::new(refine_dir).list_response() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -205,7 +205,7 @@ impl InProcessWebServer {
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
-        let service = FileClusterService::new(refine_dir);
+        let service = FileFleetService::new(refine_dir);
         let result = if is_create {
             service
                 .add_node(id)
@@ -228,7 +228,7 @@ impl InProcessWebServer {
         else {
             return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
-        match FileClusterService::new(refine_dir).remove_node(node_id) {
+        match FileFleetService::new(refine_dir).remove_node(node_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -238,7 +238,7 @@ impl InProcessWebServer {
         let refine_dir = require_refine_dir!(self, "bootstrap node");
         let Some(node_id) = request
             .path
-            .strip_prefix("/cluster/nodes/")
+            .strip_prefix("/fleet/nodes/")
             .and_then(|path| path.strip_suffix("/bootstrap"))
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -251,9 +251,9 @@ impl InProcessWebServer {
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
         let service = if let Some(runtime_root) = &self.runtime_root {
-            FileClusterService::with_runtime_root(refine_dir, runtime_root)
+            FileFleetService::with_runtime_root(refine_dir, runtime_root)
         } else {
-            FileClusterService::new(refine_dir)
+            FileFleetService::new(refine_dir)
         };
         match service.bootstrap_node_response(node_id, dry_run) {
             Ok(value) => ApiResponse::json(200, value),
@@ -262,13 +262,13 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_remote_node_run(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "run cluster command");
+        let refine_dir = require_refine_dir!(self, "run fleet command");
         let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("run cluster command");
+            return runtime_root_unavailable("run fleet command");
         };
         let Some(node_id) = request
             .path
-            .strip_prefix("/cluster/nodes/")
+            .strip_prefix("/fleet/nodes/")
             .and_then(|path| path.strip_suffix("/run"))
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -280,7 +280,7 @@ impl InProcessWebServer {
             .get("command")
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileClusterService::with_runtime_root(refine_dir, runtime_root)
+        match FileFleetService::with_runtime_root(refine_dir, runtime_root)
             .run_remote_response(node_id, command)
         {
             Ok(value) => ApiResponse::json(200, value),
@@ -289,10 +289,10 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_remote_node_transfer(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "transfer cluster item");
+        let refine_dir = require_refine_dir!(self, "transfer fleet item");
         let Some(node_id) = request
             .path
-            .strip_prefix("/cluster/nodes/")
+            .strip_prefix("/fleet/nodes/")
             .and_then(|path| path.strip_suffix("/transfer"))
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -308,7 +308,7 @@ impl InProcessWebServer {
         if item_id.is_empty() {
             return error_response(RefineError::InvalidInput("item_id is required".to_string()));
         }
-        if let Err(error) = FileClusterService::new(&refine_dir).transfer(item_id, node_id) {
+        if let Err(error) = FileFleetService::new(&refine_dir).transfer(item_id, node_id) {
             return error_response(error);
         }
         match self
@@ -320,7 +320,7 @@ impl InProcessWebServer {
         }
     }
 
-    pub(crate) fn handle_cluster_distribute(&self, request: ApiRequest) -> ApiResponse {
+    pub(crate) fn handle_fleet_distribute(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "distribute work");
         let body = request.body.unwrap_or_else(|| json!({}));
         let to = body
@@ -337,9 +337,9 @@ impl InProcessWebServer {
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
         let service = if let Some(runtime_root) = &self.runtime_root {
-            FileClusterService::with_runtime_root(refine_dir, runtime_root)
+            FileFleetService::with_runtime_root(refine_dir, runtime_root)
         } else {
-            FileClusterService::new(refine_dir)
+            FileFleetService::new(refine_dir)
         };
         match service.distribute_response(to, converge, dry_run) {
             Ok(value) => ApiResponse::json(200, value),

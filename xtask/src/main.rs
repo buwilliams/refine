@@ -21,7 +21,7 @@ fn main() {
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
         Some("test-browser") => test_browser(),
-        Some("test-cluster-ssh") => test_cluster_ssh(),
+        Some("test-fleet-ssh") => test_fleet_ssh(),
         Some("test-full-workflow") => test_full_workflow(),
         Some("test-multi-instance-sync") => test_multi_instance_sync(),
         Some("test-all") => test_all(),
@@ -137,7 +137,7 @@ fn test_integration() -> Result<(), String> {
     test_cargo_integrations()?;
     test_smoke_ai()?;
     test_cli()?;
-    test_cluster_ssh()?;
+    test_fleet_ssh()?;
     test_full_workflow()?;
     test_multi_instance_sync()
 }
@@ -226,7 +226,7 @@ fn test_browser() -> Result<(), String> {
     run(&mut command, "run browser JavaScript tests")
 }
 
-fn test_cluster_ssh() -> Result<(), String> {
+fn test_fleet_ssh() -> Result<(), String> {
     let repo_root = repo_root()?;
     let smoke_ai = ensure_smoke_ai_built(&repo_root)?;
     let mut command = Command::new("cargo");
@@ -234,7 +234,7 @@ fn test_cluster_ssh() -> Result<(), String> {
         .args([
             "test",
             "--test",
-            "cluster_ssh_cli",
+            "fleet_ssh_cli",
             "--",
             "--ignored",
             "--test-threads=1",
@@ -244,7 +244,7 @@ fn test_cluster_ssh() -> Result<(), String> {
         .env("REFINE_TEST_PORT", test_port())
         .env("REFINE_DAEMON_PORT", test_port())
         .env("REFINE_SMOKE_AI_PATH", smoke_ai);
-    run(&mut command, "run SSH-backed cluster CLI tests")
+    run(&mut command, "run SSH-backed fleet CLI tests")
 }
 
 fn test_full_workflow() -> Result<(), String> {

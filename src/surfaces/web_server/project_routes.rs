@@ -1,5 +1,5 @@
 mod dashboard;
-mod nodes_cluster;
+mod nodes_fleet;
 mod projects;
 mod settings_governance;
 mod target_app;
@@ -24,7 +24,7 @@ use crate::process::supervisor::operations::{
 };
 use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::{AgentProviderService, ProviderInvocation};
-use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
+use crate::tools::host::fleet::{FileFleetService, FleetService, NodeRemoteUpdate};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};

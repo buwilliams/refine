@@ -95,7 +95,7 @@ impl FileProjectMigrationService {
                     .unwrap_or_else(|| "project schema is not compatible".to_string()),
             ));
         }
-        if !before.safe_auto || before.requires_cluster_quiescence {
+        if !before.safe_auto || before.requires_fleet_quiescence {
             return Err(RefineError::Conflict(
                 before
                     .operator_instructions
@@ -135,7 +135,7 @@ pub fn schema_status(refine_dir: &Path) -> RefineResult<ProjectSchemaStatus> {
             migration_id: None,
             migration_description: None,
             safe_auto: true,
-            requires_cluster_quiescence: false,
+            requires_fleet_quiescence: false,
             operator_instructions: None,
         });
     }
@@ -169,7 +169,7 @@ pub fn schema_status(refine_dir: &Path) -> RefineResult<ProjectSchemaStatus> {
             migration_id: None,
             migration_description: None,
             safe_auto: true,
-            requires_cluster_quiescence: false,
+            requires_fleet_quiescence: false,
             operator_instructions: None,
         });
     }
@@ -199,7 +199,7 @@ pub fn schema_status(refine_dir: &Path) -> RefineResult<ProjectSchemaStatus> {
         migration_id: None,
         migration_description: None,
         safe_auto: false,
-        requires_cluster_quiescence: false,
+        requires_fleet_quiescence: false,
         operator_instructions: Some("Upgrade Refine before opening this app.".to_string()),
     })
 }
@@ -218,7 +218,7 @@ fn migration_required_status(
         migration_id: Some(migration_id.to_string()),
         migration_description: Some(description.to_string()),
         safe_auto: false,
-        requires_cluster_quiescence: true,
+        requires_fleet_quiescence: true,
         operator_instructions: Some(format!(
             "Use a migration agent and follow {V2_TO_V4_RUNBOOK}; this semantic migration is not performed by deterministic application code."
         )),
@@ -362,7 +362,7 @@ mod tests {
         let status = service.status().unwrap();
         assert!(status.migration_required);
         assert!(!status.safe_auto);
-        assert!(status.requires_cluster_quiescence);
+        assert!(status.requires_fleet_quiescence);
         assert!(
             status
                 .operator_instructions

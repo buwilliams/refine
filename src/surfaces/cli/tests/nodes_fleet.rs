@@ -101,8 +101,8 @@ fn node_commands_use_shared_node_registry_service() {
 }
 
 #[test]
-fn cluster_commands_use_shared_cluster_service() {
-    let temp_root = unique_temp_dir("cli-cluster-registry");
+fn fleet_commands_use_shared_fleet_service() {
+    let temp_root = unique_temp_dir("cli-fleet-registry");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
     dispatch(
@@ -110,7 +110,7 @@ fn cluster_commands_use_shared_cluster_service() {
             "refine",
             "goal",
             "create",
-            "Cluster Goal",
+            "Fleet Goal",
             "--target-root",
             target_root.to_str().unwrap(),
             "--id",
@@ -123,14 +123,14 @@ fn cluster_commands_use_shared_cluster_service() {
     for argv in [
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "list",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "add-node",
             "node-1",
             "--target-root",
@@ -138,7 +138,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "show",
             "node-1",
             "--target-root",
@@ -146,7 +146,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "edit-node",
             "node-1",
             "--ssh-host",
@@ -162,7 +162,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "disable-node",
             "node-1",
             "--target-root",
@@ -170,7 +170,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "enable-node",
             "node-1",
             "--target-root",
@@ -178,7 +178,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "bootstrap",
             "node-1",
             "--dry-run",
@@ -187,7 +187,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "edit-node",
             "node-1",
             "--target-root",
@@ -195,7 +195,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "distribute",
             "--dry-run",
             "--target-root",
@@ -203,7 +203,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "distribute",
             "--to",
             "node-1",
@@ -214,7 +214,7 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "transfer",
             "node-1",
             "GOAL1",
@@ -223,21 +223,21 @@ fn cluster_commands_use_shared_cluster_service() {
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "sync",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "maintenance",
             "--target-root",
             target_root.to_str().unwrap(),
         ],
         vec![
             "refine",
-            "cluster",
+            "fleet",
             "remove-node",
             "node-1",
             "--target-root",
@@ -264,4 +264,53 @@ fn cluster_commands_use_shared_cluster_service() {
     assert_eq!(node["archived"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn fleet_free_text_and_distribute_instructions_parse_as_agent_requests() {
+    let cli = Cli::try_parse_from(["refine", "fleet", "group related goals on one node"]).unwrap();
+    match cli.command {
+        Commands::Fleet {
+            action: FleetAction::Request(words),
+        } => assert_eq!(words, vec!["group related goals on one node"]),
+        other => panic!("expected fleet request, parsed {other:?}"),
+    }
+
+    let cli = Cli::try_parse_from([
+        "refine",
+        "fleet",
+        "distribute",
+        "spread the backlog evenly, keeping related goals together",
+    ])
+    .unwrap();
+    match cli.command {
+        Commands::Fleet {
+            action:
+                FleetAction::Distribute {
+                    instructions: Some(instructions),
+                    ..
+                },
+        } => assert_eq!(
+            instructions,
+            "spread the backlog evenly, keeping related goals together"
+        ),
+        other => panic!("expected agent-directed distribute, parsed {other:?}"),
+    }
+
+    // Instructions and deterministic flags are mutually exclusive.
+    assert!(
+        Cli::try_parse_from([
+            "refine",
+            "fleet",
+            "distribute",
+            "instructions",
+            "--to",
+            "node"
+        ])
+        .is_err()
+    );
+
+    // A single bare word is treated as a mistyped subcommand, not a request.
+    let error = dispatch(Cli::try_parse_from(["refine", "fleet", "lst"]).unwrap()).unwrap_err();
+    assert!(error.to_string().contains("unknown fleet command"));
 }

@@ -46,7 +46,7 @@ pub struct ProjectSchemaStatus {
     pub migration_id: Option<String>,
     pub migration_description: Option<String>,
     pub safe_auto: bool,
-    pub requires_cluster_quiescence: bool,
+    pub requires_fleet_quiescence: bool,
     pub operator_instructions: Option<String>,
 }
 

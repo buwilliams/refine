@@ -3,7 +3,7 @@ mod features;
 mod goals;
 mod imports_exports;
 mod logs;
-mod nodes_cluster;
+mod nodes_fleet;
 mod parsing;
 mod projects;
 mod system;

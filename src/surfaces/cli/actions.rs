@@ -7,8 +7,8 @@ use crate::model::workflow::GoalStatus;
 use crate::tools::host::installation::InstallTarget;
 
 mod agents;
-mod cluster;
 mod features;
+mod fleet;
 mod goals;
 mod logs;
 mod nodes;
@@ -18,8 +18,8 @@ mod todos;
 mod workflow;
 
 pub use agents::{AgentAction, CliAgentProfile};
-pub use cluster::ClusterAction;
 pub use features::FeatureAction;
+pub use fleet::FleetAction;
 pub use goals::GoalAction;
 pub use logs::LogAction;
 pub use nodes::NodeAction;
@@ -73,11 +73,11 @@ pub enum Commands {
         #[command(subcommand)]
         action: NodeAction,
     },
-    /// Operate the cluster (the fleet of nodes): register and bootstrap nodes,
+    /// Operate the fleet (the fleet of nodes): register and bootstrap nodes,
     /// distribute unclaimed Goal ownership, and run remote commands.
-    Cluster {
+    Fleet {
         #[command(subcommand)]
-        action: ClusterAction,
+        action: FleetAction,
     },
     /// Inspect the activity log: list, tail, query, and export entries, or build a support bundle.
     Log {
