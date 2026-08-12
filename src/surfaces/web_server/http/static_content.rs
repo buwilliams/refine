@@ -165,7 +165,6 @@ pub(super) fn website_index_path(static_root: &Path) -> PathBuf {
 pub(super) fn website_public_path_allowed(path: &str) -> bool {
     path == "README.md"
         || path == "LICENSE"
-        || path == "scripts/install.sh"
         || path.starts_with("docs/")
         || path == "src/surfaces/website/index.html"
         || path.starts_with("src/surfaces/website/assets/")

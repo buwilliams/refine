@@ -1,8 +1,8 @@
-# Install Refine
+# Install or Update Refine
 
 Refine is an agentic software delivery system that runs locally against a user's application repository. It coordinates agents and humans through Goals, workflow state, provider CLIs, local processes, and a browser UI so software changes can move from request to implementation to human review.
 
-Use this document when an agent is responsible for installing Refine. Follow the steps in order, ask the user only the questions needed for the chosen install path, confirm where Refine should be installed when you cannot infer it, and do not claim installation succeeded until the CLI reports a healthy running system or you have reported the exact blocker.
+Use this document when an agent is responsible for installing or updating Refine. Follow the steps in order, ask the user only the questions needed for the chosen path, confirm where Refine should be installed when you cannot infer it, and do not claim installation succeeded until the CLI reports a healthy running system or you have reported the exact blocker.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Ask only when the answer is not clear from the user's environment, prior convers
 ## Install Refine
 
 1. Resolve the Refine checkout path before running install commands. If an existing Refine checkout or a user preference is not clear, ask where to install Refine and use `$HOME/refine` as the default.
-2. Check for required tools, identify reachable dependency sources, and install missing dependencies only from a source the user approves. Do not use `scripts/install.sh`; the agent should make dependency choices explicitly.
+2. Check for required tools, identify reachable dependency sources, and install missing dependencies only from a source the user approves; the agent should make dependency choices explicitly.
 
 ```bash
 curl --version
@@ -35,13 +35,7 @@ cc --version
 cargo --version
 ```
 
-3. If Refine is already installed, update the checkout through the CLI and skip the fresh clone:
-
-```bash
-cd <refine-checkout>
-./r system update --yes
-```
-
+3. If Refine is already installed, follow the [Update Refine](#update-refine) section instead of a fresh clone, then continue with provider configuration below.
 4. For a fresh install, copy the latest published release files without a `.git` directory:
 
 ```bash
@@ -87,6 +81,49 @@ cd <refine-checkout>
 ```
 
 Do not offer `smoke-ai` during installation. It is reserved for deterministic tests.
+
+## Update Refine
+
+`./r system update --yes` performs this section automatically: it stops the running daemons, delegates the update to the configured agent provider with this runbook as context, and restarts the daemons afterward. If you are the agent delegated by `./r system update`, the daemons are already stopped: do not run `./r system update` again and do not start, stop, or restart Refine; complete the steps below and report the exact blocker if one fails.
+
+1. When updating manually (not delegated by `./r system update`), stop the running daemons first:
+
+```bash
+cd <refine-checkout>
+./r system stop --port <port>
+```
+
+2. Bring the checkout up to the latest published release. If the checkout is a git repository that is ahead of the latest release (a development checkout), leave the working tree alone and skip to the build step. Otherwise fetch the latest release and copy it over the checkout without a `.git` directory:
+
+```bash
+latest="$(
+  git ls-remote --tags --refs https://github.com/buwilliams/refine.git \
+    | awk -F/ '/refs\/tags\/[0-9]+\.[0-9]+\.[0-9]+$/ { print $NF }' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -n 1
+)"
+tmp="$(mktemp -d)"
+git clone --depth 1 --branch "$latest" https://github.com/buwilliams/refine.git "$tmp/refine"
+tar -C "$tmp/refine" --exclude .git -cf - . | tar -C <refine-checkout> -xf -
+rm -rf "$tmp"
+```
+
+3. Rebuild the release binary and mark the checkout as deployed:
+
+```bash
+cd <refine-checkout>
+cargo build --release --locked
+mkdir -p bin
+install -m 755 target/release/refine bin/refine
+printf 'mode=deployed\nrelease_bin=bin/refine\n' > .refine-deployed
+```
+
+4. When updating manually, restart Refine and verify it is healthy:
+
+```bash
+./r system start --port <port>
+./r system status --port <port>
+```
 
 ## After Install
 

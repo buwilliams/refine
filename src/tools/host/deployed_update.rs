@@ -9,6 +9,9 @@ use crate::process::supervisor::lifecycle::{
     http_probe,
 };
 use crate::process::supervisor::runtime::RuntimeRoot;
+use crate::tools::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
 };
@@ -23,7 +26,7 @@ pub struct DeployedUpdateSummary {
     pub binary_path: String,
     pub build_result: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub installer: Option<InstallerRunSummary>,
+    pub update_agent: Option<UpdateAgentRunSummary>,
     pub restarted_ports: Vec<u16>,
     pub failures: Vec<DeployedUpdateFailure>,
     pub manual_recovery_command: Option<String>,
@@ -37,37 +40,35 @@ pub struct DeployedUpdateFailure {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct InstallerRunSummary {
-    pub command: Vec<String>,
-    pub status: Option<i32>,
-    pub stdout: String,
-    pub stderr: String,
+pub struct UpdateAgentRunSummary {
+    pub provider: String,
+    pub prompt: String,
+    pub output: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct InstallerInvocation {
-    pub program: PathBuf,
-    pub args: Vec<String>,
+pub struct UpdateAgentInvocation {
+    pub provider: String,
+    pub prompt: String,
     pub cwd: PathBuf,
-    pub env: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct InstallerOutcome {
+pub struct UpdateAgentOutcome {
     pub succeeded: bool,
-    pub status: Option<i32>,
     pub target_version: Option<String>,
     pub binary_path: Option<PathBuf>,
-    pub stdout: String,
-    pub stderr: String,
+    pub output: String,
 }
 
 pub trait DeployedUpdateHost {
     fn running_ports(&mut self) -> RefineResult<Vec<u16>>;
     fn stop_port(&mut self, port: u16) -> RefineResult<()>;
     fn port_stopped(&mut self, port: u16) -> RefineResult<bool>;
-    fn run_installer(&mut self, invocation: &InstallerInvocation)
-    -> RefineResult<InstallerOutcome>;
+    fn run_update_agent(
+        &mut self,
+        invocation: &UpdateAgentInvocation,
+    ) -> RefineResult<UpdateAgentOutcome>;
     fn verify_binary_mode(&mut self, checkout: &Path, binary_path: &Path) -> RefineResult<()>;
     fn restart_port(&mut self, port: u16) -> RefineResult<DaemonStatus>;
 }
@@ -77,6 +78,7 @@ pub struct DeployedUpdateOptions {
     pub checkout_path: PathBuf,
     pub runtime_root: PathBuf,
     pub assume_yes: bool,
+    pub provider: String,
 }
 
 impl DeployedUpdateOptions {
@@ -85,6 +87,7 @@ impl DeployedUpdateOptions {
             checkout_path: checkout_path.into(),
             runtime_root: runtime_root.into(),
             assume_yes: false,
+            provider: default_update_provider(),
         }
     }
 
@@ -92,6 +95,15 @@ impl DeployedUpdateOptions {
         self.assume_yes = assume_yes;
         self
     }
+
+    pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
+        self.provider = provider.into();
+        self
+    }
+}
+
+pub fn default_update_provider() -> String {
+    "claude".to_string()
 }
 
 pub fn run_deployed_update<H: DeployedUpdateHost>(
@@ -101,6 +113,7 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
     let checkout_path = options.checkout_path;
     let runtime_root = options.runtime_root;
     let assume_yes = options.assume_yes;
+    let provider = options.provider;
     let binary_path = checkout_path.join("bin/refine");
     let mut summary = DeployedUpdateSummary {
         ok: false,
@@ -110,7 +123,7 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
         build_result: "not_started".to_string(),
         manual_recovery_command: Some(manual_update_recovery_command(
             &checkout_path,
-            &runtime_root,
+            &provider,
             assume_yes,
         )),
         rollback_possible: false,
@@ -150,34 +163,33 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
         }
     }
 
-    let invocation = installer_invocation(&checkout_path, &runtime_root, assume_yes);
-    let installer = match host.run_installer(&invocation) {
+    let invocation = update_agent_invocation(&checkout_path, &provider, assume_yes);
+    let agent = match host.run_update_agent(&invocation) {
         Ok(outcome) => outcome,
         Err(error) => {
             summary.build_result = "failed".to_string();
-            push_failure(&mut summary, "installer", error);
+            push_failure(&mut summary, "update_agent", error);
             return summary;
         }
     };
-    summary.installer = Some(InstallerRunSummary {
-        command: invocation.command_line(),
-        status: installer.status,
-        stdout: installer.stdout.clone(),
-        stderr: installer.stderr.clone(),
+    summary.update_agent = Some(UpdateAgentRunSummary {
+        provider: invocation.provider.clone(),
+        prompt: invocation.prompt.clone(),
+        output: agent.output.clone(),
     });
-    if !installer.succeeded {
+    if !agent.succeeded {
         summary.build_result = "failed".to_string();
         summary.failures.push(DeployedUpdateFailure {
-            stage: "installer".to_string(),
-            message: installer_failure_message(&installer),
+            stage: "update_agent".to_string(),
+            message: update_agent_failure_message(&agent),
         });
         return summary;
     }
     summary.build_result = "succeeded".to_string();
-    summary.target_version = installer
+    summary.target_version = agent
         .target_version
         .or_else(|| cargo_package_version(&checkout_path));
-    if let Some(path) = installer.binary_path {
+    if let Some(path) = agent.binary_path {
         summary.binary_path = path.display().to_string();
     }
 
@@ -204,83 +216,58 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
     summary
 }
 
-pub fn installer_invocation(
-    checkout_path: &Path,
-    runtime_root: &Path,
-    assume_yes: bool,
-) -> InstallerInvocation {
-    let mut args = vec!["--upgrade".to_string()];
-    if assume_yes {
-        args.insert(0, "--yes".to_string());
-    }
-    let mut env = vec![
-        ("REFINE_INSTALL_UPGRADE".to_string(), "1".to_string()),
-        ("REFINE_INSTALL_UPDATE_ONLY".to_string(), "1".to_string()),
-        (
-            "REFINE_INSTALL_CHECKOUT_DEFAULT".to_string(),
-            checkout_path.display().to_string(),
-        ),
-        (
-            "REFINE_INSTALL_RUNTIME_ROOT".to_string(),
-            runtime_root.display().to_string(),
-        ),
-    ];
-    if assume_yes {
-        env.push((
-            "REFINE_INSTALL_ASSUME_DEFAULTS".to_string(),
-            "1".to_string(),
-        ));
-    }
-    InstallerInvocation {
-        program: checkout_path.join("scripts/install.sh"),
-        args,
-        cwd: checkout_path.to_path_buf(),
-        env,
-    }
+pub const UPDATE_RUNBOOK_PATH: &str = "docs/runbooks/install.md";
+
+pub fn update_agent_prompt(checkout_path: &Path, assume_yes: bool) -> String {
+    let defaults = if assume_yes {
+        " Proceed with the documented defaults instead of asking questions."
+    } else {
+        ""
+    };
+    format!(
+        "Update the deployed Refine checkout at {checkout} by following the \"Update Refine\" \
+         section of {runbook} in that checkout. Refine daemons are already stopped and the \
+         caller manages the daemon lifecycle: do not run `./r system update` and do not start, \
+         stop, or restart Refine. When you finish, the freshly built release binary must be \
+         installed at bin/refine and .refine-deployed must mark the checkout as deployed. If a \
+         step fails, stop and report the exact blocker.{defaults}",
+        checkout = checkout_path.display(),
+        runbook = UPDATE_RUNBOOK_PATH,
+    )
 }
 
-impl InstallerInvocation {
-    fn command_line(&self) -> Vec<String> {
-        let mut command = Vec::with_capacity(1 + self.args.len());
-        command.push(self.program.display().to_string());
-        command.extend(self.args.clone());
-        command
+pub fn update_agent_invocation(
+    checkout_path: &Path,
+    provider: &str,
+    assume_yes: bool,
+) -> UpdateAgentInvocation {
+    UpdateAgentInvocation {
+        provider: provider.to_string(),
+        prompt: update_agent_prompt(checkout_path, assume_yes),
+        cwd: checkout_path.to_path_buf(),
     }
 }
 
 fn manual_update_recovery_command(
     checkout_path: &Path,
-    runtime_root: &Path,
+    provider: &str,
     assume_yes: bool,
 ) -> String {
-    let yes_flag = if assume_yes { " --yes" } else { "" };
     format!(
-        "cd {} && REFINE_INSTALL_UPDATE_ONLY=1 REFINE_INSTALL_RUNTIME_ROOT={} REFINE_INSTALL_CHECKOUT_DEFAULT={} scripts/install.sh{} --upgrade",
+        "cd {} && ./r agent invoke {} --provider {}",
         shell_quote(&checkout_path.display().to_string()),
-        shell_quote(&runtime_root.display().to_string()),
-        shell_quote(&checkout_path.display().to_string()),
-        yes_flag
+        shell_quote(&update_agent_prompt(checkout_path, assume_yes)),
+        shell_quote(provider)
     )
 }
 
-fn installer_failure_message(installer: &InstallerOutcome) -> String {
-    let mut message = format!(
-        "installer failed with status {}",
-        installer
-            .status
-            .map(|status| status.to_string())
-            .unwrap_or_else(|| "unknown".to_string())
-    );
-    let detail = if installer.stderr.trim().is_empty() {
-        installer.stdout.trim()
+fn update_agent_failure_message(agent: &UpdateAgentOutcome) -> String {
+    let detail = agent.output.trim();
+    if detail.is_empty() {
+        "update agent failed without output".to_string()
     } else {
-        installer.stderr.trim()
-    };
-    if !detail.is_empty() {
-        message.push_str(": ");
-        message.push_str(detail);
+        format!("update agent failed: {detail}")
     }
-    message
 }
 
 fn shell_quote(value: &str) -> String {
@@ -349,36 +336,28 @@ impl DeployedUpdateHost for FileDeployedUpdateHost {
         Ok(!status.daemon_healthy && http_probe(port).is_err())
     }
 
-    fn run_installer(
+    fn run_update_agent(
         &mut self,
-        invocation: &InstallerInvocation,
-    ) -> RefineResult<InstallerOutcome> {
-        if !invocation.program.is_file() {
+        invocation: &UpdateAgentInvocation,
+    ) -> RefineResult<UpdateAgentOutcome> {
+        if !invocation.cwd.join(UPDATE_RUNBOOK_PATH).is_file() {
             return Err(RefineError::NotFound(format!(
-                "installer not found: {}",
-                invocation.program.display()
+                "update runbook not found: {}",
+                invocation.cwd.join(UPDATE_RUNBOOK_PATH).display()
             )));
         }
-        let output = Command::new(&invocation.program)
-            .args(&invocation.args)
-            .current_dir(&invocation.cwd)
-            .envs(invocation.env.iter().map(|(key, value)| (key, value)))
-            .output()
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to launch installer {}: {error}",
-                    invocation.program.display()
-                ))
-            })?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Ok(InstallerOutcome {
-            succeeded: output.status.success(),
-            status: output.status.code(),
+        let output = HostAgentProviderService::new().invoke(ProviderInvocation {
+            provider: invocation.provider.clone(),
+            prompt: invocation.prompt.clone(),
+            session_id: None,
+            cwd: Some(invocation.cwd.display().to_string()),
+            process_metadata: Default::default(),
+        })?;
+        Ok(UpdateAgentOutcome {
+            succeeded: true,
             target_version: cargo_package_version(&invocation.cwd),
             binary_path: Some(invocation.cwd.join("bin/refine")),
-            stdout,
-            stderr,
+            output,
         })
     }
 
@@ -459,7 +438,7 @@ pub fn is_refine_checkout(path: &Path) -> bool {
     path.join(".git").exists()
         && path.join("Cargo.toml").is_file()
         && path.join("src/main.rs").is_file()
-        && path.join("scripts/install.sh").is_file()
+        && path.join(UPDATE_RUNBOOK_PATH).is_file()
         && path.join("r").is_file()
 }
 

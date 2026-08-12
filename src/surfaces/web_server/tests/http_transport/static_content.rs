@@ -49,7 +49,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert!(
         String::from_utf8(raw_doc.body)
             .unwrap()
-            .contains("# Install Refine")
+            .contains("# Install or Update Refine")
     );
 
     let compatibility_doc = daemon.handle_wire_request(HttpRequest {
@@ -74,7 +74,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(rendered_doc.status, 200);
     assert_eq!(rendered_doc.content_type, "text/html; charset=utf-8");
     let rendered_doc = String::from_utf8(rendered_doc.body).unwrap();
-    assert!(rendered_doc.contains("<h1>Install Refine</h1>"));
+    assert!(rendered_doc.contains("<h1>Install or Update Refine</h1>"));
     assert!(rendered_doc.contains("Raw Markdown"));
     assert!(
         rendered_doc.contains(r#"<div class="menu-docs" aria-label="Documentation sections">"#)

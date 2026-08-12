@@ -104,7 +104,7 @@ impl InProcessWebServer {
             return error_response(error);
         }
         error_response(RefineError::NotImplemented(
-            "HTTP system update is disabled; run `./r system update` from the Refine checkout so the installer can stop daemons, update the deployed binary, refresh service metadata, and restart ports.".to_string(),
+            "HTTP system update is disabled; run `./r system update` from the Refine checkout so it can stop daemons, delegate the update to the configured agent, and restart ports.".to_string(),
         ))
     }
 

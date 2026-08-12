@@ -42,7 +42,6 @@ Focused xtask suites:
   smoke-ai
   cli
   cluster-ssh
-  install-uninstall
   full-workflow
   multi-instance-sync
 EOF
@@ -88,9 +87,6 @@ run_test_command() {
       ;;
     cluster-ssh)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cluster-ssh
-      ;;
-    install-uninstall)
-      exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-install-uninstall
       ;;
     full-workflow)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-full-workflow
@@ -161,11 +157,6 @@ print_test_dry_run() {
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cluster-ssh\n' "$ROOT"
       ;;
-    install-uninstall)
-      printf 'mode=test\n'
-      printf 'executable=cargo\n'
-      printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-install-uninstall\n' "$ROOT"
-      ;;
     full-workflow)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
@@ -223,7 +214,7 @@ fi
 if [ "$SELECTED_MODE" = "binary" ]; then
   if [ ! -x "$RELEASE_BIN" ]; then
     printf 'refine: deployed binary is missing or not executable: %s\n' "$RELEASE_BIN" >&2
-    printf 'refine: run scripts/install.sh again, or use REFINE_RUN_MODE=cargo ./r ...\n' >&2
+    printf 'refine: rebuild it per docs/runbooks/install.md, or use REFINE_RUN_MODE=cargo ./r ...\n' >&2
     exit 127
   fi
   export REFINE_LAUNCH_MODE="binary"

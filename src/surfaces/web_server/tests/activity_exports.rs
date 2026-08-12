@@ -43,14 +43,18 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     let runtime_root = temp_root.join("run/8080");
     let (seed, target_root) = seeded_remote_clone(&temp_root);
     fs::create_dir_all(target_root.join("src")).unwrap();
-    fs::create_dir_all(target_root.join("scripts")).unwrap();
+    fs::create_dir_all(target_root.join("docs/runbooks")).unwrap();
     fs::write(
         target_root.join("Cargo.toml"),
         "[package]\nname = \"refine\"\n",
     )
     .unwrap();
     fs::write(target_root.join("src/main.rs"), "fn main() {}\n").unwrap();
-    fs::write(target_root.join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+    fs::write(
+        target_root.join("docs/runbooks/install.md"),
+        "# Install Refine\n",
+    )
+    .unwrap();
     fs::write(target_root.join("r"), "#!/bin/sh\n").unwrap();
     git(&target_root, &["add", "."]).unwrap();
     git(
