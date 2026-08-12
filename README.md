@@ -53,27 +53,6 @@ wsl --install
 
 After Ubuntu opens, use the Install yourself one-liner above.
 
-## Tests
-
-Use `./r test` as the authoritative test entrypoint. The default command runs only the in-crate Rust unit tests; integration suites are opt-in.
-
-```bash
-./r test [suite]
-```
-
-Suites:
-
-- `unit` - in-crate Rust unit tests. This is the default when no suite is provided.
-- `integration` - opt-in CLI, daemon, Docker, and cluster suites.
-- `full` - all test suites and repository checks.
-- `rust` - Rust unit, integration, and doc tests.
-- `smoke-ai` - Smoke AI fixture contract.
-- `cli` - daemon-backed CLI integration tests. These are the authoritative surface tests and exercise the same daemon-backed product services used by the web UI.
-- `cluster-ssh` - Docker/SSH-backed cluster CLI tests.
-- `install-uninstall` - Docker-backed install/uninstall tests.
-- `full-workflow` - daemon-backed full workflow test.
-- `multi-instance-sync` - multi-instance sync tests.
-
 ## License
 
 [MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No warranty, no support obligations on my end. If you build something useful on top, a heads-up is appreciated but not required.
