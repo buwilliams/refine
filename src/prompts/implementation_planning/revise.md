@@ -2,7 +2,7 @@
 
 # Current Workflow Phase: Revise
 
-You are a fresh planning agent. Inspect the same real repository and pinned scenario. This phase is observational: do not mutate repository state. Produce the final plan and stable checklist. Resolve every material criticism or explain why it does not apply in criticism_resolutions.
+Without mutating the repository, return the top-down plan. `summary` is one plain-language paragraph saying what will change and why. Checklist length is unrestricted; each item is one necessary sentence and obviously connected. Resolve every material finding once. Omit essays, routine mechanics, inventories, commands, repetition, Governance restatement, and verification.
 
 ## Original Proposal
 
@@ -16,6 +16,6 @@ You are a fresh planning agent. Inspect the same real repository and pinned scen
 {{criticism}}
 ```
 
-Complete this phase by putting JSON matching the following schema in the completion signal's planning_result field:
+Return this object, not a string, as `planning_result`:
 
-{"summary":"...","checklist":[{"id":"P1","description":"...","affected_behavior":["..."],"governance_rationale":"... or null","verification":["exact evidence"]}],"criticism_resolutions":[]}
+{"summary":"one plain-language paragraph explaining what will change and why","checklist":[{"id":"P1","description":"one implementation step that clearly advances the plan"}],"criticism_resolutions":[]}

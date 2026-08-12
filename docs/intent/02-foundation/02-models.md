@@ -35,7 +35,12 @@ Current implementation details that matter to intent:
   independent criticism, final checklist, phase/process/Git evidence, failures,
   and implementation discrepancies to the exact Round, pinned context digest,
   Goal/Round context, implementation and target branches, and base commit.
-  Missing planning evidence remains valid for legacy records.
+  The proposal and final plan remain human-readable: one plain-language,
+  top-down paragraph explaining what will change and why, followed by any
+  number of stable, one-line checklist items that clearly advance that plan and
+  capture concerns that cannot safely be ignored. Detailed verification belongs
+  to execution evidence. Missing planning evidence remains valid for legacy
+  records.
 
 Future model changes should preserve these properties: human readability, agent readability, stable workflow meaning, and clear node ownership for active work.
 

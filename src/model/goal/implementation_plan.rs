@@ -55,11 +55,11 @@ pub struct PlanningGitObservation {
 pub struct ImplementationChecklistItem {
     pub id: String,
     pub description: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub affected_behavior: Vec<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub governance_rationale: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub verification: Vec<String>,
 }
 
@@ -73,7 +73,7 @@ pub struct CriticismResolution {
 pub struct ProposedImplementationPlan {
     pub summary: String,
     pub checklist: Vec<ImplementationChecklistItem>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub criticism_resolutions: Vec<CriticismResolution>,
 }
 
@@ -99,7 +99,7 @@ pub struct ImplementationCriticismFinding {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImplementationCriticism {
     pub summary: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<ImplementationCriticismFinding>,
 }
 

@@ -2,6 +2,8 @@
 
 # Current Workflow Phase: Plan
 
-Inspect the real repository and the complete pinned scenario above. This phase is observational: do not edit files, create commits, change branches, or mutate repository state. Propose one actionable implementation plan. Use stable checklist IDs, name affected behavior and surfaces, explain Governance relevance, and name intended verification evidence. Complete this phase by putting JSON matching the following schema in the completion signal's planning_result field:
+Without mutating the repository, return a top-down plan. `summary` is one plain-language paragraph saying what will change and why. Checklist length is unrestricted; each item is one sentence and obviously connected. Include only necessary steps, risks, or failure boundaries. Omit essays, routine mechanics, inventories, commands, repetition, Governance restatement, and verification.
 
-{"summary":"...","checklist":[{"id":"P1","description":"...","affected_behavior":["..."],"governance_rationale":"... or null","verification":["exact evidence"]}],"criticism_resolutions":[]}
+Return this object, not a string, as `planning_result`:
+
+{"summary":"one plain-language paragraph explaining what will change and why","checklist":[{"id":"P1","description":"one implementation step that clearly advances the plan"}]}

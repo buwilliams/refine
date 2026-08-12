@@ -69,9 +69,9 @@ mod tests {
             checklist: vec![ImplementationChecklistItem {
                 id: "P1".to_string(),
                 description: "Implement shared behavior".to_string(),
-                affected_behavior: vec!["CLI and browser".to_string()],
+                affected_behavior: Vec::new(),
                 governance_rationale: None,
-                verification: vec!["cargo test --lib".to_string()],
+                verification: Vec::new(),
             }],
             criticism_resolutions: Vec::new(),
         }
@@ -101,6 +101,9 @@ mod tests {
             assert!(!prompt.contains("{{"));
         }
         assert!(plan.contains("# Current Workflow Phase: Plan"));
+        assert!(plan.contains("Checklist length is unrestricted"));
+        assert!(!plan.contains("affected_behavior"));
+        assert!(!plan.contains("governance_rationale"));
         assert!(criticize.contains("\"id\": \"P1\""));
         assert!(revise.contains("Missing recovery coverage"));
     }
@@ -115,6 +118,8 @@ mod tests {
         assert!(prompt.contains("Latest Round request: authoritative request"));
         assert!(prompt.contains("final Round request"));
         assert!(prompt.contains("\"id\": \"P1\""));
-        assert!(prompt.contains("cargo test --lib"));
+        assert!(prompt.contains("Implement shared behavior"));
+        assert!(!prompt.contains("affected_behavior"));
+        assert!(!prompt.contains("\"verification\""));
     }
 }

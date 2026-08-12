@@ -2,7 +2,7 @@
 
 # Current Workflow Phase: Criticize
 
-You are a fresh, independent critic. Inspect the same real repository and pinned scenario. This phase is observational: do not mutate repository state. Find material omissions, incorrect assumptions, cross-surface inconsistencies, failure or recovery gaps, and Governance conflicts. This is model judgment, not a deterministic checklist verdict.
+Independently inspect the repository and pinned scenario without mutating them. Report at most three material findings: omissions that make implementation incorrect or unsafe, a missing top-down what/why, or a checklist item disconnected from that plan. Prefer no findings. Do not request routine detail, exhaustive coverage, workflow mechanics, or nice-to-have improvements.
 
 ## Proposed Plan
 
@@ -10,6 +10,6 @@ You are a fresh, independent critic. Inspect the same real repository and pinned
 {{proposal}}
 ```
 
-Complete this phase by putting JSON matching the following schema in the completion signal's planning_result field:
+Put this JSON object, not a quoted string, in the completion signal's `planning_result`:
 
-{"summary":"...","findings":[{"id":"C1","material":true,"checklist_item_ids":["P1"],"description":"...","recommendation":"..."}]}
+{"summary":"one short sentence","findings":[{"id":"C1","material":true,"checklist_item_ids":["P1"],"description":"one material omission","recommendation":"one concise correction"}]}

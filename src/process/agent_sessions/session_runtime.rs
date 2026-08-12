@@ -108,7 +108,12 @@ where
     }
 
     let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
-    let protocol_prompt = goal_agent_protocol_prompt(&launch.prompt, &signal_path);
+    let implementation_phase = launch
+        .metadata
+        .get("implementation_phase")
+        .and_then(Value::as_str);
+    let protocol_prompt =
+        goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase);
     let launch_env_overrides = vec![
         ("TERM".to_string(), "xterm-256color".to_string()),
         ("COLORTERM".to_string(), "truecolor".to_string()),

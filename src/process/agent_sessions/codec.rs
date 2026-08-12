@@ -204,12 +204,37 @@ pub(super) fn cleanup_session_artifacts(command_path: &Path, signal_path: &Path)
     }
 }
 
-pub(super) fn goal_agent_protocol_prompt(prompt: &str, signal_path: &Path) -> String {
-    let signal_path = signal_path.display().to_string();
+pub(super) fn goal_agent_protocol_prompt(
+    prompt: &str,
+    signal_path: &Path,
+    implementation_phase: Option<&str>,
+) -> String {
+    let completion_contract = completion_contract(signal_path, implementation_phase);
     render(
         PromptTemplate::GoalAgentSession,
-        &[("goal_prompt", prompt), ("signal_path", &signal_path)],
+        &[
+            ("goal_prompt", prompt),
+            ("completion_contract", &completion_contract),
+        ],
     )
+}
+
+fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -> String {
+    let destination = signal_path.display();
+    match implementation_phase {
+        Some("plan") => format!(
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}]}}}}`."
+        ),
+        Some("criticize") => format!(
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one short sentence\",\"findings\":[]}}}}`."
+        ),
+        Some("revise") => format!(
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}],\"criticism_resolutions\":[]}}}}`."
+        ),
+        _ => format!(
+            "Report changes and exact verification. Choose applicable Guidance. On completion, write `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{{\"checklist\":[{{\"id\":\"stable checklist ID\",\"outcome\":\"completed|deviated|rejected|blocked\",\"evidence\":\"what happened\"}}],\"verification\":[\"exact command and result\"]}}}}` to `{destination}`, replacing `[0]` with applicable indexes. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan."
+        ),
+    }
 }
 
 pub(super) fn pty_size(cols: u16, rows: u16) -> PtySize {
