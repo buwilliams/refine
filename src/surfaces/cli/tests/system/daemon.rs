@@ -75,6 +75,7 @@ fn activated_service_manager_owns_background_start_configuration() {
     let temp_root = unique_temp_dir("cli-system-service-manager-options");
     let runtime_root = temp_root.join("run");
     let port = 4557;
+    write_installed_binary(&temp_root);
     let installation =
         crate::tools::host::installation::FileInstallationService::with_path_inputs_for_port(
             &runtime_root,

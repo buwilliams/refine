@@ -2,6 +2,31 @@ use super::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
+fn cargo_launch_reports_and_reuses_the_actual_debug_executable() {
+    let actual = PathBuf::from("/checkout/target/debug/refine");
+    assert_eq!(
+        select_launch_executable("cargo", Some("cargo".to_string()), Some(actual.clone())),
+        Some(actual.display().to_string())
+    );
+    assert_eq!(
+        select_launch_executable(
+            "cargo",
+            Some("/foreign/bin/refine".to_string()),
+            Some(actual.clone())
+        ),
+        Some(actual.display().to_string())
+    );
+    assert_eq!(
+        select_launch_executable(
+            "binary",
+            Some("/checkout/bin/refine".to_string()),
+            Some(actual.clone())
+        ),
+        Some("/checkout/bin/refine".to_string())
+    );
+}
+
+#[test]
 fn file_lifecycle_persists_port_scoped_status() {
     let temp_root = unique_temp_dir("lifecycle-status");
     let runtime_root = RuntimeRoot {

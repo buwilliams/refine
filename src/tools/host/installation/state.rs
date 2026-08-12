@@ -212,6 +212,7 @@ impl FileInstallationService {
         target: InstallTarget,
         repair_legacy: bool,
     ) -> RefineResult<InstallBackendRegistration> {
+        self.require_installed_executable()?;
         let now = now_timestamp();
         let legacy_runtime_root = self.legacy_external_runtime_root(&target);
         if legacy_runtime_root.is_some() && !repair_legacy {
@@ -248,6 +249,34 @@ impl FileInstallationService {
         self.register_os_backend(&mut backend, legacy_registration.as_ref())?;
         self.save_backend(&backend)?;
         Ok(backend)
+    }
+
+    fn require_installed_executable(&self) -> RefineResult<()> {
+        let executable = self.checkout_root.join("bin/refine");
+        let metadata = fs::metadata(&executable).map_err(|error| {
+            RefineError::NotFound(format!(
+                "installed Refine mode requires an executable at {}; build and install the release binary before registering or repairing a service: {error}",
+                executable.display()
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(RefineError::NotFound(format!(
+                "installed Refine mode requires a file at {}; build and install the release binary before registering or repairing a service",
+                executable.display()
+            )));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o111 == 0 {
+                return Err(RefineError::InvalidInput(format!(
+                    "installed Refine binary is not executable: {}; run `chmod +x {}` or reinstall it",
+                    executable.display(),
+                    executable.display()
+                )));
+            }
+        }
+        Ok(())
     }
 
     fn legacy_registration_belongs_to_selected_port(&self) -> RefineResult<bool> {

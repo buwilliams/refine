@@ -30,6 +30,21 @@ impl RestartSafeHandoffLauncher for RecordingLauncher {
 }
 
 #[test]
+fn source_lifecycle_handoff_inherits_debug_executable_without_installed_binary() {
+    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .canonicalize()
+        .unwrap();
+    let runtime_root = checkout.join("run");
+    let test_executable = std::env::current_exe().unwrap();
+
+    let selected =
+        operations::lifecycle_executable_for_invocation(&runtime_root, &test_executable).unwrap();
+
+    assert_eq!(selected, test_executable.canonicalize().unwrap());
+    assert_ne!(selected, checkout.join("bin/refine"));
+}
+
+#[test]
 fn http_handoff_persists_receipt_before_launch_and_reconciles_shared_result() {
     let temp_root = unique_temp_dir("daemon-lifecycle-operation-success");
     let runtime_root = RuntimeRoot {

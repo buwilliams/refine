@@ -14,6 +14,7 @@ use crate::tools::host::installation::{InstallTarget, InstallationService};
 #[test]
 fn shared_authority_uses_exact_port_installation_and_isolates_failure_evidence() {
     let temp_root = unique_temp_dir("shared-daemon-lifecycle-two-ports");
+    write_test_installed_binary(&temp_root);
     let runtime_root = temp_root.join("run");
     let path_inputs = test_path_inputs(&temp_root);
     let first_port = 4557;
@@ -206,6 +207,7 @@ fn shared_authority_uses_direct_fallback_for_an_uninstalled_reachable_port() {
 #[test]
 fn uninstalling_registered_but_inactive_installation_stops_observed_direct_runtime() {
     let temp_root = unique_temp_dir("shared-daemon-lifecycle-inactive-registration");
+    write_test_installed_binary(&temp_root);
     let runtime_root = temp_root.join("run");
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -308,6 +310,7 @@ fn failed_uninstall_shutdown_preserves_service_registration() {
     }
 
     let temp_root = unique_temp_dir("failed-uninstall-preserves-registration");
+    write_test_installed_binary(&temp_root);
     let runtime_root = temp_root.join("run");
     let authority = FileHostDaemonLifecycleService::with_path_inputs(
         RuntimeRoot {
@@ -393,6 +396,19 @@ fn test_path_inputs(temp_root: &Path) -> RuntimePathInputs {
         xdg_cache_home: Some(temp_root.join("cache")),
         xdg_state_home: Some(temp_root.join("state")),
         xdg_config_home: Some(temp_root.join("config")),
+    }
+}
+
+fn write_test_installed_binary(checkout: &Path) {
+    let executable = checkout.join("bin/refine");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(&executable, "installed fixture\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(executable, permissions).unwrap();
     }
 }
 

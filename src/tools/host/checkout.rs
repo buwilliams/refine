@@ -117,6 +117,28 @@ impl RefineCheckoutPaths {
         self.runtime_root.join(port.to_string())
     }
 
+    /// Resolve an executable which belongs to this product home.
+    ///
+    /// Runtime ownership and executable selection are separate: an installed
+    /// invocation runs `bin/refine`, while a source/debug invocation runs the
+    /// checkout's active Cargo-built executable. Both use the same `run`
+    /// directory, so child processes must inherit the active executable rather
+    /// than deriving `bin/refine` from the runtime path.
+    pub fn require_owned_executable(&self, executable: &Path) -> RefineResult<PathBuf> {
+        let executable = canonical_existing(executable, "active Refine executable")?;
+        let owner = Self::for_invocation(&executable)?;
+        if owner.checkout != self.checkout {
+            return Err(RefineError::Conflict(format!(
+                "active Refine executable {} belongs to product home {}, but runtime {} belongs to product home {}",
+                executable.display(),
+                owner.checkout.display(),
+                self.runtime_root.display(),
+                self.checkout.display()
+            )));
+        }
+        Ok(executable)
+    }
+
     pub fn validate_source_checkout(&self) -> RefineResult<()> {
         if !is_source_checkout_shape(&self.checkout) {
             return Err(RefineError::Conflict(format!(
@@ -436,5 +458,43 @@ mod tests {
 
         fs::remove_dir_all(left).unwrap();
         fs::remove_dir_all(right).unwrap();
+    }
+
+    #[test]
+    fn one_runtime_accepts_the_owning_debug_or_installed_executable_only() {
+        let root = temp_root("two-launch-modes");
+        common_shape(&root);
+        fs::create_dir(root.join(".git")).unwrap();
+        fs::create_dir_all(root.join("target/debug")).unwrap();
+        fs::write(root.join("target/debug/refine"), "debug\n").unwrap();
+        fs::write(root.join("bin/refine"), "installed\n").unwrap();
+        let paths = RefineCheckoutPaths::from_product_home(&root).unwrap();
+
+        assert_eq!(
+            paths
+                .require_owned_executable(&root.join("target/debug/refine"))
+                .unwrap(),
+            root.canonicalize().unwrap().join("target/debug/refine")
+        );
+        assert_eq!(
+            paths
+                .require_owned_executable(&root.join("bin/refine"))
+                .unwrap(),
+            root.canonicalize().unwrap().join("bin/refine")
+        );
+
+        let other = temp_root("foreign-launch-mode");
+        common_shape(&other);
+        fs::create_dir(other.join(".git")).unwrap();
+        fs::create_dir_all(other.join("target/debug")).unwrap();
+        fs::write(other.join("target/debug/refine"), "foreign\n").unwrap();
+        let error = paths
+            .require_owned_executable(&other.join("target/debug/refine"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("belongs to product home"), "{error}");
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(other).unwrap();
     }
 }

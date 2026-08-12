@@ -15,7 +15,6 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
-#[cfg(not(test))]
 use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
@@ -300,14 +299,17 @@ impl FileRunnerWorkerService {
 
 #[cfg(not(test))]
 fn runner_executable(runtime_root: &Path) -> RefineResult<PathBuf> {
+    let executable = std::env::current_exe()
+        .map_err(|error| RefineError::Io(format!("failed to locate runner executable: {error}")))?;
+    runner_executable_for_invocation(runtime_root, &executable)
+}
+
+fn runner_executable_for_invocation(
+    runtime_root: &Path,
+    executable: &Path,
+) -> RefineResult<PathBuf> {
     let (paths, _) = RefineCheckoutPaths::from_port_runtime_root(runtime_root)?;
-    if !paths.binary.is_file() {
-        return Err(RefineError::NotFound(format!(
-            "checkout-local binary {} is required to launch a runner worker",
-            paths.binary.display()
-        )));
-    }
-    Ok(paths.binary)
+    paths.require_owned_executable(executable)
 }
 
 #[cfg(test)]

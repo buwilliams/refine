@@ -12,6 +12,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
+fn service_install_fails_before_registration_when_installed_binary_is_missing() {
+    let temp_root = unique_temp_dir("installation-missing-binary");
+    let runtime_root = temp_root.join("run");
+    let service =
+        unprepared_test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+
+    let error = service
+        .install(InstallTarget::LinuxCliWeb)
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("installed Refine mode requires"), "{error}");
+    assert!(error.contains("bin/refine"), "{error}");
+    assert!(!service.backend_path().exists());
+    assert!(!service.path().exists());
+    fs::remove_dir_all(temp_root).unwrap_or(());
+}
+
+#[test]
 fn historical_target_aliases_parse_but_current_output_is_daemon_oriented() {
     assert_eq!(
         serde_json::from_str::<InstallTarget>("\"mac_os_app_bundle\"").unwrap(),
@@ -1285,6 +1304,16 @@ fn test_installation_service_for_port(
     port: u16,
     temp_root: &Path,
 ) -> FileInstallationService {
+    ensure_test_installed_binary(runtime_root);
+    unprepared_test_installation_service_for_port(runtime_root, version, port, temp_root)
+}
+
+fn unprepared_test_installation_service_for_port(
+    runtime_root: &PathBuf,
+    version: &str,
+    port: u16,
+    temp_root: &Path,
+) -> FileInstallationService {
     FileInstallationService::with_path_inputs_for_port(
         runtime_root,
         version,
@@ -1306,6 +1335,7 @@ fn test_installation_service(
     version: &str,
     temp_root: &Path,
 ) -> FileInstallationService {
+    ensure_test_installed_binary(runtime_root);
     FileInstallationService::with_path_inputs(
         runtime_root,
         version,
@@ -1319,6 +1349,21 @@ fn test_installation_service(
             xdg_config_home: Some(temp_root.join("config")),
         },
     )
+}
+
+fn ensure_test_installed_binary(runtime_root: &Path) {
+    let executable = runtime_root.parent().unwrap().join("bin/refine");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    if !executable.exists() {
+        fs::write(&executable, "installed fixture\n").unwrap();
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&executable, permissions).unwrap();
+    }
 }
 
 fn restore_env(key: &str, value: Option<String>) {

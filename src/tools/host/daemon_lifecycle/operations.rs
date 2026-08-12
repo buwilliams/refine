@@ -49,14 +49,7 @@ impl FileDaemonLifecycleOperationService {
         action: DaemonLifecycleAction,
         config: BackgroundDaemonConfig,
     ) -> RefineResult<DaemonLifecycleOperation> {
-        let paths = RefineCheckoutPaths::from_runtime_root(&self.runtime_root.root)?;
-        let executable = paths.binary;
-        if !executable.is_file() {
-            return Err(RefineError::NotFound(format!(
-                "checkout-local daemon lifecycle helper is missing: {}",
-                executable.display()
-            )));
-        }
+        let executable = lifecycle_executable(&self.runtime_root.root)?;
         let installation = FileInstallationService::for_port(
             &self.runtime_root.root,
             &self.current_version,
@@ -250,6 +243,22 @@ impl FileDaemonLifecycleOperationService {
             .join(DAEMON_LIFECYCLE_OPERATIONS_DIR)
             .join(format!("{operation_id}.json"))
     }
+}
+
+fn lifecycle_executable(runtime_root: &Path) -> RefineResult<PathBuf> {
+    let executable = std::env::current_exe().map_err(|error| {
+        RefineError::Io(format!(
+            "failed to resolve the active Refine lifecycle executable: {error}"
+        ))
+    })?;
+    lifecycle_executable_for_invocation(runtime_root, &executable)
+}
+
+pub(super) fn lifecycle_executable_for_invocation(
+    runtime_root: &Path,
+    executable: &Path,
+) -> RefineResult<PathBuf> {
+    RefineCheckoutPaths::from_runtime_root(runtime_root)?.require_owned_executable(executable)
 }
 
 fn installed_action(action: DaemonLifecycleAction) -> RefineResult<InstalledServiceAction> {

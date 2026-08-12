@@ -1,5 +1,50 @@
 use super::*;
 
+#[test]
+fn source_worker_inherits_debug_executable_without_installed_binary() {
+    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .canonicalize()
+        .unwrap();
+    let runtime_root = checkout.join("run/4557");
+    let test_executable = std::env::current_exe().unwrap();
+
+    let selected = runner_executable_for_invocation(&runtime_root, &test_executable).unwrap();
+
+    assert_eq!(selected, test_executable.canonicalize().unwrap());
+    assert_ne!(selected, checkout.join("bin/refine"));
+}
+
+#[test]
+fn installed_worker_inherits_the_stable_checkout_binary() {
+    let checkout = std::env::temp_dir().join(format!(
+        "refine-installed-worker-executable-{}",
+        uuid::Uuid::new_v4()
+    ));
+    std::fs::create_dir_all(checkout.join("src")).unwrap();
+    std::fs::create_dir_all(checkout.join("docs/runbooks")).unwrap();
+    std::fs::create_dir_all(checkout.join("bin")).unwrap();
+    std::fs::write(checkout.join("Cargo.toml"), "[package]\nname='refine'\n").unwrap();
+    std::fs::write(checkout.join("src/main.rs"), "fn main() {}\n").unwrap();
+    std::fs::write(checkout.join("docs/runbooks/install.md"), "# Install\n").unwrap();
+    std::fs::write(checkout.join("r"), "#!/bin/sh\n").unwrap();
+    std::fs::write(checkout.join("bin/refine"), "installed\n").unwrap();
+    std::fs::write(
+        checkout.join(".refine-deployed"),
+        "mode=deployed\nrelease_bin=bin/refine\n",
+    )
+    .unwrap();
+
+    let selected =
+        runner_executable_for_invocation(&checkout.join("run/4557"), &checkout.join("bin/refine"))
+            .unwrap();
+
+    assert_eq!(
+        selected,
+        checkout.join("bin/refine").canonicalize().unwrap()
+    );
+    std::fs::remove_dir_all(checkout).unwrap();
+}
+
 fn worker_record(state: &str, worker_kind: &str) -> ManagedProcess {
     ManagedProcess {
         id: format!("process-{state}-{worker_kind}"),

@@ -84,8 +84,9 @@ Do not offer `smoke-ai` during installation. It is reserved for deterministic te
 
 ## Product and runtime ownership
 
-The directory selected above is the product home. Its stable executable is
-`<refine-checkout>/bin/refine`, its base runtime is
+The directory selected above is the product home. Installed mode uses its
+stable `<refine-checkout>/bin/refine`; source/debug mode uses the active Cargo
+executable from the same checkout. Both modes use the same base runtime,
 `<refine-checkout>/run`, and port `<port>` owns only
 `<refine-checkout>/run/<port>`. `./r` anchors the invocation to that product
 home; the directory from which a user launches it is not an ownership signal.

@@ -223,5 +223,5 @@ if [ "$SELECTED_MODE" = "binary" ]; then
 fi
 
 export REFINE_LAUNCH_MODE="cargo"
-export REFINE_LAUNCH_EXECUTABLE="cargo"
+unset REFINE_LAUNCH_EXECUTABLE
 exec cargo run --quiet --manifest-path "$ROOT/Cargo.toml" -- "$@"

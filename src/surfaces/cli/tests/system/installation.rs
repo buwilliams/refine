@@ -4,6 +4,7 @@ use super::*;
 fn system_install_repair_and_uninstall_use_installation_service() {
     let temp_root = unique_temp_dir("cli-installation");
     let runtime_root = temp_root.join("run");
+    write_installed_binary(&temp_root);
 
     for argv in [
         ["refine", "system", "install"],

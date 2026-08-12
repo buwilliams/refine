@@ -41,6 +41,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let temp_root = unique_temp_dir("http-project-utils");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join("child")).unwrap();
+    write_test_installed_binary(&temp_root);
     init_git_app(&temp_root);
     let refine_dir = refine_dir_for_target_root(&temp_root).unwrap();
     let mut server = server_with_projection();

@@ -715,25 +715,30 @@ pub fn current_launch_mode() -> String {
 }
 
 pub fn current_launch_executable() -> Option<String> {
-    if let Ok(value) = std::env::var("REFINE_LAUNCH_EXECUTABLE")
-        && !value.trim().is_empty()
-    {
-        return Some(value);
+    select_launch_executable(
+        &current_launch_mode(),
+        std::env::var("REFINE_LAUNCH_EXECUTABLE").ok(),
+        std::env::current_exe().ok(),
+    )
+}
+
+fn select_launch_executable(
+    mode: &str,
+    configured: Option<String>,
+    actual: Option<PathBuf>,
+) -> Option<String> {
+    if mode == "cargo" {
+        return actual.map(|path| path.display().to_string());
     }
-    std::env::current_exe()
-        .ok()
-        .map(|path| path.display().to_string())
+    configured
+        .filter(|value| !value.trim().is_empty() && value.trim() != "cargo")
+        .or_else(|| actual.map(|path| path.display().to_string()))
 }
 
 pub fn daemon_executable_path() -> RefineResult<PathBuf> {
-    if current_launch_mode() == "binary"
-        && let Some(path) = current_launch_executable()
-        && path != "cargo"
-    {
-        return Ok(PathBuf::from(path));
-    }
-    std::env::current_exe()
-        .map_err(|error| RefineError::Io(format!("failed to locate current executable: {error}")))
+    current_launch_executable()
+        .map(PathBuf::from)
+        .ok_or_else(|| RefineError::NotFound("failed to locate current executable".to_string()))
 }
 
 pub fn daemon_executable_string() -> RefineResult<String> {

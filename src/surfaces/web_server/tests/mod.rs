@@ -478,6 +478,19 @@ fn remove_temp_dir(temp_root: impl AsRef<Path>) {
     }
 }
 
+fn write_test_installed_binary(checkout: &Path) {
+    let executable = checkout.join("bin/refine");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(&executable, "installed fixture\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(executable, permissions).unwrap();
+    }
+}
+
 fn percent_encode_for_test(value: &str) -> String {
     value
         .bytes()

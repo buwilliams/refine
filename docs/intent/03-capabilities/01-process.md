@@ -23,6 +23,12 @@ a published product home may be gitless when its release marker and
 port `P` owns only `<product-home>/run/P`. Stateful helpers and provider Agents
 must receive that exact port root. Relative `run` is compatibility syntax for
 the owning checkout, not an invitation to resolve against the caller's CWD.
+Executable mode is independent of runtime ownership: an installed invocation
+and its children use `<product-home>/bin/refine`, while a source/debug
+invocation and its children use the active checkout-owned Cargo executable.
+Workers and direct lifecycle handoffs inherit that active executable; only
+installed service registration, deployed update, and source activation require
+the stable `bin/refine` path.
 
 ## Expected Role
 
