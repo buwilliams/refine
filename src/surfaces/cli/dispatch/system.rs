@@ -48,6 +48,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         } => {
             let runtime_root = absolute_cli_path(runtime_root)?;
             let checkout_path = discover_refine_checkout()?;
+            let provider = resolve_update_provider(&runtime_root, provider)?;
             let mut host = FileDeployedUpdateHost::new(runtime_root.clone());
             let summary = run_deployed_update(
                 &mut host,

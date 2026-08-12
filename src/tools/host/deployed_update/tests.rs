@@ -256,6 +256,42 @@ fn deployed_update_reports_restart_failures_after_binary_replacement() {
 }
 
 #[test]
+fn resolve_update_provider_prefers_explicit_provider() {
+    let runtime_root = std::env::temp_dir().join(format!(
+        "refine-update-provider-explicit-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let provider = resolve_update_provider(&runtime_root, Some("codex".to_string())).unwrap();
+    assert_eq!(provider, "codex");
+}
+
+#[test]
+fn resolve_update_provider_uses_target_app_configured_provider() {
+    let root = std::env::temp_dir().join(format!(
+        "refine-update-provider-target-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let runtime_root = root.join("run");
+    let target_root = root.join("app");
+    fs::create_dir_all(&target_root).unwrap();
+    FileProjectRegistryService::new(&runtime_root, None)
+        .save(&crate::model::project::AppRegistry {
+            version: 1,
+            active_app: Some(target_root.display().to_string()),
+            apps: Default::default(),
+        })
+        .unwrap();
+    FileSettingsService::with_active_root(target_root.join(".refine"), &target_root)
+        .update(&serde_json::json!({"agent_cli": "gemini"}))
+        .unwrap();
+
+    let provider = resolve_update_provider(&runtime_root, None).unwrap();
+    assert_eq!(provider, "gemini");
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn refine_checkout_detection_requires_the_source_entrypoints() {
     let root = std::env::temp_dir().join(format!(
         "refine-checkout-detection-{}",

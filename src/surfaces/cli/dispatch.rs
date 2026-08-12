@@ -71,7 +71,8 @@ use crate::tools::host::daemon_lifecycle::{
     uninstall_daemon_installation,
 };
 use crate::tools::host::deployed_update::{
-    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
+    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout,
+    resolve_update_provider, run_deployed_update,
 };
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};

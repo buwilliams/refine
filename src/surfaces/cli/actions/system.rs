@@ -34,9 +34,11 @@ pub enum SystemAction {
         /// Skip the confirmation prompt.
         #[arg(long)]
         yes: bool,
-        /// Agent provider that performs the update (e.g. "claude").
-        #[arg(long, default_value = "claude")]
-        provider: String,
+        /// Agent provider that performs the update. Defaults to the target
+        /// app's configured provider, then the first installed provider CLI
+        /// in alphabetical order.
+        #[arg(long)]
+        provider: Option<String>,
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
