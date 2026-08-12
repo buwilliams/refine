@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::model::Timestamp;
 
-pub const IMPLEMENTATION_PLAN_SCHEMA_VERSION: u32 = 1;
+pub const IMPLEMENTATION_PLAN_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,12 +35,10 @@ pub enum ImplementationPlanState {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImplementationPlanBinding {
     pub goal_id: String,
-    /// Zero-based index, matching every other workflow/process fence.
+    /// Zero-based index of the synchronized Goal Round.
     pub round_idx: usize,
     pub context_version: u64,
     pub context_digest: String,
-    pub claim_id: String,
-    pub execution_id: String,
     pub implementation_branch: String,
     pub target_branch: String,
     pub base_commit: String,
@@ -52,21 +49,6 @@ pub struct PlanningGitObservation {
     pub head_commit: String,
     pub branch: Option<String>,
     pub status_porcelain: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct PlanningProcessEvidence {
-    pub operation_id: String,
-    pub process_id: Option<String>,
-    pub provider: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exit_code: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structured_output: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -99,7 +81,6 @@ pub struct ProposedImplementationPlan {
 pub struct ImplementationPlanArtifact {
     pub started_at: Timestamp,
     pub completed_at: Timestamp,
-    pub process: PlanningProcessEvidence,
     pub git_before: PlanningGitObservation,
     pub git_after: PlanningGitObservation,
     pub result: ProposedImplementationPlan,
@@ -126,7 +107,6 @@ pub struct ImplementationCriticism {
 pub struct ImplementationCriticismArtifact {
     pub started_at: Timestamp,
     pub completed_at: Timestamp,
-    pub process: PlanningProcessEvidence,
     pub git_before: PlanningGitObservation,
     pub git_after: PlanningGitObservation,
     pub result: ImplementationCriticism,
@@ -160,8 +140,6 @@ pub struct ImplementationExecutionEvidence {
 pub struct ImplementationAgentEvidence {
     pub started_at: Timestamp,
     pub completed_at: Timestamp,
-    pub process_id: String,
-    pub session_id: String,
     pub report: String,
     pub execution: ImplementationExecutionEvidence,
 }
@@ -173,15 +151,9 @@ pub struct ImplementationPlanningFailure {
     pub message: String,
     pub failed_at: Timestamp,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub operation_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub process_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git_before: Option<PlanningGitObservation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git_after: Option<PlanningGitObservation>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub process: Option<PlanningProcessEvidence>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -193,8 +165,6 @@ pub struct ImplementationPlan {
     pub started_at: Timestamp,
     pub phase_started_at: Timestamp,
     pub updated_at: Timestamp,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active_process: Option<PlanningProcessEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<Timestamp>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

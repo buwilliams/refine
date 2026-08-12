@@ -2,59 +2,36 @@
 
 ## Key Ideas
 
-- **One Coordination Boundary**: every cross-process mutation of workflow meaning uses one shared consistency boundary.
-- **Narrow Authorities**: each capability owns its truth and connects it to other truths through stable identities.
-- **Evidence Before State**: evidence is durable before the state whose correctness depends on it.
-- **Conflicts Preserve Decisions**: a mutation based on stale authority conflicts instead of overwriting newer work.
-- **Crash-Repairable Commitments**: an acknowledged decision survives interruption and can be completed without deciding again.
-- **Judgment Inside Integrity**: agents retain adaptable judgment while Refine deterministically protects identity, authority, durability, and coordination.
-- **Thin Surfaces**: every human or agent surface delegates these rules to the shared capabilities.
+- **Goal State Is Authority**: synchronized Goal status, node assignment, Round, and semantic evidence decide what work may advance.
+- **Execution Is Local**: workers and process identifiers are transient observations on one node.
+- **Evidence Before Transition**: semantic evidence is durable before the Goal state that depends on it.
+- **Conflicts Preserve Newer Decisions**: stale workers cannot overwrite reassignment, cancellation, a new Round, or another transition.
+- **Cheap Restart**: nonterminal work may be run again; idempotence and readback replace durable execution ownership.
 
 ## Purpose
 
-Refine has multiple processes and replaceable surfaces acting on the same local work. Durable files make that work inspectable, but independent read-modify-write paths can still publish contradictory decisions. This contract defines the minimum consistency required across those actors without prescribing storage, serialization, or recovery machinery.
-
-The contract belongs to Workflow as the coordinator of state movement. It does not collapse Foundation, Capabilities, and Surfaces into one owner. Product intent, constitution, guidance, and Goal instructions remain context for agent judgment; Refine coordinates the integrity of decisions made from that context.
+Multiple nodes and replaceable surfaces can act on the same synchronized Goals. This contract keeps those actors consistent while avoiding a second durable state machine for locks, reservations, or worker identity.
 
 ## Authority And Identity
 
-Authority stays narrow:
+Workflow owns Goal status, node assignment, Round history, and workflow decisions. Process owns node-local operations and managed-process facts. Git owns repository, worktree, ref, commit, and integration facts. Activity and evidence record what happened. Projections and surfaces own no authoritative workflow state.
 
-- Foundation owns stable target-app identity and its relationship to the current canonical root.
-- Workflow owns Goals, their round history, workflow decisions, and claims to advance a specific Goal round.
-- Process owns operations and managed-process facts; capacity owns admission leases.
-- Git owns the repository, worktree, ref, commit, and integration facts it observes.
-- Activity and evidence own the durable account of decisions and execution, not the decisions themselves.
-- Projections and surfaces own no authoritative workflow state.
-
-These authorities are connected only as needed by stable identities for the target app, Goal and round, claim, operation, process, capacity lease, Git observation, and evidence. A relationship is recorded rather than inferred later from a path, label, timestamp, process identifier, selected app, branch name, or copied status. One authority may use another as evidence without taking ownership of its truth.
+Stable synchronized relationships use target-app, Goal, Round, Feature, and Git identities. Node-local operation, process, and session identifiers support control and may be cited as execution provenance, but they never authorize a workflow mutation or act as a resumable workflow checkpoint.
 
 ## Required Invariants
 
-Every mutation that can change workflow meaning across processes crosses the same shared coordination boundary, independent of its caller. The boundary acts on the current authoritative relationships and the state on which the caller's decision depends. If either has changed, the mutation conflicts; convenience, recency, or a retry cannot turn a stale observation into authority.
+A worker may start only after reading an eligible Goal assigned to its node. It rereads Goal status, node, and Round before transitions and before consequential boundaries. A mismatched observation stops that worker without rewriting the Goal.
 
-Evidence required to justify a workflow decision is durable before the state that relies on it. Logs, process outcomes, Git observations, reviews, and governance results remain evidence linked to the relevant identities; none independently becomes a workflow verdict.
+Concurrent execution is tolerated as at-least-once work. Behaviors must be idempotent or detect already-produced semantic evidence. Restart may begin a fresh worker for the same nonterminal Goal; the new worker consumes the same synchronized instructions and preserved artifacts.
 
-Execution-time implementation planning follows the same rule at sub-state
-boundaries. The Round owns a typed, versioned proposal, criticism, final plan,
-and implementation-discrepancy history. Workflow persists each artifact before
-launching its consumer and compare-and-swaps every update against the complete
-prior planning value plus Goal/Round, claim/execution, pinned-context digest,
-branch, and base fences. A stale phase cannot overwrite newer judgment.
+Implementation planning persists typed proposal, criticism, revision, and implementation evidence with Goal/Round, context digest, branch, target branch, and base commit. Updates compare against the complete prior planning value. They do not persist the identity of the process that produced them.
 
-Those durable artifacts order a live attempt; they are not automatic-resume
-checkpoints. Interruption settles the in-progress attempt as failed. A supported
-follow-up Round begins a new planning pipeline with new claim and execution
-identities while the interrupted Round remains immutable evidence.
+Ready Merge rereads authority immediately before its first Git side effect under the repository lock. Cancellation or reassignment before that boundary prevents integration. Once integration begins it may finish and persist exact integration evidence even if cancellation arrives; cancellation remains the Goal's terminal status and no rollback is attempted.
 
-Once Refine acknowledges a decision, both the decision and enough identity to repair its incomplete consequences are durable. After interruption, recovery preserves that decision and reconciles authorities or derived views without silently choosing a different outcome or repeating consequential work as a new decision.
+Synchronization resolves one narrow ownership race: when a queued Goal is reassigned concurrently with automated work starting on its previously authoritative node, the start wins and the reassignment request is discarded. Other competing lifecycle changes remain conflicts.
 
-Agents remain responsible for interpreting intent, weighing evidence, and making implementation, quality, review, and recovery judgments. Refine is responsible for deterministic integrity around those judgments: authority, identity, conflicts, durable acknowledgement, and evidence linkage.
-
-Browser, CLI, API, MCP, and agent tools remain thin adapters. They submit intent to shared capabilities and present the resulting authoritative state; they do not duplicate coordination rules, write competing workflow truth, or infer success from a request, process, or local projection.
-
-The implementation may use serialization, optimistic concurrency, journaling, or another design. It satisfies this contract only when every process and surface observes the same authority relationships and the invariants above remain true across interruption and concurrency.
+Browser, CLI, API, MCP, and agent tools submit Goal or process intent through shared capabilities. They do not expose a parallel workflow-execution resource or infer authority from a local process identifier.
 
 ## Future Direction
 
-Coordination machinery may evolve with scale. The durable architecture is the boundary: narrow authorities connected by stable identity, evidence preceding the state it proves, stale mutations conflicting, acknowledged decisions remaining repairable, adaptable agents exercising judgment, and replaceable surfaces sharing one truth.
+Coordination may become more distributed, but stronger machinery should be added only when duplicate idempotent work is materially more expensive than maintaining it. The default remains synchronized semantic state, transient local execution, strict stale-write rejection, and observable recovery.

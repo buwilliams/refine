@@ -264,37 +264,6 @@ impl FileSourcePromotionService {
 
     pub(crate) fn active_work(&self) -> RefineResult<Vec<String>> {
         let mut active = Vec::new();
-        let workflow_path = self
-            .port_runtime_root
-            .join("workflow-automation-state.json");
-        if workflow_path.is_file() {
-            let value: Value =
-                serde_json::from_slice(&fs::read(&workflow_path).map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to read {}: {error}",
-                        workflow_path.display()
-                    ))
-                })?)
-                .map_err(|error| {
-                    RefineError::Serialization(format!(
-                        "failed to parse {}: {error}",
-                        workflow_path.display()
-                    ))
-                })?;
-            if let Some(claims) = value.get("claims").and_then(Value::as_array) {
-                for claim in claims {
-                    let state = claim.get("state").and_then(Value::as_str).unwrap_or("");
-                    if matches!(state, "claimed" | "running") {
-                        let goal = claim
-                            .get("goal_id")
-                            .or_else(|| claim.get("gap_id"))
-                            .and_then(Value::as_str)
-                            .unwrap_or("unknown");
-                        active.push(format!("active Goal claim {goal}"));
-                    }
-                }
-            }
-        }
         let supervisor = FileProcessSupervisor::new(&self.port_runtime_root);
         let pause_state = supervisor.pause_state()?;
         if !pause_state.workflow_paused {

@@ -1,23 +1,6 @@
 use super::*;
 
 impl FileProcessSupervisor {
-    /// Serializes target-bound workflow cancellation with the complete spawn-to-registration
-    /// window. A cancellation cannot mistake a not-yet-registered worker for an exited worker,
-    /// and a delayed workflow step cannot launch after its exact claim has settled.
-    pub(crate) fn workflow_process_registration_guard(
-        &self,
-        spec: &ManagedProcessSpec,
-    ) -> RefineResult<Option<WorkflowProcessRegistrationLock>> {
-        let Some((claim_id, execution_id, goal_id)) = workflow_process_identity(&spec.metadata)
-        else {
-            return Ok(None);
-        };
-        let workflow_root = workflow_runtime_root(&self.runtime_root);
-        let guard = acquire_workflow_process_registration_lock(&workflow_root)?;
-        validate_running_workflow_claim(&workflow_root, claim_id, execution_id, goal_id)?;
-        Ok(Some(guard))
-    }
-
     /// Requests termination without removing the managed-process record. The process runner owns
     /// final reaping and artifact cleanup, so callers can keep capacity reserved until the real
     /// child has exited.

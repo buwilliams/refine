@@ -72,18 +72,8 @@ fn ready_merge_conflict_aborts_without_advancing_or_losing_candidate() {
         .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
         .unwrap();
 
-    let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
     let error = FileMergerService::new(&runtime_root, &refine_dir)
-        .integrate_workflow_candidate(
-            "GOAL1",
-            0,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap_err();
     assert!(
         error.to_string().contains("candidate integration failed"),

@@ -23,7 +23,7 @@ When a Goal is done:
 - Refine removes it from active workflow consideration.
 - The final state, evidence, logs, quality results, review decisions, and merge context remain inspectable.
 - Feature rollups, dashboards, and summaries should reflect the completed work.
-- Any node claims or active execution tied to the Goal should be closed.
+- Any local execution tied to the Goal should be finished or stopped.
 - Future agents should be able to inspect why the work was considered complete.
 
 ## Future Direction

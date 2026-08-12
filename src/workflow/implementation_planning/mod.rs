@@ -20,9 +20,7 @@ mod runtime;
 
 use codec::*;
 use prompts::*;
-#[cfg(test)]
-pub(in crate::workflow) use runtime::persist_plan;
-pub(in crate::workflow) use runtime::record_current_process_settlement;
+pub(crate) use runtime::recover_interrupted_plan;
 use runtime::*;
 
 pub(super) fn run_governed_implementation_planning(
@@ -67,13 +65,11 @@ pub(super) fn run_governed_implementation_planning(
         plan.proposal = Some(ImplementationPlanArtifact {
             started_at: run.started_at,
             completed_at: run.completed_at,
-            process: run.process,
             git_before: run.git_before,
             git_after: run.git_after,
             result,
         });
         plan.updated_at = now_timestamp();
-        plan.active_process = None;
         persist_plan(ctx, Some(&previous), &plan)?;
     }
 
@@ -109,13 +105,11 @@ pub(super) fn run_governed_implementation_planning(
         plan.criticism = Some(ImplementationCriticismArtifact {
             started_at: run.started_at,
             completed_at: run.completed_at,
-            process: run.process,
             git_before: run.git_before,
             git_after: run.git_after,
             result,
         });
         plan.updated_at = now_timestamp();
-        plan.active_process = None;
         persist_plan(ctx, Some(&previous), &plan)?;
     }
 
@@ -162,18 +156,15 @@ pub(super) fn run_governed_implementation_planning(
         plan.final_plan = Some(ImplementationPlanArtifact {
             started_at: run.started_at,
             completed_at: run.completed_at,
-            process: run.process,
             git_before: run.git_before,
             git_after: run.git_after,
             result,
         });
         plan.updated_at = now_timestamp();
-        plan.active_process = None;
         persist_plan(ctx, Some(&previous), &plan)?;
     }
 
     begin_phase(ctx, &mut plan, ImplementationPlanPhase::Implement)?;
-    arm_implementation_phase(ctx, &mut plan, agent_cwd)?;
     Ok(plan.final_plan.expect("revision phase persisted").result)
 }
 
@@ -185,22 +176,9 @@ pub(super) fn governed_implementation_prompt(
     implementation_prompt(&goal_agent_prompt(goal_id, agent_context)?, final_plan)
 }
 
-pub(super) fn active_implementation_operation_id(
-    ctx: &WorkflowContext<'_>,
-) -> RefineResult<String> {
-    current_plan(ctx)?
-        .active_process
-        .map(|process| process.operation_id)
-        .ok_or_else(|| {
-            RefineError::NotFound("implementation phase operation identity is missing".to_string())
-        })
-}
-
 pub(super) fn complete_implementation_planning(
     ctx: &WorkflowContext<'_>,
     started_at: String,
-    process_id: String,
-    session_id: String,
     report: String,
     evidence: Option<ImplementationExecutionEvidence>,
 ) -> RefineResult<()> {
@@ -262,12 +240,9 @@ pub(super) fn complete_implementation_planning(
     plan.implementation = Some(ImplementationAgentEvidence {
         started_at,
         completed_at,
-        process_id,
-        session_id,
         report,
         execution: evidence,
     });
-    plan.active_process = None;
     persist_plan(ctx, Some(&previous), &plan)
 }
 
@@ -334,15 +309,32 @@ fn load_or_initialize_plan(
         .get("implementation_plan")
         .filter(|value| !value.is_null())
     {
-        let plan: ImplementationPlan = serde_json::from_value(raw.clone()).map_err(|error| {
-            RefineError::Serialization(format!("invalid implementation planning evidence: {error}"))
-        })?;
-        if plan.schema_version != IMPLEMENTATION_PLAN_SCHEMA_VERSION || plan.binding != binding {
+        let mut plan: ImplementationPlan =
+            serde_json::from_value(raw.clone()).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "invalid implementation planning evidence: {error}"
+                ))
+            })?;
+        if plan.binding != binding {
             return Err(RefineError::Conflict(format!(
                 "Goal {} round {} implementation planning binding changed",
                 ctx.goal_id,
                 ctx.round_idx + 1
             )));
+        }
+        if plan.schema_version != IMPLEMENTATION_PLAN_SCHEMA_VERSION {
+            let previous = plan.clone();
+            plan.schema_version = IMPLEMENTATION_PLAN_SCHEMA_VERSION;
+            if plan
+                .failure
+                .as_ref()
+                .is_some_and(|failure| failure.category == "interrupted")
+            {
+                plan.state = ImplementationPlanState::InProgress;
+                plan.failure = None;
+            }
+            plan.updated_at = now_timestamp();
+            persist_plan(ctx, Some(&previous), &plan)?;
         }
         return Ok(plan);
     }
@@ -355,7 +347,6 @@ fn load_or_initialize_plan(
         started_at: now.clone(),
         phase_started_at: now.clone(),
         updated_at: now,
-        active_process: None,
         completed_at: None,
         proposal: None,
         criticism: None,
@@ -394,8 +385,6 @@ fn plan_binding(
             .and_then(Value::as_u64)
             .unwrap_or(0),
         context_digest: format!("{:x}", Sha256::digest(encoded)),
-        claim_id: ctx.claim_id.clone(),
-        execution_id: ctx.execution_id.clone(),
         implementation_branch: implementation_branch.to_string(),
         target_branch: required("target_branch")?,
         base_commit: required("base_commit")?,

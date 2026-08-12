@@ -11,19 +11,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::*;
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::WorkflowAutomation;
 
 fn init_repo(repo: &Path) {
     git(repo, &["init", "-b", "main"]).unwrap();
     git(repo, &["config", "user.email", "test@example.com"]).unwrap();
     git(repo, &["config", "user.name", "Test User"]).unwrap();
-}
-
-fn start_ready_merge_claim(runtime_root: &Path, repo: &Path) -> (String, String) {
-    let automation = WorkflowEngine::with_target_root(runtime_root, repo);
-    let claim_id = automation.claim("GOAL1").unwrap();
-    let execution_id = automation.start_claim(&claim_id).unwrap();
-    (claim_id, execution_id)
 }
 
 fn commit_file(repo: &Path, path: &str, contents: &str, message: &str) {

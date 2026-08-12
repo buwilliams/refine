@@ -39,7 +39,7 @@ pub(super) fn run_workflow_worker(
             }
             if recovered_root.as_ref() != Some(&root) {
                 match workflow.recover_interrupted_goals(
-                    "workflow runner stopped before the Goal completed; restart the Goal when ready",
+                    "workflow runner restarted; nonterminal work remains schedulable from its synchronized state",
                 ) {
                     Ok(count) if count > 0 => {
                         let _ = refresh_projection(runtime_root, &target_root);
@@ -120,15 +120,6 @@ pub(super) fn retire_legacy_supervisor(
                 )));
             }
         }
-    }
-    let capacity = crate::workflow::capacity::AgentCapacityService::new(runtime_root);
-    let leases = capacity.snapshot()?;
-    for lease in leases
-        .leases
-        .into_iter()
-        .filter(|lease| lease.owner_id.starts_with("supervisor:"))
-    {
-        capacity.release(&lease.owner_id)?;
     }
     Ok(())
 }

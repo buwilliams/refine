@@ -31,68 +31,6 @@ impl FileOperationRegistry {
         Ok(operation)
     }
 
-    /// Cancels every active operation durably owned by one workflow execution.
-    ///
-    /// Ready Merge uses this before changing the workflow claim. Operation cancellation and
-    /// registration share the mutation lock. A durable execution tombstone is written even when
-    /// no operation exists yet, so a worker that already holds workflow authority cannot register
-    /// and launch after cancellation's first scan. Repeating the call remains intentional because
-    /// the workflow coordination lock orders the tombstone with the authoritative claim update.
-    pub fn cancel_workflow_execution_operations(
-        &self,
-        execution_id: &str,
-    ) -> RefineResult<Vec<OperationHandle>> {
-        let execution_id = execution_id.trim();
-        if execution_id.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "Workflow execution id is required for cancellation".to_string(),
-            ));
-        }
-        let lock = self.mutation_lock()?;
-        let cancellation = self.persist_workflow_cancellation(execution_id)?;
-        let error = cancellation.get("error").cloned().unwrap_or_else(|| {
-            json!({
-                "code": "workflow_execution_cancelled",
-                "message": format!("Workflow execution {execution_id} was cancelled"),
-                "execution_id": execution_id
-            })
-        });
-        let mut cancelled = self
-            .recover()?
-            .into_iter()
-            .filter(|operation| {
-                operation
-                    .request
-                    .get("execution_id")
-                    .and_then(Value::as_str)
-                    == Some(execution_id)
-                    && operation_active(&operation.state)
-            })
-            .collect::<Vec<_>>();
-        for operation in &mut cancelled {
-            operation.state = OperationState::Cancelled;
-            operation.error = Some(error.clone());
-            self.write(operation)?;
-        }
-        FileExt::unlock(&lock).ok();
-
-        for operation in &cancelled {
-            self.append_log(
-                &operation.id,
-                operation_log_entry(operation, "warning", "Workflow operation cancelled", None),
-            )?;
-            if let Err(error) = self.terminate_associated_processes(&operation.id) {
-                self.persist_cancellation_failure(
-                    &operation.id,
-                    "operation_process_termination_failed",
-                    &error,
-                )?;
-                return Err(error);
-            }
-        }
-        Ok(cancelled)
-    }
-
     pub(super) fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         for process in supervisor

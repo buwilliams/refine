@@ -5,29 +5,6 @@ use crate::model::goal::ImplementationPlan;
 use super::*;
 
 impl FileWorkItemService {
-    pub(crate) fn goal_round_implementation_plan(
-        &self,
-        goal_id: &str,
-        round_idx: usize,
-    ) -> RefineResult<Option<ImplementationPlan>> {
-        let detail = self.show_goal_detail(goal_id)?;
-        detail
-            .get("rounds")
-            .and_then(Value::as_array)
-            .and_then(|rounds| rounds.get(round_idx))
-            .and_then(|round| round.get("implementation_plan"))
-            .filter(|value| !value.is_null())
-            .map(|value| {
-                serde_json::from_value(value.clone()).map_err(|error| {
-                    RefineError::Serialization(format!(
-                        "Goal {goal_id} round {} has invalid implementation planning evidence: {error}",
-                        round_idx + 1
-                    ))
-                })
-            })
-            .transpose()
-    }
-
     /// Atomically replaces planning evidence only while its complete workflow/Git/context
     /// binding is still current. Planning orchestration owns the phase machine; this method
     /// owns the durable Goal-record compare-and-swap boundary.

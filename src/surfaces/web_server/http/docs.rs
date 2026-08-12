@@ -220,6 +220,11 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
                 path: "docs/intent/03-capabilities/03-workflow/10-cancelled.md",
                 summary: "Work intentionally stopped without losing context.",
             },
+            DocsNavEntry {
+                title: "Execution Ownership",
+                path: "docs/intent/03-capabilities/04-execution-ownership.md",
+                summary: "Synchronized Goal authority with replaceable node-local workers.",
+            },
         ],
     },
     DocsNavGroup {

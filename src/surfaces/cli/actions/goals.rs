@@ -124,7 +124,7 @@ pub enum GoalAction {
         #[arg(long)]
         edit_latest: bool,
     },
-    /// Queue a Goal for the agent workflow: moves backlog work to todo so automation can claim it.
+    /// Queue a Goal for the agent workflow: moves backlog work to todo so automation can start it.
     Start {
         /// Goal id.
         id: String,

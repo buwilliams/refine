@@ -19,10 +19,10 @@ use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
-    GovernanceEvaluation, active_implementation_operation_id, agent_worktree_cwd,
-    complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,
-    implementation_branch_name, json_object, now_timestamp, parse_governance_provider_output,
-    post_implementation_governance_prompt, record_current_process_settlement, round_agent_context,
+    GovernanceEvaluation, agent_worktree_cwd, complete_implementation_planning,
+    fail_implementation_phase, governed_implementation_prompt, implementation_branch_name,
+    json_object, now_timestamp, parse_governance_provider_output,
+    post_implementation_governance_prompt, round_agent_context,
     run_governed_implementation_planning, selected_agent_context, setting_string,
 };
 
@@ -89,9 +89,8 @@ impl WorkflowBehavior for WorkflowTodo {
             Err(error) => return fail(ctx, "branch", error),
         };
         // Todo is a queue, not an execution workspace. The scheduler has already
-        // acquired capacity for this Running claim before this transition, and
-        // the durable Goal state must cross into in-progress before Git is
-        // allowed to materialize a repository copy.
+        // selected this Goal using observed local capacity, and durable Goal state
+        // must cross into in-progress before Git may materialize a repository copy.
         ctx.request_transition(GoalStatus::Todo, GoalStatus::InProgress)?;
         let worktree_path = match materialize_in_progress_worktree(ctx, &app_git, &branch) {
             Ok(path) => path,
@@ -387,13 +386,9 @@ impl WorkflowBehavior for WorkflowImplementation {
         let mut process_metadata =
             ctx.workflow_process_metadata("in-progress", "WorkflowImplementation");
         process_metadata.insert("implementation_phase".to_string(), json!("implement"));
-        let implementation_operation_id = match active_implementation_operation_id(ctx) {
-            Ok(operation_id) => operation_id,
-            Err(error) => return fail(ctx, "implementation_planning", error),
-        };
         process_metadata.insert(
             "operation_id".to_string(),
-            json!(implementation_operation_id),
+            json!(uuid::Uuid::new_v4().to_string()),
         );
         process_metadata.insert(
             "worktree".to_string(),
@@ -420,7 +415,7 @@ impl WorkflowBehavior for WorkflowImplementation {
                     }))),
                 );
             },
-            |settlement| record_current_process_settlement(ctx, settlement),
+            |_| Ok(()),
         ) {
             Ok(result) => result,
             Err(error) => {
@@ -432,8 +427,6 @@ impl WorkflowBehavior for WorkflowImplementation {
         if let Err(error) = complete_implementation_planning(
             ctx,
             implementation_started_at,
-            agent_result.process_id.clone(),
-            agent_result.session_id.clone(),
             provider_output.clone(),
             agent_result.implementation_evidence.clone(),
         ) {
@@ -645,15 +638,11 @@ impl WorkflowBehavior for WorkflowQa {
             ));
             let goal_id = ctx.goal_id.clone();
             let round_idx = ctx.round_idx;
-            let claim_id = ctx.claim_id.clone();
-            let execution_id = ctx.execution_id.clone();
             let node_id = ctx.node_id.clone();
             let reverted = match merger.revert_reconciled_candidate_and_settle(
                 ReconciliationRequest {
                     goal_id: &goal_id,
                     round_idx,
-                    claim_id: &claim_id,
-                    execution_id: &execution_id,
                     node_id: &node_id,
                     integration: &integration,
                     expected_target_commit: &quality.candidate_commit,
@@ -765,15 +754,11 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             ctx.target_root,
         );
         let goal_id = ctx.goal_id.clone();
-        let claim_id = ctx.claim_id.clone();
-        let execution_id = ctx.execution_id.clone();
         let node_id = ctx.node_id.clone();
         let round_idx = ctx.round_idx;
-        let integration = match merger.integrate_workflow_candidate_and_settle(
+        let (integration, transitioned) = match merger.integrate_workflow_candidate_and_settle(
             &goal_id,
             round_idx,
-            &claim_id,
-            &execution_id,
             &node_id,
             &branch,
             &commit,
@@ -788,10 +773,16 @@ impl WorkflowBehavior for WorkflowReadyMerge {
                         "integration": integration
                     }))),
                 )?;
-                ctx.request_transition(GoalStatus::ReadyMerge, next.clone())
+                let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
+                if current.goal.status == GoalStatus::Cancelled {
+                    Ok(false)
+                } else {
+                    ctx.request_transition(GoalStatus::ReadyMerge, next.clone())?;
+                    Ok(true)
+                }
             },
         ) {
-            Ok((integration, _)) => integration,
+            Ok(settled) => settled,
             Err(RefineError::StaleCandidate {
                 candidate_commit,
                 recorded_base,
@@ -842,14 +833,24 @@ impl WorkflowBehavior for WorkflowReadyMerge {
                 });
             }
             Err(error)
-                if error.to_string().contains("Ready Merge execution")
-                    && error.to_string().contains("was cancelled") =>
+                if ctx
+                    .work_items
+                    .show_goal_summary(&ctx.goal_id)
+                    .is_ok_and(|goal| goal.goal.status == GoalStatus::Cancelled) =>
             {
                 return Err(error);
             }
             Err(error) => return fail(ctx, "merge", error),
         };
         ctx.merge = Some(integration.merge);
+        if !transitioned {
+            ctx.final_status = Some(GoalStatus::Cancelled);
+            return Ok(WorkflowAdvanceOutcome::Completed {
+                final_status: GoalStatus::Cancelled,
+                reason: "Ready Merge finished after Goal cancellation; integration evidence was preserved"
+                    .to_string(),
+            });
+        }
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::ReadyMerge,
             to: next,

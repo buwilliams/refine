@@ -362,10 +362,58 @@ pub(super) fn merge_goal_record(base: &[u8], local: &[u8], remote: &[u8]) -> Opt
     {
         return None;
     }
+    let (local, remote) = resolve_queued_reassignment_start_race(&base, local, remote)?;
     let merged = merge_json_value(&base, &local, &remote, None)?;
     let mut encoded = serde_json::to_vec_pretty(&merged).ok()?;
     encoded.push(b'\n');
     Some(encoded)
+}
+
+/// Resolve the one lifecycle race with an unambiguous authority rule: if one node starts a queued
+/// Goal while another node concurrently requests reassignment, the start on the previously
+/// authoritative node wins. The reassignment side's unrelated edits still participate in the
+/// ordinary strict merge. Every other competing lifecycle change remains a conflict.
+fn resolve_queued_reassignment_start_race(
+    base: &serde_json::Value,
+    mut local: serde_json::Value,
+    mut remote: serde_json::Value,
+) -> Option<(serde_json::Value, serde_json::Value)> {
+    let base_status = base.get("status")?.as_str()?;
+    if !matches!(base_status, "backlog" | "todo") {
+        return Some((local, remote));
+    }
+    let base_node = base
+        .get("node_id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("default");
+    let is_start = |side: &serde_json::Value| {
+        matches!(
+            side.get("status").and_then(serde_json::Value::as_str),
+            Some("in-progress" | "ready-merge" | "build" | "qa")
+        ) && side
+            .get("node_id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("default")
+            == base_node
+    };
+    let is_reassignment = |side: &serde_json::Value| {
+        side.get("status").and_then(serde_json::Value::as_str) == Some(base_status)
+            && side
+                .get("node_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("default")
+                != base_node
+    };
+    if is_start(&local) && is_reassignment(&remote) {
+        let remote = remote.as_object_mut()?;
+        remote.insert("status".to_string(), local.get("status")?.clone());
+        remote.insert("node_id".to_string(), serde_json::json!(base_node));
+    } else if is_start(&remote) && is_reassignment(&local) {
+        let local = local.as_object_mut()?;
+        local.insert("status".to_string(), remote.get("status")?.clone());
+        local.insert("node_id".to_string(), serde_json::json!(base_node));
+    }
+    Some((local, remote))
 }
 
 fn merge_json_value(

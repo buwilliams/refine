@@ -293,8 +293,6 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
                         "{:x}",
                         Sha256::digest(serde_json::to_vec(&context).unwrap())
                     ),
-                    claim_id: "claim-between-phases".to_string(),
-                    execution_id: "exec-between-phases".to_string(),
                     implementation_branch: "refine/GOAL-BETWEEN-PHASES/round-1".to_string(),
                     target_branch: "main".to_string(),
                     base_commit: "base123".to_string(),
@@ -302,7 +300,6 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
                 started_at: "2026-08-11T10:00:00Z".to_string(),
                 phase_started_at: "2026-08-11T10:01:00Z".to_string(),
                 updated_at: "2026-08-11T10:01:00Z".to_string(),
-                active_process: None,
                 completed_at: None,
                 proposal: None,
                 criticism: None,
@@ -473,7 +470,7 @@ fn web_server_opens_failed_goal_in_diagnostic_session_without_workflow_mutation(
 }
 
 #[test]
-fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
+fn browser_terminal_stop_requeues_the_goal_after_stopping_its_local_agent() {
     let _env_guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -517,27 +514,18 @@ fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
     work_items
         .advance_automated_goal_status("GOAL-TERMINAL-STOP", GoalStatus::InProgress)
         .unwrap();
-    let workflow = WorkflowEngine::with_target_root(&runtime_root, &app_root);
-    let claim_id = workflow.claim("GOAL-TERMINAL-STOP").unwrap();
-    let execution_id = workflow.start_claim(&claim_id).unwrap();
-    assert_eq!(
-        AgentCapacityService::new(&runtime_root)
-            .snapshot()
-            .unwrap()
-            .leases
-            .len(),
-        1
-    );
-
     let runtime_for_thread = runtime_root.clone();
     let app_for_thread = app_root.clone();
-    let claim_for_thread = claim_id.clone();
-    let execution_for_thread = execution_id.clone();
     let session_thread = thread::spawn(move || {
         let mut metadata = serde_json::Map::new();
         metadata.insert("goal_id".to_string(), json!("GOAL-TERMINAL-STOP"));
-        metadata.insert("claim_id".to_string(), json!(claim_for_thread));
-        metadata.insert("execution_id".to_string(), json!(execution_for_thread));
+        metadata.insert("kind".to_string(), json!("workflow"));
+        metadata.insert("node_id".to_string(), json!("default"));
+        metadata.insert("provider".to_string(), json!("smoke-ai"));
+        metadata.insert(
+            "target_app_id".to_string(),
+            json!(app_for_thread.display().to_string()),
+        );
         metadata.insert("round_idx".to_string(), json!(0));
         metadata.insert("workflow_state".to_string(), json!("in-progress"));
         run_goal_agent(
@@ -587,7 +575,7 @@ fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
     assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
     assert_eq!(stopped.body["goal"]["id"], "GOAL-TERMINAL-STOP");
     assert_eq!(stopped.body["goal"]["status"], "todo");
-    assert_eq!(stopped.body["worktree_retention"]["retained"], false);
+    assert_eq!(stopped.body["worktrees_retained"], true);
     assert!(
         FileProcessSupervisor::new(&runtime_root)
             .inspect(&process_id)
@@ -601,36 +589,22 @@ fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
             .status,
         GoalStatus::Todo
     );
-    let state = WorkflowEngine::new(&runtime_root).load_state().unwrap();
-    let claim = state
-        .claims
-        .iter()
-        .find(|claim| claim.claim_id == claim_id)
+    let receipt_path = fs::read_dir(runtime_root.join("process-stop-outcomes"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with(&format!("process-{process_id}-"))
+        })
         .unwrap();
-    assert_eq!(claim.execution_id.as_deref(), Some(execution_id.as_str()));
-    assert_eq!(claim.state, WorkflowClaimState::Cancelled);
-    assert!(
-        AgentCapacityService::new(&runtime_root)
-            .snapshot()
-            .unwrap()
-            .leases
-            .is_empty()
-    );
-    let receipt: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            runtime_root
-                .join("process-stop-outcomes")
-                .join(format!("{process_id}.json")),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(receipt["state"], "completed");
-    assert_eq!(receipt["confirmed_exit"], true);
-    assert_eq!(receipt["goal_cancelled"], false);
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(receipt_path).unwrap()).unwrap();
+    assert_eq!(receipt["termination"]["confirmed_exit"], true);
     assert_eq!(receipt["goal_requeued"], true);
-    assert_eq!(receipt["claim_cancelled"], true);
-    assert_eq!(receipt["workflow"]["execution_id"], execution_id);
+    assert_eq!(receipt["worktrees_retained"], true);
     let _ = session_thread.join().unwrap();
 
     unsafe {
@@ -644,12 +618,12 @@ fn browser_terminal_stop_uses_shared_workflow_goal_agent_cancellation() {
 }
 
 #[test]
-fn public_goal_cancel_api_reports_managed_no_claim_goal_as_durably_cancelled() {
-    let temp_root = unique_temp_dir("http-goal-cancel-no-claim");
+fn public_goal_cancel_api_reports_goal_without_a_local_process_as_durably_cancelled() {
+    let temp_root = unique_temp_dir("http-goal-cancel-no-process");
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8082");
-    let goal_id = "GOAL-API-CANCEL-NO-CLAIM";
+    let goal_id = "GOAL-API-CANCEL-NO-PROCESS";
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
         .create_goal_summary("Cancel managed Goal", Some(goal_id))
@@ -698,34 +672,25 @@ fn public_goal_cancel_api_reports_managed_no_claim_goal_as_durably_cancelled() {
 
     assert_eq!(cancelled.status, 200, "{}", cancelled.body);
     assert_eq!(cancelled.body["cancelled"], true);
-    assert_eq!(
-        cancelled.body["termination_intent"],
-        "explicit_cancellation"
-    );
     assert_eq!(cancelled.body["goal"]["status"], "cancelled");
+    assert_eq!(cancelled.body["worktrees_retained"], true);
+    assert!(
+        cancelled.body["process_failures"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(
         work_items.show_goal_summary(goal_id).unwrap().goal.status,
         GoalStatus::Cancelled
     );
     assert!(!managed_pid_is_alive(process.pid.unwrap()).unwrap());
-    let receipt: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            runtime_root
-                .join("process-stop-outcomes")
-                .join(format!("{}.json", process.id)),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(receipt["goal_cancelled"], true);
-    assert_eq!(receipt["goal_requeued"], false);
-
     remove_temp_dir(&temp_root);
 }
 
 #[test]
 fn public_process_stop_api_does_not_requeue_already_cancelled_goal() {
-    let temp_root = unique_temp_dir("http-process-stop-cancelled-no-claim");
+    let temp_root = unique_temp_dir("http-process-stop-cancelled-no-process");
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8082");
@@ -769,14 +734,9 @@ fn public_process_stop_api_does_not_requeue_already_cancelled_goal() {
 
     assert_eq!(stopped.status, 200, "{}", stopped.body);
     assert_eq!(stopped.body["stopped"], true);
-    assert_eq!(
-        stopped.body["requested_termination_intent"],
-        "interactive_stop"
-    );
-    assert_eq!(stopped.body["termination_intent"], "explicit_cancellation");
-    assert_eq!(stopped.body["intent_superseded"], true);
-    assert_eq!(stopped.body["cancelled"], true);
     assert_eq!(stopped.body["goal"]["status"], "cancelled");
+    assert_eq!(stopped.body["goal_requeued"], false);
+    assert_eq!(stopped.body["worktrees_retained"], true);
     assert_eq!(
         work_items.show_goal_summary(goal_id).unwrap().goal.status,
         GoalStatus::Cancelled

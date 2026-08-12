@@ -7,7 +7,6 @@ use crate::model::JsonObject;
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
-use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
@@ -16,8 +15,7 @@ use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_state::GoalSummaryProjection;
-use crate::tools::product::work_items::{FileWorkItemService, workflow_revision};
-use crate::workflow::{WorkflowEngine, WorkflowExecutionFence};
+use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug)]
 pub struct FileMergerService {
@@ -36,11 +34,19 @@ pub struct ReconciliationRevert {
 pub struct ReconciliationRequest<'a> {
     pub goal_id: &'a str,
     pub round_idx: usize,
-    pub claim_id: &'a str,
-    pub execution_id: &'a str,
     pub node_id: &'a str,
     pub integration: &'a RoundIntegration,
     pub expected_target_commit: &'a str,
+}
+
+#[derive(Clone, Debug)]
+struct ReadyMergeAuthority {
+    goal_id: String,
+    node_id: String,
+    round_idx: usize,
+    branch: String,
+    candidate: String,
+    remote: String,
 }
 
 impl FileMergerService {
@@ -69,14 +75,10 @@ impl FileMergerService {
     /// The repository lock serializes fetch/merge/push across processes. Successful evidence is
     /// written before the caller advances the Goal, so a crash after push is recovered by proving
     /// that the exact candidate already belongs to the configured target branch.
-    // Each argument is an independently verified execution fence component.
-    #[allow(clippy::too_many_arguments)]
     pub fn integrate_workflow_candidate(
         &self,
         goal_id: &str,
         round_idx: usize,
-        claim_id: &str,
-        execution_id: &str,
         node_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
@@ -85,8 +87,6 @@ impl FileMergerService {
         self.integrate_workflow_candidate_and_settle(
             goal_id,
             round_idx,
-            claim_id,
-            execution_id,
             node_id,
             expected_branch,
             expected_candidate,
@@ -96,20 +96,19 @@ impl FileMergerService {
         .map(|(integration, ())| integration)
     }
 
-    /// Integrates a Ready Merge candidate and atomically orders its operation settlement with the
-    /// caller's next workflow transition.
+    /// Integrates a Ready Merge candidate and orders its operation settlement with the caller's
+    /// next workflow transition.
     ///
-    /// The workflow coordination lease remains held from the initial fence commitment through
-    /// every Git effect, evidence persistence, settlement callback, and success record. Operation
-    /// cancellation uses its independent launch/settlement barrier so it can still terminate a
-    /// running Git child while workflow mutations are excluded.
+    /// Goal authority is checked once more under the repository lock immediately before the first
+    /// Git effect. From that point onward the integration is allowed to finish even if the Goal is
+    /// concurrently cancelled, because rolling back a partially published Git operation is less
+    /// reliable than recording its exact result.
+    // Keep every synchronized authority input explicit at the side-effect boundary.
     #[allow(clippy::too_many_arguments)]
     pub fn integrate_workflow_candidate_and_settle<T>(
         &self,
         goal_id: &str,
         round_idx: usize,
-        claim_id: &str,
-        execution_id: &str,
         node_id: &str,
         expected_branch: &str,
         expected_candidate: &str,
@@ -120,83 +119,85 @@ impl FileMergerService {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
-        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
-        let detail =
-            FileWorkItemService::for_node(&self.refine_dir, node_id).show_goal_detail(goal_id)?;
-        let goal_revision = workflow_revision(&detail);
-        let mut fence = WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
-            .commit_ready_merge_fence(
-                claim_id,
-                execution_id,
-                goal_id,
-                node_id,
-                round_idx,
-                goal_revision,
-            )?;
+        let authority = ReadyMergeAuthority {
+            goal_id: goal_id.to_string(),
+            node_id: node_id.to_string(),
+            round_idx,
+            branch: expected_branch.to_string(),
+            candidate: expected_candidate.to_string(),
+            remote: expected_remote.to_string(),
+        };
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
+        self.verify_integration_authority(&work_items, &authority, true)?;
         let operations = FileOperationRegistry::new(&self.runtime_root);
-        let operation = operations.register_exclusive_with_request(
-            &format!("merger:{goal_id}:{}", round_idx + 1),
-            json!({
-                "goal_id": goal_id,
-                "round_idx": round_idx,
-                "claim_id": claim_id,
-                "execution_id": execution_id,
-                "node_id": node_id,
-                "goal_revision": fence.goal_revision,
-                "candidate_commit": expected_candidate,
-                "branch": expected_branch,
-                "remote": expected_remote
-            }),
-        )?;
+        let mut operation_id = None;
+        let mut settlement = Some(settlement);
         let result = with_repository_git_lock(&target_root, || {
-            let integration = self.integrate_workflow_candidate_locked(
-                &target_root,
-                goal_id,
-                round_idx,
-                &mut fence,
-                &operation.id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
+            let detail = work_items.show_goal_detail(goal_id)?;
+            if let Some(existing) = detail
+                .get("rounds")
+                .and_then(Value::as_array)
+                .and_then(|rounds| rounds.get(round_idx))
+                .map(round_integration)
+                .transpose()?
+                .flatten()
+            {
+                self.verify_integration_authority(&work_items, &authority, false)?;
+                let git =
+                    FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
+                self.verify_existing_integration(&git, &existing)?;
+                let transitioned = settlement
+                    .take()
+                    .expect("Ready Merge settlement is called once")(
+                    &existing
+                )?;
+                return Ok((existing, transitioned));
+            }
+            let operation = operations.register_exclusive_with_request(
+                &format!("merger:{goal_id}:{}", round_idx + 1),
+                json!({
+                    "goal_id": goal_id,
+                    "round_idx": round_idx,
+                    "node_id": node_id,
+                    "candidate_commit": expected_candidate,
+                    "branch": expected_branch,
+                    "remote": expected_remote
+                }),
             )?;
-            self.verify_integration_fence(
-                &FileWorkItemService::for_node(&self.refine_dir, node_id),
-                &fence,
-                &operation.id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
+            operation_id = Some(operation.id.clone());
+            let integration =
+                self.integrate_workflow_candidate_locked(&target_root, &authority, &operation.id)?;
             let (_, transitioned) = operations.succeed_after(
                 &operation.id,
                 json!({"stage": "settled"}),
                 json!({"integration": &integration}),
-                || settlement(&integration),
+                || {
+                    settlement
+                        .take()
+                        .expect("Ready Merge settlement is called once")(
+                        &integration
+                    )
+                },
             )?;
             Ok((integration, transitioned))
         });
         match result {
             Ok(settled) => Ok(settled),
             Err(error) => {
-                let operation_state = operations.status(&operation.id).ok();
-                let state = WorkflowEngine::with_target_root(&self.runtime_root, &target_root)
-                    .load_state()
-                    .ok()
-                    .and_then(|state| {
-                        state
-                            .claim_by_id(claim_id)
-                            .cloned()
-                            .map(|claim| claim.state)
-                    });
+                let operation_state = operation_id
+                    .as_deref()
+                    .and_then(|operation_id| operations.status(operation_id).ok());
                 let cancelled = operation_state
                     .as_ref()
                     .is_some_and(|operation| operation.state == OperationState::Cancelled)
-                    || matches!(state, Some(crate::workflow::WorkflowClaimState::Cancelled));
+                    || work_items
+                        .show_goal_summary(goal_id)
+                        .is_ok_and(|goal| goal.goal.status == GoalStatus::Cancelled);
                 if cancelled {
                     // Cancellation is already durable and authoritative. Preserve its causal
                     // operation error instead of replacing it with a late Git/settlement failure.
                     return Err(RefineError::Conflict(format!(
-                        "Ready Merge execution {execution_id} was cancelled: {error}"
+                        "Ready Merge for Goal {goal_id} was cancelled: {error}"
                     )));
                 } else {
                     let code = if matches!(&error, RefineError::StaleCandidate { .. }) {
@@ -204,14 +205,15 @@ impl FileMergerService {
                     } else {
                         "ready_merge_integration_failed"
                     };
-                    let _ = operations.fail_with_error(
-                        &operation.id,
-                        json!({
-                            "code": code,
-                            "message": error.to_string(),
-                            "execution_id": execution_id
-                        }),
-                    );
+                    if let Some(operation_id) = operation_id.as_deref() {
+                        let _ = operations.fail_with_error(
+                            operation_id,
+                            json!({
+                                "code": code,
+                                "message": error.to_string()
+                            }),
+                        );
+                    }
                 }
                 Err(error)
             }
@@ -306,8 +308,6 @@ impl FileMergerService {
         let ReconciliationRequest {
             goal_id,
             round_idx,
-            claim_id,
-            execution_id,
             node_id,
             integration,
             expected_target_commit,
@@ -316,27 +316,20 @@ impl FileMergerService {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
-        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
-        let workflow =
-            WorkflowEngine::with_target_root(&self.runtime_root, &target_root).load_state()?;
-        let owns_reconciliation = workflow.claim_by_id(claim_id).is_some_and(|claim| {
-            claim.claim_id == claim_id
-                && claim.execution_id.as_deref() == Some(execution_id)
-                && claim.goal_id == goal_id
-                && claim.node_id == node_id
-                && claim.state == crate::workflow::WorkflowClaimState::Running
-        });
-        if !owns_reconciliation {
-            return Err(RefineError::Conflict(format!(
-                "execution {execution_id} no longer owns already-merged reconciliation for Goal {goal_id}"
-            )));
-        }
         let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
         let summary = work_items.show_goal_summary(goal_id)?;
         if summary.goal.status != GoalStatus::Qa {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} changed from qa to {} before its reconciliation revert",
                 summary.goal.status.as_str()
+            )));
+        }
+        if summary.goal.node_id.as_deref().unwrap_or("default") != node_id
+            || summary.goal.round_count != round_idx + 1
+        {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} no longer authorizes reconciliation on node {node_id} round {}",
+                round_idx + 1
             )));
         }
         let detail = work_items.show_goal_detail(goal_id)?;
@@ -446,118 +439,49 @@ impl FileMergerService {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn integrate_workflow_candidate_locked(
         &self,
         target_root: &Path,
-        goal_id: &str,
-        round_idx: usize,
-        fence: &mut WorkflowExecutionFence,
+        authority: &ReadyMergeAuthority,
         operation_id: &str,
-        expected_branch: &str,
-        expected_candidate: &str,
-        expected_remote: &str,
     ) -> RefineResult<RoundIntegration> {
-        let work_items = FileWorkItemService::for_node(&self.refine_dir, &fence.node_id);
-        self.verify_integration_fence(
-            &work_items,
-            fence,
-            operation_id,
-            expected_branch,
-            expected_candidate,
-            expected_remote,
-        )?;
-        let goal = work_items.show_goal_summary(goal_id)?;
-        let goal_node = goal.goal.node_id.as_deref().unwrap_or("default");
-        if goal_node != fence.node_id {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} is owned by node {goal_node}, not integration worker node {}",
-                fence.node_id
-            )));
-        }
-        let detail = work_items.show_goal_detail(goal_id)?;
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, &authority.node_id);
+        // This is the last authority check before the first Git side effect. Cancellation or
+        // reassignment before this point prevents integration. Once this succeeds, the repository
+        // operation is allowed to finish and record evidence without a rollback protocol.
+        self.verify_integration_authority(&work_items, authority, true)?;
+        let detail = work_items.show_goal_detail(&authority.goal_id)?;
         let rounds = detail
             .get("rounds")
             .and_then(Value::as_array)
-            .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} has no rounds")))?;
-        if round_idx + 1 != rounds.len() {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} candidate round changed from {} to {} before integration",
-                round_idx + 1,
-                rounds.len()
-            )));
-        }
-        let round = &rounds[round_idx];
-        let branch_name = required_string(&detail, "branch_name", goal_id)?;
-        let target_branch = required_string(&detail, "target_branch", goal_id)?;
-        let base_commit = required_string(&detail, "base_commit", goal_id)?;
-        let candidate_commit = required_string(&detail, "candidate_commit", goal_id)?;
-        let remote = required_string(round, "workflow_git_remote", goal_id)?;
-        for (label, recorded, expected) in [
-            ("branch", branch_name.as_str(), expected_branch),
-            ("candidate", candidate_commit.as_str(), expected_candidate),
-            ("remote", remote.as_str(), expected_remote),
-        ] {
-            if recorded != expected {
-                return Err(RefineError::Conflict(format!(
-                    "Goal {goal_id} {label} changed before Ready Merge integration: recorded {recorded}, worker expected {expected}"
-                )));
-            }
-        }
+            .ok_or_else(|| {
+                RefineError::Conflict(format!("Goal {} has no rounds", authority.goal_id))
+            })?;
+        let round = &rounds[authority.round_idx];
+        let branch_name = required_string(&detail, "branch_name", &authority.goal_id)?;
+        let target_branch = required_string(&detail, "target_branch", &authority.goal_id)?;
+        let base_commit = required_string(&detail, "base_commit", &authority.goal_id)?;
+        let candidate_commit = required_string(&detail, "candidate_commit", &authority.goal_id)?;
+        let remote = required_string(round, "workflow_git_remote", &authority.goal_id)?;
+        let mut process_metadata = workflow_subprocess_metadata(
+            &authority.goal_id,
+            "ready-merge",
+            "WorkflowReadyMerge",
+            Some(authority.round_idx),
+        );
+        // Goal cancellation must not kill a Git child after the Ready Merge point of no return.
+        // This is node-local process metadata, not synchronized execution authority.
+        process_metadata.insert("side_effect_committed".to_string(), json!(true));
         let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root)
             .with_operation_id(operation_id)
-            .with_process_metadata(workflow_subprocess_metadata(
-                &fence.execution_id,
-                goal_id,
-                "ready-merge",
-                "WorkflowReadyMerge",
-                Some(round_idx),
-            ));
+            .with_process_metadata(process_metadata);
         if let Some(existing) = round_integration(round)? {
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             self.verify_existing_integration(&git, &existing)?;
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             return Ok(existing);
-        }
-        if goal.goal.status != GoalStatus::ReadyMerge {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} cannot integrate from {}; expected ready-merge",
-                goal.goal.status.as_str()
-            )));
         }
         let remote_configured = git.remote_exists(&remote)?;
         if remote_configured {
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             git.fetch_branch(&remote, &branch_name)?;
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             git.ensure_branch_from_remote(&remote, &branch_name)?;
             let published = git.resolve_commit(&format!("{remote}/{branch_name}"))?;
             if published != candidate_commit {
@@ -565,34 +489,10 @@ impl FileMergerService {
                     "Published candidate {branch_name} is {published}, expected {candidate_commit}"
                 )));
             }
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             git.fetch_branch(&remote, &target_branch)?;
             let published_target = git.resolve_commit(&format!("{remote}/{target_branch}"))?;
             if git.commit_is_ancestor(&candidate_commit, &published_target)? {
-                self.verify_integration_fence(
-                    &work_items,
-                    fence,
-                    operation_id,
-                    expected_branch,
-                    expected_candidate,
-                    expected_remote,
-                )?;
                 git.switch(&target_branch)?;
-                self.verify_integration_fence(
-                    &work_items,
-                    fence,
-                    operation_id,
-                    expected_branch,
-                    expected_candidate,
-                    expected_remote,
-                )?;
                 git.fast_forward_from_remote(&remote, &target_branch)?;
                 let recovered = RoundIntegration {
                     candidate_commit,
@@ -610,18 +510,12 @@ impl FileMergerService {
                         ),
                     },
                 };
-                self.verify_integration_fence(
+                self.persist_integration(
                     &work_items,
-                    fence,
-                    operation_id,
-                    expected_branch,
-                    expected_candidate,
-                    expected_remote,
+                    &authority.goal_id,
+                    authority.round_idx,
+                    &recovered,
                 )?;
-                let revision =
-                    self.persist_integration(&work_items, goal_id, round_idx, &recovered)?;
-                WorkflowEngine::with_target_root(&self.runtime_root, target_root)
-                    .advance_ready_merge_fence_revision(fence, revision)?;
                 return Ok(recovered);
             }
         }
@@ -651,14 +545,6 @@ impl FileMergerService {
             }
         }
 
-        self.verify_integration_fence(
-            &work_items,
-            fence,
-            operation_id,
-            expected_branch,
-            expected_candidate,
-            expected_remote,
-        )?;
         git.switch(&target_branch)?;
         if remote_configured {
             let remote_target = git.resolve_commit(&format!("{remote}/{target_branch}"))?;
@@ -666,14 +552,6 @@ impl FileMergerService {
             if local_target != remote_target
                 && !git.commit_is_ancestor(&remote_target, &local_target)?
             {
-                self.verify_integration_fence(
-                    &work_items,
-                    fence,
-                    operation_id,
-                    expected_branch,
-                    expected_candidate,
-                    expected_remote,
-                )?;
                 let synchronized = git.merge_commit_no_ff(&remote_target)?;
                 if !synchronized.ok {
                     let _ = git.recover();
@@ -692,14 +570,6 @@ impl FileMergerService {
                 ),
             }
         } else {
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             let merge = git.merge_commit_no_ff(&candidate_commit)?;
             if !merge.ok {
                 let _ = git.recover();
@@ -709,14 +579,6 @@ impl FileMergerService {
         };
         let target_commit = git.resolve_commit(&target_branch)?;
         if remote_configured {
-            self.verify_integration_fence(
-                &work_items,
-                fence,
-                operation_id,
-                expected_branch,
-                expected_candidate,
-                expected_remote,
-            )?;
             git.push(&remote, &target_branch)?;
         }
         let integration = RoundIntegration {
@@ -728,96 +590,81 @@ impl FileMergerService {
             integrated_at: Utc::now().to_rfc3339(),
             merge,
         };
-        self.verify_integration_fence(
+        self.persist_integration(
             &work_items,
-            fence,
-            operation_id,
-            expected_branch,
-            expected_candidate,
-            expected_remote,
+            &authority.goal_id,
+            authority.round_idx,
+            &integration,
         )?;
-        let revision = self.persist_integration(&work_items, goal_id, round_idx, &integration)?;
-        WorkflowEngine::with_target_root(&self.runtime_root, target_root)
-            .advance_ready_merge_fence_revision(fence, revision)?;
         Ok(integration)
     }
 
-    fn verify_integration_fence(
+    fn verify_integration_authority(
         &self,
         work_items: &FileWorkItemService,
-        fence: &WorkflowExecutionFence,
-        operation_id: &str,
-        expected_branch: &str,
-        expected_candidate: &str,
-        expected_remote: &str,
+        authority: &ReadyMergeAuthority,
+        require_ready_merge: bool,
     ) -> RefineResult<()> {
-        let _coordination = acquire_workflow_coordination(&self.refine_dir)?;
-        let target_root = match &self.target_root {
-            Some(target_root) => target_root.clone(),
-            None => target_root(&self.refine_dir)?,
-        };
-        WorkflowEngine::with_target_root(&self.runtime_root, target_root)
-            .verify_ready_merge_fence(fence)?;
-        let operation = FileOperationRegistry::new(&self.runtime_root).status(operation_id)?;
-        if !matches!(
-            operation.state,
-            OperationState::Pending | OperationState::Running
-        ) {
-            return Err(RefineError::Conflict(format!(
-                "Ready Merge operation {operation_id} is {}; execution {} can no longer integrate or settle",
-                operation.state.as_api_status(),
-                fence.execution_id
-            )));
-        }
-        let detail = work_items.show_goal_detail(&fence.goal_id)?;
-        let actual_revision = workflow_revision(&detail);
-        if actual_revision != fence.goal_revision {
-            return Err(RefineError::Conflict(format!(
-                "Goal {} changed from Ready Merge revision {} to {}",
-                fence.goal_id, fence.goal_revision, actual_revision
-            )));
-        }
-        if detail.get("status").and_then(Value::as_str) != Some(GoalStatus::ReadyMerge.as_str()) {
+        let detail = work_items.show_goal_detail(&authority.goal_id)?;
+        let status = detail.get("status").and_then(Value::as_str);
+        if require_ready_merge && status != Some(GoalStatus::ReadyMerge.as_str()) {
             return Err(RefineError::Conflict(format!(
                 "Goal {} is no longer ready-merge",
-                fence.goal_id
+                authority.goal_id
+            )));
+        }
+        if !require_ready_merge && !matches!(status, Some("ready-merge" | "build" | "cancelled")) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} no longer authorizes Ready Merge recovery from status {}",
+                authority.goal_id,
+                status.unwrap_or("unknown")
+            )));
+        }
+        let node = detail
+            .get("node_id")
+            .and_then(Value::as_str)
+            .unwrap_or("default");
+        if node != authority.node_id {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} is assigned to node {node}, not {}",
+                authority.goal_id, authority.node_id
             )));
         }
         let rounds = detail
             .get("rounds")
             .and_then(Value::as_array)
             .ok_or_else(|| {
-                RefineError::Conflict(format!("Goal {} has no rounds", fence.goal_id))
+                RefineError::Conflict(format!("Goal {} has no rounds", authority.goal_id))
             })?;
-        if rounds.len() != fence.round_idx + 1 {
+        if rounds.len() != authority.round_idx + 1 {
             return Err(RefineError::Conflict(format!(
                 "Goal {} round changed before Ready Merge integration",
-                fence.goal_id
+                authority.goal_id
             )));
         }
         for (label, recorded, expected) in [
             (
                 "branch",
                 detail.get("branch_name").and_then(Value::as_str),
-                expected_branch,
+                authority.branch.as_str(),
             ),
             (
                 "candidate",
                 detail.get("candidate_commit").and_then(Value::as_str),
-                expected_candidate,
+                authority.candidate.as_str(),
             ),
             (
                 "remote",
-                rounds[fence.round_idx]
+                rounds[authority.round_idx]
                     .get("workflow_git_remote")
                     .and_then(Value::as_str),
-                expected_remote,
+                authority.remote.as_str(),
             ),
         ] {
             if recorded != Some(expected) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {} {label} changed before Ready Merge integration",
-                    fence.goal_id
+                    authority.goal_id
                 )));
             }
         }
@@ -830,13 +677,13 @@ impl FileMergerService {
         goal_id: &str,
         round_idx: usize,
         integration: &RoundIntegration,
-    ) -> RefineResult<u64> {
+    ) -> RefineResult<()> {
         work_items.update_goal_round_evaluation_summary(
             goal_id,
             round_idx,
             &json!({"workflow_integration": integration}),
         )?;
-        Ok(workflow_revision(&work_items.show_goal_detail(goal_id)?))
+        Ok(())
     }
 
     fn verify_existing_integration(

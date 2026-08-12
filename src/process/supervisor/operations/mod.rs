@@ -11,7 +11,6 @@ use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess};
-use crate::process::supervisor::coordination::replace_file_durably;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 const RECOVERY_PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(2);

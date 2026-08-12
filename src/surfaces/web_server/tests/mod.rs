@@ -1,6 +1,5 @@
 mod activity_exports;
 mod agents_chat;
-mod dashboard_retry;
 mod features;
 mod files_terminal;
 mod git_changes;
@@ -13,7 +12,6 @@ mod operations_processes;
 mod project_runtime;
 mod quality_guidance;
 mod static_surface;
-mod workflow_runtime;
 
 use crate::model::log::LogEntry;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
@@ -24,8 +22,6 @@ use crate::tools::observability::activity::{ActivityService, FileActivityService
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
-use crate::workflow::capacity::AgentCapacityService;
-use crate::workflow::{WorkflowAutomation, WorkflowClaimState, WorkflowEngine};
 use chrono::Utc;
 use serde_json::json;
 

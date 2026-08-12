@@ -34,7 +34,7 @@ Current implementation details that matter to intent:
 - A Goal Round may carry a versioned `implementation_plan`. It binds proposal,
   independent criticism, final checklist, phase/process/Git evidence, failures,
   and implementation discrepancies to the exact Round, pinned context digest,
-  workflow claim and execution, implementation/target branches, and base commit.
+  Goal/Round context, implementation and target branches, and base commit.
   Missing planning evidence remains valid for legacy records.
 
 Future model changes should preserve these properties: human readability, agent readability, stable workflow meaning, and clear node ownership for active work.

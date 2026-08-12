@@ -534,32 +534,38 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
 }
 
 #[test]
-fn manual_quality_uses_shared_workflow_agent_capacity() {
+fn manual_quality_observes_live_agent_process_capacity() {
     let fixture = goal_quality_fixture("quality-manual-capacity", "exit 99");
-    let capacity = AgentCapacityService::new(&fixture.runtime_root);
-    let policy = WorkflowPolicy {
-        global_limit: 1,
-        per_node_limit: 1,
-        per_provider_limit: 1,
-        per_target_app_limit: 1,
-        active_node_id: "default".to_string(),
-        provider: "smoke-ai".to_string(),
-        target_app_id: fixture.candidate_root.display().to_string(),
-    };
-    assert!(
-        capacity
-            .try_acquire(
-                &policy,
-                AgentCapacityRequest {
-                    owner_id: "workflow:existing".to_string(),
-                    role: "workflow".to_string(),
-                    node_id: "default".to_string(),
-                    provider: "smoke-ai".to_string(),
-                    target_app_id: fixture.candidate_root.display().to_string(),
-                },
-            )
-            .unwrap()
-    );
+    let processes = fixture.runtime_root.join("processes");
+    fs::create_dir_all(&processes).unwrap();
+    fs::write(
+        processes.join("existing-agent.json"),
+        serde_json::to_vec_pretty(&ManagedProcess {
+            id: "existing-agent".to_string(),
+            owner: ProcessOwner::Agent,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("Existing Goal agent".to_string()),
+            details: Some(
+                json!({
+                    "kind": "workflow",
+                    "goal_id": "EXISTING",
+                    "node_id": "default",
+                    "provider": "smoke-ai",
+                    "target_app_id": fixture.candidate_root.display().to_string()
+                })
+                .to_string(),
+            ),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: "2026-01-01T00:00:00Z".to_string(),
+            exit_code: None,
+        })
+        .unwrap(),
+    )
+    .unwrap();
     FileSettingsService::with_active_root(&fixture.refine_dir, &fixture.runtime_root)
         .update(&json!({
             "parallel_run_cap": "1",
@@ -580,7 +586,6 @@ fn manual_quality_uses_shared_workflow_agent_capacity() {
             .unwrap()
             .is_empty()
     );
-    capacity.release("workflow:existing").unwrap();
     fs::remove_dir_all(fixture.temp_root).unwrap();
 }
 

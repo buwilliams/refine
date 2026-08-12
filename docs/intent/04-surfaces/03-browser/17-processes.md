@@ -2,44 +2,22 @@
 
 ## Key Ideas
 
-- **Visible Runtime Work**: users should see the processes Refine owns.
-- **Actionable Status**: process rows should explain state, owner, context, logs, and available controls.
-- **Shared Supervisor Truth**: the UI should reflect supervisor-managed state, not guess from browser state.
-- **Scoped Loading**: process views should load only when needed.
+- **Visible Runtime Work**: users should see processes Refine owns on this node.
+- **Actionable Status**: rows explain owner, context, logs, and controls.
+- **Shared Supervisor Truth**: the browser reflects managed-process state.
 
 ## Purpose
 
-The Processes surface exists to make runtime work inspectable. Refine launches daemons, target-app commands, agent turns, quality checks, imports, maintenance jobs, terminal sessions, and helpers. Users need to see those processes when diagnosing or supervising automation.
-
-It answers: what is running, what owns it, what is it attached to, and what can I do about it?
+Processes makes daemons, target-app commands, agents, quality checks, imports, maintenance, terminals, and helpers inspectable. It answers what is running locally, what owns it, and what can be done about it.
 
 ## Expected Role
 
-Processes should appear under the system/node management area and should connect process state back to product concepts like Goals, sessions, workflow, and target-app activity.
+`/api/processes` exposes managed local process state. Rows may include owner, pid, state, label, Goal, Round, workflow state, output, resources, and actions. Node-local process identifiers support observation and Stop, not workflow authority.
 
-Current implementation details that matter to intent:
+Stop confirms process exit and conditionally returns an unchanged linked Goal to todo. It retains workflow worktrees and branches. If the Goal is already cancelled or changed, Stop preserves that newer state. Goal cancellation is a separate Goal action that commits terminal intent first.
 
-- `/api/processes` exposes managed process state;
-- process rows can include owner, pid, state, label, details, output availability, resource labels, and actions;
-- chat, workflow, runner, target-app, and UI contexts should be surfaced where available;
-- every active agent row exposes a process-specific Stop action through the
-  shared process capability; after confirmed process exit, a linked workflow
-  claim is released and its Goal returns to todo. Every workflow worktree and
-  branch is retained with durable recovery evidence, which the surface reports
-  as a successful shared-capability result. Cleanup remains a separate explicit
-  human-controlled operation. If explicit cancellation already became durable,
-  the surface reports that terminal result and Stop never promises or performs a
-  requeue;
-- the Goal terminal Stop control resolves the attached managed process and uses
-  the same confirmed-exit, Goal, claim, and capacity settlement response as the
-  Processes API rather than a terminal-specific Goal-Agent signal path;
-- process pause/resume controls affect background work and agents;
-- settings/processes views should avoid overfetching unrelated settings data.
-
-Processes should be a debugging and supervision surface, not a hidden implementation detail.
+The Goal terminal and Processes view use the same shared process capability. Pause and resume controls affect supported background work without creating browser-specific state.
 
 ## Future Direction
 
-Future process views should represent agent fleet execution: queues, claims, remote nodes, resource pressure, isolation, cancellation, retry, and provenance.
-
-As Refine scales, process visibility should become one of the main ways people and agents understand the live orchestration layer.
+Process views should show resource pressure, isolation, remote-node summaries, retry, and provenance while clearly distinguishing node-local execution from synchronized Goal ownership.

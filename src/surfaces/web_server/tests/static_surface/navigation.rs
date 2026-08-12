@@ -35,7 +35,6 @@ fn web_server_route_groups_cover_static_web_surface() {
         "/todos",
         "/upgrade",
         "/work",
-        "/workflow",
     ] {
         assert!(groups.contains(prefix), "missing route group {prefix}");
     }

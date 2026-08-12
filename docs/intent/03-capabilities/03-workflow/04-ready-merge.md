@@ -30,7 +30,7 @@ When a Goal is ready-merge:
 - Post-build Quality runs against the exact integrated target commit after rebuild, so review reflects the composed target app rather than only an isolated candidate.
 - Users and agents can inspect the change without losing the Goal's original intent.
 - Conflicts, stale candidates, ownership or revision races, and push failures preserve the candidate and evidence and use the failed/retry path rather than advancing.
-- Runner restart retains Ready Merge, Build, and QA checkpoints for automatic resume. Work interrupted before a durable checkpoint fails with an explicit causal event.
+- Runner restart leaves Ready Merge, Build, and QA Goals in their synchronized state for automatic rescheduling. A replacement worker reuses any exact semantic evidence already written and repeats only the incomplete idempotent work.
 
 ## Future Direction
 

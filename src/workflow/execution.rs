@@ -1,11 +1,14 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
+use crate::model::feature::compare_feature_goal_order;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::quality::POST_BUILD;
+use crate::tools::product::project_state::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
@@ -13,144 +16,110 @@ use crate::workflow::behaviors::{
     WorkflowReview, WorkflowTodo,
 };
 use crate::workflow::context::WorkflowContext;
+use crate::workflow::policy::SchedulingEligibility;
 use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
-use super::claim_history::bounded_failure_message;
 use super::{
-    ACTIVE_WORK_REPLENISH_INTERVAL, AUTOMATION_CONCURRENCY_LIMIT_REACHED, WorkflowAutomation,
-    WorkflowClaim, WorkflowClaimState, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
-    ensure_workflow_round, hydrate_retry_context, missing_workflow_artifact, now_timestamp,
+    ACTIVE_WORK_REPLENISH_INTERVAL, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
+    ensure_workflow_round, hydrate_in_progress_context, hydrate_retry_context,
+    missing_workflow_artifact, priority_rank, setting_string,
 };
 
-enum PreparedClaim<'a> {
+static RETRY_STATE: OnceLock<Mutex<BTreeMap<String, RetryState>>> = OnceLock::new();
+
+#[derive(Clone, Copy)]
+struct RetryState {
+    failures: u32,
+    not_before: Instant,
+}
+
+enum PreparedGoal<'a> {
     Execute(Box<WorkflowContext<'a>>),
     Completed(Box<WorkflowStepResult>),
 }
 
 impl WorkflowEngine {
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
-        self.evaluate_workflow_locked()
-    }
-
-    pub(super) fn evaluate_workflow_locked(&self) -> RefineResult<WorkflowPassResult> {
         let promoted = self.promote()?;
-        let steps = self.execute_claimed_work()?;
-        let state = self.load_state()?;
-        Ok(WorkflowPassResult {
-            promoted,
-            claims: state.claims,
-            steps,
-        })
+        let steps = self.execute_work()?;
+        Ok(WorkflowPassResult { promoted, steps })
     }
 
-    pub fn execute_claimed_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
-        let state = self.load_state()?;
-        self.ensure_automation_running(&state)?;
-        // Reclaim slots held by claims whose executor died with an earlier daemon,
-        // before this tick decides how much capacity is available.
-        self.reconcile_orphaned_running_claims()?;
+    /// Promotes backlog work into the state-only todo queue. Worker admission happens separately
+    /// from this durable lifecycle mutation.
+    pub fn promote(&self) -> RefineResult<usize> {
+        self.ensure_automation_running()?;
+        self.promote_backlog_to_todo()
+    }
+
+    pub fn execute_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
+        self.ensure_automation_running()?;
         let mut results = Vec::new();
         let mut errors = Vec::new();
         let mut scheduler_error = None;
         std::thread::scope(|scope| {
             let (outcome_tx, outcome_rx) = std::sync::mpsc::channel();
-            let mut running = 0usize;
+            let mut active = BTreeSet::new();
             let mut launch_order = 0usize;
-            let mut launched_any = false;
-            let mut next_replenish = std::time::Instant::now();
+            let mut next_replenish = Instant::now();
 
             loop {
-                if launched_any && running == 0 {
-                    break;
-                }
-                let workflow_paused = match self.workflow_paused() {
+                let paused = match self.workflow_paused() {
                     Ok(paused) => paused,
                     Err(error) => {
                         scheduler_error = Some(error);
                         false
                     }
                 };
-                if workflow_paused {
-                    // A pause is an admission gate, not a scheduler failure. Keep active
-                    // executions draining and retry promotion immediately after resume.
-                    next_replenish = std::time::Instant::now();
-                } else if scheduler_error.is_none() && std::time::Instant::now() >= next_replenish {
-                    if let Err(error) = self.promote() {
+                if !paused && scheduler_error.is_none() && Instant::now() >= next_replenish {
+                    if let Err(error) = self.promote_backlog_to_todo() {
                         scheduler_error = Some(error);
                     }
-                    next_replenish = std::time::Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
+                    next_replenish = Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
                 }
-                if scheduler_error.is_none() && !workflow_paused {
-                    let launchable = self.load_state().and_then(|state| {
-                        self.policy()
-                            .map(|policy| Self::launchable_claim_ids(&state, &policy))
-                    });
-                    match launchable {
-                        Ok(claim_ids) => {
-                            for claim_id in claim_ids {
+
+                let mut launched = false;
+                if !paused && scheduler_error.is_none() {
+                    match self.launchable_goals(&active) {
+                        Ok(goal_ids) => {
+                            for goal_id in goal_ids {
+                                if active.contains(&goal_id) {
+                                    continue;
+                                }
                                 let order = launch_order;
                                 launch_order += 1;
-                                let execution_id = match self.start_claim(&claim_id) {
-                                    Ok(execution_id) => execution_id,
-                                    Err(RefineError::Conflict(message))
-                                        if message == AUTOMATION_CONCURRENCY_LIMIT_REACHED =>
-                                    {
-                                        continue;
-                                    }
-                                    Err(error) => {
-                                        errors.push((order, error));
-                                        continue;
-                                    }
-                                };
-                                #[cfg(test)]
-                                if let Some(hook) = &self.before_worker_prepare_hook {
-                                    hook(&claim_id, &execution_id);
-                                }
-                                let preparation =
-                                    self.prepare_started_claim(&claim_id, &execution_id);
-                                match preparation {
-                                    Ok(PreparedClaim::Execute(ctx)) => {
-                                        running += 1;
-                                        launched_any = true;
+                                match self.prepare_goal(&goal_id) {
+                                    Ok(PreparedGoal::Execute(ctx)) => {
+                                        active.insert(goal_id.clone());
+                                        launched = true;
                                         let outcome_tx = outcome_tx.clone();
-                                        let worker_execution_id = execution_id.clone();
                                         scope.spawn(move || {
                                             let outcome = std::panic::catch_unwind(
                                                 std::panic::AssertUnwindSafe(|| {
-                                                    self.execute_prepared_claim(*ctx)
+                                                    self.execute_prepared_goal(*ctx)
                                                 }),
                                             )
                                             .unwrap_or_else(|_| {
                                                 Err(RefineError::Conflict(format!(
-                                                    "workflow worker panicked for claim {claim_id}"
+                                                    "workflow worker panicked for Goal {goal_id}"
                                                 )))
                                             });
-                                            let _ = outcome_tx.send((
-                                                order,
-                                                claim_id,
-                                                worker_execution_id,
-                                                outcome,
-                                            ));
+                                            let _ = outcome_tx.send((order, goal_id, outcome));
                                         });
                                     }
-                                    Ok(PreparedClaim::Completed(result)) => {
-                                        launched_any = true;
-                                        if let Err(error) = self.mark_claim_state(
-                                            &claim_id,
-                                            Some(&execution_id),
-                                            WorkflowClaimState::Completed,
-                                        ) {
-                                            errors.push((order, error));
-                                        } else {
-                                            results.push((order, *result));
-                                        }
+                                    Ok(PreparedGoal::Completed(result)) => {
+                                        self.clear_retry(&goal_id);
+                                        results.push((order, *result));
+                                        launched = true;
                                     }
+                                    Err(error) if is_stale_authority(&error) => {}
                                     Err(error) => {
-                                        let _ = self.mark_claim_preparation_failed(
-                                            &claim_id,
-                                            &execution_id,
+                                        let _ = self.settle_goal_failure(
+                                            &goal_id,
+                                            "preparation",
                                             &error,
                                         );
+                                        self.record_retry(&goal_id);
                                         errors.push((order, error));
                                     }
                                 }
@@ -160,32 +129,23 @@ impl WorkflowEngine {
                     }
                 }
 
-                if running == 0 {
-                    break;
+                if active.is_empty() {
+                    if !launched {
+                        break;
+                    }
+                    continue;
                 }
-
-                match outcome_rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok((order, claim_id, execution_id, outcome)) => {
-                        running -= 1;
-                        next_replenish = std::time::Instant::now();
+                match outcome_rx.recv_timeout(Duration::from_millis(100)) {
+                    Ok((order, goal_id, outcome)) => {
+                        active.remove(&goal_id);
+                        next_replenish = Instant::now();
                         match outcome {
                             Ok(result) => {
-                                if let Err(error) = self.mark_claim_state(
-                                    &claim_id,
-                                    Some(&execution_id),
-                                    WorkflowClaimState::Completed,
-                                ) {
-                                    errors.push((order, error));
-                                } else {
-                                    results.push((order, result));
-                                }
+                                self.clear_retry(&goal_id);
+                                results.push((order, result));
                             }
                             Err(error) => {
-                                let _ = self.mark_claim_execution_failed(
-                                    &claim_id,
-                                    &execution_id,
-                                    &error,
-                                );
+                                self.record_retry(&goal_id);
                                 errors.push((order, error));
                             }
                         }
@@ -210,93 +170,156 @@ impl WorkflowEngine {
         Ok(results.into_iter().map(|(_, result)| result).collect())
     }
 
-    fn prepare_started_claim<'a>(
-        &'a self,
-        claim_id: &str,
-        execution_id: &str,
-    ) -> RefineResult<PreparedClaim<'a>> {
-        let claim = self.claim_by_id(claim_id)?;
+    fn launchable_goals(&self, active: &BTreeSet<String>) -> RefineResult<Vec<String>> {
         let target_root = self.target_root.as_ref().ok_or_else(|| {
             RefineError::InvalidInput(
-                "target root is required to execute claimed workflow work".to_string(),
+                "target root is required to execute workflow work".to_string(),
             )
         })?;
         let refine_dir = prepare_refine_dir(target_root)?;
-        // One shared projection cache, as every other caller uses. Scoping it per
-        // claim wrote a full copy of project state per claim into
-        // `cache/workflow/<claim id>`, and nothing ever removed those, so disk
-        // grew without bound in proportion to claims ever created. Snapshots are
-        // published by atomic rename over a temp file, so sharing is safe under
-        // concurrent workers: a reader sees one complete snapshot, and writers
-        // rebuilding from the same sources converge.
+        ActiveGoalIndex::ensure_built(&refine_dir)?;
+        let index = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
+        let policy = self.policy()?;
+        let eligibility = SchedulingEligibility::new(index.goals(), active);
+        let mut goals = index
+            .goals()
+            .filter(|goal| {
+                matches!(
+                    goal.status,
+                    GoalStatus::Todo
+                        | GoalStatus::InProgress
+                        | GoalStatus::ReadyMerge
+                        | GoalStatus::Build
+                        | GoalStatus::Qa
+                )
+            })
+            .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == policy.active_node_id)
+            .filter(|goal| !active.contains(&goal.id))
+            .filter(|goal| !self.retry_delayed(&goal.id))
+            .filter(|goal| eligibility.feature_eligible(&goal.id))
+            .filter(|goal| eligibility.priority_eligible(goal))
+            .cloned()
+            .collect::<Vec<_>>();
+        goals.sort_by(|a, b| {
+            priority_rank(&b.priority)
+                .cmp(&priority_rank(&a.priority))
+                .then_with(|| compare_feature_goal_order(a.feature_order, b.feature_order))
+                .then_with(|| a.created.cmp(&b.created))
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        let mut load = self.observed_execution_load()?;
+        let mut result = Vec::new();
+        for goal in goals {
+            if !load.available(
+                &policy,
+                &policy.active_node_id,
+                &policy.provider,
+                &policy.target_app_id,
+            ) {
+                break;
+            }
+            load.record(
+                &policy.active_node_id,
+                &policy.provider,
+                &policy.target_app_id,
+            );
+            result.push(goal.id);
+        }
+        Ok(result)
+    }
+
+    fn prepare_goal<'a>(&'a self, goal_id: &str) -> RefineResult<PreparedGoal<'a>> {
+        let target_root = self.target_root.as_ref().ok_or_else(|| {
+            RefineError::InvalidInput(
+                "target root is required to execute workflow work".to_string(),
+            )
+        })?;
+        let refine_dir = prepare_refine_dir(target_root)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
             &self.runtime_root,
             self.runtime_root.join("cache"),
         );
-        let round_idx = ensure_workflow_round(&work_items, &claim.goal_id)?;
-        self.bind_started_claim_identity(claim_id, execution_id, &work_items, round_idx)?;
-        let claim = self.claim_by_id(claim_id)?;
+        let policy = self.policy()?;
+        let summary = work_items.show_goal_summary(goal_id)?;
+        let node_id = summary
+            .goal
+            .node_id
+            .clone()
+            .unwrap_or_else(|| "default".to_string());
+        if node_id != policy.active_node_id {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} is owned by node {node_id}, not active node {}",
+                policy.active_node_id
+            )));
+        }
+        if !matches!(
+            summary.goal.status,
+            GoalStatus::Todo
+                | GoalStatus::InProgress
+                | GoalStatus::ReadyMerge
+                | GoalStatus::Build
+                | GoalStatus::Qa
+        ) {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} is no longer eligible from {}",
+                summary.goal.status.as_str()
+            )));
+        }
+        let round_idx = ensure_workflow_round(&work_items, goal_id)?;
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let mut ctx = WorkflowContext::new(
             &self.runtime_root,
             target_root,
-            claim,
-            execution_id,
+            goal_id.to_string(),
+            node_id,
+            policy.provider,
             round_idx,
             settings,
             work_items,
         );
-        let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
-        if current == GoalStatus::Todo {
-            return match WorkflowTodo.advance(&mut ctx)? {
+        match summary.goal.status {
+            GoalStatus::Todo => match WorkflowTodo.advance(&mut ctx)? {
                 WorkflowAdvanceOutcome::Transition {
                     to: GoalStatus::InProgress,
                     ..
                 }
                 | WorkflowAdvanceOutcome::Transition {
                     to: GoalStatus::Qa, ..
-                } => Ok(PreparedClaim::Execute(Box::new(ctx))),
+                } => Ok(PreparedGoal::Execute(Box::new(ctx))),
                 WorkflowAdvanceOutcome::Completed { final_status, .. } => {
                     ctx.final_status = Some(final_status);
-                    Ok(PreparedClaim::Completed(Box::new(
+                    Ok(PreparedGoal::Completed(Box::new(
                         Self::workflow_step_result(ctx)?,
                     )))
                 }
-                WorkflowAdvanceOutcome::Noop { reason }
-                | WorkflowAdvanceOutcome::Blocked { reason }
-                | WorkflowAdvanceOutcome::Failed { reason }
-                | WorkflowAdvanceOutcome::Transition { reason, .. } => {
-                    Err(RefineError::Conflict(reason))
-                }
-            };
+                outcome => Err(RefineError::Conflict(outcome_reason(outcome))),
+            },
+            GoalStatus::InProgress => {
+                let pattern =
+                    setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
+                let target = setting_string(&ctx.settings, "merge_target_branch", "main");
+                hydrate_in_progress_context(&mut ctx, &pattern, &target)?;
+                Ok(PreparedGoal::Execute(Box::new(ctx)))
+            }
+            current => {
+                hydrate_retry_context(&mut ctx, current)?;
+                Ok(PreparedGoal::Execute(Box::new(ctx)))
+            }
         }
-        if !matches!(
-            current,
-            GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
-        ) {
-            return Err(RefineError::Conflict(format!(
-                "Goal {} cannot resume workflow from {}",
-                ctx.goal_id,
-                current.as_str()
-            )));
-        }
-        hydrate_retry_context(&mut ctx, current)?;
-        Ok(PreparedClaim::Execute(Box::new(ctx)))
     }
 
-    pub(super) fn execute_prepared_claim(
+    pub(super) fn execute_prepared_goal(
         &self,
         mut ctx: WorkflowContext<'_>,
     ) -> RefineResult<WorkflowStepResult> {
         let start_status = ctx.start_status.clone();
-        self.advance_claim_behaviors(&mut ctx, start_status)?;
+        self.advance_behaviors(&mut ctx, start_status)?;
         Self::workflow_step_result(ctx)
     }
 
     fn workflow_step_result(ctx: WorkflowContext<'_>) -> RefineResult<WorkflowStepResult> {
-        let execution_id = ctx.execution_id.clone();
         let branch = ctx
             .branch
             .clone()
@@ -305,7 +328,6 @@ impl WorkflowEngine {
             .commit
             .clone()
             .ok_or_else(|| missing_workflow_artifact("commit", &ctx.goal_id))?;
-        let merge = ctx.merge.clone();
         let provider_output = ctx
             .provider_output
             .clone()
@@ -316,21 +338,18 @@ impl WorkflowEngine {
             .unwrap_or(GoalStatus::Review)
             .as_str()
             .to_string();
-
         Ok(WorkflowStepResult {
-            claim_id: ctx.claim_id,
             goal_id: ctx.goal_id,
-            execution_id,
             provider: ctx.provider,
             branch,
             commit,
-            merge,
+            merge: ctx.merge,
             final_status,
             provider_output,
         })
     }
 
-    pub(super) fn advance_claim_behaviors(
+    pub(super) fn advance_behaviors(
         &self,
         ctx: &mut WorkflowContext<'_>,
         mut current: GoalStatus,
@@ -348,29 +367,11 @@ impl WorkflowEngine {
             if integrated_target_lane.is_none()
                 && workflow_status_uses_integrated_target(ctx, &current)?
             {
-                let lane = match IntegratedTargetWorkflowLease::acquire(
+                integrated_target_lane = Some(IntegratedTargetWorkflowLease::acquire(
                     ctx.target_root,
                     &ctx.goal_id,
                     ctx.round_idx,
-                ) {
-                    Ok(lane) => lane,
-                    Err(error) => {
-                        ctx.log(
-                            "workflow",
-                            "Integrated-target workflow lane could not start; Goal status was preserved",
-                            Some(crate::workflow::json_object(serde_json::json!({
-                                "error": error.to_string()
-                            }))),
-                        )?;
-                        return Err(error);
-                    }
-                };
-                ctx.log(
-                    "workflow",
-                    "Acquired exclusive integrated-target workflow lane",
-                    None,
-                )?;
-                integrated_target_lane = Some(lane);
+                )?);
             }
             let Some(behavior) = behaviors
                 .iter()
@@ -382,205 +383,87 @@ impl WorkflowEngine {
                     current.as_str()
                 )));
             };
-            let outcome = match behavior.advance(ctx) {
-                Ok(outcome) => outcome,
+            match behavior.advance(ctx) {
+                Ok(WorkflowAdvanceOutcome::Transition { to, .. }) => current = to,
+                Ok(WorkflowAdvanceOutcome::Completed { .. }) => {
+                    if let Some(lane) = integrated_target_lane.as_mut() {
+                        lane.finish()?;
+                    }
+                    return Ok(());
+                }
+                Ok(outcome) => {
+                    if let Some(lane) = integrated_target_lane.as_mut() {
+                        lane.finish_if_clean();
+                    }
+                    return Err(RefineError::Conflict(outcome_reason(outcome)));
+                }
                 Err(error) => {
                     if let Some(lane) = integrated_target_lane.as_mut() {
                         lane.finish_if_clean();
                     }
                     return Err(error);
                 }
-            };
-            match outcome {
-                WorkflowAdvanceOutcome::Transition { to, .. } => {
-                    current = to;
-                }
-                WorkflowAdvanceOutcome::Completed { .. } => {
-                    if let Some(lane) = integrated_target_lane.as_mut() {
-                        lane.finish()?;
-                    }
-                    return Ok(());
-                }
-                WorkflowAdvanceOutcome::Noop { reason }
-                | WorkflowAdvanceOutcome::Blocked { reason }
-                | WorkflowAdvanceOutcome::Failed { reason } => {
-                    if let Some(lane) = integrated_target_lane.as_mut() {
-                        lane.finish_if_clean();
-                    }
-                    return Err(RefineError::Conflict(reason));
-                }
             }
         }
     }
 
-    pub(super) fn claim_by_id(&self, claim_id: &str) -> RefineResult<WorkflowClaim> {
-        self.load_state()?
-            .claim_by_id(claim_id)
-            .cloned()
-            .ok_or_else(|| RefineError::NotFound(format!("claim {claim_id} was not found")))
+    fn retry_key(&self, goal_id: &str) -> String {
+        format!(
+            "{}:{}:{goal_id}",
+            self.runtime_root.display(),
+            self.target_root
+                .as_deref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_default()
+        )
     }
 
-    pub(super) fn mark_claim_state(
-        &self,
-        claim_id: &str,
-        expected_execution_id: Option<&str>,
-        claim_state: WorkflowClaimState,
-    ) -> RefineResult<()> {
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        let Some(claim) = state
-            .claims
-            .iter_mut()
-            .find(|claim| claim.claim_id == claim_id)
-        else {
-            return Err(RefineError::NotFound(format!(
-                "claim {claim_id} was not found"
-            )));
-        };
-        if !matches!(
-            claim.state,
-            WorkflowClaimState::Claimed | WorkflowClaimState::Running
-        ) {
-            return Ok(());
-        }
-        if let Some(expected_execution_id) = expected_execution_id
-            && (claim.execution_id.as_deref() != Some(expected_execution_id)
-                || claim.state != WorkflowClaimState::Running)
-        {
-            return Err(RefineError::Conflict(format!(
-                "execution {expected_execution_id} no longer owns claim {claim_id}"
-            )));
-        }
-        claim.decision_version = claim.decision_version.saturating_add(1);
-        claim.state = claim_state;
-        claim.updated_at = now_timestamp();
-        let terminal = !matches!(
-            claim.state,
-            WorkflowClaimState::Claimed | WorkflowClaimState::Running
-        );
-        self.save_state(&mut state)?;
-        if terminal {
-            self.release_claim_capacity(claim_id)?;
-        }
-        Ok(())
+    fn retry_delayed(&self, goal_id: &str) -> bool {
+        RETRY_STATE
+            .get_or_init(Default::default)
+            .lock()
+            .ok()
+            .and_then(|state| state.get(&self.retry_key(goal_id)).copied())
+            .is_some_and(|state| state.not_before > Instant::now())
     }
 
-    fn mark_claim_execution_failed(
-        &self,
-        claim_id: &str,
-        expected_execution_id: &str,
-        error: &RefineError,
-    ) -> RefineResult<()> {
-        let identity = self.current_goal_identity(&self.claim_by_id(claim_id)?.goal_id);
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        let Some(claim) = state
-            .claims
-            .iter_mut()
-            .find(|claim| claim.claim_id == claim_id)
-        else {
-            return Err(RefineError::NotFound(format!(
-                "claim {claim_id} was not found"
-            )));
-        };
-        if claim.state != WorkflowClaimState::Running
-            || claim.execution_id.as_deref() != Some(expected_execution_id)
-        {
-            return Err(RefineError::Conflict(format!(
-                "execution {expected_execution_id} no longer owns claim {claim_id}"
-            )));
+    fn record_retry(&self, goal_id: &str) {
+        if let Ok(mut retries) = RETRY_STATE.get_or_init(Default::default).lock() {
+            let key = self.retry_key(goal_id);
+            let failures = retries
+                .get(&key)
+                .map(|state| state.failures.saturating_add(1))
+                .unwrap_or(1);
+            let delay = 5_u64.saturating_mul(1_u64 << failures.saturating_sub(1).min(6));
+            retries.insert(
+                key,
+                RetryState {
+                    failures,
+                    not_before: Instant::now() + Duration::from_secs(delay.min(300)),
+                },
+            );
         }
-        claim.failure_stage = Some("execution".to_string());
-        claim.failure_message = Some(bounded_failure_message(&error.to_string()));
-        if let Some((round_idx, goal_revision)) = identity {
-            claim.round_idx = round_idx;
-            claim.goal_revision = goal_revision;
-        }
-        claim.decision_version = claim.decision_version.saturating_add(1);
-        claim.state = WorkflowClaimState::Failed;
-        claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
-        self.release_claim_capacity(claim_id)?;
-        Ok(())
     }
 
-    fn mark_claim_preparation_failed(
-        &self,
-        claim_id: &str,
-        expected_execution_id: &str,
-        error: &RefineError,
-    ) -> RefineResult<()> {
-        let goal_id = self.claim_by_id(claim_id)?.goal_id;
-        // Preparation can fail because the target or Goal record itself cannot
-        // be read. The claim evidence remains authoritative even if the best-
-        // effort Goal settlement cannot make the failure visible there.
-        let identity = self.settle_goal_failure(&goal_id, "preparation", error);
-
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        let Some(claim) = state
-            .claims
-            .iter_mut()
-            .find(|claim| claim.claim_id == claim_id)
-        else {
-            return Err(RefineError::NotFound(format!(
-                "claim {claim_id} was not found"
-            )));
-        };
-        if claim.state != WorkflowClaimState::Running
-            || claim.execution_id.as_deref() != Some(expected_execution_id)
-        {
-            return Err(RefineError::Conflict(format!(
-                "execution {expected_execution_id} no longer owns claim {claim_id}"
-            )));
+    fn clear_retry(&self, goal_id: &str) {
+        if let Ok(mut retries) = RETRY_STATE.get_or_init(Default::default).lock() {
+            retries.remove(&self.retry_key(goal_id));
         }
-        if let Some((round_idx, goal_revision)) = identity {
-            claim.round_idx = round_idx;
-            claim.goal_revision = goal_revision;
-        }
-        claim.failure_stage = Some("preparation".to_string());
-        claim.failure_message = Some(bounded_failure_message(&error.to_string()));
-        claim.decision_version = claim.decision_version.saturating_add(1);
-        claim.state = WorkflowClaimState::Failed;
-        claim.updated_at = now_timestamp();
-        self.save_state(&mut state)?;
-        self.release_claim_capacity(claim_id)?;
-        Ok(())
     }
+}
 
-    pub(super) fn interrupt_active_claims(&self, goal_ids: &[String]) -> RefineResult<()> {
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let goal_ids = goal_ids.iter().collect::<BTreeSet<_>>();
-        let mut state = self.load_state()?;
-        let mut changed = false;
-        let mut released_claim_ids = Vec::new();
-        let now = now_timestamp();
-        for claim in &mut state.claims {
-            if goal_ids.contains(&claim.goal_id)
-                && matches!(
-                    claim.state,
-                    WorkflowClaimState::Claimed | WorkflowClaimState::Running
-                )
-            {
-                claim.decision_version = claim.decision_version.saturating_add(1);
-                claim.state = WorkflowClaimState::Interrupted;
-                claim.updated_at = now.clone();
-                released_claim_ids.push(claim.claim_id.clone());
-                changed = true;
-            }
-        }
-        if changed {
-            self.save_state(&mut state)?;
-            for claim_id in released_claim_ids {
-                self.release_claim_capacity(&claim_id)?;
-            }
-        }
-        Ok(())
+fn outcome_reason(outcome: WorkflowAdvanceOutcome) -> String {
+    match outcome {
+        WorkflowAdvanceOutcome::Transition { reason, .. }
+        | WorkflowAdvanceOutcome::Completed { reason, .. }
+        | WorkflowAdvanceOutcome::Noop { reason }
+        | WorkflowAdvanceOutcome::Blocked { reason }
+        | WorkflowAdvanceOutcome::Failed { reason } => reason,
     }
+}
+
+fn is_stale_authority(error: &RefineError) -> bool {
+    matches!(error, RefineError::Conflict(message) if message.contains("owned by node") || message.contains("no longer eligible") || message.contains("changed from expected"))
 }
 
 fn workflow_status_uses_integrated_target(

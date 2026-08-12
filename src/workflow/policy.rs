@@ -1,19 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::model::goal::{
-    GoalIndexProjection, ImplementationPlan, ImplementationPlanState, ImplementationPlanningFailure,
-};
+use crate::model::goal::GoalIndexProjection;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptEngine, PromptTemplate};
-use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
@@ -23,12 +20,69 @@ use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::promotion::BacklogPromotionService;
 
 use super::{
-    ClaimLoad, ClaimMetadata, WorkflowAutomation, WorkflowAutomationState, WorkflowClaim,
-    WorkflowClaimState, WorkflowEngine, WorkflowPolicy, default_node_id, json_object,
-    now_timestamp, priority_rank, setting_cap_with_default_values, setting_string, setting_usize,
+    WorkflowEngine, WorkflowPolicy, json_object, now_timestamp, priority_rank,
+    setting_cap_with_default_values, setting_string, setting_usize,
 };
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct ExecutionLoad {
+    pub global: usize,
+    pub by_node: BTreeMap<String, usize>,
+    pub by_provider: BTreeMap<String, usize>,
+    pub by_target_app: BTreeMap<String, usize>,
+}
+
+impl ExecutionLoad {
+    pub(super) fn record(&mut self, node: &str, provider: &str, target_app: &str) {
+        self.global += 1;
+        *self.by_node.entry(node.to_string()).or_default() += 1;
+        *self.by_provider.entry(provider.to_string()).or_default() += 1;
+        *self
+            .by_target_app
+            .entry(target_app.to_string())
+            .or_default() += 1;
+    }
+
+    pub(super) fn available(
+        &self,
+        policy: &WorkflowPolicy,
+        node: &str,
+        provider: &str,
+        target_app: &str,
+    ) -> bool {
+        self.global < policy.global_limit
+            && self.by_node.get(node).copied().unwrap_or(0) < policy.per_node_limit
+            && self.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
+            && self.by_target_app.get(target_app).copied().unwrap_or(0)
+                < policy.per_target_app_limit
+    }
+}
+
 impl WorkflowEngine {
+    pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            target_root: None,
+        }
+    }
+
+    pub fn with_target_root(
+        runtime_root: impl Into<PathBuf>,
+        target_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            target_root: Some(target_root.into()),
+        }
+    }
+
+    pub(super) fn refine_dir(&self) -> RefineResult<Option<PathBuf>> {
+        self.target_root
+            .as_ref()
+            .map(|target_root| prepare_refine_dir(target_root))
+            .transpose()
+    }
+
     pub fn policy(&self) -> RefineResult<WorkflowPolicy> {
         let Some(target_root) = &self.target_root else {
             return Ok(WorkflowPolicy::default());
@@ -37,9 +91,6 @@ impl WorkflowEngine {
         self.policy_for_refine_dir(&refine_dir)
     }
 
-    /// Resolves the workflow/agent capacity policy for an already-established target-app state
-    /// directory. Manual agent capabilities use this entry point so they share the scheduler's
-    /// exact limits without rediscovering or relocating state.
     pub fn policy_for_refine_dir(&self, refine_dir: &Path) -> RefineResult<WorkflowPolicy> {
         let active_node_id =
             FileNodeRegistryService::with_active_root(refine_dir, &self.runtime_root)
@@ -47,7 +98,6 @@ impl WorkflowEngine {
         self.policy_for_refine_dir_and_node(refine_dir, &active_node_id)
     }
 
-    /// Loads Node-scoped workflow policy using a previously resolved ownership identity.
     pub fn policy_for_refine_dir_and_node(
         &self,
         refine_dir: &Path,
@@ -56,19 +106,6 @@ impl WorkflowEngine {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
             let settings = FileSettingsService::for_node(refine_dir, node_id).load()?;
-            // Concurrency defaults to what this host can actually support rather
-            // than to a fixed number. The same constant previously applied to a
-            // two-core node and a thirty-two-core one, wasting the capable host
-            // and overcommitting the constrained one. An explicit setting still
-            // wins: the governor supplies the fallback, not an override.
-            //
-            // A stored value is honoured whatever it is, including one equal to
-            // the cap Refine used to seed. Reinterpreting that number as "unset"
-            // would let a capable host reach the governor without an operator
-            // touching anything, but at the cost of making it impossible to
-            // deliberately choose it — and the two cases are indistinguishable
-            // at read time. Nodes carrying the seeded value are handed back by
-            // clearing the setting, which the migration runbook covers.
             let governed_limit = HostResources::current(&self.runtime_root)
                 .recommended_agent_concurrency(observed_agent_memory_bytes(&self.runtime_root));
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", governed_limit);
@@ -98,20 +135,10 @@ impl WorkflowEngine {
     }
 
     pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
-        let runnable = {
-            let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-            let _state_lock = self.acquire_state_mutation_lock()?;
-            let mut state = self.load_state()?;
-            state.policy = self.policy()?;
-            let runnable = match self.ensure_automation_running(&state) {
-                Ok(()) => true,
-                Err(RefineError::Conflict(_)) => false,
-                Err(error) => return Err(error),
-            };
-            self.save_state(&mut state)?;
-            runnable
-        };
-        if runnable { self.promote() } else { Ok(0) }
+        if self.workflow_paused()? {
+            return Ok(0);
+        }
+        self.promote_backlog_to_todo()
     }
 
     pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
@@ -132,22 +159,30 @@ impl WorkflowEngine {
         FileProcessSupervisor::new(&self.runtime_root).set_workflow_paused(paused)
     }
 
-    pub fn recover_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
-        if let Some(target_root) = &self.target_root {
-            return with_repository_git_lock(target_root, || {
-                self.recover_interrupted_goals_locked(detail)
-            });
-        }
-        self.recover_interrupted_goals_locked(detail)
+    pub(super) fn workflow_paused(&self) -> RefineResult<bool> {
+        Ok(FileProcessSupervisor::new(&self.runtime_root)
+            .pause_state()?
+            .workflow_paused)
     }
 
-    pub(super) fn recover_interrupted_goals_locked(&self, detail: &str) -> RefineResult<usize> {
+    pub(super) fn ensure_automation_running(&self) -> RefineResult<()> {
+        if self.workflow_paused()? {
+            return Err(RefineError::Conflict(
+                "workflow automation is paused".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Reconciles node-local execution after a runner restart without changing synchronized
+    /// workflow authority. Old workers are stopped; durable stages remain where they were so the
+    /// next scheduler pass can repeat the incomplete idempotent work.
+    pub fn recover_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
         };
-        // Every status this looks for is one the scheduler index holds, so the
-        // interrupted set is found without reading a projection of the whole
-        // project.
+        self.terminate_stale_workflow_processes()?;
+        self.cleanup_legacy_execution_state()?;
         let active = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let active_node_id = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
         let active_goals = active
@@ -164,33 +199,14 @@ impl WorkflowEngine {
             .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == active_node_id)
             .cloned()
             .collect::<Vec<_>>();
-        if active_goals.is_empty() {
-            return Ok(0);
-        }
-
-        let detail = detail.trim();
-        let detail = if detail.is_empty() {
-            "workflow runner stopped before the Goal completed"
-        } else {
-            detail
-        };
         let work_items = FileWorkItemService::new(&refine_dir);
         let logs = FileLogService::new(&refine_dir);
+        let detail = if detail.trim().is_empty() {
+            "workflow runner restarted before the Goal completed"
+        } else {
+            detail.trim()
+        };
         for goal in &active_goals {
-            let checkpointed = matches!(
-                goal.status,
-                GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
-            );
-            if !checkpointed {
-                // In-progress may be between arbitrary provider and Git effects, so it cannot be
-                // resumed without a durable stage boundary. Fail it with a causal event rather
-                // than silently guessing. Later stages are explicit idempotent checkpoints and
-                // remain eligible for the scheduler's normal automatic resume.
-                if goal.status == GoalStatus::InProgress {
-                    self.fail_interrupted_implementation_plan(&work_items, goal, detail)?;
-                }
-                work_items.advance_automated_goal_status(&goal.id, GoalStatus::Failed)?;
-            }
             let round_idx = match goal.round_count.checked_sub(1) {
                 Some(round_idx) => round_idx,
                 None => work_items
@@ -201,30 +217,28 @@ impl WorkflowEngine {
                     )?
                     .goal
                     .round_count
-                    .checked_sub(1)
-                    .ok_or_else(|| {
-                        RefineError::InvalidInput(format!("Goal {} has no rounds", goal.id))
-                    })?,
+                    .saturating_sub(1),
             };
+            super::implementation_planning::recover_interrupted_plan(
+                &work_items,
+                &goal.id,
+                round_idx,
+            )?;
             logs.append_round_log(
                 &goal.id,
                 round_idx,
                 LogEntry {
                     datetime: now_timestamp(),
-                    severity: if checkpointed { "warning" } else { "error" }.to_string(),
+                    severity: "warning".to_string(),
                     category: "workflow".to_string(),
-                    message: if checkpointed {
-                        format!(
-                            "Workflow interrupted at durable {} checkpoint; automatic resume retained: {detail}",
-                            goal.status.as_str()
-                        )
-                    } else {
-                        format!("Workflow interrupted during in-progress work: {detail}")
-                    },
+                    message: format!(
+                        "Workflow execution was restarted from durable {} state: {detail}",
+                        goal.status.as_str()
+                    ),
                     details: Some(json_object(json!({
                         "reason": detail,
                         "checkpoint": goal.status.as_str(),
-                        "automatic_resume": checkpointed
+                        "automatic_restart": true
                     }))),
                     actions: Vec::new(),
                     actor: Some("refine".to_string()),
@@ -232,360 +246,144 @@ impl WorkflowEngine {
                 },
             )?;
         }
-        let goal_ids = active_goals
-            .iter()
-            .map(|goal| goal.id.clone())
-            .collect::<Vec<_>>();
-        self.interrupt_active_claims(&goal_ids)?;
         Ok(active_goals.len())
     }
 
-    fn fail_interrupted_implementation_plan(
-        &self,
-        work_items: &FileWorkItemService,
-        goal: &GoalIndexProjection,
-        detail: &str,
-    ) -> RefineResult<()> {
-        let Some(round_idx) = goal.round_count.checked_sub(1) else {
-            return Ok(());
-        };
-        let goal_detail = work_items.show_goal_detail(&goal.id)?;
-        let Some(raw) = goal_detail
-            .get("rounds")
-            .and_then(Value::as_array)
-            .and_then(|rounds| rounds.get(round_idx))
-            .and_then(|round| round.get("implementation_plan"))
-            .filter(|value| !value.is_null())
-        else {
-            return Ok(());
-        };
-        let previous: ImplementationPlan = serde_json::from_value(raw.clone()).map_err(|error| {
-            RefineError::Serialization(format!(
-                "Goal {} has invalid implementation planning evidence during interruption settlement: {error}",
-                goal.id
-            ))
-        })?;
-        if previous.state != ImplementationPlanState::InProgress {
-            return Ok(());
-        }
-        if previous.binding.goal_id != goal.id || previous.binding.round_idx != round_idx {
-            return Err(RefineError::Conflict(format!(
-                "Goal {} interruption settlement found a stale implementation planning binding",
-                goal.id
-            )));
-        }
-        let mut failed = previous.clone();
-        failed.state = ImplementationPlanState::Failed;
-        failed.updated_at = now_timestamp();
-        failed.failure = Some(ImplementationPlanningFailure {
-            phase: previous.phase.clone(),
-            category: "interrupted".to_string(),
-            message: detail.to_string(),
-            failed_at: failed.updated_at.clone(),
-            operation_id: previous
-                .active_process
-                .as_ref()
-                .map(|process| process.operation_id.clone()),
-            process_id: previous
-                .active_process
-                .as_ref()
-                .and_then(|process| process.process_id.clone()),
-            git_before: None,
-            git_after: None,
-            process: previous.active_process.clone(),
-        });
-        failed.active_process = None;
-        work_items.replace_goal_round_implementation_plan(
-            &goal.id,
-            round_idx,
-            Some(&previous),
-            &failed,
-        )?;
-        Ok(())
-    }
-
-    pub(super) fn signal_workflow_subprocesses(
-        &self,
-        execution_id: &str,
-        signal: &str,
-    ) -> RefineResult<usize> {
-        let mut signalled = 0;
-        // Current providers register under the managed-agent root. The legacy port root remains
-        // observable during migration so a daemon upgrade can still stop an older process.
-        for process_root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
-            let supervisor = FileProcessSupervisor::new(process_root);
+    fn terminate_stale_workflow_processes(&self) -> RefineResult<()> {
+        for root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
+            let supervisor = FileProcessSupervisor::new(root);
             for process in supervisor.list()? {
-                let matches_execution = process
+                let metadata = process
                     .details
                     .as_deref()
-                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
-                    .and_then(|details| {
-                        details
-                            .get("execution_id")
-                            .and_then(|value| value.as_str())
-                            .map(|value| value == execution_id)
-                    })
-                    .unwrap_or(false);
-                if matches_execution {
-                    supervisor.request_termination(&process.id, signal)?;
-                    signalled += 1;
+                    .and_then(|details| serde_json::from_str::<Value>(details).ok());
+                let workflow_owned = metadata
+                    .as_ref()
+                    .and_then(|details| details.get("kind"))
+                    .and_then(Value::as_str)
+                    == Some("workflow");
+                if workflow_owned && FileProcessSupervisor::process_is_alive(&process)? {
+                    supervisor.terminate_and_confirm_exit(&process, Duration::from_secs(10))?;
                 }
             }
         }
-        Ok(signalled)
+        Ok(())
     }
 
-    /// True when a managed agent process for `execution_id` is still running.
-    pub(super) fn workflow_execution_process_alive(
-        &self,
-        execution_id: &str,
-    ) -> RefineResult<bool> {
-        for process_root in [self.runtime_root.join("agents"), self.runtime_root.clone()] {
-            let supervisor = FileProcessSupervisor::new(process_root);
+    fn cleanup_legacy_execution_state(&self) -> RefineResult<()> {
+        for name in [
+            "workflow-automation-state.json",
+            ".workflow-automation-state.lock",
+            "agent-capacity-state.json",
+            ".agent-capacity.lock",
+            ".workflow-process-registration.lock",
+        ] {
+            let path = self.runtime_root.join(name);
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove retired execution state {}: {error}",
+                        path.display()
+                    )));
+                }
+            }
+        }
+        let tombstones = self
+            .runtime_root
+            .join("operations")
+            .join(".workflow-cancellations");
+        match std::fs::remove_dir_all(&tombstones) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to remove retired workflow cancellation state {}: {error}",
+                    tombstones.display()
+                )));
+            }
+        }
+        let outcomes = self.runtime_root.join("process-stop-outcomes");
+        let entries = match std::fs::read_dir(&outcomes) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect retired cancellation journals {}: {error}",
+                    outcomes.display()
+                )));
+            }
+        };
+        for entry in entries {
+            let path = entry
+                .map_err(|error| RefineError::Io(error.to_string()))?
+                .path();
+            let legacy = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    name.starts_with("workflow-cancellation-") && name.ends_with(".json")
+                });
+            if legacy {
+                std::fs::remove_file(&path).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to remove retired cancellation journal {}: {error}",
+                        path.display()
+                    ))
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn observed_execution_load(&self) -> RefineResult<ExecutionLoad> {
+        let mut load = ExecutionLoad::default();
+        for root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
+            let supervisor = FileProcessSupervisor::new(root);
             for process in supervisor.list()? {
-                if process.state != "running" {
+                if !matches!(process.owner, ProcessOwner::Agent | ProcessOwner::Quality)
+                    || !FileProcessSupervisor::process_is_alive(&process)?
+                {
                     continue;
                 }
-                let matches_execution = process
+                let details = process
                     .details
                     .as_deref()
                     .and_then(|details| serde_json::from_str::<Value>(details).ok())
-                    .and_then(|details| {
-                        details
-                            .get("execution_id")
-                            .and_then(|value| value.as_str())
-                            .map(|value| value == execution_id)
-                    })
-                    .unwrap_or(false);
-                if matches_execution {
-                    return Ok(true);
-                }
+                    .unwrap_or_else(|| json!({}));
+                let node = details
+                    .get("node_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("default");
+                let provider = details
+                    .get("provider")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown");
+                let target = details
+                    .get("target_app_id")
+                    .or_else(|| details.get("cwd"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown");
+                load.record(node, provider, target);
             }
         }
-        Ok(false)
+        Ok(load)
     }
 
-    /// Settle `Running` claims whose executor no longer exists, releasing the
-    /// concurrency slot each one was holding.
-    ///
-    /// A claim reaches `Running` only after its capacity lease is acquired, and a
-    /// lease records the pid of the process that took it, so within one daemon
-    /// generation a `Running` claim always holds a live lease. When a daemon dies
-    /// between starting a claim and recording its terminal state, the worker that
-    /// would have settled the claim dies with it: the lease is pruned as dead on
-    /// the next capacity read, but the claim stays `Running` on disk forever.
-    ///
-    /// Nothing else reconciled that. Completion reports are matched by
-    /// `execution_id` and never arrive, and `interrupt_active_claims` only runs
-    /// against an explicit stop list. Admission counts every `Running` claim, so
-    /// each orphan permanently consumed a slot and effective parallelism drifted
-    /// below the configured cap with every mid-flight daemon death.
-    ///
-    /// Both conditions are required, and the order matters. Absence of a lease
-    /// alone would also match the brief window in which settlement has released
-    /// capacity but not yet persisted the terminal claim state, so a live process
-    /// for the execution vetoes the sweep.
-    pub(super) fn reconcile_orphaned_running_claims(&self) -> RefineResult<usize> {
-        // Reading the capacity snapshot prunes leases whose holder is gone, which
-        // is what makes a missing lease meaningful here.
-        let held = self
-            .capacity_service()
-            .snapshot()?
-            .leases
-            .into_iter()
-            .map(|lease| lease.owner_id)
-            .collect::<BTreeSet<_>>();
-        let candidates = self
-            .load_state()?
-            .active_claims()
-            .filter(|claim| claim.state == WorkflowClaimState::Running)
-            .filter(|claim| !held.contains(&format!("workflow:{}", claim.claim_id)))
-            .cloned()
-            .collect::<Vec<_>>();
-        if candidates.is_empty() {
-            return Ok(0);
-        }
-
-        let mut orphaned = BTreeSet::new();
-        for claim in candidates {
-            let alive = match claim.execution_id.as_deref() {
-                Some(execution_id) => self.workflow_execution_process_alive(execution_id)?,
-                None => false,
-            };
-            if !alive {
-                orphaned.insert(claim.claim_id);
-            }
-        }
-        if orphaned.is_empty() {
-            return Ok(0);
-        }
-
-        let _coordination = acquire_workflow_coordination(&self.coordination_root()?)?;
-        let _state_lock = self.acquire_state_mutation_lock()?;
-        let mut state = self.load_state()?;
-        let mut released_claim_ids = Vec::new();
-        let now = now_timestamp();
-        for claim in &mut state.claims {
-            // Re-check under the lock: a settlement may have landed since the scan.
-            if claim.state == WorkflowClaimState::Running && orphaned.contains(&claim.claim_id) {
-                claim.decision_version = claim.decision_version.saturating_add(1);
-                claim.state = WorkflowClaimState::Interrupted;
-                claim.updated_at = now.clone();
-                released_claim_ids.push(claim.claim_id.clone());
-            }
-        }
-        if released_claim_ids.is_empty() {
-            return Ok(0);
-        }
-        self.save_state(&mut state)?;
-        for claim_id in &released_claim_ids {
-            self.release_claim_capacity(claim_id)?;
-        }
-        Ok(released_claim_ids.len())
-    }
-
-    pub(super) fn workflow_paused(&self) -> RefineResult<bool> {
-        let pause_state = FileProcessSupervisor::new(&self.runtime_root).pause_state()?;
-        Ok(pause_state.workflow_paused)
-    }
-
-    pub(super) fn ensure_automation_running(
+    pub fn soft_capacity_available(
         &self,
-        _state: &WorkflowAutomationState,
-    ) -> RefineResult<()> {
-        if self.workflow_paused()? {
-            return Err(RefineError::Conflict(
-                "workflow automation is paused".to_string(),
-            ));
-        }
-        Ok(())
-    }
-
-    pub(super) fn active_claim<'a>(
-        state: &'a WorkflowAutomationState,
-        goal_id: &str,
-    ) -> Option<&'a WorkflowClaim> {
-        state.active_claim(goal_id)
-    }
-
-    pub(super) fn claim_load(
-        state: &WorkflowAutomationState,
         policy: &WorkflowPolicy,
-    ) -> ClaimLoad {
-        let mut load = ClaimLoad::default();
-        for claim in state.active_claims() {
-            load.global += 1;
-            *load.by_node.entry(claim.node_id.clone()).or_default() += 1;
-            *load.by_provider.entry(claim.provider.clone()).or_default() += 1;
-            *load
-                .by_target_app
-                .entry(claim.target_app_id.clone())
-                .or_default() += 1;
-        }
-        load.ensure_policy_keys(policy);
-        load
-    }
-
-    pub(super) fn capacity_available(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-        node_id: &str,
+        node: &str,
         provider: &str,
-        target_app_id: &str,
-    ) -> bool {
-        let load = Self::claim_load(state, policy);
-        Self::capacity_available_for_load(&load, policy, node_id, provider, target_app_id)
-    }
-
-    pub(super) fn capacity_available_for_load(
-        load: &ClaimLoad,
-        policy: &WorkflowPolicy,
-        node_id: &str,
-        provider: &str,
-        target_app_id: &str,
-    ) -> bool {
-        load.global < policy.global_limit
-            && load.by_node.get(node_id).copied().unwrap_or(0) < policy.per_node_limit
-            && load.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
-            && load.by_target_app.get(target_app_id).copied().unwrap_or(0)
-                < policy.per_target_app_limit
-    }
-
-    pub(super) fn record_claim_load(load: &mut ClaimLoad, claim: &WorkflowClaim) {
-        load.global += 1;
-        *load.by_node.entry(claim.node_id.clone()).or_default() += 1;
-        *load.by_provider.entry(claim.provider.clone()).or_default() += 1;
-        *load
-            .by_target_app
-            .entry(claim.target_app_id.clone())
-            .or_default() += 1;
-    }
-
-    pub(super) fn running_claim_load(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-    ) -> ClaimLoad {
-        let mut load = ClaimLoad::default();
-        for claim in state
-            .active_claims()
-            .filter(|claim| claim.state == WorkflowClaimState::Running)
-        {
-            Self::record_claim_load(&mut load, claim);
-        }
-        load.ensure_policy_keys(policy);
-        load
-    }
-
-    pub(super) fn launchable_claim_ids(
-        state: &WorkflowAutomationState,
-        policy: &WorkflowPolicy,
-    ) -> Vec<String> {
-        let mut load = Self::running_claim_load(state, policy);
-        let mut claim_ids = Vec::new();
-        for claim in state
-            .active_claims()
-            .filter(|claim| claim.state == WorkflowClaimState::Claimed)
-        {
-            if Self::capacity_available_for_load(
-                &load,
-                policy,
-                &claim.node_id,
-                &claim.provider,
-                &claim.target_app_id,
-            ) {
-                Self::record_claim_load(&mut load, claim);
-                claim_ids.push(claim.claim_id.clone());
-            }
-        }
-        claim_ids
-    }
-
-    pub(super) fn claim_metadata(
-        &self,
-        goal: Option<&GoalIndexProjection>,
-        policy: &WorkflowPolicy,
-    ) -> RefineResult<ClaimMetadata> {
-        let node_id = goal
-            .and_then(|goal| goal.node_id.clone())
-            .unwrap_or_else(default_node_id);
-        if node_id != policy.active_node_id {
-            let goal_id = goal
-                .map(|goal| goal.id.as_str())
-                .unwrap_or("requested Goal");
-            return Err(RefineError::Conflict(format!(
-                "{goal_id} is owned by node {node_id}, not active node {}",
-                policy.active_node_id
-            )));
-        }
-        Ok(ClaimMetadata {
-            node_id,
-            provider: policy.provider.clone(),
-            target_app_id: policy.target_app_id.clone(),
-        })
+        target_app: &str,
+    ) -> RefineResult<bool> {
+        Ok(self
+            .observed_execution_load()?
+            .available(policy, node, provider, target_app))
     }
 }
 
-/// A Goal past implementation no longer holds its Feature's ordering queue.
 fn releases_feature_order(status: &GoalStatus) -> bool {
     matches!(
         status,
@@ -593,7 +391,6 @@ fn releases_feature_order(status: &GoalStatus) -> bool {
     )
 }
 
-/// Statuses that occupy a Feature's single in-flight slot.
 fn occupies_feature_slot(status: &GoalStatus) -> bool {
     matches!(
         status,
@@ -601,41 +398,21 @@ fn occupies_feature_slot(status: &GoalStatus) -> bool {
     )
 }
 
-/// Claim eligibility for a set of Goals, decided up front.
-///
-/// Both predicates used to be answered by rescanning the whole snapshot per
-/// candidate, and the priority scan called the Feature scan inside its own loop.
-/// That made promotion quadratic in Goal count at rest and cubic once a batch of
-/// Todo Goals shared a Feature and a priority band — the shape a real backlog
-/// takes. Neither predicate actually needs per-candidate scanning: Feature
-/// eligibility reduces to two aggregates per (Node, Feature), and priority
-/// eligibility to one maximum per Node. One pass answers every candidate in
-/// constant time.
-pub(super) struct ClaimEligibility {
+pub(super) struct SchedulingEligibility {
     feature_eligible: BTreeSet<String>,
-    highest_claimable_todo_rank: BTreeMap<String, u8>,
+    highest_todo_rank: BTreeMap<String, u8>,
 }
 
-impl ClaimEligibility {
-    /// Takes the Goals themselves rather than a projection, so the scheduler can
-    /// be fed the active index — bounded by work in flight — instead of a
-    /// snapshot of everything the project has ever contained.
+impl SchedulingEligibility {
     pub(super) fn new<'a>(
         goals: impl IntoIterator<Item = &'a GoalIndexProjection> + Clone,
         excluded_goal_ids: &BTreeSet<String>,
     ) -> Self {
-        // Per (Node, Feature): the lowest order still holding the queue, and how
-        // many ordered Goals currently occupy the in-flight slot.
         let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
         let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
         for goal in goals.clone() {
-            let Some(feature_id) = goal.feature_id.as_deref() else {
-                continue;
-            };
-            // Only ordered Goals participate: the original scans reached these
-            // comparisons through `feature_order`, so an unordered Goal neither
-            // holds the queue nor occupies the slot.
-            let Some(order) = goal.feature_order else {
+            let (Some(feature_id), Some(order)) = (goal.feature_id.as_deref(), goal.feature_order)
+            else {
                 continue;
             };
             let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
@@ -649,22 +426,23 @@ impl ClaimEligibility {
                 *occupying_count.entry(key).or_default() += 1;
             }
         }
-
         let feature_eligible = goals
             .clone()
             .into_iter()
             .filter(|goal| {
-                Self::feature_eligible_from(goal, &lowest_holding_order, &occupying_count)
+                let (Some(feature_id), Some(order)) =
+                    (goal.feature_id.as_deref(), goal.feature_order)
+                else {
+                    return true;
+                };
+                let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
+                lowest_holding_order.get(&key).copied() == Some(order)
+                    && (goal.status != GoalStatus::Todo
+                        || occupying_count.get(&key).copied().unwrap_or(0) == 0)
             })
             .map(|goal| goal.id.clone())
             .collect::<BTreeSet<_>>();
-
-        // A Goal is priority-eligible when nothing claimable on its Node
-        // outranks it. Whether the Goal itself contributes to this maximum does
-        // not matter: dropping one entry equal to its own rank cannot change
-        // whether a strictly greater entry exists. That is what lets a
-        // per-candidate scan collapse into a single maximum.
-        let mut highest_claimable_todo_rank: BTreeMap<String, u8> = BTreeMap::new();
+        let mut highest_todo_rank = BTreeMap::new();
         for goal in goals {
             if goal.status != GoalStatus::Todo
                 || excluded_goal_ids.contains(&goal.id)
@@ -673,41 +451,15 @@ impl ClaimEligibility {
                 continue;
             }
             let rank = priority_rank(&goal.priority);
-            highest_claimable_todo_rank
+            highest_todo_rank
                 .entry(goal.node_id.as_deref().unwrap_or("default").to_string())
-                .and_modify(|highest| *highest = (*highest).max(rank))
+                .and_modify(|highest: &mut u8| *highest = (*highest).max(rank))
                 .or_insert(rank);
         }
-
         Self {
             feature_eligible,
-            highest_claimable_todo_rank,
+            highest_todo_rank,
         }
-    }
-
-    fn feature_eligible_from(
-        goal: &GoalIndexProjection,
-        lowest_holding_order: &BTreeMap<(&str, &str), i64>,
-        occupying_count: &BTreeMap<(&str, &str), usize>,
-    ) -> bool {
-        let Some(feature_id) = goal.feature_id.as_deref() else {
-            return true;
-        };
-        let Some(order) = goal.feature_order else {
-            return true;
-        };
-        let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
-        // Nothing earlier in the Feature may still be holding the queue.
-        if lowest_holding_order
-            .get(&key)
-            .is_some_and(|lowest| *lowest < order)
-        {
-            return false;
-        }
-        // The Feature admits one ordered Goal in flight at a time, and a Goal
-        // already holding that slot does not block itself.
-        let occupying = occupying_count.get(&key).copied().unwrap_or_default();
-        occupying.saturating_sub(usize::from(occupies_feature_slot(&goal.status))) == 0
     }
 
     pub(super) fn feature_eligible(&self, goal_id: &str) -> bool {
@@ -715,8 +467,10 @@ impl ClaimEligibility {
     }
 
     pub(super) fn priority_eligible(&self, goal: &GoalIndexProjection) -> bool {
-        self.highest_claimable_todo_rank
-            .get(goal.node_id.as_deref().unwrap_or("default"))
-            .is_none_or(|highest| *highest <= priority_rank(&goal.priority))
+        goal.status != GoalStatus::Todo
+            || self
+                .highest_todo_rank
+                .get(goal.node_id.as_deref().unwrap_or("default"))
+                .is_none_or(|highest| priority_rank(&goal.priority) >= *highest)
     }
 }

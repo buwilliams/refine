@@ -28,6 +28,6 @@ The UI should not invent its own workflow states or counts. It should reflect th
 
 ## Future Direction
 
-Future workflow UI should make multi-agent orchestration understandable. It should show dependencies, blocked paths, active claims, review gates, risk, and evidence.
+Future workflow UI should make multi-agent orchestration understandable. It should show dependencies, blocked paths, node ownership, live local work, review gates, risk, and evidence.
 
 As automation improves, the workflow surface should become less about manually clicking states and more about supervising state movement and investigating exceptions.

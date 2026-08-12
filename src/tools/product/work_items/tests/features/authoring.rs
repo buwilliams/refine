@@ -186,7 +186,7 @@ fn file_work_item_service_rejects_feature_transfer_with_active_member_goal() {
 }
 
 #[test]
-fn distribute_skips_feature_and_claimed_goals_and_honors_dry_run() {
+fn distribute_skips_feature_and_active_goals_and_honors_dry_run() {
     let temp_root = unique_temp_dir("distribute-skips");
     let refine_dir = temp_root.join(".refine");
     let service = FileWorkItemService::new(&refine_dir);
@@ -196,7 +196,7 @@ fn distribute_skips_feature_and_claimed_goals_and_honors_dry_run() {
         .create_goal_summary("In feature", Some("GOAL1"))
         .unwrap();
     service
-        .create_goal_summary("Claimed", Some("GOAL2"))
+        .create_goal_summary("Active", Some("GOAL2"))
         .unwrap();
     service.create_goal_summary("Free", Some("GOAL3")).unwrap();
     service
@@ -204,25 +204,31 @@ fn distribute_skips_feature_and_claimed_goals_and_honors_dry_run() {
         .unwrap();
     service.assign_goal_to_feature("FEA1", "GOAL1").unwrap();
 
-    let mut claimed = std::collections::BTreeSet::new();
-    claimed.insert("GOAL2".to_string());
+    service
+        .append_goal_round_summary("GOAL2", "Reporter", "Implement")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL2", GoalStatus::InProgress)
+        .unwrap();
     let targets = vec!["node-a".to_string()];
     let result = service
-        .distribute_goals_across_nodes(&targets, false, &claimed, true)
+        .distribute_goals_across_nodes(&targets, false, true)
         .unwrap();
 
     assert_eq!(result.strategy, "fill");
     assert!(result.dry_run);
     assert_eq!(result.moved, 1);
     assert_eq!(result.moves[0].goal_id, "GOAL3");
-    assert_eq!(result.skipped, 2);
+    assert_eq!(result.skipped, 1);
     let reasons: Vec<&str> = result
         .skipped_details
         .iter()
         .map(|detail| detail.reason.as_str())
         .collect();
     assert!(reasons.contains(&"feature:FEA1"));
-    assert!(reasons.contains(&"claimed"));
     let free_goal = service.show_goal_summary("GOAL3").unwrap();
     assert_eq!(
         free_goal

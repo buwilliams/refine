@@ -2,7 +2,9 @@ mod configuration;
 mod execution;
 mod results;
 
-use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
@@ -10,8 +12,6 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::WorkflowPolicy;
-use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};

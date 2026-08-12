@@ -252,7 +252,7 @@ const GUIDE_CATEGORIES = [
         "Default: 1 hour. Use Never to keep backlog manual.",
         { hash: "#/node/runtime", selector: "#s-backlog-promote" }),
       guideItem("runtime-worktree-cleanup", "Inactive worktree hibernation", "Educate and configure",
-        "Todo Goals are state-only. Once admitted to in-progress, each Goal round gets an isolated worktree. A clean Goal worktree in any status is hibernated after the retention delay when no live claim, operation, or process owns it; its recoverable branch recreates the checkout on demand. Dirty, standalone, state, and unrecognized ignored content remain protected. Exact Refine candidate refs already present in the target branch may be retired locally and upstream.",
+        "Todo Goals are state-only. Once admitted to in-progress, each Goal round gets an isolated worktree. A clean Goal worktree in any status is hibernated after the retention delay when no live process or operation uses it; its recoverable branch recreates the checkout on demand. Dirty, standalone, state, and unrecognized ignored content remain protected. Exact Refine candidate refs already present in the target branch may be retired locally and upstream.",
         "Default: immediately. Cargo target directories and Node node_modules are recognized automatically; add only target-app cache paths that are safe to delete. The cleanup worker scans every registered app at least once per minute.",
         { hash: "#/node/runtime", selector: "#s-worktree-cleanup-delay" }),
       guideItem("runtime-project-update-pulse", "Refine state synchronization", "Educate and configure",

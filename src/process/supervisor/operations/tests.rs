@@ -26,66 +26,6 @@ fn exclusive_operation_registration_serializes_one_owner() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
-#[test]
-fn workflow_cancellation_tombstone_blocks_late_operation_registration() {
-    let temp_root = unique_temp_dir("operations-workflow-cancellation-tombstone");
-    let registry = FileOperationRegistry::new(&temp_root);
-
-    assert!(
-        registry
-            .cancel_workflow_execution_operations("execution-cancelled-before-registration")
-            .unwrap()
-            .is_empty()
-    );
-    let exclusive = registry
-        .register_exclusive_with_request(
-            "merger:GOAL1:1",
-            json!({"execution_id": "execution-cancelled-before-registration"}),
-        )
-        .unwrap_err();
-    assert!(
-        exclusive
-            .to_string()
-            .contains("cancelled before operation registration"),
-        "{exclusive}"
-    );
-    let ordinary = registry
-        .register_with_request(
-            "workflow:test",
-            json!({"execution_id": "execution-cancelled-before-registration"}),
-        )
-        .unwrap_err();
-    assert!(
-        ordinary
-            .to_string()
-            .contains("cancelled before operation registration"),
-        "{ordinary}"
-    );
-    assert!(
-        registry
-            .register_exclusive_with_request(
-                "merger:GOAL1:1",
-                json!({"execution_id": "replacement-execution"}),
-            )
-            .is_ok()
-    );
-
-    let cancellations = fs::read_dir(registry.operations_dir().join(".workflow-cancellations"))
-        .unwrap()
-        .filter_map(Result::ok)
-        .collect::<Vec<_>>();
-    assert_eq!(cancellations.len(), 1);
-    let evidence: Value =
-        serde_json::from_slice(&fs::read(cancellations[0].path()).unwrap()).unwrap();
-    assert_eq!(evidence["error"]["code"], "workflow_execution_cancelled");
-    assert!(
-        evidence["error"]["message"]
-            .as_str()
-            .is_some_and(|message| !message.trim().is_empty())
-    );
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
 use crate::process::subprocess::{
     ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,
     managed_pid_is_alive,

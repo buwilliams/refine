@@ -40,7 +40,7 @@ fn is_false(value: &bool) -> bool {
 ///
 /// Scheduling decisions never need a project's whole history. Feature ordering
 /// is decided by Goals that still hold their Feature's queue, and priority by
-/// Goals still waiting to be claimed; a Goal that reached Review, Done, or
+/// Goals still waiting to run; a Goal that reached Review, Done, or
 /// Cancelled influences neither. In a mature project those are the overwhelming
 /// majority, so an index of the rest is bounded by work in flight rather than by
 /// how much work has ever been done.
@@ -61,10 +61,10 @@ impl ActiveGoalIndex {
     /// Whether a Goal in this status still affects scheduling.
     ///
     /// Mirrors the eligibility rules exactly: Review, Done, and Cancelled
-    /// release a Feature's ordering queue and cannot be claimed, so nothing the
-    /// scheduler computes can depend on them. Backlog and Failed do still hold
-    /// their Feature's queue, so both remain resident despite never being
-    /// claimed directly.
+    /// release a Feature's ordering queue and are not schedulable, so nothing
+    /// the scheduler computes can depend on them. Backlog and Failed do still
+    /// hold their Feature's queue, so both remain resident despite not being
+    /// directly runnable.
     pub fn holds_scheduler_attention(status: &GoalStatus) -> bool {
         !matches!(
             status,
@@ -296,7 +296,7 @@ mod tests {
     // Scheduling never depends on a Goal past Review, so the index that feeds it
     // is bounded by work in flight rather than by everything the project has
     // ever contained. Backlog and Failed stay resident because they still hold
-    // their Feature's ordering queue even though neither is claimed directly.
+    // their Feature's ordering queue even though neither is directly runnable.
     #[test]
     fn the_index_holds_only_goals_that_still_affect_scheduling() {
         let refine_dir = unique_temp_dir("active-index-membership").join(".refine");

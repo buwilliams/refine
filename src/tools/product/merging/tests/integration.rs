@@ -81,19 +81,9 @@ fn ready_merge_push_failure_retries_without_duplicate_merge() {
     work_items
         .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
         .unwrap();
-    let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
     let merger = FileMergerService::new(&runtime_root, &refine_dir);
     let error = merger
-        .integrate_workflow_candidate(
-            "GOAL1",
-            0,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap_err();
     assert!(
         error.to_string().contains("pre-receive hook declined"),
@@ -125,16 +115,7 @@ fn ready_merge_push_failure_retries_without_duplicate_merge() {
 
     fs::remove_file(&hook).unwrap();
     let retried = merger
-        .integrate_workflow_candidate(
-            "GOAL1",
-            0,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(retried.target_commit, integrated_head);
     assert!(retried.pushed);

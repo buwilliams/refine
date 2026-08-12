@@ -89,34 +89,6 @@ pub(crate) fn workflow_revision(value: &Value) -> u64 {
         .unwrap_or(0)
 }
 
-pub(crate) fn workflow_revision_for_goal_projection(
-    refine_dir: &std::path::Path,
-    goal: &GoalIndexProjection,
-) -> RefineResult<u64> {
-    let goal_path = refine_dir.join(&goal.json_path);
-    let bytes = fs::read(&goal_path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to read Goal {}: {error}",
-            goal_path.display()
-        ))
-    })?;
-    let value = serde_json::from_slice::<Value>(&bytes).map_err(|error| {
-        RefineError::Serialization(format!(
-            "failed to parse Goal {}: {error}",
-            goal_path.display()
-        ))
-    })?;
-    Ok(workflow_revision(&value))
-}
-
-pub(super) fn set_workflow_revision(value: &mut Value, revision: u64) -> RefineResult<()> {
-    let object = value.as_object_mut().ok_or_else(|| {
-        RefineError::Serialization("workflow record is not a JSON object".to_string())
-    })?;
-    object.insert("workflow_revision".to_string(), Value::from(revision));
-    Ok(())
-}
-
 pub(super) fn workflow_record_root(path: &std::path::Path) -> PathBuf {
     for ancestor in path.ancestors() {
         if matches!(

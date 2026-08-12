@@ -38,7 +38,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - a tab whose process already exited or no longer exists closes locally without
   requiring a successful stop request;
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
-  workflow claim settlement, worktree and branch retention, Goal requeue, and audit
+  process settlement, worktree and branch retention, Goal requeue, and audit
   semantics after the browser surface detaches;
 - when an explicit Stop is already in progress, closing its tab only detaches
   the browser surface and never sends a duplicate Stop; the original
@@ -65,7 +65,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
   Changing the selected Reporter reloads that Reporter's lists, and explicit
   Refresh reconciles state synchronized from another Node without polling.
 
-The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, lock, capacity leases, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
+The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, locks, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
 
 ## Boundary
 
@@ -77,4 +77,4 @@ the target app's inspectable Refine state; the tab only renders and invokes the
 shared todo API. The toolbar does not implement workflow transitions, duplicate
 Goal ownership, agent turn scheduling, or an alternate conversation protocol.
 
-Future versions may add fleet-level views for active claims, pending approvals, process health, Goal evidence, and multiple native agents while retaining lazy creation and explicit lifecycle ownership.
+Future versions may add fleet-level views for active Goals, pending approvals, process health, Goal evidence, and multiple native agents while retaining lazy creation and explicit lifecycle ownership.

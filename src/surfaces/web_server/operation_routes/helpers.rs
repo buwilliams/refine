@@ -1,47 +1,5 @@
 use super::*;
 
-pub(in crate::surfaces::web_server) fn workflow_retry_response(
-    automation: &WorkflowEngine,
-    execution_id: &str,
-) -> ApiResponse {
-    match automation.retry(execution_id) {
-        Ok(retried_execution_id) => {
-            match workflow_execution_json(automation, &retried_execution_id) {
-                Ok(execution) => ApiResponse::json(
-                    200,
-                    json!({
-                        "retried_from": execution_id,
-                        "execution": execution
-                    }),
-                ),
-                Err(error) => error_response(error),
-            }
-        }
-        Err(error) => error_response(error),
-    }
-}
-
-pub(in crate::surfaces::web_server) fn workflow_execution_json(
-    automation: &WorkflowEngine,
-    execution_id: &str,
-) -> RefineResult<Value> {
-    let state = automation.load_state()?;
-    let claim = state.claim_by_execution(execution_id).ok_or_else(|| {
-        RefineError::NotFound(format!("Workflow execution {execution_id} was not found"))
-    })?;
-    Ok(json!({
-        "id": execution_id,
-        "claim_id": claim.claim_id,
-        "goal_id": claim.goal_id,
-        "status": claim.state,
-        "node_id": claim.node_id,
-        "provider": claim.provider,
-        "target_app_id": claim.target_app_id,
-        "created_at": claim.created_at,
-        "updated_at": claim.updated_at
-    }))
-}
-
 pub(in crate::surfaces::web_server) fn diagnostics_cache_key(
     runtime_root: &std::path::Path,
     refine_dir: Option<&PathBuf>,

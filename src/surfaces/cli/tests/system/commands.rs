@@ -160,7 +160,7 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
     assert_eq!(stopped["termination"]["confirmed_exit"], true);
     assert_eq!(stopped["goal"]["id"], "GOAL-NESTED");
     assert_eq!(stopped["goal"]["status"], "todo");
-    assert_eq!(stopped["worktree_retention"]["retained"], false);
+    assert_eq!(stopped["worktrees_retained"], true);
     assert!(agent_supervisor.inspect(&stoppable.id).is_err());
     assert_eq!(
         work_items
@@ -206,16 +206,9 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
     )
     .unwrap();
     assert_eq!(cancelled_stop["stopped"], true);
-    assert_eq!(
-        cancelled_stop["requested_termination_intent"],
-        "interactive_stop"
-    );
-    assert_eq!(
-        cancelled_stop["termination_intent"],
-        "explicit_cancellation"
-    );
-    assert_eq!(cancelled_stop["cancelled"], true);
     assert_eq!(cancelled_stop["goal"]["status"], "cancelled");
+    assert_eq!(cancelled_stop["goal_requeued"], false);
+    assert_eq!(cancelled_stop["worktrees_retained"], true);
     assert_eq!(
         work_items
             .show_goal_summary("GOAL-NESTED-CANCELLED")

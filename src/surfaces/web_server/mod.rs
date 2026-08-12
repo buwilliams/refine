@@ -6,7 +6,7 @@ use crate::process::supervisor::errors::RefineResult;
 use crate::process::supervisor::lifecycle::DaemonStatus;
 use crate::tools::product::project_state::ProjectionSnapshot;
 
-pub const API_CONTRACT_VERSION: &str = "1";
+pub const API_CONTRACT_VERSION: &str = "2";
 pub const IDEMPOTENCY_DIR: &str = "idempotency";
 pub const API_EVENTS_FILE: &str = "api-events.jsonl";
 
@@ -36,10 +36,6 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     ApiRouteGroup {
         prefix: "/work",
         capability: "Goals, Features, imports, state transitions",
-    },
-    ApiRouteGroup {
-        prefix: "/workflow",
-        capability: "workflow automation",
     },
     ApiRouteGroup {
         prefix: "/activity",

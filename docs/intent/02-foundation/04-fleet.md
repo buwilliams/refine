@@ -2,46 +2,26 @@
 
 ## Key Ideas
 
-- **Fleet As Composed Nodes**: a fleet is many nodes coordinating through the same durable state, claims, and Git remotes — not a new system layered on top.
-- **Distribute Is The Mechanism**: there is no scheduler. Distribute is how work moves between nodes — every assignment, rebalance, and handoff is an invocation of this one operation.
-- **Agent-Managed Machines**: operating agents follow the manage-fleet runbook to create, credential, verify, and dispose of machines on any infrastructure; Refine does not embed cloud control planes or provider-specific recipes.
-- **Credentials Follow Policy**: subscription logins and direct API keys are both legitimate; the managing agent applies the user's chosen posture without persisting secrets in Refine state.
-- **Ephemeral Workers, Durable Evidence**: worker nodes should be rebuildable from Git and shared state; nothing irreplaceable lives on a worker.
-- **Symmetric Sync**: every node publishes and pulls the same `refine/state` control branch; no node is a required intermediary for state and application branches remain separate.
-- **Judgment Converges**: implementation can happen on any node, but review and merge converge to the node where people exercise judgment.
-- **Any Infrastructure**: a fleet should run on a laptop, a rack of machines, or a cloud provider without changing the model.
-- **Self-Hosting Proof**: the fleet is proven when Refine improves Refine — its own repository distributed across its own nodes.
+- **Fleet As Composed Nodes**: nodes coordinate through shared Goal state and Git remotes.
+- **Distribute Is The Mechanism**: assignment, rebalance, and handoff use one explicit operation.
+- **Ephemeral Workers, Durable Evidence**: a worker can be rebuilt from Git and synchronized state.
+- **Symmetric Sync**: every node publishes and pulls the same control branch.
+- **Judgment Converges**: implementation may run anywhere while review converges where judgment occurs.
 
 ## Purpose
 
-The Fleet concept explains how Refine operates many nodes as one delivery system. Node establishes ownership: which actor holds each active Goal. Fleet establishes movement: how work spreads across nodes, how nodes come into existence with working agents, and how finished work converges back for review and merge.
-
-The starting point should stay easy: one machine is already a fleet of one. Nothing about fleet operation should burden the single-node experience. The future direction is larger: a person or agent files a Feature, distributes its Goals across provisioned nodes, watches parallel implementation stream evidence back, and reviews the converged results in one place.
-
-Refine needs this concept because parallel agents are only useful when the work can reach them and return from them. Ownership without distribution leaves every node working alone. Distribution without convergence scatters results no one can judge. Fleet names the full loop: provision, distribute, implement, converge, review, merge.
+Fleet explains how work moves across nodes and returns for review. One machine is a fleet of one; larger fleets add parallel execution without changing the Goal ownership model.
 
 ## Expected Role
 
-Fleet should define how Refine thinks about work at scale:
+Distribute reassigns eligible queued Goals among enabled, healthy nodes. It does not move a Goal already in an automated state. Reassignment of queued work is the explicit transfer of semantic ownership; local workers and processes are not transferred.
 
-- Distribute is the mechanism for moving work, not one option among several. There is no scheduler process deciding placement in the background; if work is on a different node than it was before, distribute was invoked — by a person, an agent, or policy.
-- Distribute operates over registered nodes: it takes eligible Goals — captured or actionable, with no active claim — and reassigns their node ownership across enabled, healthy nodes. Reassigning ownership of unclaimed work is the one sanctioned exception to node ownership enforcement, because reassignment is the transfer.
-- Convergence is distribution pointed home: moving a reviewable Goal back to the review node is the same operation, not a separate return path.
-- Distribution strategies stay simple and inspectable: spread evenly, fill available capacity, or match Goals to nodes by provider. Workflow policy limits and Feature ordering are respected wherever work lands.
-- Because distribute is an operation on shared capability, every surface gets it: a person from the CLI or browser, an agent through MCP. Automatic distribution, when it arrives, is policy invoking distribute on a cadence or trigger — never a second mechanism with its own placement logic.
-- The manage-fleet runbook covers both halves of a working node: the machine (a host bootstrapped from Git on infrastructure the user chooses) and the agent (provider CLIs installed, credentials materialized, authentication verified — not just binary presence). Refine begins at node registration and `node init`; machine lifecycle remains outside the binary. `fleet manage` makes this conversational: it opens an agent session seeded with the runbook, and the agent asks what the fleet should look like before acting through the same shared commands.
-- Credential posture is per-node policy. Long-lived nodes near a person may use subscription logins the way a developer machine does. Ephemeral workers should prefer metered, revocable API keys injected at boot. Secrets are held by a credential source the fleet trusts and never written into shared state or Git.
-- State syncs symmetrically on one dedicated `refine/state` branch. Each node keeps its local mutation projection at `<app>/.git/refine-live-state/` and checks the branch out at `<app>/.git/refine-state-worktree/`; Goal and standalone worktrees likewise remain under `.git/`. The primary application worktree never contains `<app>/.refine`; `.refine` exists only inside the isolated state worktree. The node applies its local state delta, detects same-record races, creates one summarized batch commit, and pushes without checking out, staging, pulling, or pushing the application branch. The `git_remote` setting selects the remote for both state synchronization and Goal/application branch publication and defaults to `origin`. Durable mutations request synchronization through a short trailing debounce and fetch only the state branch. Separately, the project update pulse fetches all branches from that same remote every five minutes by default so Refine observes human application commits without moving the checked-out branch. Manual Sync bypasses both cadences. When the configured remote is absent, Refine still installs the local `.refine` exclusion and initializes and commits the local `refine/state` branch; it reports that publication was skipped.
-- Goal state records the target branch, base commit, candidate branch, and exact candidate commit. Application branches are fetched only by the workflow operation that needs them; approval fast-forwards the target branch, merges the recorded candidate commit, and pushes that branch explicitly.
-- Implementation, quality, and governance evidence are produced where the work runs; branches push to the shared remote; the Goal converges to the review node where the judgment boundary lives. Merge happens once, where it is reviewed.
-- Node health is reported, not assumed: distribute should only target nodes that are enabled and recently alive.
+Convergence is distribution pointed toward the review node. Strategies remain inspectable: spread evenly, fill observed capacity, or match provider capability while respecting priority and Feature order.
 
-The fleet should remain decentralized in character. Any node can distribute, any node can implement, and the review node is a role, not a privileged service. Refine on a cloud provider is the same binary, the same flat files, and the same Git discipline as Refine on a laptop.
+State synchronizes symmetrically on `refine/state`; application branches remain separate. Goal records carry target branch, base commit, candidate branch, and exact candidate commit. Implementation, quality, and governance evidence are produced where work runs, and review and integration consume that durable evidence.
+
+Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 
 ## Future Direction
 
-The nearest proof is self-hosting: Refine attached to its own repository, distributing its own Goals across provisioned worker nodes, each running a different provider agent, with results converging to one review queue — and, after merge, redeploying its own workers from the code its agents wrote.
-
-Beyond that, fleets may grow the orchestration the Node document anticipates — leases, work stealing, dependency-aware placement, conflict prediction, and capacity awareness across heterogeneous nodes. All of it should arrive as richer distribute strategies and policies, not as a scheduler alongside distribute. Infrastructure automation may invoke the manage-fleet runbook contract or a future external driver, but cloud lifecycle code should not enter Refine's core. None of this should displace the foundations: durable flat files, Git as the sync and safety substrate, explicit ownership, and review as the judgment boundary.
-
-The central question this document protects is: how does Refine move work across many provisioned nodes and bring the results back to human judgment, without a central service, hidden scheduling, or state that cannot be rebuilt from Git?
+Fleet policy may add dependency-aware placement, health, conflict prediction, and capacity awareness. Those remain richer uses of distribute and synchronized Goal authority, not a separate durable scheduler or worker-lock system.

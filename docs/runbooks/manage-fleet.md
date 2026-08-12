@@ -122,8 +122,8 @@ together on one node"), plan the assignments yourself and apply them
 Goal by Goal:
 
 1. Read the current state: `refine fleet list` for enabled healthy nodes,
-   `refine goal list` for eligible Goals (captured or actionable, no active
-   claim) and their contents.
+   `refine goal list` for eligible Goals (captured or actionable) and their
+   contents.
 2. Group and place the Goals per the instructions, respecting workflow policy
    limits and Feature ordering.
 3. Apply each assignment: `refine fleet transfer <node-id> <goal-id>`.
@@ -134,8 +134,8 @@ Goal by Goal:
 ## Retire a worker
 
 Pause new admission, move both ordinary open work and Review work away, and
-only then destroy the machine. Distribution cannot move an actively claimed
-Goal; wait for it to settle or stop it through the supported Goal/process
+only then destroy the machine. Distribution cannot move a Goal in an automated
+state; wait for it to settle or stop it through the supported Goal/process
 lifecycle first.
 
 ```bash
@@ -154,8 +154,8 @@ destroy the machine with the user's infrastructure tooling, then:
 refine fleet remove-node <node-id>
 ```
 
-`disable-node` prevents new distribution but does not cancel or transfer an
-existing claim.
+`disable-node` prevents new distribution but does not cancel or transfer
+already-running Goal work.
 
 ## Verify
 

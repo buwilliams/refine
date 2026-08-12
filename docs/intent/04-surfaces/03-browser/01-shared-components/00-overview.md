@@ -36,6 +36,6 @@ Shared components should not hide product semantics. They should make the same s
 
 ## Future Direction
 
-As Refine becomes more agentic, shared components should show richer evidence and risk without becoming visually noisy. Future components may need to represent agent claims, confidence, provenance, dependency impact, approval requirements, and recovery paths.
+As Refine becomes more agentic, shared components should show richer evidence and risk without becoming visually noisy. Future components may need to represent node ownership, confidence, provenance, dependency impact, approval requirements, and recovery paths.
 
 The design direction should remain consistent: reusable operational patterns over one-off page inventions.

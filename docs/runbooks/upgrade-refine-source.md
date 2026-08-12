@@ -9,8 +9,8 @@ healthy. Published-release updates remain unchanged.
 - The controller checkout is on a branch with a reachable configured remote.
 - The controller checkout has no staged, unstaged, or untracked changes.
 - The fetched commit is a fast-forward descendant of the current commit.
-- Refine automation and background processes are paused, with no active Goal
-  claims or running non-daemon work on the selected port.
+- Refine automation and background processes are paused, with no running
+  non-daemon work on the selected port.
 
 Do not stash, reset, merge, or discard work to satisfy these checks. Resolve a
 dirty or divergent checkout explicitly before retrying.

@@ -366,9 +366,9 @@ impl FileWorkItemService {
 
     /// Reassigns node ownership of eligible Goals across the given nodes.
     /// Distribute is the one sanctioned exception to node ownership
-    /// enforcement: unclaimed work may move regardless of which node owns it,
+    /// enforcement: queued work may move regardless of which node owns it,
     /// because reassignment is the transfer. Eligible means captured or
-    /// actionable (backlog/todo) with no active claim; converge instead moves
+    /// actionable (backlog/todo); converge instead moves
     /// reviewable Goals home to a single review node. Feature-bound goals are
     /// skipped so Feature ordering stays intact — transfer the Feature to move
     /// them as a unit.
@@ -376,7 +376,6 @@ impl FileWorkItemService {
         &self,
         target_node_ids: &[String],
         converge: bool,
-        claimed_goal_ids: &BTreeSet<String>,
         dry_run: bool,
     ) -> RefineResult<DistributeResult> {
         if target_node_ids.is_empty() {
@@ -429,16 +428,6 @@ impl FileWorkItemService {
                 skipped_details.push(BulkSkippedDetail {
                     id: goal.goal.id.clone(),
                     reason: format!("feature:{feature_id}"),
-                });
-                if let Some(index) = node_ids.iter().position(|id| *id == owner) {
-                    load[index] += 1;
-                }
-                continue;
-            }
-            if claimed_goal_ids.contains(&goal.goal.id) {
-                skipped_details.push(BulkSkippedDetail {
-                    id: goal.goal.id.clone(),
-                    reason: "claimed".to_string(),
                 });
                 if let Some(index) = node_ids.iter().position(|id| *id == owner) {
                     load[index] += 1;

@@ -47,8 +47,8 @@ impl QualityOperationRunner {
         Ok(operation)
     }
 
-    /// Starts an operator-requested Quality evaluation under the same Node ownership and agent
-    /// capacity policy used by automated workflow work.
+    /// Starts an operator-requested Quality evaluation under the same soft, observable process
+    /// limits used by automated workflow work.
     pub fn start_manual_goal_checks(
         &self,
         goal_id: &str,
@@ -69,45 +69,27 @@ impl QualityOperationRunner {
 
         let engine = WorkflowEngine::with_target_root(&self.runtime_root, &self.target_root);
         let policy = engine.policy_for_refine_dir_and_node(&self.refine_dir, &active_node)?;
-        let capacity = AgentCapacityService::new(&self.runtime_root);
-        let lease_owner = format!(
-            "quality-manual:{}:{}",
-            summary.goal.id,
-            uuid::Uuid::new_v4()
-        );
-        let acquired = capacity.try_acquire(
+        if !engine.soft_capacity_available(
             &policy,
-            AgentCapacityRequest {
-                owner_id: lease_owner.clone(),
-                role: "quality".to_string(),
-                node_id: goal_node.to_string(),
-                provider: provider.to_string(),
-                target_app_id: self.target_root.display().to_string(),
-            },
-        )?;
-        if !acquired {
+            goal_node,
+            provider,
+            &self.target_root.display().to_string(),
+        )? {
             return Err(RefineError::Conflict(
                 "automation concurrency limit reached".to_string(),
             ));
         }
 
-        let (operation, request) = match self.register_goal_checks_for_node(
+        let (operation, request) = self.register_goal_checks_for_node(
             goal_id,
             provider,
             process_metadata,
             Some(&active_node),
-        ) {
-            Ok(registered) => registered,
-            Err(error) => {
-                let _ = capacity.release(&lease_owner);
-                return Err(error);
-            }
-        };
+        )?;
         let runner = self.clone();
         let operation_id = operation.id.clone();
         thread::spawn(move || {
             let _ = runner.run_registered(&operation_id, request);
-            let _ = AgentCapacityService::new(&runner.runtime_root).release(&lease_owner);
         });
         Ok(operation)
     }

@@ -121,7 +121,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
     assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
     assert_eq!(stopped.body["goal"]["id"], "GOAL-STOP-AGENT");
     assert_eq!(stopped.body["goal"]["status"], "todo");
-    assert_eq!(stopped.body["worktree_retention"]["retained"], false);
+    assert_eq!(stopped.body["worktrees_retained"], true);
     assert!(!managed_pid_is_alive(pid).unwrap());
     assert!(agent_supervisor.inspect(&process.id).is_err());
 
@@ -153,7 +153,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
     assert_eq!(stopped_chat.body["termination"]["already_idle"], true);
     assert_eq!(stopped_chat.body["goal"]["id"], "GOAL-STOP-CHAT");
     assert_eq!(stopped_chat.body["goal"]["status"], "todo");
-    assert_eq!(stopped_chat.body["worktree_retention"]["retained"], false);
+    assert_eq!(stopped_chat.body["worktrees_retained"], true);
     assert!(
         chat.list_sessions()
             .unwrap()

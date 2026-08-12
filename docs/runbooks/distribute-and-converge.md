@@ -9,7 +9,7 @@ exact candidate before it reaches Review.
 
 - More than one enabled node (`refine fleet list`), each healthy (`health`
   absent or `ready`).
-- Goals exist in `backlog` or `todo`. Goals with active claims stay where they
+- Goals exist in `backlog` or `todo`. Goals in automated states stay where they
   are; Goals inside a Feature move only when the Feature is transferred, so
   ordering survives.
 
@@ -22,7 +22,7 @@ refine fleet distribute                # spread across enabled healthy nodes
 refine fleet distribute --to worker-1  # or: fill one specific node
 ```
 
-Distribution reassigns node ownership of unclaimed work — that is the entire
+Distribution reassigns node ownership of queued work — that is the entire
 mechanism. There is no background scheduler; work moved because this command
 was invoked. Refine's daemon observes the durable state change and publishes a
 debounced batch through the shared `refine/state` branch. Other nodes do the

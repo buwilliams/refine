@@ -18,8 +18,8 @@ it worked — several steps are silent when they do nothing.
 
 - Goal log sidecars live under `runtime/` inside the live state directory, where
   synchronization excludes them structurally rather than by filename.
-- Per-claim projection caches are gone. These were full copies of project state,
-  one per claim ever created, and nothing pruned them.
+- Per-worker projection caches are gone. These were full copies of project state
+  created for old workflow attempts, and nothing pruned them.
 - The projection snapshot has been rebuilt, so resident Goal text is the bounded
   form rather than every note body and Round prompt.
 - The retired Goal mutation lock file is gone.
@@ -120,9 +120,9 @@ The relative shard structure is preserved by construction:
 `goals/GO/AL1/logs.jsonl` becomes `runtime/goals/GO/AL1/logs.jsonl`, which is
 what the reader derives from a Goal identifier.
 
-## 3. Remove per-claim projection caches
+## 3. Remove retired workflow projection caches
 
-Each workflow claim used to receive its own directory holding a full copy of
+Each old workflow attempt used to receive its own directory holding a full copy of
 project state, and nothing ever removed them. On a long-running node this is
 usually the largest single reclaim in this migration — measure before deleting
 so you can report what it recovered.
@@ -189,11 +189,7 @@ curl -s -X PATCH "http://127.0.0.1:$PORT/api/settings" \
 There is no CLI for writing settings — `refine node settings <node-id>` only
 prints them.
 
-Confirm it took effect by reading back the effective policy:
-
-```bash
-python3 -c "import json;print(json.load(open('$PORT_RUNTIME/workflow-automation-state.json'))['policy'])"
-```
+Confirm it took effect by reading back settings through the API or browser.
 
 Leave a cap in place where it was chosen for a reason — a node sharing hardware
 with something else, or one deliberately limited during an investigation. The
@@ -225,7 +221,7 @@ Confirm the four things this migration was for:
    effect for that shard.
 2. **Work schedules.** If workflow was running before the migration, resume it
    with `REFINE_DAEMON_PORT="$PORT" ./r workflow resume`, then confirm a Todo
-   Goal is claimed. The scheduler now reads `runtime/active-goals.jsonl`; if
+   Goal starts. The scheduler now reads `runtime/active-goals.jsonl`; if
    that file is absent after a promotion pass, the node is not on the upgraded
    build. If workflow was already paused, leave it paused and report that
    scheduling was not exercised.

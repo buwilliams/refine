@@ -1,13 +1,6 @@
 use super::*;
 
 impl FileWorkItemService {
-    pub(crate) fn workflow_revision_for_goal_projection(
-        &self,
-        goal: &GoalIndexProjection,
-    ) -> RefineResult<u64> {
-        workflow_revision_for_goal_projection(&self.refine_dir, goal)
-    }
-
     pub(super) fn with_goal_reporter_registered<T>(
         &self,
         reporter: &str,

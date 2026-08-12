@@ -2,72 +2,43 @@
 
 ## Key Ideas
 
+- **Goal Lifecycle**: synchronized Goal state expresses what work may happen next.
 - **Always-On Automation**: workflow is state movement, not a user-facing scheduler.
-- **Goal Lifecycle**: work advances through explicit states from backlog to done or cancelled.
-- **Agents As Tools**: agents participate in workflow steps; they do not own the meaning of workflow.
-- **Shared Semantics**: CLI, browser, API, and agent surfaces should use the same workflow rules.
-- **Shared Consistency**: cross-process mutations use one coordination boundary so state, execution, and evidence cannot contradict one another.
-- **Recoverable Progress**: claims, executions, failures, retries, and pauses should be visible and resumable.
+- **Agents As Tools**: agents perform steps; they do not own workflow meaning.
+- **Transient Execution**: local workers are replaceable and may run work at least once.
+- **Shared Semantics**: CLI, browser, API, MCP, and agent surfaces use the same rules.
 
 ## Purpose
 
-Workflow exists to move software work forward without turning each Goal into an ad hoc chat session. It gives Refine the ability to promote, claim, implement, quality-check, integrate, optionally rebuild, review, retry, pause, resume, and recover work.
+Workflow moves software work forward without turning each Goal into an ad hoc chat session. It promotes, implements, quality-checks, integrates, optionally rebuilds, reviews, retries, pauses, resumes, and recovers work through explicit Goal states.
 
-The point is not scheduling for its own sake. The point is durable state advancement. Refine should know what can happen next, why it can happen, and which actor is responsible for doing it.
+The point is durable semantic advancement. Refine should know what can happen next, why it can happen, and which node owns the Goal without persisting a second execution-ownership state machine.
 
 ## Expected Role
 
-The workflow capability should be the primary engine of Refine's agentic behavior. It coordinates work across model state, process execution, Git worktrees, quality checks, merge behavior, provider invocation, node ownership, and user review.
+The lifecycle is:
 
-The workflow lifecycle is:
+- backlog: captured work waits until it is ready;
+- todo: actionable work is eligible on its assigned node;
+- in-progress: agents or processes implement the current Round;
+- qa: checks gather evidence before integration or after build according to pinned timing;
+- ready-merge: exact candidate integration is serialized by the repository lock;
+- build: the integrated target app is rebuilt or explicitly skipped;
+- review: evidence and judgment accept or decline the integrated result;
+- done: the intended outcome is complete;
+- failed: the attempt stopped with inspectable evidence;
+- cancelled: the work is intentionally terminal.
 
-- backlog: captured work waits until it is ready for action;
-- todo: actionable work becomes eligible for claiming;
-- in-progress: a node owns the active attempt and agents or processes act;
-- qa: checks gather evidence against the isolated candidate before integration or the integrated target after rebuild, according to the round's pinned Quality timing;
-- ready-merge: the merger-owned queue serializes exact candidate integration into the recorded target branch;
-- build: the integrated target app is rebuilt when configured, or records an explicit skip;
-- review: evidence and judgment accept or decline the already-integrated result;
-- done: the intended outcome is complete and evidence remains inspectable;
-- failed: the attempt did not complete, but evidence supports recovery;
-- cancelled: the work is intentionally stopped.
+Workflow policy applies soft global, node, provider, and target-app limits based on observed live processes. Feature order and priority shape selection. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
-Current implementation details that matter to intent:
+Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable.
 
-- `WorkflowEngine` owns workflow-state advancement.
-- Workflow policy tracks limits by global, node, provider, and target app scope.
-- Claims record which Goal is being worked, by which provider and node, for which target app.
-- Workflow claim state keeps a compact per-Goal authority and retry summary. Every active claim is
-  retained, while terminal attempt records are semantically deduplicated and hard-capped at the
-  newest 256 entries. The latest preparation-stage failure remains in the per-Goal summary after its
-  full claim record ages out, so its evidence stays inspectable.
-- Preparation and non-retryable workflow failures settle the Goal visibly to failed when its record
-  remains available. A failure that preserves a retryable checkpoint keeps that stage and uses an
-  exponential admission delay starting at five seconds with a five-minute cap; shared status
-  surfaces report the exact retry time instead of presenting inert work. Historical failures never
-  permanently exclude a Goal. A user-submitted fresh Round or explicit failed-to-todo requeue
-  changes the Goal revision and receives a fresh claim and execution identity rather than reusing
-  the failed attempt. Persisted legacy quarantine fields are discarded during claim-state
-  normalization without discarding prior claims or failure evidence.
-- Pause controls can stop agents, target-app work, or all automation.
-- Goal state rules distinguish manual transitions from automated transitions.
-- Bulk status correction can place non-automated Goals in review or done, while Goals in actively
-  automated states or with active claims remain protected from generic bulk status replacement.
-  Bulk cancellation is the deliberate lifecycle exception: it delegates each selected Goal to the
-  shared process/workflow cancellation settlement, can stop active, claimed, failed, or review
-  Goals, reports partial failures per Goal, and keeps done Goals protected.
-- Feature ordering is respected so ordered Goals advance without losing Feature intent.
-- While agents are running, the engine periodically discovers newly eligible queued Goals and
-  uses available capacity without waiting for the current agents to finish. Each replenishment
-  applies the same priority and Feature-order eligibility rules as the initial claim pass.
-- Review is a meaningful boundary: a Goal in review can unblock later ordered Feature work.
+Preparation and non-retryable failures move an unchanged active Goal to failed. Retryable local failures use in-memory backoff and do not create durable delay records. Pause controls suppress new work and quiesce supported processes.
 
-Workflow should not be reimplemented in page-local JavaScript, one-off CLI commands, or provider-specific scripts. Those surfaces should call the shared capability.
+Bulk status correction protects automated states from generic replacement. Explicit cancellation is the lifecycle exception: it writes `cancelled` as Goal intent and then performs best-effort local cleanup per Goal.
 
-The [Shared Workflow Consistency Contract](11-consistency-contract.md) defines the authority, identity, evidence, conflict, durability, recovery, and thin-surface invariants shared by every workflow state.
+The [Shared Workflow Consistency Contract](11-consistency-contract.md) and [Execution Ownership](../04-execution-ownership.md) define the authority and recovery rules.
 
 ## Future Direction
 
-Future workflow should support fleets of agents composing software at scale. That requires richer dependency reasoning, better claim negotiation, stronger retry semantics, multi-agent coordination, evidence-aware review, and merge orchestration.
-
-The long-term design can be compressed to workflow plus persistence plus orchestration. If future AI systems discover better internal machinery, they should still preserve explicit work state, recoverable progress, shared semantics, and inspectable evidence.
+Workflow should support richer dependency reasoning, agent selection, multi-agent composition, evidence-aware review, and merge orchestration while preserving explicit Goal state, cheap restart, shared semantics, and inspectable evidence.

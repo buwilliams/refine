@@ -6,10 +6,6 @@ use serde_json::json;
 use super::*;
 use crate::process::subprocess::{ManagedProcess, ProcessOwner};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::workflow::{
-    WORKFLOW_AUTOMATION_STATE_FILE, WorkflowAutomationState, WorkflowClaim, WorkflowClaimState,
-    WorkflowPolicy,
-};
 
 #[test]
 fn cleanup_hibernates_all_clean_inactive_round_worktrees_and_preserves_branches() {
@@ -318,54 +314,6 @@ fn cleanup_preserves_dirty_missing_and_owned_worktrees_but_hibernates_inactive_s
     for path in [dirty, active, operation, missing] {
         assert!(path.exists(), "preserved {}", path.display());
     }
-}
-
-#[test]
-fn cleanup_preserves_a_worktree_owned_by_an_active_workflow_claim() {
-    let fixture = Fixture::new("active-claim");
-    fixture.create_goal("CLAIMED", "refine/CLAIMED/round-1", false);
-    let worktree = fixture.add_worktree("refine/CLAIMED/round-1");
-    let state = WorkflowAutomationState {
-        version: 1,
-        policy: WorkflowPolicy::default(),
-        claim_history_version: 0,
-        claim_summaries: Default::default(),
-        claims: vec![WorkflowClaim {
-            claim_id: "claim-1".to_string(),
-            goal_id: "CLAIMED".to_string(),
-            node_id: "default".to_string(),
-            provider: "claude".to_string(),
-            target_app_id: "default".to_string(),
-            execution_id: None,
-            round_idx: Some(0),
-            goal_revision: None,
-            failure_stage: None,
-            failure_message: None,
-            decision_version: 1,
-            occurrences: 1,
-            state: WorkflowClaimState::Claimed,
-            created_at: "2026-01-01T00:00:00Z".to_string(),
-            updated_at: "2026-01-01T00:00:00Z".to_string(),
-        }],
-        updated_at: Some("2026-01-01T00:00:00Z".to_string()),
-    };
-    fs::create_dir_all(&fixture.runtime_root).unwrap();
-    fs::write(
-        fixture.runtime_root.join(WORKFLOW_AUTOMATION_STATE_FILE),
-        serde_json::to_vec_pretty(&state).unwrap(),
-    )
-    .unwrap();
-
-    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
-        .run(WorktreeCleanupOptions {
-            apply: true,
-            older_than_seconds: 0,
-        })
-        .unwrap();
-
-    assert_eq!(report.removed, 0);
-    assert_eq!(report.entries[0].reason, "active_owner");
-    assert!(worktree.exists());
 }
 
 #[test]

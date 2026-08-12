@@ -143,7 +143,7 @@ Do not create these derived node-local paths by hand:
   records and then maintains it as Goals change.
 - `runtime/record-locks/` — per-record locks are created on demand.
 - port-scoped projection snapshots or `cache/workflow/` — current v4 rebuilds
-  projections and no longer uses per-claim project copies.
+  projections and no longer uses per-worker project copies.
 - retired project-wide mutation locks such as `.goal-mutations.lock`.
 
 ## 3. Validate before handoff

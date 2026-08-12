@@ -74,7 +74,7 @@ pub enum Commands {
         action: NodeAction,
     },
     /// Operate the fleet (the fleet of nodes): register and bootstrap nodes,
-    /// distribute unclaimed Goal ownership, and run remote commands.
+    /// distribute queued Goal ownership, and run remote commands.
     Fleet {
         #[command(subcommand)]
         action: FleetAction,

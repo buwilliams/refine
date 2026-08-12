@@ -2,72 +2,28 @@
 
 ## Key Ideas
 
-- **Claimed Work**: in-progress means active work is owned by a node.
-- **Observable Execution**: the work should expose process, agent, logs, and evidence as it advances.
-- **Recoverable Interruption**: interruption should leave enough state to retry, resume, or reassign.
+- **Node-Owned Work**: in-progress means the synchronized Goal is active on its assigned node.
+- **Observable Execution**: local processes, agent sessions, logs, and evidence remain inspectable.
+- **Replaceable Workers**: interruption may start the same semantic attempt again.
 
 ## Purpose
 
-In-progress exists to make active work explicit. A Goal should not disappear into an agent turn, terminal command, or hidden process once work begins.
+In-progress makes active work explicit. A Goal should not disappear into an agent turn, terminal command, or hidden process once work begins.
 
 ## Expected Role
 
-In-progress should connect the Goal to node ownership, workflow claims, process execution, agent activity, target-app context, and evidence. Other nodes and agents should be able to see that the work is already active and avoid duplicating it.
+The Goal's status, node assignment, and current Round authorize advancement. Local managed processes record which worker is currently acting, but their identifiers do not enter synchronized Goal or Round evidence.
 
-If an in-progress run fails or is interrupted, Refine should preserve what happened and decide whether the Goal returns to todo, moves to failed, or follows a recovery path.
+Before implementation, Workflow pins the Round context and advances the typed Plan -> Criticize -> Revise -> Implement pipeline. Each completed artifact is persisted before its consumer starts and updates compare against the complete prior planning value plus Goal, Round, context digest, branch, target branch, and base commit.
 
-## What Happens
+Planning agents must leave the repository unchanged. The implementation agent receives the final checklist and reports semantic checklist and verification evidence. Guidance selection occurs inside the implementation turn. Post-implementation governance evaluates the pinned governance snapshot.
 
-When a Goal is in-progress:
+The Goal Agent runs as an observable managed PTY so browser and CLI can attach without creating another session. If user input is genuinely required, the same local process may wait for it. A daemon restart does not promise to restore that process; a replacement worker consumes the same synchronized context and preserved artifacts.
 
-- A node owns the active attempt.
-- Refine records the workflow claim, provider or actor, target app, and execution context.
-- Agents use guidance, governance, tools, files, terminal/process execution, and target-app lifecycle context to act on the work.
-- The implementing Goal Agent runs in a background PTY owned by this workflow
-  attempt. A user may attach through CLI or browser without creating a duplicate
-  agent or changing workflow ownership.
-- Before the PTY starts, Refine pins the Round's context contract: governance
-  product, constitution, and rules; a short workflow summary; enabled guidance
-  candidates; Goal context; previous Rounds; and the current Round request.
-- The pinned agent-context value remains the durable internal snapshot. One
-  shared prompt serializer maps it into a flat Markdown specification without a
-  JSON representation or duplicated Goal and Round sections. The authoritative
-  latest-Round request remains the final substantive instruction. Large
-  composed frames use the shared provider prompt transport, and the
-  workflow-owned PTY retains its artifact lease through terminal handoff so
-  early exec or command-channel cleanup cannot replace the real provider
-  failure.
-- Before repository implementation, Workflow advances one durable planning
-  pipeline through plan, criticize, revise, and implement. Every phase is
-  fenced to the exact Goal, Round, claim/execution, context digest,
-  implementation and target branches, and base commit. Each completed artifact
-  is written before the next process launches; stale observations conflict.
-- Plan, criticism, and revision use fresh managed native agents with repository
-  access. Their worktree must have identical Git observations before and after.
-  A mutation is preserved as failure evidence and implementation does not start.
-- The implementation prompt includes the final checklist while keeping the
-  final Round request authoritative. Completion evidence reports every stable
-  checklist ID; discrepancies do not rewrite the accepted plan.
-- An interruption, cancellation, or terminated phase process fails the current
-  in-progress attempt through shared Process and Workflow settlement. Refine
-  does not resume a phase, reuse its execution identity, or treat Git
-  observations as restart checkpoints. Recovery is a fresh follow-up Round with
-  a new Plan -> Criticize -> Revise -> Implement pipeline; prior process output,
-  logs, branch, worktree, and Round evidence remain inspectable.
-- Guidance selection happens inside the implementation turn and is returned in
-  the completion signal. It never requires a separate provider invocation.
-- Post-implementation governance evaluates against the pinned governance
-  snapshot rather than reloading settings that may have changed mid-turn.
-- A Goal Agent that truly needs a user decision keeps its process and claim alive,
-  records an explicit needs-input state, and continues in the same session after
-  the user responds.
-- Silence does not become needs-input; the Goal Agent remains autonomous and
-  makes the best decision supported by its current context.
-- Process output, logs, changed files, agent output, and intermediate evidence should remain observable.
-- Other nodes should not silently duplicate the same active work.
-- On success, the work should produce a reviewable handoff and move toward ready-merge or another appropriate next state.
-- On interruption or failure, Refine should preserve evidence and route the Goal to retry, failed, or recovery.
+Every transition rereads status, node, and Round. Reassignment, cancellation, a new Round, or another state transition makes a stale worker stop. Duplicate idempotent work can occur during restart or delayed synchronization, but only a worker with current Goal authority may publish the next state.
+
+On success, implementation produces a reviewable candidate and advances toward QA or Ready Merge. On failure, semantic evidence is preserved and the unchanged active Goal moves to failed where appropriate.
 
 ## Future Direction
 
-Future in-progress behavior should support richer concurrency controls, leases, partial progress, cooperative multi-agent work, and stronger recovery semantics while preserving clear ownership.
+In-progress should support cooperative agents, better progress evidence, and remote-node observability while keeping worker lifetime separate from synchronized Goal authority.

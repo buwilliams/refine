@@ -311,8 +311,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
     }
     automation_loop.stop_for_test();
 
-    let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
-    assert!(state.contains("\"goal_id\": \"GOAL1\""));
+    assert!(!runtime_root.join("workflow-automation-state.json").exists());
     assert!(
         !fs::read_to_string(runtime_root.join(API_EVENTS_FILE))
             .unwrap_or_default()

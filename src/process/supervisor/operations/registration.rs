@@ -7,7 +7,6 @@ impl FileOperationRegistry {
         request: Value,
     ) -> RefineResult<OperationHandle> {
         let lock = self.mutation_lock()?;
-        self.ensure_request_execution_active(&request)?;
         let handle = OperationHandle {
             id: new_operation_id(),
             owner: owner.to_string(),
@@ -37,7 +36,6 @@ impl FileOperationRegistry {
         request: Value,
     ) -> RefineResult<OperationHandle> {
         let lock = self.mutation_lock()?;
-        self.ensure_request_execution_active(&request)?;
         if let Some(active) = self
             .recover()?
             .into_iter()
@@ -67,7 +65,7 @@ impl FileOperationRegistry {
         Ok(handle)
     }
 
-    /// Atomically claims a durable replacement for an interrupted operation.
+    /// Atomically creates or recovers a durable replacement for an interrupted operation.
     ///
     /// The source id and retry identity are written into the replacement request while the
     /// registry mutation lock is held. Concurrent callers, including callers in separate daemon

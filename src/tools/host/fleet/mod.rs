@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -11,7 +10,6 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::WorkflowEngine;
 
 // The legacy registry keeps its pre-rename on-disk name so existing synced
 // state still migrates into the node registry.
@@ -313,29 +311,12 @@ impl FileFleetService {
                 .map(|node| node.id.clone())
                 .collect(),
         };
-        let claimed = self.active_claim_goal_ids();
         let result = FileWorkItemService::new(&self.refine_dir)
-            .distribute_goals_across_nodes(&targets, converge, &claimed, dry_run)?;
+            .distribute_goals_across_nodes(&targets, converge, dry_run)?;
         Ok(serde_json::json!({
             "ok": true,
             "distribute": result
         }))
-    }
-
-    /// Goals with an active claim are pinned to their node; distribution only
-    /// moves unclaimed work. Claims live in runtime state, so this is empty
-    /// when no runtime root is configured.
-    fn active_claim_goal_ids(&self) -> BTreeSet<String> {
-        let Some(runtime_root) = &self.runtime_root else {
-            return BTreeSet::new();
-        };
-        let Ok(state) = WorkflowEngine::new(runtime_root).load_state() else {
-            return BTreeSet::new();
-        };
-        state
-            .active_claim_goal_ids()
-            .map(ToString::to_string)
-            .collect()
     }
 
     pub fn maintenance_response(&self) -> RefineResult<serde_json::Value> {

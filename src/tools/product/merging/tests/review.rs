@@ -70,19 +70,9 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
         .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
         .unwrap();
 
-    let (claim_id, execution_id) = start_ready_merge_claim(&runtime_root, &repo);
     let merger = FileMergerService::new(&runtime_root, &refine_dir);
     let wrong_round = merger
-        .integrate_workflow_candidate(
-            "GOAL1",
-            1,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 1, "default", branch, &candidate_commit, "origin")
         .unwrap_err();
     assert!(
         wrong_round.to_string().contains("round changed"),
@@ -93,8 +83,6 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
-                &claim_id,
-                &execution_id,
                 "other-node",
                 branch,
                 &candidate_commit,
@@ -102,7 +90,7 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
             )
             .unwrap_err()
             .to_string()
-            .contains("no longer owns active claim")
+            .contains("not other-node")
     );
     let first = merger.clone();
     let second = merger.clone();
@@ -111,8 +99,6 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
             first.integrate_workflow_candidate(
                 "GOAL1",
                 0,
-                &claim_id,
-                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
@@ -123,8 +109,6 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
             second.integrate_workflow_candidate(
                 "GOAL1",
                 0,
-                &claim_id,
-                &execution_id,
                 "default",
                 branch,
                 &candidate_commit,
@@ -138,32 +122,14 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
     assert!(integrated.merge.ok);
     assert_eq!(concurrent_recovery, integrated);
     let repeated = merger
-        .integrate_workflow_candidate(
-            "GOAL1",
-            0,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(repeated, integrated);
     work_items
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_integration": null}))
         .unwrap();
     let recovered = merger
-        .integrate_workflow_candidate(
-            "GOAL1",
-            0,
-            &claim_id,
-            &execution_id,
-            "default",
-            branch,
-            &candidate_commit,
-            "origin",
-        )
+        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(recovered.candidate_commit, candidate_commit);
     assert_eq!(recovered.target_commit, integrated.target_commit);

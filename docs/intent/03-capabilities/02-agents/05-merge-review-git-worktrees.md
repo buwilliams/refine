@@ -30,7 +30,7 @@ This capability should connect workflow with the user's source repository:
 - standalone worktree output should be able to become structured ready-merge work.
 - clean managed Goal worktrees in any status should be hibernated by the shared
   maintenance capability after the configured retention delay when no live
-  claim, operation, or process owns them. Recoverable branches recreate the
+  live operation or process owns them. Recoverable branches recreate the
   checkout on demand. Dirty work, ambiguous ownership, standalone worktrees,
   the state worktree, and unrecognized ignored content remain protected.
   Generated cache paths are removable only when recognized by Refine or

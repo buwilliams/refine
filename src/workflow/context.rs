@@ -12,16 +12,14 @@ use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::host::quality::{FileQualityService, POST_BUILD, PRE_MERGE};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::{WorkflowClaim, json_object, now_timestamp};
+use crate::workflow::{json_object, now_timestamp};
 
 pub struct WorkflowContext<'a> {
     pub runtime_root: &'a Path,
     pub target_root: &'a Path,
-    pub claim_id: String,
     pub goal_id: String,
     pub node_id: String,
     pub provider: String,
-    pub execution_id: String,
     pub round_idx: usize,
     pub settings: JsonObject,
     pub work_items: FileWorkItemService,
@@ -43,11 +41,15 @@ pub struct WorkflowContext<'a> {
 }
 
 impl<'a> WorkflowContext<'a> {
+    // Context construction makes the runtime, target, Goal, node, provider, and Round axes
+    // explicit so callers cannot derive execution authority from a local worker identity.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         runtime_root: &'a Path,
         target_root: &'a Path,
-        claim: WorkflowClaim,
-        execution_id: &str,
+        goal_id: String,
+        node_id: String,
+        provider: String,
         round_idx: usize,
         settings: JsonObject,
         work_items: FileWorkItemService,
@@ -55,11 +57,9 @@ impl<'a> WorkflowContext<'a> {
         Self {
             runtime_root,
             target_root,
-            claim_id: claim.claim_id,
-            goal_id: claim.goal_id,
-            node_id: claim.node_id,
-            provider: claim.provider,
-            execution_id: execution_id.to_string(),
+            goal_id,
+            node_id,
+            provider,
             round_idx,
             settings,
             work_items,
@@ -105,6 +105,16 @@ impl<'a> WorkflowContext<'a> {
                 to.as_str()
             )));
         }
+        let current_node = current.goal.node_id.as_deref().unwrap_or("default");
+        if current_node != self.node_id {
+            return Err(RefineError::Conflict(format!(
+                "Goal {} moved from node {} to {} before workflow transition to {}",
+                self.goal_id,
+                self.node_id,
+                current_node,
+                to.as_str()
+            )));
+        }
         if let Err(error) = self
             .work_items
             .advance_automated_goal_status(&self.goal_id, to.clone())
@@ -139,8 +149,8 @@ impl<'a> WorkflowContext<'a> {
     ) -> RefineResult<()> {
         let mut details = details.unwrap_or_default();
         details
-            .entry("execution_id".to_string())
-            .or_insert_with(|| json!(&self.execution_id));
+            .entry("node_id".to_string())
+            .or_insert_with(|| json!(&self.node_id));
         FileLogService::new(self.refine_dir()).append_round_log(
             &self.goal_id,
             self.round_idx,
@@ -181,13 +191,17 @@ impl<'a> WorkflowContext<'a> {
 
     pub fn workflow_process_metadata(&self, workflow_state: &str, behavior: &str) -> JsonObject {
         let mut metadata = workflow_subprocess_metadata(
-            &self.execution_id,
             &self.goal_id,
             workflow_state,
             behavior,
             Some(self.round_idx),
         );
-        metadata.insert("claim_id".to_string(), json!(&self.claim_id));
+        metadata.insert("node_id".to_string(), json!(&self.node_id));
+        metadata.insert("provider".to_string(), json!(&self.provider));
+        metadata.insert(
+            "target_app_id".to_string(),
+            json!(self.target_root.display().to_string()),
+        );
         metadata
     }
 
@@ -388,7 +402,6 @@ fn missing_artifact(name: &str, goal_id: &str) -> RefineError {
 mod tests {
     use super::*;
     use crate::tools::host::quality::{POST_BUILD, PRE_MERGE, QualitySettingsPatch};
-    use crate::workflow::WorkflowClaimState;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -412,36 +425,20 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-        let claim = WorkflowClaim {
-            claim_id: "claim-1".to_string(),
-            goal_id: "GOAL1".to_string(),
-            node_id: "default".to_string(),
-            provider: "smoke-ai".to_string(),
-            target_app_id: target_root.display().to_string(),
-            execution_id: Some("exec-1".to_string()),
-            round_idx: Some(0),
-            goal_revision: None,
-            failure_stage: None,
-            failure_message: None,
-            decision_version: 1,
-            occurrences: 1,
-            state: WorkflowClaimState::Running,
-            created_at: "now".to_string(),
-            updated_at: "now".to_string(),
-        };
         let mut first = WorkflowContext::new(
             &runtime_root,
             &target_root,
-            claim.clone(),
-            "exec-1",
+            "GOAL1".to_string(),
+            "default".to_string(),
+            "smoke-ai".to_string(),
             0,
             JsonObject::new(),
             work_items.clone(),
         );
         let process_metadata =
             first.workflow_process_metadata("in-progress", "WorkflowImplementation");
-        assert_eq!(process_metadata["claim_id"], "claim-1");
-        assert_eq!(process_metadata["execution_id"], "exec-1");
+        assert_eq!(process_metadata["goal_id"], "GOAL1");
+        assert_eq!(process_metadata["node_id"], "default");
         assert_eq!(process_metadata["round_idx"], 0);
         assert_eq!(
             first.quality_timing(GoalStatus::ReadyMerge).unwrap(),
@@ -457,8 +454,9 @@ mod tests {
         let mut retry = WorkflowContext::new(
             &runtime_root,
             &target_root,
-            claim,
-            "exec-2",
+            "GOAL1".to_string(),
+            "default".to_string(),
+            "smoke-ai".to_string(),
             0,
             JsonObject::new(),
             work_items.clone(),
@@ -526,28 +524,12 @@ mod tests {
                     ..Default::default()
                 })
                 .unwrap();
-            let claim = WorkflowClaim {
-                claim_id: "claim-1".to_string(),
-                goal_id: "GOAL1".to_string(),
-                node_id: "default".to_string(),
-                provider: "smoke-ai".to_string(),
-                target_app_id: target_root.display().to_string(),
-                execution_id: Some("exec-1".to_string()),
-                round_idx: Some(0),
-                goal_revision: None,
-                failure_stage: None,
-                failure_message: None,
-                decision_version: 1,
-                occurrences: 1,
-                state: WorkflowClaimState::Running,
-                created_at: "now".to_string(),
-                updated_at: "now".to_string(),
-            };
             let mut first = WorkflowContext::new(
                 &runtime_root,
                 &target_root,
-                claim.clone(),
-                "exec-1",
+                "GOAL1".to_string(),
+                "default".to_string(),
+                "smoke-ai".to_string(),
                 0,
                 JsonObject::new(),
                 work_items.clone(),
@@ -567,8 +549,9 @@ mod tests {
             let mut retry = WorkflowContext::new(
                 &runtime_root,
                 &target_root,
-                claim,
-                "exec-2",
+                "GOAL1".to_string(),
+                "default".to_string(),
+                "smoke-ai".to_string(),
                 0,
                 JsonObject::new(),
                 work_items.clone(),

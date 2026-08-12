@@ -4,10 +4,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::model::workflow::GoalStatus;
+use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::WorkflowEngine;
 
 /// The `refine next` oracle: reads durable state and recommends the next
 /// operations, each with the exact command to run. No scheduler and no side
@@ -50,7 +50,7 @@ impl FileNextActionsService {
             .active_node_id()
             .unwrap_or_else(|_| "default".to_string());
         let goals = FileWorkItemService::new(&self.refine_dir).list_goal_summaries()?;
-        let claimed = self.active_claim_count();
+        let running_workflow_processes = self.running_workflow_process_count();
 
         let mut status_counts: BTreeMap<&'static str, usize> = BTreeMap::new();
         let mut open_by_node: BTreeMap<String, usize> = BTreeMap::new();
@@ -165,20 +165,32 @@ impl FileNextActionsService {
                 "open_goals_by_node": open_by_node,
                 "nodes_enabled": enabled_nodes.len(),
                 "nodes_healthy": healthy_node_count,
-                "active_claims": claimed,
+                "running_workflow_processes": running_workflow_processes,
             },
             "suggestions": suggestions
         }))
     }
 
-    fn active_claim_count(&self) -> usize {
+    fn running_workflow_process_count(&self) -> usize {
         let Some(runtime_root) = &self.runtime_root else {
             return 0;
         };
-        WorkflowEngine::new(runtime_root)
-            .load_state()
-            .map(|state| state.active_claim_count())
-            .unwrap_or(0)
+        [runtime_root.clone(), runtime_root.join("agents")]
+            .into_iter()
+            .filter_map(|root| FileProcessSupervisor::new(root).list().ok())
+            .flatten()
+            .filter(|process| {
+                FileProcessSupervisor::process_is_alive(process).unwrap_or(false)
+                    && process
+                        .details
+                        .as_deref()
+                        .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
+                        .and_then(|details| details.get("kind").cloned())
+                        .and_then(|kind| kind.as_str().map(str::to_string))
+                        .as_deref()
+                        == Some("workflow")
+            })
+            .count()
     }
 }
 

@@ -493,143 +493,32 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub(crate) fn prepare_goal_cancellation_if_current(
+    pub(crate) fn requeue_goal_after_process_stop_if_current(
         &self,
         goal_id: &str,
         expected: &GoalCancellationExpectation,
-        target_status: GoalStatus,
-        implementation_plan_replacement: Option<(&ImplementationPlan, &ImplementationPlan)>,
-    ) -> RefineResult<GoalCancellationTransaction> {
-        let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
+    ) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
-        self.ensure_goal_owned(&current)?;
+        if current.goal.status == GoalStatus::Cancelled {
+            return Ok(current);
+        }
+        let node = current.goal.node_id.as_deref().unwrap_or("default");
         if current.goal.status != expected.status
             || current.goal.round_count != expected.round_count
             || current.goal.updated != expected.updated
+            || node != expected.node_id
         {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} ownership fence changed before stop settlement (expected status {}, round {}, revision {}; observed status {}, round {}, revision {}); the Goal was not changed",
-                expected.status.as_str(),
-                expected.round_count,
-                expected.updated,
-                current.goal.status.as_str(),
-                current.goal.round_count,
-                current.goal.updated
+                "Goal {goal_id} changed after process Stop preflight; its newer status, Round, or node ownership was preserved"
             )));
         }
         if current.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(format!(
-                "done Goal {goal_id} cannot be settled to {} by process control",
-                target_status.as_str()
+                "done Goal {goal_id} cannot be requeued by process Stop"
             )));
         }
-        let (goal_path, original) = self.read_goal_value_unchecked_locked(&current)?;
-        let observed_plan = expected
-            .round_count
-            .checked_sub(1)
-            .and_then(|round_idx| {
-                original
-                    .get("rounds")
-                    .and_then(Value::as_array)
-                    .and_then(|rounds| rounds.get(round_idx))
-                    .and_then(|round| round.get("implementation_plan"))
-                    .filter(|value| !value.is_null())
-            })
-            .map(|value| {
-                serde_json::from_value::<ImplementationPlan>(value.clone()).map_err(|error| {
-                    RefineError::Serialization(format!(
-                        "Goal {goal_id} has invalid implementation planning evidence during process settlement: {error}"
-                    ))
-                })
-            })
-            .transpose()?;
-        if observed_plan != expected.implementation_plan {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} implementation planning authority changed before process settlement"
-            )));
-        }
-        let mut settled = original.clone();
-        if let Some((previous, failed)) = implementation_plan_replacement {
-            let round_idx = expected.round_count.checked_sub(1).ok_or_else(|| {
-                RefineError::Conflict(format!(
-                    "Goal {goal_id} has no round for implementation planning settlement"
-                ))
-            })?;
-            self.replace_goal_round_implementation_plan_in_value(
-                goal_id,
-                round_idx,
-                Some(previous),
-                failed,
-                &mut settled,
-            )?;
-        }
-        let object = settled.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        let now = now_timestamp();
-        if implementation_plan_replacement.is_some() {
-            let round = object
-                .get_mut("rounds")
-                .and_then(Value::as_array_mut)
-                .and_then(|rounds| rounds.last_mut())
-                .and_then(Value::as_object_mut)
-                .ok_or_else(|| {
-                    RefineError::Serialization(format!(
-                        "latest round for Goal {goal_id} is not a JSON object"
-                    ))
-                })?;
-            round.insert("updated".to_string(), Value::String(now.clone()));
-        }
-        object.insert(
-            "status".to_string(),
-            Value::String(target_status.as_str().to_string()),
-        );
-        object.insert("updated".to_string(), Value::String(now));
-        set_workflow_revision(&mut settled, workflow_revision(&original).saturating_add(1))?;
-        Ok(GoalCancellationTransaction {
-            service: self.clone(),
-            _lock: goal_lock,
-            goal_id: goal_id.to_string(),
-            goal_path,
-            original,
-            settled,
-            committed: false,
-        })
-    }
-
-    pub(crate) fn prepare_goal_cancellation_replay(
-        &self,
-        goal_id: &str,
-        original: &Value,
-        settled: &Value,
-        restored: Option<&Value>,
-        superseded: Option<&Value>,
-    ) -> RefineResult<GoalCancellationTransaction> {
-        let goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
-        let current = self.show_goal_summary(goal_id)?;
-        self.ensure_goal_owned(&current)?;
-        let (goal_path, current_value) = self.read_goal_value_unchecked_locked(&current)?;
-        let replay_original = if &current_value == original {
-            original
-        } else if restored.is_some_and(|restored| current_value == *restored) {
-            restored.expect("restored Goal replay state was checked")
-        } else if &current_value == settled {
-            original
-        } else if superseded.is_some_and(|superseded| current_value == *superseded) {
-            superseded.expect("superseded Goal replay state was checked")
-        } else {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} changed outside the interrupted cancellation settlement; replay did not overwrite the newer Goal state"
-            )));
-        };
-        Ok(GoalCancellationTransaction {
-            service: self.clone(),
-            _lock: goal_lock,
-            goal_id: goal_id.to_string(),
-            goal_path,
-            original: replay_original.clone(),
-            settled: settled.clone(),
-            committed: current_value == *settled,
-        })
+        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Todo)?;
+        self.show_goal_summary(goal_id)
     }
 }

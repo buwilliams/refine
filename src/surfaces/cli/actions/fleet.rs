@@ -114,7 +114,7 @@ pub enum FleetAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Reassign eligible unclaimed Goal ownership across the fleet.
+    /// Reassign eligible queued Goal ownership across the fleet.
     /// Spreads across enabled healthy nodes by default, fills one node with --to,
     /// converges reviewable Goals home with --converge --to <node>, or delegates
     /// to an agent when given plain-language instructions.

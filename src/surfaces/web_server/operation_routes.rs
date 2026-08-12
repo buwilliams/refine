@@ -27,7 +27,7 @@ use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosti
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::process_control::FileProcessControlService;
-use crate::workflow::{WorkflowAutomation, WorkflowEngine};
+use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
@@ -48,6 +48,5 @@ mod operations;
 mod pause;
 mod processes;
 mod releases;
-mod workflow;
 
 use helpers::*;

@@ -179,7 +179,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-worktree-cleanup-delay",
         label: "Inactive worktree retention",
         guideItemId: "runtime-worktree-cleanup",
-        description: "hibernate clean Goal worktrees with no live claim, operation, or process after this delay. Dirty, standalone, state, and unrecognized ignored content remain protected.",
+        description: "hibernate clean Goal worktrees with no live process or operation after this delay. Dirty, standalone, state, and unrecognized ignored content remain protected.",
         valueLabel: optionLabel(worktreeCleanupOptions, worktreeCleanup),
         control: `<select id="s-worktree-cleanup-delay" data-testid="runtime-worktree-cleanup-delay">
           ${worktreeCleanupOptions.map(([v, lbl]) => `<option value="${v}" ${worktreeCleanup === v ? "selected" : ""}>${lbl}</option>`).join("")}

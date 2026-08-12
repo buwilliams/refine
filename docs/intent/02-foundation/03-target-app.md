@@ -23,7 +23,7 @@ Target App should be the foundation that ties durable work to the real project. 
 
 - the active app and project registry;
 - durable product state in the repository's Git-owned Refine layout, with `.refine` checked out only in the isolated `refine/state` worktree;
-- runtime state for the local daemon, processes, operations, claims, and caches;
+- runtime state for the local daemon, processes, operations, and caches;
 - workflow state that explains what can happen next;
 - projection snapshots and other derived state that keep the product fast without becoming authoritative;
 - target-app lifecycle instructions for start, stop, and rebuild, plus deterministic commands for tests and health checks;

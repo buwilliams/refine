@@ -209,6 +209,31 @@ fn goal_merge_does_not_use_timestamps_to_hide_competing_lifecycle_changes() {
 }
 
 #[test]
+fn goal_merge_keeps_the_authoritative_start_over_a_concurrent_reassignment_request() {
+    let base = br#"{"id":"GOALA","node_id":"node-a","status":"todo","title":"Base","updated":"2026-08-03T18:20:00Z"}"#;
+    let local = br#"{"id":"GOALA","node_id":"node-a","status":"in-progress","title":"Base","updated":"2026-08-03T18:21:00Z"}"#;
+    let remote = br#"{"id":"GOALA","node_id":"node-b","status":"todo","title":"Clarified","updated":"2026-08-03T18:22:00Z"}"#;
+
+    let merged = merge_goal_record(base, local, remote).unwrap();
+    let merged: serde_json::Value = serde_json::from_slice(&merged).unwrap();
+    assert_eq!(merged["status"], "in-progress");
+    assert_eq!(merged["node_id"], "node-a");
+    assert_eq!(merged["title"], "Clarified");
+    assert_eq!(merged["updated"], "2026-08-03T18:22:00Z");
+}
+
+#[test]
+fn goal_merge_still_rejects_competing_non_start_lifecycle_changes() {
+    let base =
+        br#"{"id":"GOALA","node_id":"node-a","status":"todo","updated":"2026-08-03T18:20:00Z"}"#;
+    let local = br#"{"id":"GOALA","node_id":"node-a","status":"cancelled","updated":"2026-08-03T18:21:00Z"}"#;
+    let remote =
+        br#"{"id":"GOALA","node_id":"node-b","status":"done","updated":"2026-08-03T18:22:00Z"}"#;
+
+    assert!(merge_goal_record(base, local, remote).is_none());
+}
+
+#[test]
 fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
     let fixture = SyncFixture::new("mixed-goal-conflicts");
     for id in ["GOALA", "GOALB"] {

@@ -25,7 +25,6 @@ use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::WorkflowEngine;
-use crate::workflow::capacity::{AgentCapacityRequest, AgentCapacityService};
 
 use super::types::*;
 

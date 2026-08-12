@@ -7,7 +7,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::git_sync::with_repository_git_lock;
-use crate::tools::host::git_worktrees::FileGitWorktreeService;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::context::WorkflowContext;
 
@@ -172,6 +172,66 @@ pub(super) fn hydrate_retry_context(
             "status": current.as_str(),
             "branch": branch,
             "candidate_commit": candidate,
+            "round": ctx.round_idx + 1
+        }))),
+    )
+}
+
+/// Restores the implementation workspace for an interrupted in-progress Goal.
+///
+/// In-progress may have stopped anywhere between the durable status transition and the first
+/// candidate commit. The branch name is deterministic, completed planning artifacts live on the
+/// Round, and `ensure_worktree` is idempotent, so restarting is cheaper and safer than persisting
+/// a worker identity.
+pub(super) fn hydrate_in_progress_context(
+    ctx: &mut WorkflowContext<'_>,
+    branch_pattern: &str,
+    target_branch: &str,
+) -> RefineResult<()> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let branch = detail
+        .get("branch_name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| implementation_branch_name(branch_pattern, &ctx.goal_id, ctx.round_idx));
+    let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+    let base = detail
+        .get("base_commit")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or(git.resolve_commit(target_branch)?);
+    let worktree_target = git
+        .git_path("refine-worktrees")?
+        .join(branch.replace('/', "-"));
+    let worktree = with_repository_git_lock(ctx.target_root, || {
+        git.ensure_worktree(&branch, &worktree_target)
+    })?;
+    ctx.work_items.update_goal_git_refs(
+        &ctx.goal_id,
+        &branch,
+        target_branch,
+        &base,
+        detail
+            .get("candidate_commit")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty()),
+    )?;
+    ctx.branch = Some(branch.clone());
+    ctx.worktree_path = Some(worktree.clone());
+    ctx.agent_cwd = Some(PathBuf::from(&worktree));
+    ctx.start_status = GoalStatus::InProgress;
+    ctx.log(
+        "workflow",
+        "Restarted interrupted implementation from its retained worktree",
+        Some(json_object(json!({
+            "status": GoalStatus::InProgress.as_str(),
+            "branch": branch,
+            "worktree": worktree,
             "round": ctx.round_idx + 1
         }))),
     )

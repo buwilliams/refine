@@ -89,20 +89,6 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/workflow/executions/")
-            && request.path.ends_with("/retry")
-        {
-            return self.handle_workflow_execution_retry(request);
-        }
-
-        if request.method == "POST"
-            && request.path.starts_with("/workflow/executions/")
-            && request.path.ends_with("/cancel")
-        {
-            return self.handle_workflow_execution_cancel(request);
-        }
-
-        if request.method == "POST"
             && request.path.starts_with("/operations/")
             && request.path.ends_with("/cancel")
         {
