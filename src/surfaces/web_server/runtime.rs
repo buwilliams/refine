@@ -59,6 +59,15 @@ impl OperationProjectionRefresher for InProcessWebServer {
 }
 
 impl InProcessWebServer {
+    pub(super) fn product_paths(&self) -> RefineResult<&RefineCheckoutPaths> {
+        self.product_paths.as_ref().ok_or_else(|| {
+            RefineError::NotFound(
+                "daemon product-home authority is unavailable; production bootstrap must resolve the owning checkout before serving requests"
+                    .to_string(),
+            )
+        })
+    }
+
     pub(super) fn agent_provider_service(&self) -> HostAgentProviderService {
         self.runtime_root
             .as_ref()

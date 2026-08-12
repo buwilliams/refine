@@ -34,7 +34,7 @@ impl FileInstallationService {
                 && backend.activated
                 && matches!(
                     backend.target,
-                    InstallTarget::LinuxCliWeb | InstallTarget::MacOsAppBundle
+                    InstallTarget::LinuxCliWeb | InstallTarget::MacosDaemon
                 )
         }) else {
             return Ok(None);
@@ -210,7 +210,10 @@ impl FileInstallationService {
         }
     }
 
-    fn reload_registration(&self, backend: &InstallBackendRegistration) -> RefineResult<()> {
+    pub(super) fn reload_registration(
+        &self,
+        backend: &InstallBackendRegistration,
+    ) -> RefineResult<()> {
         if backend.target != InstallTarget::LinuxCliWeb {
             return Ok(());
         }
@@ -240,12 +243,12 @@ fn registered_executable(
                     .into_iter()
                     .next()
             }),
-        InstallTarget::MacOsAppBundle => metadata
+        InstallTarget::MacosDaemon => metadata
             .split_once("<key>ProgramArguments</key>")
             .and_then(|(_, arguments)| arguments.split_once("<string>"))
             .and_then(|(_, executable)| executable.split_once("</string>"))
             .map(|(executable, _)| xml_unescape(executable)),
-        InstallTarget::WindowsInstaller => serde_json::from_str::<serde_json::Value>(metadata)
+        InstallTarget::WindowsDaemon => serde_json::from_str::<serde_json::Value>(metadata)
             .ok()
             .and_then(|value| {
                 value
@@ -280,7 +283,7 @@ fn xml_unescape(value: &str) -> String {
         .replace("&amp;", "&")
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> RefineResult<()> {
+pub(super) fn atomic_write(path: &Path, bytes: &[u8]) -> RefineResult<()> {
     let parent = path.parent().ok_or_else(|| {
         RefineError::InvalidInput(format!(
             "service registration {} has no parent",
@@ -294,10 +297,11 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> RefineResult<()> {
         ))
     })?;
     let pending = path.with_extension(format!(
-        "{}.pending",
+        "{}.{}.pending",
         path.extension()
             .and_then(|extension| extension.to_str())
-            .unwrap_or("registration")
+            .unwrap_or("registration"),
+        uuid::Uuid::new_v4().simple()
     ));
     let mut file = OpenOptions::new()
         .create(true)

@@ -2,6 +2,19 @@ use super::*;
 
 impl InProcessWebServer {
     fn system_runtime_root(&self) -> RefineResult<std::path::PathBuf> {
+        if let Some(paths) = &self.product_paths {
+            let expected_port_root = paths.port_runtime_root(self.status.port);
+            if self.runtime_root.as_deref() != Some(expected_port_root.as_path())
+                || self.app_registry_root.as_deref() != Some(paths.runtime_root.as_path())
+            {
+                return Err(RefineError::Conflict(format!(
+                    "daemon runtime bootstrap does not match owning checkout {} and port {}",
+                    paths.checkout.display(),
+                    self.status.port
+                )));
+            }
+            return Ok(paths.runtime_root.clone());
+        }
         if let Some(root) = &self.app_registry_root {
             return Ok(root.clone());
         }
@@ -201,7 +214,10 @@ impl InProcessWebServer {
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("inspect source promotion status");
         }
-        let checkout = match discover_refine_checkout() {
+        let checkout = match self.product_paths().and_then(|paths| {
+            paths.validate_source_checkout()?;
+            Ok(paths.checkout.clone())
+        }) {
             Ok(checkout) => checkout,
             Err(error) => return error_response(error),
         };
@@ -227,7 +243,10 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("promote source checkout");
         };
-        let checkout = match discover_refine_checkout() {
+        let checkout = match self.product_paths().and_then(|paths| {
+            paths.validate_source_checkout()?;
+            Ok(paths.checkout.clone())
+        }) {
             Ok(checkout) => checkout,
             Err(error) => return error_response(error),
         };

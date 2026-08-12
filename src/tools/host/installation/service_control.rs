@@ -61,10 +61,10 @@ impl FileInstallationService {
             InstallTarget::LinuxCliWeb => {
                 self.control_systemd_service_with(&backend, action, run)?
             }
-            InstallTarget::MacOsAppBundle => {
+            InstallTarget::MacosDaemon => {
                 self.control_launchd_service_with(&backend, action, run)?
             }
-            InstallTarget::WindowsInstaller => return Ok(None),
+            InstallTarget::WindowsDaemon => return Ok(None),
         };
         Ok(Some(ServiceManagerControl {
             service_manager: backend.service_manager,
@@ -84,7 +84,7 @@ impl FileInstallationService {
                 && backend.activated
                 && matches!(
                     backend.target,
-                    InstallTarget::LinuxCliWeb | InstallTarget::MacOsAppBundle
+                    InstallTarget::LinuxCliWeb | InstallTarget::MacosDaemon
                 )
         }))
     }

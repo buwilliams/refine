@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Subcommand)]
 pub enum SystemAction {
-    /// Install Refine on this machine (macOS app bundle, Windows installer, or Linux CLI/web).
+    /// Install the Refine daemon on this machine (launchd, Windows user service, or systemd).
     Install {
         /// Daemon port to configure for the installation.
         #[arg(long)]
@@ -39,6 +39,9 @@ pub enum SystemAction {
         /// in alphabetical order.
         #[arg(long)]
         provider: Option<String>,
+        /// Port whose checkout-local runtime owns the update Agent artifacts.
+        #[arg(long, default_value_t = 8082)]
+        port: u16,
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
@@ -313,8 +316,8 @@ pub enum SystemAction {
 #[derive(Clone, Debug, ValueEnum)]
 pub enum CliInstallTarget {
     Auto,
-    MacosAppBundle,
-    WindowsInstaller,
+    MacosDaemon,
+    WindowsDaemon,
     LinuxCliWeb,
 }
 
@@ -322,12 +325,12 @@ impl CliInstallTarget {
     pub(in crate::surfaces::cli) fn into_target(self) -> InstallTarget {
         match self {
             CliInstallTarget::Auto => match std::env::consts::OS {
-                "macos" => InstallTarget::MacOsAppBundle,
-                "windows" => InstallTarget::WindowsInstaller,
+                "macos" => InstallTarget::MacosDaemon,
+                "windows" => InstallTarget::WindowsDaemon,
                 _ => InstallTarget::LinuxCliWeb,
             },
-            CliInstallTarget::MacosAppBundle => InstallTarget::MacOsAppBundle,
-            CliInstallTarget::WindowsInstaller => InstallTarget::WindowsInstaller,
+            CliInstallTarget::MacosDaemon => InstallTarget::MacosDaemon,
+            CliInstallTarget::WindowsDaemon => InstallTarget::WindowsDaemon,
             CliInstallTarget::LinuxCliWeb => InstallTarget::LinuxCliWeb,
         }
     }

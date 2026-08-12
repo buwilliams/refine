@@ -15,6 +15,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
+#[cfg(not(test))]
+use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::product::chat::FileChatService;
@@ -131,9 +133,7 @@ impl FileRunnerWorkerService {
         {
             return Ok(BackgroundWorkerEnsure::Paused);
         }
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!("failed to locate runner executable: {error}"))
-        })?;
+        let executable = runner_executable(&self.runtime_root)?;
         supervisor
             .launch(background_worker_spec(
                 &executable,
@@ -169,9 +169,7 @@ impl FileRunnerWorkerService {
             registry.status(&operation.id)
         }
         #[cfg(not(test))]
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!("failed to locate runner executable: {error}"))
-        })?;
+        let executable = runner_executable(&self.runtime_root)?;
         #[cfg(not(test))]
         let spec =
             project_sync_worker_spec(&executable, &self.runtime_root, target_root, &operation.id);
@@ -272,9 +270,7 @@ impl FileRunnerWorkerService {
         let spec = jira_export_test_worker_spec(&self.runtime_root, &operation.id)?;
         #[cfg(not(test))]
         let spec = {
-            let executable = std::env::current_exe().map_err(|error| {
-                RefineError::Io(format!("failed to locate runner executable: {error}"))
-            })?;
+            let executable = runner_executable(&self.runtime_root)?;
             jira_export_worker_spec(&executable, &self.runtime_root, &operation.id)
         };
         self.launch_jira_export_worker(registry, &operation, spec)
@@ -300,6 +296,24 @@ impl FileRunnerWorkerService {
             }
         }
     }
+}
+
+#[cfg(not(test))]
+fn runner_executable(runtime_root: &Path) -> RefineResult<PathBuf> {
+    let (paths, _) = RefineCheckoutPaths::from_port_runtime_root(runtime_root)?;
+    if !paths.binary.is_file() {
+        return Err(RefineError::NotFound(format!(
+            "checkout-local binary {} is required to launch a runner worker",
+            paths.binary.display()
+        )));
+    }
+    Ok(paths.binary)
+}
+
+#[cfg(test)]
+fn runner_executable(_runtime_root: &Path) -> RefineResult<PathBuf> {
+    std::env::current_exe()
+        .map_err(|error| RefineError::Io(format!("failed to locate runner executable: {error}")))
 }
 
 #[derive(Clone, Debug)]

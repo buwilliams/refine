@@ -14,6 +14,7 @@ pub(super) fn default_state(
             stale: false,
             partial: false,
             conflicting: false,
+            legacy_runtime_root: None,
             backend: None,
         },
         previous_version: None,
@@ -27,27 +28,24 @@ pub(super) fn backend_for_target(
     timestamp: &str,
     path_inputs: RuntimePathInputs,
     port: Option<u16>,
+    checkout_root: &std::path::Path,
 ) -> InstallBackendRegistration {
-    let (os, service_manager, credential_store, desktop_bundle, notes) = match &target {
-        InstallTarget::MacOsAppBundle => (
+    let (os, service_manager, credential_store, notes) = match &target {
+        InstallTarget::MacosDaemon => (
             RuntimeOs::Macos,
-            "launchd_login_item",
+            "launchd_user_daemon",
             "keychain",
-            Some("/Applications/Refine.app".to_string()),
             vec![
-                "signed app bundle and notarization are represented by release packaging metadata"
-                    .to_string(),
-                "daemon auto-start uses launchd/Login Item registration".to_string(),
+                "macOS registration launches the checkout-local Refine daemon".to_string(),
+                "daemon auto-start uses a launchd user agent".to_string(),
             ],
         ),
-        InstallTarget::WindowsInstaller => (
+        InstallTarget::WindowsDaemon => (
             RuntimeOs::Windows,
             "windows_user_service",
             "windows_credential_manager",
-            Some(r"%LOCALAPPDATA%\Programs\Refine\Refine.exe".to_string()),
             vec![
-                "signed installer metadata is represented by release packaging metadata"
-                    .to_string(),
+                "Windows registration launches the checkout-local Refine daemon".to_string(),
                 "daemon auto-start uses a user-session service strategy".to_string(),
             ],
         ),
@@ -55,7 +53,6 @@ pub(super) fn backend_for_target(
             RuntimeOs::Linux,
             "systemd_user",
             "environment_or_provider_store",
-            None,
             vec![
                 "Linux install supports CLI/web with systemd user service when available"
                     .to_string(),
@@ -63,22 +60,24 @@ pub(super) fn backend_for_target(
             ],
         ),
     };
-    let layout = RuntimePathLayout::for_os(os, DEFAULT_APP_ID, path_inputs);
+    let layout = RuntimePathLayout::checkout_for_os(checkout_root, os, DEFAULT_APP_ID, path_inputs);
     let service_metadata_path = layout
         .service_metadata_path
         .as_ref()
         .map(|path| port_scoped_service_metadata_path(path, &target, port))
         .map(|path| path.display().to_string());
+    let port_runtime_root = port
+        .map(|port| layout.runtime_root.join(port.to_string()))
+        .unwrap_or_else(|| layout.runtime_root.clone());
     InstallBackendRegistration {
         target,
         port,
         service_manager: service_manager.to_string(),
         service_metadata_path,
         app_support_dir: Some(layout.app_support_dir.display().to_string()),
-        cache_dir: Some(layout.cache_dir.display().to_string()),
-        logs_dir: Some(layout.logs_dir.display().to_string()),
+        cache_dir: Some(port_runtime_root.join("cache").display().to_string()),
+        logs_dir: Some(port_runtime_root.join("logs").display().to_string()),
         credential_store: credential_store.to_string(),
-        desktop_bundle,
         registered: false,
         activated: false,
         activation_commands: Vec::new(),
@@ -101,8 +100,8 @@ pub(super) fn port_scoped_service_metadata_path(
     };
     let file_name = match target {
         InstallTarget::LinuxCliWeb => format!("refine-{port}.service"),
-        InstallTarget::MacOsAppBundle => format!("com.refine.daemon-{port}.plist"),
-        InstallTarget::WindowsInstaller => format!("service-{port}.json"),
+        InstallTarget::MacosDaemon => format!("com.refine.daemon-{port}.plist"),
+        InstallTarget::WindowsDaemon => format!("service-{port}.json"),
     };
     path.with_file_name(file_name)
 }
@@ -151,7 +150,7 @@ pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<S
                 ),
             ]
         }
-        InstallTarget::MacOsAppBundle => {
+        InstallTarget::MacosDaemon => {
             let Some(plist) = backend.service_metadata_path.clone() else {
                 return Vec::new();
             };
@@ -168,7 +167,7 @@ pub(super) fn activation_commands(backend: &InstallBackendRegistration) -> Vec<S
                 ),
             ]
         }
-        InstallTarget::WindowsInstaller => Vec::new(),
+        InstallTarget::WindowsDaemon => Vec::new(),
     }
 }
 
@@ -191,7 +190,7 @@ pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec
                 ),
             ]
         }
-        InstallTarget::MacOsAppBundle => {
+        InstallTarget::MacosDaemon => {
             let Some(plist) = backend.service_metadata_path.clone() else {
                 return Vec::new();
             };
@@ -208,7 +207,7 @@ pub(super) fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec
                 ),
             ]
         }
-        InstallTarget::WindowsInstaller => Vec::new(),
+        InstallTarget::WindowsDaemon => Vec::new(),
     }
 }
 
@@ -236,7 +235,7 @@ pub(super) fn deactivation_after_stop_commands(
                 vec!["--user".to_string(), "daemon-reload".to_string()],
             ),
         ],
-        InstallTarget::MacOsAppBundle => vec![ServiceCommand::new(
+        InstallTarget::MacosDaemon => vec![ServiceCommand::new(
             "launchctl",
             vec![
                 "disable".to_string(),
@@ -247,7 +246,7 @@ pub(super) fn deactivation_after_stop_commands(
                 ),
             ],
         )],
-        InstallTarget::WindowsInstaller => Vec::new(),
+        InstallTarget::WindowsDaemon => Vec::new(),
     }
 }
 

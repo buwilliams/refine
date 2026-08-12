@@ -3,7 +3,8 @@ use super::*;
 impl InstallationService for FileInstallationService {
     fn install(&self, target: InstallTarget) -> RefineResult<InstallStatus> {
         let now = now_timestamp();
-        let backend = self.register_backend(target.clone())?;
+        let backend = self.register_backend(target.clone(), false)?;
+        let legacy_runtime_root = self.legacy_external_runtime_root(&target);
         let state = InstallStateDocument {
             status: InstallStatus {
                 installed: true,
@@ -13,6 +14,7 @@ impl InstallationService for FileInstallationService {
                 stale: false,
                 partial: !backend_complete(&backend),
                 conflicting: false,
+                legacy_runtime_root,
                 backend: Some(backend),
             },
             previous_version: None,
@@ -27,11 +29,12 @@ impl InstallationService for FileInstallationService {
         let mut state = self.load()?;
         state.status.installed = true;
         state.status.port = self.port;
-        let backend = self.register_backend(state.status.target.clone())?;
+        let backend = self.register_backend(state.status.target.clone(), true)?;
         state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.stale = false;
         state.status.backend = Some(backend);
+        state.status.legacy_runtime_root = self.legacy_external_runtime_root(&state.status.target);
         if state.status.version.is_none() {
             state.status.version = Some(self.current_version.clone());
         }
@@ -48,7 +51,7 @@ impl InstallationService for FileInstallationService {
             ));
         }
         let mut state = self.load()?;
-        let backend = self.register_backend(state.status.target.clone())?;
+        let backend = self.register_backend(state.status.target.clone(), true)?;
         state.previous_version = state.status.version.clone();
         state.status.installed = true;
         state.status.port = self.port;
@@ -57,6 +60,7 @@ impl InstallationService for FileInstallationService {
         state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.backend = Some(backend);
+        state.status.legacy_runtime_root = self.legacy_external_runtime_root(&state.status.target);
         state.updated_at = now_timestamp();
         if state.installed_at.is_none() {
             state.installed_at = Some(state.updated_at.clone());
@@ -77,10 +81,11 @@ impl InstallationService for FileInstallationService {
         state.status.port = self.port;
         state.status.version = Some(previous);
         state.status.stale = false;
-        let backend = self.register_backend(state.status.target.clone())?;
+        let backend = self.register_backend(state.status.target.clone(), true)?;
         state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.backend = Some(backend);
+        state.status.legacy_runtime_root = self.legacy_external_runtime_root(&state.status.target);
         state.previous_version = current;
         state.updated_at = now_timestamp();
         self.save(&state)?;
@@ -111,6 +116,8 @@ impl InstallationService for FileInstallationService {
                 .map(|backend| backend.target != state.status.target)
                 .unwrap_or(false);
         state.status.backend = backend;
+        state.status.legacy_runtime_root = self.legacy_external_runtime_root(&state.status.target);
+        state.status.conflicting |= state.status.legacy_runtime_root.is_some();
         Ok(state.status)
     }
 

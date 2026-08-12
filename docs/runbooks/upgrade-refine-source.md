@@ -6,6 +6,7 @@ healthy. Published-release updates remain unchanged.
 
 ## Preconditions
 
+- The invoked `bin/refine` belongs to the same source checkout being inspected.
 - The controller checkout is on a branch with a reachable configured remote.
 - The controller checkout has no staged, unstaged, or untracked changes.
 - The fetched commit is a fast-forward descendant of the current commit.
@@ -14,6 +15,10 @@ healthy. Published-release updates remain unchanged.
 
 Do not stash, reset, merge, or discard work to satisfy these checks. Resolve a
 dirty or divergent checkout explicitly before retrying.
+
+This workflow is unavailable for a gitless published product home. Use the
+published-release update workflow there; do not add Git metadata or infer a
+source checkout from the caller's working directory.
 
 ## UI Workflow
 
@@ -60,6 +65,10 @@ revisioned record under `<runtime-root>/<port>/operations/` is authoritative;
 `source-promotion.json` is a redacted projection repaired from it after a
 crash. `run/<port>/...` is only the checkout-local default.
 
+More precisely, `run` resolves only to the owning checkout's canonical
+`<checkout>/run`; arbitrary relative or external absolute runtime roots are
+rejected before a check, build, helper launch, or source mutation.
+
 ## Restart-Safe Handoff Evidence
 
 The operation reserves a unique attempt and nonce verifier before submission.
@@ -69,6 +78,13 @@ atomically claims before delay or mutation. The registry records the expected
 systemd unit, launchd label, or detached process fingerprint and a bounded
 claim deadline, followed by a structured receipt. Only receipt or claim plus
 exact live identity can activate `restart_safe_handoff`.
+
+The candidate is built in isolated storage and then atomically installed at
+the stable `<checkout>/bin/refine` path. Service registration continues to
+point at that path across the restart. The exact prior binary is backed up for
+this attempt and restored together with prior source state if activation or
+health verification fails; the existing attempt/receipt protocol remains the
+authority for helper liveness.
 
 After a daemon restart, Refine adopts one exact live claimant. No claimant,
 identity mismatch, stale or late claim, or ambiguous evidence settles visibly

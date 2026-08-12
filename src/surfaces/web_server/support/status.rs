@@ -322,16 +322,12 @@ pub(in crate::surfaces::web_server) fn runtime_bool_setting(value: &Value) -> bo
 
 pub(in crate::surfaces::web_server) fn parse_install_target(value: Option<&str>) -> InstallTarget {
     match value.unwrap_or("").trim().to_lowercase().as_str() {
-        "macos" | "macos_app_bundle" | "macos-app-bundle" | "app_bundle" => {
-            InstallTarget::MacOsAppBundle
-        }
-        "windows" | "windows_installer" | "windows-installer" | "installer" => {
-            InstallTarget::WindowsInstaller
-        }
+        "macos" | "macos_daemon" | "macos-daemon" => InstallTarget::MacosDaemon,
+        "windows" | "windows_daemon" | "windows-daemon" => InstallTarget::WindowsDaemon,
         "linux" | "linux_cli_web" | "linux-cli-web" | "cli_web" => InstallTarget::LinuxCliWeb,
         _ => match std::env::consts::OS {
-            "macos" => InstallTarget::MacOsAppBundle,
-            "windows" => InstallTarget::WindowsInstaller,
+            "macos" => InstallTarget::MacosDaemon,
+            "windows" => InstallTarget::WindowsDaemon,
             _ => InstallTarget::LinuxCliWeb,
         },
     }

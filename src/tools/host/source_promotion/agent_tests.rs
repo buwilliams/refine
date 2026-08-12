@@ -327,6 +327,8 @@ fn workflow_admission_restoration_failure_is_terminal_and_preserves_both_outcome
 #[test]
 fn repeated_upgrade_requests_return_the_same_active_receipt() {
     let root = test_directory("source-upgrade-idempotency");
+    fs::create_dir_all(root.join("checkout/bin")).unwrap();
+    fs::write(root.join("checkout/bin/refine"), b"installed-refine").unwrap();
     let service =
         FileSourcePromotionService::new(root.join("checkout"), root.join("run/8080"), 8080);
     let mut active = operation();

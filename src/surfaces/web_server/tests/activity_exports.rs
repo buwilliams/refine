@@ -56,6 +56,12 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     )
     .unwrap();
     fs::write(target_root.join("r"), "#!/bin/sh\n").unwrap();
+    fs::create_dir_all(target_root.join("bin")).unwrap();
+    fs::copy(
+        std::env::current_exe().unwrap(),
+        target_root.join("bin/refine"),
+    )
+    .unwrap();
     git(&target_root, &["add", "."]).unwrap();
     git(
         &target_root,

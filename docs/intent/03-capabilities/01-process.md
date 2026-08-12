@@ -7,12 +7,22 @@
 - **Recoverable Work**: stopping or losing a process should preserve Goal, Round, branch, worktree, and evidence so work can be started again cheaply.
 - **Soft Capacity**: admission uses observed live processes and configured limits, not durable reservations.
 - **Shared Control**: CLI, browser, API, and agents use the same process capability.
+- **Checkout Ownership**: one product home owns its executable and every port runtime beneath its `run/` directory.
 
 ## Purpose
 
 Refine runs target apps, agents, quality checks, imports, maintenance tasks, terminals, and background operations. The Process capability makes that local execution visible and controllable without making process identity part of synchronized product state.
 
 A user or agent should be able to answer what is running on this node, why it was started, where its output is, whether it is alive, and whether it can be stopped.
+
+The product home is derived from the executable that was invoked, never from
+the caller's working directory, home directory, XDG state, or platform support
+directory. A source product home is the exact Git checkout or linked worktree;
+a published product home may be gitless when its release marker and
+`bin/refine` identify the deployed release. Both own `<product-home>/run`, and
+port `P` owns only `<product-home>/run/P`. Stateful helpers and provider Agents
+must receive that exact port root. Relative `run` is compatibility syntax for
+the owning checkout, not an invitation to resolve against the caller's CWD.
 
 ## Expected Role
 
@@ -34,6 +44,14 @@ or detached-process identity; it adopts one live claimant or settles zero,
 stale, duplicate, or ambiguous evidence visibly and retryably. Cancellation
 fences claims first and cannot become terminal until the exact helper is gone
 or safely reconciled.
+
+Source inspection and promotion additionally require the owning product home
+to be a usable Git checkout. A gitless release remains fully valid for normal
+CLI, daemon, web, MCP, provider, and published-update operation, but source Git
+commands fail closed with an actionable diagnostic. Candidate activation
+replaces the stable `<product-home>/bin/refine` atomically; daemon registration
+continues to name that stable path while the existing attempt-fenced handoff
+proves restart and rollback identity.
 
 Worktree cleanup is separate from Stop. It may hibernate a clean inactive worktree when no live local process or operation uses it, while dirty, ambiguous, standalone, and state worktrees remain protected. Candidate branches retain their own exact-SHA integration safeguards.
 

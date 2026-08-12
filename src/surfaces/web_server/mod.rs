@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::process::supervisor::errors::RefineResult;
 use crate::process::supervisor::lifecycle::DaemonStatus;
+use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::product::project_projection::ProjectionSnapshot;
 
 pub const API_CONTRACT_VERSION: &str = "2";
@@ -195,6 +196,9 @@ pub struct InProcessWebServer {
     /// shared by every daemon port under this root.
     pub app_registry_root: Option<PathBuf>,
     pub runtime_root: Option<PathBuf>,
+    /// Request-scoped product-path authority resolved once during production
+    /// daemon bootstrap. Test-only isolated servers may omit it.
+    pub product_paths: Option<RefineCheckoutPaths>,
 }
 
 macro_rules! require_refine_dir {

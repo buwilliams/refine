@@ -60,10 +60,41 @@ impl ServiceCommandOutput {
     }
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum LegacyRepairFailpoint {
+    PendingWrite,
+    AtomicPublish,
+    Reload,
+    Activation,
+    Verification,
+}
+
 impl FileInstallationService {
     pub(super) fn register_os_backend(
         &self,
         backend: &mut InstallBackendRegistration,
+        legacy_backup: Option<&LegacyRegistrationBackup>,
+    ) -> RefineResult<()> {
+        self.register_os_backend_inner(backend, legacy_backup, None)
+    }
+
+    #[cfg(test)]
+    pub(super) fn register_os_backend_with_failpoint(
+        &self,
+        backend: &mut InstallBackendRegistration,
+        legacy_backup: Option<&LegacyRegistrationBackup>,
+        failpoint: LegacyRepairFailpoint,
+    ) -> RefineResult<()> {
+        self.register_os_backend_inner(backend, legacy_backup, Some(failpoint))
+    }
+
+    fn register_os_backend_inner(
+        &self,
+        backend: &mut InstallBackendRegistration,
+        legacy_backup: Option<&LegacyRegistrationBackup>,
+        #[cfg(test)] failpoint: Option<LegacyRepairFailpoint>,
+        #[cfg(not(test))] _failpoint: Option<()>,
     ) -> RefineResult<()> {
         if let Some(path) = &backend.service_metadata_path {
             let path = PathBuf::from(path);
@@ -97,18 +128,123 @@ impl FileInstallationService {
                 })?;
             }
             let metadata = self.service_metadata(backend)?;
-            fs::write(&path, metadata).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to write service metadata {}: {error}",
-                    path.display()
-                ))
-            })?;
+            #[cfg(test)]
+            let publish = match failpoint {
+                Some(LegacyRepairFailpoint::PendingWrite) => Err(RefineError::Io(
+                    "injected pending registration write failure".to_string(),
+                )),
+                Some(LegacyRepairFailpoint::AtomicPublish) => {
+                    match super::service_registration::atomic_write(&path, metadata.as_bytes()) {
+                        Ok(()) => Err(RefineError::Io(
+                            "injected atomic registration publish failure".to_string(),
+                        )),
+                        Err(error) => Err(error),
+                    }
+                }
+                _ => super::service_registration::atomic_write(&path, metadata.as_bytes()),
+            };
+            #[cfg(not(test))]
+            let publish = super::service_registration::atomic_write(&path, metadata.as_bytes());
+            if let Err(error) = publish {
+                if let Some(backup) = legacy_backup {
+                    let rollback =
+                        super::service_registration::atomic_write(&backup.path, &backup.bytes)
+                            .and_then(|_| self.reload_registration(backend));
+                    let outcome = if rollback.is_ok() {
+                        "publish_failed_rolled_back"
+                    } else {
+                        "publish_failed_rollback_failed"
+                    };
+                    let detail = format!("{error}; exact registration rollback: {rollback:?}");
+                    self.record_legacy_migration_outcome(backup, outcome, Some(&detail))?;
+                    return Err(RefineError::Degraded(format!(
+                        "failed to publish repaired daemon registration: {error}; exact registration rollback {outcome}"
+                    )));
+                }
+                return Err(error);
+            }
             backend.registered = true;
             backend.notes.push(format!(
                 "native service metadata written to {}",
                 path.display()
             ));
+            #[cfg(test)]
+            if matches!(
+                failpoint,
+                Some(LegacyRepairFailpoint::Reload | LegacyRepairFailpoint::Activation)
+            ) {
+                backend.activated = false;
+                backend.activation_error = Some(match failpoint {
+                    Some(LegacyRepairFailpoint::Reload) => {
+                        "injected service registration reload failure".to_string()
+                    }
+                    _ => "injected service activation failure".to_string(),
+                });
+            } else {
+                self.activate_os_backend(backend);
+            }
+            #[cfg(not(test))]
             self.activate_os_backend(backend);
+            if let Some(backup) = legacy_backup {
+                if let Some(error) = backend.activation_error.clone() {
+                    let rollback =
+                        super::service_registration::atomic_write(&backup.path, &backup.bytes)
+                            .and_then(|_| self.reload_registration(backend));
+                    let outcome = if rollback.is_ok() {
+                        "activation_failed_rolled_back"
+                    } else {
+                        "activation_failed_rollback_failed"
+                    };
+                    self.record_legacy_migration_outcome(backup, outcome, Some(&error))?;
+                    return Err(RefineError::Degraded(format!(
+                        "failed to activate repaired daemon registration: {error}; exact registration rollback {outcome}"
+                    )));
+                }
+                #[cfg(test)]
+                let observed = if failpoint == Some(LegacyRepairFailpoint::Verification) {
+                    Ok(b"injected post-write identity mismatch".to_vec())
+                } else {
+                    fs::read(&path)
+                };
+                #[cfg(not(test))]
+                let observed = fs::read(&path);
+                let observed = match observed {
+                    Ok(observed) => observed,
+                    Err(error) => {
+                        let rollback =
+                            super::service_registration::atomic_write(&backup.path, &backup.bytes)
+                                .and_then(|_| self.reload_registration(backend));
+                        let outcome = if rollback.is_ok() {
+                            "verification_read_failed_rolled_back"
+                        } else {
+                            "verification_read_failed_rollback_failed"
+                        };
+                        let detail = format!(
+                            "failed to read {}: {error}; exact registration rollback: {rollback:?}",
+                            path.display()
+                        );
+                        self.record_legacy_migration_outcome(backup, outcome, Some(&detail))?;
+                        return Err(RefineError::Degraded(format!(
+                            "failed to verify repaired daemon registration {}: {error}; exact registration rollback {outcome}",
+                            path.display()
+                        )));
+                    }
+                };
+                if observed != metadata.as_bytes() {
+                    super::service_registration::atomic_write(&backup.path, &backup.bytes)?;
+                    self.reload_registration(backend)?;
+                    self.record_legacy_migration_outcome(
+                        backup,
+                        "verification_failed_rolled_back",
+                        Some("published bytes did not match rendered registration"),
+                    )?;
+                    return Err(RefineError::Degraded(
+                        "repaired daemon registration failed byte verification; exact original registration was restored"
+                            .to_string(),
+                    ));
+                }
+                self.record_legacy_migration_outcome(backup, "completed", None)?;
+            }
         } else {
             backend.registered = false;
             backend.activated = false;
@@ -126,9 +262,9 @@ impl FileInstallationService {
         backend.activation_commands = commands.iter().map(ServiceCommand::display).collect();
         if commands.is_empty() {
             backend.activated = false;
-            backend
-                .notes
-                .push("service activation is handled by the platform installer".to_string());
+            backend.notes.push(
+                "service activation is handled by the platform service controller".to_string(),
+            );
             return;
         }
         for command in commands {
@@ -200,8 +336,7 @@ impl FileInstallationService {
         &self,
         backend: &InstallBackendRegistration,
     ) -> RefineResult<String> {
-        let executable = PathBuf::from(daemon_executable_string()?);
-        self.service_metadata_for_executable(backend, &executable)
+        self.service_metadata_for_executable(backend, &self.checkout_root.join("bin/refine"))
     }
 
     pub(super) fn service_metadata_for_executable(
@@ -211,8 +346,8 @@ impl FileInstallationService {
     ) -> RefineResult<String> {
         match backend.target {
             InstallTarget::LinuxCliWeb => self.systemd_user_unit(backend, executable),
-            InstallTarget::MacOsAppBundle => self.launchd_plist(backend, executable),
-            InstallTarget::WindowsInstaller => self.windows_service_manifest(backend, executable),
+            InstallTarget::MacosDaemon => self.launchd_plist(backend, executable),
+            InstallTarget::WindowsDaemon => self.windows_service_manifest(backend, executable),
         }
     }
 
@@ -232,7 +367,7 @@ impl FileInstallationService {
             systemd_escape_arg(&exe),
             port_args,
             systemd_escape_arg(&self.runtime_root.display().to_string()),
-            systemd_escape_path(backend.app_support_dir.as_deref().unwrap_or(".")),
+            systemd_escape_path(&self.checkout_root.display().to_string()),
             systemd_escape_path(logs_dir),
             systemd_escape_path(logs_dir)
         ))
@@ -245,6 +380,7 @@ impl FileInstallationService {
     ) -> RefineResult<String> {
         let exe = xml_escape(&executable.display().to_string());
         let runtime_root = xml_escape(&self.runtime_root.display().to_string());
+        let working_directory = xml_escape(&self.checkout_root.display().to_string());
         let logs_dir = xml_escape(backend.logs_dir.as_deref().unwrap_or("."));
         let label = xml_escape(&service_control::launchd_label(backend));
         let port_arguments = backend
@@ -273,6 +409,7 @@ impl FileInstallationService {
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>WorkingDirectory</key><string>{working_directory}</string>
   <key>StandardOutPath</key><string>{logs_dir}/daemon.log</string>
   <key>StandardErrorPath</key><string>{logs_dir}/daemon.err.log</string>
 </dict>
@@ -286,14 +423,27 @@ impl FileInstallationService {
         backend: &InstallBackendRegistration,
         executable: &std::path::Path,
     ) -> RefineResult<String> {
+        let mut arguments = vec![
+            "system".to_string(),
+            "start".to_string(),
+            "--foreground".to_string(),
+        ];
+        if let Some(port) = backend.port {
+            arguments.extend(["--port".to_string(), port.to_string()]);
+        }
+        arguments.extend([
+            "--runtime-root".to_string(),
+            self.runtime_root.display().to_string(),
+        ]);
         let manifest = serde_json::json!({
             "service_name": "Refine",
             "display_name": "Refine daemon",
             "executable": executable.display().to_string(),
-            "arguments": ["system", "start", "--foreground", "--runtime-root", self.runtime_root.display().to_string()],
+            "arguments": arguments,
+            "working_directory": self.checkout_root.display().to_string(),
             "app_support_dir": backend.app_support_dir,
             "logs_dir": backend.logs_dir,
-            "notes": "Windows service creation is represented as installer metadata; installer should register this manifest with the service manager."
+            "notes": "Windows service creation is represented as daemon registration metadata for the service manager."
         });
         serde_json::to_string_pretty(&manifest).map_err(|error| {
             RefineError::Serialization(format!(
@@ -304,8 +454,8 @@ impl FileInstallationService {
 
     pub(super) fn default_target(&self) -> InstallTarget {
         match std::env::consts::OS {
-            "macos" => InstallTarget::MacOsAppBundle,
-            "windows" => InstallTarget::WindowsInstaller,
+            "macos" => InstallTarget::MacosDaemon,
+            "windows" => InstallTarget::WindowsDaemon,
             _ => InstallTarget::LinuxCliWeb,
         }
     }

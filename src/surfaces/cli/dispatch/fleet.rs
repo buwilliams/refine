@@ -11,8 +11,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     request,
                     provider,
                     runtime_root,
+                    port,
                 },
-        } => dispatch_manage(request, provider, runtime_root),
+        } => dispatch_manage(request, provider, runtime_root, port),
         Commands::Fleet {
             action:
                 FleetAction::Distribute {
@@ -219,7 +220,7 @@ pub(super) fn dispatch_request(words: Vec<String>) -> RefineResult<()> {
             "unknown fleet command {request:?}; to delegate a request to an agent, quote a plain-language sentence: refine fleet \"<request>\""
         )));
     }
-    dispatch_manage(request.to_string(), None, PathBuf::from("run"))
+    dispatch_manage(request.to_string(), None, PathBuf::from("run"), 8082)
 }
 
 /// `refine fleet distribute "<instructions>"`: agent-directed distribution.
@@ -234,6 +235,7 @@ pub(super) fn dispatch_distribute_instructions(instructions: String) -> RefineRe
         ),
         None,
         PathBuf::from("run"),
+        8082,
     )
 }
 
@@ -244,8 +246,9 @@ pub(super) fn dispatch_manage(
     request: String,
     provider: Option<String>,
     runtime_root: PathBuf,
+    port: u16,
 ) -> RefineResult<()> {
-    let runtime_root = absolute_cli_path(runtime_root)?;
+    let runtime_root = resolve_system_runtime_root(runtime_root)?;
     let checkout = discover_refine_checkout()?;
     if !checkout.join(FLEET_RUNBOOK_PATH).is_file() {
         return Err(RefineError::NotFound(format!(
@@ -255,7 +258,8 @@ pub(super) fn dispatch_manage(
     }
     let provider = resolve_agent_provider(&runtime_root, provider)?;
     let prompt = fleet_manage_prompt(&checkout, &request);
-    let launch = HostAgentProviderService::new().interactive_command(&provider, &prompt)?;
+    let launch = HostAgentProviderService::with_runtime_root(runtime_root.join(port.to_string()))
+        .interactive_command(&provider, &prompt)?;
     launch.validate_prompt_artifact()?;
     eprintln!(
         "refine: opening {} to manage the fleet (guided by {FLEET_RUNBOOK_PATH})",

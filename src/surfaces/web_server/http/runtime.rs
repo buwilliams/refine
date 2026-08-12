@@ -20,13 +20,11 @@ impl LocalHttpDaemon {
                     .recover()?
                     .into_iter()
                     .any(|operation| operation.owner == "maintenance:source-upgrade");
-            if source_upgrade_present
-                && let Ok(checkout) =
-                    crate::tools::host::deployed_update::discover_refine_checkout()
-            {
+            if source_upgrade_present && let Some(paths) = &self.server.product_paths {
+                paths.validate_source_checkout()?;
                 report("reconciling restart-safe source-upgrade attempt");
                 crate::tools::host::source_promotion::FileSourcePromotionService::new(
-                    checkout,
+                    paths.checkout.clone(),
                     runtime_root,
                     self.server.status.port,
                 )

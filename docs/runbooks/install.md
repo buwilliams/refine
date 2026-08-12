@@ -82,6 +82,37 @@ cd <refine-checkout>
 
 Do not offer `smoke-ai` during installation. It is reserved for deterministic tests.
 
+## Product and runtime ownership
+
+The directory selected above is the product home. Its stable executable is
+`<refine-checkout>/bin/refine`, its base runtime is
+`<refine-checkout>/run`, and port `<port>` owns only
+`<refine-checkout>/run/<port>`. `./r` anchors the invocation to that product
+home; the directory from which a user launches it is not an ownership signal.
+Do not configure HOME, XDG, platform support directories, or a neighboring
+checkout as the runtime root.
+
+A published installation is intentionally gitless and is identified by
+`.refine-deployed` plus `bin/refine`. It supports ordinary daemon, web, MCP,
+provider, and published-update operations. Source status and source promotion
+require an actual Git checkout and will fail closed for a gitless product home.
+
+Current service registrations launch the checkout-local binary with the exact
+port and checkout-local runtime and use the checkout as their working
+directory. The current targets are `macos_daemon`, `windows_daemon`, and
+`linux_cli_web`. The historical JSON values `mac_os_app_bundle` and
+`windows_installer` are accepted only when reading migration-era state; new
+state is always written with current names.
+
+Ordinary install/status reports a conflicting legacy external runtime or
+registration without changing it. `./r system repair --port <port>` is the
+explicit migration boundary: it leaves external runtime and binary trees
+untouched, stores the exact original registration bytes, SHA-256, parsed
+identity, and final outcome under
+`run/<port>/installation-migrations/`, then atomically publishes only the new
+registration. If activation or byte verification fails, Refine restores the
+exact original registration and retains the journal.
+
 ## Update Refine
 
 `./r system update --yes` performs this section automatically: it stops the running daemons, delegates the update to the configured agent provider with this runbook as context, and restarts the daemons afterward. If you are the agent delegated by `./r system update`, the daemons are already stopped: do not run `./r system update` again and do not start, stop, or restart Refine; complete the steps below and report the exact blocker if one fails.
@@ -174,6 +205,10 @@ Runtime lifecycle commands:
 ./r system repair --port <port>
 ./r system update --yes
 ```
+
+Use `--runtime-root run` only as compatibility syntax for this checkout's
+canonical `run` directory. Any other relative value, or an absolute path that
+is not the exact canonical runtime of the invoked product home, is rejected.
 
 Target app commands:
 

@@ -246,6 +246,7 @@ fn web_server_extracts_exactly_one_plan_goal_without_a_feature_destination() {
     }
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(refine_dir.join("runtime/8080"));
 
     let extracted = server.handle(ApiRequest {
         method: "POST".to_string(),

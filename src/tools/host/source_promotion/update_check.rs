@@ -110,11 +110,8 @@ impl FileSourcePromotionService {
         &self,
         force_refresh: bool,
     ) -> RefineResult<CachedSourcePromotionStatus> {
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to locate source update-check worker executable: {error}"
-            ))
-        })?;
+        let executable = self.checkout_path.join("bin/refine");
+        require_checkout_binary(&executable, "source update-check worker")?;
         self.request_update_check_with(force_refresh, &executable)
     }
 
@@ -625,6 +622,8 @@ mod tests {
         let mut permissions = fs::metadata(&worker).unwrap().permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(&worker, permissions).unwrap();
+        fs::create_dir_all(checkout.join("bin")).unwrap();
+        fs::copy(&worker, checkout.join("bin/refine")).unwrap();
 
         let service = Arc::new(FileSourcePromotionService::new(&checkout, &runtime, 8080));
         let barrier = Arc::new(Barrier::new(3));

@@ -18,6 +18,12 @@ The API should be treated as local capability plumbing. It is important, but it 
 
 The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
 
+The daemon stores the checkout identity resolved at bootstrap and passes that
+request-scoped authority through system, install, update, source, process, and
+provider handlers. Handlers do not rediscover a checkout from their own CWD or
+construct a user-global runtime service. Port status responses include the
+canonical checkout-local runtime root so clients can diagnose ownership.
+
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
 Browser mutations must present an `Origin` or `Referer` whose authority matches

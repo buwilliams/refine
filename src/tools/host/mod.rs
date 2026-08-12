@@ -1,4 +1,5 @@
 pub mod agent_providers;
+pub mod checkout;
 pub mod daemon_lifecycle;
 pub mod deployed_update;
 pub mod fleet;

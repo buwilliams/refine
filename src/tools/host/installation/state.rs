@@ -2,8 +2,10 @@ use super::*;
 
 impl FileInstallationService {
     pub fn new(runtime_root: impl Into<PathBuf>, current_version: impl Into<String>) -> Self {
+        let runtime_root = runtime_root.into();
         Self {
-            runtime_root: runtime_root.into(),
+            checkout_root: checkout_root_for_runtime(&runtime_root),
+            runtime_root,
             current_version: current_version.into(),
             port: None,
             path_inputs: RuntimePathInputs::from_env(),
@@ -15,8 +17,10 @@ impl FileInstallationService {
         current_version: impl Into<String>,
         port: u16,
     ) -> Self {
+        let runtime_root = runtime_root.into();
         Self {
-            runtime_root: runtime_root.into(),
+            checkout_root: checkout_root_for_runtime(&runtime_root),
+            runtime_root,
             current_version: current_version.into(),
             port: Some(port),
             path_inputs: RuntimePathInputs::from_env(),
@@ -28,8 +32,10 @@ impl FileInstallationService {
         current_version: impl Into<String>,
         path_inputs: RuntimePathInputs,
     ) -> Self {
+        let runtime_root = runtime_root.into();
         Self {
-            runtime_root: runtime_root.into(),
+            checkout_root: checkout_root_for_runtime(&runtime_root),
+            runtime_root,
             current_version: current_version.into(),
             port: None,
             path_inputs,
@@ -42,8 +48,10 @@ impl FileInstallationService {
         port: u16,
         path_inputs: RuntimePathInputs,
     ) -> Self {
+        let runtime_root = runtime_root.into();
         Self {
-            runtime_root: runtime_root.into(),
+            checkout_root: checkout_root_for_runtime(&runtime_root),
+            runtime_root,
             current_version: current_version.into(),
             port: Some(port),
             path_inputs,
@@ -202,21 +210,42 @@ impl FileInstallationService {
     pub(super) fn register_backend(
         &self,
         target: InstallTarget,
+        repair_legacy: bool,
     ) -> RefineResult<InstallBackendRegistration> {
         let now = now_timestamp();
-        let mut backend = backend_for_target(target, &now, self.path_inputs.clone(), self.port);
+        let legacy_runtime_root = self.legacy_external_runtime_root(&target);
+        if legacy_runtime_root.is_some() && !repair_legacy {
+            return Err(RefineError::Conflict(format!(
+                "legacy external Refine runtime detected at {}; it was not merged, deleted, or overwritten; inspect it, then run `./r system repair --port {}` from the intended checkout",
+                legacy_runtime_root.as_deref().unwrap_or("unknown"),
+                self.port.unwrap_or(8082)
+            )));
+        }
+        let mut backend = backend_for_target(
+            target,
+            &now,
+            self.path_inputs.clone(),
+            self.port,
+            &self.checkout_root,
+        );
         if let Some(existing) = self.load_backend()? {
             backend.created_at = existing.created_at;
             backend.legacy_service_label = existing.legacy_service_label.or_else(|| {
                 let path = existing.service_metadata_path?;
                 let metadata = fs::read_to_string(path).ok()?;
-                (existing.target == InstallTarget::MacOsAppBundle
+                (existing.target == InstallTarget::MacosDaemon
                     && metadata.contains("<key>Label</key><string>com.refine.daemon</string>")
                     && service_control::launchd_label(&backend) != "com.refine.daemon")
                     .then(|| "com.refine.daemon".to_string())
             });
         }
-        self.register_os_backend(&mut backend)?;
+        let legacy_registration = self.detect_external_registration(&mut backend, repair_legacy)?;
+        if let Some(legacy_runtime_root) = legacy_runtime_root {
+            backend.notes.push(format!(
+                "legacy external runtime detected at {legacy_runtime_root}; explicit repair left it unchanged"
+            ));
+        }
+        self.register_os_backend(&mut backend, legacy_registration.as_ref())?;
         self.save_backend(&backend)?;
         Ok(backend)
     }
@@ -258,8 +287,8 @@ impl FileInstallationService {
         };
         let explicit_ports = match backend.target {
             InstallTarget::LinuxCliWeb => systemd_exec_ports(&metadata),
-            InstallTarget::MacOsAppBundle => launchd_program_ports(&metadata),
-            InstallTarget::WindowsInstaller => Vec::new(),
+            InstallTarget::MacosDaemon => launchd_program_ports(&metadata),
+            InstallTarget::WindowsDaemon => Vec::new(),
         };
         if explicit_ports.contains(&selected_port) {
             return Ok(true);
@@ -353,6 +382,13 @@ impl FileInstallationService {
             ))),
         }
     }
+}
+
+fn checkout_root_for_runtime(runtime_root: &std::path::Path) -> PathBuf {
+    runtime_root
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(|| runtime_root.to_path_buf())
 }
 
 fn systemd_exec_ports(metadata: &str) -> Vec<u16> {

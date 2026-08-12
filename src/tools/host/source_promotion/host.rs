@@ -4,16 +4,22 @@ use super::*;
 pub(super) struct FileSourcePromotionHost {
     service: FileSourcePromotionService,
     previous_executable: PathBuf,
+    previous_binary_backup: PathBuf,
+    candidate_artifact: Option<PathBuf>,
     pub(crate) candidate_builder: PathBuf,
 }
 
 impl FileSourcePromotionHost {
     pub(super) fn new(service: FileSourcePromotionService) -> Self {
-        let previous_executable =
-            std::env::current_exe().unwrap_or_else(|_| PathBuf::from("refine"));
+        let previous_executable = service.checkout_path.join("bin/refine");
+        let previous_binary_backup = service
+            .port_runtime_root
+            .join("source-promotion/prior-bin-refine");
         Self {
             service,
             previous_executable,
+            previous_binary_backup,
+            candidate_artifact: None,
             candidate_builder: PathBuf::from("cargo"),
         }
     }
@@ -144,14 +150,53 @@ impl SourcePromotionHost for FileSourcePromotionHost {
 
     fn prepare_restart(
         &mut self,
-        executable: &Path,
+        _executable: &Path,
     ) -> RefineResult<Option<ServiceRegistrationUpdate>> {
-        FileInstallationService::for_port(
+        if self.previous_binary_backup.exists() {
+            return Err(RefineError::Conflict(format!(
+                "a prior deployed-binary backup remains at {}; reconcile it before another promotion",
+                self.previous_binary_backup.display()
+            )));
+        }
+        if !self.previous_executable.is_file() {
+            return Err(RefineError::NotFound(format!(
+                "checkout-local deployed binary is missing: {}; run `./r system update` before source promotion",
+                self.previous_executable.display()
+            )));
+        }
+        if let Some(parent) = self.previous_binary_backup.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to create binary backup directory {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        fs::copy(&self.previous_executable, &self.previous_binary_backup).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to preserve deployed binary {} as {}: {error}",
+                self.previous_executable.display(),
+                self.previous_binary_backup.display()
+            ))
+        })?;
+        fs::File::open(&self.previous_binary_backup)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to synchronize deployed-binary backup {}: {error}",
+                    self.previous_binary_backup.display()
+                ))
+            })?;
+        let registration = FileInstallationService::for_port(
             self.runtime_root()?,
             env!("CARGO_PKG_VERSION"),
             self.service.port,
         )
-        .prepare_service_executable(executable)
+        .prepare_service_executable(&self.previous_executable);
+        if registration.is_err() {
+            let _ = fs::remove_file(&self.previous_binary_backup);
+        }
+        registration
     }
 
     fn stop_daemon(&mut self) -> RefineResult<()> {
@@ -177,6 +222,48 @@ impl SourcePromotionHost for FileSourcePromotionHost {
             "Refine daemon on port {} did not stop",
             self.service.port
         )))
+    }
+
+    fn activate_candidate_binary(&mut self, candidate: &Path) -> RefineResult<PathBuf> {
+        let parent = self.previous_executable.parent().ok_or_else(|| {
+            RefineError::InvalidInput("deployed binary has no parent directory".to_string())
+        })?;
+        fs::create_dir_all(parent).map_err(|error| {
+            RefineError::Io(format!("failed to create {}: {error}", parent.display()))
+        })?;
+        let pending = parent.join("refine.source-promotion-pending");
+        fs::copy(candidate, &pending).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to stage source-promotion binary {} as {}: {error}",
+                candidate.display(),
+                pending.display()
+            ))
+        })?;
+        fs::File::open(&pending)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to synchronize pending source-promotion binary {}: {error}",
+                    pending.display()
+                ))
+            })?;
+        replace_binary(&pending, &self.previous_executable).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to activate checkout-local binary {}: {error}",
+                self.previous_executable.display()
+            ))
+        })?;
+        #[cfg(unix)]
+        fs::File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to synchronize deployed binary directory {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        self.candidate_artifact = Some(candidate.to_path_buf());
+        Ok(self.previous_executable.clone())
     }
 
     fn activate(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()> {
@@ -250,7 +337,30 @@ impl SourcePromotionHost for FileSourcePromotionHost {
             env!("CARGO_PKG_VERSION"),
             self.service.port,
         )
-        .complete_service_executable_update()
+        .complete_service_executable_update()?;
+        match fs::remove_file(&self.previous_binary_backup) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to remove deployed-binary backup {}: {error}",
+                    self.previous_binary_backup.display()
+                )));
+            }
+        }
+        if let Some(candidate) = self.candidate_artifact.take() {
+            match fs::remove_file(&candidate) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove source-promotion candidate {}: {error}",
+                        candidate.display()
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn restore_restart_registration(&mut self) -> RefineResult<bool> {
@@ -260,6 +370,22 @@ impl SourcePromotionHost for FileSourcePromotionHost {
             self.service.port,
         )
         .restore_service_executable()
+    }
+
+    fn restore_previous_binary(&mut self) -> RefineResult<bool> {
+        if !self.previous_binary_backup.exists() {
+            return Ok(false);
+        }
+        replace_binary(&self.previous_binary_backup, &self.previous_executable).map_err(
+            |error| {
+                RefineError::Io(format!(
+                    "failed to restore checkout-local binary {} from {}: {error}",
+                    self.previous_executable.display(),
+                    self.previous_binary_backup.display()
+                ))
+            },
+        )?;
+        Ok(true)
     }
 
     fn verify_previous_registration(&mut self) -> RefineResult<PathBuf> {
@@ -386,6 +512,14 @@ impl SourcePromotionHost for FileSourcePromotionHost {
             }
         }
     }
+}
+
+fn replace_binary(source: &Path, destination: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    if destination.exists() {
+        fs::remove_file(destination)?;
+    }
+    fs::rename(source, destination)
 }
 
 fn canonicalization_result(result: std::io::Result<PathBuf>) -> String {

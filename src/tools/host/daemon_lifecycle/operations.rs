@@ -10,6 +10,7 @@ use uuid::Uuid;
 use super::*;
 use crate::process::supervisor::coordination::replace_file_durably;
 use crate::process::supervisor::lifecycle::DaemonRuntimeService;
+use crate::tools::host::checkout::RefineCheckoutPaths;
 
 pub const DAEMON_LIFECYCLE_OPERATIONS_DIR: &str = "daemon-lifecycle-operations";
 
@@ -48,11 +49,14 @@ impl FileDaemonLifecycleOperationService {
         action: DaemonLifecycleAction,
         config: BackgroundDaemonConfig,
     ) -> RefineResult<DaemonLifecycleOperation> {
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to locate daemon lifecycle helper executable: {error}"
-            ))
-        })?;
+        let paths = RefineCheckoutPaths::from_runtime_root(&self.runtime_root.root)?;
+        let executable = paths.binary;
+        if !executable.is_file() {
+            return Err(RefineError::NotFound(format!(
+                "checkout-local daemon lifecycle helper is missing: {}",
+                executable.display()
+            )));
+        }
         let installation = FileInstallationService::for_port(
             &self.runtime_root.root,
             &self.current_version,

@@ -120,7 +120,7 @@ pub(super) fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
                 repo_url,
                 target_path,
                 agent_providers,
-                runtime_root: absolute_cli_path(runtime_root)?,
+                runtime_root: resolve_system_runtime_root(runtime_root)?,
                 port,
             })?;
             let ok = report.get("ok").and_then(|value| value.as_bool()) == Some(true);

@@ -72,6 +72,23 @@ where
     update_operation(
         operation,
         "running",
+        "activate_binary",
+        "Daemon stopped; activating the checkout-local deployed binary",
+    );
+    persist(operation)?;
+    let deployed = match host.activate_candidate_binary(&candidate) {
+        Ok(deployed) => deployed,
+        Err(error) => {
+            settle_registration_rollback(host, operation);
+            return fail_operation(operation, "activate_binary", error, &mut persist);
+        }
+    };
+    operation.candidate_executable = Some(deployed.display().to_string());
+    persist(operation)?;
+
+    update_operation(
+        operation,
+        "running",
         "activate_source",
         "Daemon stopped; activating the fast-forward source commit",
     );
@@ -103,8 +120,8 @@ where
     );
     persist(operation)?;
     let restart_result = host
-        .restart_daemon(&candidate)
-        .and_then(|_| host.verify_daemon(&operation.to_commit, &candidate));
+        .restart_daemon(&deployed)
+        .and_then(|_| host.verify_daemon(&operation.to_commit, &deployed));
     if let Err(error) = restart_result {
         let source_rollback = host.rollback(&operation.from_commit, &operation.to_commit);
         let source_restored = Some(source_rollback.is_ok());
@@ -154,6 +171,11 @@ fn settle_registration_rollback<H: SourcePromotionHost>(
     host: &mut H,
     operation: &mut SourcePromotionOperation,
 ) {
+    if let Err(error) = host.restore_previous_binary() {
+        operation.recovery = Some(format!(
+            "The checkout-local binary could not be restored after shutdown failed: {error}"
+        ));
+    }
     if operation.registration_updated {
         let restored = host.restore_restart_registration();
         operation.registration_rollback_succeeded = Some(restored.is_ok());
@@ -226,6 +248,28 @@ where
         ..Default::default()
     });
     persist(operation)?;
+
+    let binary_restored = match host.restore_previous_binary() {
+        Ok(true) => true,
+        Ok(false) => {
+            operation
+                .rollback_evidence
+                .as_mut()
+                .unwrap()
+                .errors
+                .push("checkout-local binary restoration backup was missing".to_string());
+            false
+        }
+        Err(error) => {
+            operation
+                .rollback_evidence
+                .as_mut()
+                .unwrap()
+                .errors
+                .push(format!("checkout-local binary restoration failed: {error}"));
+            false
+        }
+    };
 
     if operation.registration_updated {
         let restored = restore_registration(host, operation);
@@ -302,8 +346,11 @@ where
         .as_ref()
         .and_then(|evidence| evidence.replacement_succeeded)
         == Some(true);
-    let mut rollback_succeeded =
-        source_settled && registration_settled && replacement_succeeded && observation_verified;
+    let mut rollback_succeeded = binary_restored
+        && source_settled
+        && registration_settled
+        && replacement_succeeded
+        && observation_verified;
     if rollback_succeeded
         && operation.registration_updated
         && let Err(error) = host.complete_restart_registration()

@@ -33,6 +33,7 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
     }
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(refine_dir.join("runtime/8080"));
 
     let extracted = server.handle(ApiRequest {
         method: "POST".to_string(),
