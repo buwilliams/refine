@@ -155,6 +155,37 @@
   justify-content: flex-end;
 }
 
+.reporter-onboarding-modal {
+  max-width: 520px;
+}
+.reporter-onboarding-modal .modal-body > p:first-child {
+  margin-top: 0;
+}
+.reporter-onboarding-choices {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.reporter-onboarding-divider {
+  margin: 14px 0 10px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.reporter-onboarding-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.modal-body .reporter-onboarding-create-row input[type="text"] {
+  margin-top: 0;
+  min-width: 0;
+}
+.reporter-onboarding-guidance {
+  margin: 14px 0 0;
+}
+
 .feature-modal {
   position: relative;
 }

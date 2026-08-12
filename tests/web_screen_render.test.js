@@ -190,10 +190,19 @@ function serveStaticTree() {
   });
 }
 
-async function openApp({ fixture = apiFixture, onRequest = null } = {}) {
+async function openApp({
+  fixture = apiFixture,
+  onRequest = null,
+  selectedReporter = "Reporter",
+} = {}) {
   const server = await serveStaticTree();
   const browser = await BROWSER.chromium.launch({ executablePath: BROWSER.executablePath });
   const page = await browser.newPage();
+  if (selectedReporter !== null) {
+    await page.addInitScript((reporter) => {
+      localStorage.setItem("refine_last_reporter", reporter);
+    }, selectedReporter);
+  }
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error.message).split("\n")[0]));
   await page.route("**/api/**", async (route) => {
@@ -220,6 +229,110 @@ async function openApp({ fixture = apiFixture, onRequest = null } = {}) {
     },
   };
 }
+
+test("Reporter onboarding selects an existing Reporter before routed modal navigation", { skip: SKIP }, async () => {
+  const app = await openApp({ selectedReporter: null });
+  try {
+    await app.page.goto(`${app.origin}/#/goals/new`);
+    const onboarding = app.page.locator('[data-testid="reporter-onboarding-dialog"]');
+    await onboarding.waitFor();
+    assert.equal(await onboarding.getAttribute("aria-labelledby"), "reporter-onboarding-title");
+    assert.match(await onboarding.innerText(), /Who are you\?/);
+    assert.match(await onboarding.innerText(), /Controls > Reporter/);
+
+    await onboarding.getByRole("button", { name: "Reporter", exact: true }).click();
+    await app.page.locator('[data-testid="new-goal-modal"]').waitFor();
+    assert.equal(await onboarding.count(), 0);
+    assert.equal(await app.page.locator('[aria-modal="true"]').count(), 1);
+    assert.equal(
+      await app.page.evaluate(() => localStorage.getItem("refine_last_reporter")),
+      "Reporter",
+    );
+
+    await app.page.reload();
+    await app.page.locator('[data-testid="new-goal-modal"]').waitFor();
+    assert.equal(await onboarding.count(), 0, "a persisted valid selection suppresses reload onboarding");
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("Reporter onboarding creates and persists the canonical Reporter", { skip: SKIP }, async () => {
+  const requests = [];
+  const reporters = [{ id: 1, name: "Reporter" }];
+  const app = await openApp({
+    selectedReporter: null,
+    async fixture(pathname, request) {
+      if (pathname === "/api/reporters" && request.method() === "POST") {
+        const body = request.postDataJSON();
+        const reporter = { id: 42, name: body.name.trim() };
+        reporters.push(reporter);
+        return { reporter };
+      }
+      if (pathname === "/api/reporters") return { reporters };
+      return apiFixture(pathname);
+    },
+    onRequest(pathname, request) {
+      if (pathname === "/api/reporters") requests.push([request.method(), pathname]);
+    },
+  });
+  try {
+    await app.page.goto(`${app.origin}/#/`);
+    const onboarding = app.page.locator('[data-testid="reporter-onboarding-dialog"]');
+    await onboarding.waitFor();
+    await onboarding.locator("#reporter-onboarding-name").fill("Grace Hopper");
+    await onboarding.locator('[data-testid="reporter-onboarding-create"]').click();
+    await onboarding.waitFor({ state: "detached" });
+
+    assert.equal(
+      await app.page.evaluate(() => localStorage.getItem("refine_last_reporter")),
+      "Grace Hopper",
+    );
+    assert.deepEqual(requests.slice(-2), [
+      ["POST", "/api/reporters"],
+      ["GET", "/api/reporters"],
+    ]);
+    await app.page.reload();
+    await app.page.locator("#dash").waitFor();
+    assert.equal(await onboarding.count(), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("asynchronous Feature detail remains the only modal and onboarding safely resumes", { skip: SKIP }, async () => {
+  const app = await openApp({
+    selectedReporter: null,
+    async fixture(pathname) {
+      if (pathname === "/api/features/FEAT1") {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        return { feature: FEATURE };
+      }
+      return apiFixture(pathname);
+    },
+  });
+  try {
+    await app.page.goto(`${app.origin}/#/features/FEAT1`);
+    const onboarding = app.page.locator('[data-testid="reporter-onboarding-dialog"]');
+    await onboarding.waitFor();
+    await app.page.locator('[data-testid="feature-detail-modal"]').waitFor();
+    assert.equal(await onboarding.count(), 0);
+    assert.equal(await app.page.locator('[aria-modal="true"]').count(), 1);
+    assert.equal(
+      await app.page.evaluate(() => document.activeElement?.closest('[data-testid="feature-detail-modal"]') !== null),
+      true,
+    );
+
+    await app.page.locator('[data-testid="feature-modal-close"]').click();
+    await onboarding.waitFor();
+    assert.equal(await app.page.locator('[aria-modal="true"]').count(), 1);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
 
 // A screen that throws while rendering is caught by its own error handler and
 // replaced with a placeholder, which is why the marker has to be asserted: the
