@@ -9,7 +9,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::{ActiveGoalIndex, ProjectionSnapshot};
+use crate::tools::product::project_projection::{ActiveGoalIndex, ProjectionSnapshot};
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug)]

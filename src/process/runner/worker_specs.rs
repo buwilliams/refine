@@ -14,7 +14,7 @@ pub(super) fn current_target_root(
 
 pub(super) fn project_sync_result(
     git_sync: &GitSyncResult,
-    projection: &crate::tools::product::project_state::ProjectionSnapshot,
+    projection: &crate::tools::product::project_projection::ProjectionSnapshot,
 ) -> Value {
     json!({
         "http_status": 200,

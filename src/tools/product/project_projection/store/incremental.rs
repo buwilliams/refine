@@ -49,7 +49,7 @@ fn fingerprint_matches(previous: &SourceFingerprint, current: &SourceFingerprint
         && previous.change_unix_ns == current.change_unix_ns
 }
 
-impl FileProjectStateStore {
+impl FileProjectProjectionStore {
     /// Compares observed sources against a snapshot's fingerprints.
     ///
     /// Metadata only, so this costs one `stat` per source and never opens a

@@ -1,6 +1,6 @@
 use super::*;
 
-impl FileProjectStateStore {
+impl FileProjectProjectionStore {
     pub(super) fn project_activity(
         &self,
     ) -> RefineResult<BTreeMap<String, ActivitySummaryProjection>> {

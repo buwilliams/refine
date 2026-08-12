@@ -8,7 +8,7 @@ use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::quality::POST_BUILD;
-use crate::tools::product::project_state::ActiveGoalIndex;
+use crate::tools::product::project_projection::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{

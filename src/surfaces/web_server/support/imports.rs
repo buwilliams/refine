@@ -57,7 +57,7 @@ pub(in crate::surfaces::web_server) fn import_feature_destination(
 }
 
 pub(in crate::surfaces::web_server) fn feature_import_response(
-    feature: &crate::tools::product::project_state::FeatureSummaryProjection,
+    feature: &crate::tools::product::project_projection::FeatureSummaryProjection,
 ) -> serde_json::Value {
     json!({
         "id": feature.feature.id,

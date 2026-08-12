@@ -19,8 +19,8 @@ use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::goal_exports::FileGoalExportService;
+use crate::tools::product::project_projection::FileProjectProjectionStore;
 use crate::tools::product::project_registry::FileProjectRegistryService;
-use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
 use crate::tools::product::work_items::BulkGoalSelection;
 use crate::tools::product::worktree_cleanup::{
     FileWorktreeCleanupService, WorktreeCleanupOptions, automatic_cleanup_delay_seconds,

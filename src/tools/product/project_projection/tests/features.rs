@@ -215,7 +215,7 @@ fn rebuild_projection_scans_python_style_goal_and_feature_records() {
         )
         .unwrap();
 
-    let snapshot = FileProjectStateStore::new(&refine_dir)
+    let snapshot = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let goal = &snapshot.goals["GOAL1"];

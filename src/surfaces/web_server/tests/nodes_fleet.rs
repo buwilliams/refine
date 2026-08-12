@@ -245,7 +245,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
     assert_eq!(carol["active"], 0);
     assert_eq!(carol["done"], 1);
     assert_eq!(carol["completion_rate"], 100.0);
-    let cached = FileProjectStateStore::new(&refine_dir)
+    let cached = FileProjectProjectionStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();

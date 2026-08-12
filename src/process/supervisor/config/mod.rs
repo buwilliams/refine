@@ -17,7 +17,7 @@ use crate::process::supervisor::coordination::{
 use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::errors::RefineResult;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::ActiveGoalIndex;
+use crate::tools::product::project_projection::ActiveGoalIndex;
 use crate::tools::product::todos::FileTodoService;
 
 pub const SETTINGS_FILE: &str = "settings.json";

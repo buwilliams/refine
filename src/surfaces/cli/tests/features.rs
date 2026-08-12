@@ -364,7 +364,7 @@ fn feature_import_uses_shared_import_service() {
     )
     .unwrap();
 
-    let snapshot = FileProjectStateStore::new(&refine_dir)
+    let snapshot = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let goal = snapshot.goals.values().next().unwrap();

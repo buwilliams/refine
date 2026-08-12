@@ -43,8 +43,7 @@ fn file_store_persists_and_loads_projection_snapshot() {
     let temp_root = unique_temp_dir("projection-store");
     let refine_dir = temp_root.join("refine");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    let store = FileProjectStateStore::new(&refine_dir);
-    store.initialize().unwrap();
+    let store = FileProjectProjectionStore::new(&refine_dir);
 
     let mut goals = BTreeMap::new();
     goals.insert(
@@ -79,8 +78,7 @@ fn file_store_persists_projection_snapshot_concurrently() {
     let temp_root = unique_temp_dir("projection-store-concurrent");
     let refine_dir = temp_root.join("refine");
     let cache_dir = temp_root.join("run").join("cache");
-    let store = FileProjectStateStore::new(&refine_dir);
-    store.initialize().unwrap();
+    let store = FileProjectProjectionStore::new(&refine_dir);
 
     let barrier = Arc::new(Barrier::new(12));
     let handles = (0..12)
@@ -116,7 +114,7 @@ fn file_store_persists_projection_snapshot_concurrently() {
 fn file_store_ignores_incompatible_snapshot_versions() {
     let temp_root = unique_temp_dir("projection-version");
     let cache_dir = temp_root.join("run").join("8080").join("cache");
-    let store = FileProjectStateStore::new(temp_root.join("refine"));
+    let store = FileProjectProjectionStore::new(temp_root.join("refine"));
     let mut snapshot = store.rebuild_projection().unwrap();
     snapshot.version = PROJECTION_SNAPSHOT_VERSION + 1;
 
@@ -146,7 +144,7 @@ fn rebuild_projection_with_runtime_root_avoids_refine_runtime_processes() {
     git(&temp_root, &["add", "app.txt"]).unwrap();
     git(&temp_root, &["commit", "-m", "initial"]).unwrap();
 
-    FileProjectStateStore::with_runtime_root(&refine_dir, &runtime_root)
+    FileProjectProjectionStore::with_runtime_root(&refine_dir, &runtime_root)
         .rebuild_projection()
         .unwrap();
 
@@ -163,7 +161,7 @@ fn rebuild_projection_with_runtime_root_avoids_refine_runtime_processes() {
 // be reached by consulting the record.
 #[test]
 fn text_past_the_resident_prefix_is_still_searchable() {
-    use crate::tools::product::project_state::helpers::RESIDENT_SEARCH_TEXT_LIMIT;
+    use crate::tools::product::project_projection::helpers::RESIDENT_SEARCH_TEXT_LIMIT;
 
     let temp_root = unique_temp_dir("projection-deep-search");
     let refine_dir = temp_root.join(".refine");
@@ -182,7 +180,7 @@ fn text_past_the_resident_prefix_is_still_searchable() {
     )
     .unwrap();
 
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     let snapshot = store.rebuild_projection().unwrap();
 
     let goal = &snapshot.goals["GOAL1"];

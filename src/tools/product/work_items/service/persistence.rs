@@ -17,7 +17,7 @@ impl FileWorkItemService {
 
     pub(super) fn projection_snapshot(
         &self,
-    ) -> RefineResult<crate::tools::product::project_state::ProjectionSnapshot> {
+    ) -> RefineResult<crate::tools::product::project_projection::ProjectionSnapshot> {
         if let Some(cache_dir) = &self.projection_cache_dir {
             // Same explicit runtime root as ownership resolution: inferring it from
             // the cache directory pointed the store at a nested cache path.
@@ -25,12 +25,12 @@ impl FileWorkItemService {
                 .active_node_root
                 .as_ref()
                 .map(|runtime_root| {
-                    FileProjectStateStore::with_runtime_root(&self.refine_dir, runtime_root)
+                    FileProjectProjectionStore::with_runtime_root(&self.refine_dir, runtime_root)
                 })
-                .unwrap_or_else(|| FileProjectStateStore::new(&self.refine_dir));
+                .unwrap_or_else(|| FileProjectProjectionStore::new(&self.refine_dir));
             store.load_or_refresh_projection(cache_dir)
         } else {
-            let store = FileProjectStateStore::new(&self.refine_dir);
+            let store = FileProjectProjectionStore::new(&self.refine_dir);
             store.rebuild_projection()
         }
     }

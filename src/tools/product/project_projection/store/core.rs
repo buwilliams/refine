@@ -1,6 +1,6 @@
 use super::*;
 
-impl FileProjectStateStore {
+impl FileProjectProjectionStore {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),

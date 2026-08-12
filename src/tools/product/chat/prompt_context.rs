@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptEngine, PromptTemplate, render};
-use crate::tools::product::project_state::FileProjectStateStore;
+use crate::tools::product::project_projection::FileProjectProjectionStore;
 
 use super::{ChatAttachment, ChatSessionRecord, FileChatService};
 
@@ -69,7 +69,8 @@ impl FileChatService {
     }
 
     fn attached_product_context(&self, record: &ChatSessionRecord) -> RefineResult<String> {
-        let store = FileProjectStateStore::with_runtime_root(&self.refine_dir, &self.runtime_root);
+        let store =
+            FileProjectProjectionStore::with_runtime_root(&self.refine_dir, &self.runtime_root);
         let snapshot = store.load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         match &record.attachment {
             ChatAttachment::Goal(id) => {

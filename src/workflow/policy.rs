@@ -15,7 +15,7 @@ use crate::tools::host::host_resources::{HostResources, observed_agent_memory_by
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::ActiveGoalIndex;
+use crate::tools::product::project_projection::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::promotion::BacklogPromotionService;
 

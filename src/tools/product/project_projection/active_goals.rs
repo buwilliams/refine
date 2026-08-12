@@ -11,7 +11,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::coordination::replace_file_durably;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
-use super::store::FileProjectStateStore;
+use super::store::FileProjectProjectionStore;
 
 pub const ACTIVE_GOALS_FILE: &str = "runtime/active-goals.jsonl";
 /// Rewrite the log once it carries more than this multiple of the records it
@@ -154,9 +154,9 @@ impl ActiveGoalIndex {
 
     /// Project every Goal record, keeping only those that still matter.
     pub fn rebuild(refine_dir: &Path) -> RefineResult<Self> {
-        let store = FileProjectStateStore::new(refine_dir);
+        let store = FileProjectProjectionStore::new(refine_dir);
         let mut goals = BTreeMap::new();
-        for path in FileProjectStateStore::collect_goal_record_paths(refine_dir)? {
+        for path in FileProjectProjectionStore::collect_goal_record_paths(refine_dir)? {
             let Some(projection) = store.project_goal(&path)? else {
                 continue;
             };
@@ -194,7 +194,7 @@ impl ActiveGoalIndex {
     /// index to discover which moved, which costs a stat per Goal on every
     /// scheduling pass and is exactly the scan this exists to avoid.
     pub fn record_goal(refine_dir: &Path, goal_path: &Path) -> RefineResult<()> {
-        let store = FileProjectStateStore::new(refine_dir);
+        let store = FileProjectProjectionStore::new(refine_dir);
         let record = match store.project_goal(goal_path)? {
             Some(projection) if Self::holds_scheduler_attention(&projection.goal.status) => {
                 ActiveGoalRecord {

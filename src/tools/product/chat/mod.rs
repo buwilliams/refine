@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::{JsonObject, Timestamp};
 use crate::process::supervisor::errors::RefineResult;
-use crate::tools::product::project_state::GoalSummaryProjection;
+use crate::tools::product::project_projection::GoalSummaryProjection;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -216,7 +216,7 @@ fn native_sse_streams_projected_goal_round_logs() {
     let mut server = server_with_projection();
     server.projection.activity.insert(
         "round-log:GOAL1:0:0".to_string(),
-        crate::tools::product::project_state::ActivitySummaryProjection {
+        crate::tools::product::project_projection::ActivitySummaryProjection {
             entry: ActivityEntry {
                 id: "round-log:GOAL1:0:0".to_string(),
                 datetime: "2026-07-21T12:00:00Z".to_string(),
@@ -250,7 +250,7 @@ fn goal_log_activity_page_returns_the_newest_entries() {
         let id = format!("round-log:GOAL1:0:{index:03}");
         server.projection.activity.insert(
             id.clone(),
-            crate::tools::product::project_state::ActivitySummaryProjection {
+            crate::tools::product::project_projection::ActivitySummaryProjection {
                 entry: ActivityEntry {
                     id,
                     datetime: format!("2026-07-21T12:{:02}:{:02}Z", index / 60, index % 60),

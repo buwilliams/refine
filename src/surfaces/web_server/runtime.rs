@@ -19,10 +19,10 @@ use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_registry::FileProjectRegistryService;
-use crate::tools::product::project_state::{
-    FileProjectStateStore, ProjectStateStore, ProjectionSnapshot, RuntimeProjection,
+use crate::tools::product::project_projection::{
+    FileProjectProjectionStore, ProjectionSnapshot, RuntimeProjection,
 };
+use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::work_items::FileWorkItemService;
 
 use super::support::*;
@@ -94,7 +94,8 @@ impl InProcessWebServer {
         if let Some(refine_dir) = self.current_refine_dir()? {
             if let Some(runtime_root) = &self.runtime_root {
                 let key = projection_cache_key(&refine_dir, runtime_root);
-                let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
+                let store =
+                    FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root);
                 if let Some(snapshot) = hot_projection(&key)?
                     && store.source_fingerprints_match(&snapshot.source_fingerprints)?
                 {
@@ -104,7 +105,7 @@ impl InProcessWebServer {
                 store_hot_projection(key, snapshot.clone())?;
                 Ok(snapshot)
             } else {
-                let store = FileProjectStateStore::new(refine_dir);
+                let store = FileProjectProjectionStore::new(refine_dir);
                 store.rebuild_projection()
             }
         } else {
@@ -319,7 +320,7 @@ impl InProcessWebServer {
         let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(None);
         };
-        let snapshot = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root)
+        let snapshot = FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
             .load_or_refresh_projection(&runtime_root.join("cache"))?;
         store_hot_projection(
             projection_cache_key(&refine_dir, runtime_root),
@@ -340,7 +341,7 @@ impl InProcessWebServer {
                 "target root is required to rebuild projection cache".to_string(),
             ));
         };
-        let store = FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root);
+        let store = FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root);
         let mut projection = store.rebuild_projection()?;
         projection.runtime = self.refresh_runtime_projection_cache()?;
         store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
@@ -370,7 +371,7 @@ impl InProcessWebServer {
         let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(());
         };
-        FileProjectStateStore::with_runtime_root(refine_dir, runtime_root)
+        FileProjectProjectionStore::with_runtime_root(refine_dir, runtime_root)
             .persist_projection_snapshot(&runtime_root.join("cache"), projection)
     }
 

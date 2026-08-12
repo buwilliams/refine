@@ -31,7 +31,7 @@ fn rebuild_projection_scans_git_changes_and_joins_goal_display_fields() {
     fs::write(temp_root.join("app.txt"), "two\n").unwrap();
     git(&temp_root, &["commit", "-am", "GOAL1 update app"]).unwrap();
 
-    let snapshot = FileProjectStateStore::new(&refine_dir)
+    let snapshot = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     assert!(snapshot.source_fingerprints.contains_key("git:HEAD"));
@@ -69,7 +69,7 @@ fn rebuild_projection_scans_git_changes_and_joins_goal_display_fields() {
 // Goal count alone does not explain.
 #[test]
 fn projected_round_log_activity_keeps_a_bounded_newest_window() {
-    use crate::tools::product::project_state::store::PROJECTED_ACTIVITY_PER_GOAL_LIMIT;
+    use crate::tools::product::project_projection::store::PROJECTED_ACTIVITY_PER_GOAL_LIMIT;
 
     let temp_root = unique_temp_dir("projection-activity-bound");
     let refine_dir = temp_root.join(".refine");
@@ -110,7 +110,7 @@ fn projected_round_log_activity_keeps_a_bounded_newest_window() {
     fs::create_dir_all(&logs_dir).unwrap();
     fs::write(logs_dir.join("logs.jsonl"), sidecar).unwrap();
 
-    let snapshot = FileProjectStateStore::new(&refine_dir)
+    let snapshot = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
 

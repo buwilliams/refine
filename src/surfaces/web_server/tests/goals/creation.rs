@@ -213,7 +213,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
     server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root);
     server.warm_current_projection_cache().unwrap();
-    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+    FileProjectProjectionStore::reset_rebuild_count(&refine_dir);
 
     let duplicate_started = Instant::now();
     let duplicate = server.handle(ApiRequest {
@@ -231,7 +231,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
         format!("GOAL{:04}", GOAL_COUNT - 1)
     );
     assert_eq!(
-        FileProjectStateStore::rebuild_count(&refine_dir),
+        FileProjectProjectionStore::rebuild_count(&refine_dir),
         0,
         "a warmed duplicate decision must not rebuild the projection"
     );
@@ -249,7 +249,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
     assert_eq!(created.status, 201);
     assert_eq!(created.body["goal"]["round_count"], 1);
     assert_eq!(
-        FileProjectStateStore::rebuild_count(&refine_dir),
+        FileProjectProjectionStore::rebuild_count(&refine_dir),
         1,
         "a successful create must rebuild the complete projection exactly once"
     );
@@ -353,7 +353,7 @@ fn concurrent_goal_create_requests_make_one_auditable_duplicate_decision() {
     assert_eq!(responses[0].status, 201);
     assert_eq!(responses[1].status, 409);
     assert_eq!(responses[1].body["error"]["code"], "duplicate_goal");
-    let projection = FileProjectStateStore::new(&refine_dir)
+    let projection = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     assert_eq!(projection.goals.len(), 1);

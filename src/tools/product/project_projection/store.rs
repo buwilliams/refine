@@ -36,22 +36,12 @@ const PROJECTED_ACTIVITY_LIMIT: usize = 5_000;
 #[cfg(test)]
 static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = OnceLock::new();
 
-pub trait ProjectStateStore {
-    fn initialize(&self) -> RefineResult<()>;
-    fn load_projection_snapshot(
-        &self,
-        cache_dir: &Path,
-    ) -> RefineResult<Option<ProjectionSnapshot>>;
-    fn persist_projection_snapshot(
-        &self,
-        cache_dir: &Path,
-        snapshot: &ProjectionSnapshot,
-    ) -> RefineResult<()>;
-    fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot>;
-}
-
+/// Builds and caches a disposable read model of project Goals, Features, and activity.
+///
+/// The files under `refine_dir` remain authoritative. A persisted
+/// [`ProjectionSnapshot`] is only a cache and can always be rebuilt from those sources.
 #[derive(Clone, Debug)]
-pub struct FileProjectStateStore {
+pub struct FileProjectProjectionStore {
     pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }

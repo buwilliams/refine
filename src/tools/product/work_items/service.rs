@@ -35,9 +35,9 @@ use crate::process::supervisor::coordination::{
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::observability::logs::{FileLogService, LogService};
 use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_state::{
-    ActiveGoalIndex, FeatureSummaryProjection, FileProjectStateStore, GoalSummaryProjection,
-    ProjectStateStore, ProjectionSnapshot, goal_text_matches,
+use crate::tools::product::project_projection::{
+    ActiveGoalIndex, FeatureSummaryProjection, FileProjectProjectionStore, GoalSummaryProjection,
+    ProjectionSnapshot, goal_text_matches,
 };
 
 use super::types::*;

@@ -34,7 +34,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
     });
     assert_eq!(status.status, 200, "{:#}", status.body);
     assert_eq!(status.body["operation"]["status"], "running");
-    let cached = FileProjectStateStore::new(&refine_dir)
+    let cached = FileProjectProjectionStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
@@ -62,7 +62,7 @@ fn web_server_reads_and_cancels_runtime_operations() {
             .iter()
             .any(|entry| entry["message"] == "Operation cancelled")
     );
-    let cached = FileProjectStateStore::new(&refine_dir)
+    let cached = FileProjectProjectionStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();

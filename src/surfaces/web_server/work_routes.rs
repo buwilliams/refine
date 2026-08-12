@@ -29,7 +29,7 @@ use crate::tools::product::imports::{
 };
 use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::process_control::FileProcessControlService;
-use crate::tools::product::project_state::{
+use crate::tools::product::project_projection::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GoalProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };

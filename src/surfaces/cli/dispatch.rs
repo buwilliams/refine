@@ -92,10 +92,10 @@ use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::process_control::FileProcessControlService;
-use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
-use crate::tools::product::project_state::{
-    FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
+use crate::tools::product::project_projection::{
+    FileProjectProjectionStore, ProjectionQuery, ProjectionSnapshot,
 };
+use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
 use crate::tools::product::todos::FileTodoService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
@@ -274,7 +274,8 @@ pub(super) fn run_system_start(
             let cache_root = cache_dir
                 .clone()
                 .unwrap_or_else(|| port_runtime_root.join("cache"));
-            let store = FileProjectStateStore::with_runtime_root(&refine_dir, &port_runtime_root);
+            let store =
+                FileProjectProjectionStore::with_runtime_root(&refine_dir, &port_runtime_root);
             store.load_or_refresh_projection(&cache_root)?
         } else {
             eprintln!("refine: no active project; using empty project cache");

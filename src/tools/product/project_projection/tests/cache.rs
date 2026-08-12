@@ -17,7 +17,7 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
             }"#,
     )
     .unwrap();
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     let mut snapshot = store.load_or_refresh_projection(&cache_dir).unwrap();
     assert_eq!(snapshot.goals["GOAL1"].goal.name, "Cached name");
 
@@ -111,7 +111,7 @@ fn file_store_rebuilds_legacy_snapshot_before_deserializing_current_schema() {
     )
     .unwrap();
 
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     let rebuilt = store.load_or_refresh_projection(&cache_dir).unwrap();
 
     assert_eq!(rebuilt.version, PROJECTION_SNAPSHOT_VERSION);
@@ -142,7 +142,7 @@ fn file_store_rebuilds_malformed_projection_snapshot() {
     )
     .unwrap();
 
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     let rebuilt = store.load_or_refresh_projection(&cache_dir).unwrap();
 
     assert_eq!(rebuilt.version, PROJECTION_SNAPSHOT_VERSION);
@@ -176,10 +176,10 @@ fn goal_writes_patch_the_projection_without_a_full_rebuild() {
         .unwrap();
     }
 
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     // Cold cache legitimately rebuilds once.
     store.load_or_refresh_projection(&cache_dir).unwrap();
-    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+    FileProjectProjectionStore::reset_rebuild_count(&refine_dir);
 
     let goal_path = refine_dir.join("goals").join("GO").join("AL1");
     fs::write(
@@ -191,7 +191,7 @@ fn goal_writes_patch_the_projection_without_a_full_rebuild() {
     let patched = store.load_or_refresh_projection(&cache_dir).unwrap();
 
     assert_eq!(
-        FileProjectStateStore::rebuild_count(&refine_dir),
+        FileProjectProjectionStore::rebuild_count(&refine_dir),
         0,
         "a Goal write must not re-read the whole corpus"
     );
@@ -216,7 +216,7 @@ fn goal_writes_patch_the_projection_without_a_full_rebuild() {
 
     // The patched projection is what a later read observes, without rebuilding.
     let reloaded = store.load_or_refresh_projection(&cache_dir).unwrap();
-    assert_eq!(FileProjectStateStore::rebuild_count(&refine_dir), 0);
+    assert_eq!(FileProjectProjectionStore::rebuild_count(&refine_dir), 0);
     assert_eq!(reloaded.goals["GOAL1"].goal.name, "GOAL1 renamed");
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -237,14 +237,14 @@ fn removing_a_goal_record_drops_it_from_the_patched_projection() {
         .unwrap();
     }
 
-    let store = FileProjectStateStore::new(&refine_dir);
+    let store = FileProjectProjectionStore::new(&refine_dir);
     store.load_or_refresh_projection(&cache_dir).unwrap();
-    FileProjectStateStore::reset_rebuild_count(&refine_dir);
+    FileProjectProjectionStore::reset_rebuild_count(&refine_dir);
 
     fs::remove_dir_all(refine_dir.join("goals").join("GO").join("AL2")).unwrap();
     let patched = store.load_or_refresh_projection(&cache_dir).unwrap();
 
-    assert_eq!(FileProjectStateStore::rebuild_count(&refine_dir), 0);
+    assert_eq!(FileProjectProjectionStore::rebuild_count(&refine_dir), 0);
     assert!(patched.goals.contains_key("GOAL1"));
     assert!(
         !patched.goals.contains_key("GOAL2"),

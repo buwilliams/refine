@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::tools::product::project_state::{FeatureSummaryProjection, ProjectionSnapshot};
+use crate::tools::product::project_projection::{FeatureSummaryProjection, ProjectionSnapshot};
 
 use super::ApiResponse;
 

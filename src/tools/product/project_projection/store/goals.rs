@@ -1,6 +1,6 @@
 use super::*;
 
-impl FileProjectStateStore {
+impl FileProjectProjectionStore {
     pub(crate) fn project_goal(&self, path: &Path) -> RefineResult<Option<GoalSummaryProjection>> {
         let value = Self::read_json(path)?;
         let Some(object) = value.as_object() else {

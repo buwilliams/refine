@@ -28,8 +28,8 @@ use crate::tools::host::fleet::{FileFleetService, FleetService, NodeRemoteUpdate
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
+use crate::tools::product::project_projection::{DashboardProjectionQuery, ProjectionQuery};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
-use crate::tools::product::project_state::{DashboardProjectionQuery, ProjectionQuery};
 use crate::tools::product::todos::FileTodoService;
 use crate::tools::product::work_items::BulkGoalSelection;
 use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};

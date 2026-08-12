@@ -25,7 +25,7 @@ fn web_server_transitions_goal_and_refine_dir() {
             }"#,
     )
     .unwrap();
-    let projection = FileProjectStateStore::new(&refine_dir)
+    let projection = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let mut server = server_with_projection();

@@ -53,10 +53,11 @@ use crate::surfaces::web_server::support::{
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::tools::product::project_state::{
-    ActivityProjectionQuery, DashboardProjection, FeatureSummaryProjection, FileProjectStateStore,
-    GoalSummaryProjection, PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, PageRequest,
-    ProjectStateStore, ProjectionQuery, ProjectionSnapshot, RuntimeProjection,
+use crate::tools::product::project_projection::{
+    ActivityProjectionQuery, DashboardProjection, FeatureSummaryProjection,
+    FileProjectProjectionStore, GoalSummaryProjection, PROJECTION_SNAPSHOT_FILE,
+    PROJECTION_SNAPSHOT_VERSION, PageRequest, ProjectionQuery, ProjectionSnapshot,
+    RuntimeProjection,
 };
 use crate::tools::product::work_items::FileWorkItemService;
 

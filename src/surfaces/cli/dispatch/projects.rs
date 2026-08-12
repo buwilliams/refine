@@ -143,9 +143,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 .as_ref()
                 .and_then(|cache_dir| cache_dir.parent())
                 .map(|runtime_root| {
-                    FileProjectStateStore::with_runtime_root(&refine_dir, runtime_root)
+                    FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
                 })
-                .unwrap_or_else(|| FileProjectStateStore::new(&refine_dir));
+                .unwrap_or_else(|| FileProjectProjectionStore::new(&refine_dir));
             let snapshot = store.rebuild_projection()?;
             if let Some(cache_dir) = &cache_dir {
                 store.persist_projection_snapshot(cache_dir, &snapshot)?;

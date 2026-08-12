@@ -8,7 +8,7 @@ use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, Proce
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
-use crate::tools::product::project_state::RuntimeProjection;
+use crate::tools::product::project_projection::RuntimeProjection;
 
 #[derive(Clone, Debug)]
 pub struct FileProcessStatusService {

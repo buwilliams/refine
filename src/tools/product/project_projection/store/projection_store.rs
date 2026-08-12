@@ -1,16 +1,7 @@
 use super::*;
 
-impl ProjectStateStore for FileProjectStateStore {
-    fn initialize(&self) -> RefineResult<()> {
-        fs::create_dir_all(&self.refine_dir).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to initialize refine dir {}: {error}",
-                self.refine_dir.display()
-            ))
-        })
-    }
-
-    fn load_projection_snapshot(
+impl FileProjectProjectionStore {
+    pub fn load_projection_snapshot(
         &self,
         cache_dir: &Path,
     ) -> RefineResult<Option<ProjectionSnapshot>> {
@@ -48,7 +39,7 @@ impl ProjectStateStore for FileProjectStateStore {
         }
     }
 
-    fn persist_projection_snapshot(
+    pub fn persist_projection_snapshot(
         &self,
         cache_dir: &Path,
         snapshot: &ProjectionSnapshot,
@@ -79,7 +70,7 @@ impl ProjectStateStore for FileProjectStateStore {
         })
     }
 
-    fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot> {
+    pub fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot> {
         #[cfg(test)]
         {
             *PROJECTION_REBUILD_COUNTS

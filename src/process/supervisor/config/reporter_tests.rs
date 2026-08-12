@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::tools::product::project_projection::FileProjectProjectionStore;
 use crate::tools::product::work_items::{FileWorkItemService, GoalAuthoringRequest};
 
 #[test]
@@ -21,7 +21,7 @@ fn goal_creation_and_reporter_rename_are_one_linearizable_operation() {
     let release_rx = Arc::new(Mutex::new(release_rx));
     let paused = Arc::new(AtomicBool::new(false));
     let paused_for_hook = Arc::clone(&paused);
-    let snapshot = FileProjectStateStore::new(&refine_dir)
+    let snapshot = FileProjectProjectionStore::new(&refine_dir)
         .rebuild_projection()
         .unwrap();
     let create_service = FileWorkItemService::new(&refine_dir)
