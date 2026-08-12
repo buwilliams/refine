@@ -241,14 +241,30 @@ impl QualityOperationRunner {
                     "Goal {goal_id} has no candidate branch for Quality evaluation"
                 ))
             })?;
-            let cwd =
-                FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root)
-                    .existing_worktree_for_branch(branch)?
-                    .ok_or_else(|| {
-                        RefineError::Conflict(format!(
-                            "Goal {goal_id} candidate worktree was not found"
-                        ))
-                    })?;
+            let git =
+                FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root);
+            let expected_path = git
+                .git_path("refine-worktrees")?
+                .join(branch.replace('/', "-"));
+            let cwd = git.existing_worktree_for_branch(branch)?.ok_or_else(|| {
+                RefineError::QualityCandidateInfrastructure(Box::new(
+                    crate::process::supervisor::errors::QualityCandidateInfrastructureError {
+                        goal_id: goal_id.to_string(),
+                        phase: "before operation registration".to_string(),
+                        reason: "the exact candidate worktree is not registered".to_string(),
+                        expected_round_idx: round_idx,
+                        observed_round_idx: Some(round_idx),
+                        expected_branch: branch.to_string(),
+                        observed_branch: summary.goal.branch_name.clone(),
+                        expected_path: expected_path.display().to_string(),
+                        observed_path: None,
+                        expected_registered: true,
+                        observed_registered: false,
+                        expected_commit: source_candidate_commit.clone(),
+                        observed_commit: None,
+                    },
+                ))
+            })?;
             (cwd, source_candidate_commit.clone(), "isolated_candidate")
         };
         let request = QualityCheckRequest {
@@ -259,9 +275,53 @@ impl QualityOperationRunner {
             cwd: cwd.display().to_string(),
             source_candidate_commit: Some(source_candidate_commit.clone()),
             evaluation_scope: evaluation_scope.to_string(),
-            candidate_commit: evaluated_commit,
+            candidate_commit: evaluated_commit.clone(),
+            identity_commitment: Some(if evaluation_scope == ISOLATED_CANDIDATE {
+                QualityIdentityCommitment::isolated(
+                    goal_id,
+                    round_idx,
+                    summary.goal.branch_name.as_deref().unwrap_or_default(),
+                    &cwd,
+                    &source_candidate_commit,
+                )
+            } else {
+                let integration = round
+                    .get("workflow_integration")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        RefineError::Conflict(format!(
+                            "Goal {goal_id} integrated-target Quality has no integration evidence"
+                        ))
+                    })?;
+                let target_branch = integration
+                    .get("target_branch")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        RefineError::Conflict(format!(
+                            "Goal {goal_id} integration evidence has no target branch"
+                        ))
+                    })?;
+                QualityIdentityCommitment::integrated(
+                    evaluation_scope,
+                    goal_id,
+                    round_idx,
+                    target_branch,
+                    &cwd,
+                    &evaluated_commit,
+                    &source_candidate_commit,
+                )
+            }),
             process_metadata,
         };
+        if let Some(commitment) = request.identity_commitment.as_ref() {
+            validate_quality_identity(
+                &self.refine_dir,
+                &self.target_root,
+                &self.runtime_root,
+                commitment,
+                "before operation registration",
+            )?;
+        }
         let registry = FileOperationRegistry::new(&self.runtime_root);
         let owner = format!("quality:{goal_id}:{}", request.candidate_commit);
         let operation = registry.register_exclusive_with_request(
@@ -271,10 +331,11 @@ impl QualityOperationRunner {
                 "round_idx": round_idx,
                 "node_id": node_id,
                 "provider": provider,
-                "cwd": request.cwd,
-                "candidate_commit": request.candidate_commit,
+                "cwd": &request.cwd,
+                "candidate_commit": &request.candidate_commit,
                 "source_candidate_commit": source_candidate_commit,
                 "evaluation_scope": evaluation_scope,
+                "identity_commitment": &request.identity_commitment,
                 "target_root": self.target_root.display().to_string(),
                 "refine_dir": self.refine_dir.display().to_string(),
                 "defer_cancellation_terminal": true
@@ -321,7 +382,53 @@ impl QualityOperationRunner {
         );
         let registry = FileOperationRegistry::new(&self.runtime_root);
         let service = FileQualityService::with_runtime_root(&self.refine_dir, &self.runtime_root);
-        match service.run_checks(request.clone()) {
+        let operation_still_owns_execution = registry.status(operation_id).is_ok_and(|operation| {
+            matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running
+            )
+        });
+        if operation_still_owns_execution
+            && let Some(commitment) = request.identity_commitment.as_ref()
+        {
+            let validation = validate_quality_identity(
+                &self.refine_dir,
+                &self.target_root,
+                &self.runtime_root,
+                commitment,
+                "before supervised execution",
+            );
+            if let Err(error) = validation {
+                if super::is_quality_candidate_infrastructure(&error) {
+                    self.record_candidate_infrastructure_fault(operation_id, &request, &error)?;
+                } else {
+                    self.record_persistence_failure(operation_id, &request, &error);
+                }
+                return Err(error);
+            }
+        }
+        let execution = service.run_checks(request.clone());
+        let operation_still_owns_execution = registry.status(operation_id).is_ok_and(|operation| {
+            matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running
+            )
+        });
+        if operation_still_owns_execution
+            && let Some(commitment) = request.identity_commitment.as_ref()
+            && let Err(error) = validate_quality_identity(
+                &self.refine_dir,
+                &self.target_root,
+                &self.runtime_root,
+                commitment,
+                "after supervised execution",
+            )
+            && super::is_quality_candidate_infrastructure(&error)
+        {
+            self.record_candidate_infrastructure_fault(operation_id, &request, &error)?;
+            return Err(error);
+        }
+        match execution {
             Ok(result) => {
                 let operation_message = if result.ok {
                     "Quality checks passed"
@@ -441,5 +548,37 @@ impl QualityOperationRunner {
                 Err(error)
             }
         }
+    }
+
+    fn record_candidate_infrastructure_fault(
+        &self,
+        operation_id: &str,
+        request: &QualityCheckRequest,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        registry.append_log(
+            operation_id,
+            quality_operation_log(
+                &request.owner_id,
+                "error",
+                &error.to_string(),
+                Some(json!({
+                    "error": error.to_string(),
+                    "error_kind": "candidate_infrastructure",
+                    "evaluation_scope": request.evaluation_scope,
+                    "identity_commitment": request.identity_commitment
+                })),
+            ),
+        )?;
+        registry.fail_with_error(
+            operation_id,
+            json!({
+                "code": "quality_candidate_infrastructure_fault",
+                "message": error.to_string(),
+                "identity_commitment": request.identity_commitment
+            }),
+        )?;
+        Ok(())
     }
 }

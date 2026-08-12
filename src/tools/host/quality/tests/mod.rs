@@ -6,10 +6,12 @@ use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
 };
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::errors::RefineError;
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::tools::host::agent_providers::smoke_ai_env_lock;
+use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
 use serde_json::{Value, json};
@@ -95,6 +97,22 @@ fn init_git_candidate(root: &PathBuf) -> String {
     String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
+fn git_output(root: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
+}
+
 fn make_executable(path: &PathBuf) {
     #[cfg(unix)]
     {
@@ -121,6 +139,16 @@ struct GoalQualityFixture {
     refine_dir: PathBuf,
     runtime_root: PathBuf,
     smoke_ai: PathBuf,
+}
+
+struct LinkedGoalQualityFixture {
+    temp_root: PathBuf,
+    target_root: PathBuf,
+    candidate_root: PathBuf,
+    refine_dir: PathBuf,
+    runtime_root: PathBuf,
+    branch: String,
+    candidate: String,
 }
 
 impl GoalQualityFixture {
@@ -176,6 +204,60 @@ fn goal_quality_fixture(prefix: &str, provider_body: &str) -> GoalQualityFixture
         refine_dir,
         runtime_root,
         smoke_ai,
+    }
+}
+
+fn linked_goal_quality_fixture(prefix: &str) -> LinkedGoalQualityFixture {
+    let temp_root = unique_temp_dir(prefix);
+    let target_root = temp_root.join("target");
+    let runtime_root = temp_root.join("run/8080");
+    let candidate = init_git_candidate(&target_root);
+    let branch = "refine/GOAL1/round-1".to_string();
+    let candidate_root = target_root
+        .join(".git/refine-worktrees")
+        .join(branch.replace('/', "-"));
+    fs::create_dir_all(candidate_root.parent().unwrap()).unwrap();
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                &branch,
+                candidate_root.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let refine_dir =
+        crate::tools::host::project_layout::refine_dir_for_target_root(&target_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Quality candidate", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Reporter", "Verify candidate")
+        .unwrap();
+    work_items
+        .update_goal_git_refs("GOAL1", &branch, "main", &candidate, Some(&candidate))
+        .unwrap();
+    FileQualityService::new(&refine_dir)
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["Outcome works".to_string()]),
+            ..QualitySettingsPatch::default()
+        })
+        .unwrap();
+    LinkedGoalQualityFixture {
+        temp_root,
+        target_root,
+        candidate_root,
+        refine_dir,
+        runtime_root,
+        branch,
+        candidate,
     }
 }
 

@@ -183,6 +183,7 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit: candidate_commit.clone(),
+            identity_commitment: None,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
         .unwrap();
@@ -324,6 +325,7 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
+            identity_commitment: None,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
         .unwrap();
@@ -374,6 +376,7 @@ fn quality_runs_supervised_commands_with_bash_process_substitution() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
+            identity_commitment: None,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
         .unwrap();
@@ -463,6 +466,7 @@ fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
+            identity_commitment: None,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
         .unwrap();
@@ -516,6 +520,7 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit,
+            identity_commitment: None,
             process_metadata: quality_operation_metadata(&runtime_root),
         })
         .unwrap_err();

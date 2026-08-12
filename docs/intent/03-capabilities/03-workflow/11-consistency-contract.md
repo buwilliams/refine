@@ -20,13 +20,24 @@ Stable synchronized relationships use target-app, Goal, Round, Feature, and Git 
 
 ## Required Invariants
 
-A worker may start only after reading an eligible Goal assigned to its node. It rereads Goal status, node, and Round before transitions and before consequential boundaries. A mismatched observation stops that worker without rewriting the Goal.
+A worker may start only after reading an eligible Goal assigned to its node. A
+zero-Round Goal is never eligible. Todo start atomically rereads status, node,
+exact authored Round count, non-empty request, and record revision before the
+in-progress write and before Git or agent side effects. A mismatched observation
+stops that worker without rewriting the Goal.
 
 Concurrent execution is tolerated as at-least-once work. Behaviors must be idempotent or detect already-produced semantic evidence. Restart may begin a fresh worker for the same nonterminal Goal; the new worker consumes the same synchronized instructions and preserved artifacts.
 
 Implementation planning persists typed proposal, criticism, revision, and implementation evidence with Goal/Round, context digest, branch, target branch, and base commit. Updates compare against the complete prior planning value. They do not persist the identity of the process that produced them.
 
 Ready Merge rereads authority immediately before its first Git side effect under the repository lock. Cancellation or reassignment before that boundary prevents integration. Once integration begins it may finish and persist exact integration evidence even if cancellation arrives; cancellation remains the Goal's terminal status and no rollback is attempted.
+
+The selected Round index and request remain the execution axis through
+implementation planning, implementation, Quality, Governance, and Ready Merge.
+Workflow-owned evidence may advance the record revision, but it may not silently
+switch to another Round. Restart recovery never synthesizes a generic Round:
+zero-Round in-progress, Ready Merge, Build, or QA Goals are preserved, diagnosed,
+and skipped while valid siblings continue.
 
 Synchronization resolves one narrow ownership race: when a queued Goal is reassigned concurrently with automated work starting on its previously authoritative node, the start wins and the reassignment request is discarded. Other competing lifecycle changes remain conflicts.
 

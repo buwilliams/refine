@@ -230,6 +230,18 @@ impl QualityOperationRunner {
                 .unwrap_or("isolated_candidate")
                 .to_string(),
             candidate_commit: required_operation_request_string(operation, "candidate_commit")?,
+            identity_commitment: operation
+                .request
+                .get("identity_commitment")
+                .cloned()
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "Quality operation {} has invalid identity commitment: {error}",
+                        operation.id
+                    ))
+                })?,
             process_metadata: Map::new(),
         };
         self.settle_cancelled(&request, &operation.id)

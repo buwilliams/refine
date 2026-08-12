@@ -29,6 +29,15 @@ Import should sit between raw source material and durable work state. It should 
 - source evidence that explains where imported work came from;
 - persistence through shared work item services.
 
+Trusted development-request email is a direct source-preserving import. One
+accepted message creates one low-priority Goal whose first Round is assembled
+from explicit From and Subject fields, decoded body text, and every named text
+attachment in MIME order. The sender is Reporter, normal assignee semantics are
+retained, and no extraction or review model may replace that authoritative
+Round. Its local retry ledger migrates a received schema-1 record by re-fetching
+the raw provider message before authoring; missing raw mail remains retryable,
+while already-linked legacy records remain historical and unchanged.
+
 Import should not create a parallel work format. Its successful output should be ordinary Refine work: Goals, Features, notes, ordering, source context, and evidence that workflow and agents can use.
 
 AI Import should adapt to the source material. A long product spec or Plan transcript can be decomposed with architecture lenses such as persistence, logic, surfaces, integrations, recovery, and tests. A CSV, bug list, issue list, or short note should be imported directly into draft work without forcing those lenses.

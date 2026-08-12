@@ -21,7 +21,7 @@ use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
 use super::{
     ACTIVE_WORK_REPLENISH_INTERVAL, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
-    ensure_workflow_round, hydrate_in_progress_context, hydrate_retry_context,
+    authored_workflow_commitment, hydrate_in_progress_context, hydrate_retry_context,
     missing_workflow_artifact, priority_rank, setting_string,
 };
 
@@ -194,6 +194,7 @@ impl WorkflowEngine {
                 )
             })
             .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == policy.active_node_id)
+            .filter(|goal| goal.round_count > 0)
             .filter(|goal| !active.contains(&goal.id))
             .filter(|goal| !self.retry_delayed(&goal.id))
             .filter(|goal| eligibility.feature_eligible(&goal.id))
@@ -266,7 +267,8 @@ impl WorkflowEngine {
                 summary.goal.status.as_str()
             )));
         }
-        let round_idx = ensure_workflow_round(&work_items, goal_id)?;
+        let (round_idx, authored_revision, authored_request) =
+            authored_workflow_commitment(&work_items, goal_id)?;
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let mut ctx = WorkflowContext::new(
@@ -279,6 +281,8 @@ impl WorkflowEngine {
             settings,
             work_items,
         );
+        ctx.authored_revision = authored_revision;
+        ctx.authored_request = authored_request;
         match summary.goal.status {
             GoalStatus::Todo => match WorkflowTodo.advance(&mut ctx)? {
                 WorkflowAdvanceOutcome::Transition {
