@@ -143,6 +143,41 @@ mod tests {
     }
 
     #[test]
+    fn catalog_describes_workflow_pause_and_resume_contract() {
+        let catalog = commands_catalog();
+        let workflow = catalog["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|command| command["name"] == "workflow")
+            .expect("workflow command present");
+        let subcommands = workflow["subcommands"].as_array().unwrap();
+        let pause = subcommands
+            .iter()
+            .find(|command| command["name"] == "pause")
+            .unwrap()["about"]
+            .as_str()
+            .unwrap();
+        let resume = subcommands
+            .iter()
+            .find(|command| command["name"] == "resume")
+            .unwrap()["about"]
+            .as_str()
+            .unwrap();
+        for phrase in [
+            "new Goal admission",
+            "automatic Git sync",
+            "inactive-worktree cleanup",
+        ] {
+            assert!(pause.contains(phrase), "pause missing {phrase}: {pause}");
+            assert!(resume.contains(phrase), "resume missing {phrase}: {resume}");
+        }
+        assert!(pause.contains("Active Goal executions continue"));
+        assert!(resume.contains("eligible again"));
+        assert!(resume.contains("remain uninterrupted"));
+    }
+
+    #[test]
     fn operational_runbooks_use_current_cli_and_layout_contracts() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let runbooks_dir = root.join("docs/runbooks");

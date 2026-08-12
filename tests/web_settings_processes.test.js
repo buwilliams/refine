@@ -23,6 +23,7 @@ function processSettingsRuntime() {
       isAgent: isCurrentAgentProviderProcessRecord,
       renderActions: renderProcessActions,
       workflowPausedFor,
+      workflowPauseActionModel,
     };
   `, context);
   return context.processSettingsTest;
@@ -37,9 +38,119 @@ test("workflow controls use one canonical pause gate", () => {
     workflow_paused: true,
     agents_paused: true,
     background_processes_stopped: true,
+  }), true);
+  assert.equal(processes.workflowPausedFor({
+    paused: true,
+    workflow_paused: false,
+    agents_paused: true,
+    background_processes_stopped: true,
   }), false);
   assert.equal(processes.workflowPausedFor({ workflow_paused: true }), true);
   assert.equal(processes.workflowPausedFor({ agents_paused: true }), true);
+});
+
+test("workflow pause action model locks descriptions, confirmation, actions, and payloads", () => {
+  const processes = processSettingsRuntime();
+  const pause = processes.workflowPauseActionModel({ workflow_paused: false });
+  assert.equal(pause.shouldPause, true);
+  assert.equal(pause.actionId, "pause_workflow");
+  assert.equal(pause.direction, "pause");
+  assert.equal(pause.status, "active");
+  assert.equal(pause.buttonLabel, "Pause Workflow");
+  assert.equal(pause.busyLabel, "Pausing…");
+  assert.deepEqual(JSON.parse(JSON.stringify(pause.payload)), { paused: true });
+  assert.equal(
+    pause.description,
+    "New Goal admission, automatic Git sync, and inactive-worktree cleanup are eligible. Active Goal executions continue unless stopped separately.",
+  );
+  assert.equal(
+    pause.confirmation,
+    "Pause workflow automation? Refine will stop admitting new Goal work and quiesce automatic Git sync and inactive-worktree cleanup at safe boundaries. Already active Goal executions continue unless you Stop their Agents separately.",
+  );
+
+  const resume = processes.workflowPauseActionModel({ workflow_paused: true });
+  assert.equal(resume.shouldPause, false);
+  assert.equal(resume.actionId, "unpause_workflow");
+  assert.equal(resume.direction, "resume");
+  assert.equal(resume.status, "paused");
+  assert.equal(resume.buttonLabel, "Resume Workflow");
+  assert.equal(resume.busyLabel, "Resuming…");
+  assert.equal(resume.confirmation, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(resume.payload)), { paused: false });
+  assert.equal(
+    resume.description,
+    "New Goal admission is paused; automatic Git sync and inactive-worktree cleanup quiesce at safe boundaries. Active Goal executions continue unless stopped separately.",
+  );
+});
+
+test("workflow pause handler delegates the action model to the shared API and refreshes state", async () => {
+  for (const paused of [false, true]) {
+    const button = { dataset: { workflowPaused: String(paused) } };
+    const calls = [];
+    const busyLabels = [];
+    let refreshed = 0;
+    let scheduled = 0;
+    let confirmation = null;
+    const context = vm.createContext({
+      htmlEscape: String,
+      document: {
+        querySelector() { return null; },
+        getElementById() { return null; },
+      },
+      $$(selector) {
+        return selector === "[data-toggle-workflow]" ? [button] : [];
+      },
+      bindOnce(element, event, handler) {
+        if (element && event === "click") element.click = handler;
+      },
+      bindCommand() {},
+      async modalConfirm(message) {
+        confirmation = message;
+        return true;
+      },
+      async withButtonBusy(_button, label, action) {
+        busyLabels.push(label);
+        await action();
+      },
+      async api(...args) { calls.push(args); },
+      async refreshProcessesSettingsTab() { refreshed += 1; },
+      refreshAgentStatusIndicator() {},
+      scheduleProcessesTabRefreshes() { scheduled += 1; },
+      async showActionError(error) { throw error; },
+    });
+    const source = fs.readFileSync(
+      path.join(__dirname, "../src/surfaces/web/static/js/features/settings_processes.js"),
+      "utf8",
+    );
+    vm.runInContext(source, context);
+    context.refreshProcessesSettingsTab = async () => { refreshed += 1; };
+    context.scheduleProcessesTabRefreshes = () => { scheduled += 1; };
+    vm.runInContext("refreshTargetAppStatus = () => {}; bindSettingsProcessesTab({});", context);
+    await button.click();
+
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(calls)),
+      [["POST", "/api/workflow/pause", { paused: !paused }]],
+    );
+    assert.deepEqual(busyLabels, [paused ? "Resuming…" : "Pausing…"]);
+    assert.equal(refreshed, 1);
+    assert.equal(scheduled, paused ? 1 : 0);
+    assert.equal(
+      confirmation,
+      paused ? null : "Pause workflow automation? Refine will stop admitting new Goal work and quiesce automatic Git sync and inactive-worktree cleanup at safe boundaries. Already active Goal executions continue unless you Stop their Agents separately.",
+    );
+  }
+});
+
+test("Guide states the complete workflow pause and resume contract", () => {
+  const guide = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/js/features/guide.js"),
+    "utf8",
+  );
+  assert.match(guide, /Pause or resume workflow/);
+  assert.match(guide, /Pausing blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries\./);
+  assert.match(guide, /Already active Goal executions continue unless stopped separately\./);
+  assert.match(guide, /Resuming makes admission and those repository workers eligible again\./);
 });
 
 test("Agents includes background and foreground provider processes", () => {

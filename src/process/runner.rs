@@ -34,6 +34,7 @@ pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
 pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
 pub const DEVELOPMENT_REQUEST_RUNNER: &str = "development-requests";
+const PAUSE_AWARE_BACKGROUND_RUNNERS: [&str; 2] = [GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER];
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
 const WORKTREE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
@@ -67,6 +68,8 @@ mod git_sync;
 mod jira_export;
 mod project_sync;
 mod schedule;
+#[cfg(test)]
+mod test_hooks;
 mod worker_specs;
 mod workflow;
 mod worktree_cleanup;
@@ -78,6 +81,8 @@ use git_sync::*;
 use jira_export::*;
 use project_sync::*;
 use schedule::*;
+#[cfg(test)]
+use test_hooks::*;
 use worker_specs::*;
 use workflow::*;
 use worktree_cleanup::*;
@@ -95,14 +100,22 @@ impl FileRunnerWorkerService {
         self
     }
 
-    pub fn ensure_background_worker(&self, worker_kind: &str) -> RefineResult<ManagedProcess> {
+    pub fn ensure_background_worker(
+        &self,
+        worker_kind: &str,
+    ) -> RefineResult<BackgroundWorkerEnsure> {
         validate_worker_kind(worker_kind, false)?;
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        if PAUSE_AWARE_BACKGROUND_RUNNERS.contains(&worker_kind)
+            && self.background_automation_paused()?
+        {
+            return Ok(BackgroundWorkerEnsure::Paused);
+        }
         let recovered = supervisor.recover_owner(ProcessOwner::Runner)?;
         if let Some(process) = recovered.iter().into_iter().find(|process| {
             adoptable_worker(process, worker_kind, self.project_registry_root.as_deref())
         }) {
-            return Ok(process.clone());
+            return Ok(BackgroundWorkerEnsure::Running(Box::new(process.clone())));
         }
         for process in recovered.into_iter().filter(|process| {
             process.owner == ProcessOwner::Runner
@@ -111,15 +124,31 @@ impl FileRunnerWorkerService {
         }) {
             let _ = supervisor.signal(&process.id, "terminate");
         }
+        #[cfg(test)]
+        run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::EnsureLaunch);
+        if PAUSE_AWARE_BACKGROUND_RUNNERS.contains(&worker_kind)
+            && self.background_automation_paused()?
+        {
+            return Ok(BackgroundWorkerEnsure::Paused);
+        }
         let executable = std::env::current_exe().map_err(|error| {
             RefineError::Io(format!("failed to locate runner executable: {error}"))
         })?;
-        supervisor.launch(background_worker_spec(
-            &executable,
-            &self.runtime_root,
-            self.project_registry_root.as_deref(),
-            worker_kind,
-        ))
+        supervisor
+            .launch(background_worker_spec(
+                &executable,
+                &self.runtime_root,
+                self.project_registry_root.as_deref(),
+                worker_kind,
+            ))
+            .map(Box::new)
+            .map(BackgroundWorkerEnsure::Running)
+    }
+
+    pub fn background_automation_paused(&self) -> RefineResult<bool> {
+        Ok(FileProcessSupervisor::new(&self.runtime_root)
+            .pause_state()?
+            .workflow_paused)
     }
 
     pub fn queue_project_sync(&self, target_root: &Path) -> RefineResult<OperationHandle> {
@@ -271,6 +300,42 @@ impl FileRunnerWorkerService {
             }
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum BackgroundWorkerEnsure {
+    Running(Box<ManagedProcess>),
+    Paused,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BackgroundOperationOutcome<T> {
+    Completed(T),
+    Paused,
+}
+
+fn run_background_repository_operation<T>(
+    runtime_root: &Path,
+    worker_kind: &'static str,
+    operation: impl FnOnce() -> T,
+) -> RefineResult<BackgroundOperationOutcome<T>> {
+    let _ = worker_kind;
+    if background_automation_is_paused(runtime_root)? {
+        return Ok(BackgroundOperationOutcome::Paused);
+    }
+    #[cfg(test)]
+    run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::BeforeOperation);
+    if background_automation_is_paused(runtime_root)? {
+        return Ok(BackgroundOperationOutcome::Paused);
+    }
+    let result = operation();
+    #[cfg(test)]
+    run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::AfterOperation);
+    Ok(BackgroundOperationOutcome::Completed(result))
+}
+
+pub(super) fn background_automation_is_paused(runtime_root: &Path) -> RefineResult<bool> {
+    FileRunnerWorkerService::new(runtime_root).background_automation_paused()
 }
 
 #[cfg(test)]

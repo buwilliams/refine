@@ -18,20 +18,13 @@ impl LocalHttpDaemon {
                     }
                     // Supervise these independently: cleanup must keep running
                     // even if workflow execution itself cannot be launched.
-                    let workflow_error = workers
-                        .ensure_background_worker(WORKFLOW_RUNNER)
-                        .err()
-                        .map(|error| format!("workflow runner: {error}"));
-                    let cleanup_error = workers
-                        .ensure_background_worker(WORKTREE_CLEANUP_RUNNER)
-                        .err()
-                        .map(|error| format!("worktree cleanup runner: {error}"));
+                    let workflow_error = ensure_worker_failure(&workers, WORKFLOW_RUNNER);
+                    let cleanup_error = ensure_worker_failure(&workers, WORKTREE_CLEANUP_RUNNER);
                     let development_request_error =
                         match load_self_development_email_config(runtime_root) {
-                            Ok(Some(_)) => workers
-                                .ensure_background_worker(DEVELOPMENT_REQUEST_RUNNER)
-                                .err()
-                                .map(|error| format!("development request runner: {error}")),
+                            Ok(Some(_)) => {
+                                ensure_worker_failure(&workers, DEVELOPMENT_REQUEST_RUNNER)
+                            }
                             Ok(None) => None,
                             Err(error) => Some(format!("self-development email contract: {error}")),
                         };
@@ -75,7 +68,9 @@ impl LocalHttpDaemon {
                     if let Some(project_registry_root) = &project_registry_root {
                         workers = workers.with_project_registry_root(project_registry_root);
                     }
-                    let _ = workers.ensure_background_worker(GIT_SYNC_RUNNER);
+                    if let Some(error) = ensure_worker_failure(&workers, GIT_SYNC_RUNNER) {
+                        eprintln!("refine git sync supervision: {error}");
+                    }
                 }
                 sleep_until_stopped(&thread_stop, Duration::from_secs(1));
             }
@@ -84,5 +79,39 @@ impl LocalHttpDaemon {
             stop,
             handle: Some(handle),
         }
+    }
+}
+
+fn ensure_worker_failure(workers: &FileRunnerWorkerService, worker_kind: &str) -> Option<String> {
+    match workers.ensure_background_worker(worker_kind) {
+        Ok(BackgroundWorkerEnsure::Running(_)) | Ok(BackgroundWorkerEnsure::Paused) => None,
+        Err(error) => Some(format!("{worker_kind} runner: {error}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::process::subprocess::FileProcessSupervisor;
+
+    #[test]
+    fn paused_workers_are_quiet_but_pause_state_faults_are_reported() {
+        let runtime_root = std::env::temp_dir().join(format!(
+            "refine-background-supervision-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        supervisor.set_workflow_paused(true).unwrap();
+        let workers = FileRunnerWorkerService::new(&runtime_root);
+        for worker_kind in [GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER] {
+            assert_eq!(ensure_worker_failure(&workers, worker_kind), None);
+        }
+
+        std::fs::write(supervisor.pause_state_path(), "{invalid").unwrap();
+        for worker_kind in [GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER] {
+            let error = ensure_worker_failure(&workers, worker_kind).unwrap();
+            assert!(error.contains("failed to parse process control"), "{error}");
+        }
+        std::fs::remove_dir_all(runtime_root).unwrap();
     }
 }

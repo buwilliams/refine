@@ -8,6 +8,11 @@ pub fn run_worker(
     operation_id: Option<String>,
 ) -> RefineResult<()> {
     validate_worker_kind(worker_kind, true)?;
+    if PAUSE_AWARE_BACKGROUND_RUNNERS.contains(&worker_kind)
+        && background_automation_is_paused(&runtime_root)?
+    {
+        return Ok(());
+    }
     match worker_kind {
         WORKFLOW_RUNNER => run_workflow_worker(&runtime_root, project_registry_root.as_deref()),
         WORKTREE_CLEANUP_RUNNER => {

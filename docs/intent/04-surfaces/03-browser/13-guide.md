@@ -28,6 +28,8 @@ Current implementation details that matter to intent:
 
 Guide should stay terse and actionable. It should explain just enough for users and agents to infer the next step.
 
+Process guidance should describe the shared pause contract precisely: pausing blocks new Goal admission, quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, and leaves active Goal executions running unless stopped separately. Resume makes the paused admission and repository workers eligible again without promising permanent runner processes.
+
 ## Future Direction
 
 Future Guide behavior should become more adaptive. Agents may update guidance from discovered project facts, explain configuration decisions, or surface context-sensitive advice.

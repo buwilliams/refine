@@ -6,14 +6,26 @@ pub(super) fn run_worktree_cleanup_worker(
 ) -> RefineResult<()> {
     let mut next_cleanup = Instant::now();
     loop {
+        if background_automation_is_paused(runtime_root)? {
+            return Ok(());
+        }
         if Instant::now() >= next_cleanup {
             match registered_target_roots(runtime_root, project_registry_root) {
                 Ok(target_roots) => {
                     for target_root in target_roots {
-                        // Each app is independently fail-closed so one unavailable
-                        // repository does not prevent reclaiming inactive worktrees
-                        // belonging to the other registered apps.
-                        run_configured_worktree_cleanup(runtime_root, &target_root);
+                        match run_background_repository_operation(
+                            runtime_root,
+                            WORKTREE_CLEANUP_RUNNER,
+                            || {
+                                // Each app is independently fail-closed so one unavailable
+                                // repository does not prevent reclaiming inactive worktrees
+                                // belonging to the other registered apps.
+                                run_configured_worktree_cleanup(runtime_root, &target_root);
+                            },
+                        )? {
+                            BackgroundOperationOutcome::Completed(()) => {}
+                            BackgroundOperationOutcome::Paused => return Ok(()),
+                        }
                     }
                 }
                 Err(error) => {
