@@ -11,14 +11,14 @@ refine coordinates your agent fleet for software delivery. It is not another age
 
 ## Intent
 
-The full design intent of Refine is documented at [Intent](docs/intent/README.md). You can learn the most by reading these documents.
+You can learn about refine by reading the [online docs](https://getrefine.dev/docs) or by prompting your agent.
 
 ## Install with your agent
 
 Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
 
 ```bash
-Follow instructions found at: https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/runbooks/install.md
+Follow instructions found at: https://getrefine.dev/read/docs/runbooks/install.md
 ```
 
 Or have your agent ensure system dependencies are installed:
@@ -26,16 +26,6 @@ Or have your agent ensure system dependencies are installed:
 ```bash
 Install or repair required system dependencies: curl, git, a C compiler/linker, and Rust Cargo.
 ```
-
-## Install yourself
-
-Linux, macOS, or Ubuntu/WSL:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
-```
-
-The installer checks the host, installs or repairs missing tools when you approve, and starts Refine. Attach a target application from the browser Guide after startup, or pass `REFINE_INSTALL_TARGET_APP=/path/to/app` to attach one during install.
 
 refine has a robust CLI:
 
@@ -51,7 +41,7 @@ Open PowerShell as Administrator:
 wsl --install
 ```
 
-After Ubuntu opens, use the Install yourself one-liner above.
+After Ubuntu opens, follow the install instructions above.
 
 ## License
 
