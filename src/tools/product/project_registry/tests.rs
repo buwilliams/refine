@@ -156,66 +156,133 @@ fn file_project_registry_normalizes_refine_dir_inputs_before_persisting() {
 #[test]
 fn project_status_uses_authoritative_identity_across_attach_switch_and_restart() {
     let temp_root = unique_temp_dir("project-registry-node-identity");
-    let runtime_root = temp_root.join("run/8082");
+    let registry_root = temp_root.join("run");
+    let active_node_root = registry_root.join("8082");
     let app_a = temp_root.join("app-a");
     let app_b = temp_root.join("app-b");
+    let clone_source = temp_root.join("clone-source");
+    let clone_destination = temp_root.join("clone-destination");
     fs::create_dir_all(&app_a).unwrap();
     fs::create_dir_all(&app_b).unwrap();
+    fs::create_dir_all(&clone_source).unwrap();
     git_init(&app_a);
     git_init(&app_b);
-    let service = FileProjectRegistryService::new(&runtime_root, None);
+    git_init(&clone_source);
+    let service = FileProjectRegistryService::new(&registry_root, None)
+        .with_active_node_root(&active_node_root);
+
+    // Initialize app A, then deliberately split the stale shared selection from
+    // the authoritative port-local selection.
     service.attach(app_a.to_str().unwrap()).unwrap();
+    let refine_a = refine_dir_for_target_root(&app_a).unwrap();
+    let shared_nodes = FileNodeRegistryService::with_active_root(&refine_a, &registry_root);
+    shared_nodes.create("stale-base").unwrap();
+    shared_nodes
+        .rename("stale-base", "Stale Base Node")
+        .unwrap();
+    shared_nodes.activate("stale-base").unwrap();
+
+    let port_nodes_a = FileNodeRegistryService::with_active_root(&refine_a, &active_node_root);
+    port_nodes_a.create("port-a").unwrap();
+    port_nodes_a.rename("port-a", "Port A").unwrap();
+    port_nodes_a.activate("port-a").unwrap();
+
+    let attached_a = service.attach(app_a.to_str().unwrap()).unwrap();
+    assert_project_status_identity(&attached_a, "port-a", "Port A");
+    let active_a = service.status().unwrap();
+    assert_project_status_identity(&active_a, "port-a", "Port A");
+    assert_eq!(shared_nodes.active_node_id().unwrap(), "stale-base");
+
     service
         .register_path(Some("app-b"), app_b.to_str().unwrap(), false)
         .unwrap();
-    let refine_a = refine_dir_for_target_root(&app_a).unwrap();
+    let switched_b = service.switch_with_migration("app-b").unwrap();
+    assert_project_status_project_mismatch(&switched_b);
     let refine_b = refine_dir_for_target_root(&app_b).unwrap();
-    let nodes_a = FileNodeRegistryService::with_active_root(&refine_a, &runtime_root);
-    nodes_a.create("ethan").unwrap();
-    nodes_a.rename("ethan", "Ethan's Node").unwrap();
-    nodes_a.activate("ethan").unwrap();
+    let port_nodes_b = FileNodeRegistryService::with_active_root(&refine_b, &active_node_root);
+    port_nodes_b.create("port-b").unwrap();
+    port_nodes_b.rename("port-b", "Port B").unwrap();
+    port_nodes_b.activate("port-b").unwrap();
+    let inspected_b = service.inspect(app_b.to_str().unwrap()).unwrap();
+    assert_project_status_identity(&inspected_b, "port-b", "Port B");
 
-    let active_a = service.status().unwrap();
-    assert_eq!(active_a.active_node_id.as_deref(), Some("ethan"));
-    assert_eq!(active_a.active_node.as_deref(), Some("Ethan's Node"));
-    assert!(active_a.active_node_diagnostics.is_empty());
+    let switched_a = service.switch_with_migration("app-a").unwrap();
+    assert_project_status_project_mismatch(&switched_a);
+    port_nodes_a.activate("port-a").unwrap();
+    let inspected_a = service.inspect(app_a.to_str().unwrap()).unwrap();
+    assert_project_status_identity(&inspected_a, "port-a", "Port A");
 
-    fs::create_dir_all(&refine_b).unwrap();
-    FileProjectMigrationService::new(&refine_b)
-        .initialize_current_schema()
+    let cloned = service
+        .clone_app(
+            clone_source.to_str().unwrap(),
+            clone_destination.to_str().unwrap(),
+            Some("cloned"),
+            true,
+        )
         .unwrap();
-    fs::write(
-        refine_b.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
-        serde_json::json!({
-            "nodes": [{
-                "id": "default",
-                "display_name": "BO2LNXNEVO04 (QA)",
-                "created_at": "2026-01-01T00:00:00Z",
-                "updated_at": "2026-01-01T00:00:00Z"
-            }]
-        })
-        .to_string(),
-    )
-    .unwrap();
-    let switched = service.switch_with_migration("app-b").unwrap();
-    assert_eq!(switched.active_node_id.as_deref(), Some("default"));
-    assert_eq!(switched.active_node.as_deref(), Some("Default"));
-    let codes = switched
-        .active_node_diagnostics
-        .iter()
-        .map(|diagnostic| diagnostic.code.as_str())
-        .collect::<Vec<_>>();
-    assert!(codes.contains(&"active_node_selection_project_mismatch"));
-    assert!(codes.contains(&"ambiguous_legacy_default_display_name"));
+    assert_project_status_project_mismatch(&cloned);
+    let clone_refine_dir = refine_dir_for_target_root(&clone_destination).unwrap();
+    assert!(clone_refine_dir.join("refine.json").exists());
+    let port_nodes_clone =
+        FileNodeRegistryService::with_active_root(&clone_refine_dir, &active_node_root);
+    port_nodes_clone.create("port-clone").unwrap();
+    port_nodes_clone.rename("port-clone", "Port Clone").unwrap();
+    port_nodes_clone.activate("port-clone").unwrap();
+    let inspected_clone = service
+        .inspect(clone_destination.to_str().unwrap())
+        .unwrap();
+    assert_project_status_identity(&inspected_clone, "port-clone", "Port Clone");
 
-    let restarted = FileProjectRegistryService::new(&runtime_root, None)
+    let detached = service.detach().unwrap();
+    assert!(!detached.attached);
+    assert!(detached.active_node_id.is_none());
+    assert!(detached.active_node.is_none());
+    assert!(detached.active_node_diagnostics.is_empty());
+
+    let mismatched_attach = service.attach(app_a.to_str().unwrap()).unwrap();
+    assert_project_status_project_mismatch(&mismatched_attach);
+    port_nodes_a.activate("port-a").unwrap();
+    let reattached_a = service.attach(app_a.to_str().unwrap()).unwrap();
+    assert_project_status_identity(&reattached_a, "port-a", "Port A");
+
+    let restarted = FileProjectRegistryService::new(&registry_root, None)
+        .with_active_node_root(&active_node_root)
         .status()
         .unwrap();
-    assert_eq!(restarted.active_node_id.as_deref(), Some("default"));
-    assert_eq!(restarted.active_node.as_deref(), Some("Default"));
-    assert_eq!(restarted.active_node_diagnostics.len(), 2);
+    assert_project_status_identity(&restarted, "port-a", "Port A");
+
+    assert!(registry_root.join(APP_REGISTRY_FILE).exists());
+    assert!(!active_node_root.join(APP_REGISTRY_FILE).exists());
+    assert!(registry_root.join("processes").exists());
+    assert!(!active_node_root.join("processes").exists());
+    for refine_dir in [&refine_a, &refine_b, &clone_refine_dir] {
+        assert!(refine_dir.join("refine.json").exists());
+    }
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+fn assert_project_status_identity(status: &ProjectStatus, id: &str, display_name: &str) {
+    assert!(status.attached);
+    assert_eq!(status.active_node_id.as_deref(), Some(id));
+    assert_eq!(status.active_node.as_deref(), Some(display_name));
+    assert!(status.active_node_diagnostics.is_empty());
+    assert_ne!(status.active_node_id.as_deref(), Some("stale-base"));
+    assert_ne!(status.active_node.as_deref(), Some("Stale Base Node"));
+}
+
+fn assert_project_status_project_mismatch(status: &ProjectStatus) {
+    assert!(status.attached);
+    assert_eq!(status.active_node_id.as_deref(), Some("default"));
+    assert_eq!(status.active_node.as_deref(), Some("Default"));
+    assert!(
+        status
+            .active_node_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "active_node_selection_project_mismatch")
+    );
+    assert_ne!(status.active_node_id.as_deref(), Some("stale-base"));
+    assert_ne!(status.active_node.as_deref(), Some("Stale Base Node"));
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
