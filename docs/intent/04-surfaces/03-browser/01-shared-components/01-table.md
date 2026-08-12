@@ -24,7 +24,7 @@ Current implementation details that matter to intent:
 - filters live above tables in collapsible shells where appropriate;
 - mobile-card table styling preserves readability on narrow screens;
 - bulk selection appears only when the filter shell is open where that reduces visual noise.
-- desktop columns that commonly contain long identity labels may expose a bounded,
+- wide-screen columns that commonly contain long identity labels may expose a bounded,
   keyboard-operable resize separator while retaining ellipsis and full-value inspection;
 - the Goals Node width is a per-tab surface preference: it survives table rerenders,
   pagination, and refresh through session storage, then returns to its default in a

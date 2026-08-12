@@ -51,7 +51,7 @@ Once Refine acknowledges a decision, both the decision and enough identity to re
 
 Agents remain responsible for interpreting intent, weighing evidence, and making implementation, quality, review, and recovery judgments. Refine is responsible for deterministic integrity around those judgments: authority, identity, conflicts, durable acknowledgement, and evidence linkage.
 
-Browser, desktop, CLI, API, MCP, and agent tools remain thin adapters. They submit intent to shared capabilities and present the resulting authoritative state; they do not duplicate coordination rules, write competing workflow truth, or infer success from a request, process, or local projection.
+Browser, CLI, API, MCP, and agent tools remain thin adapters. They submit intent to shared capabilities and present the resulting authoritative state; they do not duplicate coordination rules, write competing workflow truth, or infer success from a request, process, or local projection.
 
 The implementation may use serialization, optimistic concurrency, journaling, or another design. It satisfies this contract only when every process and surface observes the same authority relationships and the invariants above remain true across interruption and concurrency.
 

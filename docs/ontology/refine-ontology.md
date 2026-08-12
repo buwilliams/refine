@@ -32,7 +32,7 @@ implemented authority in those cases.
 
 The scope is Refine's domain model: work, intent, ownership, workflow,
 execution, evidence, and projections. Transport-only request/response types and
-installer, release, and desktop-shell mechanics are excluded unless they define
+installer and release mechanics are excluded unless they define
 a domain boundary.
 
 ## The Ontology In One Paragraph

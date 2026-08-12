@@ -10,7 +10,7 @@
 
 The footer concept exists to define what Refine should not become: a page-like website with ornamental bottom navigation or marketing chrome.
 
-The browser-desktop surface already has persistent utility areas: toolbar dock, Guide panel, banners, and shell status. Those should carry operational context better than a conventional footer would.
+The browser surface already has persistent utility areas: toolbar dock, Guide panel, banners, and shell status. Those should carry operational context better than a conventional footer would.
 
 ## Expected Role
 

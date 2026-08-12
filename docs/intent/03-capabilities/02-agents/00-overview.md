@@ -7,7 +7,7 @@
 - **Tools With Accountability**: agents should use powerful local tools through shared behavior and leave recoverable traces.
 - **Evidence Before Trust**: quality checks, logs, diffs, review, and activity should explain why work is ready.
 - **Reviewable Handoff**: agent work should move through review, merge, and Git worktree boundaries without losing context.
-- **Shared Capability**: browser, CLI, API, desktop, and agent-native surfaces should call the same agent behavior.
+- **Shared Capability**: browser, CLI, API, MCP, and agent-native surfaces should call the same agent behavior.
 - **Unhobbled By Default**: prompts should be concise enough to leave room for the spiky intelligence and capability overhang of current models.
 
 ## Purpose

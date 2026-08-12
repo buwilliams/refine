@@ -639,7 +639,7 @@ test("Todo List renders an item-first workspace with responsive list navigation"
       drawToolbar();
     });
 
-    const desktop = await app.page.evaluate(() => {
+    const wideScreen = await app.page.evaluate(() => {
       const rail = document.querySelector(".todo-list-rail").getBoundingClientRect();
       const workspace = document.querySelector(".todo-workspace").getBoundingClientRect();
       const composer = document.querySelector(".todo-add-form").getBoundingClientRect();
@@ -652,7 +652,7 @@ test("Todo List renders an item-first workspace with responsive list navigation"
         completedCount: document.querySelector(".todo-completed-section h4 span").textContent,
       };
     });
-    assert.deepEqual(desktop, {
+    assert.deepEqual(wideScreen, {
       railBeforeWorkspace: true,
       composerBeforeItems: true,
       title: "Release",
@@ -1017,7 +1017,7 @@ test("Goals Node column widens accessibly, stays bounded, and survives rerenders
   }
 });
 
-test("Goals mobile cards ignore desktop Node width and show the complete label", { skip: SKIP }, async () => {
+test("Goals mobile cards ignore wide-screen Node width and show the complete label", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
     await app.page.setViewportSize({ width: 700, height: 800 });

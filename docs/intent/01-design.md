@@ -28,7 +28,7 @@ State and storage are part of the target-app foundation because flat files, Git,
 
 ### Surfaces
 
-A system can have many types of interfaces: mobile, desktop, cli, api, browser, mcp, voice, agent, and the list is growing by the day. Often several of these are used at once. Therefore, Refine should not be dependent on any one of them with the base being the CLI.
+A system can have many types of interfaces: CLI, API, browser, MCP, voice, and agent, and the list is growing by the day. Often several of these are used at once. Therefore, Refine should not be dependent on any one of them with the base being the CLI.
 
 #### API and UI
 
@@ -37,10 +37,6 @@ This is currently the most user-friendly version of Refine, but I expect it to b
 #### CLI
 
 The CLI is the most reliable (because of limited UI statefulness) surface.
-
-#### Desktop
-
-Since Refine is intended for any user, the Desktop and Browser are the easiest current surfaces for Refine with Agent-first as a fast follow via voice and text.
 
 ## Foundation, Capabilities, And Surfaces
 
@@ -54,7 +50,7 @@ The foundation should remain small. It defines the concepts future agents must p
 
 The capabilities should be shared. Process, Agents, and Workflow should not belong to one UI, command, or integration. They are the system's durable powers. Agents contains the supporting capabilities that let agents act well: tools, guidance, import, quality, governance, merge, review, Git worktrees, activity, and evidence. Every surface should call into these capabilities rather than reimplementing them.
 
-The surfaces should be replaceable. Browser, desktop, CLI, API, voice, and agent-native interfaces will evolve quickly. Refine should treat them as adapters over the same model and capabilities so a new surface can appear without changing what work means.
+The surfaces should be replaceable. Browser, CLI, API, voice, and agent-native interfaces will evolve quickly. Refine should treat them as adapters over the same model and capabilities so a new surface can appear without changing what work means.
 
 ## Intended Outcome
 
@@ -74,7 +70,7 @@ The long-term direction is software composition at scale: workflow, persistence,
 
 Refine should resist becoming a centralized SaaS-shaped system by default. Centralization may become useful at some scale, but the first design pressure is local ownership: the user's code, files, Git history, settings, runtime state, and agent outputs should remain close to the work.
 
-Refine should also resist becoming a UI-shaped system. The browser and desktop surfaces matter because they make the product accessible, but the core system should be understandable and operable by agents directly. As AI gets better, the highest-value surface may be an agent reading the intent docs, inspecting the flat files, and using the shared capabilities without needing a human-style screen.
+Refine should also resist becoming a UI-shaped system. The browser matters because it makes the product accessible, but the core system should be understandable and operable by agents directly. As AI gets better, the highest-value surface may be an agent reading the intent docs, inspecting the flat files, and using the shared capabilities without needing a human-style screen.
 
 ## Architecture Direction
 

@@ -15,7 +15,7 @@ Import exists because work often starts outside Refine: spreadsheets, CSVs, plan
 
 The capability should make that material useful without forcing users to manually create every Goal. It should transform external material into reviewable draft work, then persist accepted drafts as ordinary Refine Goals and Features.
 
-Import is a capability, not just a browser flow. A future agent, CLI command, API route, or desktop surface should be able to use the same extraction, draft, deduplication, and persistence behavior.
+Import is a capability, not just a browser flow. An agent, CLI command, API route, or MCP tool should be able to use the same extraction, draft, deduplication, and persistence behavior.
 
 ## Expected Role
 

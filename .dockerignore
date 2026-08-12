@@ -3,7 +3,6 @@
 .dockerignore
 
 target
-desktop/src-tauri/target
 xtask/target
 tests/fixtures/smoke-ai/target
 

@@ -4,13 +4,13 @@
 
 - **Local Daemon Contract**: the API is primarily the contract between surfaces and the local Refine daemon.
 - **Capability Groups**: routes should map to real system capabilities, not arbitrary page needs.
-- **Surface Alignment**: browser, CLI, desktop, and agent integrations should share API behavior where appropriate.
+- **Surface Alignment**: browser, CLI, MCP, and agent integrations should share API behavior where appropriate.
 - **Not A SaaS Boundary By Default**: the API should not imply that Refine must become a centralized hosted service.
 - **Recoverable Mutations**: API writes should flow through shared services with idempotency, logging, and state repair where needed.
 
 ## Purpose
 
-The API exists so surfaces can talk to the local daemon consistently. It gives browser JavaScript, CLI daemon routing, desktop wrappers, and future agent integrations a shared way to access project status, work items, workflow, processes, chat, settings, files, terminal sessions, diagnostics, and more.
+The API exists so surfaces can talk to the local daemon consistently. It gives browser JavaScript, CLI daemon routing, MCP tools, and future agent integrations a shared way to access project status, work items, workflow, processes, chat, settings, files, terminal sessions, diagnostics, and more.
 
 The API should be treated as local capability plumbing. It is important, but it is not the product center.
 

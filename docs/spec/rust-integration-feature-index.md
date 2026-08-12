@@ -328,7 +328,7 @@ Implementation Internals (for e2e testing)
 		refine_guide_state / refine_guide_checklist / refine_guide_width — guide panel mode, checklist status, panel width
 		refine_last_reporter — global reporter selection
 		refine_import_session_v — import wizard session (mode/phase/source/drafts/destination/operationId), for recovery
-		refine_checkout / refine_port — runtime/desktop wiring
+		refine_checkout / refine_port — runtime wiring
 	Constants & limits (assert truncation/pagination against these)
 		Default list limit 50; entries options 50/100/250/500/1000 (goals, changes, logs, features, performance)
 		Import draft page size 25 (IMPORT_DRAFT_PAGE_SIZE); Feature-modal goals page size 25

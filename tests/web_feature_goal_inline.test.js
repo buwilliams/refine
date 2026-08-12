@@ -301,7 +301,7 @@ test("Cmd+Enter submits and Escape resets the live composer without closing Feat
   assert.equal(browser.document.activeElement, fields.prompt);
 });
 
-test("desktop and narrow viewports compute the intended layout on rendered composer elements", () => {
+test("wide and narrow viewports compute the intended layout on rendered composer elements", () => {
   const browser = composerRuntime();
   const fields = browser.root.querySelector(".feature-goal-composer-fields");
   const actions = browser.root.querySelector(".feature-goal-composer-actions");

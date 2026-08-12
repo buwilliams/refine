@@ -112,14 +112,6 @@ pub(in crate::surfaces::web_server) fn mutation_origin_allowed(request: &HttpReq
         return false;
     };
 
-    if scheme.eq_ignore_ascii_case("tauri")
-        || (scheme.eq_ignore_ascii_case("https")
-            && origin_authority
-                .host()
-                .eq_ignore_ascii_case("tauri.localhost"))
-    {
-        return true;
-    }
     if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
         return false;
     }

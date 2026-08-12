@@ -236,8 +236,8 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
                 summary: "The most reliable surface for people and agents.",
             },
             DocsNavEntry {
-                title: "Browser Desktop",
-                path: "docs/intent/04-surfaces/03-browser-desktop/00-overview.md",
+                title: "Browser",
+                path: "docs/intent/04-surfaces/03-browser/00-overview.md",
                 summary: "The visual product surface for local software work.",
             },
             DocsNavEntry {
@@ -257,122 +257,122 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
         items: &[
             DocsNavEntry {
                 title: "Shared Components",
-                path: "docs/intent/04-surfaces/03-browser-desktop/01-shared-components/00-overview.md",
+                path: "docs/intent/04-surfaces/03-browser/01-shared-components/00-overview.md",
                 summary: "Reusable interaction patterns for the visual UI.",
             },
             DocsNavEntry {
                 title: "Table",
-                path: "docs/intent/04-surfaces/03-browser-desktop/01-shared-components/01-table.md",
+                path: "docs/intent/04-surfaces/03-browser/01-shared-components/01-table.md",
                 summary: "Dense, scannable data views for repeated work.",
             },
             DocsNavEntry {
                 title: "Pagination",
-                path: "docs/intent/04-surfaces/03-browser-desktop/01-shared-components/02-pagination.md",
+                path: "docs/intent/04-surfaces/03-browser/01-shared-components/02-pagination.md",
                 summary: "Navigation for long local records without losing context.",
             },
             DocsNavEntry {
                 title: "Nav",
-                path: "docs/intent/04-surfaces/03-browser-desktop/02-nav.md",
+                path: "docs/intent/04-surfaces/03-browser/02-nav.md",
                 summary: "Orientation and movement through the browser product.",
             },
             DocsNavEntry {
                 title: "Command Palette",
-                path: "docs/intent/04-surfaces/03-browser-desktop/03-command-palette.md",
+                path: "docs/intent/04-surfaces/03-browser/03-command-palette.md",
                 summary: "Fast command access without hunting through screens.",
             },
             DocsNavEntry {
                 title: "Main",
-                path: "docs/intent/04-surfaces/03-browser-desktop/04-main.md",
+                path: "docs/intent/04-surfaces/03-browser/04-main.md",
                 summary: "The primary browser workspace.",
             },
             DocsNavEntry {
                 title: "Dashboard",
-                path: "docs/intent/04-surfaces/03-browser-desktop/05-dashboard.md",
+                path: "docs/intent/04-surfaces/03-browser/05-dashboard.md",
                 summary: "A high-level view of work, state, and attention.",
             },
             DocsNavEntry {
                 title: "Workflow",
-                path: "docs/intent/04-surfaces/03-browser-desktop/06-workflow.md",
+                path: "docs/intent/04-surfaces/03-browser/06-workflow.md",
                 summary: "The browser view of work movement.",
             },
             DocsNavEntry {
                 title: "Feature",
-                path: "docs/intent/04-surfaces/03-browser-desktop/07-feature.md",
+                path: "docs/intent/04-surfaces/03-browser/07-feature.md",
                 summary: "Larger product goals composed from Goals.",
             },
             DocsNavEntry {
                 title: "Goal",
-                path: "docs/intent/04-surfaces/03-browser-desktop/08-goal.md",
+                path: "docs/intent/04-surfaces/03-browser/08-goal.md",
                 summary: "The core unit of product difference and repair.",
             },
             DocsNavEntry {
                 title: "Import",
-                path: "docs/intent/04-surfaces/03-browser-desktop/09-import.md",
+                path: "docs/intent/04-surfaces/03-browser/09-import.md",
                 summary: "Bringing outside work into the browser surface.",
             },
             DocsNavEntry {
                 title: "Changes Visualizations",
-                path: "docs/intent/04-surfaces/03-browser-desktop/10-changes-visualizations.md",
+                path: "docs/intent/04-surfaces/03-browser/10-changes-visualizations.md",
                 summary: "Readable change views for review and understanding.",
             },
             DocsNavEntry {
                 title: "Log",
-                path: "docs/intent/04-surfaces/03-browser-desktop/11-log.md",
+                path: "docs/intent/04-surfaces/03-browser/11-log.md",
                 summary: "Evidence and event history in the browser.",
             },
             DocsNavEntry {
                 title: "Settings",
-                path: "docs/intent/04-surfaces/03-browser-desktop/12-settings.md",
+                path: "docs/intent/04-surfaces/03-browser/12-settings.md",
                 summary: "Project configuration, governance, and local controls.",
             },
             DocsNavEntry {
                 title: "Guide",
-                path: "docs/intent/04-surfaces/03-browser-desktop/13-guide.md",
+                path: "docs/intent/04-surfaces/03-browser/13-guide.md",
                 summary: "Contextual help close to the current task.",
             },
             DocsNavEntry {
                 title: "Target App",
-                path: "docs/intent/04-surfaces/03-browser-desktop/14-target-app.md",
+                path: "docs/intent/04-surfaces/03-browser/14-target-app.md",
                 summary: "The attached software project inside the UI.",
             },
             DocsNavEntry {
                 title: "Toolbar",
-                path: "docs/intent/04-surfaces/03-browser-desktop/15-toolbar.md",
+                path: "docs/intent/04-surfaces/03-browser/15-toolbar.md",
                 summary: "Persistent tools, chat, files, and terminal access.",
             },
             DocsNavEntry {
                 title: "System",
-                path: "docs/intent/04-surfaces/03-browser-desktop/16-system.md",
+                path: "docs/intent/04-surfaces/03-browser/16-system.md",
                 summary: "Runtime, install, and operational state.",
             },
             DocsNavEntry {
                 title: "Processes",
-                path: "docs/intent/04-surfaces/03-browser-desktop/17-processes.md",
+                path: "docs/intent/04-surfaces/03-browser/17-processes.md",
                 summary: "Process visibility and control in the browser.",
             },
             DocsNavEntry {
                 title: "Files",
-                path: "docs/intent/04-surfaces/03-browser-desktop/18-files.md",
+                path: "docs/intent/04-surfaces/03-browser/18-files.md",
                 summary: "File inspection close to agent work.",
             },
             DocsNavEntry {
                 title: "Terminal",
-                path: "docs/intent/04-surfaces/03-browser-desktop/19-terminal.md",
+                path: "docs/intent/04-surfaces/03-browser/19-terminal.md",
                 summary: "Command execution without leaving the product context.",
             },
             DocsNavEntry {
                 title: "Chat",
-                path: "docs/intent/04-surfaces/03-browser-desktop/20-chat.md",
+                path: "docs/intent/04-surfaces/03-browser/20-chat.md",
                 summary: "Conversation tied to work and evidence.",
             },
             DocsNavEntry {
                 title: "Standalone",
-                path: "docs/intent/04-surfaces/03-browser-desktop/21-standalone.md",
+                path: "docs/intent/04-surfaces/03-browser/21-standalone.md",
                 summary: "Focused browser use outside the primary workspace.",
             },
             DocsNavEntry {
                 title: "Footer",
-                path: "docs/intent/04-surfaces/03-browser-desktop/22-footer.md",
+                path: "docs/intent/04-surfaces/03-browser/22-footer.md",
                 summary: "Low-priority navigation and product affordances.",
             },
         ],
@@ -549,7 +549,7 @@ pub(super) fn render_docs_landing_page() -> WireResponse {
           <article>
             <span>03</span>
             <h3>Surfaces</h3>
-            <p>CLI, browser, API, desktop, and agent interfaces adapt the same underlying system.</p>
+            <p>CLI, browser, API, MCP, and agent interfaces adapt the same underlying system.</p>
           </article>
         </div>
       </section>

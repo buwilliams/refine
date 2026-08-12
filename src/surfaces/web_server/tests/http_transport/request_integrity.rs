@@ -82,22 +82,6 @@ fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
     });
     assert_eq!(wrong_port.status, 403);
 
-    let tauri = daemon.handle_wire_request(HttpRequest {
-        method: "POST".to_string(),
-        path: "/missing".to_string(),
-        headers: BTreeMap::from([("origin".to_string(), "tauri://localhost".to_string())]),
-        body: None,
-    });
-    assert_eq!(tauri.status, 404);
-
-    let tauri_https = daemon.handle_wire_request(HttpRequest {
-        method: "POST".to_string(),
-        path: "/missing".to_string(),
-        headers: BTreeMap::from([("origin".to_string(), "https://tauri.localhost/".to_string())]),
-        body: None,
-    });
-    assert_eq!(tauri_https.status, 404);
-
     let no_origin = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
         path: "/missing".to_string(),

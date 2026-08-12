@@ -33,6 +33,9 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     let docs_home = String::from_utf8(docs_home.body).unwrap();
     assert!(docs_home.contains("<h1 id=\"docs-home-title\">How Refine works.</h1>"));
     assert!(docs_home.contains("Browser Details"));
+    assert!(
+        docs_home.contains(r#"href="/read/docs/intent/04-surfaces/03-browser/00-overview.md""#)
+    );
     assert!(docs_home.contains(r#"href="/read/docs/intent/04-surfaces/05-agent.md""#));
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {

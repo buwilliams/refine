@@ -49,7 +49,7 @@ Current implementation details that matter to intent:
 - the daemon remains a responsive control plane while supervised runners own workflow and Git synchronization waits.
 - one shared host daemon-lifecycle capability selects port-scoped systemd or
   launchd control versus supervised direct-process fallback from the selected
-  runtime and installation context. CLI, HTTP/API, Desktop, update, and
+  runtime and installation context. CLI, HTTP/API, update, and
   maintenance callers submit lifecycle intent without owning parallel
   reachability, confirmation, evidence, recovery, or legacy-migration state
   machines. Work initiated inside the managed daemon that must stop or restart
